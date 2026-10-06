@@ -1,18 +1,19 @@
+Rewrite app/main.py (COMPLETE file; the current file is the CURRENT FILE below). Keep all existing behaviour. Changes:
+1. app.state.login_limiter = app.auth.LoginLimiter() in create_app.
+2. Routers: include app.api.auth.router publicly (no dependency); include devices, scans, events and the new app.api.config router each with dependencies=[Depends(require_auth)] (from app.auth import require_auth). /api/health stays public.
+3. After all routes, if the directory Path(__file__).parent / "static" exists, mount it: app.mount("/", StaticFiles(directory=static_dir, html=True), name="static") (from fastapi.staticfiles import StaticFiles). It must be the last thing registered.
+CURRENT FILE:
 """Netlens application entry point."""
 
 import asyncio
 import contextlib
 import os
-from pathlib import Path
 from typing import Any
 
 import uvicorn
-from fastapi import Depends, FastAPI
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI
 
-from app.api import config, devices, events, scans
-from app.api.auth import router as auth_router
-from app.auth import LoginLimiter, require_auth
+from app.api import devices, events, scans
 from app.config import load_settings
 from app.db import connect, init_db
 from app.scanner.orchestrator import ScanManager
@@ -62,23 +63,14 @@ def create_app(
     app.state.db_path = str(db_path) if db_path is not None else str(settings.data_dir / "netlens.db")
     app.state.scheduler = scheduler
     app.state.scan_manager = scan_manager or ScanManager(app.state.db_path, settings)
-    app.state.login_limiter = LoginLimiter()
 
-    app.include_router(auth_router)
-
-    auth_deps = [Depends(require_auth)]
-    app.include_router(devices.router, dependencies=auth_deps)
-    app.include_router(scans.router, dependencies=auth_deps)
-    app.include_router(events.router, dependencies=auth_deps)
-    app.include_router(config.router, dependencies=auth_deps)
+    app.include_router(devices.router)
+    app.include_router(scans.router)
+    app.include_router(events.router)
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
         return {"status": "ok", "version": VERSION}
-
-    static_dir = Path(__file__).parent / "static"
-    if static_dir.exists():
-        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
     return app
 
