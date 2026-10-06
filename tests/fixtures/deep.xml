@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nmaprun scanner="nmap" args="nmap -sV -O --top-ports 1000 -oX - 192.168.1.0/24" start="1791317000" version="7.94">
+<host starttime="1791317001" endtime="1791317030"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.1.1" addrtype="ipv4"/>
+<address addr="C0:56:27:AA:BB:01" addrtype="mac" vendor="Belkin International"/>
+<hostnames><hostname name="router.lan" type="PTR"/></hostnames>
+<ports><extraports state="closed" count="996"><extrareasons reason="resets" count="996"/></extraports>
+<port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ssh" product="Dropbear sshd" version="2020.81" method="probed" conf="10"/></port>
+<port protocol="tcp" portid="53"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="domain" product="dnsmasq" version="2.85" method="probed" conf="10"/></port>
+<port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="http" product="lighttpd" method="probed" conf="10"/></port>
+<port protocol="tcp" portid="443"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="https" tunnel="ssl" method="table" conf="3"/></port>
+</ports>
+<os><osmatch name="Linux 4.15 - 5.8" accuracy="96" line="1"><osclass type="router" vendor="Linux" osfamily="Linux" osgen="4.X" accuracy="96"/></osmatch>
+<osmatch name="OpenWrt 21.02 (Linux 5.4)" accuracy="90" line="2"><osclass type="WAP" vendor="Linux" osfamily="Linux" osgen="5.X" accuracy="90"/></osmatch></os>
+</host>
+<host starttime="1791317001" endtime="1791317031"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.1.20" addrtype="ipv4"/>
+<address addr="B8:27:EB:12:34:56" addrtype="mac" vendor="Raspberry Pi Foundation"/>
+<hostnames><hostname name="pi-nas" type="PTR"/></hostnames>
+<ports>
+<port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ssh" product="OpenSSH" version="9.2p1 Debian 2" extrainfo="protocol 2.0" ostype="Linux" method="probed" conf="10"/></port>
+<port protocol="tcp" portid="445"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="netbios-ssn" product="Samba smbd" version="4.6.2" method="probed" conf="10"/></port>
+</ports>
+<os><osmatch name="Linux 5.4" accuracy="100" line="1"><osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="5.X" accuracy="100"/></osmatch></os>
+</host>
+<host starttime="1791317002" endtime="1791317032"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.1.30" addrtype="ipv4"/>
+<address addr="3C:2A:F4:00:00:09" addrtype="mac"/>
+<hostnames/>
+<ports><port protocol="tcp" portid="631"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ipp" product="CUPS" version="2.4" method="probed" conf="10"/></port>
+<port protocol="udp" portid="161"><state state="open|filtered" reason="no-response" reason_ttl="0"/><service name="snmp" method="table" conf="3"/></port>
+</ports>
+</host>
+<host starttime="1791317003" endtime="1791317033"><status state="up" reason="localhost-response" reason_ttl="0"/>
+<address addr="192.168.1.50" addrtype="ipv4"/>
+<hostnames><hostname name="scanbox" type="user"/><hostname name="scanbox.lan" type="PTR"/></hostnames>
+<ports><port protocol="tcp" portid="8080"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="http-proxy" method="table" conf="3"/></port></ports>
+</host>
+<host><status state="down" reason="no-response" reason_ttl="0"/><address addr="192.168.1.99" addrtype="ipv4"/></host>
+<runstats><finished time="1791317040" timestr="Tue Oct  6 20:44:00 2026" elapsed="40.00" exit="success"/><hosts up="4" down="1" total="5"/></runstats>
+</nmaprun>

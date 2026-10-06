@@ -1,0 +1,9 @@
+Create app/api/devices.py (FastAPI). Existing modules: app.db has connect(path) -> sqlite3.Connection (row_factory=sqlite3.Row, foreign keys on). The FastAPI app stores the SQLite file path in request.app.state.db_path.
+
+- def get_conn(request: Request): a FastAPI dependency generator that opens connect(request.app.state.db_path) and closes it afterwards (try/finally).
+- router = APIRouter(prefix="/api", tags=["devices"]).
+- DEVICE_TYPES = {"router","switch","ap","server","pc","phone","printer","iot","camera","nas","vm","unknown"}.
+- GET /devices: query params online: bool | None, q: str | None (case-insensitive substring match against hostname, custom_name, primary_ip, mac, vendor). Returns a list of device dicts ordered by primary_ip then id, each WITHOUT the raw_xml column and with extra keys: "name" (custom_name or hostname or primary_ip), "type" (type_override or device_type or "unknown"), "open_ports" (count of rows in ports for that device), "tags" as a list of strings (stored comma separated text; empty list if null).
+- GET /devices/{device_id}: the same dict plus "ips" (rows of device_ips ordered by last_seen desc), "names" (device_names), "ports" (ports ordered by proto, port), "events" (latest 20 events of that device, newest first). 404 {"detail": "device not found"} if missing.
+- PATCH /devices/{device_id}: JSON body (pydantic model) with optional custom_name: str | None, notes: str | None, tags: list[str] | None, type_override: str | None. Only fields present in the body are changed (use model_fields_set). An empty string for custom_name/notes/type_override clears the column to NULL. type_override must be in DEVICE_TYPES else 422. tags are stored comma separated, stripped, empties dropped, max 20 tags of max 40 chars else 422. Returns the updated device detail like GET. 404 if missing.
+Use parameterised SQL only.

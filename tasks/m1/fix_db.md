@@ -1,3 +1,8 @@
+Fix the defect below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECT: connect() calls sqlite3.connect(path) BEFORE creating the parent directory, so opening a database in a directory that does not exist raises sqlite3.OperationalError: unable to open database file. Create the parent directory (Path(path).parent.mkdir(parents=True, exist_ok=True)) BEFORE sqlite3.connect, for file paths only (skip when path is the string ':memory:' or empty).
+
+CURRENT FILE:
 """Database layer for Netlens using only the standard library sqlite3."""
 
 from __future__ import annotations
@@ -18,13 +23,6 @@ def utcnow() -> str:
 
 def connect(path: str | os.PathLike) -> sqlite3.Connection:
     """Open a SQLite connection with sensible defaults for Netlens."""
-    # Create parent directory for file paths before connecting.
-    # Skip for in-memory databases or empty paths.
-    if isinstance(path, os.PathLike) or isinstance(path, str):
-        p = Path(path)
-        if p.parent and p.parent != Path(".") and not p.exists():
-            p.parent.mkdir(parents=True, exist_ok=True)
-
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
 
@@ -36,6 +34,12 @@ def connect(path: str | os.PathLike) -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL")
     except sqlite3.OperationalError:
         pass
+
+    # Create parent directory for file paths.
+    if isinstance(path, os.PathLike) or isinstance(path, str):
+        p = Path(path)
+        if p.parent and p.parent != Path(".") and not p.exists():
+            p.parent.mkdir(parents=True, exist_ok=True)
 
     return conn
 
