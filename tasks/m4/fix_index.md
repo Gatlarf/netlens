@@ -1,3 +1,9 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+Add a third stylesheet link <link rel="stylesheet" href="css/map.css"> after the css/pages.css link.
+
+CURRENT FILE:
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +12,6 @@
   <title>Netlens</title>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/pages.css">
-  <link rel="stylesheet" href="css/map.css">
 </head>
 <body>
   <header class="topbar">

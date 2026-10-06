@@ -1,3 +1,9 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+renderPage() can run twice concurrently (initial load and after login, or fast hash changes); because page render() functions are async, the slower call appends its DOM after the faster one and pages show duplicated content, and stale pages register timers/listeners that are never cleaned up. Fix: keep a module-level counter renderGen. In renderPage: const gen = ++renderGen; call and clear the previous cleanup; create a fresh container element for this render (document.createElement('div') with class 'page'); await mod.render(fresh, route.params); AFTER the await, if gen !== renderGen the render is stale: call the returned cleanup (if it is a function) immediately and return without touching the DOM; otherwise clear #view, append the fresh element to #view, store the cleanup. Note the page's render() builds its DOM in the container passed to it before returning, so attach the fresh element to #view BEFORE awaiting render (so size/layout measuring works), but when a newer render has started replace/remove it: i.e. at the start of each renderPage clear #view and append the new fresh element immediately; stale renders keep writing only into their own detached element. Error handling stays the same but writes into the fresh element.
+
+CURRENT FILE:
 import { get, post, ApiError } from "./api.js";
 import { clear, toast, el } from "./util.js";
 
@@ -14,7 +20,6 @@ let currentCleanup = null;
 let currentRoute = null;
 let pollTimer = null;
 let wasRunning = false;
-let renderGen = 0;
 
 function parseRoute() {
   const hash = location.hash;
@@ -37,10 +42,8 @@ function updateNav(name) {
 }
 
 async function renderPage() {
-  const view = el("#view");
-  if (!view) return;
-
-  const gen = ++renderGen;
+  const container = el("#view");
+  if (!container) return;
 
   if (currentCleanup) {
     try {
@@ -55,39 +58,23 @@ async function renderPage() {
   currentRoute = route;
   updateNav(route.name);
 
-  const fresh = document.createElement("div");
-  fresh.className = "page";
-
-  clear(view);
-  view.appendChild(fresh);
-
   try {
     const mod = await import(`./pages/${route.name}.js`);
-    const cleanup = await mod.render(fresh, route.params);
-
-    if (gen !== renderGen) {
-      if (typeof cleanup === "function") cleanup();
-      return;
-    }
-
+    const cleanup = await mod.render(container, route.params);
     if (typeof cleanup === "function") {
       currentCleanup = cleanup;
     }
   } catch (err) {
-    if (gen !== renderGen) return;
-
     const card = document.createElement("div");
     card.className = "card";
     const msg = document.createElement("p");
     msg.textContent = err.message || "Error rendering page";
     card.appendChild(msg);
-    clear(fresh);
-    fresh.appendChild(card);
+    clear(container);
+    container.appendChild(card);
   }
 
-  if (gen === renderGen) {
-    fresh.focus();
-  }
+  container.focus();
 }
 
 function startPoll() {
