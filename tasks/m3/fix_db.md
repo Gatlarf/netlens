@@ -1,3 +1,9 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+FastAPI runs sync dependencies and endpoints in different worker threads, so a connection opened by a dependency is used from another thread and fails with sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that same thread. Open every file connection with sqlite3.connect(path, check_same_thread=False) (each request uses its own connection, so this is safe).
+
+CURRENT FILE:
 """Database layer for Netlens using only the standard library sqlite3."""
 
 from __future__ import annotations
@@ -25,7 +31,7 @@ def connect(path: str | os.PathLike) -> sqlite3.Connection:
         if p.parent and p.parent != Path(".") and not p.exists():
             p.parent.mkdir(parents=True, exist_ok=True)
 
-    conn = sqlite3.connect(path, check_same_thread=False)
+    conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
 
     # Enable foreign keys.

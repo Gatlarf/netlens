@@ -1,0 +1,185 @@
+.heading-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.device-name {
+  margin: 0;
+}
+
+.back-link {
+  margin-left: auto;
+}
+
+.col-left,
+.col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.col-left .card,
+.col-right .card {
+  margin-bottom: 0;
+}
+
+.card-title {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
+.card-body {
+  display: block;
+}
+
+.kv {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.kv-key,
+.kv-label {
+  color: var(--muted);
+  width: 130px;
+  flex: none;
+}
+
+.kv-value {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.edit-form {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+}
+
+.field label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+}
+
+.field textarea {
+  min-height: 90px;
+}
+
+.edit-form button {
+  align-self: start;
+}
+
+.names-list,
+.ip-list,
+.events-list,
+.event-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.names-list li,
+.ip-list li,
+.events-list li,
+.event-list li,
+.event-item {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.names-list li:last-child,
+.ip-list li:last-child,
+.events-list li:last-child,
+.event-list li:last-child,
+.event-item:last-child {
+  border-bottom: none;
+}
+
+.name-value {
+  font-weight: normal;
+}
+
+.source-badge {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  background: var(--muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.ip-seen {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+.event-time {
+  color: var(--muted);
+  font-size: 0.85rem;
+  min-width: 90px;
+}
+
+.event-kind {
+  font-size: 0.85rem;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.event-detail {
+  flex: 1;
+}
+
+.event-link {
+  color: var(--accent);
+}
+
+.filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.kind-filter {
+  min-width: 160px;
+}
+
+.export-link {
+  color: var(--accent);
+  text-decoration: none;
+  margin-right: 12px;
+}
+
+.export-link:hover {
+  text-decoration: underline;
+}
+
+.terminal-slot {
+  margin-top: 16px;
+}
+
+.terminal-slot:empty {
+  margin-top: 0;
+}
+
+.count {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
