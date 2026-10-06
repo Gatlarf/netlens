@@ -1,3 +1,5 @@
+Rewrite app/main.py (COMPLETE file; current file below). Keep everything. Additionally include two more routers, each with dependencies=[Depends(require_auth)] exactly like the existing protected routers: app.api.relations.router and app.api.export.router (import them with the others).
+CURRENT FILE:
 """Netlens application entry point."""
 
 import asyncio
@@ -10,7 +12,7 @@ import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api import config, devices, events, export, relations, scans
+from app.api import config, devices, events, scans
 from app.api.auth import router as auth_router
 from app.auth import LoginLimiter, require_auth
 from app.config import load_settings
@@ -71,8 +73,6 @@ def create_app(
     app.include_router(scans.router, dependencies=auth_deps)
     app.include_router(events.router, dependencies=auth_deps)
     app.include_router(config.router, dependencies=auth_deps)
-    app.include_router(relations.router, dependencies=auth_deps)
-    app.include_router(export.router, dependencies=auth_deps)
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:

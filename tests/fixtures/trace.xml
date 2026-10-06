@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nmaprun scanner="nmap" args="nmap -sV -O --traceroute -oX - 192.168.1.0/24 10.0.5.0/24" start="1791317000" version="7.94">
+<host><status state="up" reason="echo-reply" reason_ttl="62"/>
+<address addr="10.0.5.20" addrtype="ipv4"/>
+<hostnames><hostname name="lab-srv" type="PTR"/></hostnames>
+<ports><port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="62"/><service name="ssh" product="OpenSSH" version="8.9" method="probed" conf="10"/></port></ports>
+<trace proto="icmp" port="0">
+<hop ttl="1" ipaddr="192.168.1.1" rtt="0.45"/>
+<hop ttl="2" ipaddr="10.0.0.2" rtt="1.20" host="core.lan"/>
+<hop ttl="3" ipaddr="10.0.5.20" rtt="1.90"/>
+</trace>
+</host>
+<host><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="192.168.1.20" addrtype="ipv4"/>
+<address addr="B8:27:EB:12:34:56" addrtype="mac" vendor="Raspberry Pi Foundation"/>
+<hostnames/>
+<ports><port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="ssh" method="table" conf="3"/></port></ports>
+<trace proto="icmp" port="0"><hop ttl="1" ipaddr="192.168.1.20" rtt="0.30"/></trace>
+</host>
+<runstats><finished time="1791317040" elapsed="40.00" exit="success"/><hosts up="2" down="0" total="2"/></runstats>
+</nmaprun>

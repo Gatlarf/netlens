@@ -1,3 +1,9 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+The deep argument list now includes '--traceroute' immediately after '--osscan-guess': ['-T3','-sV','-O','--osscan-guess','--traceroute','--top-ports','1000','-oX','-', *targets]. Update test_build_args_deep and any other test that asserts the exact deep arguments (including timing variants).
+
+CURRENT FILE:
 import json
 import os
 import sys
@@ -46,7 +52,6 @@ def test_build_args_deep() -> None:
         "-sV",
         "-O",
         "--osscan-guess",
-        "--traceroute",
         "--top-ports",
         "1000",
         "-oX",

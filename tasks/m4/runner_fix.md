@@ -1,3 +1,6 @@
+In app/scanner/nmap_runner.py (output the COMPLETE file; current file below) the "deep" argument list must include "--traceroute" immediately after "--osscan-guess": ["-T<timing>", "-sV", "-O", "--osscan-guess", "--traceroute", "--top-ports", "1000", "-oX", "-"] (targets appended last as before). Nothing else changes.
+
+CURRENT FILE:
 """Nmap runner for Netlens scanner."""
 
 from __future__ import annotations
@@ -39,7 +42,6 @@ def build_args(kind: str, targets: list[str], timing: int = 3) -> list[str]:
             "-sV",
             "-O",
             "--osscan-guess",
-            "--traceroute",
             "--top-ports",
             "1000",
             "-oX",

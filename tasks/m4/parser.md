@@ -1,4 +1,7 @@
-from dataclasses import dataclass, field
+Fix and extend app/scanner/nmap_parser.py (output the COMPLETE file; the current file is given as CURRENT FILE). Keep every existing behaviour and field. Add one dataclass field to ScanHost at the END with a default: hops: list[str] = field(default_factory=list) (import field from dataclasses). Fill it from the host's <trace> element: the ipaddr attribute of every <hop> child in document order, EXCLUDING hops whose ipaddr equals the host's own ipv4 address (the destination is listed as the last hop). Hosts without a trace element get []. Example: for 10.0.5.20 with hops 192.168.1.1, 10.0.0.2, 10.0.5.20 the result is ["192.168.1.1", "10.0.0.2"].
+
+CURRENT FILE:
+from dataclasses import dataclass
 from typing import Optional
 import xml.etree.ElementTree as ET
 
@@ -26,7 +29,6 @@ class ScanHost:
     os_type: Optional[str]
     ttl: Optional[int]
     via: str
-    hops: list[str] = field(default_factory=list)
 
 
 def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
@@ -163,15 +165,6 @@ def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
             except ValueError:
                 pass
 
-        # Trace hops
-        hops: list[str] = []
-        trace_elem = host.find("trace")
-        if trace_elem is not None:
-            for hop in trace_elem.findall("hop"):
-                hop_ip = hop.get("ipaddr", "")
-                if hop_ip and hop_ip != ip:
-                    hops.append(hop_ip)
-
         hosts.append(ScanHost(
             ip=ip,
             mac=mac,
@@ -183,7 +176,6 @@ def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
             os_type=os_type,
             ttl=ttl,
             via=via,
-            hops=hops,
         ))
 
     return hosts

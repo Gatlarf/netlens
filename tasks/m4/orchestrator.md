@@ -1,5 +1,9 @@
+Rewrite app/scanner/orchestrator.py (COMPLETE file; current file below) keeping ALL existing behaviour, names and signatures, and adding relation inference.
+Additions:
+1. Constructor gets one more keyword-only parameter: gateway_provider=detect_gateway (import detect_gateway from app.scanner.netinfo; it is an async function returning the default gateway IP string or None). Store it.
+2. After a successful save_scan_results and mark_offline (inside the same try block in _run, before finish_scan), compute relations: gateway_ip = await self.gateway_provider() wrapped in try/except Exception -> None. hops = {host.ip: host.hops for host in hosts if host.hops} (ScanHost.hops is list[str]). devices = a list of dicts, one for EVERY device row in the devices table: {"id": id, "primary_ip": primary_ip, "type": type_override or device_type or "unknown", "hostname": hostname, "vendor": vendor, "ports": [open port numbers from the ports table where state LIKE 'open%'], "online": online}. edges = infer_relations(devices, hops, gateway_ip) (from app.scanner.relations import infer_relations); then replace_inferred(conn, edges) (from app.scanner.relstore import replace_inferred). Failures in this relation step must not fail the scan: wrap just that step in try/except Exception and log with logging.getLogger(__name__).exception.
+CURRENT FILE:
 import asyncio
-import logging
 import sqlite3
 from typing import Any
 
@@ -8,10 +12,8 @@ from app.scanner.nmap_parser import parse_nmap_xml
 from app.scanner.store import save_scan_results
 from app.scanner.presence import mark_offline
 from app.scanner.scans import create_scan, finish_scan, running_scan
-from app.scanner.netinfo import detect_ranges, detect_gateway
+from app.scanner.netinfo import detect_ranges
 from app.scanner.names import collect_names
-from app.scanner.relations import infer_relations
-from app.scanner.relstore import replace_inferred
 from app.db import connect, utcnow
 from app.config import Settings
 
@@ -29,7 +31,6 @@ class ScanManager:
         runner=run_nmap,
         names_provider=collect_names,
         ranges_provider=detect_ranges,
-        gateway_provider=detect_gateway,
         nmap_path: str = "nmap",
     ) -> None:
         self.db_path = db_path
@@ -37,7 +38,6 @@ class ScanManager:
         self.runner = runner
         self.names_provider = names_provider
         self.ranges_provider = ranges_provider
-        self.gateway_provider = gateway_provider
         self.nmap_path = nmap_path
         self._task: asyncio.Task | None = None
 
@@ -121,40 +121,6 @@ class ScanManager:
                 targets,
                 now=utcnow(),
             )
-
-            try:
-                gateway_ip = await self.gateway_provider()
-            except Exception:
-                gateway_ip = None
-
-            hops = {host.ip: host.hops for host in hosts if host.hops}
-
-            devices = []
-            cursor = conn.execute(
-                "SELECT id, primary_ip, type_override, device_type, hostname, vendor, online FROM devices"
-            )
-            for row in cursor.fetchall():
-                ports_cursor = conn.execute(
-                    "SELECT port FROM ports WHERE device_id = ? AND state LIKE 'open%'",
-                    (row["id"],),
-                )
-                open_ports = [p["port"] for p in ports_cursor.fetchall()]
-                devices.append({
-                    "id": row["id"],
-                    "primary_ip": row["primary_ip"],
-                    "type": row["type_override"] or row["device_type"] or "unknown",
-                    "hostname": row["hostname"],
-                    "vendor": row["vendor"],
-                    "ports": open_ports,
-                    "online": row["online"],
-                })
-
-            try:
-                edges = infer_relations(devices, hops, gateway_ip)
-                replace_inferred(conn, edges)
-            except Exception:
-                logging.getLogger(__name__).exception("relation inference failed")
-
             finish_scan(
                 conn,
                 scan_id,
