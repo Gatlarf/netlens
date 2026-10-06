@@ -1,0 +1,53 @@
+# NetLens LAN scanner service
+# Uses host networking for raw L2/ARP access and mDNS/SSDP discovery.
+# File capabilities on nmap require NET_RAW and NET_ADMIN; no-new-privileges
+# would prevent those capabilities from being honored, so it is intentionally omitted.
+
+services:
+  netlens:
+    build: .
+    image: netlens:latest
+    container_name: netlens
+    restart: unless-stopped
+
+    # Host network mode is required for ARP/L2 discovery and mDNS/SSDP.
+    # The app listens on NETLENS_BIND (default 0.0.0.0:8080) on the Docker host.
+    network_mode: host
+
+    # Drop all capabilities by default, then add only those needed for raw sockets
+    # and network administration (required for nmap file capabilities to work).
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+
+    # Read-only root filesystem for security; /tmp is writable via tmpfs.
+    read_only: true
+    tmpfs:
+      - "/tmp"
+
+    # Persistent storage for scan results and state.
+    volumes:
+      - "netlens-data:/data"
+
+    # Environment variables sourced from .env with sensible defaults.
+    environment:
+      # Required token for API access; must be set in .env.
+      NETLENS_TOKEN: ${NETLENS_TOKEN:?Set NETLENS_TOKEN in .env (a long random string)}
+      # Optional scan ranges; empty string means auto-detect.
+      NETLENS_RANGES: ${NETLENS_RANGES:-}
+      # Quick scan interval in seconds (default 15 minutes).
+      NETLENS_QUICK_INTERVAL: ${NETLENS_QUICK_INTERVAL:-900}
+      # Deep scan interval in seconds (default 24 hours).
+      NETLENS_DEEP_INTERVAL: ${NETLENS_DEEP_INTERVAL:-86400}
+      # Enable terminal UI (on/off).
+      NETLENS_TERMINAL: ${NETLENS_TERMINAL:-on}
+      # Optional SNMP community string; empty means disabled.
+      NETLENS_SNMP_COMMUNITY: ${NETLENS_SNMP_COMMUNITY:-}
+      # Bind address for the web server (default 0.0.0.0:8080).
+      NETLENS_BIND: ${NETLENS_BIND:-0.0.0.0:8080}
+
+volumes:
+  # Named volume for persistent data storage.
+  netlens-data: {}

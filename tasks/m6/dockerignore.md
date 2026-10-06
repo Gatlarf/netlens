@@ -1,0 +1,1 @@
+Create the file .dockerignore (one pattern per line, with a few # comments) excluding: .git, .gitignore, __pycache__, *.pyc, .pytest_cache, .venv, venv, tests, tasks, ledger, tools, docs, data, .env, *.md except README.md (use !README.md after *.md), Dockerfile? NO keep Dockerfile and docker-compose.yml out of the exclude list, requirements-dev.txt. Output only the file content.

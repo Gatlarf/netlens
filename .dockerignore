@@ -1,0 +1,30 @@
+# Version control
+.git
+.gitignore
+
+# Python artifacts
+__pycache__
+*.pyc
+.pytest_cache
+
+# Virtual environments
+.venv
+venv
+
+# Development and test directories
+tests
+tasks
+ledger
+tools
+docs
+data
+
+# Environment and secrets
+.env
+
+# Documentation
+*.md
+!README.md
+
+# Development dependencies
+requirements-dev.txt

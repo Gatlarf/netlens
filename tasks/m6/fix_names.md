@@ -1,3 +1,9 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+Hardening: parse_upnp_description must return {} immediately when the input text contains '<!ENTITY' (entity declarations are never expected in UPnP descriptions). Nothing else changes.
+
+CURRENT FILE:
 """
 app/scanner/names.py
 
@@ -51,9 +57,6 @@ def parse_upnp_description(xml_text: str) -> dict[str, str]:
     Keys: "friendly_name", "manufacturer", "model_name", "model_number".
     Invalid XML returns {}.
     """
-    if "<!ENTITY" in xml_text:
-        return {}
-
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError:

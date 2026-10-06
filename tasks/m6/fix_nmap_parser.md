@@ -1,3 +1,9 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+Hardening: before parsing, reject any input that contains an entity declaration: if '<!ENTITY' appears in xml_text (case-sensitive is fine) raise ValueError('invalid nmap xml'). Do NOT reject '<!DOCTYPE nmaprun>' (real nmap output contains it). Nothing else changes.
+
+CURRENT FILE:
 from dataclasses import dataclass, field
 from typing import Optional
 import xml.etree.ElementTree as ET
@@ -30,9 +36,6 @@ class ScanHost:
 
 
 def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
-    if '<!ENTITY' in xml_text:
-        raise ValueError('invalid nmap xml')
-
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError as exc:

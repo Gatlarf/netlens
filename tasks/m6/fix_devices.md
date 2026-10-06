@@ -1,10 +1,16 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+Add input limits to the PATCH body model: custom_name at most 100 characters and notes at most 4000 characters; exceeding them returns HTTP 422 (use pydantic Field(max_length=...) on the optional str fields, or an explicit check that raises HTTPException(422, ...)). Nothing else changes.
+
+CURRENT FILE:
 from __future__ import annotations
 
 import sqlite3
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.db import connect
 
@@ -36,8 +42,8 @@ router = APIRouter(prefix="/api", tags=["devices"])
 
 
 class DevicePatch(BaseModel):
-    custom_name: str | None = Field(default=None, max_length=100)
-    notes: str | None = Field(default=None, max_length=4000)
+    custom_name: str | None = None
+    notes: str | None = None
     tags: list[str] | None = None
     type_override: str | None = None
     pos_x: float | None = None

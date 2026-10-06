@@ -1,3 +1,5 @@
+Modify app/api/auth.py (output the COMPLETE file; current file below). Keep ALL behaviour. Change: the session cookie set by POST /login must also carry secure=True when the connection is HTTPS: request.url.scheme == "https" or the header x-forwarded-proto (first comma-separated value, lowercased, stripped) equals "https". Plain HTTP keeps secure=False (the UI must keep working on a LAN without TLS). Apply the same condition to the delete_cookie call in POST /logout (secure=<same flag>).
+CURRENT FILE:
 import hmac
 from typing import Optional
 
@@ -13,14 +15,6 @@ class LoginBody(BaseModel):
 
 
 router = APIRouter(prefix="/api", tags=["auth"])
-
-
-def _is_https(request: Request) -> bool:
-    if request.url.scheme == "https":
-        return True
-    x_forwarded_proto = request.headers.get("x-forwarded-proto", "")
-    first_value = x_forwarded_proto.split(",")[0].strip().lower()
-    return first_value == "https"
 
 
 @router.post("/login")
@@ -49,7 +43,6 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
         samesite="strict",
         path="/",
         max_age=30 * 24 * 3600,
-        secure=_is_https(request),
     )
     return response
 
@@ -57,13 +50,7 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
 @router.post("/logout")
 async def logout(request: Request) -> JSONResponse:
     response = JSONResponse({"ok": True})
-    response.delete_cookie(
-        COOKIE_NAME,
-        path="/",
-        httponly=True,
-        samesite="strict",
-        secure=_is_https(request),
-    )
+    response.delete_cookie(COOKIE_NAME, path="/")
     return response
 
 

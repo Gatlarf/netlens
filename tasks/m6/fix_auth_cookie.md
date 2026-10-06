@@ -1,3 +1,9 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+The logout deletion cookie must carry the same attributes as the login cookie: call response.delete_cookie(COOKIE_NAME, path='/', httponly=True, samesite='strict', secure=<same secure flag>).
+
+CURRENT FILE:
 import hmac
 from typing import Optional
 
@@ -57,13 +63,7 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
 @router.post("/logout")
 async def logout(request: Request) -> JSONResponse:
     response = JSONResponse({"ok": True})
-    response.delete_cookie(
-        COOKIE_NAME,
-        path="/",
-        httponly=True,
-        samesite="strict",
-        secure=_is_https(request),
-    )
+    response.delete_cookie(COOKIE_NAME, path="/", secure=_is_https(request))
     return response
 
 

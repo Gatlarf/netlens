@@ -1,3 +1,5 @@
+Rewrite app/main.py (COMPLETE file; current file below). Keep everything. Add app.add_middleware(SecurityHeadersMiddleware) (from app.security import SecurityHeadersMiddleware) in create_app right after the FastAPI object is created.
+CURRENT FILE:
 """Netlens application entry point."""
 
 import asyncio
@@ -18,7 +20,6 @@ from app.config import load_settings
 from app.db import connect, init_db
 from app.scanner.orchestrator import ScanManager
 from app.scanner.scheduler import scheduler_loop
-from app.security import SecurityHeadersMiddleware
 from app.terminal.ssh import SSHBackend
 from app.terminal.telnet import TelnetBackend
 
@@ -61,8 +62,6 @@ def create_app(
     scan_manager: ScanManager | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Netlens", lifespan=lifespan)
-
-    app.add_middleware(SecurityHeadersMiddleware)
 
     app.state.settings = settings
     app.state.db_path = str(db_path) if db_path is not None else str(settings.data_dir / "netlens.db")
