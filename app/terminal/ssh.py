@@ -97,8 +97,11 @@ class SSHBackend(TerminalBackend):
     async def read(self) -> bytes:
         if self._process is None:
             return b""
-        data = await self._process.stdout.read(4096)
-        return data or b""
+        try:
+            data = await self._process.stdout.read(4096)
+            return data or b""
+        except (asyncssh.Error, OSError, asyncio.IncompleteReadError, ConnectionError):
+            return b""
 
     async def write(self, data: bytes) -> None:
         if self._process is None:

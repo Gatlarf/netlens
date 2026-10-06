@@ -243,6 +243,13 @@ async def terminal_ws(
                 except asyncio.CancelledError:
                     pass
 
+            # Retrieve results/exceptions for all tasks to prevent 'Task exception was never retrieved'
+            for t in tasks:
+                try:
+                    t.result()
+                except (asyncio.CancelledError, Exception):
+                    pass
+
         finally:
             # 8. Cleanup
             try:

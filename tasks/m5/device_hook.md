@@ -1,6 +1,7 @@
+Modify app/static/js/pages/device.js (output the COMPLETE file; the current file is given below). Keep ALL existing behaviour. Changes: 1) import { mountTerminal, isTerminalActive } from "../terminal.js". 2) After the page DOM has been built and appended and the existing empty #terminal-slot div exists, call mountTerminal(terminalSlot, device) (await it inside try/catch; errors only toast); keep the returned object and call its dispose() in the page's returned cleanup function. 3) The existing periodic auto refresh (which re-renders the whole page) must be skipped while isTerminalActive(terminalSlot) is true, and must never re-render over an active terminal.
+CURRENT FILE:
 import { get, patch, ApiError } from "../api.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS } from "../util.js";
-import { mountTerminal, isTerminalActive } from "../terminal.js";
 
 const WEB_PORTS = new Set([80, 443, 8080, 8443, 8006, 5000, 5001, 9000]);
 
@@ -287,15 +288,7 @@ export async function render(container, params) {
   const terminalSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
   container.appendChild(terminalSlot);
 
-  let terminalHandle = null;
-  try {
-    terminalHandle = await mountTerminal(terminalSlot, device);
-  } catch (err) {
-    toast("Terminal failed to load", "error");
-  }
-
   const interval = setInterval(async () => {
-    if (isTerminalActive(terminalSlot)) return;
     if (editResult.isDirty() || editResult.isFocused()) return;
     try {
       const fresh = await get(`/api/devices/${params.id}`);
@@ -309,9 +302,6 @@ export async function render(container, params) {
 
   const cleanup = () => {
     clearInterval(interval);
-    if (terminalHandle && typeof terminalHandle.dispose === "function") {
-      terminalHandle.dispose();
-    }
   };
 
   container._cleanup = cleanup;

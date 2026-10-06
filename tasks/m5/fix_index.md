@@ -1,3 +1,9 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+Add a fourth stylesheet link <link rel="stylesheet" href="css/terminal.css"> after the css/map.css link.
+
+CURRENT FILE:
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,7 +13,6 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/pages.css">
   <link rel="stylesheet" href="css/map.css">
-  <link rel="stylesheet" href="css/terminal.css">
 </head>
 <body>
   <header class="topbar">

@@ -1,7 +1,7 @@
 Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
 
 DEFECTS:
-When the callback rejects the host key (known_fingerprint set and different), asyncssh raises asyncssh.HostKeyNotVerifiable (a subclass of asyncssh.Error) which currently becomes ConnectFailed('connection failed'). Catch asyncssh.HostKeyNotVerifiable BEFORE the generic asyncssh.Error handler and raise HostKeyMismatch(self._known_fingerprint, self.fingerprint) from it (keep the attribute names consistent with the rest of the class).
+SSHBackend.read() must never raise when the remote side drops the connection: wrap the stdout read in try/except (asyncssh.Error, OSError, asyncio.IncompleteReadError, ConnectionError) and return b'' (end of session) in that case. asyncssh.ConnectionLost is a subclass of asyncssh.Error.
 
 CURRENT FILE:
 import asyncio
@@ -82,6 +82,8 @@ class SSHBackend(TerminalBackend):
             )
         except asyncssh.PermissionDenied:
             raise AuthFailed("authentication failed")
+        except asyncssh.HostKeyNotVerifiable as e:
+            raise HostKeyMismatch(self.known_fingerprint, self.fingerprint) from e
         except asyncssh.Error as e:
             raise ConnectFailed("connection failed")
         except OSError as e:

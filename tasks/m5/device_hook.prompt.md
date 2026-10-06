@@ -1,6 +1,108 @@
+FRONTEND CONVENTIONS: plain ES modules, no framework, no build step, no CDN, no inline event-handler attributes, never use innerHTML with data (build DOM with the h() helper or textContent). Files live under app/static/ and are served from / (so index.html loads css/app.css and js/app.js as an ES module).
+
+REAL API RESPONSES (authenticated, JSON; cookie auth, credentials same-origin):
+GET /api/devices (first item): {
+ "id": 1,
+ "primary_ip": "192.168.1.1",
+ "mac": "c0:56:27:aa:bb:01",
+ "hostname": "router.lan",
+ "custom_name": null,
+ "vendor": "Belkin International",
+ "device_type": "router",
+ "type_override": null,
+ "notes": null,
+ "tags": [],
+ "online": 1,
+ "first_seen": "2026-10-06T21:24:38Z",
+ "last_seen": "2026-10-06T21:24:38Z",
+ "name": "router.lan",
+ "type": "router",
+ "open_ports": 4
+}
+GET /api/devices/1: {
+ "id": 1,
+ "primary_ip": "192.168.1.1",
+ "mac": "c0:56:27:aa:bb:01",
+ "hostname": "router.lan",
+ "custom_name": null,
+ "vendor": "Belkin International",
+ "device_type": "router",
+ "type_override": null,
+ "notes": null,
+ "tags": [],
+ "online": 1,
+ "first_seen": "2026-10-06T21:24:38Z",
+ "last_seen": "2026-10-06T21:24:38Z",
+ "name": "router.lan",
+ "type": "router",
+ "open_ports": 4,
+ "ips": [
+  {
+   "ip": "192.168.1.1",
+   "last_seen": "2026-10-06T21:24:38Z"
+  }
+ ],
+ "names": [
+  {
+   "name": "router.lan",
+   "source": "ptr"
+  }
+ ],
+ "ports": [
+  {
+   "port": 22,
+   "proto": "tcp",
+   "service": "ssh"
+  },
+  {
+   "port": 53,
+   "proto": "tcp",
+   "service": "domain"
+  },
+  {
+   "port": 80,
+   "proto": "tcp",
+   "service": "http"
+  },
+  {
+   "port": 443,
+   "proto": "tcp",
+   "service": "https"
+  }
+ ],
+ "events": [
+  {
+   "id": 1,
+   "ts": "2026-10-06T21:24:38Z",
+   "kind": "device_new",
+   "detail": "192.168.1.1 Belkin International"
+  }
+ ]
+}
+GET /api/scans: [{"id": 1, "kind": "deep", "status": "done", "started": "2026-10-06T21:24:38Z", "finished": "2026-10-06T21:24:38Z", "hosts_found": 4, "error": null}]
+GET /api/scans/current: {"running": false, "scan": null}
+GET /api/events (first 2): [{"id": 4, "ts": "2026-10-06T21:24:38Z", "device_id": 4, "kind": "device_new", "detail": "192.168.1.50"}, {"id": 3, "ts": "2026-10-06T21:24:38Z", "device_id": 3, "kind": "device_new", "detail": "192.168.1.30"}]
+POST /api/scans body {kind:'quick'|'deep'} -> 202 {id}; 409 {detail:'scan already running'}
+PATCH /api/devices/{id} body {custom_name?, notes?, tags?: [str], type_override?} -> device detail; 422 on invalid type_override
+Other endpoints: GET /api/config -> {version, ranges:[str], quick_interval, deep_interval, terminal_enabled, snmp_enabled, bind}; POST /api/login {token} -> {ok:true} | 401 {detail}; POST /api/logout; GET /api/session -> {authenticated: bool} (never 401). GET /api/devices?online=true|false&q=text. Device types: router, switch, ap, server, pc, phone, printer, iot, camera, nas, vm, unknown. Event kinds: device_new, device_online, device_offline, ip_changed, port_opened, os_changed. Device JSON also has os_name, os_confidence, pos_x, pos_y.
+
+## EXISTING app/static/js/util.js
+1:export function h(tag, attrs = {}, ...children) {
+42:export function clear(el) {
+48:export function fmtTime(iso) {
+60:export function timeAgo(iso, now = Date.now()) {
+75:export function debounce(fn, ms) {
+83:export function toast(message, kind = "info") {
+99:export function el(selector, root = document) {
+103:export const TYPE_LABELS = {
+118:export function typeBadge(type) {
+122:export function statusDot(online) {
+
+TASK:
+Modify app/static/js/pages/device.js (output the COMPLETE file; the current file is given below). Keep ALL existing behaviour. Changes: 1) import { mountTerminal, isTerminalActive } from "../terminal.js". 2) After the page DOM has been built and appended and the existing empty #terminal-slot div exists, call mountTerminal(terminalSlot, device) (await it inside try/catch; errors only toast); keep the returned object and call its dispose() in the page's returned cleanup function. 3) The existing periodic auto refresh (which re-renders the whole page) must be skipped while isTerminalActive(terminalSlot) is true, and must never re-render over an active terminal.
+CURRENT FILE:
 import { get, patch, ApiError } from "../api.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS } from "../util.js";
-import { mountTerminal, isTerminalActive } from "../terminal.js";
 
 const WEB_PORTS = new Set([80, 443, 8080, 8443, 8006, 5000, 5001, 9000]);
 
@@ -287,15 +389,7 @@ export async function render(container, params) {
   const terminalSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
   container.appendChild(terminalSlot);
 
-  let terminalHandle = null;
-  try {
-    terminalHandle = await mountTerminal(terminalSlot, device);
-  } catch (err) {
-    toast("Terminal failed to load", "error");
-  }
-
   const interval = setInterval(async () => {
-    if (isTerminalActive(terminalSlot)) return;
     if (editResult.isDirty() || editResult.isFocused()) return;
     try {
       const fresh = await get(`/api/devices/${params.id}`);
@@ -309,9 +403,6 @@ export async function render(container, params) {
 
   const cleanup = () => {
     clearInterval(interval);
-    if (terminalHandle && typeof terminalHandle.dispose === "function") {
-      terminalHandle.dispose();
-    }
   };
 
   container._cleanup = cleanup;

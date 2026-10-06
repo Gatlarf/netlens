@@ -1,0 +1,41 @@
+.card.warning {
+  border-color: var(--bad);
+  background: rgba(220, 38, 38, 0.08);
+  padding: 16px;
+}
+
+.card.warning h2 {
+  color: var(--bad);
+}
+
+.terminal-wrap {
+  height: 420px;
+  background: #0b1020;
+  border-radius: 8px;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.terminal-wrap .xterm {
+  height: 100%;
+}
+
+.terminal-slot .btn + .btn {
+  margin-left: 8px;
+}
+
+.terminal-slot form {
+  display: grid;
+  gap: 10px;
+  max-width: 460px;
+}
+
+.terminal-slot details summary {
+  cursor: pointer;
+}
+
+.terminal-slot textarea {
+  min-height: 100px;
+  font-family: monospace;
+  width: 100%;
+}

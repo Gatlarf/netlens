@@ -1,7 +1,7 @@
 Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
 
 DEFECTS:
-Step 4 is wrong: 'msg = await asyncio.wait_for(websocket.receive(), ...); if msg.get("type") != "auth"' inspects the raw ASGI message (whose type is 'websocket.receive'). Instead: wait for text with raw = await asyncio.wait_for(websocket.receive_text(), timeout=30.0) (catch asyncio.TimeoutError -> error code auth_message 'timeout waiting for auth message'; catch WebSocketDisconnect -> just return), then data = json.loads(raw) in try/except (invalid JSON or not a dict -> error code 'auth_message', message 'invalid auth message'); require data.get('type') == 'auth' (else code 'auth_message', message 'invalid message type') and then validate the fields exactly as described before.
+After the asyncio.wait(..., return_when=FIRST_COMPLETED) call and cancelling the pending tasks, retrieve the result/exception of every task that finished or was cancelled (for t in tasks: try: t.result() except BaseException: pass, taking care not to swallow KeyboardInterrupt in the main task: catch (asyncio.CancelledError, Exception)), so that asyncio never logs 'Task exception was never retrieved'. Also await the cancelled tasks (asyncio.gather(*pending, return_exceptions=True)).
 
 CURRENT FILE:
 import asyncio
@@ -104,23 +104,37 @@ async def terminal_ws(
 
         # 4. Wait for auth message
         try:
-            msg = await asyncio.wait_for(websocket.receive(), timeout=30.0)
+            raw = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
         except asyncio.TimeoutError:
             await websocket.send_json({"type": "error", "code": "auth_message", "message": "timeout waiting for auth message"})
             await websocket.close(code=1008)
             return
+        except WebSocketDisconnect:
+            return
 
-        if msg.get("type") != "auth":
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            await websocket.send_json({"type": "error", "code": "auth_message", "message": "invalid auth message"})
+            await websocket.close(code=1008)
+            return
+
+        if not isinstance(data, dict):
+            await websocket.send_json({"type": "error", "code": "auth_message", "message": "invalid auth message"})
+            await websocket.close(code=1008)
+            return
+
+        if data.get("type") != "auth":
             await websocket.send_json({"type": "error", "code": "auth_message", "message": "invalid message type"})
             await websocket.close(code=1008)
             return
 
-        username = msg.get("username", "")
-        password = msg.get("password")
-        private_key = msg.get("private_key")
-        passphrase = msg.get("passphrase")
-        cols = msg.get("cols", 80)
-        rows = msg.get("rows", 24)
+        username = data.get("username", "")
+        password = data.get("password")
+        private_key = data.get("private_key")
+        passphrase = data.get("passphrase")
+        cols = data.get("cols", 80)
+        rows = data.get("rows", 24)
 
         if proto == "ssh":
             if not username or len(username) > 128:
