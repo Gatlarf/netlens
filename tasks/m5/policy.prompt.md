@@ -1,0 +1,95 @@
+INTERFACES OF EXISTING CODE (use these exact names; do not invent attributes, columns or functions that are not listed):
+
+## Database schema (app/db.py, SQLite, connections use row_factory=sqlite3.Row)
+CREATE TABLE schema_version (
+            version INTEGER
+        )
+CREATE TABLE devices (
+            id INTEGER PRIMARY KEY,
+            mac TEXT UNIQUE,
+            primary_ip TEXT,
+            hostname TEXT,
+            vendor TEXT,
+            os_name TEXT,
+            os_confidence INTEGER,
+            device_type TEXT,
+            type_override TEXT,
+            custom_name TEXT,
+            notes TEXT,
+            tags TEXT,
+            online INTEGER NOT NULL DEFAULT 1,
+            first_seen TEXT NOT NULL,
+            last_seen TEXT NOT NULL,
+            pos_x REAL,
+            pos_y REAL,
+            raw_xml TEXT
+        )
+CREATE TABLE device_ips (
+            id INTEGER PRIMARY KEY,
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            ip TEXT NOT NULL,
+            first_seen TEXT NOT NULL,
+            last_seen TEXT NOT NULL,
+            UNIQUE(device_id, ip)
+        )
+CREATE TABLE device_names (
+            id INTEGER PRIMARY KEY,
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            source TEXT NOT NULL,
+            first_seen TEXT NOT NULL,
+            last_seen TEXT NOT NULL,
+            UNIQUE(device_id, name, source)
+        )
+CREATE TABLE ports (
+            id INTEGER PRIMARY KEY,
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            proto TEXT NOT NULL,
+            port INTEGER NOT NULL,
+            state TEXT NOT NULL,
+            service TEXT,
+            product TEXT,
+            version TEXT,
+            updated TEXT NOT NULL,
+            UNIQUE(device_id, proto, port)
+        )
+CREATE TABLE scans (
+            id INTEGER PRIMARY KEY,
+            kind TEXT NOT NULL,
+            status TEXT NOT NULL,
+            started TEXT NOT NULL,
+            finished TEXT,
+            hosts_found INTEGER NOT NULL DEFAULT 0,
+            error TEXT
+        )
+CREATE TABLE events (
+            id INTEGER PRIMARY KEY,
+            ts TEXT NOT NULL,
+            device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
+            kind TEXT NOT NULL,
+            detail TEXT
+        )
+CREATE TABLE relations (
+            id INTEGER PRIMARY KEY,
+            src_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            dst_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            source TEXT NOT NULL,
+            confidence REAL NOT NULL DEFAULT 1.0,
+            manual INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(src_id, dst_id, kind)
+        )
+CREATE TABLE settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+CREATE TABLE host_keys (
+            device_id INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+            fingerprint TEXT NOT NULL,
+            first_seen TEXT NOT NULL
+        )
+
+TASK:
+Create app/terminal/policy.py (stdlib only; ipaddress).
+- def target_allowed(ip: str, ranges) -> bool: ranges is an iterable of CIDR strings (the configured scan ranges, may be empty). Invalid ip -> False. Loopback, unspecified, multicast, reserved and public addresses are never allowed. If ranges is non-empty the ip must lie inside at least one range (ip_network(strict=False)); if ranges is empty the ip must be private (RFC1918) or link-local.
+- def pick_port(proto: str, requested: int | None, open_ports: list[tuple[str, int]]) -> int: proto is "ssh" or "telnet" (else ValueError). The default port is 22 for ssh and 23 for telnet. open_ports is a list of (protocol, port) pairs known for the device (e.g. ("tcp", 22)). If requested is None use the default. The chosen port must be a TCP port present in open_ports, else ValueError("port not open on this device"). requested must be 1-65535 else ValueError.

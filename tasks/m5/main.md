@@ -1,3 +1,5 @@
+Rewrite app/main.py (COMPLETE file; current file below). Keep everything. Additions in create_app: app.state.terminal_backends = {"ssh": SSHBackend, "telnet": TelnetBackend} (from app.terminal.ssh import SSHBackend; from app.terminal.telnet import TelnetBackend) and app.state.terminal_sessions = 0. If settings.terminal_enabled is True, include app.api.terminal.router WITHOUT router-level dependencies (the WebSocket route authenticates itself and the REST route carries its own dependency); when it is False do not include it at all. The router must be included BEFORE the static files mount.
+CURRENT FILE:
 """Netlens application entry point."""
 
 import asyncio
@@ -12,14 +14,11 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import config, devices, events, export, relations, scans
 from app.api.auth import router as auth_router
-from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, require_auth
 from app.config import load_settings
 from app.db import connect, init_db
 from app.scanner.orchestrator import ScanManager
 from app.scanner.scheduler import scheduler_loop
-from app.terminal.ssh import SSHBackend
-from app.terminal.telnet import TelnetBackend
 
 VERSION = "0.1.0"
 
@@ -66,8 +65,6 @@ def create_app(
     app.state.scheduler = scheduler
     app.state.scan_manager = scan_manager or ScanManager(app.state.db_path, settings)
     app.state.login_limiter = LoginLimiter()
-    app.state.terminal_backends = {"ssh": SSHBackend, "telnet": TelnetBackend}
-    app.state.terminal_sessions = 0
 
     app.include_router(auth_router)
 
@@ -78,9 +75,6 @@ def create_app(
     app.include_router(config.router, dependencies=auth_deps)
     app.include_router(relations.router, dependencies=auth_deps)
     app.include_router(export.router, dependencies=auth_deps)
-
-    if getattr(settings, "terminal_enabled", False):
-        app.include_router(terminal_router)
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
