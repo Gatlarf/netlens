@@ -1,3 +1,9 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+test_type_defaults_unknown is outdated: scans now classify every device. Replace it with a test asserting the types from the fixture: 192.168.1.1 -> 'router', 192.168.1.20 -> 'nas' (hostname pi-nas), 192.168.1.30 -> 'printer', 192.168.1.50 -> 'server'. Look the devices up by primary_ip in the list response (field 'primary_ip'). Also keep a test that a device with type_override set reports that override as 'type'.
+
+CURRENT FILE:
 import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
@@ -77,21 +83,8 @@ def test_name_fallback_primary_ip(client, seeded_client):
 def test_type_defaults_unknown(client, seeded_client):
     resp = seeded_client.get("/api/devices")
     data = resp.json()
-    device_map = {d["primary_ip"]: d for d in data}
-    assert device_map["192.168.1.1"]["type"] == "router"
-    assert device_map["192.168.1.20"]["type"] == "nas"
-    assert device_map["192.168.1.30"]["type"] == "printer"
-    assert device_map["192.168.1.50"]["type"] == "server"
-
-
-def test_type_override(client, seeded_client):
-    resp = seeded_client.get("/api/devices")
-    data = resp.json()
-    device_id = data[0]["id"]
-    resp = seeded_client.patch(f"/api/devices/{device_id}", json={"type_override": "router"})
-    assert resp.status_code == 200
-    d = resp.json()
-    assert d["type"] == "router"
+    for d in data:
+        assert d["type"] == "unknown"
 
 
 def test_open_ports_for_first_device(client, seeded_client):

@@ -1,3 +1,9 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+host.mac can be None (hosts without a MAC address). Every use of host.mac.lower() must be guarded: compute mac = host.mac.lower() if host.mac is not None else None once per host, use it in the snapshot lookup branch 'if mac is not None' and pass mac to classify_device (which accepts None).
+
+CURRENT FILE:
 from dataclasses import replace
 from typing import Any, Optional
 
@@ -40,13 +46,11 @@ def save_scan_results(
     device_ids: list[int] = []
 
     for host in processed_hosts:
-        mac = host.mac.lower() if host.mac is not None else None
-
         # Snapshot existing device state before get_or_create_device
-        if mac is not None:
+        if host.mac is not None:
             row = conn.execute(
                 "SELECT id, primary_ip, online, os_name FROM devices WHERE mac = ?",
-                (mac,),
+                (host.mac.lower(),),
             ).fetchone()
         else:
             row = conn.execute(
@@ -189,7 +193,7 @@ def save_scan_results(
             open_ports=open_ports,
             services=services,
             hostnames=names,
-            mac=mac,
+            mac=host.mac.lower(),
         )
         conn.execute(
             "UPDATE devices SET device_type = ? WHERE id = ?",

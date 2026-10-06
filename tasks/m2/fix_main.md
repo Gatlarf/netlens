@@ -1,7 +1,12 @@
+Fix the defects below and output the COMPLETE corrected file. Keep everything else identical.
+
+DEFECTS:
+The lifespan function is defined but never attached: FastAPI(title='Netlens') must be FastAPI(title='Netlens', lifespan=lifespan), and lifespan must be decorated with @contextlib.asynccontextmanager (import contextlib). Without it the database schema is never created.
+
+CURRENT FILE:
 """Netlens application entry point."""
 
 import asyncio
-import contextlib
 import os
 from typing import Any
 
@@ -17,7 +22,6 @@ from app.scanner.scheduler import scheduler_loop
 VERSION = "0.1.0"
 
 
-@contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     conn = connect(app.state.db_path)
     init_db(conn)
@@ -52,7 +56,7 @@ def create_app(
     scheduler: bool = False,
     scan_manager: ScanManager | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Netlens", lifespan=lifespan)
+    app = FastAPI(title="Netlens")
 
     app.state.settings = settings
     app.state.db_path = str(db_path) if db_path is not None else str(settings.data_dir / "netlens.db")
