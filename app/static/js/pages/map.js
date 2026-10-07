@@ -86,8 +86,9 @@ function buildEdgeData(edge) {
   };
 }
 
-function applyFilters(network, nodes, edges, search, typeFilter, statusFilter) {
+function applyFilters(nodesDS, edgesDS, nodes, edges, search, typeFilter, statusFilter) {
   const q = search.toLowerCase();
+  const hiddenNodes = new Set();
   for (const node of nodes) {
     let hidden = false;
     if (q) {
@@ -102,14 +103,15 @@ function applyFilters(network, nodes, edges, search, typeFilter, statusFilter) {
     if (typeFilter !== "All" && node.type !== typeFilter) hidden = true;
     if (statusFilter === "Online" && !node.online) hidden = true;
     if (statusFilter === "Offline" && node.online) hidden = true;
-    network.nodes.update({ id: node.id, hidden });
+    if (hidden) hiddenNodes.add(node.id);
   }
-  for (const edge of edges) {
-    const fromNode = network.nodes.get(edge.from);
-    const toNode = network.nodes.get(edge.to);
-    const hidden = (fromNode && fromNode.hidden) || (toNode && toNode.hidden);
-    network.edges.update({ id: edge.id, hidden });
-  }
+  nodesDS.update(nodes.map((node) => ({ id: node.id, hidden: hiddenNodes.has(node.id) })));
+  edgesDS.update(
+    edges.map((edge) => ({
+      id: edge.id,
+      hidden: hiddenNodes.has(edge.from) || hiddenNodes.has(edge.to),
+    }))
+  );
 }
 
 export async function render(container, params) {
@@ -372,17 +374,17 @@ export async function render(container, params) {
 
   searchInput.addEventListener("input", () => {
     if (destroyed) return;
-    applyFilters(network, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value);
+    applyFilters(nodesDS, edgesDS, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value);
   });
 
   typeSelect.addEventListener("change", () => {
     if (destroyed) return;
-    applyFilters(network, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value);
+    applyFilters(nodesDS, edgesDS, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value);
   });
 
   statusSelect.addEventListener("change", () => {
     if (destroyed) return;
-    applyFilters(network, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value);
+    applyFilters(nodesDS, edgesDS, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value);
   });
 
   async function reload() {
@@ -433,7 +435,7 @@ export async function render(container, params) {
       currentNodes = newNodes;
       currentEdges = newEdges;
 
-      applyFilters(network, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value);
+      applyFilters(nodesDS, edgesDS, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value);
 
       if (currentNodes.length === 0) {
         clear(canvasEl);
