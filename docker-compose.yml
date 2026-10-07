@@ -29,7 +29,7 @@ services:
 
     # Persistent storage for scan results and state.
     volumes:
-      - "netlens-data:/data"
+      - "${DOCKERDIR:?Set DOCKERDIR in .env}/appdata/netlens:/data"
 
     # Environment variables sourced from .env with sensible defaults.
     environment:
@@ -47,7 +47,3 @@ services:
       NETLENS_SNMP_COMMUNITY: ${NETLENS_SNMP_COMMUNITY:-}
       # Bind address for the web server (default 0.0.0.0:8080).
       NETLENS_BIND: ${NETLENS_BIND:-0.0.0.0:8080}
-
-volumes:
-  # Named volume for persistent data storage.
-  netlens-data: {}

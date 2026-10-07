@@ -19,7 +19,7 @@ RUN apt-get update && \
         iproute2 \
         libcap2-bin \
         ca-certificates && \
-    setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip "$(readlink -f "$(command -v nmap)")" && \
+    setcap cap_net_raw,cap_net_admin+eip "$(readlink -f "$(command -v nmap)")" && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user and group for security.

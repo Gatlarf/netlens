@@ -4,7 +4,9 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
 
 ## Overview
 
-Netlens scans private network ranges, discovers devices, classifies them, and builds a visual network map. It includes a web-based terminal for SSH and Telnet sessions to discovered devices.
+Netlens is a self-hosted LAN scanner and network map for home labs and small networks. It periodically scans your private network ranges with nmap, discovers devices, works out what they are (router, server, printer, VM, ...), tracks when they appear, disappear or change, and draws the result as an interactive map. From any discovered device you can open an SSH or Telnet session straight in the browser.
+
+It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaScript UI) with no external services and no cloud component. Everything stays on your network.
 
 ## Features
 
@@ -20,17 +22,70 @@ Netlens scans private network ranges, discovers devices, classifies them, and bu
 - PNG export of the network map
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
 
-## Quick start
+## Build and deploy with Docker Compose
+
+### Requirements
+
+- A Linux Docker host on the network you want to scan, with Docker Engine and the Compose plugin (`docker compose version`).
+- The container uses **host networking** (needed for ARP/L2 discovery and mDNS/SSDP), so it must run on a host that is directly attached to the LAN. Docker Desktop on macOS/Windows will not work for scanning.
+
+### Option A: standalone (this repository's compose file)
 
 ```bash
+git clone https://github.com/Gatlarf/netlens.git
+cd netlens
 cp .env.example .env
-# Set NETLENS_TOKEN in .env
+# Edit .env:
+#   NETLENS_TOKEN  a long random string (generate with: openssl rand -hex 32)
+#   DOCKERDIR      base directory for application data, e.g. /home/you/docker
+mkdir -p "$DOCKERDIR/appdata/netlens"
+sudo chown 10001:10001 "$DOCKERDIR/appdata/netlens"   # the container runs as uid 10001
 docker compose up -d --build
 ```
 
-Open `http://<docker-host>:8080`, log in with the token, and press **"Quick scan"**.
+Open `http://<docker-host>:8080`, log in with the token, and press **Quick scan**.
 
-> **Note:** This project was developed but not yet deployed or tested on a real LAN.
+Application data (the SQLite database) is stored in `$DOCKERDIR/appdata/netlens`, mounted as `/data`, so it survives rebuilds and container removal.
+
+### Option B: add Netlens to an existing compose stack
+
+If you already keep all your services in one `docker-compose.yml` with a shared `.env` (defining `DOCKERDIR`), copy this repository to `$DOCKERDIR/build/netlens`, add `NETLENS_TOKEN` to the shared `.env`, and append this service:
+
+```yaml
+  netlens:
+    build: ${DOCKERDIR}/build/netlens
+    image: netlens:latest
+    container_name: netlens
+    restart: unless-stopped
+    network_mode: host
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - $DOCKERDIR/appdata/netlens:/data
+    environment:
+      - TZ=${TZ}
+      - NETLENS_TOKEN=${NETLENS_TOKEN:?Set NETLENS_TOKEN in .env}
+      - NETLENS_BIND=0.0.0.0:8080
+```
+
+Create and chown the data directory as in option A, then run `docker compose up -d --build netlens` from the directory that holds your compose file. The other `NETLENS_*` variables in the table below can be added to `environment:` as needed.
+
+### Operating it
+
+```bash
+docker compose ps                  # status and health
+docker compose logs -f netlens     # logs (scan errors also appear in the UI under "Scans & events")
+docker compose up -d --build       # rebuild and restart after pulling new code
+docker compose down                # stop and remove the container (data in appdata is kept)
+```
+
+Do not use `--no-new-privileges` or remove the `NET_RAW`/`NET_ADMIN` capabilities: nmap runs as a non-root user and relies on file capabilities for raw sockets.
 
 ## Configuration
 
