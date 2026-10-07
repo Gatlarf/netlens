@@ -277,6 +277,24 @@ tests
 
 ## Troubleshooting
 
+- **Container keeps restarting (running, then restarting):** the app is exiting at startup and `restart: unless-stopped` starts it again. The reason is in the container log:
+
+  ```bash
+  docker compose logs --tail 50 netlens      # or: docker logs --tail 50 netlens
+  docker inspect netlens --format '{{.State.ExitCode}} {{.State.Error}}'
+  ```
+
+  Common causes and what the log shows:
+
+  | Log message | Fix |
+  |---|---|
+  | `PermissionError: [Errno 13] Permission denied: '/data...'` | The data directory is not writable by the container user. Run `sudo chown 10001:10001 $DOCKERDIR/appdata/netlens` |
+  | `NETLENS_TOKEN is required and must be non-empty` | Set `NETLENS_TOKEN` in `.env` |
+  | `NETLENS_RANGES contains non-scannable range` | Use private ranges only, no larger than /20 |
+  | `NETLENS_BIND must be in format host:port` | Fix the value, e.g. `0.0.0.0:8080` |
+  | `address already in use` | Another service on the host already uses port 8080 (the container uses host networking). Change `NETLENS_BIND` |
+
+  If `docker compose up` itself refuses to start, the message names the missing variable (for example `DOCKERDIR` or `NETLENS_TOKEN`). Run `docker compose config` to see the final configuration with all variables filled in.
 - **No devices found:** Check ranges, host networking, and that nmap has capabilities. Check `docker logs netlens`; scan errors appear under "Scans & events".
 - **OS detection empty:** Needs deep scan and root-capable nmap.
 - **Terminal button missing:** Port 22/23 not seen open yet, or `NETLENS_TERMINAL=off`.
