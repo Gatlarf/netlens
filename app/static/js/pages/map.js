@@ -264,7 +264,8 @@ export async function render(container, params) {
 
   network.on("selectNode", (params) => {
     if (destroyed) return;
-    const node = nodesDS.get(params.nodes[0]);
+    // nodesDS only holds drawing attributes; the device details come from /api/map.
+    const node = currentNodes.find((n) => n.id === params.nodes[0]);
     if (node) fillPanel(node);
   });
 
