@@ -40,6 +40,7 @@ class DevicePatch(BaseModel):
     notes: str | None = Field(default=None, max_length=4000)
     tags: list[str] | None = None
     type_override: str | None = None
+    notify_offline: bool | None = None
     pos_x: float | None = None
     pos_y: float | None = None
 
@@ -72,6 +73,7 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
         "name": row["custom_name"] or row["hostname"] or row["primary_ip"],
         "type": row["type_override"] or row["device_type"] or "unknown",
         "open_ports": row["open_ports"],
+        "notify_offline": bool(row["notify_offline"]),
     }
 
 
@@ -151,6 +153,7 @@ def list_devices(
             os_confidence,
             pos_x,
             pos_y,
+            notify_offline,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
     """
@@ -202,6 +205,7 @@ def get_device(
             os_confidence,
             pos_x,
             pos_y,
+            notify_offline,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
         WHERE id = ?
@@ -241,6 +245,7 @@ def patch_device(
             os_confidence,
             pos_x,
             pos_y,
+            notify_offline,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
         WHERE id = ?
@@ -287,6 +292,9 @@ def patch_device(
                 raise HTTPException(status_code=422, detail="max 40 chars per tag")
             updates["tags"] = ",".join(cleaned) if cleaned else None
 
+    if "notify_offline" in fields_set:
+        updates["notify_offline"] = 0 if body.notify_offline is False else 1
+
     if "pos_x" in fields_set:
         updates["pos_x"] = body.pos_x
 
@@ -319,6 +327,7 @@ def patch_device(
             os_confidence,
             pos_x,
             pos_y,
+            notify_offline,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
         WHERE id = ?

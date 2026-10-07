@@ -8,6 +8,7 @@ from app.scanner.nmap_runner import ScanError, run_nmap
 from app.scanner.nmap_parser import parse_nmap_xml
 from app.scanner.store import save_scan_results
 from app.uptime import record_checks
+from app.notify.service import process_notifications
 from app.scanner.presence import mark_offline
 from app.scanner.scans import create_scan, finish_scan, running_scan
 from app.scanner.netinfo import detect_ranges, detect_gateway
@@ -33,7 +34,10 @@ class ScanManager:
         ranges_provider=detect_ranges,
         gateway_provider=detect_gateway,
         nmap_path: str = "nmap",
+        after_scan: list | None = None,
     ) -> None:
+        # Async callables f(db_path) run after every successful scan; failures never fail the scan.
+        self.after_scan = [process_notifications] if after_scan is None else list(after_scan)
         self.db_path = db_path
         self.settings = settings
         self.runner = runner
@@ -176,6 +180,12 @@ class ScanManager:
                 now=utcnow(),
             )
             conn.commit()
+
+            for hook in self.after_scan:
+                try:
+                    await hook(str(self.db_path))
+                except Exception:
+                    logging.getLogger(__name__).exception("after-scan hook %r failed", hook)
         except Exception as exc:
             logging.getLogger(__name__).warning("scan %s failed: %r", scan_id, exc)
             conn = connect(self.db_path)
