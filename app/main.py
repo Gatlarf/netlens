@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import backup as backup_api, config, devices, events, export, notifications, relations, scans, uptime
+from app.api import backup as backup_api, config, devices, events, export, notifications, proxmox, relations, scans, uptime
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, require_auth
@@ -93,6 +93,7 @@ def create_app(
     app.include_router(uptime.router, dependencies=auth_deps)
     app.include_router(notifications.router, dependencies=auth_deps)
     app.include_router(backup_api.router, dependencies=auth_deps)
+    app.include_router(proxmox.router, dependencies=auth_deps)
 
     # Always mounted; each request is refused (404) while the terminal is switched off,
     # so it can be toggled at runtime from the Settings page.

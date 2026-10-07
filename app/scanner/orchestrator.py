@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 import sqlite3
 from typing import Any
@@ -9,6 +10,7 @@ from app.scanner.nmap_parser import parse_nmap_xml
 from app.scanner.store import save_scan_results
 from app.uptime import record_checks
 from app.notify.service import process_notifications
+from app.integrations.proxmox_sync import proxmox_after_scan
 from app.scanner.presence import mark_offline
 from app.scanner.scans import create_scan, finish_scan, running_scan
 from app.scanner.netinfo import detect_ranges, detect_gateway
@@ -37,7 +39,7 @@ class ScanManager:
         after_scan: list | None = None,
     ) -> None:
         # Async callables f(db_path) run after every successful scan; failures never fail the scan.
-        self.after_scan = [process_notifications] if after_scan is None else list(after_scan)
+        self.after_scan = [proxmox_after_scan, process_notifications] if after_scan is None else list(after_scan)
         self.db_path = db_path
         self.settings = settings
         self.runner = runner
@@ -46,6 +48,8 @@ class ScanManager:
         self.gateway_provider = gateway_provider
         self.nmap_path = nmap_path
         self._task: asyncio.Task | None = None
+        # Live state of the running scan for the UI: phase, nmap task/percent, hosts found so far.
+        self.progress: dict | None = None
 
     def is_running(self) -> bool:
         return self._task is not None and not self._task.done()
@@ -92,8 +96,19 @@ class ScanManager:
         if self._task is not None:
             await self._task
 
+    def _set_progress(self, **fields: Any) -> None:
+        self.progress = {**(self.progress or {}), **fields}
+
+    def _runner_accepts_progress(self) -> bool:
+        try:
+            params = inspect.signature(self.runner).parameters.values()
+        except (TypeError, ValueError):
+            return False
+        return any(p.name == "progress" or p.kind is inspect.Parameter.VAR_KEYWORD for p in params)
+
     async def _run(self, kind: str, scan_id: int) -> None:
         conn: sqlite3.Connection | None = None
+        self.progress = {"scan_id": scan_id, "kind": kind, "phase": "preparing", "task": None, "percent": None, "hosts_found": 0}
         try:
             targets = list(self.settings.ranges)
             if not targets:
@@ -101,17 +116,20 @@ class ScanManager:
             if not targets:
                 raise ScanError("no scan ranges found")
 
-            xml = await self.runner(
-                kind,
-                targets,
-                nmap_path=self.nmap_path,
-            )
+            self._set_progress(phase="scanning", targets=targets)
+            kwargs: dict[str, Any] = {"nmap_path": self.nmap_path}
+            if self._runner_accepts_progress():
+                kwargs["progress"] = lambda update: self._set_progress(**update)
+            xml = await self.runner(kind, targets, **kwargs)
             hosts = parse_nmap_xml(xml)
+            self._set_progress(phase="names", task=None, percent=None, hosts_found=len(hosts))
 
             try:
                 extra = await self.names_provider()
             except Exception:
                 extra = {}
+
+            self._set_progress(phase="saving")
 
             conn = connect(self.db_path)
             result = save_scan_results(
@@ -181,6 +199,7 @@ class ScanManager:
             )
             conn.commit()
 
+            self._set_progress(phase="finishing")
             for hook in self.after_scan:
                 try:
                     await hook(str(self.db_path))
@@ -203,3 +222,4 @@ class ScanManager:
         finally:
             if conn is not None:
                 conn.close()
+            self.progress = None

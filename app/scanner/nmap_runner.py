@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,7 +15,7 @@ class ScanError(RuntimeError):
     """Raised when an nmap scan fails."""
 
 
-def build_args(kind: str, targets: list[str], timing: int = 3) -> list[str]:
+def build_args(kind: str, targets: list[str], timing: int = 3, stats_every: str | None = None) -> list[str]:
     """Build nmap argument list (without executable name).
 
     Args:
@@ -47,6 +48,10 @@ def build_args(kind: str, targets: list[str], timing: int = 3) -> list[str]:
         ]
     else:
         raise ValueError(f"invalid kind: {kind!r}")
+
+    if stats_every:
+        # periodic <taskprogress> elements in the XML stream (used for live progress)
+        args[0:0] = ["--stats-every", stats_every]
 
     for target in targets:
         if not _is_valid_target(target):
@@ -81,6 +86,30 @@ def _is_valid_target(target: str) -> bool:
     return False
 
 
+_TASK_PROGRESS_RE = re.compile(r'<taskprogress task="([^"]*)"[^>]*?percent="([0-9.]+)"')
+_TASK_BEGIN_RE = re.compile(r'<taskbegin task="([^"]*)"')
+_HOST_RE = re.compile(r"<host[ >]")
+
+
+def _scan_progress(text: str, state: dict) -> dict | None:
+    """Update `state` from nmap's XML stream seen so far; return a progress dict if something changed."""
+    events = [(m.start(), m.group(1), 0.0) for m in _TASK_BEGIN_RE.finditer(text, state["pos"])]
+    events += [(m.start(), m.group(1), min(100.0, float(m.group(2)))) for m in _TASK_PROGRESS_RE.finditer(text, state["pos"])]
+    changed = False
+    for _, task, percent in sorted(events):  # apply in stream order
+        state.update(task=task, percent=percent)
+        changed = True
+    hosts = len(_HOST_RE.findall(text))
+    if hosts != state["hosts"]:
+        state["hosts"] = hosts
+        changed = True
+    # leave a small overlap so a tag split across two chunks is still found next time
+    state["pos"] = max(state["pos"], len(text) - 200)
+    if not changed:
+        return None
+    return {"task": state["task"], "percent": state["percent"], "hosts_found": state["hosts"]}
+
+
 async def run_nmap(
     kind: str,
     targets: list[str],
@@ -88,6 +117,7 @@ async def run_nmap(
     nmap_path: str = "nmap",
     timing: int = 3,
     timeout: float = 3600.0,
+    progress=None,
 ) -> str:
     """Run nmap and return stdout as UTF-8 string.
 
@@ -97,6 +127,7 @@ async def run_nmap(
         nmap_path: Path to nmap executable.
         timing: Nmap timing template (0-5).
         timeout: Timeout in seconds.
+        progress: Optional callable receiving {"task", "percent", "hosts_found"} while nmap runs.
 
     Returns:
         stdout decoded as UTF-8.
@@ -104,7 +135,7 @@ async def run_nmap(
     Raises:
         ScanError: If nmap fails, times out, or is not found.
     """
-    args = build_args(kind, targets, timing)
+    args = build_args(kind, targets, timing, stats_every="2s" if progress else None)
 
     try:
         process = await asyncio.create_subprocess_exec(
@@ -118,11 +149,32 @@ async def run_nmap(
     except OSError as exc:
         raise ScanError(f"cannot execute nmap: {exc}")
 
+    async def read_stdout() -> bytes:
+        chunks: list[bytes] = []
+        text = ""
+        state = {"pos": 0, "task": "", "percent": None, "hosts": 0}
+        while True:
+            chunk = await process.stdout.read(65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            if progress is not None:
+                text += chunk.decode("utf-8", errors="replace")
+                update = _scan_progress(text, state)
+                if update is not None:
+                    try:
+                        progress(update)
+                    except Exception:  # a broken progress callback must never break the scan
+                        pass
+        return b"".join(chunks)
+
+    async def run() -> tuple[bytes, bytes]:
+        stdout, stderr = await asyncio.gather(read_stdout(), process.stderr.read())
+        await process.wait()
+        return stdout, stderr
+
     try:
-        stdout, stderr = await asyncio.wait_for(
-            process.communicate(),
-            timeout=timeout,
-        )
+        stdout, stderr = await asyncio.wait_for(run(), timeout=timeout)
     except asyncio.TimeoutError:
         process.kill()
         raise ScanError("nmap timed out")

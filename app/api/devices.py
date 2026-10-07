@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from typing import Any
 
@@ -77,6 +78,44 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def _proxmox_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any] | None:
+    """Proxmox role of a device: it is a guest (VM/container) of a host and/or a host with guests."""
+    guest = None
+    row = conn.execute(
+        """
+        SELECT g.vmid, g.name, g.kind, g.node, g.status, g.host_device_id,
+               COALESCE(h.custom_name, h.hostname, h.primary_ip) AS host_name
+        FROM proxmox_guests g LEFT JOIN devices h ON h.id = g.host_device_id
+        WHERE g.device_id = ?
+        """,
+        (device_id,),
+    ).fetchone()
+    if row is not None:
+        guest = {k: row[k] for k in row.keys()}
+
+    rows = conn.execute(
+        """
+        SELECT g.vmid, g.name, g.kind, g.status, g.ips, g.device_id,
+               COALESCE(d.custom_name, d.hostname, d.primary_ip) AS device_name
+        FROM proxmox_guests g LEFT JOIN devices d ON d.id = g.device_id
+        WHERE g.host_device_id = ? ORDER BY g.vmid
+        """,
+        (device_id,),
+    ).fetchall()
+    guests = []
+    for r in rows:
+        item = {k: r[k] for k in r.keys()}
+        try:
+            item["ips"] = json.loads(item["ips"])
+        except (TypeError, ValueError):
+            item["ips"] = []
+        guests.append(item)
+
+    if guest is None and not guests:
+        return None
+    return {"guest": guest, "guests": guests}
+
+
 def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.Row) -> dict[str, Any]:
     result = _device_dict(row)
 
@@ -123,6 +162,8 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
         {"id": r["id"], "ts": r["ts"], "kind": r["kind"], "detail": r["detail"]}
         for r in events
     ]
+
+    result["proxmox"] = _proxmox_info(conn, device_id)
 
     return result
 

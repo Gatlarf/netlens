@@ -32,7 +32,8 @@ def get_current_scan(
     conn: Connection = Depends(get_conn),
 ) -> dict[str, Any]:
     scan = running_scan(conn)
-    return {"running": scan is not None, "scan": scan}
+    progress = request.app.state.scan_manager.progress if scan is not None else None
+    return {"running": scan is not None, "scan": scan, "progress": progress}
 
 
 @router.post("/scans", status_code=202)
