@@ -202,6 +202,8 @@ Order of precedence: the web setting, then `NETLENS_RANGES`, then auto-detection
 
 ## Settings in the web interface
 
+A menu on the left of the Settings page jumps to each section and highlights the one you are reading (on a narrow screen it becomes a row of buttons on top). Sections can be linked directly: `#/settings/ranges`, `nmap`, `schedule`, `notifications`, `proxmox`, `backup`, `about`, `export` and `session`, for example `http://<docker-host>:8080/#/settings/proxmox`.
+
 Everything below is saved in the data directory, so it survives updates and rebuilds. Values set in the browser take precedence over the matching environment variables; "Reset" returns to the environment value.
 
 | Card | What you can change |
@@ -273,7 +275,7 @@ Netlens must be able to see the guests' MAC addresses, so run it on the same net
 
 ### Scan progress
 
-While a scan runs, the header shows what it is doing, for example `Deep scan · Service scan 45% · 12 hosts`, with a progress bar for the current nmap step, the **time the scan has taken so far and the average of your recent scans of the same type** (for example `1m 16s (avg 7m 26s)`). The strip appears under the header only while a scan runs. Scan failures are explained (for example missing network capabilities) in **Scans & events** and in the logs.
+While a scan runs, the header shows what it is doing, for example `Deep scan · Service scan 45% · 12 hosts`, with a progress bar for the current nmap step, the **time the scan has taken so far and the typical duration of your recent scans of the same type** (the median of the last 20, so one scan that hung does not distort it), for example `1m 16s (typical 7m 26s)`. The strip appears under the header only while a scan runs. Scan failures are explained (for example missing network capabilities) in **Scans & events** and in the logs.
 
 ## How it works
 

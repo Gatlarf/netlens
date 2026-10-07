@@ -32,12 +32,12 @@ export function describeScan(res) {
   return { text: parts.join(" · "), percent };
 }
 
-// "1m 12s (avg 7m 26s)": time the running scan has taken so far and the mean of recent scans of the
-// same kind. `extraSeconds` is the time passed since the response arrived, so the display can tick
+// "1m 12s (typical 7m 26s)": time the running scan has taken so far and the typical (median)
+// duration of recent scans of the same kind. `extraSeconds` is the time passed since the response arrived, so the display can tick
 // between polls.
 export function describeTiming(res, extraSeconds = 0) {
   if (!res || !res.running || typeof res.elapsed_seconds !== "number") return "";
   const elapsed = humanDuration(Math.max(0, Math.round(res.elapsed_seconds + extraSeconds)));
-  if (typeof res.average_seconds !== "number") return elapsed;
-  return `${elapsed} (avg ${humanDuration(res.average_seconds)})`;
+  if (typeof res.typical_seconds !== "number") return elapsed;
+  return `${elapsed} (typical ${humanDuration(res.typical_seconds)})`;
 }

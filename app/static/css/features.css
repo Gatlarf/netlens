@@ -20,3 +20,16 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .scan-time { font-size: 0.9em; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .scan-info { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .scan-info[hidden] { display: none; }
+
+/* Settings page: side menu + sections */
+.settings-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 20px; align-items: start; }
+.settings-nav { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 2px; }
+.settings-nav a { display: block; padding: 7px 12px; border-radius: 6px; color: var(--text); text-decoration: none; font-size: 0.95em; border-left: 3px solid transparent; }
+.settings-nav a:hover { background: var(--bg); }
+.settings-nav a.active { background: var(--surface); border-left-color: var(--accent); font-weight: 600; box-shadow: 0 0 0 1px var(--border); }
+.settings-section { scroll-margin-top: 12px; }
+@media (max-width: 800px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .settings-nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .settings-nav a { border: 1px solid var(--border); background: var(--surface); }
+}

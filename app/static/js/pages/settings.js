@@ -88,16 +88,94 @@ function fillRangesCard(card, cfg) {
   card.appendChild(form);
 }
 
+// Sections of the page, in order. The side menu links to them and "#/settings/<key>" deep-links to one.
+const SECTIONS = [
+  { key: "ranges", label: "Scan ranges" },
+  { key: "nmap", label: "Scan performance" },
+  { key: "schedule", label: "Schedule & terminal" },
+  { key: "notifications", label: "E-mail notifications" },
+  { key: "proxmox", label: "Proxmox connector" },
+  { key: "backup", label: "Backup & restore" },
+  { key: "about", label: "About" },
+  { key: "export", label: "Export" },
+  { key: "session", label: "Session" },
+];
+
 export async function render(container, params) {
   clear(container);
 
+  // ---- layout: side menu + sections
+  const nav = h("nav", { class: "settings-nav", "aria-label": "Settings sections" });
+  const content = h("div", { class: "settings-content" });
+  container.appendChild(h("div", { class: "settings-layout" }, nav, content));
+
+  const sections = {};
+  const links = {};
+  for (const { key, label } of SECTIONS) {
+    sections[key] = h("section", { class: "settings-section", id: `sec-${key}` });
+    content.appendChild(sections[key]);
+    links[key] = h("a", {
+      href: `#/settings/${key}`,
+      "data-section": key,
+      onclick: (e) => {
+        e.preventDefault();
+        lockUntil = Date.now() + 600; // keep the clicked entry highlighted while the page scrolls there
+        sections[key].scrollIntoView({ behavior: "smooth", block: "start" });
+        setActive(key);
+      },
+    }, label);
+    nav.appendChild(links[key]);
+  }
+
+  let active = null;
+  let lockUntil = 0;
+  function setActive(key) {
+    if (key === active) return;
+    active = key;
+    for (const [k, link] of Object.entries(links)) {
+      link.classList.toggle("active", k === key);
+      if (k === key) link.setAttribute("aria-current", "true");
+      else link.removeAttribute("aria-current");
+    }
+  }
+
+  // Highlight the section being read: the last one whose top has reached the upper part of the screen.
+  let frame = null;
+  function updateActive() {
+    frame = null;
+    if (Date.now() < lockUntil) {
+      lockUntil = Date.now() + 150; // still scrolling to the clicked section: let it settle
+      return;
+    }
+    const bottomReached = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+    let current = SECTIONS[0].key;
+    for (const { key } of SECTIONS) {
+      if (sections[key].getBoundingClientRect().top <= 140) current = key;
+    }
+    setActive(bottomReached ? SECTIONS[SECTIONS.length - 1].key : current);
+  }
+  function onScroll() {
+    if (frame === null) frame = requestAnimationFrame(updateActive);
+  }
+  // the user scrolling by hand takes over from a menu click immediately
+  const unlock = () => { lockUntil = 0; };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  for (const type of ["wheel", "touchstart", "keydown"]) window.addEventListener(type, unlock, { passive: true });
+  setActive(params && sections[params.section] ? params.section : SECTIONS[0].key);
+
+  // ---- cards
+  const rangesCard = h("div", { class: "card" });
+  sections.ranges.appendChild(rangesCard);
+
   const configCard = h("div", { class: "card" });
   configCard.appendChild(h("h2", {}, "About"));
+  sections.about.appendChild(configCard);
 
   const exportCard = h("div", { class: "card" });
   exportCard.appendChild(h("h2", {}, "Export"));
   exportCard.appendChild(downloadLink("/api/export/devices.csv", "Devices CSV"));
   exportCard.appendChild(downloadLink("/api/export/devices.json", "Devices JSON"));
+  sections.export.appendChild(exportCard);
 
   const sessionCard = h("div", { class: "card" });
   sessionCard.appendChild(h("h2", {}, "Session"));
@@ -112,28 +190,21 @@ export async function render(container, params) {
     }
   });
   sessionCard.appendChild(logoutBtn);
+  sections.session.appendChild(sessionCard);
 
-  const rangesCard = h("div", { class: "card" });
-  container.appendChild(rangesCard);
-  const scanSlot = h("div", {});
-  const generalSlot = h("div", {});
-  const notifySlot = h("div", {});
-  const proxmoxSlot = h("div", {});
-  container.appendChild(scanSlot);
-  container.appendChild(generalSlot);
-  container.appendChild(notifySlot);
-  container.appendChild(proxmoxSlot);
-  container.appendChild(buildBackupCard());
-  container.appendChild(configCard);
-  for (const [slot, build] of [[scanSlot, buildScanOptionsCard], [generalSlot, buildGeneralCard], [notifySlot, buildNotificationsCard], [proxmoxSlot, buildProxmoxCard]]) {
+  sections.backup.appendChild(buildBackupCard());
+  for (const [key, build] of [
+    ["nmap", buildScanOptionsCard],
+    ["schedule", buildGeneralCard],
+    ["notifications", buildNotificationsCard],
+    ["proxmox", buildProxmoxCard],
+  ]) {
     build().then((card) => {
-      slot.appendChild(card);
+      sections[key].appendChild(card);
     }).catch((err) => {
-      slot.appendChild(h("div", { class: "card" }, h("p", { class: "error" }, err.message || "Failed to load")));
+      sections[key].appendChild(h("div", { class: "card" }, h("p", { class: "error" }, err.message || "Failed to load")));
     });
   }
-  container.appendChild(exportCard);
-  container.appendChild(sessionCard);
 
   try {
     const cfg = await get("/api/config");
@@ -148,13 +219,19 @@ export async function render(container, params) {
     const errCard = h("div", { class: "card" });
     errCard.appendChild(h("h2", {}, "Configuration"));
     errCard.appendChild(h("p", { class: "error" }, err.message || "Failed to load configuration"));
-    container.appendChild(errCard);
+    sections.about.appendChild(errCard);
   }
 
-  // "#/settings/nmap" (the header button) jumps straight to the nmap card. Done last so the
-  // cards above it have their final height and the card stays at the top of the screen.
-  if (params && params.section === "nmap") {
-    const target = document.getElementById("nmap-settings");
-    if (target) target.scrollIntoView({ block: "start" });
+  // A deep link ("#/settings/proxmox", or the header's Scan settings button -> "#/settings/nmap")
+  // jumps to its section. Done last so the cards above have their final height.
+  if (params && sections[params.section]) {
+    sections[params.section].scrollIntoView({ block: "start" });
   }
+
+  // the router calls this when the user leaves the page
+  return () => {
+    window.removeEventListener("scroll", onScroll);
+    for (const type of ["wheel", "touchstart", "keydown"]) window.removeEventListener(type, unlock);
+    if (frame !== null) cancelAnimationFrame(frame);
+  };
 }

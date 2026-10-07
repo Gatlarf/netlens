@@ -1,4 +1,5 @@
 import sqlite3
+import statistics
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -66,10 +67,11 @@ def _seconds_between(start: str, end: str) -> float:
     return (datetime.strptime(end, _TS_FORMAT) - datetime.strptime(start, _TS_FORMAT)).total_seconds()
 
 
-def average_duration(conn: sqlite3.Connection, kind: str, limit: int = 20) -> tuple[int | None, int]:
-    """Mean duration in seconds of the last `limit` successfully finished scans of `kind`.
+def typical_duration(conn: sqlite3.Connection, kind: str, limit: int = 20) -> tuple[int | None, int]:
+    """Typical (median) duration in seconds of the last `limit` successfully finished scans of `kind`.
 
-    Returns (average or None, number of scans used). Failed or unfinished scans are ignored.
+    The median is used instead of the mean so one scan that hung for an hour does not distort it.
+    Returns (typical or None, number of scans used). Failed or unfinished scans are ignored.
     """
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
@@ -87,7 +89,7 @@ def average_duration(conn: sqlite3.Connection, kind: str, limit: int = 20) -> tu
             durations.append(seconds)
     if not durations:
         return None, 0
-    return round(sum(durations) / len(durations)), len(durations)
+    return round(statistics.median(durations)), len(durations)
 
 
 def elapsed_seconds(started: str, now: datetime | None = None) -> int | None:
