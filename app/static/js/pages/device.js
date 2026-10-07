@@ -101,7 +101,7 @@ function buildPortsCard(device) {
   return card;
 }
 
-function buildEditCard(device) {
+function buildEditCard(device, onSaved) {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Edit"));
 
@@ -157,22 +157,19 @@ function buildEditCard(device) {
     e.preventDefault();
     const body = {
       custom_name: nameInput.value,
-      type_override: typeSelect.value,
+      type_override: typeSelect.value || null,
       tags: tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean),
       notes: notesTextarea.value,
     };
     try {
       await patch(`/api/devices/${device.id}`, body);
-      dirty = false;
-      toast("Saved", "success");
-      render(container, params);
     } catch (err) {
-      if (err instanceof ApiError) {
-        toast(err.message, "error");
-      } else {
-        toast("Save failed", "error");
-      }
+      toast(err instanceof ApiError ? err.message : "Save failed", "error");
+      return;
     }
+    dirty = false;
+    toast("Saved", "success");
+    onSaved();
   });
 
   card.appendChild(form);
@@ -247,72 +244,102 @@ function buildNotFound() {
 }
 
 export async function render(container, params) {
-  clear(container);
-
-  let device;
-  try {
-    device = await get(`/api/devices/${params.id}`);
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 404) {
-      container.appendChild(buildNotFound());
-      return;
-    }
-    toast("Failed to load device", "error");
-    return;
-  }
-
-  const heading = h("div", { class: "heading-row" });
-  heading.appendChild(statusDot(device.online));
-  heading.appendChild(h("h1", {}, device.name || device.primary_ip || "Unknown"));
-  heading.appendChild(typeBadge(device.type));
-  heading.appendChild(h("a", { href: "#/devices" }, "← Devices"));
-  container.appendChild(heading);
-
-  const grid = h("div", { class: "grid-2" });
-
-  const left = h("div", { class: "col-left" });
-  left.appendChild(buildDetailsCard(device));
-  left.appendChild(buildPortsCard(device));
-  grid.appendChild(left);
-
-  const right = h("div", { class: "col-right" });
-  const editResult = buildEditCard(device);
-  right.appendChild(editResult.card);
-  right.appendChild(buildNamesCard(device));
-  right.appendChild(buildEventsCard(device));
-  grid.appendChild(right);
-
-  container.appendChild(grid);
-
-  const terminalSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
-  container.appendChild(terminalSlot);
-
+  let disposed = false;
+  let loading = false;
+  let failing = false;
+  let editResult = null;
+  let terminalSlot = null;
   let terminalHandle = null;
-  try {
-    terminalHandle = await mountTerminal(terminalSlot, device);
-  } catch (err) {
-    toast("Terminal failed to load", "error");
-  }
 
-  const interval = setInterval(async () => {
-    if (isTerminalActive(terminalSlot)) return;
-    if (editResult.isDirty() || editResult.isFocused()) return;
-    try {
-      const fresh = await get(`/api/devices/${params.id}`);
-      render(container, params);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        render(container, params);
-      }
-    }
-  }, 20000);
-
-  const cleanup = () => {
-    clearInterval(interval);
+  const disposeTerminal = () => {
     if (terminalHandle && typeof terminalHandle.dispose === "function") {
       terminalHandle.dispose();
     }
+    terminalHandle = null;
   };
 
-  container._cleanup = cleanup;
+  // Builds the whole page off-screen and swaps it in, so a refresh never
+  // leaves half a page or two copies of it in the container.
+  async function show(device) {
+    const page = h("div", {});
+
+    const heading = h("div", { class: "heading-row" });
+    heading.appendChild(statusDot(device.online));
+    heading.appendChild(h("h1", {}, device.name || device.primary_ip || "Unknown"));
+    heading.appendChild(typeBadge(device.type));
+    heading.appendChild(h("a", { href: "#/devices" }, "← Devices"));
+    page.appendChild(heading);
+
+    const grid = h("div", { class: "grid-2" });
+    const left = h("div", { class: "col-left" });
+    left.appendChild(buildDetailsCard(device));
+    left.appendChild(buildPortsCard(device));
+    grid.appendChild(left);
+
+    const right = h("div", { class: "col-right" });
+    const newEdit = buildEditCard(device, () => load());
+    right.appendChild(newEdit.card);
+    right.appendChild(buildNamesCard(device));
+    right.appendChild(buildEventsCard(device));
+    grid.appendChild(right);
+    page.appendChild(grid);
+
+    const newSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
+    page.appendChild(newSlot);
+
+    disposeTerminal();
+    editResult = newEdit;
+    terminalSlot = newSlot;
+    clear(container);
+    container.appendChild(page);
+
+    try {
+      const handle = await mountTerminal(newSlot, device);
+      if (disposed || terminalSlot !== newSlot) {
+        if (handle && typeof handle.dispose === "function") handle.dispose();
+      } else {
+        terminalHandle = handle;
+      }
+    } catch (err) {
+      if (!disposed) toast("Terminal failed to load", "error");
+    }
+  }
+
+  async function load() {
+    if (loading || disposed) return;
+    loading = true;
+    try {
+      const device = await get(`/api/devices/${params.id}`);
+      if (disposed) return;
+      failing = false;
+      await show(device);
+    } catch (err) {
+      if (disposed) return;
+      if (err instanceof ApiError && err.status === 404) {
+        disposeTerminal();
+        clear(container);
+        container.appendChild(buildNotFound());
+        return;
+      }
+      // Report a failure once, not on every refresh while it persists.
+      if (!failing) toast("Failed to load device", "error");
+      failing = true;
+    } finally {
+      loading = false;
+    }
+  }
+
+  await load();
+
+  const interval = setInterval(() => {
+    if (terminalSlot && isTerminalActive(terminalSlot)) return;
+    if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
+    load();
+  }, 20000);
+
+  return () => {
+    disposed = true;
+    clearInterval(interval);
+    disposeTerminal();
+  };
 }
