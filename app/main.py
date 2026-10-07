@@ -29,6 +29,7 @@ VERSION = "0.1.0"
 async def lifespan(app: FastAPI):
     conn = connect(app.state.db_path)
     init_db(conn)
+    config.load_saved_ranges(app)
     app.state.scan_manager.recover()
 
     task = None
@@ -65,6 +66,8 @@ def create_app(
     app.add_middleware(SecurityHeadersMiddleware)
 
     app.state.settings = settings
+    app.state.env_ranges = tuple(getattr(settings, "ranges", ()))
+    app.state.ranges_override = False
     app.state.db_path = str(db_path) if db_path is not None else str(settings.data_dir / "netlens.db")
     app.state.scheduler = scheduler
     app.state.scan_manager = scan_manager or ScanManager(app.state.db_path, settings)

@@ -466,3 +466,5 @@ dialog#login-dialog::backdrop {
   .table-wrap { overflow-x: auto; }
   .map-panel { width: 100%; }
 }
+.hint { color: var(--muted); font-size: 0.85em; margin: 0.4em 0 0; }
+.error:empty { display: none; }

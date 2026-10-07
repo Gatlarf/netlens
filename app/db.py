@@ -329,3 +329,22 @@ def list_devices(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     )
     rows = cur.fetchall()
     return [dict(row) for row in rows]
+
+
+def get_setting(conn: sqlite3.Connection, key: str) -> str | None:
+    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
+    conn.commit()
+
+
+def delete_setting(conn: sqlite3.Connection, key: str) -> None:
+    conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+    conn.commit()

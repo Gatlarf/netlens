@@ -1,4 +1,4 @@
-import { get, post } from "../api.js";
+import { get, post, put } from "../api.js";
 import { h, clear, toast } from "../util.js";
 
 function kvRow(label, value) {
@@ -11,6 +11,76 @@ function kvRow(label, value) {
 function downloadLink(href, label) {
   const a = h("a", { class: "export-link", href, download: "" }, label);
   return a;
+}
+
+const SOURCE_TEXT = {
+  ui: "set on this page",
+  env: "from the NETLENS_RANGES environment variable",
+  auto: "auto-detected from this host's network interfaces",
+};
+
+function fillRangesCard(card, cfg) {
+  clear(card);
+  card.appendChild(h("h2", {}, "Scan ranges"));
+
+  const current = cfg.ranges && cfg.ranges.length > 0
+    ? cfg.ranges.join(", ")
+    : (cfg.detected_ranges && cfg.detected_ranges.length > 0
+      ? cfg.detected_ranges.join(", ")
+      : "none found");
+  card.appendChild(kvRow("Scanning", current));
+  card.appendChild(kvRow("Source", SOURCE_TEXT[cfg.ranges_source] || ""));
+  if (cfg.ranges_source !== "auto" && cfg.detected_ranges && cfg.detected_ranges.length > 0) {
+    card.appendChild(kvRow("Detected on this host", cfg.detected_ranges.join(", ")));
+  }
+
+  const form = h("form", { class: "edit-form" });
+  const field = h("div", { class: "field" });
+  field.appendChild(h("label", {}, "Ranges to scan"));
+  const input = h("input", {
+    type: "text",
+    name: "ranges",
+    placeholder: "e.g. 192.168.1.0/24, 10.0.0.0/22",
+    value: cfg.ranges_source === "ui" ? cfg.ranges.join(", ") : "",
+  });
+  field.appendChild(input);
+  field.appendChild(h("p", { class: "hint" },
+    "Separate several ranges with commas. Private IPv4 only (10.x, 172.16-31.x, 192.168.x), " +
+    "each /20 or smaller. Applies from the next scan. It also limits which devices the web " +
+    "terminal may connect to. Leave empty and save, or use Reset, to go back to the default."));
+  form.appendChild(field);
+
+  const errorEl = h("p", { class: "error" }, "");
+  form.appendChild(errorEl);
+
+  const saveBtn = h("button", { type: "submit", class: "btn" }, "Save");
+  const resetBtn = h("button", { type: "button", class: "btn" }, "Reset to default");
+  form.appendChild(saveBtn);
+  form.appendChild(resetBtn);
+
+  async function submit(ranges, doneMessage) {
+    errorEl.textContent = "";
+    saveBtn.disabled = true;
+    resetBtn.disabled = true;
+    try {
+      const updated = await put("/api/config/ranges", { ranges });
+      toast(doneMessage, "success");
+      fillRangesCard(card, updated);
+    } catch (err) {
+      errorEl.textContent = err.message || "Failed to save";
+      saveBtn.disabled = false;
+      resetBtn.disabled = false;
+    }
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const ranges = input.value.split(/[\s,;]+/).filter(Boolean);
+    submit(ranges, ranges.length > 0 ? "Scan ranges saved" : "Scan ranges reset");
+  });
+  resetBtn.addEventListener("click", () => submit([], "Scan ranges reset"));
+
+  card.appendChild(form);
 }
 
 export async function render(container, params) {
@@ -38,6 +108,8 @@ export async function render(container, params) {
   });
   sessionCard.appendChild(logoutBtn);
 
+  const rangesCard = h("div", { class: "card" });
+  container.appendChild(rangesCard);
   container.appendChild(configCard);
   container.appendChild(exportCard);
   container.appendChild(sessionCard);
@@ -47,10 +119,7 @@ export async function render(container, params) {
 
     configCard.appendChild(kvRow("Version", cfg.version ?? ""));
 
-    const ranges = Array.isArray(cfg.ranges) && cfg.ranges.length > 0
-      ? cfg.ranges.join(", ")
-      : "auto-detected";
-    configCard.appendChild(kvRow("Scan ranges", ranges));
+    fillRangesCard(rangesCard, cfg);
 
     const quickMin = cfg.quick_interval != null
       ? (cfg.quick_interval / 60).toFixed(0)

@@ -50,6 +50,30 @@ def is_scannable_range(cidr: str) -> bool:
     return False
 
 
+def normalize_ranges(items) -> list[str]:
+    """Validate and normalize user-supplied scan ranges (CIDR or single IPv4).
+
+    Raises ValueError naming the first bad entry. Duplicates are dropped, order is kept.
+    """
+    result: list[str] = []
+    for raw in items:
+        raw = str(raw).strip()
+        if not raw:
+            continue
+        try:
+            network = ipaddress.ip_network(raw, strict=False)
+        except ValueError:
+            raise ValueError(f"invalid address or CIDR: {raw}")
+        normalized = str(network)
+        if not is_scannable_range(normalized):
+            raise ValueError(
+                f"not scannable: {raw} (private IPv4 ranges only, /20 or smaller)"
+            )
+        if normalized not in result:
+            result.append(normalized)
+    return result
+
+
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     if env is None:
         env = os.environ

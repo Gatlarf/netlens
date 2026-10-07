@@ -21,6 +21,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Device type classification by rules (vendor, OS, ports, hostnames)
 - Network map with gateway, route, host-of, and manual edges
 - Web terminal (SSH and Telnet) via xterm.js
+- Scan ranges editable in the web UI (Settings), no restart needed
 - CSV and JSON export of devices
 - PNG export of the network map
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
@@ -169,13 +170,22 @@ Restoring the backup matters because a newer version may have changed the databa
 | Variable | Default | Description |
 |---|---|---|
 | `NETLENS_TOKEN` | *(required)* | Access token for login |
-| `NETLENS_RANGES` | auto-detect | Private ranges only, prefix >= /20 |
+| `NETLENS_RANGES` | auto-detect | Private ranges only, prefix >= /20. Can also be changed at runtime in the web UI (see below); the web setting takes precedence |
 | `NETLENS_QUICK_INTERVAL` | `900` | Quick scan interval in seconds |
 | `NETLENS_DEEP_INTERVAL` | `86400` | Deep scan interval in seconds |
 | `NETLENS_TERMINAL` | `on` | Enable/disable web terminal |
 | `NETLENS_SNMP_COMMUNITY` | *(reserved/unused)* | SNMP community string |
 | `NETLENS_BIND` | `0.0.0.0:8080` | Bind address and port |
 | `NETLENS_DATA_DIR` | `/data` | Data directory |
+
+### Choosing what to scan
+
+By default Netlens scans the networks it finds on the Docker host's interfaces. You can restrict or change that in two ways:
+
+- **Web UI (recommended):** open **Settings → Scan ranges**, enter one or more ranges separated by commas (for example `192.168.1.0/24, 10.0.0.0/22`) and press **Save**. It takes effect from the next scan, with no restart. It is stored in the data directory, so it survives updates and rebuilds. **Reset to default** removes it.
+- **Environment variable:** `NETLENS_RANGES` in `.env`, same format.
+
+Order of precedence: the web setting, then `NETLENS_RANGES`, then auto-detection. Only private IPv4 ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, and link-local) of /20 or smaller are accepted, and a single address such as `192.168.1.10` works too. When ranges are set, the web terminal can only connect to devices inside them.
 
 ## How it works
 
