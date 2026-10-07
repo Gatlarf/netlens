@@ -78,9 +78,9 @@ def test_api_cache_control_no_store(client):
     assert r.headers["Cache-Control"] == "no-store"
 
 
-def test_page_no_cache_control_added(client):
+def test_page_revalidates(client):
     r = client.get("/page")
-    assert "Cache-Control" not in r.headers
+    assert r.headers["Cache-Control"] == "no-cache"
 
 
 def test_cached_keeps_own_cache_control(client):

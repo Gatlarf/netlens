@@ -48,6 +48,10 @@ class SecurityHeadersMiddleware:
 
                 if is_api:
                     add_header("Cache-Control", "no-store")
+                else:
+                    # Static UI files: always revalidate (cheap 304 via ETag) so a
+                    # redeploy is picked up immediately instead of a stale cached module.
+                    add_header("Cache-Control", "no-cache")
 
                 message["headers"] = headers
 
