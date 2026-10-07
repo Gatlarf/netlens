@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="css/pages.css">
   <link rel="stylesheet" href="css/map.css">
   <link rel="stylesheet" href="css/terminal.css">
+  <link rel="stylesheet" href="css/features.css">
 </head>
 <body>
   <header class="topbar">
@@ -15,11 +16,12 @@
     <nav id="nav">
       <a class="nav-link" href="#/map" data-route="map">Map</a>
       <a class="nav-link" href="#/devices" data-route="devices">Devices</a>
+      <a class="nav-link" href="#/uptime" data-route="uptime">Uptime</a>
       <a class="nav-link" href="#/scans" data-route="scans">Scans &amp; events</a>
       <a class="nav-link" href="#/settings" data-route="settings">Settings</a>
     </nav>
     <div class="topbar-actions">
-      <span id="scan-status" class="scan-status"></span>
+      <span id="scan-status" class="scan-status"></span><progress id="scan-progress" class="scan-progress" max="100" hidden></progress>
       <button id="scan-quick" class="btn">Quick scan</button>
       <button id="scan-deep" class="btn">Deep scan</button>
       <button id="logout" class="btn ghost">Log out</button>

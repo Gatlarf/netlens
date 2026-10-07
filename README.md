@@ -25,6 +25,12 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - CSV and JSON export of devices
 - PNG export of the network map
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
+- Uptime history like Uptime Kuma: heartbeat bars, 24 h / 7 d / 30 d uptime and response times per device
+- E-mail notifications for new and offline devices, with an on/off switch per device
+- Proxmox connector: shows which VMs and containers run on which Proxmox host, on the map and on the device pages
+- Live scan progress in the header
+- Backup and restore of everything from the Settings page
+- Every setting you need day to day (ranges, schedule, terminal, mail, Proxmox) is editable in the browser
 
 ## Build and deploy with Docker Compose
 
@@ -57,7 +63,10 @@ If you already keep all your services in one `docker-compose.yml` with a shared 
 
 ```yaml
   netlens:
-    build: ${DOCKERDIR}/build/netlens
+    build:
+      context: ${DOCKERDIR}/build/netlens
+      args:
+        NETLENS_VERSION: ${NETLENS_VERSION:-dev}
     image: netlens:latest
     container_name: netlens
     restart: unless-stopped
@@ -112,7 +121,7 @@ Do not use `--no-new-privileges` or remove the `NET_RAW`/`NET_ADMIN` capabilitie
 
 Netlens is built from source, so updating means pulling the new code and rebuilding the image. Your data lives in `$DOCKERDIR/appdata/netlens` and is not touched by a rebuild. Releases and changes are listed at https://github.com/Gatlarf/netlens/commits/main; while the project is in development, check for changes to the data format or configuration before updating.
 
-1. **Back up the data** (recommended before every update):
+1. **Back up the data** (recommended before every update). The easiest way is **Settings → Backup and restore → Download backup**. From the command line:
 
    ```bash
    docker compose stop netlens
@@ -130,8 +139,12 @@ Netlens is built from source, so updating means pulling the new code and rebuild
 3. **Rebuild and restart** from the directory that holds your compose file (for option B, `$DOCKERDIR`):
 
    ```bash
-   docker compose up -d --build netlens      # option A: docker compose up -d --build
+   # The version number rises with every commit: <VERSION file>.<commit count>
+   export NETLENS_VERSION="$(tr -d '[:space:]' < build/netlens/VERSION).$(git -C build/netlens rev-list --count HEAD)"   # option B
+   docker compose up -d --build netlens      # option A: run in the clone, and use NETLENS_VERSION="$(tr -d '[:space:]' < VERSION).$(git rev-list --count HEAD)"
    ```
+
+   If you skip the `NETLENS_VERSION` line the app still works, it just reports the version as `dev`.
 
    Compose rebuilds the image, recreates the container, and starts it again with the same settings and the same data directory.
 
@@ -187,6 +200,63 @@ By default Netlens scans the networks it finds on the Docker host's interfaces. 
 
 Order of precedence: the web setting, then `NETLENS_RANGES`, then auto-detection. Only private IPv4 ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, and link-local) of /20 or smaller are accepted, and a single address such as `192.168.1.10` works too. When ranges are set, the web terminal can only connect to devices inside them.
 
+## Settings in the web interface
+
+Everything below is saved in the data directory, so it survives updates and rebuilds. Values set in the browser take precedence over the matching environment variables; "Reset" returns to the environment value.
+
+| Card | What you can change |
+|---|---|
+| Scan ranges | which networks are scanned (see "Choosing what to scan") |
+| Scan schedule and terminal | how often quick and deep scans run, and the web terminal on/off. Takes effect from the next scheduler cycle, no restart |
+| E-mail notifications | SMTP server and recipients (see below) |
+| Proxmox connector | Proxmox URL and credentials (see below) |
+| Backup and restore | download a snapshot, restore one |
+
+### Version
+
+The header shows the running version. It is `<major.minor from the VERSION file>.<number of commits>`, so it rises with every commit and every published image, for example `0.2.57`. The pre-built image is tagged with it (`ghcr.io/gatlarf/netlens:0.2.57`) as well as `latest`. Builds from source report `dev` unless you pass `NETLENS_VERSION` as shown under "Updating".
+
+### Uptime history
+
+After every scan Netlens records, for each device inside the scanned ranges, whether it answered (and its response time when nmap reports one). The **Uptime** page shows a heartbeat bar per device (green = up, red = down, newest on the right) with 24 hour and 7 day uptime, like Uptime Kuma. Each device page has a larger bar, 24 h / 7 d / 30 d uptime, average response time, how long the current state has lasted, and a response-time graph. History is kept for 90 days. The resolution is your scan interval (15 minutes by default); shorten it under Settings for finer detail.
+
+### E-mail notifications
+
+1. Open **Settings → E-mail notifications**, enter your SMTP server, port and security (STARTTLS, SSL/TLS or none), username and password, the sender and one or more recipients (comma separated).
+2. Press **Save**, then **Send test email** to check the settings. A failure is explained in plain words (wrong password, host not found, connection refused, ...).
+3. Tick **Send e-mail notifications** and save.
+
+After each scan Netlens sends **one digest mail** listing the devices that appeared ("new devices") and the devices that went offline. Switching notifications on starts from that moment: you never get a mail about the backlog. If the mail server is down, the events are kept and sent after a later scan.
+
+You can switch the offline mails off **per device** with the checkbox "Send an e-mail when this device goes offline" on the device page (useful for phones and laptops that come and go). New-device mails always go out when that option is on.
+
+The SMTP password is stored in the database in plain text (like all settings) and is included in backups, so protect the data directory and the backup files.
+
+### Proxmox connector
+
+The connector asks Proxmox which VMs and containers exist and which host they run on, and matches them to the devices Netlens found (by MAC address, then by IP). The result:
+
+- the map shows a `host-of` link from every guest to its Proxmox host (confidence 100%, replacing the heuristic guess),
+- a guest's device page shows "Container (LXC) 105, name, on node X" with a link to the host,
+- the host's device page lists all its guests, including stopped ones and guests that are not on the scanned network.
+
+Netlens only reads from Proxmox; it never changes anything. To set it up:
+
+1. **Recommended: create a read-only API token** in Proxmox: *Datacenter → Permissions → API Tokens → Add* (user for example `root@pam`, token ID `netlens`, untick "Privilege Separation" or give the token the role below). Then *Datacenter → Permissions → Add → API Token Permission*: path `/`, the token, role **PVEAuditor**. A username and password work too, but a token limits what a leaked credential can do.
+2. In Netlens open **Settings → Proxmox connector**, enter the URL (`https://<proxmox-host>:8006`), the token ID (`user@realm!tokenname`) and its secret, or a username and password.
+3. Proxmox uses a self-signed certificate by default: untick **Verify TLS certificate**, or install a trusted certificate on Proxmox and keep it ticked.
+4. **Test connection** (nothing is saved by the test), then tick **Enable the connector** and **Save**. It syncs immediately and again after every scan; **Sync now** forces it.
+
+Netlens must be able to see the guests' MAC addresses, so run it on the same network (host networking, as in the compose file). Guests whose MAC never shows up in a scan are listed on the host page as "not seen on the network".
+
+### Backup and restore
+
+**Settings → Backup and restore → Download backup** gives you a consistent snapshot of the whole database (devices, history, settings, saved credentials) while Netlens keeps running. **Restore from file** replaces the current data with a backup; it asks for confirmation, refuses to run during a scan, keeps a safety copy of the previous data next to the database (`netlens.db.pre-restore`), and upgrades a backup made by an older version automatically. A backup from a newer Netlens version is refused. Treat backup files like passwords because they contain the saved SMTP and Proxmox credentials.
+
+### Scan progress
+
+While a scan runs, the header shows what it is doing, for example `Deep scan · Service scan 45% · 12 hosts`, with a progress bar for the current nmap step. Scan failures are explained (for example missing network capabilities) in **Scans & events** and in the logs.
+
 ## How it works
 
 ### Quick scans
@@ -227,7 +297,7 @@ Order of precedence: the web setting, then `NETLENS_RANGES`, then auto-detection
 
 - **gateway** — default route, confidence 1.0 or heuristic 0.5
 - **route** — traceroute hops
-- **host-of** — VM to a single probable hypervisor, heuristic
+- **host-of** — VM or container to its hypervisor: exact when the Proxmox connector is enabled, otherwise a heuristic guess
 - **manual** — drawn or deleted links in the UI; deleted inferred links stay hidden
 
 ### Map features
@@ -269,7 +339,7 @@ Order of precedence: the web setting, then `NETLENS_RANGES`, then auto-detection
 - Switch-to-device links come only from traceroute/heuristics/manual
 - IPv6 hosts are ignored
 - No multi-user accounts
-- No alerts or notifications
+- Notifications are e-mail only (no webhooks, Telegram, ntfy, ...)
 - No vulnerability scanning
 - No embedded proxying of device web UIs
 - VNC/RDP only as links
@@ -283,7 +353,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-- About 480 tests, no real network or nmap needed
+- About 600 tests (including a static check of the browser modules), no real network or nmap needed
 - nmap output tested against XML fixtures in `tests/fixtures`
 
 Run locally:
@@ -297,10 +367,13 @@ NETLENS_TOKEN=dev NETLENS_DATA_DIR=./data python -m app.main
 ### Project layout
 
 ```
-app/scanner
-app/terminal
-app/api
-app/static
+app/scanner      nmap runner, parsing, scheduling, relations
+app/notify       e-mail notifications (config, SMTP, digest, service)
+app/integrations Proxmox client, matching and sync
+app/terminal     SSH/Telnet backends
+app/api          REST API routers
+app/uptime.py    uptime history, app/backup.py  backup and restore
+app/static       web UI (js/pages, js/cards)
 tests
 ```
 
@@ -324,6 +397,9 @@ tests
   | `address already in use` | Another service on the host already uses port 8080 (the container uses host networking). Change `NETLENS_BIND` |
 
   If `docker compose up` itself refuses to start, the message names the missing variable (for example `DOCKERDIR` or `NETLENS_TOKEN`). Run `docker compose config` to see the final configuration with all variables filled in.
+- **Proxmox sync fails:** the message in Settings says why. `the TLS certificate could not be verified`: untick *Verify TLS certificate* (Proxmox's default certificate is self-signed). `authentication failed`: check the token ID (`user@realm!tokenname`), the secret, or the password. `permission denied (... PVEAuditor)`: give the token or user the PVEAuditor role on `/`. `cannot connect`: wrong URL/port or a firewall.
+- **No notification mails:** use **Send test email** first. Check that *Send e-mail notifications* is ticked, that the device has not opted out, and the status line under the card for the last problem. Gmail and most providers need an app password, not your normal password.
+- **A guest does not show under its Proxmox host:** the connector matches by MAC address, so Netlens must have scanned that guest at least once on the same network. Run a scan and press *Sync now*.
 - **No devices found:** Check ranges, host networking, and that nmap has capabilities. Check `docker logs netlens`; scan errors appear under "Scans & events".
 - **OS detection empty:** Needs deep scan and root-capable nmap.
 - **Terminal button missing:** Port 22/23 not seen open yet, or `NETLENS_TERMINAL=off`.

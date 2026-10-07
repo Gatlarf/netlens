@@ -1,3 +1,4 @@
+import { describeScan } from "./progress.js";
 import { get, post, ApiError } from "./api.js";
 import { clear, toast, el } from "./util.js";
 
@@ -6,6 +7,7 @@ const ROUTES = {
   "#/": "map",
   "#/map": "map",
   "#/devices": "devices",
+  "#/uptime": "uptime",
   "#/scans": "scans",
   "#/settings": "settings",
 };
@@ -98,8 +100,18 @@ function startPoll() {
       const res = await get("/api/scans/current");
       const running = res.running;
       const statusEl = el("#scan-status");
+      const barEl = el("#scan-progress");
+      const info = describeScan(res);
       if (statusEl) {
-        statusEl.textContent = running ? "Scanning…" : "";
+        statusEl.textContent = running ? info.text || "Scanning…" : "";
+      }
+      if (barEl) {
+        barEl.hidden = !running;
+        if (running && info.percent !== null) {
+          barEl.value = info.percent;
+        } else {
+          barEl.removeAttribute("value"); // indeterminate while there is no percentage
+        }
       }
       const quickBtn = el("#scan-quick");
       const deepBtn = el("#scan-deep");
@@ -113,7 +125,7 @@ function startPoll() {
     } catch (e) {
       // ignore polling errors
     }
-  }, 3000);
+  }, 2000);
 }
 
 function stopPoll() {
@@ -124,6 +136,8 @@ function stopPoll() {
   wasRunning = false;
   const statusEl = el("#scan-status");
   if (statusEl) statusEl.textContent = "";
+  const barEl = el("#scan-progress");
+  if (barEl) barEl.hidden = true;
   const quickBtn = el("#scan-quick");
   const deepBtn = el("#scan-deep");
   if (quickBtn) quickBtn.disabled = false;

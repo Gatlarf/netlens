@@ -1,0 +1,18 @@
+/* Uptime heartbeat bars, sparkline and scan progress (added with the uptime/progress features) */
+.hb-bar { display: flex; gap: 2px; align-items: stretch; height: 22px; min-width: 120px; }
+.hb { flex: 1 1 0; min-width: 3px; max-width: 8px; border-radius: 2px; }
+.hb-up { background: var(--ok); }
+.hb-down { background: var(--bad); }
+.hb-empty { background: var(--border); opacity: 0.5; }
+.up-good { color: var(--ok); font-weight: 600; }
+.up-ok { color: #b45309; font-weight: 600; }
+.up-bad { color: var(--bad); font-weight: 600; }
+.up-na { color: var(--muted); }
+.sparkline { width: 100%; max-width: 320px; height: 36px; color: var(--accent); }
+.uptime-filter { margin: 8px 0; max-width: 280px; }
+.scan-progress { width: 90px; height: 8px; vertical-align: middle; margin-right: 8px; }
+.scan-status { font-size: 0.85em; color: var(--muted); margin-right: 6px; }
+.card h3 { margin: 14px 0 6px; font-size: 1em; }
+/* checkbox fields: keep the box next to its label instead of stretching it full width */
+.field input[type="checkbox"] { width: auto; margin-right: 6px; vertical-align: middle; }
+.field input[type="file"] { width: 100%; }

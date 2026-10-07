@@ -1,5 +1,9 @@
 import { get, post, put } from "../api.js";
 import { h, clear, toast } from "../util.js";
+import { buildGeneralCard } from "../cards/general.js";
+import { buildNotificationsCard } from "../cards/notifications.js";
+import { buildProxmoxCard } from "../cards/proxmox.js";
+import { buildBackupCard } from "../cards/backup.js";
 
 function kvRow(label, value) {
   const row = h("div", { class: "kv" });
@@ -87,7 +91,7 @@ export async function render(container, params) {
   clear(container);
 
   const configCard = h("div", { class: "card" });
-  configCard.appendChild(h("h2", {}, "Configuration (read-only, set via environment variables)"));
+  configCard.appendChild(h("h2", {}, "About"));
 
   const exportCard = h("div", { class: "card" });
   exportCard.appendChild(h("h2", {}, "Export"));
@@ -110,7 +114,19 @@ export async function render(container, params) {
 
   const rangesCard = h("div", { class: "card" });
   container.appendChild(rangesCard);
+  const generalSlot = h("div", {});
+  const notifySlot = h("div", {});
+  const proxmoxSlot = h("div", {});
+  container.appendChild(generalSlot);
+  container.appendChild(notifySlot);
+  container.appendChild(proxmoxSlot);
+  container.appendChild(buildBackupCard());
   container.appendChild(configCard);
+  for (const [slot, build] of [[generalSlot, buildGeneralCard], [notifySlot, buildNotificationsCard], [proxmoxSlot, buildProxmoxCard]]) {
+    build().then((card) => slot.appendChild(card)).catch((err) => {
+      slot.appendChild(h("div", { class: "card" }, h("p", { class: "error" }, err.message || "Failed to load")));
+    });
+  }
   container.appendChild(exportCard);
   container.appendChild(sessionCard);
 
@@ -121,17 +137,6 @@ export async function render(container, params) {
 
     fillRangesCard(rangesCard, cfg);
 
-    const quickMin = cfg.quick_interval != null
-      ? (cfg.quick_interval / 60).toFixed(0)
-      : "";
-    configCard.appendChild(kvRow("Quick scan interval (minutes)", quickMin));
-
-    const deepHours = cfg.deep_interval != null
-      ? (cfg.deep_interval / 3600).toFixed(1)
-      : "";
-    configCard.appendChild(kvRow("Deep scan interval (hours)", deepHours));
-
-    configCard.appendChild(kvRow("Web terminal", cfg.terminal_enabled ? "enabled" : "disabled"));
     configCard.appendChild(kvRow("SNMP", cfg.snmp_enabled ? "enabled" : "disabled"));
     configCard.appendChild(kvRow("Listening on", cfg.bind ?? ""));
   } catch (err) {

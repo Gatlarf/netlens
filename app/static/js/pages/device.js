@@ -1,6 +1,7 @@
 import { get, patch, ApiError } from "../api.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS } from "../util.js";
 import { mountTerminal, isTerminalActive } from "../terminal.js";
+import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 
 const WEB_PORTS = new Set([80, 443, 8080, 8443, 8006, 5000, 5001, 9000]);
 
@@ -139,13 +140,19 @@ function buildEditCard(device, onSaved) {
   notesField.appendChild(notesTextarea);
   form.appendChild(notesField);
 
+  const notifyField = h("div", { class: "field" });
+  const notifyInput = h("input", { type: "checkbox", name: "notify_offline", checked: device.notify_offline !== false });
+  notifyField.appendChild(h("label", {}, notifyInput, " Send an e-mail when this device goes offline"));
+  notifyField.appendChild(h("p", { class: "hint" }, "Needs e-mail notifications to be set up under Settings."));
+  form.appendChild(notifyField);
+
   const saveBtn = h("button", { type: "submit" }, "Save");
   form.appendChild(saveBtn);
 
   let dirty = false;
   let focused = false;
 
-  const fields = [nameInput, typeSelect, tagsInput, notesTextarea];
+  const fields = [nameInput, typeSelect, tagsInput, notesTextarea, notifyInput];
   for (const f of fields) {
     f.addEventListener("input", () => { dirty = true; });
     f.addEventListener("change", () => { dirty = true; });
@@ -160,6 +167,7 @@ function buildEditCard(device, onSaved) {
       type_override: typeSelect.value || null,
       tags: tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean),
       notes: notesTextarea.value,
+      notify_offline: notifyInput.checked,
     };
     try {
       await patch(`/api/devices/${device.id}`, body);
@@ -175,6 +183,44 @@ function buildEditCard(device, onSaved) {
   card.appendChild(form);
 
   return { card, isDirty: () => dirty, isFocused: () => focused };
+}
+
+function buildProxmoxCard(device) {
+  const info = device.proxmox;
+  if (!info) return null;
+  const card = h("div", { class: "card" });
+  card.appendChild(h("h2", {}, "Proxmox"));
+
+  if (info.guest) {
+    const g = info.guest;
+    const kind = g.kind === "lxc" ? "Container (LXC)" : "Virtual machine";
+    card.appendChild(kvRow("Runs as", h("span", {}, `${kind} ${g.vmid}, ${g.name}`)));
+    card.appendChild(kvRow("Status", h("span", {}, g.status)));
+    card.appendChild(kvRow("Node", h("span", {}, g.node)));
+    if (g.host_device_id) {
+      card.appendChild(kvRow("Host", h("a", { href: `#/device/${g.host_device_id}` }, g.host_name || `device ${g.host_device_id}`)));
+    }
+  }
+
+  if (info.guests && info.guests.length > 0) {
+    card.appendChild(h("p", { class: "hint" }, `Proxmox host with ${info.guests.length} guest${info.guests.length === 1 ? "" : "s"}:`));
+    const table = h("table", { class: "data" });
+    const headRow = h("tr");
+    ["ID", "Name", "Type", "Status", "Device"].forEach((c) => headRow.appendChild(h("th", {}, c)));
+    table.appendChild(h("thead", {}, headRow));
+    const tbody = h("tbody");
+    for (const g of info.guests) {
+      const deviceCell = g.device_id
+        ? h("td", {}, h("a", { href: `#/device/${g.device_id}` }, g.device_name || `device ${g.device_id}`))
+        : h("td", { class: "hint" }, g.status === "running" ? "not seen on the network" : "not running");
+      tbody.appendChild(h("tr", {},
+        h("td", {}, String(g.vmid)), h("td", {}, g.name), h("td", {}, g.kind === "lxc" ? "LXC" : "VM"),
+        h("td", {}, g.status), deviceCell));
+    }
+    table.appendChild(tbody);
+    card.appendChild(table);
+  }
+  return card;
 }
 
 function buildNamesCard(device) {
@@ -279,6 +325,11 @@ export async function render(container, params) {
     const right = h("div", { class: "col-right" });
     const newEdit = buildEditCard(device, () => load());
     right.appendChild(newEdit.card);
+    const proxmoxCard = buildProxmoxCard(device);
+    if (proxmoxCard) right.appendChild(proxmoxCard);
+    const uptimeSlot = h("div", {});
+    right.appendChild(uptimeSlot);
+    buildDeviceUptimeCard(device.id).then((c) => { if (!disposed) uptimeSlot.appendChild(c); }).catch(() => {});
     right.appendChild(buildNamesCard(device));
     right.appendChild(buildEventsCard(device));
     grid.appendChild(right);
