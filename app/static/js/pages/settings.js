@@ -1,5 +1,6 @@
 import { get, post, put } from "../api.js";
 import { h, clear, toast } from "../util.js";
+import { buildScanOptionsCard } from "../cards/scan_options.js";
 import { buildGeneralCard } from "../cards/general.js";
 import { buildNotificationsCard } from "../cards/notifications.js";
 import { buildProxmoxCard } from "../cards/proxmox.js";
@@ -114,16 +115,20 @@ export async function render(container, params) {
 
   const rangesCard = h("div", { class: "card" });
   container.appendChild(rangesCard);
+  const scanSlot = h("div", {});
   const generalSlot = h("div", {});
   const notifySlot = h("div", {});
   const proxmoxSlot = h("div", {});
+  container.appendChild(scanSlot);
   container.appendChild(generalSlot);
   container.appendChild(notifySlot);
   container.appendChild(proxmoxSlot);
   container.appendChild(buildBackupCard());
   container.appendChild(configCard);
-  for (const [slot, build] of [[generalSlot, buildGeneralCard], [notifySlot, buildNotificationsCard], [proxmoxSlot, buildProxmoxCard]]) {
-    build().then((card) => slot.appendChild(card)).catch((err) => {
+  for (const [slot, build] of [[scanSlot, buildScanOptionsCard], [generalSlot, buildGeneralCard], [notifySlot, buildNotificationsCard], [proxmoxSlot, buildProxmoxCard]]) {
+    build().then((card) => {
+      slot.appendChild(card);
+    }).catch((err) => {
       slot.appendChild(h("div", { class: "card" }, h("p", { class: "error" }, err.message || "Failed to load")));
     });
   }
@@ -144,5 +149,12 @@ export async function render(container, params) {
     errCard.appendChild(h("h2", {}, "Configuration"));
     errCard.appendChild(h("p", { class: "error" }, err.message || "Failed to load configuration"));
     container.appendChild(errCard);
+  }
+
+  // "#/settings/nmap" (the header button) jumps straight to the nmap card. Done last so the
+  // cards above it have their final height and the card stays at the top of the screen.
+  if (params && params.section === "nmap") {
+    const target = document.getElementById("nmap-settings");
+    if (target) target.scrollIntoView({ block: "start" });
   }
 }

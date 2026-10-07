@@ -6,6 +6,7 @@ from typing import Any
 
 from app.scanner.errors import explain_scan_error
 from app.scanner.nmap_runner import ScanError, run_nmap
+from app.scanner.options import ScanOptions
 from app.scanner.nmap_parser import parse_nmap_xml
 from app.scanner.store import save_scan_results
 from app.uptime import record_checks
@@ -50,6 +51,8 @@ class ScanManager:
         self._task: asyncio.Task | None = None
         # Live state of the running scan for the UI: phase, nmap task/percent, hosts found so far.
         self.progress: dict | None = None
+        # nmap options chosen on the Settings page (ports, timing, ...); read at the start of each scan
+        self.options: ScanOptions = ScanOptions()
 
     def is_running(self) -> bool:
         return self._task is not None and not self._task.done()
@@ -99,12 +102,12 @@ class ScanManager:
     def _set_progress(self, **fields: Any) -> None:
         self.progress = {**(self.progress or {}), **fields}
 
-    def _runner_accepts_progress(self) -> bool:
+    def _runner_accepts(self, name: str) -> bool:
         try:
             params = inspect.signature(self.runner).parameters.values()
         except (TypeError, ValueError):
             return False
-        return any(p.name == "progress" or p.kind is inspect.Parameter.VAR_KEYWORD for p in params)
+        return any(p.name == name or p.kind is inspect.Parameter.VAR_KEYWORD for p in params)
 
     async def _run(self, kind: str, scan_id: int) -> None:
         conn: sqlite3.Connection | None = None
@@ -118,8 +121,10 @@ class ScanManager:
 
             self._set_progress(phase="scanning", targets=targets)
             kwargs: dict[str, Any] = {"nmap_path": self.nmap_path}
-            if self._runner_accepts_progress():
+            if self._runner_accepts("progress"):
                 kwargs["progress"] = lambda update: self._set_progress(**update)
+            if self._runner_accepts("options"):
+                kwargs["options"] = self.options
             xml = await self.runner(kind, targets, **kwargs)
             hosts = parse_nmap_xml(xml)
             self._set_progress(phase="names", task=None, percent=None, hosts_found=len(hosts))

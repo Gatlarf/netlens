@@ -28,6 +28,7 @@ function parseRoute() {
     }
     return { name: "devices", params: {} };
   }
+  if (hash === "#/settings/nmap") return { name: "settings", params: { section: "nmap" } };
   const name = ROUTES[hash];
   return name ? { name, params: {} } : { name: "devices", params: {} };
 }

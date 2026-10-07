@@ -14,5 +14,6 @@
 .scan-status { font-size: 0.85em; color: var(--muted); margin-right: 6px; }
 .card h3 { margin: 14px 0 6px; font-size: 1em; }
 /* checkbox fields: keep the box next to its label instead of stretching it full width */
-.field input[type="checkbox"] { width: auto; margin-right: 6px; vertical-align: middle; }
+.field input[type="checkbox"] { width: auto; justify-self: start; margin: 4px 6px 4px 0; }
+a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .field input[type="file"] { width: 100%; }

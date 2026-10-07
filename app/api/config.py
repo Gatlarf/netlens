@@ -5,13 +5,25 @@ import json
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from typing import Any
+
 from app.config import normalize_ranges
 from app.db import connect, delete_setting, get_setting, set_setting
+from app.scanner.options import (
+    PRESETS,
+    ScanOptions,
+    command_preview,
+    options_from_dict,
+    options_from_json,
+    options_to_dict,
+    preset_dict,
+)
 from app.version import VERSION
 
 RANGES_KEY = "ranges"
 INTERVAL_KEYS = ("quick_interval", "deep_interval")
 TERMINAL_KEY = "terminal_enabled"
+SCAN_OPTIONS_KEY = "scan_options"
 MAX_RANGES = 16
 MIN_INTERVAL = 60
 MAX_INTERVAL = 30 * 86400
@@ -51,6 +63,13 @@ def apply_overrides(app) -> None:
     app.state.settings = new_settings
     app.state.scan_manager.settings = new_settings
     app.state.overrides = set(overrides)
+
+    conn = connect(app.state.db_path)
+    try:
+        saved = get_setting(conn, SCAN_OPTIONS_KEY)
+    finally:
+        conn.close()
+    app.state.scan_manager.options = options_from_json(saved)
 
 
 # kept for callers/tests that used the earlier names
@@ -162,3 +181,48 @@ async def put_general(request: Request, body: GeneralBody) -> dict:
 
     apply_overrides(request.app)
     return await _config_payload(request)
+
+
+def _scan_options_payload(request: Request) -> dict:
+    opts: ScanOptions = request.app.state.scan_manager.options
+    defaults = ScanOptions()
+    return {
+        "options": options_to_dict(opts),
+        "defaults": options_to_dict(defaults),
+        "is_default": opts == defaults,
+        "presets": {name: preset_dict(name) for name in PRESETS},
+        "preview": {kind: command_preview(kind, opts) for kind in ("quick", "deep")},
+    }
+
+
+@router.get("/scan-options")
+def get_scan_options(request: Request) -> dict:
+    """nmap options (ports, timing, detection) used by scans, plus presets and the resulting command lines."""
+    return _scan_options_payload(request)
+
+
+@router.put("/scan-options")
+def put_scan_options(request: Request, body: dict[str, Any]) -> dict:
+    """Change the nmap options; only the keys sent are changed. Applies from the next scan."""
+    try:
+        opts = options_from_dict(body, base=request.app.state.scan_manager.options)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    conn = connect(request.app.state.db_path)
+    try:
+        set_setting(conn, SCAN_OPTIONS_KEY, json.dumps(options_to_dict(opts)))
+    finally:
+        conn.close()
+    request.app.state.scan_manager.options = opts
+    return _scan_options_payload(request)
+
+
+@router.delete("/scan-options")
+def reset_scan_options(request: Request) -> dict:
+    conn = connect(request.app.state.db_path)
+    try:
+        delete_setting(conn, SCAN_OPTIONS_KEY)
+    finally:
+        conn.close()
+    request.app.state.scan_manager.options = ScanOptions()
+    return _scan_options_payload(request)

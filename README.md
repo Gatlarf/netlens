@@ -207,10 +207,28 @@ Everything below is saved in the data directory, so it survives updates and rebu
 | Card | What you can change |
 |---|---|
 | Scan ranges | which networks are scanned (see "Choosing what to scan") |
+| Scan performance (nmap) | ports, timing and detection used by quick and deep scans, with presets (see "Making scans faster"). The **Scan settings** button next to the scan buttons jumps straight to it |
 | Scan schedule and terminal | how often quick and deep scans run, and the web terminal on/off. Takes effect from the next scheduler cycle, no restart |
 | E-mail notifications | SMTP server and recipients (see below) |
 | Proxmox connector | Proxmox URL and credentials (see below) |
 | Backup and restore | download a snapshot, restore one |
+
+### Making scans faster
+
+Quick scans are normally a few seconds. **Deep scans are the slow part**: they probe the top 1000 ports of every host and run service version detection, OS detection and traceroute. On a network with about 35 devices a default deep scan took 5 to 8 minutes (and occasionally much longer when a device answers slowly). Under **Settings → Scan performance (nmap)** (or the **Scan settings** button in the header) you can trade detail for speed; the page shows how long your last quick and deep scan took so you can see the effect. Changes apply from the next scan.
+
+| Setting | Effect on speed | What you give up |
+|---|---|---|
+| Timing T4 instead of T3 | faster on a local network | can miss hosts on a flaky or very slow network (T5 even more so) |
+| Fewer deep ports (top 200 instead of 1000, or a list such as `22,80,443,8000-8100`) | the biggest win for deep scans | ports outside the list disappear from a device after the next deep scan |
+| Version detection light or off | large | `light` is less accurate; `off` clears product and version columns at the next deep scan |
+| OS detection off | large | OS names stop updating (the last known one stays) |
+| Traceroute off | small | the route links on the map |
+| Skip reverse DNS | small to medium | hostnames that come from DNS stop updating (mDNS/SSDP names stay) |
+| Host timeout (for example 120 s) | caps the worst case | slow hosts are abandoned and show up as missing for that scan |
+| Quick scan: hosts only (no ports) | fastest quick scan | quick scans no longer refresh ports (deep scans still do) |
+
+Three presets set these for you: **Default** (the original behavior), **Fast** (T4, top 200 ports and light version detection in deep scans) and **Fastest** (also no OS or version detection and no reverse DNS, quick scans on the top 50 ports, 2 minute limit per host). The card shows the exact `nmap` command lines that result.
 
 ### Version
 

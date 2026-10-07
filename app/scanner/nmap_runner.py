@@ -7,6 +7,8 @@ import ipaddress
 import re
 from typing import TYPE_CHECKING
 
+from app.scanner.options import ScanOptions, option_args
+
 if TYPE_CHECKING:
     from app.config import is_scannable_range
 
@@ -15,7 +17,13 @@ class ScanError(RuntimeError):
     """Raised when an nmap scan fails."""
 
 
-def build_args(kind: str, targets: list[str], timing: int = 3, stats_every: str | None = None) -> list[str]:
+def build_args(
+    kind: str,
+    targets: list[str],
+    timing: int = 3,
+    stats_every: str | None = None,
+    options: ScanOptions | None = None,
+) -> list[str]:
     """Build nmap argument list (without executable name).
 
     Args:
@@ -32,22 +40,12 @@ def build_args(kind: str, targets: list[str], timing: int = 3, stats_every: str 
     if timing < 0 or timing > 5:
         raise ValueError(f"timing must be 0-5, got {timing}")
 
-    if kind == "quick":
-        args = ["-T" + str(timing), "--top-ports", "100", "-oX", "-"]
-    elif kind == "deep":
-        args = [
-            "-T" + str(timing),
-            "-sV",
-            "-O",
-            "--osscan-guess",
-            "--traceroute",
-            "--top-ports",
-            "1000",
-            "-oX",
-            "-",
-        ]
-    else:
+    if kind not in ("quick", "deep"):
         raise ValueError(f"invalid kind: {kind!r}")
+    # `options` (set on the Settings page) decides the command line; without it the defaults
+    # apply with the given timing template.
+    opts = options if options is not None else ScanOptions(timing=timing)
+    args = option_args(kind, opts) + ["-oX", "-"]
 
     if stats_every:
         # -v makes nmap emit <taskbegin>/<taskend> (which step it is on) in the XML stream and
@@ -123,6 +121,7 @@ async def run_nmap(
     timing: int = 3,
     timeout: float = 3600.0,
     progress=None,
+    options: ScanOptions | None = None,
 ) -> str:
     """Run nmap and return stdout as UTF-8 string.
 
@@ -132,6 +131,7 @@ async def run_nmap(
         nmap_path: Path to nmap executable.
         timing: Nmap timing template (0-5).
         timeout: Timeout in seconds.
+        options: Optional ScanOptions (ports, timing, version/OS detection, ...); defaults when None.
         progress: Optional callable receiving {"task", "percent", "hosts_found"} while nmap runs.
 
     Returns:
@@ -140,7 +140,7 @@ async def run_nmap(
     Raises:
         ScanError: If nmap fails, times out, or is not found.
     """
-    args = build_args(kind, targets, timing, stats_every="2s" if progress else None)
+    args = build_args(kind, targets, timing, stats_every="2s" if progress else None, options=options)
 
     try:
         process = await asyncio.create_subprocess_exec(
