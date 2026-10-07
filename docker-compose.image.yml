@@ -1,0 +1,30 @@
+# NetLens using the pre-built image from GitHub Container Registry.
+# No source code or Dockerfile needed, so this works in the Portainer web editor.
+#
+# Required variables (.env file or the stack's environment variables):
+#   DOCKERDIR      host folder for app data; create $DOCKERDIR/appdata/netlens and
+#                  run: sudo chown 10001:10001 $DOCKERDIR/appdata/netlens
+#   NETLENS_TOKEN  long random string (openssl rand -hex 32)
+
+services:
+  netlens:
+    image: ghcr.io/gatlarf/netlens:latest
+    container_name: netlens
+    restart: unless-stopped
+    # Host networking is required for ARP/L2 discovery and mDNS/SSDP.
+    network_mode: host
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ${DOCKERDIR:?Set DOCKERDIR}/appdata/netlens:/data
+    environment:
+      - TZ=${TZ:-UTC}
+      - NETLENS_TOKEN=${NETLENS_TOKEN:?Set NETLENS_TOKEN}
+      - NETLENS_BIND=${NETLENS_BIND:-0.0.0.0:8080}
+      # Optional: NETLENS_RANGES, NETLENS_QUICK_INTERVAL, NETLENS_DEEP_INTERVAL, NETLENS_TERMINAL

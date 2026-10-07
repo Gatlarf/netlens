@@ -79,6 +79,23 @@ If you already keep all your services in one `docker-compose.yml` with a shared 
 
 Create and chown the data directory as in option A, then run `docker compose up -d --build netlens` from the directory that holds your compose file. The other `NETLENS_*` variables in the table below can be added to `environment:` as needed.
 
+### Option C: pre-built image (no build, works with Portainer)
+
+A multi-architecture image (amd64 and arm64) is published to GitHub Container Registry on every push to `main` and for every `v*` release tag: `ghcr.io/gatlarf/netlens` (tags: `latest`, a version such as `1.2.3`, and the commit `sha-...`). No source code or Dockerfile is needed on the host, and no registry account is needed to pull it.
+
+```bash
+mkdir netlens && cd netlens
+curl -O https://raw.githubusercontent.com/Gatlarf/netlens/main/docker-compose.image.yml
+printf 'DOCKERDIR=/home/you/docker\nNETLENS_TOKEN=%s\n' "$(openssl rand -hex 32)" > .env
+mkdir -p /home/you/docker/appdata/netlens
+sudo chown 10001:10001 /home/you/docker/appdata/netlens
+docker compose -f docker-compose.image.yml up -d
+```
+
+**Portainer:** under **Stacks → Add stack → Web editor**, paste the contents of [`docker-compose.image.yml`](docker-compose.image.yml) and add `DOCKERDIR` and `NETLENS_TOKEN` as environment variables. (The regular `docker-compose.yml` has a `build:` section and fails in the web editor with `failed to read dockerfile: open Dockerfile: no such file or directory`, because there is no source to build from. Use this file, or deploy the stack from the Git repository instead.)
+
+To pin a specific version instead of following `latest`, change the image line, for example `ghcr.io/gatlarf/netlens:1.2.3`.
+
 ### Operating it
 
 ```bash
@@ -124,6 +141,8 @@ Netlens is built from source, so updating means pulling the new code and rebuild
    curl http://<docker-host>:8080/api/health # {"status":"ok","version":"..."}
    docker compose logs --tail 50 netlens
    ```
+
+   **If you use the pre-built image (option C),** there is nothing to pull or build from source: run `docker compose -f docker-compose.image.yml pull && docker compose -f docker-compose.image.yml up -d` (in Portainer, recreate the stack with **Pull latest image** enabled). Do the backup and verify steps as above.
 
 5. **Clean up** old images once you are happy with the new version:
 
