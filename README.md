@@ -52,7 +52,7 @@ Application data (the SQLite database) is stored in `$DOCKERDIR/appdata/netlens`
 
 ### Option B: add Netlens to an existing compose stack
 
-If you already keep all your services in one `docker-compose.yml` with a shared `.env` (defining `DOCKERDIR`), copy this repository to `$DOCKERDIR/build/netlens`, add `NETLENS_TOKEN` to the shared `.env`, and append this service:
+If you already keep all your services in one `docker-compose.yml` with a shared `.env` (defining `DOCKERDIR`), clone this repository to `$DOCKERDIR/build/netlens` (`git clone https://github.com/Gatlarf/netlens.git $DOCKERDIR/build/netlens`), add `NETLENS_TOKEN` to the shared `.env`, and append this service:
 
 ```yaml
   netlens:
@@ -89,6 +89,61 @@ docker compose down                # stop and remove the container (data in appd
 ```
 
 Do not use `--no-new-privileges` or remove the `NET_RAW`/`NET_ADMIN` capabilities: nmap runs as a non-root user and relies on file capabilities for raw sockets.
+
+## Updating to a new version
+
+Netlens is built from source, so updating means pulling the new code and rebuilding the image. Your data lives in `$DOCKERDIR/appdata/netlens` and is not touched by a rebuild. Releases and changes are listed at https://github.com/Gatlarf/netlens/commits/main; while the project is in development, check for changes to the data format or configuration before updating.
+
+1. **Back up the data** (recommended before every update):
+
+   ```bash
+   docker compose stop netlens
+   sudo cp -a "$DOCKERDIR/appdata/netlens" "$DOCKERDIR/appdata/netlens.bak-$(date +%F)"
+   ```
+
+2. **Pull the new code.** Option A: run this in your clone. Option B: run it in `$DOCKERDIR/build/netlens`.
+
+   ```bash
+   git pull
+   ```
+
+   To run a specific release instead of the latest `main`, use `git fetch --tags && git checkout <tag>`.
+
+3. **Rebuild and restart** from the directory that holds your compose file (for option B, `$DOCKERDIR`):
+
+   ```bash
+   docker compose up -d --build netlens      # option A: docker compose up -d --build
+   ```
+
+   Compose rebuilds the image, recreates the container, and starts it again with the same settings and the same data directory.
+
+4. **Verify:**
+
+   ```bash
+   docker compose ps                         # STATUS should show "healthy"
+   curl http://<docker-host>:8080/api/health # {"status":"ok","version":"..."}
+   docker compose logs --tail 50 netlens
+   ```
+
+5. **Clean up** old images once you are happy with the new version:
+
+   ```bash
+   docker image prune -f
+   ```
+
+### Rolling back
+
+If the new version misbehaves, stop the container, go back to the previous code, restore the data backup, and rebuild:
+
+```bash
+docker compose stop netlens
+git checkout <previous-tag-or-commit>
+sudo rm -rf "$DOCKERDIR/appdata/netlens"
+sudo cp -a "$DOCKERDIR/appdata/netlens.bak-<date>" "$DOCKERDIR/appdata/netlens"
+docker compose up -d --build netlens
+```
+
+Restoring the backup matters because a newer version may have changed the database in a way an older version cannot read. If the update made no data changes you can skip the restore, but you should not count on that.
 
 ## Configuration
 
