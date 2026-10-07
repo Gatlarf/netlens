@@ -38,6 +38,7 @@ def save_scan_results(
     new_count = 0
     updated_count = 0
     device_ids: list[int] = []
+    rtts: dict[int, float] = {}
 
     for host in processed_hosts:
         mac = host.mac.lower() if host.mac is not None else None
@@ -74,6 +75,8 @@ def save_scan_results(
         # Create or update device
         device_id = get_or_create_device(conn, host.mac, host.ip, now)
         device_ids.append(device_id)
+        if host.rtt_ms is not None:
+            rtts[device_id] = host.rtt_ms
 
         is_new = device_id > prev_max
         if is_new:
@@ -198,4 +201,4 @@ def save_scan_results(
 
     conn.commit()
 
-    return {"new": new_count, "updated": updated_count, "device_ids": device_ids}
+    return {"new": new_count, "updated": updated_count, "device_ids": device_ids, "rtts": rtts}

@@ -7,6 +7,7 @@ from app.scanner.errors import explain_scan_error
 from app.scanner.nmap_runner import ScanError, run_nmap
 from app.scanner.nmap_parser import parse_nmap_xml
 from app.scanner.store import save_scan_results
+from app.uptime import record_checks
 from app.scanner.presence import mark_offline
 from app.scanner.scans import create_scan, finish_scan, running_scan
 from app.scanner.netinfo import detect_ranges, detect_gateway
@@ -122,6 +123,17 @@ class ScanManager:
                 targets,
                 now=utcnow(),
             )
+
+            try:
+                record_checks(
+                    conn,
+                    set(result["device_ids"]),
+                    targets,
+                    now=utcnow(),
+                    rtts=result.get("rtts"),
+                )
+            except Exception:
+                logging.getLogger(__name__).exception("recording uptime checks failed")
 
             try:
                 gateway_ip = await self.gateway_provider()

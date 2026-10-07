@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def utcnow() -> str:
@@ -38,6 +38,13 @@ def connect(path: str | os.PathLike) -> sqlite3.Connection:
         pass
 
     return conn
+
+
+
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+    cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
 
 def init_db(conn: sqlite3.Connection) -> None:
@@ -184,6 +191,42 @@ def init_db(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
+        )
+        """
+    )
+
+    # --- schema v2 -------------------------------------------------------
+    _add_column_if_missing(conn, "devices", "notify_offline", "INTEGER NOT NULL DEFAULT 1")
+
+    # uptime heartbeats: one row per device per completed scan covering it
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS checks (
+            id INTEGER PRIMARY KEY,
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            ts TEXT NOT NULL,
+            up INTEGER NOT NULL,
+            rtt_ms REAL
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_checks_device_ts ON checks(device_id, ts)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_checks_ts ON checks(ts)")
+
+    # Proxmox guests (VMs / containers) from the last sync
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS proxmox_guests (
+            vmid INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            node TEXT NOT NULL,
+            status TEXT NOT NULL,
+            macs TEXT NOT NULL DEFAULT '[]',
+            ips TEXT NOT NULL DEFAULT '[]',
+            device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
+            host_device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
+            updated TEXT NOT NULL
         )
         """
     )

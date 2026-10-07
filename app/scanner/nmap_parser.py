@@ -27,6 +27,7 @@ class ScanHost:
     ttl: Optional[int]
     via: str
     hops: list[str] = field(default_factory=list)
+    rtt_ms: Optional[float] = None
 
 
 def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
@@ -175,6 +176,17 @@ def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
                 if hop_ip and hop_ip != ip:
                     hops.append(hop_ip)
 
+        # Smoothed round-trip time (nmap reports microseconds)
+        rtt_ms: Optional[float] = None
+        times_elem = host.find("times")
+        if times_elem is not None:
+            try:
+                srtt = int(times_elem.get("srtt", ""))
+                if srtt > 0:
+                    rtt_ms = round(srtt / 1000.0, 2)
+            except ValueError:
+                pass
+
         hosts.append(ScanHost(
             ip=ip,
             mac=mac,
@@ -187,6 +199,7 @@ def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
             ttl=ttl,
             via=via,
             hops=hops,
+            rtt_ms=rtt_ms,
         ))
 
     return hosts

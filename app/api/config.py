@@ -10,35 +10,52 @@ from app.db import connect, delete_setting, get_setting, set_setting
 from app.version import VERSION
 
 RANGES_KEY = "ranges"
+INTERVAL_KEYS = ("quick_interval", "deep_interval")
+TERMINAL_KEY = "terminal_enabled"
 MAX_RANGES = 16
+MIN_INTERVAL = 60
+MAX_INTERVAL = 30 * 86400
 
 router = APIRouter(prefix="/api", tags=["config"])
 
 
-def apply_ranges(app, ranges: list[str]) -> None:
-    """Make `ranges` the effective scan ranges (empty = env value / auto-detect)."""
-    effective = tuple(ranges) if ranges else app.state.env_ranges
-    new_settings = dataclasses.replace(app.state.settings, ranges=effective)
-    app.state.settings = new_settings
-    app.state.scan_manager.settings = new_settings
-    app.state.ranges_override = bool(ranges)
-
-
-def load_saved_ranges(app) -> None:
-    """Apply a range override saved through the web UI, if any (called at startup)."""
-    conn = connect(app.state.db_path)
+def _read_overrides(db_path: str) -> dict:
+    """Overrides saved through the web UI: {ranges, quick_interval, deep_interval, terminal_enabled}."""
+    conn = connect(db_path)
     try:
+        out: dict = {}
         raw = get_setting(conn, RANGES_KEY)
+        if raw:
+            try:
+                ranges = normalize_ranges(json.loads(raw))
+                if ranges:
+                    out["ranges"] = tuple(ranges)
+            except (ValueError, TypeError):
+                pass
+        for key in INTERVAL_KEYS:
+            raw = get_setting(conn, key)
+            if raw and raw.isdigit() and MIN_INTERVAL <= int(raw) <= MAX_INTERVAL:
+                out[key] = int(raw)
+        raw = get_setting(conn, TERMINAL_KEY)
+        if raw in ("on", "off"):
+            out[TERMINAL_KEY] = raw == "on"
+        return out
     finally:
         conn.close()
-    if not raw:
-        return
-    try:
-        saved = normalize_ranges(json.loads(raw))
-    except (ValueError, TypeError):
-        return
-    if saved:
-        apply_ranges(app, saved)
+
+
+def apply_overrides(app) -> None:
+    """Make UI overrides on top of the environment settings the effective settings."""
+    overrides = _read_overrides(app.state.db_path)
+    new_settings = dataclasses.replace(app.state.env_settings, **overrides)
+    app.state.settings = new_settings
+    app.state.scan_manager.settings = new_settings
+    app.state.overrides = set(overrides)
+
+
+# kept for callers/tests that used the earlier names
+def load_saved_ranges(app) -> None:
+    apply_overrides(app)
 
 
 async def _detected_ranges(request: Request) -> list[str]:
@@ -49,24 +66,31 @@ async def _detected_ranges(request: Request) -> list[str]:
         return []
 
 
+def _source(request: Request, key: str, env_value) -> str:
+    if key in getattr(request.app.state, "overrides", set()):
+        return "ui"
+    if key == "ranges":
+        return "env" if env_value else "auto"
+    return "env"
+
+
 async def _config_payload(request: Request) -> dict:
     settings = request.app.state.settings
-    override = getattr(request.app.state, "ranges_override", False)
-    if override:
-        source = "ui"
-    elif getattr(request.app.state, "env_ranges", settings.ranges):
-        source = "env"
-    else:
-        source = "auto"
-
+    env = request.app.state.env_settings
     return {
         "version": VERSION,
         "ranges": list(settings.ranges),
-        "ranges_source": source,
+        "ranges_source": _source(request, "ranges", env.ranges),
         "detected_ranges": await _detected_ranges(request),
         "quick_interval": settings.quick_interval,
         "deep_interval": settings.deep_interval,
+        "quick_interval_source": _source(request, "quick_interval", env.quick_interval),
+        "deep_interval_source": _source(request, "deep_interval", env.deep_interval),
+        "env_quick_interval": env.quick_interval,
+        "env_deep_interval": env.deep_interval,
         "terminal_enabled": settings.terminal_enabled,
+        "terminal_source": _source(request, "terminal_enabled", env.terminal_enabled),
+        "env_terminal_enabled": env.terminal_enabled,
         "snmp_enabled": settings.snmp_community is not None,
         "bind": f"{settings.bind_host}:{settings.bind_port}",
     }
@@ -98,5 +122,43 @@ async def put_ranges(request: Request, body: RangesBody) -> dict:
     finally:
         conn.close()
 
-    apply_ranges(request.app, ranges)
+    apply_overrides(request.app)
+    return await _config_payload(request)
+
+
+class GeneralBody(BaseModel):
+    """Each field present in the request is applied; null resets it to the environment value."""
+
+    quick_interval: int | None = None
+    deep_interval: int | None = None
+    terminal_enabled: bool | None = None
+
+
+@router.put("/config/general")
+async def put_general(request: Request, body: GeneralBody) -> dict:
+    fields = body.model_fields_set
+    conn = connect(request.app.state.db_path)
+    try:
+        for key in INTERVAL_KEYS:
+            if key not in fields:
+                continue
+            value = getattr(body, key)
+            if value is None:
+                delete_setting(conn, key)
+            elif not MIN_INTERVAL <= value <= MAX_INTERVAL:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{key} must be between {MIN_INTERVAL} and {MAX_INTERVAL} seconds",
+                )
+            else:
+                set_setting(conn, key, str(value))
+        if "terminal_enabled" in fields:
+            if body.terminal_enabled is None:
+                delete_setting(conn, TERMINAL_KEY)
+            else:
+                set_setting(conn, TERMINAL_KEY, "on" if body.terminal_enabled else "off")
+    finally:
+        conn.close()
+
+    apply_overrides(request.app)
     return await _config_payload(request)

@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import uvicorn
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
+from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import config, devices, events, export, relations, scans
+from app.api import config, devices, events, export, relations, scans, uptime
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, require_auth
@@ -25,11 +26,16 @@ from app.version import VERSION
 
 
 
+async def require_terminal_enabled(conn: HTTPConnection) -> None:
+    if not conn.app.state.settings.terminal_enabled:
+        raise HTTPException(status_code=404, detail="web terminal is disabled")
+
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     conn = connect(app.state.db_path)
     init_db(conn)
-    config.load_saved_ranges(app)
+    config.apply_overrides(app)
     app.state.scan_manager.recover()
 
     task = None
@@ -37,8 +43,8 @@ async def lifespan(app: FastAPI):
         task = asyncio.create_task(
             scheduler_loop(
                 app.state.scan_manager,
-                app.state.settings.quick_interval,
-                app.state.settings.deep_interval,
+                lambda: app.state.settings.quick_interval,
+                lambda: app.state.settings.deep_interval,
             )
         )
 
@@ -66,8 +72,8 @@ def create_app(
     app.add_middleware(SecurityHeadersMiddleware)
 
     app.state.settings = settings
-    app.state.env_ranges = tuple(getattr(settings, "ranges", ()))
-    app.state.ranges_override = False
+    app.state.env_settings = settings
+    app.state.overrides = set()
     app.state.db_path = str(db_path) if db_path is not None else str(settings.data_dir / "netlens.db")
     app.state.scheduler = scheduler
     app.state.scan_manager = scan_manager or ScanManager(app.state.db_path, settings)
@@ -84,9 +90,11 @@ def create_app(
     app.include_router(config.router, dependencies=auth_deps)
     app.include_router(relations.router, dependencies=auth_deps)
     app.include_router(export.router, dependencies=auth_deps)
+    app.include_router(uptime.router, dependencies=auth_deps)
 
-    if getattr(settings, "terminal_enabled", False):
-        app.include_router(terminal_router)
+    # Always mounted; each request is refused (404) while the terminal is switched off,
+    # so it can be toggled at runtime from the Settings page.
+    app.include_router(terminal_router, dependencies=[Depends(require_terminal_enabled)])
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:

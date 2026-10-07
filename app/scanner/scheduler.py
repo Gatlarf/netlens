@@ -7,7 +7,7 @@ Async scheduler loop that periodically triggers quick and deep scans via ScanMan
 import asyncio
 import logging
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 from app.scanner.orchestrator import ScanBusy, ScanManager
 
@@ -49,8 +49,8 @@ def due_kind(
 
 async def scheduler_loop(
     manager: ScanManager,
-    quick_interval: float,
-    deep_interval: float,
+    quick_interval: float | Callable[[], float],
+    deep_interval: float | Callable[[], float],
     *,
     poll: float = 15.0,
     clock: callable = time.monotonic,
@@ -75,7 +75,9 @@ async def scheduler_loop(
 
     while True:
         now = clock()
-        kind = due_kind(now, started_at, last_quick, last_deep, quick_interval, deep_interval)
+        qi = quick_interval() if callable(quick_interval) else quick_interval
+        di = deep_interval() if callable(deep_interval) else deep_interval
+        kind = due_kind(now, started_at, last_quick, last_deep, qi, di)
 
         if kind is not None and not manager.is_running():
             try:
