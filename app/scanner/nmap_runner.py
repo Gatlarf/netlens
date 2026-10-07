@@ -50,8 +50,9 @@ def build_args(kind: str, targets: list[str], timing: int = 3, stats_every: str 
         raise ValueError(f"invalid kind: {kind!r}")
 
     if stats_every:
-        # periodic <taskprogress> elements in the XML stream (used for live progress)
-        args[0:0] = ["--stats-every", stats_every]
+        # -v makes nmap emit <taskbegin>/<taskend> (which step it is on) in the XML stream and
+        # --stats-every adds <taskprogress> percentages for long steps; both feed the live progress.
+        args[0:0] = ["-v", "--stats-every", stats_every]
 
     for target in targets:
         if not _is_valid_target(target):
@@ -88,18 +89,22 @@ def _is_valid_target(target: str) -> bool:
 
 _TASK_PROGRESS_RE = re.compile(r'<taskprogress task="([^"]*)"[^>]*?percent="([0-9.]+)"')
 _TASK_BEGIN_RE = re.compile(r'<taskbegin task="([^"]*)"')
-_HOST_RE = re.compile(r"<host[ >]")
+# -v makes nmap list every probed address, so count only hosts that are up
+_HOST_UP_RE = re.compile(r'<host[^>]*>\s*<status state="up"[^>]*/>\s*<address addr="([^"]+)"')
 
 
 def _scan_progress(text: str, state: dict) -> dict | None:
     """Update `state` from nmap's XML stream seen so far; return a progress dict if something changed."""
-    events = [(m.start(), m.group(1), 0.0) for m in _TASK_BEGIN_RE.finditer(text, state["pos"])]
+    events = [(m.start(), m.group(1), None) for m in _TASK_BEGIN_RE.finditer(text, state["pos"])]
     events += [(m.start(), m.group(1), min(100.0, float(m.group(2)))) for m in _TASK_PROGRESS_RE.finditer(text, state["pos"])]
     changed = False
     for _, task, percent in sorted(events):  # apply in stream order
         state.update(task=task, percent=percent)
         changed = True
-    hosts = len(_HOST_RE.findall(text))
+    # verbose nmap may report the same up host more than once: count unique addresses
+    addrs = state.setdefault("addrs", set())
+    addrs.update(_HOST_UP_RE.findall(text))
+    hosts = len(addrs)
     if hosts != state["hosts"]:
         state["hosts"] = hosts
         changed = True

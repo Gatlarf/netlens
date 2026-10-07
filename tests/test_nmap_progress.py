@@ -15,19 +15,34 @@ def test_build_args_adds_stats_every_only_when_asked():
     plain = build_args("quick", ["192.168.1.0/24"])
     assert "--stats-every" not in plain
     withp = build_args("quick", ["192.168.1.0/24"], stats_every="2s")
-    assert withp[:2] == ["--stats-every", "2s"] and withp[-1] == "192.168.1.0/24"
-    assert [a for a in withp if a != "--stats-every" and a != "2s"] == plain
+    # -v is required: without it nmap does not put the task markers into the XML stream
+    assert withp[:3] == ["-v", "--stats-every", "2s"] and withp[-1] == "192.168.1.0/24"
+    assert withp[3:] == plain
 
 
 def test_progress_parsing_in_stream_order():
     st = _state()
     text = '<taskbegin task="ARP Ping Scan" time="1"/><taskprogress task="ARP Ping Scan" time="2" percent="40.5" remaining="3"/>'
     assert _scan_progress(text, st) == {"task": "ARP Ping Scan", "percent": 40.5, "hosts_found": 0}
-    text += '<host starttime="1"><status state="up"/></host><host><status state="up"/></host>'
+    text += '<host starttime="1"><status state="up"/><address addr="192.168.1.1" addrtype="ipv4"/></host>'
+    text += '<host><status state="up"/><address addr="192.168.1.2" addrtype="ipv4"/></host>'
     text += '<taskbegin task="Service scan" time="9"/>'
     # the earlier progress line is still inside the overlap window but must not override the newer task
     out = _scan_progress(text, st)
-    assert out == {"task": "Service scan", "percent": 0.0, "hosts_found": 2}
+    assert out == {"task": "Service scan", "percent": None, "hosts_found": 2}  # no percentage known yet
+
+
+def test_down_hosts_listed_by_verbose_nmap_are_not_counted():
+    st = _state()
+    down = '<host><status state="down" reason="no-response"/><address addr="192.168.1.9" addrtype="ipv4"/></host>' * 50
+    up = '<host starttime="1"><status state="up" reason="arp-response"/><address addr="192.168.1.1" addrtype="ipv4"/></host>'
+    assert _scan_progress(down + up, st)["hosts_found"] == 1
+
+
+def test_host_reported_twice_is_counted_once():
+    st = _state()
+    up = '<host><status state="up" reason="arp-response"/><address addr="192.168.1.1" addrtype="ipv4"/></host>'
+    assert _scan_progress(up + up, st)["hosts_found"] == 1
 
 
 def test_no_change_returns_none():
