@@ -1,4 +1,4 @@
-import { describeScan } from "./progress.js";
+import { describeScan, describeTiming } from "./progress.js";
 import { get, post, ApiError } from "./api.js";
 import { clear, toast, el } from "./util.js";
 
@@ -93,6 +93,28 @@ async function renderPage() {
   }
 }
 
+let scanSnapshot = null; // last /api/scans/current response and when it arrived
+let tickTimer = null;
+
+function renderScanTime() {
+  const timeEl = el("#scan-time");
+  if (!timeEl) return;
+  const text = scanSnapshot ? describeTiming(scanSnapshot.res, (Date.now() - scanSnapshot.at) / 1000) : "";
+  timeEl.textContent = text;
+  timeEl.hidden = !text;
+}
+
+function setScanSnapshot(res) {
+  scanSnapshot = res && res.running ? { res, at: Date.now() } : null;
+  renderScanTime();
+  if (scanSnapshot && !tickTimer) {
+    tickTimer = setInterval(renderScanTime, 1000); // smooth seconds between the 2 s polls
+  } else if (!scanSnapshot && tickTimer) {
+    clearInterval(tickTimer);
+    tickTimer = null;
+  }
+}
+
 function startPoll() {
   if (pollTimer) return;
   wasRunning = false;
@@ -102,7 +124,10 @@ function startPoll() {
       const running = res.running;
       const statusEl = el("#scan-status");
       const barEl = el("#scan-progress");
+      const stripEl = el("#scan-info");
+      if (stripEl) stripEl.hidden = !running;
       const info = describeScan(res);
+      setScanSnapshot(res);
       if (statusEl) {
         statusEl.textContent = running ? info.text || "Scanning…" : "";
       }
@@ -139,6 +164,9 @@ function stopPoll() {
   if (statusEl) statusEl.textContent = "";
   const barEl = el("#scan-progress");
   if (barEl) barEl.hidden = true;
+  const stripEl = el("#scan-info");
+  if (stripEl) stripEl.hidden = true;
+  setScanSnapshot(null);
   const quickBtn = el("#scan-quick");
   const deepBtn = el("#scan-deep");
   if (quickBtn) quickBtn.disabled = false;

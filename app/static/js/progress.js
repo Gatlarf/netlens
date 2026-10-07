@@ -1,4 +1,5 @@
 // Turns the /api/scans/current response into header text and a progress-bar value.
+import { humanDuration } from "./heartbeat.js";
 
 const PHASE_TEXT = {
   preparing: "Preparing",
@@ -29,4 +30,14 @@ export function describeScan(res) {
     parts.push(`${progress.hosts_found} host${progress.hosts_found === 1 ? "" : "s"}`);
   }
   return { text: parts.join(" · "), percent };
+}
+
+// "1m 12s (avg 7m 26s)": time the running scan has taken so far and the mean of recent scans of the
+// same kind. `extraSeconds` is the time passed since the response arrived, so the display can tick
+// between polls.
+export function describeTiming(res, extraSeconds = 0) {
+  if (!res || !res.running || typeof res.elapsed_seconds !== "number") return "";
+  const elapsed = humanDuration(Math.max(0, Math.round(res.elapsed_seconds + extraSeconds)));
+  if (typeof res.average_seconds !== "number") return elapsed;
+  return `${elapsed} (avg ${humanDuration(res.average_seconds)})`;
 }

@@ -21,13 +21,19 @@
       <a class="nav-link" href="#/settings" data-route="settings">Settings</a>
     </nav>
     <div class="topbar-actions">
-      <span id="scan-status" class="scan-status"></span><progress id="scan-progress" class="scan-progress" max="100" hidden></progress>
       <a id="scan-settings" class="btn" href="#/settings/nmap" title="Change which ports and checks nmap uses">&#9881; Scan settings</a>
       <button id="scan-quick" class="btn">Quick scan</button>
       <button id="scan-deep" class="btn">Deep scan</button>
       <button id="logout" class="btn ghost">Log out</button>
     </div>
   </header>
+
+  <!-- shown only while a scan runs: what it is doing, a progress bar, elapsed time and the usual duration -->
+  <div id="scan-info" class="scan-info" hidden>
+    <span id="scan-status" class="scan-status"></span>
+    <progress id="scan-progress" class="scan-progress" max="100"></progress>
+    <span id="scan-time" class="scan-time"></span>
+  </div>
 
   <main id="view" class="view" tabindex="-1"></main>
 

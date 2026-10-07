@@ -10,10 +10,13 @@
 .up-na { color: var(--muted); }
 .sparkline { width: 100%; max-width: 320px; height: 36px; color: var(--accent); }
 .uptime-filter { margin: 8px 0; max-width: 280px; }
-.scan-progress { width: 90px; height: 8px; vertical-align: middle; margin-right: 8px; }
-.scan-status { font-size: 0.85em; color: var(--muted); margin-right: 6px; }
+.scan-progress { width: 220px; max-width: 40vw; height: 8px; vertical-align: middle; }
+.scan-status { font-size: 0.9em; }
 .card h3 { margin: 14px 0 6px; font-size: 1em; }
 /* checkbox fields: keep the box next to its label instead of stretching it full width */
 .field input[type="checkbox"] { width: auto; justify-self: start; margin: 4px 6px 4px 0; }
 a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .field input[type="file"] { width: 100%; }
+.scan-time { font-size: 0.9em; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.scan-info { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.scan-info[hidden] { display: none; }

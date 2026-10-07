@@ -9,7 +9,7 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 - **E-mail notifications** for new and offline devices (one digest per scan), SMTP settings and a test button in Settings, and a per-device switch for offline mails.
 - **Proxmox connector**: read-only sync of VMs and containers, matching to devices by MAC/IP, exact `host-of` links on the map, and Proxmox details on the device pages. API token or password login.
 - **Backup and restore** of the whole database from Settings.
-- **Live scan progress** in the header (current nmap step, percentage, hosts found).
+- **Live scan progress** (current nmap step, percentage, hosts found) with elapsed time and the average duration of recent scans of the same type, shown in a strip under the header while a scan runs.
 - **Scan performance settings** (Settings → Scan performance): nmap timing, number of top ports or a custom port list for quick and deep scans, version detection (full/light/off), OS detection, traceroute, reverse DNS and a per-host timeout, with Default/Fast/Fastest presets, the resulting command lines and the duration of the last scans. A **Scan settings** button next to the scan buttons opens it.
 - **Settings in the browser** for scan ranges, quick/deep scan interval and the web terminal switch (no restart needed).
 - Friendly scan error messages (missing capabilities, nmap missing, timeout, no ranges).

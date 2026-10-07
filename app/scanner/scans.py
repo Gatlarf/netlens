@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.db import utcnow
@@ -57,3 +58,42 @@ def running_scan(conn: sqlite3.Connection) -> dict | None:
     if row is None:
         return None
     return dict(row)
+
+_TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def _seconds_between(start: str, end: str) -> float:
+    return (datetime.strptime(end, _TS_FORMAT) - datetime.strptime(start, _TS_FORMAT)).total_seconds()
+
+
+def average_duration(conn: sqlite3.Connection, kind: str, limit: int = 20) -> tuple[int | None, int]:
+    """Mean duration in seconds of the last `limit` successfully finished scans of `kind`.
+
+    Returns (average or None, number of scans used). Failed or unfinished scans are ignored.
+    """
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT started, finished FROM scans WHERE kind = ? AND status = 'done' AND finished IS NOT NULL "
+        "ORDER BY id DESC LIMIT ?",
+        (kind, limit),
+    ).fetchall()
+    durations = []
+    for row in rows:
+        try:
+            seconds = _seconds_between(row["started"], row["finished"])
+        except (TypeError, ValueError):
+            continue
+        if seconds >= 0:
+            durations.append(seconds)
+    if not durations:
+        return None, 0
+    return round(sum(durations) / len(durations)), len(durations)
+
+
+def elapsed_seconds(started: str, now: datetime | None = None) -> int | None:
+    """Seconds since `started` (never negative); None when the timestamp is unreadable."""
+    try:
+        begin = datetime.strptime(started, _TS_FORMAT).replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+    return max(0, round(((now or datetime.now(timezone.utc)) - begin).total_seconds()))

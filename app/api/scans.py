@@ -6,7 +6,7 @@ from sqlite3 import Connection
 
 from app.api.devices import get_conn
 from app.scanner.orchestrator import ScanBusy
-from app.scanner.scans import list_scans, running_scan
+from app.scanner.scans import average_duration, elapsed_seconds, list_scans, running_scan
 
 router = APIRouter(prefix="/api", tags=["scans"])
 
@@ -33,7 +33,13 @@ def get_current_scan(
 ) -> dict[str, Any]:
     scan = running_scan(conn)
     progress = request.app.state.scan_manager.progress if scan is not None else None
-    return {"running": scan is not None, "scan": scan, "progress": progress}
+    body: dict[str, Any] = {"running": scan is not None, "scan": scan, "progress": progress}
+    if scan is not None:
+        average, samples = average_duration(conn, scan["kind"])
+        body["elapsed_seconds"] = elapsed_seconds(scan["started"])
+        body["average_seconds"] = average  # mean of recent finished scans of the same kind, None if no history
+        body["average_samples"] = samples
+    return body
 
 
 @router.post("/scans", status_code=202)

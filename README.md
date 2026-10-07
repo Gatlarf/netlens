@@ -273,7 +273,7 @@ Netlens must be able to see the guests' MAC addresses, so run it on the same net
 
 ### Scan progress
 
-While a scan runs, the header shows what it is doing, for example `Deep scan · Service scan 45% · 12 hosts`, with a progress bar for the current nmap step. Scan failures are explained (for example missing network capabilities) in **Scans & events** and in the logs.
+While a scan runs, the header shows what it is doing, for example `Deep scan · Service scan 45% · 12 hosts`, with a progress bar for the current nmap step, the **time the scan has taken so far and the average of your recent scans of the same type** (for example `1m 16s (avg 7m 26s)`). The strip appears under the header only while a scan runs. Scan failures are explained (for example missing network capabilities) in **Scans & events** and in the logs.
 
 ## How it works
 
