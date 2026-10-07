@@ -21,8 +21,8 @@ from app.scanner.scheduler import scheduler_loop
 from app.security import SecurityHeadersMiddleware
 from app.terminal.ssh import SSHBackend
 from app.terminal.telnet import TelnetBackend
+from app.version import VERSION
 
-VERSION = "0.1.0"
 
 
 @contextlib.asynccontextmanager

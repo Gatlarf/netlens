@@ -115,6 +115,8 @@ async def run_nmap(
         )
     except FileNotFoundError:
         raise ScanError("nmap not found")
+    except OSError as exc:
+        raise ScanError(f"cannot execute nmap: {exc}")
 
     try:
         stdout, stderr = await asyncio.wait_for(

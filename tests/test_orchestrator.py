@@ -308,7 +308,7 @@ async def test_recover_marks_running_scan_failed(db_path: Path, settings: Any, f
     conn = connect(db_path)
     scan = _get_scan(conn, scan_id)
     assert scan["status"] == "failed"
-    assert scan["error"] == "interrupted by restart"
+    assert "restarted" in scan["error"]
     conn.close()
 
 

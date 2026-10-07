@@ -36,6 +36,10 @@ RUN pip install -r requirements.txt
 
 COPY app ./app
 
+# Set at build time: NETLENS_VERSION=<major.minor>.<commit count> (see README).
+ARG NETLENS_VERSION=dev
+ENV NETLENS_VERSION=$NETLENS_VERSION
+
 USER netlens
 
 VOLUME ["/data"]

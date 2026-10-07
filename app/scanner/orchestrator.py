@@ -3,6 +3,7 @@ import logging
 import sqlite3
 from typing import Any
 
+from app.scanner.errors import explain_scan_error
 from app.scanner.nmap_runner import ScanError, run_nmap
 from app.scanner.nmap_parser import parse_nmap_xml
 from app.scanner.store import save_scan_results
@@ -57,7 +58,7 @@ class ScanManager:
                     conn,
                     scan_id,
                     "failed",
-                    error="interrupted by restart",
+                    error=explain_scan_error("interrupted by restart"),
                     now=utcnow(),
                 )
                 count += 1
@@ -164,13 +165,14 @@ class ScanManager:
             )
             conn.commit()
         except Exception as exc:
+            logging.getLogger(__name__).warning("scan %s failed: %r", scan_id, exc)
             conn = connect(self.db_path)
             try:
                 finish_scan(
                     conn,
                     scan_id,
                     "failed",
-                    error=str(exc)[:300],
+                    error=explain_scan_error(exc)[:400],
                     now=utcnow(),
                 )
                 conn.commit()

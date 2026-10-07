@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 
 from app.config import normalize_ranges
 from app.db import connect, delete_setting, get_setting, set_setting
+from app.version import VERSION
 
-VERSION = "0.1.0"
 RANGES_KEY = "ranges"
 MAX_RANGES = 16
 

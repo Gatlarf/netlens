@@ -5,7 +5,10 @@
 
 services:
   netlens:
-    build: .
+    build:
+      context: .
+      args:
+        NETLENS_VERSION: ${NETLENS_VERSION:-dev}
     image: netlens:latest
     container_name: netlens
     restart: unless-stopped

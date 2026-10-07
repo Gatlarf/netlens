@@ -468,3 +468,4 @@ dialog#login-dialog::backdrop {
 }
 .hint { color: var(--muted); font-size: 0.85em; margin: 0.4em 0 0; }
 .error:empty { display: none; }
+.app-version { color: var(--muted); font-size: 0.75em; margin-left: 6px; }

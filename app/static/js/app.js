@@ -249,3 +249,8 @@ async function init() {
 }
 
 init();
+// Show the running version next to the logo.
+fetch("/api/health").then((r) => r.json()).then((d) => {
+  const el = document.getElementById("app-version");
+  if (el && d.version) el.textContent = "v" + d.version;
+}).catch(() => {});
