@@ -4,6 +4,7 @@ import { buildScanOptionsCard } from "../cards/scan_options.js";
 import { buildGeneralCard } from "../cards/general.js";
 import { buildNotificationsCard } from "../cards/notifications.js";
 import { buildProxmoxCard } from "../cards/proxmox.js";
+import { buildAsusCard } from "../cards/asus.js";
 import { buildBackupCard } from "../cards/backup.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 
@@ -96,6 +97,7 @@ const SECTIONS = [
   { key: "schedule", label: "Schedule & terminal" },
   { key: "notifications", label: "E-mail notifications" },
   { key: "proxmox", label: "Proxmox connector" },
+  { key: "asus", label: "ASUS router (AiMesh)" },
   { key: "ignored", label: "Ignored devices" },
   { key: "backup", label: "Backup & restore" },
   { key: "about", label: "About" },
@@ -202,6 +204,7 @@ export async function render(container, params) {
     ["schedule", buildGeneralCard],
     ["notifications", buildNotificationsCard],
     ["proxmox", buildProxmoxCard],
+    ["asus", buildAsusCard],
     ["ignored", buildIgnoredCard],
   ]) {
     build().then((card) => {

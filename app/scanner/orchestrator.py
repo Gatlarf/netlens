@@ -12,6 +12,7 @@ from app.scanner.nmap_parser import parse_nmap_xml
 from app.scanner.store import save_scan_results
 from app.uptime import record_checks
 from app.notify.service import process_notifications
+from app.integrations.asus_sync import asus_after_scan
 from app.integrations.proxmox_sync import proxmox_after_scan
 from app.scanner.presence import mark_offline
 from app.scanner.scans import create_scan, finish_scan, running_scan
@@ -50,7 +51,7 @@ class ScanManager:
         after_scan: list | None = None,
     ) -> None:
         # Async callables f(db_path) run after every successful scan; failures never fail the scan.
-        self.after_scan = [proxmox_after_scan, process_notifications] if after_scan is None else list(after_scan)
+        self.after_scan = [proxmox_after_scan, asus_after_scan, process_notifications] if after_scan is None else list(after_scan)
         self.db_path = db_path
         self.settings = settings
         self.runner = runner

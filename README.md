@@ -28,6 +28,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Uptime history like Uptime Kuma: heartbeat bars, 24 h / 7 d / 30 d uptime and response times per device
 - E-mail notifications for new and offline devices, with an on/off switch per device
 - Proxmox connector: shows which VMs and containers run on which Proxmox host, on the map and on the device pages
+- ASUS router connector: shows which device is connected to which AiMesh node (stock ASUSWRT)
 - Network hierarchy: which device depends on which (gateway, then Proxmox host, then its guests), as a tree page, a tree layout on the map, and a parent you can set per device
 - Live scan progress in the header
 - Light and dark mode, switchable from the top bar
@@ -205,7 +206,7 @@ Order of precedence: the web setting, then `NETLENS_RANGES`, then auto-detection
 
 ## Settings in the web interface
 
-A menu on the left of the Settings page jumps to each section and highlights the one you are reading (on a narrow screen it becomes a row of buttons on top). Sections can be linked directly: `#/settings/ranges`, `nmap`, `schedule`, `notifications`, `proxmox`, `backup`, `about`, `export` and `session`, for example `http://<docker-host>:8080/#/settings/proxmox`.
+A menu on the left of the Settings page jumps to each section and highlights the one you are reading (on a narrow screen it becomes a row of buttons on top). Sections can be linked directly: `#/settings/ranges`, `nmap`, `schedule`, `notifications`, `proxmox`, `asus`, `backup`, `about`, `export` and `session`, for example `http://<docker-host>:8080/#/settings/proxmox`.
 
 Everything below is saved in the data directory, so it survives updates and rebuilds. Values set in the browser take precedence over the matching environment variables; "Reset" returns to the environment value.
 
@@ -259,6 +260,16 @@ After each scan Netlens sends **one digest mail** listing the devices that appea
 You can switch the offline mails off **per device** with the checkbox "Send an e-mail when this device goes offline" on the device page (useful for phones and laptops that come and go). New-device mails always go out when that option is on.
 
 The SMTP password is stored in the database in plain text (like all settings) and is included in backups, so protect the data directory and the backup files.
+
+### ASUS router (AiMesh) connector
+
+Reads your ASUS router's client list and AiMesh node list and links every online device to the mesh node it is connected to (wired or Wi-Fi), and every mesh node to the router. These links appear in the hierarchy and on the map and rank above traceroute and gateway guesses. It is read-only and uses the router's HTTPS web interface (one login, two reads, a logout per sync; no SSH). Tested on an RT-AX92U with stock firmware.
+
+1. In Settings → *ASUS router (AiMesh)* enter the router's address (for example `192.168.0.1`; HTTPS uses port 8443 unless you give another), the admin username and password, and leave *Verify TLS certificate* off (the router's certificate is self-signed).
+2. Press *Test connection*, then tick *Enable the connector* and *Save*. It then syncs after every scan; *Sync now* does it on demand.
+3. If the router refuses the login, Netlens stops trying until you save or sync again, so a wrong password cannot get the account locked.
+
+The password is stored in Netlens' database (inside the data volume and in backups). A dedicated account is a good idea if your firmware allows it.
 
 ### Proxmox connector
 
