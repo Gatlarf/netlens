@@ -68,6 +68,7 @@ def _overview(conn, now: str) -> dict:
         "new_30d": count("first_seen >= ?", _ago(now, days=30)),
         "stale_30d": count("last_seen < ?", _ago(now, days=30)),
         "ignored": conn.execute("SELECT COUNT(*) FROM ignored_devices").fetchone()[0],
+        "unknown": count("trusted = 0"),
     }
 
 
@@ -96,6 +97,34 @@ def _topology_clients(conn) -> tuple[list[dict], dict[str, str]]:
             mac = client.get("node_mac") or (gateway or {}).get("mac")
             clients.append({"node": node_names.get(mac, "unknown"), "medium": client.get("medium", "unknown"), "band": client.get("band")})
     return clients, node_names
+
+
+WEAK_RSSI = -75
+
+
+def _wifi(conn, now: str) -> dict:
+    """Signal picture from the newest Wi-Fi sample of every client seen in the last two hours."""
+    rows = conn.execute(
+        f"""
+        SELECT d.id, {NAME} AS n, s.band, s.rssi, s.node
+        FROM wifi_samples s JOIN devices d ON d.id = s.device_id
+        WHERE s.id = (SELECT MAX(id) FROM wifi_samples WHERE device_id = d.id) AND s.ts >= ?
+        """,
+        (_ago(now, hours=2),),
+    ).fetchall()
+    rssis = [r["rssi"] for r in rows if r["rssi"] is not None]
+    buckets = Counter()
+    for v in rssis:
+        buckets["excellent (-55 and better)" if v >= -55 else "good (-56 to -65)" if v >= -65 else "fair (-66 to -75)" if v >= -75 else "weak (below -75)"] += 1
+    weakest = sorted((r for r in rows if r["rssi"] is not None), key=lambda r: r["rssi"])[:5]
+    return {
+        "clients": len(rows),
+        "avg_rssi": round(sum(rssis) / len(rssis)) if rssis else None,
+        "weak": sum(1 for v in rssis if v < WEAK_RSSI),
+        "quality": [{"label": k, "count": v} for k, v in sorted(buckets.items(), key=lambda kv: -kv[1])],
+        "weakest": [{"id": r["id"], "name": r["n"], "rssi": r["rssi"], "node": r["node"], "band": r["band"]} for r in weakest],
+        "roams_7d": conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'wifi_roamed' AND ts >= ?", (_ago(now, days=7),)).fetchone()[0],
+    }
 
 
 def _composition(conn, devs: dict, hierarchy: dict) -> dict:
@@ -331,6 +360,7 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
         "range": range_key,
         "overview": _overview(conn, now),
         "composition": _composition(conn, devs, hierarchy),
+        "wifi": _wifi(conn, now),
         "availability": _availability(conn, now),
         "history": _history(conn, now, days),
         "ports": _ports(conn, now),
@@ -345,13 +375,14 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     """The small, versioned document Home Assistant polls (see SUMMARY_API). Keys never disappear within one API version."""
     now = now or utcnow()
     overview = _overview(conn, now)
+    wifi = _wifi(conn, now)
     devs, hierarchy = load_hierarchy(conn)
     names = {i: (d["custom_name"] or d["hostname"] or d["primary_ip"] or str(i)) for i, d in devs.items()}
-    rows = {r["id"]: r for r in conn.execute("SELECT id, mac, vendor, last_seen, " + TYPE + " AS t FROM devices d")}
+    rows = {r["id"]: r for r in conn.execute("SELECT id, mac, vendor, last_seen, trusted, " + TYPE + " AS t FROM devices d")}
     devices = [
         {
             "id": i, "name": names[i], "ip": devs[i]["primary_ip"], "mac": rows[i]["mac"], "online": bool(devs[i]["online"]),
-            "type": rows[i]["t"], "vendor": rows[i]["vendor"], "last_seen": rows[i]["last_seen"],
+            "type": rows[i]["t"], "vendor": rows[i]["vendor"], "last_seen": rows[i]["last_seen"], "trusted": bool(rows[i]["trusted"]),
             "parent_id": hierarchy[i].parent_id, "parent_name": names.get(hierarchy[i].parent_id),
         }
         for i in sorted(devs)
@@ -374,7 +405,8 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "api": SUMMARY_API,
         "version": VERSION,
         "generated": now,
-        "devices": {k: overview[k] for k in ("total", "online", "offline", "new_24h", "new_7d", "stale_30d")},
+        "devices": {k: overview[k] for k in ("total", "online", "offline", "new_24h", "new_7d", "stale_30d", "unknown")},
+        "wifi": {k: wifi[k] for k in ("clients", "weak", "avg_rssi")},
         "uptime": {"24h": _pct(day["u"] or 0, day["n"]), "7d": _pct(week["u"] or 0, week["n"])},
         "ports": {"open": conn.execute("SELECT COUNT(*) FROM ports WHERE state = 'open'").fetchone()[0]},
         "events": {"24h": conn.execute("SELECT COUNT(*) FROM events WHERE ts >= ?", (_ago(now, hours=24),)).fetchone()[0],

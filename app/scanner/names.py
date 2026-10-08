@@ -67,6 +67,7 @@ def parse_upnp_description(xml_text: str) -> dict[str, str]:
         "manufacturer": "manufacturer",
         "modelName": "model_name",
         "modelNumber": "model_number",
+        "deviceType": "device_type",
     }
 
     for elem in root.iter():
@@ -85,7 +86,65 @@ def parse_upnp_description(xml_text: str) -> dict[str, str]:
     return result
 
 
-async def ssdp_search(timeout: float = 3.0) -> dict[str, list[tuple[str, str]]]:
+def hints_from_upnp(desc: dict[str, str]) -> list[str]:
+    """Discovery hints from a parsed UPnP description: its device type and make/model."""
+    hints = []
+    device_type = desc.get("device_type", "")
+    if device_type:
+        # urn:schemas-upnp-org:device:InternetGatewayDevice:1 -> internetgatewaydevice
+        parts = [p for p in device_type.split(":") if p]
+        kind = next((parts[i + 1] for i, p in enumerate(parts[:-1]) if p == "device"), parts[-1])
+        hints.append(f"upnp:{kind.lower()}")
+    model = " ".join(x for x in (desc.get("manufacturer"), desc.get("model_name")) if x)
+    if model:
+        hints.append(f"model:{model[:60]}")
+    return hints
+
+
+def hints_from_mdns(service_type: str, properties: dict | None = None) -> tuple[list[str], list[str]]:
+    """(hints, friendly names) for one mDNS service: its type, and the names/models devices put in the TXT record."""
+    hints = []
+    kind = service_type.strip(".").removesuffix(".local").lower()
+    if kind.startswith("_"):
+        hints.append(f"mdns:{kind}")
+    names = []
+
+    def text(value) -> str:
+        if isinstance(value, bytes):
+            value = value.decode("utf-8", errors="replace")
+        return str(value).strip() if value else ""
+
+    props = {text(k).lower(): text(v) for k, v in (properties or {}).items()}
+    if props.get("fn"):  # Chromecast and friends: the friendly name
+        names.append(props["fn"][:80])
+    for key in ("md", "am", "model", "ty"):  # model strings
+        if props.get(key):
+            hints.append(f"model:{props[key][:60]}")
+            break
+    return hints, names
+
+
+async def fetch_upnp_description(location: str, expected_ip: str, timeout: float = 2.0) -> dict[str, str]:
+    """Fetch a device's UPnP description (only from the host that announced it, plain http, small answers only)."""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(location)
+    if parsed.scheme != "http" or parsed.hostname != expected_ip:
+        return {}
+
+    def get() -> str:
+        import urllib.request
+
+        with urllib.request.urlopen(location, timeout=timeout) as resp:  # noqa: S310 - checked above
+            return resp.read(65536).decode("utf-8", errors="replace")
+
+    try:
+        return parse_upnp_description(await asyncio.to_thread(get))
+    except Exception:  # noqa: BLE001 - discovery is best effort
+        return {}
+
+
+async def ssdp_search(timeout: float = 3.0, locations: dict[str, str] | None = None) -> dict[str, list[tuple[str, str]]]:
     """
     Send an M-SEARCH over UDP multicast 239.255.255.250:1900.
 
@@ -139,6 +198,8 @@ async def ssdp_search(timeout: float = 3.0) -> dict[str, list[tuple[str, str]]]:
             text = data.decode("utf-8", errors="replace")
             headers = parse_ssdp_response(text)
 
+            if locations is not None and headers.get("location") and addr[0] not in locations:
+                locations[addr[0]] = headers["location"]
             server = headers.get("server", "")
             if server:
                 # Extract product token from SERVER header
@@ -185,7 +246,17 @@ async def mdns_browse(timeout: float = 3.0) -> dict[str, list[tuple[str, str]]]:
                 "_ssh._tcp.local.",
                 "_airplay._tcp.local.",
                 "_ipp._tcp.local.",
+                "_ipps._tcp.local.",
+                "_printer._tcp.local.",
+                "_pdl-datastream._tcp.local.",
                 "_smb._tcp.local.",
+                "_googlecast._tcp.local.",
+                "_hap._tcp.local.",
+                "_raop._tcp.local.",
+                "_spotify-connect._tcp.local.",
+                "_esphomelib._tcp.local.",
+                "_rtsp._tcp.local.",
+                "_axis-video._tcp.local.",
             ],
         )
 
@@ -199,6 +270,16 @@ async def mdns_browse(timeout: float = 3.0) -> dict[str, list[tuple[str, str]]]:
                 if info is None:
                     continue
 
+                kind_hints, friendly = hints_from_mdns(info.type or service, info.properties)
+                for ip in info.parsed_addresses():
+                    for hint in kind_hints:
+                        entry = (hint, "hint")
+                        if entry not in result.setdefault(ip, []):
+                            result[ip].append(entry)
+                    for fn in friendly:
+                        entry = (fn, "mdns")
+                        if entry not in result[ip]:
+                            result[ip].append(entry)
                 server_name = info.server
                 if server_name:
                     # Remove trailing ".local." and trailing dot
@@ -235,9 +316,10 @@ async def collect_names(timeout: float = 3.0) -> dict[str, list[tuple[str, str]]
 
     Merge the dicts (dedupe). Never raise.
     """
+    locations: dict[str, str] = {}
     try:
         ssdp_result, mdns_result = await asyncio.gather(
-            ssdp_search(timeout),
+            ssdp_search(timeout, locations),
             mdns_browse(timeout),
             return_exceptions=True,
         )
@@ -266,5 +348,24 @@ async def collect_names(timeout: float = 3.0) -> dict[str, list[tuple[str, str]]
         for entry in entries:
             if entry not in merged[ip]:
                 merged[ip].append(entry)
+
+    # what the UPnP devices say about themselves (name, make, model, kind of device)
+    if locations:
+        gate = asyncio.Semaphore(8)
+
+        async def describe(ip: str, location: str) -> tuple[str, dict[str, str]]:
+            async with gate:
+                return ip, await fetch_upnp_description(location, ip)
+
+        for ip, desc in await asyncio.gather(*(describe(i, l) for i, l in locations.items())):
+            if not desc:
+                continue
+            extra = []
+            if desc.get("friendly_name"):
+                extra.append((desc["friendly_name"][:80], "upnp"))
+            extra += [(h, "hint") for h in hints_from_upnp(desc)]
+            for entry in extra:
+                if entry not in merged.setdefault(ip, []):
+                    merged[ip].append(entry)
 
     return merged

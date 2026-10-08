@@ -121,6 +121,46 @@ VENDOR_PHONE_KEYWORDS: tuple[str, ...] = (
     "motorola",
 )
 
+# Discovery hints (stored per device as "mdns:<service type>", "upnp:<device type>", "model:<text>").
+# Strong hints name the kind of device outright; weak hints only say "something smart / a computer" and are
+# used after the operating system rules.
+STRONG_HINTS: tuple[tuple[str, str], ...] = (
+    ("upnp:internetgatewaydevice", "router"),
+    ("upnp:wlanaccesspoint", "ap"),
+    ("upnp:printer", "printer"),
+    ("mdns:_ipp._tcp", "printer"),
+    ("mdns:_ipps._tcp", "printer"),
+    ("mdns:_printer._tcp", "printer"),
+    ("mdns:_pdl-datastream._tcp", "printer"),
+    ("mdns:_scanner._tcp", "printer"),
+    ("mdns:_axis-video._tcp", "camera"),
+    ("mdns:_rtsp._tcp", "camera"),
+)
+WEAK_HINTS: tuple[tuple[str, str], ...] = (
+    ("mdns:_googlecast._tcp", "iot"),
+    ("mdns:_hap._tcp", "iot"),
+    ("mdns:_homekit._tcp", "iot"),
+    ("mdns:_esphomelib._tcp", "iot"),
+    ("mdns:_arduino._tcp", "iot"),
+    ("mdns:_spotify-connect._tcp", "iot"),
+    ("mdns:_airplay._tcp", "iot"),
+    ("mdns:_raop._tcp", "iot"),
+    ("upnp:mediarenderer", "iot"),
+    ("upnp:mediaserver", "iot"),
+    ("mdns:_workstation._tcp", "pc"),
+)
+
+# Words in a device's name that say what it is (the name is split on anything that is not a letter or digit).
+HOSTNAME_TOKENS: tuple[tuple[str, frozenset[str]], ...] = (
+    ("phone", frozenset({"iphone", "ipad", "android", "galaxy", "pixel", "oneplus", "redmi", "huawei-phone"})),
+    ("camera", frozenset({"cam", "camera", "ipcam", "doorbell", "reolink", "wyze"})),
+    ("printer", frozenset({"printer", "laserjet", "officejet", "deskjet", "pixma", "envy"})),
+    ("iot", frozenset({"shelly", "tasmota", "esp", "esp32", "esp8266", "esphome", "sonoff", "tuya", "wled", "chromecast", "roku", "firetv", "appletv", "sonos", "hue", "tv"})),
+    ("nas", frozenset({"nas", "synology", "qnap", "truenas", "diskstation"})),
+    ("server", frozenset({"pve", "proxmox", "esxi", "docker", "srv", "server", "homeassistant", "pihole"})),
+    ("pc", frozenset({"desktop", "laptop", "macbook", "imac", "thinkpad", "workstation", "pc"})),
+)
+
 # Rule 4: Port-based rules
 CAMERA_PORTS: frozenset[int] = frozenset({554, 8554})
 NAS_PORTS: frozenset[int] = frozenset({5000, 5001, 2049, 548})
@@ -134,6 +174,11 @@ LINUX_SERVER_PORTS: frozenset[int] = frozenset({22, 80, 443, 3306, 5432, 8080, 8
 SERVER_PORTS: frozenset[int] = frozenset({22, 80, 443, 8080, 3306})
 
 
+def _token_matches(token: str, word: str) -> bool:
+    """'shelly1' is the word 'shelly' plus a number; long words also match as a prefix ('thinkpadx1')."""
+    return token == word or re.fullmatch(rf"{re.escape(word)}\d+", token) is not None or (len(word) >= 6 and token.startswith(word))
+
+
 def classify_device(
     *,
     vendor: str | None = None,
@@ -143,6 +188,7 @@ def classify_device(
     services: Iterable[str] = (),
     hostnames: Iterable[str] = (),
     mac: str | None = None,
+    hints: Iterable[str] = (),
 ) -> str:
     """Classify a device into one of DEVICE_TYPES.
 
@@ -158,6 +204,7 @@ def classify_device(
     ports = set(open_ports)
     services_set = {s.lower() for s in services if s}
     hostnames_set = {h.lower() for h in hostnames if h}
+    hint_set = {h.lower() for h in hints if h}
 
     # Rule 1: VM
     if mac_lower:
@@ -174,6 +221,15 @@ def classify_device(
         mapped = OS_TYPE_MAP.get(os_type_lower)
         if mapped:
             return mapped
+
+    # Rule 2b: discovery hints that name the kind of device, then words in its name
+    for token, device_type in STRONG_HINTS:
+        if token in hint_set:
+            return device_type
+    name_tokens = {t for h in hostnames_set for t in re.split(r"[^a-z0-9]+", h.split(".")[0]) if t}  # first label only: the domain says nothing
+    for device_type, words in HOSTNAME_TOKENS:
+        if any(_token_matches(t, w) for t in name_tokens for w in words):
+            return device_type
 
     # Rule 3: Vendor keywords
     if vendor_lower:
@@ -262,6 +318,11 @@ def classify_device(
         # macOS
         if "mac os" in os_name_lower or "macos" in os_name_lower:
             return "pc"
+
+    # Rule 5b: weak discovery hints
+    for token, device_type in WEAK_HINTS:
+        if token in hint_set:
+            return device_type
 
     # Rule 6: General server ports
     if ports & SERVER_PORTS:

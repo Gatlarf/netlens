@@ -186,7 +186,7 @@ async def test_topology_sync_creates_uplinks_with_the_plugin_as_source(db, tmp_p
     path, ids = db
     enable(path, "asus", ASUS_CONFIG)
     svc = service(path, tmp_path, asus=fake(fetch=lambda cfg: TOPO))
-    assert await svc.sync("asus") == {"nodes": 2, "clients": 3, "links": 4}
+    assert await svc.sync("asus") == {"nodes": 2, "clients": 3, "links": 4, "samples": 1, "roams": 0}  # one Wi-Fi client
     assert edges(path) == {
         (ids["garden"], ids["main"], "uplink", "plugin:asus", 0),
         (ids["wired"], ids["main"], "uplink", "plugin:asus", 0),

@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 from app.db import connect, delete_setting, get_setting, set_setting, utcnow
 from app.plugins.contract import ContractError, clean_config, default_config, missing_required, validate_output
+from app.plugins.enrich import device_lookup, record_router_names, record_wifi
 from app.plugins.matching import match_hypervisor, norm_mac, topology_links
 from app.plugins.registry import Plugin, discover
 from app.plugins.runner import PluginRunError, run_subprocess
@@ -188,15 +189,7 @@ def apply_plugin(conn: sqlite3.Connection, plugin: Plugin) -> dict:
             "links": len(pairs),
         }
     else:
-        by_mac: dict[str, int] = {}
-        by_ip: dict[str, int] = {}
-        for row in conn.execute("SELECT id, mac, primary_ip FROM devices ORDER BY id DESC"):
-            if row["mac"]:
-                by_mac[norm_mac(row["mac"])] = row["id"]
-            if row["primary_ip"]:
-                by_ip[row["primary_ip"]] = row["id"]
-        for row in conn.execute("SELECT device_id, ip FROM device_ips ORDER BY device_id DESC"):
-            by_ip[row["ip"]] = row["device_id"]
+        by_mac, by_ip = device_lookup(conn)
         links = topology_links(data, by_mac, by_ip)
         _insert_links(conn, plugin.id, kind, [(c, p) for c, p, _how in links])
         summary = {"nodes": len(data["nodes"]), "clients": len(data["clients"]), "links": len(links)}
@@ -253,6 +246,12 @@ class PluginService:
                 return {"error": message, "auth_failed": False}
             set_setting(conn, _key(plugin.id, "data"), json.dumps(data))
             summary = apply_plugin(conn, plugin)
+            if plugin.manifest["kind"] == "topology":
+                try:  # what the router tells us besides the links; a failure here must not fail the sync
+                    record_router_names(conn, data)
+                    summary.update(record_wifi(conn, data))
+                except sqlite3.Error:
+                    log.exception("could not store the router's names and Wi-Fi samples")
             set_status(conn, plugin.id, ok=True, **summary)
             return summary
         finally:

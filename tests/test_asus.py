@@ -19,7 +19,10 @@ ONBOARDING = "﻿get_onboardinglist = [{}][0];\nget_cfg_clientlist = [" + json.d
 
 
 def _client_entry(mac, ip, wl="0", node="", online="1", name=""):
-    return {"mac": mac.upper(), "ip": ip, "isWL": wl, "amesh_papMac": node.upper(), "isOnline": online, "name": name}
+    entry = {"mac": mac.upper(), "ip": ip, "isWL": wl, "amesh_papMac": node.upper(), "isOnline": online, "name": name}
+    if wl != "0":
+        entry.update(rssi="-61", curTx="72.2", curRx="1")
+    return entry
 
 
 CLIENTS = {"get_clientlist": {
@@ -75,7 +78,9 @@ def test_parse_onboarding_and_snapshot():
     assert snap["nodes"][0]["wired_macs"] == [N1]
     assert {c["mac"] for c in snap["clients"]} == {"02:00:00:00:00:01", "02:00:00:00:00:02", "02:00:00:00:00:03"}  # offline one dropped
     wifi = next(c for c in snap["clients"] if c["mac"].endswith(":02"))
-    assert wifi == {"mac": "02:00:00:00:00:02", "ip": "10.0.0.12", "name": "wifi on garden", "wired": False, "band": "5 GHz", "node_mac": N1}
+    assert wifi == {"mac": "02:00:00:00:00:02", "ip": "10.0.0.12", "name": "wifi on garden", "wired": False, "band": "5 GHz", "node_mac": N1,
+                    "rssi": -61, "tx_mbps": 72.2, "rx_mbps": 1.0}
+    assert next(c for c in snap["clients"] if c["mac"].endswith(":01"))["rssi"] is None  # wired: no signal
     assert next(c for c in snap["clients"] if c["mac"].endswith(":01"))["node_mac"] is None
     with pytest.raises(AsusError):
         parse_onboarding("nothing here")

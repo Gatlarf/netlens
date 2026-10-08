@@ -166,12 +166,13 @@ def test_summary_document(db):
     conn, _ = db
     doc = summary(conn, NOW, scan_running=True)
     assert doc["api"] == 1 and doc["generated"] == NOW and doc["scans"]["running"] is True
-    assert doc["devices"] == {"total": 5, "online": 3, "offline": 2, "new_24h": 1, "new_7d": 1, "stale_30d": 1}
+    assert doc["devices"] == {"total": 5, "online": 3, "offline": 2, "new_24h": 1, "new_7d": 1, "stale_30d": 1, "unknown": 5}
+    assert doc["wifi"] == {"clients": 0, "weak": 0, "avg_rssi": None}
     assert doc["ports"] == {"open": 5} and doc["events"]["24h"] == 1 and doc["events"]["last_id"] == 5
     assert doc["uptime"]["24h"] is not None and doc["scans"]["last"]["kind"] == "quick" and doc["scans"]["last_ok_age_s"] == 3600 - 10
     dev = {d["id"]: d for d in doc["device_list"]}
     assert dev[2] == {"id": 2, "name": "NAS", "ip": "10.0.0.2", "mac": "aa:00:00:00:00:02", "online": True, "type": "nas", "vendor": "Synology",
-                      "last_seen": ago(hours=1), "parent_id": 1, "parent_name": "Router"}
+                      "last_seen": ago(hours=1), "trusted": False, "parent_id": 1, "parent_name": "Router"}
     assert dev[1]["parent_id"] is None and len(dev) == 5
     assert doc["scans"]["failed_24h"] == 1 and doc["problems"] == 0 and doc["problem"] is False  # an old failure that later scans recovered from
 
@@ -230,3 +231,41 @@ def test_events_since_id(client):
     newer = client.get("/api/events", params={"since_id": sorted(ids)[2]}).json()
     assert sorted(e["id"] for e in newer) == sorted(ids)[3:]
     assert client.get("/api/events", params={"since_id": max(ids)}).json() == []
+
+
+def test_wifi_picture_and_trust_counts(db):
+    conn, _ = db
+    conn.execute("UPDATE devices SET trusted = 1 WHERE id IN (1, 2)")
+    for dev, node, band, rssi in ((1, "Garden", "5 GHz", -50), (2, "Garden", "2.4 GHz", -80), (3, "Attic", "5 GHz", -70)):
+        conn.execute("INSERT INTO wifi_samples (device_id, ts, node, band, rssi) VALUES (?, ?, ?, ?, 0)", (dev, ago(hours=3), node, band))  # too old
+        conn.execute("INSERT INTO wifi_samples (device_id, ts, node, band, rssi) VALUES (?, ?, ?, ?, ?)", (dev, ago(hours=1), node, band, rssi))
+    conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES (?, 3, 'wifi_roamed', 'a -> b')", (ago(days=1),))
+    w = compute_stats(conn, "7d", NOW)["wifi"]
+    assert w["clients"] == 3 and w["weak"] == 1 and w["avg_rssi"] == -67 and w["roams_7d"] == 1
+    assert {q["label"]: q["count"] for q in w["quality"]} == {"excellent (-55 and better)": 1, "fair (-66 to -75)": 1, "weak (below -75)": 1}
+    assert [x["name"] for x in w["weakest"]] == ["NAS", "Phone", "Router"] and w["weakest"][0]["node"] == "Garden"
+    doc = summary(conn, NOW)
+    assert doc["devices"]["unknown"] == 3 and doc["wifi"] == {"clients": 3, "weak": 1, "avg_rssi": -67}
+    assert {d["id"]: d["trusted"] for d in doc["device_list"]} == {1: True, 2: True, 3: False, 4: False, 5: False}
+
+
+def _real_ago(**kw):
+    from app.db import utcnow
+    from app.stats import _ago
+
+    return _ago(utcnow(), **kw)
+
+
+def test_device_wifi_endpoint(client, db):
+    conn, _ = db
+    for i, (node, rssi) in enumerate((("Garden", -60), ("Garden", -62), ("Attic", -70))):
+        conn.execute("INSERT INTO wifi_samples (device_id, ts, node, band, rssi, tx_mbps) VALUES (3, ?, ?, '5 GHz', ?, 72.2)", (_real_ago(hours=2 - i * 0.5), node, rssi))
+    conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES (?, 3, 'wifi_roamed', 'Garden -> Attic (5 GHz)')", (_real_ago(hours=1),))
+    conn.commit()
+    body = client.get("/api/devices/3/wifi", params={"hours": 24}).json()
+    assert [s["rssi"] for s in body["samples"]] == [-60, -62, -70]
+    assert body["current"]["node"] == "Attic" and body["current"]["quality"] == "fair" and body["current"]["tx_mbps"] == 72.2
+    assert body["roams"] == [{"ts": _real_ago(hours=1), "detail": "Garden -> Attic (5 GHz)"}]
+    assert client.get("/api/devices/1/wifi").json() == {"current": None, "samples": [], "roams": []}
+    assert client.get("/api/devices/99/wifi").status_code == 404
+    assert client.get("/api/devices/3/wifi", headers={"Authorization": "Bearer no"}).status_code == 401

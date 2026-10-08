@@ -43,6 +43,7 @@ function build(s) {
   const ev = s.events;
   const sys = s.system;
   const hist = s.history;
+  const w = s.wifi;
   const root = h("div", { class: "stats" });
 
   // ------------------------------------------------------------------ overview
@@ -50,7 +51,7 @@ function build(s) {
     tile(fmtNumber(o.total), "devices"), tile(fmtNumber(o.online), "online", { tone: "good" }),
     tile(fmtNumber(o.offline), "offline", { tone: o.offline ? "warn" : "" }), tile(fmtPct(o.online_pct), "online now"),
     tile(fmtNumber(o.new_24h), "new in 24 h"), tile(fmtNumber(o.new_7d), "new in 7 days"), tile(fmtNumber(o.new_30d), "new in 30 days"),
-    tile(fmtNumber(o.stale_30d), "not seen for 30 days", { tone: o.stale_30d ? "warn" : "" }), tile(fmtNumber(o.ignored), "ignored")));
+    tile(fmtNumber(o.stale_30d), "not seen for 30 days", { tone: o.stale_30d ? "warn" : "" }), tile(fmtNumber(o.unknown), "unknown (not marked as known)", { tone: o.unknown ? "warn" : "" }), tile(fmtNumber(o.ignored), "ignored")));
 
   // ------------------------------------------------------------------ history
   const online = hist.online_series.map((r) => ({ x: r.t.replace("T", " ").slice(5, hist.bucket === "hour" ? 16 : 10), online: r.online, monitored: r.monitored }));
@@ -67,6 +68,14 @@ function build(s) {
     card("Top vendors", barList(c.by_vendor)), card("Operating systems", barList(c.by_os)), card("Subnets", barList(c.by_subnet)),
     card("Wired and Wi-Fi", conn.length ? donut(conn) : emptyNote("Turn on a router plugin to see this."), c.wifi_bands.length ? h("h4", {}, "Wi-Fi bands") : null, c.wifi_bands.length ? barList(c.wifi_bands) : null),
     card("Clients per network node", c.clients_per_node.length ? barList(c.clients_per_node) : emptyNote("Turn on a router plugin to see this."))));
+
+  // ------------------------------------------------------------------ Wi-Fi
+  if (w.clients) {
+    root.appendChild(section("Wi-Fi",
+      h("div", { class: "tiles inline" }, tile(fmtNumber(w.clients), "Wi-Fi clients"), tile(w.avg_rssi === null ? "–" : `${w.avg_rssi} dBm`, "average signal"), tile(fmtNumber(w.weak), "weak (below -75 dBm)", { tone: w.weak ? "warn" : "" }), tile(fmtNumber(w.roams_7d), "moves between nodes, 7 days")),
+      card("Signal quality", donut(w.quality)),
+      card("Weakest clients", table(["Device", "Signal", "Node", "Band"], w.weakest.map((r) => [link(r), `${r.rssi} dBm`, r.node || "", r.band || ""])))));
+  }
 
   // ------------------------------------------------------------------ availability
   const rel = (list) => table(["Device", "Uptime (7 d)", "Outages"], list.map((r) => [link(r), fmtPct(r.uptime), String(r.outages)]));

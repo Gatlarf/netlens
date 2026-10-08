@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 def utcnow() -> str:
@@ -41,10 +41,13 @@ def connect(path: str | os.PathLike) -> sqlite3.Connection:
 
 
 
-def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:
+    """Add the column when it is not there yet; returns True when it was added."""
     cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
     if column not in cols:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+        return True
+    return False
 
 
 def _migrate_to_plugins(conn: sqlite3.Connection) -> None:
@@ -330,6 +333,65 @@ def init_db(conn: sqlite3.Connection) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_hv_guests_device ON hypervisor_guests(device_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_hv_guests_host ON hypervisor_guests(host_device_id)")
     _migrate_to_plugins(conn)
+
+    # --- schema v7: trusted devices, identification hints, Wi-Fi samples, service checks ---------
+    # trusted: 1 = a device the user knows. Devices that already exist when this column appears are all trusted, so an
+    # upgrade does not turn the whole network into "unknown devices"; devices found later start untrusted.
+    if _add_column_if_missing(conn, "devices", "trusted", "INTEGER NOT NULL DEFAULT 0"):
+        conn.execute("UPDATE devices SET trusted = 1")
+    # hints: what discovery told us about the device (mDNS service types, UPnP device types, models), JSON list
+    _add_column_if_missing(conn, "devices", "hints", "TEXT NOT NULL DEFAULT '[]'")
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS wifi_samples (
+            id INTEGER PRIMARY KEY,
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            ts TEXT NOT NULL,
+            node TEXT,
+            band TEXT,
+            rssi INTEGER,
+            tx_mbps REAL,
+            rx_mbps REAL
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_wifi_device_ts ON wifi_samples(device_id, ts)")
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS service_checks (
+            id INTEGER PRIMARY KEY,
+            device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            host TEXT NOT NULL,
+            port INTEGER,
+            path TEXT NOT NULL DEFAULT '',
+            expect TEXT NOT NULL DEFAULT '',
+            interval_s INTEGER NOT NULL DEFAULT 60,
+            timeout_s INTEGER NOT NULL DEFAULT 5,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            last_ts TEXT,
+            last_up INTEGER,
+            last_ms REAL,
+            last_detail TEXT,
+            since TEXT,
+            created TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS service_results (
+            id INTEGER PRIMARY KEY,
+            check_id INTEGER NOT NULL REFERENCES service_checks(id) ON DELETE CASCADE,
+            ts TEXT NOT NULL,
+            up INTEGER NOT NULL,
+            ms REAL,
+            detail TEXT
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_service_results ON service_results(check_id, ts)")
 
     # --- schema v6: one row per day for the history charts of the Statistics page ---------
     cur.execute(

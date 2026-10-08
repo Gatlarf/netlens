@@ -1,9 +1,20 @@
+import json
 from dataclasses import replace
 from typing import Any, Optional
 
 from app.db import add_event, get_or_create_device, utcnow
+from app.plugins.enrich import refresh_hostname
 from app.scanner.classify import classify_device
 from app.scanner.nmap_parser import ScanHost
+
+
+MAX_HINTS = 40  # discovery hints kept per device
+
+
+def _hours_before(ts: str, hours: int) -> str:
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def save_scan_results(
@@ -83,8 +94,18 @@ def save_scan_results(
         # Read prev_max inside the loop immediately before get_or_create_device
         prev_max = conn.execute("SELECT COALESCE(MAX(id), 0) FROM devices").fetchone()[0]
 
+        # Another device held this IP until now (seen within a day): worth a note, it explains odd history
+        holder = conn.execute(
+            "SELECT id, mac, hostname, custom_name, last_seen FROM devices WHERE primary_ip = ? AND id != ? AND last_seen >= ?",
+            (host.ip, existing_device_id or -1, _hours_before(now, 24)),
+        ).fetchone()
+
         # Create or update device
         device_id = get_or_create_device(conn, host.mac, host.ip, now)
+        if holder is not None and holder["mac"] != mac:
+            detail = f"{host.ip} is now used by {mac or 'a device without MAC'}; it was {holder['custom_name'] or holder['hostname'] or holder['mac'] or 'another device'} ({holder['mac'] or 'no MAC'})"
+            if conn.execute("SELECT 1 FROM events WHERE kind = 'ip_reused' AND device_id = ? AND detail = ?", (device_id, detail)).fetchone() is None:
+                add_event(conn, "ip_reused", detail, device_id=device_id, now=now)
         device_ids.append(device_id)
         if host.rtt_ms is not None:
             rtts[device_id] = host.rtt_ms
@@ -117,14 +138,26 @@ def save_scan_results(
                 (host.os_name, host.os_accuracy, device_id),
             )
 
-        # Determine hostname: first PTR name else first name else unchanged
+        # Discovery hints are kept on the device (they are not names); everything else is a name
+        named = [(n, src) for n, src in host.hostnames if src.lower() != "hint"]
+        new_hints = [n for n, src in host.hostnames if src.lower() == "hint"]
+        if new_hints:
+            try:
+                kept = json.loads(conn.execute("SELECT hints FROM devices WHERE id = ?", (device_id,)).fetchone()["hints"] or "[]")
+            except ValueError:
+                kept = []
+            merged_hints = (kept + [h for h in new_hints if h not in kept])[-MAX_HINTS:]
+            conn.execute("UPDATE devices SET hints = ? WHERE id = ?", (json.dumps(merged_hints), device_id))
+
+        # Determine hostname: the PTR name, else the first real name (an SSDP product token such as "Linux" is not a
+        # name), else unchanged; a device that still has none takes its best alias
         hostname = None
-        for name, source in host.hostnames:
+        for name, source in named:
             if source.lower() == "ptr":
                 hostname = name
                 break
-        if hostname is None and host.hostnames:
-            hostname = host.hostnames[0][0]
+        if hostname is None:
+            hostname = next((name for name, source in named if source.lower() != "ssdp"), None)
         if hostname is not None:
             conn.execute(
                 "UPDATE devices SET hostname = ? WHERE id = ?",
@@ -132,7 +165,7 @@ def save_scan_results(
             )
 
         # Upsert device_names
-        for name, source in host.hostnames:
+        for name, source in named:
             conn.execute(
                 """
                 INSERT INTO device_names (device_id, name, source, first_seen, last_seen)
@@ -141,6 +174,7 @@ def save_scan_results(
                 """,
                 (device_id, name, source.lower(), now, now),
             )
+        refresh_hostname(conn, device_id)
 
         # Upsert ports
         for port in host.ports:
@@ -202,9 +236,13 @@ def save_scan_results(
 
         # Get current device values for classification
         dev_row = conn.execute(
-            "SELECT vendor, os_name, type_override FROM devices WHERE id = ?",
+            "SELECT vendor, os_name, type_override, hints FROM devices WHERE id = ?",
             (device_id,),
         ).fetchone()
+        try:
+            stored_hints = json.loads(dev_row["hints"] or "[]")
+        except ValueError:
+            stored_hints = []
 
         device_type = classify_device(
             vendor=dev_row["vendor"],
@@ -214,6 +252,7 @@ def save_scan_results(
             services=services,
             hostnames=names,
             mac=mac,
+            hints=stored_hints,
         )
         conn.execute(
             "UPDATE devices SET device_type = ? WHERE id = ?",

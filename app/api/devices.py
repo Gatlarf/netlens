@@ -44,6 +44,7 @@ class DevicePatch(BaseModel):
     tags: list[str] | None = None
     type_override: str | None = None
     notify_offline: bool | None = None
+    trusted: bool | None = None             # True = a device the user knows
     parent_mode: str | None = None          # 'auto' | 'none' | 'device'
     parent_device_id: int | None = None
     pos_x: float | None = None
@@ -79,6 +80,7 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
         "type": row["type_override"] or row["device_type"] or "unknown",
         "open_ports": row["open_ports"],
         "notify_offline": bool(row["notify_offline"]),
+        "trusted": bool(row["trusted"]),
     }
 
 
@@ -205,6 +207,7 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
 def list_devices(
     request: Request,
     online: bool | None = None,
+    trusted: bool | None = None,
     q: str | None = None,
     conn: sqlite3.Connection = Depends(get_conn),
 ) -> list[dict[str, Any]]:
@@ -228,6 +231,7 @@ def list_devices(
             pos_x,
             pos_y,
             notify_offline,
+            trusted,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
     """
@@ -237,6 +241,10 @@ def list_devices(
     if online is not None:
         conditions.append("online = ?")
         params.append(int(online))
+
+    if trusted is not None:
+        conditions.append("trusted = ?")
+        params.append(int(trusted))
 
     if q:
         conditions.append(
@@ -252,6 +260,24 @@ def list_devices(
 
     rows = conn.execute(sql, params).fetchall()
     return [_device_dict(row) for row in rows]
+
+
+class TrustBody(BaseModel):
+    ids: list[int] | None = None  # these devices; omit to apply to every device
+    trusted: bool = True
+
+
+@router.post("/devices/trust")
+def trust_devices(body: TrustBody, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, int]:
+    """Mark devices as known (or unknown again). Without `ids` it applies to all devices ("trust everything on my network now")."""
+    value = 1 if body.trusted else 0
+    if body.ids is None:
+        changed = conn.execute("UPDATE devices SET trusted = ? WHERE trusted != ?", (value, value)).rowcount
+    else:
+        marks = ",".join("?" for _ in body.ids) or "NULL"
+        changed = conn.execute(f"UPDATE devices SET trusted = ? WHERE trusted != ? AND id IN ({marks})", (value, value, *body.ids)).rowcount
+    conn.commit()
+    return {"changed": changed}
 
 
 @router.get("/devices/{device_id}")
@@ -280,6 +306,7 @@ def get_device(
             pos_x,
             pos_y,
             notify_offline,
+            trusted,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
         WHERE id = ?
@@ -320,6 +347,7 @@ def patch_device(
             pos_x,
             pos_y,
             notify_offline,
+            trusted,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
         WHERE id = ?
@@ -368,6 +396,9 @@ def patch_device(
 
     if "notify_offline" in fields_set:
         updates["notify_offline"] = 0 if body.notify_offline is False else 1
+
+    if "trusted" in fields_set and body.trusted is not None:
+        updates["trusted"] = 1 if body.trusted else 0
 
     if "parent_mode" in fields_set or "parent_device_id" in fields_set:
         mode = body.parent_mode
@@ -428,6 +459,7 @@ def patch_device(
             pos_x,
             pos_y,
             notify_offline,
+            trusted,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
         WHERE id = ?

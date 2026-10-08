@@ -42,6 +42,22 @@ def norm_mac(value: Any) -> str | None:
     return None
 
 
+def _int(value: Any, low: int, high: int) -> int | None:
+    try:
+        number = int(float(str(value).strip()))
+    except (TypeError, ValueError):
+        return None
+    return number if low <= number <= high else None
+
+
+def _number(value: Any) -> float | None:
+    try:
+        number = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
 def parse_onboarding(text: str) -> list[dict]:
     """Pull the node list out of ajax_onboarding.asp ('get_cfg_clientlist = [[{...}, ...]];')."""
     text = text.lstrip("﻿")
@@ -97,6 +113,9 @@ def build_snapshot(clientlist: Any, onboarding_nodes: list[dict]) -> dict:
             "wired": wl == "0",
             "band": {"1": "2.4 GHz", "2": "5 GHz", "3": "5 GHz", "4": "6 GHz"}.get(wl),
             "node_mac": norm_mac(c.get("amesh_papMac")),
+            "rssi": _int(c.get("rssi"), -127, -1) if wl != "0" else None,
+            "tx_mbps": _number(c.get("curTx")) if wl != "0" else None,
+            "rx_mbps": _number(c.get("curRx")) if wl != "0" else None,
         })
     return {"nodes": nodes, "clients": clients}
 

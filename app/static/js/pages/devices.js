@@ -1,5 +1,5 @@
-import { get } from "../api.js";
-import { h, clear, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS } from "../util.js";
+import { get, post } from "../api.js";
+import { h, clear, toast, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS } from "../util.js";
 
 const REFRESH_MS = 15000;
 
@@ -102,6 +102,35 @@ function buildToolbar(state) {
   });
   toolbar.appendChild(typeSel);
 
+  const trustSel = h("select", { "aria-label": "Known or unknown devices", class: "trust-filter" });
+  trustSel.appendChild(h("option", { value: "" }, "Known and unknown"));
+  trustSel.appendChild(h("option", { value: "false" }, "Unknown only"));
+  trustSel.appendChild(h("option", { value: "true" }, "Known only"));
+  trustSel.value = state.trusted;
+  trustSel.addEventListener("change", () => {
+    state.trusted = trustSel.value;
+    load();
+  });
+  toolbar.appendChild(trustSel);
+
+  const trustAll = h("button", { type: "button", class: "btn trust-all", title: "Mark every device on the list as known" }, "Trust all unknown");
+  trustAll.addEventListener("click", async () => {
+    const unknown = devices.filter((d) => !d.trusted);
+    if (!unknown.length) {
+      toast("Every device here is already known", "info");
+      return;
+    }
+    if (!window.confirm(`Mark ${unknown.length} device(s) as known? New devices that appear later will still be flagged as unknown.`)) return;
+    try {
+      const res = await post("/api/devices/trust", { ids: unknown.map((d) => d.id) });
+      toast(`${res.changed} device(s) marked as known`, "success");
+      load();
+    } catch (err) {
+      toast(err.message || "Could not mark the devices", "error");
+    }
+  });
+  toolbar.appendChild(trustAll);
+
   const count = h("span", { class: "count" }, "0 devices");
   toolbar.appendChild(count);
 
@@ -175,6 +204,7 @@ function renderRows() {
 
     const nameCell = h("td", {});
     nameCell.appendChild(h("span", { class: "device-name" }, d.name || "—"));
+    if (!d.trusted) nameCell.appendChild(h("span", { class: "tag unknown-tag", title: "Not marked as a known device yet" }, "unknown"));
     if (Array.isArray(d.tags) && d.tags.length) {
       const chips = h("div", { class: "tags" });
       for (const t of d.tags) {
@@ -202,6 +232,7 @@ async function load() {
   const params = new URLSearchParams();
   if (state.q) params.set("q", state.q);
   if (state.online) params.set("online", state.online);
+  if (state.trusted) params.set("trusted", state.trusted);
 
   try {
     devices = await get("/api/devices?" + params.toString());
@@ -235,6 +266,7 @@ let interval;
 const state = {
   q: "",
   online: "",
+  trusted: "",
   type: "",
   sortKey: "primary_ip",
   sortDir: "asc"

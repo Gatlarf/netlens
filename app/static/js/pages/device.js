@@ -2,6 +2,7 @@ import { get, patch, post, del, ApiError } from "../api.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS } from "../util.js";
 import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
+import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildParentCard } from "../cards/device_parent.js";
 
 const WEB_PORTS = new Set([80, 443, 8080, 8443, 8006, 5000, 5001, 9000]);
@@ -147,13 +148,19 @@ function buildEditCard(device, onSaved) {
   notifyField.appendChild(h("p", { class: "hint" }, "Needs e-mail notifications to be set up under Settings."));
   form.appendChild(notifyField);
 
+  const trustField = h("div", { class: "field" });
+  const trustInput = h("input", { type: "checkbox", name: "trusted", checked: device.trusted === true });
+  trustField.appendChild(h("label", {}, trustInput, " Known device"));
+  trustField.appendChild(h("p", { class: "hint" }, "Tick it for devices you recognise. Devices that appear later start as unknown, so you can spot newcomers."));
+  form.appendChild(trustField);
+
   const saveBtn = h("button", { type: "submit" }, "Save");
   form.appendChild(saveBtn);
 
   let dirty = false;
   let focused = false;
 
-  const fields = [nameInput, typeSelect, tagsInput, notesTextarea, notifyInput];
+  const fields = [nameInput, typeSelect, tagsInput, notesTextarea, notifyInput, trustInput];
   for (const f of fields) {
     f.addEventListener("input", () => { dirty = true; });
     f.addEventListener("change", () => { dirty = true; });
@@ -169,6 +176,7 @@ function buildEditCard(device, onSaved) {
       tags: tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean),
       notes: notesTextarea.value,
       notify_offline: notifyInput.checked,
+      trusted: trustInput.checked,
     };
     try {
       await patch(`/api/devices/${device.id}`, body);
@@ -415,6 +423,9 @@ export async function render(container, params) {
     const uptimeSlot = h("div", {});
     right.appendChild(uptimeSlot);
     buildDeviceUptimeCard(device.id).then((c) => { if (!disposed) uptimeSlot.appendChild(c); }).catch(() => {});
+    const wifiSlot = h("div", {});
+    right.appendChild(wifiSlot);
+    buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
     right.appendChild(buildNamesCard(device));
     right.appendChild(buildEventsCard(device));
     right.appendChild(buildDeleteCard(device, (open) => { deleteOpen = open; }));

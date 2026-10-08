@@ -70,6 +70,16 @@ def _ipv4(value: Any, path: str) -> str | None:
     return str(addr)
 
 
+def _optional_number(value: Any, path: str, low: float, high: float, *, integer: bool = False):
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        _fail(path, f"must be a number, got {value!r}")
+    if not low <= value <= high:
+        _fail(path, f"must be between {low} and {high}, got {value}")
+    return int(value) if integer else float(value)
+
+
 def _list(value: Any, path: str) -> list:
     if value is None:
         return []
@@ -324,5 +334,8 @@ def _topology(data: Any) -> dict:
             "node_mac": node_mac,
             "medium": medium,
             "band": _text(raw.get("band"), f"{path}.band", max_len=20) or None,
+            "rssi": _optional_number(raw.get("rssi"), f"{path}.rssi", -127, 0, integer=True),
+            "tx_mbps": _optional_number(raw.get("tx_mbps"), f"{path}.tx_mbps", 0, 100000),
+            "rx_mbps": _optional_number(raw.get("rx_mbps"), f"{path}.rx_mbps", 0, 100000),
         })
     return {"nodes": nodes, "clients": clients}
