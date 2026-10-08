@@ -173,11 +173,14 @@ def test_summary_document(db):
     assert dev[2] == {"id": 2, "name": "NAS", "ip": "10.0.0.2", "mac": "aa:00:00:00:00:02", "online": True, "type": "nas", "vendor": "Synology",
                       "last_seen": ago(hours=1), "parent_id": 1, "parent_name": "Router"}
     assert dev[1]["parent_id"] is None and len(dev) == 5
-    assert doc["problems"] == 1 and doc["problem"] is True  # a failed scan in the last 24 h
+    assert doc["scans"]["failed_24h"] == 1 and doc["problems"] == 0 and doc["problem"] is False  # an old failure that later scans recovered from
 
 
 def test_summary_problem_logic(db):
     conn, _ = db
+    assert summary(conn, NOW)["problem"] is False
+    conn.execute("INSERT INTO scans (kind, status, started, finished, hosts_found) VALUES ('quick', 'failed', ?, ?, 0)", (ago(hours=0.1), ago(hours=0.1)))
+    assert summary(conn, NOW)["problems"] == 1  # the most recent scan failed
     conn.execute("DELETE FROM scans WHERE status = 'failed'")
     assert summary(conn, NOW)["problem"] is False
     set_setting(conn, "plugin.asus.status", json.dumps({"ts": NOW, "ok": False, "error": "login refused"}))

@@ -368,7 +368,8 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     failed_24h = conn.execute("SELECT COUNT(*) FROM scans WHERE status = 'failed' AND started >= ?", (_ago(now, hours=24),)).fetchone()[0]
     plugins = _plugin_status(conn)
     failing = [p for p in plugins if p["enabled"] and p["ok"] is False]
-    problems = (1 if failed_24h else 0) + len(failing) + (1 if age is not None and age > stale_after_s else 0)
+    # the last scan failed (a single failure in the past day that later scans recovered from is not a problem), a plugin is failing, or no scan finished for a while
+    problems = (1 if last_info and last_info["status"] == "failed" else 0) + len(failing) + (1 if age is not None and age > stale_after_s else 0)
     return {
         "api": SUMMARY_API,
         "version": VERSION,
