@@ -330,7 +330,12 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
     last_prune = 0.0
     while True:
         try:
-            await run_due_checks(db_path)
+            if await run_due_checks(db_path):
+                from app.notify.channels import process_channels  # a service going down should not wait for the next scan
+                from app.notify.service import process_notifications
+
+                await process_channels(db_path)
+                await process_notifications(db_path)
             if time.monotonic() - last_prune > 3600:
                 last_prune = time.monotonic()
                 conn = connect(db_path)

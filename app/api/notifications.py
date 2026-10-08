@@ -54,6 +54,7 @@ class NotificationsBody(BaseModel):
     to_addrs: list[str] | str | None = None
     notify_new: bool | None = None
     notify_offline: bool | None = None
+    notify_services: bool | None = None
 
 
 @router.put("/notifications")
@@ -77,7 +78,7 @@ def put_notifications(request: Request, body: NotificationsBody) -> dict:
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
 
-        for name in ("enabled", "smtp_port", "security", "notify_new", "notify_offline"):
+        for name in ("enabled", "smtp_port", "security", "notify_new", "notify_offline", "notify_services"):
             if name in fields and getattr(body, name) is not None:
                 setattr(cfg, name, getattr(body, name))
         for name in ("smtp_host", "username"):

@@ -125,3 +125,6 @@ label.check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 td.actions { white-space: nowrap; }
 td.actions .btn { padding: 2px 8px; font-size: 0.85em; }
 .service-form { max-width: 560px; }
+.check-row { display: block; margin: 3px 0; }
+.channel-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.channel-row .kv-label { flex: 1 1 220px; }

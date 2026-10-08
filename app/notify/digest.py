@@ -43,6 +43,11 @@ def collect_events(
                 "mac": row["mac"],
                 "vendor": row["vendor"],
             })
+        elif row["kind"] in ("service_down", "service_up") and cfg.notify_services:
+            kept.append({
+                "id": row["id"], "ts": row["ts"], "kind": row["kind"], "device_id": row["device_id"],
+                "name": row["detail"] or row["kind"], "ip": row["primary_ip"] or "", "mac": row["mac"], "vendor": row["vendor"],
+            })
         elif row["kind"] == "device_offline" and cfg.notify_offline:
             if row["device_id"] is None or row["notify_offline"] != 1:
                 continue
@@ -70,6 +75,8 @@ def build_message(events: list[dict], app_name: str = "Netlens") -> tuple[str, s
 
     new_events = [e for e in events if e["kind"] == "device_new"]
     offline_events = [e for e in events if e["kind"] == "device_offline"]
+    down_events = [e for e in events if e["kind"] == "service_down"]
+    up_events = [e for e in events if e["kind"] == "service_up"]
 
     parts: list[str] = []
     if new_events:
@@ -78,6 +85,11 @@ def build_message(events: list[dict], app_name: str = "Netlens") -> tuple[str, s
     if offline_events:
         n = len(offline_events)
         parts.append(f"{n} device{'s' if n > 1 else ''} offline")
+
+    if down_events:
+        parts.append(f"{len(down_events)} service{'s' if len(down_events) > 1 else ''} down")
+    if up_events:
+        parts.append(f"{len(up_events)} service{'s' if len(up_events) > 1 else ''} back up")
 
     subject = f"[{app_name}] " + ", ".join(parts)
 
@@ -92,6 +104,15 @@ def build_message(events: list[dict], app_name: str = "Netlens") -> tuple[str, s
         lines.append("Went offline:")
         for e in offline_events:
             lines.append(f"  - {e['name']} ({e['ip']}) at {e['ts']}")
+
+    if down_events:
+        lines.append("Services down:")
+        lines += [f"  - {e['name']} at {e['ts']}" for e in down_events]
+        lines.append("")
+    if up_events:
+        lines.append("Services back up:")
+        lines += [f"  - {e['name']} at {e['ts']}" for e in up_events]
+        lines.append("")
 
     lines.append("")
     lines.append(f"-- sent by {app_name}")

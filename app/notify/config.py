@@ -18,6 +18,7 @@ class NotifyConfig:
     to_addrs: list[str] = field(default_factory=list)
     notify_new: bool = True
     notify_offline: bool = True
+    notify_services: bool = True
     last_event_id: int | None = None
 
 
@@ -55,7 +56,7 @@ def load_config(conn) -> NotifyConfig:
         elif f.name == "enabled":
             if not isinstance(val, bool):
                 val = False
-        elif f.name in ("notify_new", "notify_offline"):
+        elif f.name in ("notify_new", "notify_offline", "notify_services"):
             if not isinstance(val, bool):
                 val = True
         elif f.name in ("smtp_host", "username", "password", "from_addr"):

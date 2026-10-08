@@ -7,6 +7,7 @@ import { buildPluginCard } from "../cards/plugin.js";
 import { buildPluginsCard } from "../cards/plugins.js";
 import { buildPluginGuideCard } from "../cards/plugin_guide.js";
 import { buildMapCard } from "../cards/map_settings.js";
+import { buildChannelsCard } from "../cards/channels.js";
 import { buildBackupCard } from "../cards/backup.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 
@@ -148,7 +149,10 @@ const STATIC_GROUPS = [
   },
   {
     title: "Notifications",
-    items: [{ key: "notifications", label: "E-mail notifications", build: buildNotificationsCard }],
+    items: [
+      { key: "notifications", label: "E-mail notifications", build: buildNotificationsCard },
+      { key: "channels", label: "Channels & quiet hours", build: buildChannelsCard },
+    ],
   },
   "integrations",
   {

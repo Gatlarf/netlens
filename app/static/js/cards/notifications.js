@@ -130,6 +130,12 @@ function fillCard(card, cfg) {
     "You can switch this off for individual devices on their device page."));
   form.appendChild(notifyOfflineField);
 
+  const notifyServicesField = h("div", { class: "field" });
+  const notifyServicesInput = h("input", { type: "checkbox", name: "notify_services", checked: cfg.notify_services !== false });
+  notifyServicesField.appendChild(h("label", {}, "Notify when a service check goes down or comes back"));
+  notifyServicesField.appendChild(notifyServicesInput);
+  form.appendChild(notifyServicesField);
+
   form.appendChild(errorEl);
 
   const saveBtn = h("button", { type: "submit", class: "btn" }, "Save");
@@ -173,6 +179,7 @@ function fillCard(card, cfg) {
       to_addrs: toInput.value,
       notify_new: notifyNewInput.checked,
       notify_offline: notifyOfflineInput.checked,
+      notify_services: notifyServicesInput.checked,
     };
     if (passwordInput.value) {
       body.password = passwordInput.value;
@@ -195,6 +202,7 @@ function fillCard(card, cfg) {
         to_addrs: toInput.value,
         notify_new: notifyNewInput.checked,
         notify_offline: notifyOfflineInput.checked,
+        notify_services: notifyServicesInput.checked,
       };
       if (passwordInput.value) {
         body.password = passwordInput.value;
