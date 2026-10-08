@@ -30,6 +30,8 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Proxmox connector: shows which VMs and containers run on which Proxmox host, on the map and on the device pages
 - Network hierarchy: which device depends on which (gateway, then Proxmox host, then its guests), as a tree page, a tree layout on the map, and a parent you can set per device
 - Live scan progress in the header
+- Light and dark mode, switchable from the top bar
+- Delete a device (optionally ignoring it in future scans), and a full scan of a single host from its page
 - Backup and restore of everything from the Settings page
 - Every setting you need day to day (ranges, schedule, terminal, mail, Proxmox) is editable in the browser
 
@@ -214,6 +216,7 @@ Everything below is saved in the data directory, so it survives updates and rebu
 | Scan schedule and terminal | how often quick and deep scans run, and the web terminal on/off. Takes effect from the next scheduler cycle, no restart |
 | E-mail notifications | SMTP server and recipients (see below) |
 | Proxmox connector | Proxmox URL and credentials (see below) |
+| Ignored devices | devices that scans skip, with a button to stop ignoring them |
 | Backup and restore | download a snapshot, restore one |
 
 ### Making scans faster
@@ -294,6 +297,18 @@ The result is always a tree: an assignment that would put a device below itself 
 - **Device page**, card **Network position**: shows what the device sits below and why, lists the devices below it, and lets you choose the parent: *Automatic*, *None (top level)* or a specific device. Devices below the current one are not offered, so a loop is impossible. If a chosen parent is deleted, the device goes back to automatic.
 
 The same data is available as `GET /api/hierarchy`, and `PATCH /api/devices/<id>` accepts `parent_mode` (`auto`, `none`, `device`) and `parent_device_id`.
+
+### Dark mode
+
+The **moon / sun button** at the right end of the top bar switches between light and dark mode. Without a choice Netlens follows your operating system's setting; once you click the button your choice is remembered in that browser (it is not shared between browsers or users). Charts and the map follow the theme too.
+
+### Deleting a device and ignoring devices
+
+On a device's page, the **Delete device** card removes it together with its ports, names, uptime history and links (past events stay in the log, marked as deleted). A device that is still on the network would simply be found again by the next scan, so the confirmation offers **Also ignore it in future scans** (ticked by default for an online device). Ignored devices are skipped by every scan, are not mailed about, and are listed under **Settings → Ignored devices**, where **Stop ignoring** lets the next scan add one back. Devices are ignored by MAC address, or by IP address when they have no MAC (for example the bridge address of a container network), so a different device that takes over the same IP is not ignored. The same actions exist as `DELETE /api/devices/<id>?ignore=true` and `GET`/`DELETE /api/ignored`.
+
+### Full scan of a single host
+
+The **Full scan** button next to a device's name runs one thorough scan of that host only: all 65535 TCP ports, service versions, OS detection and a traceroute (`nmap -T4 -p- -sV -O --osscan-guess --traceroute`, at most 30 minutes; the aggressive timing is a minimum, and your reverse-DNS preference applies). It is the way to find a service on an unusual port that the top-1000 scan never looks at. The strip under the top bar shows `Full scan of 192.168.0.5` with its progress and the usual elapsed/typical time, you can cancel it like any scan, and the result replaces that device's port list. It does not touch other devices, does not add an uptime heartbeat and does not recalculate the network relations, and it appears in **Scans & events** as `full <ip>`. Only one scan runs at a time. The API is `POST /api/devices/<id>/scan`.
 
 ### Backup and restore
 

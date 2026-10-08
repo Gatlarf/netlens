@@ -6,12 +6,12 @@ from typing import Optional
 from app.db import utcnow
 
 
-def create_scan(conn: sqlite3.Connection, kind: str, now: str | None = None) -> int:
+def create_scan(conn: sqlite3.Connection, kind: str, now: str | None = None, target: str | None = None) -> int:
     conn.row_factory = sqlite3.Row
     started = now or utcnow()
     cursor = conn.execute(
-        "INSERT INTO scans (kind, status, started) VALUES (?, ?, ?)",
-        (kind, "running", started),
+        "INSERT INTO scans (kind, status, started, target) VALUES (?, ?, ?, ?)",
+        (kind, "running", started, target),
     )
     conn.commit()
     return cursor.lastrowid

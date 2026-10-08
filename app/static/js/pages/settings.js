@@ -5,6 +5,7 @@ import { buildGeneralCard } from "../cards/general.js";
 import { buildNotificationsCard } from "../cards/notifications.js";
 import { buildProxmoxCard } from "../cards/proxmox.js";
 import { buildBackupCard } from "../cards/backup.js";
+import { buildIgnoredCard } from "../cards/ignored.js";
 
 function kvRow(label, value) {
   const row = h("div", { class: "kv" });
@@ -95,6 +96,7 @@ const SECTIONS = [
   { key: "schedule", label: "Schedule & terminal" },
   { key: "notifications", label: "E-mail notifications" },
   { key: "proxmox", label: "Proxmox connector" },
+  { key: "ignored", label: "Ignored devices" },
   { key: "backup", label: "Backup & restore" },
   { key: "about", label: "About" },
   { key: "export", label: "Export" },
@@ -148,9 +150,11 @@ export async function render(container, params) {
       return;
     }
     const bottomReached = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+    // a section counts as "being read" once its top is a little below the sticky top bar
+    const barHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--topbar-h"), 10) || 58;
     let current = SECTIONS[0].key;
     for (const { key } of SECTIONS) {
-      if (sections[key].getBoundingClientRect().top <= 140) current = key;
+      if (sections[key].getBoundingClientRect().top <= barHeight + 80) current = key;
     }
     setActive(bottomReached ? SECTIONS[SECTIONS.length - 1].key : current);
   }
@@ -198,6 +202,7 @@ export async function render(container, params) {
     ["schedule", buildGeneralCard],
     ["notifications", buildNotificationsCard],
     ["proxmox", buildProxmoxCard],
+    ["ignored", buildIgnoredCard],
   ]) {
     build().then((card) => {
       sections[key].appendChild(card);

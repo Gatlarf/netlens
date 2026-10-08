@@ -11,6 +11,9 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 - **Backup and restore** of the whole database from Settings.
 - **Live scan progress** (current nmap step, percentage, hosts found) with elapsed time and the typical (median) duration of recent scans of the same type, shown in a strip under the header while a scan runs.
 - **Scan performance settings** (Settings → Scan performance): nmap timing, number of top ports or a custom port list for quick and deep scans, version detection (full/light/off), OS detection, traceroute, reverse DNS and a per-host timeout, with Default/Fast/Fastest presets, the resulting command lines and the duration of the last scans. A **Scan settings** button next to the scan buttons opens it.
+- **Dark / light mode** switch at the right of the top bar (remembered per browser, follows the system until you choose); the map canvas follows the theme.
+- **Delete a device** from its page, optionally ignoring it in future scans; **Settings → Ignored devices** lists them and lets you undo. Database schema version 4.
+- **Full scan of a single host** (all TCP ports, versions, OS, traceroute) from the device page, with progress, cancel and a `full <ip>` entry in the scan history.
 - **Network hierarchy**: every device gets a parent (manual choice, Proxmox host, traceroute, default gateway), shown on a new **Hierarchy** page, as a *Hierarchy links* view and *Tree layout* on the map (Proxmox guests now hang under their host), and editable per device under **Network position**. Loops are impossible. API: `GET /api/hierarchy`, `parent_mode`/`parent_device_id` on devices. Database schema version 3 (migrates automatically).
 - **Host timeouts** for scans (default 120 s for quick and 900 s for deep scans, editable under Scan performance): nmap gives up on a host that takes too long, so one slow device can no longer hold a scan up for an hour. A timed-out host stays online, keeps its known ports, and logs a "Host timeout" event.
 - **Cancel scan** button in the scan strip (and `POST /api/scans/cancel`): kills nmap, marks the scan `cancelled`, saves nothing.
@@ -28,6 +31,8 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 - Database schema version 2 (migrates automatically; existing data is kept).
 
 ### Fixed
+- Settings menu and deep links: a section scrolled to the top is no longer hidden behind the sticky top bar (also on narrow screens, where the bar wraps).
+- Dragging a node on the map now opens its details panel.
 - Device page: duplicated content, repeated "Failed to load device" toasts and a false "Save failed" message.
 - Map: error on open/refresh, filters that never worked, and the empty details panel after clicking a device.
 - nmap capability mismatch that stopped scans from starting in the container.

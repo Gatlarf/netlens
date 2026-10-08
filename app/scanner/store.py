@@ -19,9 +19,20 @@ def save_scan_results(
     if now is None:
         now = utcnow()
 
+    # Devices the user chose to ignore are not stored again
+    ignored_macs = {r["mac"] for r in conn.execute("SELECT mac FROM ignored_devices WHERE mac IS NOT NULL")}
+    ignored_ips = {r["ip"] for r in conn.execute("SELECT ip FROM ignored_devices WHERE mac IS NULL")}
+
+    def is_ignored(host: ScanHost) -> bool:
+        if host.mac is not None:
+            return host.mac.lower() in ignored_macs
+        return host.ip in ignored_ips
+
     # Apply extra names to hosts without mutating input
     processed_hosts: list[ScanHost] = []
     for host in hosts:
+        if is_ignored(host):
+            continue
         if extra_names and host.ip in extra_names:
             existing_names = {name for name, _ in host.hostnames}
             new_names = []

@@ -7,7 +7,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app.db import connect
+from app.db import add_event, connect, utcnow
+from app.scanner.orchestrator import ScanBusy
 from app.hierarchy import children_map, descendants, device_name, load_hierarchy, would_loop
 
 DEVICE_TYPES = {
@@ -435,3 +436,54 @@ def patch_device(
     ).fetchone()
 
     return _build_device_detail(conn, device_id, row)
+
+
+@router.delete("/devices/{device_id}", status_code=204)
+def delete_device(device_id: int, ignore: bool = False, conn: sqlite3.Connection = Depends(get_conn)) -> None:
+    """Delete a device with its ports, names, history and links.
+
+    With ignore=true the device is also put on the ignore list, so scans do not add it back
+    (a device that is still on the network would otherwise reappear at the next scan).
+    """
+    row = conn.execute(
+        "SELECT mac, primary_ip, hostname, custom_name FROM devices WHERE id = ?", (device_id,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    label = row["custom_name"] or row["hostname"] or row["primary_ip"] or (row["mac"] or f"device {device_id}")
+    if ignore:
+        if row["mac"]:
+            conn.execute(
+                "INSERT INTO ignored_devices (mac, ip, label, added) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(mac) WHERE mac IS NOT NULL DO UPDATE SET ip = excluded.ip, label = excluded.label",
+                (row["mac"].lower(), row["primary_ip"], label, utcnow()),
+            )
+        elif row["primary_ip"]:
+            conn.execute(
+                "INSERT INTO ignored_devices (mac, ip, label, added) VALUES (NULL, ?, ?, ?) "
+                "ON CONFLICT(ip) WHERE mac IS NULL DO UPDATE SET label = excluded.label",
+                (row["primary_ip"], label, utcnow()),
+            )
+        else:
+            raise HTTPException(status_code=422, detail="this device has no MAC or IP address to ignore")
+    conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
+    conn.commit()
+    ip = f" ({row['primary_ip']})" if row["primary_ip"] and row["primary_ip"] != label else ""
+    add_event(conn, "device_deleted", f"{label}{ip} deleted" + (" and ignored" if ignore else ""))
+
+
+@router.post("/devices/{device_id}/scan", status_code=202)
+async def scan_device(device_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Run a full scan of this one host: all TCP ports, service versions, OS detection and traceroute."""
+    row = conn.execute("SELECT primary_ip FROM devices WHERE id = ?", (device_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    if not row["primary_ip"]:
+        raise HTTPException(status_code=422, detail="this device has no IP address to scan")
+    try:
+        scan_id = await request.app.state.scan_manager.start("full", target=row["primary_ip"])
+    except ScanBusy:
+        raise HTTPException(status_code=409, detail="scan already running")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"id": scan_id}

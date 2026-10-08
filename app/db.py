@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def utcnow() -> str:
@@ -197,6 +197,23 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     # --- schema v2 -------------------------------------------------------
     _add_column_if_missing(conn, "devices", "notify_offline", "INTEGER NOT NULL DEFAULT 1")
+
+    # --- schema v4: single-host scans and ignored devices -----------------
+    _add_column_if_missing(conn, "scans", "target", "TEXT")  # the host of a "full" scan, else NULL
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ignored_devices (
+            id INTEGER PRIMARY KEY,
+            mac TEXT,
+            ip TEXT,
+            label TEXT NOT NULL,
+            added TEXT NOT NULL
+        )
+        """
+    )
+    # a device is ignored by MAC when it has one, otherwise by IP (routed hosts have no MAC)
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ignored_mac ON ignored_devices(mac) WHERE mac IS NOT NULL")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_ignored_ip ON ignored_devices(ip) WHERE mac IS NULL")
 
     # --- schema v3: user-chosen parent in the network hierarchy -----------
     # parent_mode: 'auto' (derived from Proxmox/route/gateway), 'none' (top level on purpose)

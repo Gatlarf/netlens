@@ -163,9 +163,20 @@ def preset_dict(name: str) -> dict:
     return options_to_dict(options_from_dict(PRESETS[name]))
 
 
+FULL_SCAN_HOST_TIMEOUT = 1800  # seconds: a full scan of one host may take a while, but not forever
+
+
 def option_args(kind: str, opts: ScanOptions) -> list[str]:
-    if kind not in ("quick", "deep"):
+    if kind not in ("quick", "deep", "full"):
         raise ValueError(f"unknown kind: {kind}")
+    if kind == "full":
+        # Everything about ONE host: all 65535 TCP ports, service versions, OS and the route to it.
+        # Aggressive timing is fine for a single host; the reverse-DNS preference is respected.
+        args = [f"-T{max(4, opts.timing)}", "-p-", "-sV", "-O", "--osscan-guess", "--traceroute"]
+        if opts.skip_dns:
+            args.append("-n")
+        args.extend(["--host-timeout", f"{FULL_SCAN_HOST_TIMEOUT}s"])
+        return args
     args: list[str] = []
     args.append(f"-T{opts.timing}")
     if kind == "quick":
@@ -201,4 +212,5 @@ def option_args(kind: str, opts: ScanOptions) -> list[str]:
 
 
 def command_preview(kind: str, opts: ScanOptions) -> str:
-    return "nmap " + " ".join(option_args(kind, opts)) + " -oX - <ranges>"
+    target = "<host>" if kind == "full" else "<ranges>"
+    return "nmap " + " ".join(option_args(kind, opts)) + f" -oX - {target}"

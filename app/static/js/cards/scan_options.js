@@ -272,8 +272,9 @@ export async function buildScanOptionsCard() {
 
     // Resulting nmap commands
     const h3Preview = h("h3", {}, "Resulting nmap commands");
-    const prePreview = h("pre", { class: "mono" }, `${preview.quick}\n${preview.deep}`);
     form.appendChild(h3Preview);
+    form.appendChild(h("p", { class: "hint" }, "Quick scan, deep scan, and the full scan of a single host (button on the device page; all 65535 TCP ports, always at least aggressive timing)."));
+    const prePreview = h("pre", { class: "mono" }, [preview.quick, preview.deep, preview.full].filter(Boolean).join("\n"));
     form.appendChild(prePreview);
 
     card.appendChild(form);

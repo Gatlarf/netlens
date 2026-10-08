@@ -156,7 +156,7 @@ def test_real_proxmox_sync_puts_guests_under_their_host(tmp_path):
     assert parents == {1: (None, "none"), 2: (1, "gateway"), 3: (2, "proxmox"), 4: (2, "proxmox")}
 
 
-def test_v2_database_is_migrated_to_v3(tmp_path):
+def test_v2_database_gets_the_parent_columns(tmp_path):
     path = tmp_path / "v2.db"
     old = sqlite3.connect(path)
     old.execute(
@@ -173,7 +173,7 @@ def test_v2_database_is_migrated_to_v3(tmp_path):
 
     conn = connect(path)
     init_db(conn)
-    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == SCHEMA_VERSION == 3
+    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == SCHEMA_VERSION
     row = conn.execute("SELECT parent_mode, parent_device_id FROM devices WHERE id = 1").fetchone()
     assert (row["parent_mode"], row["parent_device_id"]) == ("auto", None)
     init_db(conn)  # idempotent

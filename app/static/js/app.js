@@ -1,4 +1,5 @@
 import { describeScan, describeTiming } from "./progress.js";
+import { initThemeToggle } from "./theme.js";
 import { get, post, ApiError } from "./api.js";
 import { clear, toast, el } from "./util.js";
 
@@ -345,3 +346,15 @@ if (scanSettingsLink) {
     if (location.hash === "#/settings/nmap") renderPage();
   });
 }
+
+initThemeToggle();
+
+// The top bar is sticky and changes height when it wraps on a small screen. Publish its height so
+// scrolled-to sections and the settings menu can stay below it instead of hiding behind it.
+const topbar = document.querySelector("header.topbar");
+function syncTopbarHeight() {
+  if (topbar) document.documentElement.style.setProperty("--topbar-h", `${topbar.offsetHeight}px`);
+}
+syncTopbarHeight();
+window.addEventListener("resize", syncTopbarHeight);
+if (topbar && window.ResizeObserver) new ResizeObserver(syncTopbarHeight).observe(topbar);

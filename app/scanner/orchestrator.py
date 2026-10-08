@@ -1,11 +1,12 @@
 import asyncio
 import inspect
+import ipaddress
 import logging
 import sqlite3
 from typing import Any
 
 from app.scanner.errors import explain_scan_error
-from app.scanner.nmap_runner import ScanError, run_nmap
+from app.scanner.nmap_runner import ScanError, _is_valid_target, run_nmap
 from app.scanner.options import ScanOptions
 from app.scanner.nmap_parser import parse_nmap_xml
 from app.scanner.store import save_scan_results
@@ -20,6 +21,15 @@ from app.scanner.relations import infer_relations
 from app.scanner.relstore import replace_inferred
 from app.db import connect, utcnow
 from app.config import Settings
+
+
+def _is_single_private_host(target: str) -> bool:
+    """One IPv4 address (not a range) that is allowed to be scanned."""
+    try:
+        addr = ipaddress.ip_address(target)
+    except ValueError:
+        return False
+    return addr.version == 4 and _is_valid_target(target)
 
 
 class ScanBusy(RuntimeError):
@@ -79,20 +89,26 @@ class ScanManager:
         finally:
             conn.close()
 
-    async def start(self, kind: str) -> int:
-        if kind not in ("quick", "deep"):
-            raise ValueError("kind must be 'quick' or 'deep'")
+    async def start(self, kind: str, target: str | None = None) -> int:
+        """Start a scan. kind 'full' scans the single host `target` thoroughly; the others scan the ranges."""
+        if kind not in ("quick", "deep", "full"):
+            raise ValueError("kind must be 'quick', 'deep' or 'full'")
+        if kind == "full":
+            if not target or not _is_single_private_host(target):
+                raise ValueError("a full scan needs one private IPv4 address as its target")
+        elif target is not None:
+            raise ValueError("only a full scan takes a target")
         if self.is_running():
             raise ScanBusy("scan already running")
 
         conn = connect(self.db_path)
         try:
-            scan_id = create_scan(conn, kind, now=utcnow())
+            scan_id = create_scan(conn, kind, now=utcnow(), target=target)
             conn.commit()
         finally:
             conn.close()
 
-        self._task = asyncio.create_task(self._run(kind, scan_id))
+        self._task = asyncio.create_task(self._run(kind, scan_id, target))
         return scan_id
 
     async def wait(self) -> None:
@@ -127,15 +143,18 @@ class ScanManager:
             return False
         return any(p.name == name or p.kind is inspect.Parameter.VAR_KEYWORD for p in params)
 
-    async def _run(self, kind: str, scan_id: int) -> None:
+    async def _run(self, kind: str, scan_id: int, target: str | None = None) -> None:
         conn: sqlite3.Connection | None = None
-        self.progress = {"scan_id": scan_id, "kind": kind, "phase": "preparing", "task": None, "percent": None, "hosts_found": 0}
+        self.progress = {"scan_id": scan_id, "kind": kind, "target": target, "phase": "preparing", "task": None, "percent": None, "hosts_found": 0}
         try:
-            targets = list(self.settings.ranges)
-            if not targets:
-                targets = await self.ranges_provider()
-            if not targets:
-                raise ScanError("no scan ranges found")
+            if kind == "full":
+                targets = [target]
+            else:
+                targets = list(self.settings.ranges)
+                if not targets:
+                    targets = await self.ranges_provider()
+                if not targets:
+                    raise ScanError("no scan ranges found")
 
             self._set_progress(phase="scanning", targets=targets)
             kwargs: dict[str, Any] = {"nmap_path": self.nmap_path}
@@ -158,7 +177,8 @@ class ScanManager:
             result = save_scan_results(
                 conn,
                 hosts,
-                kind,
+                # a full scan reports the complete port list of its host: store it like a deep scan
+                "deep" if kind == "full" else kind,
                 now=utcnow(),
                 extra_names=extra,
             )
@@ -169,49 +189,52 @@ class ScanManager:
                 now=utcnow(),
             )
 
-            try:
-                record_checks(
-                    conn,
-                    set(result["device_ids"]),
-                    targets,
-                    now=utcnow(),
-                    rtts=result.get("rtts"),
+            # A full scan looks at ONE host: it adds no uptime heartbeat (those mark the regular scan
+            # cadence) and must not re-infer the network's relations from a single host's traceroute.
+            if kind != "full":
+                try:
+                    record_checks(
+                        conn,
+                        set(result["device_ids"]),
+                        targets,
+                        now=utcnow(),
+                        rtts=result.get("rtts"),
+                    )
+                except Exception:
+                    logging.getLogger(__name__).exception("recording uptime checks failed")
+
+                try:
+                    gateway_ip = await self.gateway_provider()
+                except Exception:
+                    gateway_ip = None
+
+                hops = {host.ip: host.hops for host in hosts if host.hops}
+
+                devices = []
+                cursor = conn.execute(
+                    "SELECT id, primary_ip, type_override, device_type, hostname, vendor, online FROM devices"
                 )
-            except Exception:
-                logging.getLogger(__name__).exception("recording uptime checks failed")
+                for row in cursor.fetchall():
+                    ports_cursor = conn.execute(
+                        "SELECT port FROM ports WHERE device_id = ? AND state LIKE 'open%'",
+                        (row["id"],),
+                    )
+                    open_ports = [p["port"] for p in ports_cursor.fetchall()]
+                    devices.append({
+                        "id": row["id"],
+                        "primary_ip": row["primary_ip"],
+                        "type": row["type_override"] or row["device_type"] or "unknown",
+                        "hostname": row["hostname"],
+                        "vendor": row["vendor"],
+                        "ports": open_ports,
+                        "online": row["online"],
+                    })
 
-            try:
-                gateway_ip = await self.gateway_provider()
-            except Exception:
-                gateway_ip = None
-
-            hops = {host.ip: host.hops for host in hosts if host.hops}
-
-            devices = []
-            cursor = conn.execute(
-                "SELECT id, primary_ip, type_override, device_type, hostname, vendor, online FROM devices"
-            )
-            for row in cursor.fetchall():
-                ports_cursor = conn.execute(
-                    "SELECT port FROM ports WHERE device_id = ? AND state LIKE 'open%'",
-                    (row["id"],),
-                )
-                open_ports = [p["port"] for p in ports_cursor.fetchall()]
-                devices.append({
-                    "id": row["id"],
-                    "primary_ip": row["primary_ip"],
-                    "type": row["type_override"] or row["device_type"] or "unknown",
-                    "hostname": row["hostname"],
-                    "vendor": row["vendor"],
-                    "ports": open_ports,
-                    "online": row["online"],
-                })
-
-            try:
-                edges = infer_relations(devices, hops, gateway_ip)
-                replace_inferred(conn, edges)
-            except Exception:
-                logging.getLogger(__name__).exception("relation inference failed")
+                try:
+                    edges = infer_relations(devices, hops, gateway_ip)
+                    replace_inferred(conn, edges)
+                except Exception:
+                    logging.getLogger(__name__).exception("relation inference failed")
 
             finish_scan(
                 conn,

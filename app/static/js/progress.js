@@ -11,8 +11,10 @@ const PHASE_TEXT = {
 export function describeScan(res) {
   if (!res || !res.running) return { text: "", percent: null };
   const progress = res.progress || {};
-  const kind = (progress.kind || (res.scan && res.scan.kind)) === "deep" ? "Deep" : "Quick";
-  const parts = [`${kind} scan`];
+  const rawKind = progress.kind || (res.scan && res.scan.kind);
+  const kind = rawKind === "deep" ? "Deep" : rawKind === "full" ? "Full" : "Quick";
+  const target = progress.target || (res.scan && res.scan.target);
+  const parts = [rawKind === "full" && target ? `Full scan of ${target}` : `${kind} scan`];
   let percent = null;
 
   if (progress.phase === "scanning" || !progress.phase) {

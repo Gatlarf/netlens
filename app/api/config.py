@@ -191,7 +191,7 @@ def _scan_options_payload(request: Request) -> dict:
         "defaults": options_to_dict(defaults),
         "is_default": opts == defaults,
         "presets": {name: preset_dict(name) for name in PRESETS},
-        "preview": {kind: command_preview(kind, opts) for kind in ("quick", "deep")},
+        "preview": {kind: command_preview(kind, opts) for kind in ("quick", "deep", "full")},
     }
 
 

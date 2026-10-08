@@ -14,8 +14,27 @@
   --radius: 8px;
 }
 
+/* Theme: follows the system unless the user picked one with the switch in the top bar
+   (js/theme-init.js sets data-theme="light" or "dark" on <html> before the page paints). */
+:root { color-scheme: light; }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+    --bg: #14171c;
+    --surface: #1d2127;
+    --text: #e6e9ef;
+    --muted: #9aa3af;
+    --border: #333a44;
+    --accent: #4f83f0;
+    --accent-text: #ffffff;
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --bad: #ef4444;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #14171c;
     --surface: #1d2127;
     --text: #e6e9ef;
@@ -233,17 +252,17 @@ th.sortable.sorted-desc::after { content: "\2193"; color: var(--accent); }
   border: 1px solid var(--border);
 }
 
-.badge.type-router { background: color-mix(in srgb, #2563eb 18%, var(--surface)); color: #1e40af; }
-.badge.type-switch { background: color-mix(in srgb, #0891b2 18%, var(--surface)); color: #0e7490; }
-.badge.type-ap { background: color-mix(in srgb, #7c3aed 18%, var(--surface)); color: #6d28d9; }
-.badge.type-server { background: color-mix(in srgb, #475569 18%, var(--surface)); color: #334155; }
-.badge.type-pc { background: color-mix(in srgb, #059669 18%, var(--surface)); color: #047857; }
-.badge.type-phone { background: color-mix(in srgb, #db2777 18%, var(--surface)); color: #be185d; }
-.badge.type-printer { background: color-mix(in srgb, #ea580c 18%, var(--surface)); color: #c2410c; }
-.badge.type-iot { background: color-mix(in srgb, #65a30d 18%, var(--surface)); color: #4d7c0f; }
-.badge.type-camera { background: color-mix(in srgb, #dc2626 18%, var(--surface)); color: #b91c1c; }
-.badge.type-nas { background: color-mix(in srgb, #0d9488 18%, var(--surface)); color: #0f766e; }
-.badge.type-vm { background: color-mix(in srgb, #6366f1 18%, var(--surface)); color: #4f46e5; }
+.badge.type-router { background: color-mix(in srgb, #2563eb 18%, var(--surface)); color: color-mix(in srgb, #2563eb 65%, var(--text)); }
+.badge.type-switch { background: color-mix(in srgb, #0891b2 18%, var(--surface)); color: color-mix(in srgb, #0891b2 65%, var(--text)); }
+.badge.type-ap { background: color-mix(in srgb, #7c3aed 18%, var(--surface)); color: color-mix(in srgb, #7c3aed 65%, var(--text)); }
+.badge.type-server { background: color-mix(in srgb, #475569 18%, var(--surface)); color: color-mix(in srgb, #475569 65%, var(--text)); }
+.badge.type-pc { background: color-mix(in srgb, #059669 18%, var(--surface)); color: color-mix(in srgb, #059669 65%, var(--text)); }
+.badge.type-phone { background: color-mix(in srgb, #db2777 18%, var(--surface)); color: color-mix(in srgb, #db2777 65%, var(--text)); }
+.badge.type-printer { background: color-mix(in srgb, #ea580c 18%, var(--surface)); color: color-mix(in srgb, #ea580c 65%, var(--text)); }
+.badge.type-iot { background: color-mix(in srgb, #65a30d 18%, var(--surface)); color: color-mix(in srgb, #65a30d 65%, var(--text)); }
+.badge.type-camera { background: color-mix(in srgb, #dc2626 18%, var(--surface)); color: color-mix(in srgb, #dc2626 65%, var(--text)); }
+.badge.type-nas { background: color-mix(in srgb, #0d9488 18%, var(--surface)); color: color-mix(in srgb, #0d9488 65%, var(--text)); }
+.badge.type-vm { background: color-mix(in srgb, #6366f1 18%, var(--surface)); color: color-mix(in srgb, #6366f1 65%, var(--text)); }
 .badge.type-unknown { background: color-mix(in srgb, var(--muted) 15%, var(--surface)); color: var(--muted); }
 
 /* ---------- dots ---------- */
@@ -469,3 +488,6 @@ dialog#login-dialog::backdrop {
 .hint { color: var(--muted); font-size: 0.85em; margin: 0.4em 0 0; }
 .error:empty { display: none; }
 .app-version { color: var(--muted); font-size: 0.75em; margin-left: 6px; }
+
+/* theme switch in the top bar */
+.theme-toggle { font-size: 1.1em; line-height: 1; padding: 6px 10px; min-width: 38px; }

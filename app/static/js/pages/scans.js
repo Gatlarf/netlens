@@ -8,7 +8,8 @@ const KIND_LABELS = {
   ip_changed: "IP changed",
   port_opened: "Port opened",
   os_changed: "OS changed",
-  host_timeout: "Host timeout"
+  host_timeout: "Host timeout",
+  device_deleted: "Device deleted"
 };
 
 const KIND_ORDER = [
@@ -18,7 +19,8 @@ const KIND_ORDER = [
   "ip_changed",
   "port_opened",
   "os_changed",
-  "host_timeout"
+  "host_timeout",
+  "device_deleted"
 ];
 
 function statusClass(status) {
@@ -110,7 +112,7 @@ export async function render(container, params) {
       for (const scan of scans) {
         const row = h("tr");
         row.appendChild(h("td", {}, fmtTime(scan.started)));
-        row.appendChild(h("td", {}, scan.kind));
+        row.appendChild(h("td", {}, scan.target ? `${scan.kind} ${scan.target}` : scan.kind));
 
         const statusCell = h("td", { class: statusClass(scan.status) }, scan.status);
         row.appendChild(statusCell);

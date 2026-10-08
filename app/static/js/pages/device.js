@@ -1,4 +1,4 @@
-import { get, patch, ApiError } from "../api.js";
+import { get, patch, post, del, ApiError } from "../api.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS } from "../util.js";
 import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
@@ -259,6 +259,64 @@ function buildNamesCard(device) {
   return card;
 }
 
+// Delete the device. A device that is still on the network is added again by the next scan,
+// so the confirmation offers to ignore it as well. `onOpenChange` tells the page not to refresh
+// itself (and close the box) while the confirmation is open.
+function buildDeleteCard(device, onOpenChange) {
+  const card = h("div", { class: "card" });
+  card.appendChild(h("h2", {}, "Delete device"));
+  const name = device.name || device.primary_ip || "this device";
+  card.appendChild(h("p", { class: "hint" },
+    "Removes the device with its ports, names, uptime history and links. Scans add it back if it is still on the network, unless you ignore it."));
+
+  const openBtn = h("button", { class: "btn danger", type: "button" }, "Delete device…");
+  const box = h("div", { class: "confirm-box", hidden: true });
+  const ignoreInput = h("input", { type: "checkbox", name: "ignore", checked: !!device.online });
+  const errorEl = h("p", { class: "error" }, "");
+  const confirmBtn = h("button", { class: "btn danger", type: "button" }, "Delete");
+  const cancelBtn = h("button", { class: "btn", type: "button" }, "Cancel");
+
+  box.appendChild(h("p", {}, `Delete ${name}? This cannot be undone.`));
+  box.appendChild(h("label", { class: "check" }, ignoreInput, " Also ignore it in future scans"));
+  box.appendChild(h("p", { class: "hint" }, device.online
+    ? "It is online right now, so without this the next scan would add it again."
+    : "It is offline. Tick this if it should never be added back, even when it appears again."));
+  box.appendChild(errorEl);
+  box.appendChild(h("div", { class: "btn-row" }, confirmBtn, cancelBtn));
+
+  openBtn.addEventListener("click", () => {
+    box.hidden = false;
+    openBtn.hidden = true;
+    onOpenChange(true);
+  });
+  cancelBtn.addEventListener("click", () => {
+    box.hidden = true;
+    openBtn.hidden = false;
+    errorEl.textContent = "";
+    onOpenChange(false);
+  });
+  confirmBtn.addEventListener("click", async () => {
+    confirmBtn.disabled = true;
+    cancelBtn.disabled = true;
+    errorEl.textContent = "";
+    try {
+      await del(`/api/devices/${device.id}?ignore=${ignoreInput.checked}`);
+    } catch (err) {
+      errorEl.textContent = err.message || "Could not delete the device";
+      confirmBtn.disabled = false;
+      cancelBtn.disabled = false;
+      return;
+    }
+    onOpenChange(false);
+    toast(ignoreInput.checked ? `${name} deleted and ignored` : `${name} deleted`, "success");
+    window.location.hash = "#/devices";
+  });
+
+  card.appendChild(openBtn);
+  card.appendChild(box);
+  return card;
+}
+
 function buildEventsCard(device) {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Recent events"));
@@ -295,6 +353,7 @@ export async function render(container, params) {
   let loading = false;
   let failing = false;
   let editResult = null;
+  let deleteOpen = false;
   let terminalSlot = null;
   let terminalHandle = null;
 
@@ -315,6 +374,25 @@ export async function render(container, params) {
     heading.appendChild(h("h1", {}, device.name || device.primary_ip || "Unknown"));
     heading.appendChild(typeBadge(device.type));
     heading.appendChild(h("a", { href: "#/devices" }, "← Devices"));
+    if (device.primary_ip) {
+      const scanBtn = h("button", {
+        class: "btn",
+        type: "button",
+        title: "All 65535 TCP ports, service versions, OS detection and traceroute for this host only. Can take a few minutes.",
+        onclick: async () => {
+          scanBtn.disabled = true;
+          try {
+            await post(`/api/devices/${device.id}/scan`);
+            toast(`Full scan of ${device.primary_ip} started. Progress is shown under the top bar.`, "info");
+          } catch (err) {
+            toast(err instanceof ApiError && err.status === 409 ? "A scan is already running" : (err.message || "Could not start the scan"), "error");
+          } finally {
+            scanBtn.disabled = false;
+          }
+        },
+      }, "Full scan");
+      heading.appendChild(scanBtn);
+    }
     page.appendChild(heading);
 
     const grid = h("div", { class: "grid-2" });
@@ -338,6 +416,7 @@ export async function render(container, params) {
     buildDeviceUptimeCard(device.id).then((c) => { if (!disposed) uptimeSlot.appendChild(c); }).catch(() => {});
     right.appendChild(buildNamesCard(device));
     right.appendChild(buildEventsCard(device));
+    right.appendChild(buildDeleteCard(device, (open) => { deleteOpen = open; }));
     grid.appendChild(right);
     page.appendChild(grid);
 
@@ -391,12 +470,22 @@ export async function render(container, params) {
   const interval = setInterval(() => {
     if (terminalSlot && isTerminalActive(terminalSlot)) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
+    if (deleteOpen) return;
     load();
   }, 20000);
+
+  // show the result of a (full) scan as soon as it is done
+  const onScanFinished = () => {
+    if (deleteOpen || (terminalSlot && isTerminalActive(terminalSlot))) return;
+    if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
+    load();
+  };
+  document.addEventListener("netlens:scan-finished", onScanFinished);
 
   return () => {
     disposed = true;
     clearInterval(interval);
+    document.removeEventListener("netlens:scan-finished", onScanFinished);
     disposeTerminal();
   };
 }

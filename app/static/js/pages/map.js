@@ -1,3 +1,4 @@
+import { cssVar, isDark } from "../theme.js";
 import { get, post, patch, del, ApiError } from "../api.js";
 import { h, clear, toast, typeBadge, statusDot, TYPE_LABELS } from "../util.js";
 
@@ -89,13 +90,19 @@ function buildNodeData(node, treeLayout = false) {
   return data;
 }
 
+// The parent links are the main structure of the hierarchy view; keep them readable on both themes.
+function edgeColor(kind) {
+  if (kind === "parent") return isDark() ? "#cbd5e1" : EDGE_STYLES.parent.color;
+  return (EDGE_STYLES[kind] || EDGE_STYLES.gateway).color;
+}
+
 function buildEdgeData(edge, treeLayout = false) {
   const style = EDGE_STYLES[edge.kind] || EDGE_STYLES.gateway;
   return {
     id: edge.id,
     from: edge.from,
     to: edge.to,
-    color: style.color,
+    color: edgeColor(edge.kind),
     width: style.width,
     dashes: style.dashes,
     arrows: "to",
@@ -188,7 +195,7 @@ export async function render(container, params) {
   ];
   for (const item of legendItems) {
     const swatch = h("span", { class: "legend-swatch" });
-    swatch.style.backgroundColor = EDGE_STYLES[item.kind].color;
+    swatch.style.backgroundColor = edgeColor(item.kind);
     legend.appendChild(h("div", { class: "legend-item" }, swatch, h("span", {}, item.label)));
   }
 
@@ -221,7 +228,7 @@ export async function render(container, params) {
     nodes: {
       shape: "dot",
       size: 18,
-      font: { size: 12 },
+      font: { size: 12, color: cssVar("--text", "#1c1f24") },
     },
     edges: {
       arrows: "to",
@@ -535,6 +542,9 @@ export async function render(container, params) {
   }
 
   document.addEventListener("netlens:scan-finished", onScanFinished);
+  // the canvas draws its own colours, so rebuild the map when the theme changes
+  const onTheme = () => refreshView();
+  document.addEventListener("netlens:theme", onTheme);
 
   reload();
 
@@ -543,5 +553,6 @@ export async function render(container, params) {
     network.destroy();
     clearInterval(interval);
     document.removeEventListener("netlens:scan-finished", onScanFinished);
+    document.removeEventListener("netlens:theme", onTheme);
   };
 }

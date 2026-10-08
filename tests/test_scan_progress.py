@@ -42,7 +42,7 @@ async def test_progress_is_visible_while_scanning_and_cleared_afterwards(tmp_pat
         body = (await c.get("/api/scans/current")).json()
         assert body["running"] is True
         assert body["progress"] == {
-            "scan_id": body["scan"]["id"], "kind": "deep", "phase": "scanning", "targets": ["192.168.1.0/24"],
+            "scan_id": body["scan"]["id"], "kind": "deep", "target": None, "phase": "scanning", "targets": ["192.168.1.0/24"],
             "task": "SYN Stealth Scan", "percent": 42.5, "hosts_found": 3,
         }
 
