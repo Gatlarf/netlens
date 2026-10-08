@@ -71,3 +71,40 @@ label.check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .markdown h2 { font-size: 1.5em; }
 .markdown h3 { font-size: 1.2em; padding-top: 0.4em; border-top: 1px solid var(--border); }
 .markdown h4 { font-size: 1.05em; }
+
+/* ---- Statistics page ---- */
+.stats-body { display: flex; flex-direction: column; gap: 8px; }
+.stat-section > h3 { margin: 18px 0 8px; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; align-items: start; }
+.stat-grid > .tiles { grid-column: 1 / -1; }
+.stat-card h2 { font-size: 1em; margin-top: 0; }
+.stat-card h4 { margin: 12px 0 6px; font-size: 0.9em; }
+.stats-stamp { margin-left: auto; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.tile-value { font-size: 1.6em; font-weight: 700; line-height: 1.1; }
+.tile-label { color: var(--muted); font-size: 0.85em; margin-top: 2px; }
+.tile.good .tile-value { color: #15803d; }
+.tile.warn .tile-value { color: #b45309; }
+:root[data-theme="dark"] .tile.good .tile-value { color: #4ade80; }
+:root[data-theme="dark"] .tile.warn .tile-value { color: #fbbf24; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tile.good .tile-value { color: #4ade80; } :root:not([data-theme="light"]) .tile.warn .tile-value { color: #fbbf24; } }
+.bars { display: flex; flex-direction: column; gap: 5px; }
+.bar-row { display: grid; grid-template-columns: minmax(70px, 38%) 1fr auto; gap: 8px; align-items: center; font-size: 0.9em; }
+.bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { background: var(--bg); border-radius: 4px; height: 10px; display: block; }
+.bar-fill { display: block; height: 10px; border-radius: 4px; }
+.bar-value { font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+.donut { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.donut svg { flex: none; }
+.donut-total { font-size: 22px; font-weight: 700; fill: var(--text); }
+.legend-list { list-style: none; padding: 0; margin: 0; font-size: 0.88em; }
+.legend-list.inline { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+.legend-list .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.line-chart { width: 100%; height: auto; display: block; }
+.line-chart .grid { stroke: var(--border); stroke-width: 1; }
+.line-chart .axis { fill: var(--muted); font-size: 11px; }
+.columns { display: flex; align-items: flex-end; gap: 2px; }
+.columns .col { flex: 1; min-width: 2px; border-radius: 2px 2px 0 0; }
+.col-axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8em; margin-top: 2px; }
+.empty-note { margin: 4px 0; }

@@ -28,6 +28,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Uptime history like Uptime Kuma: heartbeat bars, 24 h / 7 d / 30 d uptime and response times per device
 - E-mail notifications for new and offline devices, with an on/off switch per device
 - Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: Proxmox VE and ASUS AiMesh come built in (which VM runs on which host, which device is connected to which mesh node)
+- Statistics page: devices by type/vendor/OS, uptime and reliability, flapping devices, ports and services, scan performance, event history, hierarchy and plugin health, with 24 h to 90 day periods; a compact `/api/stats/summary` for integrations such as Home Assistant
 - Network hierarchy: which device depends on which (gateway, then Proxmox host, then its guests), as a tree page, a tree layout on the map, and a parent you can set per device
 - Live scan progress in the header
 - Light and dark mode, switchable from the top bar
@@ -259,6 +260,12 @@ After each scan Netlens sends **one digest mail** listing the devices that appea
 You can switch the offline mails off **per device** with the checkbox "Send an e-mail when this device goes offline" on the device page (useful for phones and laptops that come and go). New-device mails always go out when that option is on.
 
 The SMTP password is stored in the database in plain text (like all settings) and is included in backups, so protect the data directory and the backup files.
+
+### Statistics
+
+The **Statistics** page (top bar) shows what Netlens knows, in groups: *History* (devices online per hour or day, devices over time, events per day), *What is on the network* (by type, vendor, operating system, subnet, wired versus Wi-Fi and clients per mesh node when a router plugin is on), *Availability* (network uptime 24 h/7 d/30 d, least and most reliable devices, flapping devices, who has been offline longest, slowest responders), *Ports and services* (counts only: open ports, most common ports and services, devices with the most open ports, newly opened ports), *Network structure* (depth, busiest parents, where the hierarchy comes from, guests per hypervisor host), *Scans* (counts, median/95th percentile/longest duration per kind, hosts found per scan, host timeouts), *Events* and *System* (version, database size, rows, plugin health). The period buttons (24 hours to 90 days) set the window of the history, scan and event groups and are remembered per browser; the page refreshes itself every minute.
+
+The history charts use the uptime checks (kept 90 days) and a **daily snapshot** (devices, online, new devices, open ports, events, scans) that Netlens stores after every scan and keeps for 400 days, so "devices over time" fills in as the days go by. The data comes from `GET /api/stats?range=7d` (24h, 7d, 30d or 90d). `GET /api/stats/summary` is a small, versioned document (`api: 1`) with the headline numbers, scan state, plugin health, a `problem` flag and a compact device list; it is what the Home Assistant integration polls. Both answers are cached for 30 seconds. `GET /api/events?since_id=<id>` returns only events newer than an id.
 
 ### Plugins
 

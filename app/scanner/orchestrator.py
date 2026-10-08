@@ -13,6 +13,7 @@ from app.scanner.store import save_scan_results
 from app.uptime import record_checks
 from app.notify.service import process_notifications
 from app.plugins.service import PluginService
+from app.stats import record_daily_snapshot
 from app.scanner.presence import mark_offline
 from app.scanner.scans import create_scan, finish_scan, running_scan
 from app.scanner.netinfo import detect_ranges, detect_gateway
@@ -51,7 +52,7 @@ class ScanManager:
     ) -> None:
         # Async callables f(db_path) run after every successful scan; failures never fail the scan.
         self.plugin_runner = None  # tests replace the subprocess runner of the plugins
-        self.after_scan = [self._plugins_after_scan, process_notifications] if after_scan is None else list(after_scan)
+        self.after_scan = [self._plugins_after_scan, self._stats_after_scan, process_notifications] if after_scan is None else list(after_scan)
         self.db_path = db_path
         self.settings = settings
         self.runner = runner
@@ -146,6 +147,13 @@ class ScanManager:
 
     async def _plugins_after_scan(self, db_path: str) -> None:
         await PluginService(db_path, self.settings.data_dir, self.plugin_runner).after_scan()
+
+    async def _stats_after_scan(self, db_path: str) -> None:
+        conn = connect(db_path)
+        try:
+            record_daily_snapshot(conn)
+        finally:
+            conn.close()
 
     async def _run(self, kind: str, scan_id: int, target: str | None = None) -> None:
         conn: sqlite3.Connection | None = None

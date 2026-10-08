@@ -23,6 +23,7 @@ def list_events(
     limit: int = Query(100, ge=1, le=500),
     kind: str | None = None,
     device_id: int | None = None,
+    since_id: int | None = Query(None, ge=0, description="only events newer than this id (for integrations that poll)"),
     conn: sqlite3.Connection = Depends(get_conn),
 ) -> list[dict[str, Any]]:
     conditions: list[str] = []
@@ -35,6 +36,10 @@ def list_events(
     if device_id is not None:
         conditions.append("device_id = ?")
         params.append(device_id)
+
+    if since_id is not None:
+        conditions.append("id > ?")
+        params.append(since_id)
 
     query = "SELECT id, ts, device_id, kind, detail FROM events"
     if conditions:

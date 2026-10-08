@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 def utcnow() -> str:
@@ -330,6 +330,21 @@ def init_db(conn: sqlite3.Connection) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_hv_guests_device ON hypervisor_guests(device_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_hv_guests_host ON hypervisor_guests(host_device_id)")
     _migrate_to_plugins(conn)
+
+    # --- schema v6: one row per day for the history charts of the Statistics page ---------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS stats_daily (
+            day TEXT PRIMARY KEY,
+            devices INTEGER NOT NULL,
+            online INTEGER NOT NULL,
+            new_devices INTEGER NOT NULL DEFAULT 0,
+            open_ports INTEGER NOT NULL DEFAULT 0,
+            events INTEGER NOT NULL DEFAULT 0,
+            scans INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
 
     # host_keys
     cur.execute(
