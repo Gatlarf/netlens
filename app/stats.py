@@ -307,6 +307,24 @@ def _events(conn, now: str, days: int) -> dict:
     return {"total": sum(kinds.values()), "by_kind": _top(kinds, 20), "most_active": active, "recent": recent}
 
 
+def _services(conn, now: str) -> dict:
+    since = _ago(now, hours=24)
+    rows = conn.execute("SELECT id, name, kind, host, port, path, enabled, last_up, last_ms, last_detail FROM service_checks ORDER BY name COLLATE NOCASE").fetchall()
+    uptime = {r["check_id"]: _pct(r["u"], r["n"]) for r in conn.execute("SELECT check_id, SUM(up) AS u, COUNT(*) AS n FROM service_results WHERE ts >= ? GROUP BY check_id", (since,))}
+    checks = [
+        {"id": r["id"], "name": r["name"], "kind": r["kind"], "state": None if r["last_up"] is None else ("up" if r["last_up"] else "down"),
+         "enabled": bool(r["enabled"]), "uptime_24h": uptime.get(r["id"]), "ms": r["last_ms"], "detail": r["last_detail"]}
+        for r in rows
+    ]
+    active = [c for c in checks if c["enabled"]]
+    return {
+        "total": len(checks),
+        "down": sum(1 for c in active if c["state"] == "down"),
+        "up": sum(1 for c in active if c["state"] == "up"),
+        "checks": checks[:30],
+    }
+
+
 def _plugin_status(conn) -> list[dict]:
     out = []
     for r in conn.execute("SELECT key, value FROM settings WHERE key LIKE 'plugin.%' AND key NOT LIKE 'plugin.%.%'"):
@@ -367,6 +385,7 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
         "structure": _structure(conn, devs, hierarchy),
         "scans": _scans(conn, now, days),
         "events": _events(conn, now, days),
+        "services": _services(conn, now),
         "system": _system(conn, db_path),
     }
 
@@ -400,7 +419,8 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     plugins = _plugin_status(conn)
     failing = [p for p in plugins if p["enabled"] and p["ok"] is False]
     # the last scan failed (a single failure in the past day that later scans recovered from is not a problem), a plugin is failing, or no scan finished for a while
-    problems = (1 if last_info and last_info["status"] == "failed" else 0) + len(failing) + (1 if age is not None and age > stale_after_s else 0)
+    services = _services(conn, now)
+    problems = (1 if services["down"] else 0) + (1 if last_info and last_info["status"] == "failed" else 0) + len(failing) + (1 if age is not None and age > stale_after_s else 0)
     return {
         "api": SUMMARY_API,
         "version": VERSION,
@@ -412,6 +432,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "events": {"24h": conn.execute("SELECT COUNT(*) FROM events WHERE ts >= ?", (_ago(now, hours=24),)).fetchone()[0],
                    "last_id": conn.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()[0]},
         "scans": {"running": scan_running, "last": last_info, "last_ok_age_s": age, "failed_24h": failed_24h},
+        "services": {"total": services["total"], "up": services["up"], "down": services["down"]},
         "plugins": plugins,
         "problems": problems,
         "problem": problems > 0,

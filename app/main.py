@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import backup as backup_api, config, devices, events, export, hierarchy as hierarchy_api, ignored, mapsettings, notifications, plugins, relations, scans, stats as stats_api, uptime, wifi
+from app.api import backup as backup_api, config, devices, events, export, hierarchy as hierarchy_api, ignored, mapsettings, notifications, plugins, relations, scans, services as services_api, stats as stats_api, uptime, wifi
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, require_auth
@@ -22,6 +22,7 @@ from app.scanner.scheduler import scheduler_loop
 from app.security import SecurityHeadersMiddleware
 from app.terminal.ssh import SSHBackend
 from app.terminal.telnet import TelnetBackend
+from app.services import service_loop
 from app.version import VERSION
 
 
@@ -38,20 +39,21 @@ async def lifespan(app: FastAPI):
     config.apply_overrides(app)
     app.state.scan_manager.recover()
 
-    task = None
+    tasks = []
     if getattr(app.state, "scheduler", False):
-        task = asyncio.create_task(
+        tasks.append(asyncio.create_task(
             scheduler_loop(
                 app.state.scan_manager,
                 lambda: app.state.settings.quick_interval,
                 lambda: app.state.settings.deep_interval,
             )
-        )
+        ))
+        tasks.append(asyncio.create_task(service_loop(app.state.db_path)))
 
     try:
         yield
     finally:
-        if task is not None:
+        for task in tasks:
             task.cancel()
             try:
                 await task
@@ -96,6 +98,7 @@ def create_app(
     app.include_router(plugins.router, dependencies=auth_deps)
     app.include_router(stats_api.router, dependencies=auth_deps)
     app.include_router(wifi.router, dependencies=auth_deps)
+    app.include_router(services_api.router, dependencies=auth_deps)
     app.include_router(mapsettings.router, dependencies=auth_deps)
     app.include_router(hierarchy_api.router, dependencies=auth_deps)
     app.include_router(ignored.router, dependencies=auth_deps)

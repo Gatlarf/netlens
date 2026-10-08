@@ -269,3 +269,16 @@ def test_device_wifi_endpoint(client, db):
     assert client.get("/api/devices/1/wifi").json() == {"current": None, "samples": [], "roams": []}
     assert client.get("/api/devices/99/wifi").status_code == 404
     assert client.get("/api/devices/3/wifi", headers={"Authorization": "Bearer no"}).status_code == 401
+
+
+def test_service_checks_in_the_statistics_and_the_summary(db):
+    conn, _ = db
+    conn.execute("INSERT INTO service_checks (id, name, kind, host, port, enabled, last_up, last_ms, last_detail, created) VALUES (1, 'Web', 'tcp', 'a', 80, 1, 1, 4.0, 'port open', ?)", (NOW,))
+    conn.execute("INSERT INTO service_checks (id, name, kind, host, port, enabled, last_up, last_detail, created) VALUES (2, 'DB', 'tcp', 'b', 5432, 1, 0, 'refused', ?)", (NOW,))
+    conn.execute("INSERT INTO service_checks (id, name, kind, host, port, enabled, last_up, created) VALUES (3, 'Paused', 'tcp', 'c', 1, 0, 0, ?)", (NOW,))
+    conn.executemany("INSERT INTO service_results (check_id, ts, up) VALUES (?, ?, ?)", [(1, ago(hours=1), 1), (1, ago(hours=2), 0), (2, ago(hours=1), 0)])
+    svc = compute_stats(conn, "7d", NOW)["services"]
+    assert (svc["total"], svc["up"], svc["down"]) == (3, 1, 1)  # a paused check is neither up nor down
+    assert {c["name"]: c["uptime_24h"] for c in svc["checks"]} == {"DB": 0.0, "Paused": None, "Web": 50.0}
+    doc = summary(conn, NOW)
+    assert doc["services"] == {"total": 3, "up": 1, "down": 1} and doc["problems"] >= 1 and doc["problem"] is True

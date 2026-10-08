@@ -118,3 +118,10 @@ label.check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 :root[data-theme="dark"] .wifi-quality.q-weak { color: #f87171; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .wifi-quality.q-excellent, :root:not([data-theme="light"]) .wifi-quality.q-good { color: #4ade80; } :root:not([data-theme="light"]) .wifi-quality.q-fair { color: #fbbf24; } :root:not([data-theme="light"]) .wifi-quality.q-weak { color: #f87171; } }
 .roam-list { margin: 4px 0; padding-left: 18px; font-size: 0.9em; }
+.svc-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; }
+.svc-dot.svc-up { background: #16a34a; }
+.svc-dot.svc-down { background: #dc2626; }
+.svc-dot.svc-paused { background: transparent; border: 2px solid #94a3b8; }
+td.actions { white-space: nowrap; }
+td.actions .btn { padding: 2px 8px; font-size: 0.85em; }
+.service-form { max-width: 560px; }

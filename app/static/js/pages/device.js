@@ -3,6 +3,7 @@ import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS } 
 import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
+import { buildDeviceServicesCard } from "../cards/device_services.js";
 import { buildParentCard } from "../cards/device_parent.js";
 
 const WEB_PORTS = new Set([80, 443, 8080, 8443, 8006, 5000, 5001, 9000]);
@@ -423,6 +424,9 @@ export async function render(container, params) {
     const uptimeSlot = h("div", {});
     right.appendChild(uptimeSlot);
     buildDeviceUptimeCard(device.id).then((c) => { if (!disposed) uptimeSlot.appendChild(c); }).catch(() => {});
+    const servicesSlot = h("div", {});
+    right.appendChild(servicesSlot);
+    buildDeviceServicesCard(device).then((c) => { if (!disposed) servicesSlot.appendChild(c); }).catch(() => {});
     const wifiSlot = h("div", {});
     right.appendChild(wifiSlot);
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});

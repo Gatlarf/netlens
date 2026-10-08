@@ -11,6 +11,7 @@ const ROUTES = {
   "#/hierarchy": "hierarchy",
   "#/uptime": "uptime",
   "#/stats": "stats",
+  "#/services": "services",
   "#/scans": "scans",
   "#/settings": "settings",
 };

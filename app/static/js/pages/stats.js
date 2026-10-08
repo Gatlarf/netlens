@@ -6,6 +6,7 @@ const RANGES = [["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["90d
 const EVENT_LABELS = {
   device_new: "New device", device_offline: "Went offline", device_online: "Came online", ip_changed: "IP changed",
   os_changed: "OS changed", port_opened: "Port opened", host_timeout: "Host timeout", device_deleted: "Deleted",
+  service_down: "Service down", service_up: "Service up", wifi_roamed: "Wi-Fi move", ip_reused: "IP reused",
 };
 
 const dev = (item) => ({ ...item, href: `#/device/${item.id}` });
@@ -106,6 +107,14 @@ function build(s) {
       kinds.map(([k, v]) => [k, String(v.total), String(v.done), String(v.failed), String(v.cancelled), fmtDuration(v.median_s), fmtDuration(v.p95_s), fmtDuration(v.max_s)])),
     h("p", { class: "hint" }, `${sc.host_timeouts} host timeout${sc.host_timeouts === 1 ? "" : "s"}.`)),
     card("Hosts found per scan", lineChart(sc.hosts_trend.map((r, i) => ({ x: `#${r.id}`, hosts: r.hosts })), [{ key: "hosts", label: "hosts" }]))));
+
+  // ------------------------------------------------------------------ services
+  const svc = s.services;
+  if (svc.total) {
+    root.appendChild(section("Service checks",
+      h("div", { class: "tiles inline" }, tile(fmtNumber(svc.total), "checks"), tile(fmtNumber(svc.up), "up", { tone: "good" }), tile(fmtNumber(svc.down), "down", { tone: svc.down ? "warn" : "" })),
+      card("Checks (24 h)", table(["Check", "State", "Uptime", "Response"], svc.checks.map((c) => [h("a", { href: "#/services" }, c.name), !c.enabled ? "paused" : c.state === "down" ? `down: ${c.detail || ""}` : c.state || "waiting", fmtPct(c.uptime_24h), c.ms === null ? "–" : `${Math.round(c.ms)} ms`])))));
+  }
 
   // ------------------------------------------------------------------ events
   root.appendChild(section("Events",
