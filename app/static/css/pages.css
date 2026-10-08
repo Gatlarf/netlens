@@ -162,7 +162,7 @@
 }
 
 .export-link {
-  color: var(--accent);
+  color: var(--link);
   text-decoration: none;
   margin-right: 12px;
 }

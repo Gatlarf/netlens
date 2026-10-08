@@ -20,10 +20,6 @@
   border-top: 2px solid;
 }
 
-.legend-swatch.gateway { border-top: 2px solid #888; }
-.legend-swatch.route    { border-top: 2px dashed #2563eb; }
-.legend-swatch.host-of  { border-top: 2px dotted #7c3aed; }
-.legend-swatch.manual   { border-top: 4px solid var(--accent); }
 
 .map-wrap {
   position: relative;

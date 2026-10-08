@@ -49,9 +49,9 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .tree-name { font-weight: 600; }
 .tree-count { font-size: 0.8em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; }
 .tree-source { font-size: 0.75em; border-radius: 999px; padding: 1px 8px; background: var(--bg); color: var(--muted); }
-.tree-source.src-proxmox { background: color-mix(in srgb, #7c3aed 18%, var(--surface)); color: color-mix(in srgb, #7c3aed 65%, var(--text)); }
-.tree-source.src-manual { background: color-mix(in srgb, #d97706 20%, var(--surface)); color: color-mix(in srgb, #d97706 65%, var(--text)); }
-.tree-source.src-uplink { background: color-mix(in srgb, #16a34a 20%, var(--surface)); color: color-mix(in srgb, #16a34a 65%, var(--text)); }
+.tree-source.src-proxmox { background: color-mix(in srgb, #7c3aed 18%, var(--surface)); color: color-mix(in srgb, #7c3aed 50%, var(--text)); }
+.tree-source.src-manual { background: color-mix(in srgb, #d97706 20%, var(--surface)); color: color-mix(in srgb, #d97706 50%, var(--text)); }
+.tree-source.src-uplink { background: color-mix(in srgb, #16a34a 20%, var(--surface)); color: color-mix(in srgb, #16a34a 50%, var(--text)); }
 .tree ul.tree { border-left: 1px dashed var(--border); margin-left: 10px; }
 
 .children-list { list-style: none; margin: 0; padding: 0; }

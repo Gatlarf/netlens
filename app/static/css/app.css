@@ -2,10 +2,12 @@
   --bg: #f5f6f8;
   --surface: #ffffff;
   --text: #1c1f24;
-  --muted: #6b7280;
+  --muted: #5f6877;
   --border: #d7dbe2;
   --accent: #2563eb;
   --accent-text: #ffffff;
+  --link: #1d4ed8;
+  --link-hover: #1e3a8a;
   --ok: #16a34a;
   --warn: #d97706;
   --bad: #dc2626;
@@ -26,7 +28,9 @@
     --muted: #9aa3af;
     --border: #333a44;
     --accent: #4f83f0;
-    --accent-text: #ffffff;
+    --accent-text: #0a0f1a;
+    --link: #8ab4ff;
+    --link-hover: #bfd7ff;
     --ok: #22c55e;
     --warn: #f59e0b;
     --bad: #ef4444;
@@ -41,7 +45,9 @@
     --muted: #9aa3af;
     --border: #333a44;
     --accent: #4f83f0;
-    --accent-text: #ffffff;
+    --accent-text: #0a0f1a;
+    --link: #8ab4ff;
+    --link-hover: #bfd7ff;
     --ok: #22c55e;
     --warn: #f59e0b;
     --bad: #ef4444;
@@ -141,8 +147,9 @@ body {
 .btn.ghost:hover { background: var(--bg); }
 
 .btn.danger {
-  background: var(--bad);
-  border-color: var(--bad);
+  /* a fixed deep red with white text: 4.8:1 or better in both themes (the dark theme's --bad is too bright for white text) */
+  background: #c62828;
+  border-color: #c62828;
   color: #fff;
 }
 
@@ -252,18 +259,18 @@ th.sortable.sorted-desc::after { content: "\2193"; color: var(--accent); }
   border: 1px solid var(--border);
 }
 
-.badge.type-router { background: color-mix(in srgb, #2563eb 18%, var(--surface)); color: color-mix(in srgb, #2563eb 65%, var(--text)); }
-.badge.type-switch { background: color-mix(in srgb, #0891b2 18%, var(--surface)); color: color-mix(in srgb, #0891b2 65%, var(--text)); }
-.badge.type-ap { background: color-mix(in srgb, #7c3aed 18%, var(--surface)); color: color-mix(in srgb, #7c3aed 65%, var(--text)); }
-.badge.type-server { background: color-mix(in srgb, #475569 18%, var(--surface)); color: color-mix(in srgb, #475569 65%, var(--text)); }
-.badge.type-pc { background: color-mix(in srgb, #059669 18%, var(--surface)); color: color-mix(in srgb, #059669 65%, var(--text)); }
-.badge.type-phone { background: color-mix(in srgb, #db2777 18%, var(--surface)); color: color-mix(in srgb, #db2777 65%, var(--text)); }
-.badge.type-printer { background: color-mix(in srgb, #ea580c 18%, var(--surface)); color: color-mix(in srgb, #ea580c 65%, var(--text)); }
-.badge.type-iot { background: color-mix(in srgb, #65a30d 18%, var(--surface)); color: color-mix(in srgb, #65a30d 65%, var(--text)); }
-.badge.type-camera { background: color-mix(in srgb, #dc2626 18%, var(--surface)); color: color-mix(in srgb, #dc2626 65%, var(--text)); }
-.badge.type-nas { background: color-mix(in srgb, #0d9488 18%, var(--surface)); color: color-mix(in srgb, #0d9488 65%, var(--text)); }
-.badge.type-vm { background: color-mix(in srgb, #6366f1 18%, var(--surface)); color: color-mix(in srgb, #6366f1 65%, var(--text)); }
-.badge.type-unknown { background: color-mix(in srgb, var(--muted) 15%, var(--surface)); color: var(--muted); }
+.badge.type-router { background: color-mix(in srgb, #2563eb 18%, var(--surface)); color: color-mix(in srgb, #2563eb 50%, var(--text)); }
+.badge.type-switch { background: color-mix(in srgb, #0891b2 18%, var(--surface)); color: color-mix(in srgb, #0891b2 50%, var(--text)); }
+.badge.type-ap { background: color-mix(in srgb, #7c3aed 18%, var(--surface)); color: color-mix(in srgb, #7c3aed 50%, var(--text)); }
+.badge.type-server { background: color-mix(in srgb, #475569 18%, var(--surface)); color: color-mix(in srgb, #475569 50%, var(--text)); }
+.badge.type-pc { background: color-mix(in srgb, #059669 18%, var(--surface)); color: color-mix(in srgb, #059669 50%, var(--text)); }
+.badge.type-phone { background: color-mix(in srgb, #db2777 18%, var(--surface)); color: color-mix(in srgb, #db2777 50%, var(--text)); }
+.badge.type-printer { background: color-mix(in srgb, #ea580c 18%, var(--surface)); color: color-mix(in srgb, #ea580c 50%, var(--text)); }
+.badge.type-iot { background: color-mix(in srgb, #65a30d 18%, var(--surface)); color: color-mix(in srgb, #65a30d 50%, var(--text)); }
+.badge.type-camera { background: color-mix(in srgb, #dc2626 18%, var(--surface)); color: color-mix(in srgb, #dc2626 50%, var(--text)); }
+.badge.type-nas { background: color-mix(in srgb, #0d9488 18%, var(--surface)); color: color-mix(in srgb, #0d9488 50%, var(--text)); }
+.badge.type-vm { background: color-mix(in srgb, #6366f1 18%, var(--surface)); color: color-mix(in srgb, #6366f1 50%, var(--text)); }
+.badge.type-unknown { background: color-mix(in srgb, var(--muted) 15%, var(--surface)); color: var(--text); }
 
 /* ---------- dots ---------- */
 .dot {
@@ -490,4 +497,11 @@ dialog#login-dialog::backdrop {
 .app-version { color: var(--muted); font-size: 0.75em; margin-left: 6px; }
 
 /* theme switch in the top bar */
-.theme-toggle { font-size: 1.1em; line-height: 1; padding: 6px 10px; min-width: 38px; }
+.theme-toggle { font-size: 1.1em; line-height: 1; padding: 6px 10px; min-width: 38px; color: var(--text); }
+
+/* Links: one themed colour (no washed-out browser defaults, visited links look the same).
+   :where() gives these rules zero specificity so every class rule (.btn, .nav-link, ...) still wins. */
+:where(a, a:visited) { color: var(--link); text-underline-offset: 2px; }
+:where(a:hover) { color: var(--link-hover); }
+:where(a:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.topbar .brand, .topbar .brand:visited { color: var(--text); text-decoration: none; }

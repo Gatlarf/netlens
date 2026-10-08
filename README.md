@@ -300,7 +300,7 @@ The same data is available as `GET /api/hierarchy`, and `PATCH /api/devices/<id>
 
 ### Dark mode
 
-The **moon / sun button** at the right end of the top bar switches between light and dark mode. Without a choice Netlens follows your operating system's setting; once you click the button your choice is remembered in that browser (it is not shared between browsers or users). Charts and the map follow the theme too.
+The **moon / sun button** at the right end of the top bar switches between light and dark mode. Without a choice Netlens follows your operating system's setting; once you click the button your choice is remembered in that browser (it is not shared between browsers or users). Charts and the map follow the theme too (the map draws brighter device colours and links with outlined dots and haloed labels in dark mode, and offline devices get a dashed outline).
 
 ### Deleting a device and ignoring devices
 

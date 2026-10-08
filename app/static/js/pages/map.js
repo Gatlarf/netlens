@@ -2,7 +2,9 @@ import { cssVar, isDark } from "../theme.js";
 import { get, post, patch, del, ApiError } from "../api.js";
 import { h, clear, toast, typeBadge, statusDot, TYPE_LABELS } from "../util.js";
 
-const PALETTE = {
+// Colours of the devices and links, one set per theme. The dark set is brighter so everything keeps
+// at least 3:1 contrast against the dark canvas (checked by the theme browser test).
+const PALETTE_LIGHT = {
   router: "#2563eb",
   switch: "#0891b2",
   ap: "#7c3aed",
@@ -10,20 +12,51 @@ const PALETTE = {
   pc: "#059669",
   phone: "#db2777",
   printer: "#ea580c",
-  iot: "#ca8a04",
+  iot: "#a16207",
   camera: "#dc2626",
   nas: "#0d9488",
   vm: "#6366f1",
-  unknown: "#94a3b8",
+  unknown: "#7b8aa0",
 };
 
-const EDGE_STYLES = {
+const PALETTE_DARK = {
+  router: "#60a5fa",
+  switch: "#22d3ee",
+  ap: "#a78bfa",
+  server: "#94a3b8",
+  pc: "#34d399",
+  phone: "#f472b6",
+  printer: "#fb923c",
+  iot: "#facc15",
+  camera: "#f87171",
+  nas: "#2dd4bf",
+  vm: "#818cf8",
+  unknown: "#cbd5e1",
+};
+
+const EDGES_LIGHT = {
   gateway: { color: "#64748b", width: 1.5, dashes: false },
   route: { color: "#2563eb", width: 1, dashes: [8, 6] },
   "host-of": { color: "#7c3aed", width: 1, dashes: [2, 5] },
-  manual: { color: "#f59e0b", width: 3, dashes: false },
+  manual: { color: "#d97706", width: 3, dashes: false },
   parent: { color: "#334155", width: 2, dashes: false },
 };
+
+const EDGES_DARK = {
+  gateway: { color: "#94a3b8", width: 2, dashes: false },
+  route: { color: "#60a5fa", width: 1.5, dashes: [8, 6] },
+  "host-of": { color: "#c4b5fd", width: 1.5, dashes: [2, 5] },
+  manual: { color: "#fbbf24", width: 3, dashes: false },
+  parent: { color: "#e2e8f0", width: 2.5, dashes: false },
+};
+
+export function mapPalette(dark) {
+  return { nodes: dark ? PALETTE_DARK : PALETTE_LIGHT, edges: dark ? EDGES_DARK : EDGES_LIGHT };
+}
+
+function palette() {
+  return mapPalette(isDark());
+}
 
 // Remembered view choices (the page is re-rendered when one changes).
 function readPref(key, allowed, fallback) {
@@ -68,19 +101,33 @@ function edgeTitle(edge) {
 }
 
 function nodeColor(type) {
-  return PALETTE[type] || PALETTE.unknown;
+  const nodes = palette().nodes;
+  return nodes[type] || nodes.unknown;
 }
 
 function buildNodeData(node, treeLayout = false) {
   const color = nodeColor(node.type);
   const label = node.label && node.label !== node.ip ? `${node.label}\n${node.ip}` : node.ip;
+  const dark = isDark();
+  // dark mode: a light outline keeps every dot clear of the dark canvas; offline devices get a
+  // dashed outline as well as the faded fill, so they are recognisable without relying on colour
+  const outline = dark ? "#f1f5f9" : color;
+  const picked = dark ? "#ffffff" : "#0f172a";
   const data = {
     id: node.id,
     label,
     shape: "dot",
     size: 18,
-    color: { background: color, border: color },
-    opacity: node.online ? 1 : 0.4,
+    color: {
+      background: color,
+      border: outline,
+      highlight: { background: color, border: picked },
+      hover: { background: color, border: picked },
+    },
+    borderWidth: dark ? 2 : 1,
+    borderWidthSelected: 4,
+    shapeProperties: { borderDashes: node.online ? false : [4, 3] },
+    opacity: node.online ? 1 : dark ? 0.6 : 0.4,
     hidden: false,
   };
   if (!treeLayout && node.pos_x != null && node.pos_y != null) {
@@ -90,19 +137,22 @@ function buildNodeData(node, treeLayout = false) {
   return data;
 }
 
-// The parent links are the main structure of the hierarchy view; keep them readable on both themes.
+function edgeStyle(kind) {
+  const edges = palette().edges;
+  return edges[kind] || edges.gateway;
+}
+
 function edgeColor(kind) {
-  if (kind === "parent") return isDark() ? "#cbd5e1" : EDGE_STYLES.parent.color;
-  return (EDGE_STYLES[kind] || EDGE_STYLES.gateway).color;
+  return edgeStyle(kind).color;
 }
 
 function buildEdgeData(edge, treeLayout = false) {
-  const style = EDGE_STYLES[edge.kind] || EDGE_STYLES.gateway;
+  const style = edgeStyle(edge.kind);
   return {
     id: edge.id,
     from: edge.from,
     to: edge.to,
-    color: edgeColor(edge.kind),
+    color: { color: edgeColor(edge.kind), highlight: isDark() ? "#ffffff" : "#0f172a", hover: isDark() ? "#ffffff" : "#0f172a" },
     width: style.width,
     dashes: style.dashes,
     arrows: "to",
@@ -195,7 +245,10 @@ export async function render(container, params) {
   ];
   for (const item of legendItems) {
     const swatch = h("span", { class: "legend-swatch" });
-    swatch.style.backgroundColor = edgeColor(item.kind);
+    const style = edgeStyle(item.kind);
+    swatch.style.borderTopColor = style.color;
+    swatch.style.borderTopWidth = `${Math.max(2, Math.round(style.width))}px`;
+    swatch.style.borderTopStyle = !style.dashes ? "solid" : style.dashes[0] <= 3 ? "dotted" : "dashed";
     legend.appendChild(h("div", { class: "legend-item" }, swatch, h("span", {}, item.label)));
   }
 
@@ -228,7 +281,7 @@ export async function render(container, params) {
     nodes: {
       shape: "dot",
       size: 18,
-      font: { size: 12, color: cssVar("--text", "#1c1f24") },
+      font: { size: 13, color: cssVar("--text", "#1c1f24"), strokeWidth: 3, strokeColor: cssVar("--surface", "#ffffff") },
     },
     edges: {
       arrows: "to",
