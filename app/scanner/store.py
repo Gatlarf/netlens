@@ -152,8 +152,18 @@ def save_scan_results(
                 detail = f"{port.proto}/{port.port} {port.service or ''}".strip()
                 add_event(conn, "port_opened", detail, device_id=device_id, now=now)
 
-        # For deep scans, delete ports not in the result
-        if kind == "deep":
+        if host.timed_out:
+            add_event(
+                conn,
+                "host_timeout",
+                f"{host.ip}: nmap gave up on this host (host timeout); its ports were not refreshed",
+                device_id=device_id,
+                now=now,
+            )
+
+        # For deep scans, delete ports not in the result. A host nmap gave up on has an incomplete
+        # (usually empty) result, so it keeps the ports it had.
+        if kind == "deep" and not host.timed_out:
             result_ports = {(p.proto, p.port) for p in host.ports}
             existing_port_ids = conn.execute(
                 "SELECT id, proto, port FROM ports WHERE device_id = ?",

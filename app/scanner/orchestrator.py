@@ -99,6 +99,24 @@ class ScanManager:
         if self._task is not None:
             await self._task
 
+    # Phases in which a scan can still be cancelled without leaving half-saved results behind.
+    CANCELLABLE_PHASES = ("preparing", "scanning", "names")
+
+    def can_cancel(self) -> bool:
+        return self.is_running() and (self.progress or {}).get("phase") in self.CANCELLABLE_PHASES
+
+    async def cancel(self) -> bool:
+        """Stop the running scan (kills nmap, marks the scan 'cancelled'). False if it cannot be cancelled now."""
+        if not self.can_cancel():
+            return False
+        task = self._task
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        return True
+
     def _set_progress(self, **fields: Any) -> None:
         self.progress = {**(self.progress or {}), **fields}
 
@@ -210,6 +228,17 @@ class ScanManager:
                     await hook(str(self.db_path))
                 except Exception:
                     logging.getLogger(__name__).exception("after-scan hook %r failed", hook)
+        except asyncio.CancelledError:
+            # Cancelled by the user before anything was saved: record it and end quietly.
+            logging.getLogger(__name__).info("scan %s cancelled", scan_id)
+            conn = connect(self.db_path)
+            try:
+                row = conn.execute("SELECT status FROM scans WHERE id = ?", (scan_id,)).fetchone()
+                if row is not None and row["status"] == "running":
+                    finish_scan(conn, scan_id, "cancelled", error="Cancelled by the user", now=utcnow())
+                    conn.commit()
+            finally:
+                conn.close()
         except Exception as exc:
             logging.getLogger(__name__).warning("scan %s failed: %r", scan_id, exc)
             conn = connect(self.db_path)

@@ -25,8 +25,8 @@ def finish_scan(
     error: str | None = None,
     now: str | None = None,
 ) -> None:
-    if status not in ("done", "failed"):
-        raise ValueError("status must be 'done' or 'failed'")
+    if status not in ("done", "failed", "cancelled"):
+        raise ValueError("status must be 'done', 'failed' or 'cancelled'")
 
     conn.row_factory = sqlite3.Row
     finished = now or utcnow()

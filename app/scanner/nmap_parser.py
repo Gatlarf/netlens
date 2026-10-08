@@ -28,6 +28,7 @@ class ScanHost:
     via: str
     hops: list[str] = field(default_factory=list)
     rtt_ms: Optional[float] = None
+    timed_out: bool = False  # nmap gave up on this host (--host-timeout): its port list is incomplete
 
 
 def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
@@ -200,6 +201,7 @@ def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
             via=via,
             hops=hops,
             rtt_ms=rtt_ms,
+            timed_out=host.get("timedout") == "true",
         ))
 
     return hosts

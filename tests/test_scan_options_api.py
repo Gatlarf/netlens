@@ -21,8 +21,8 @@ def test_defaults_presets_and_preview(tmp_path):
     with _client(tmp_path / "t.db") as c:
         body = c.get("/api/scan-options").json()
         assert body["is_default"] is True and body["options"] == body["defaults"]
-        assert body["preview"]["quick"] == "nmap -T3 --top-ports 100 -oX - <ranges>"
-        assert body["preview"]["deep"] == "nmap -T3 -sV -O --osscan-guess --traceroute --top-ports 1000 -oX - <ranges>"
+        assert body["preview"]["quick"] == "nmap -T3 --top-ports 100 --host-timeout 120s -oX - <ranges>"
+        assert body["preview"]["deep"] == "nmap -T3 -sV -O --osscan-guess --traceroute --top-ports 1000 --host-timeout 900s -oX - <ranges>"
         assert set(body["presets"]) == {"default", "fast", "fastest"}
         assert body["presets"]["fast"]["timing"] == 4 and body["presets"]["fast"]["deep_version"] == "light"
 
@@ -34,7 +34,7 @@ def test_partial_update_applies_to_the_scan_manager_and_survives_restart(tmp_pat
         assert r.status_code == 200
         body = r.json()
         assert body["is_default"] is False and body["options"]["timing"] == 4 and body["options"]["deep_top_ports"] == 1000
-        assert body["preview"]["deep"] == "nmap -T4 -sV --version-light -O --osscan-guess --traceroute -p 22,80,443 -oX - <ranges>"
+        assert body["preview"]["deep"] == "nmap -T4 -sV --version-light -O --osscan-guess --traceroute -p 22,80,443 --host-timeout 900s -oX - <ranges>"
         assert c.app.state.scan_manager.options.deep_ports == "22,80,443"
         # a second partial update keeps the earlier changes
         c.put("/api/scan-options", json={"skip_dns": True})
@@ -54,7 +54,7 @@ def test_partial_update_applies_to_the_scan_manager_and_survives_restart(tmp_pat
     ({"quick_ports": "22;ls"}, "quick_ports"),
     ({"deep_version": "turbo"}, "deep_version"),
     ({"turbo": True}, "unknown setting"),
-    ({"host_timeout": 3}, "host_timeout"),
+    ({"deep_host_timeout": 3}, "deep_host_timeout"),
 ])
 def test_invalid_updates_are_rejected_and_change_nothing(tmp_path, payload, text):
     with _client(tmp_path / "t.db") as c:
@@ -83,9 +83,9 @@ def test_corrupt_saved_options_fall_back_to_defaults(tmp_path):
 
 
 def test_build_args_default_is_unchanged_and_options_take_over():
-    assert build_args("quick", ["192.168.1.0/24"]) == ["-T3", "--top-ports", "100", "-oX", "-", "192.168.1.0/24"]
+    assert build_args("quick", ["192.168.1.0/24"]) == ["-T3", "--top-ports", "100", "--host-timeout", "120s", "-oX", "-", "192.168.1.0/24"]
     assert build_args("quick", ["192.168.1.0/24"], timing=5)[0] == "-T5"
-    fast = options_from_dict({"timing": 4, "deep_version": "off", "deep_os": False, "deep_traceroute": False, "deep_top_ports": 100})
+    fast = options_from_dict({"timing": 4, "deep_version": "off", "deep_os": False, "deep_traceroute": False, "deep_top_ports": 100, "deep_host_timeout": 0})
     assert build_args("deep", ["192.168.1.0/24"], options=fast) == ["-T4", "--top-ports", "100", "-oX", "-", "192.168.1.0/24"]
     with_progress = build_args("quick", ["192.168.1.0/24"], stats_every="2s", options=fast)
     assert with_progress[:3] == ["-v", "--stats-every", "2s"]
@@ -101,7 +101,7 @@ async def test_run_nmap_passes_the_chosen_options_to_the_process(tmp_path):
     fake = tmp_path / "nmap"
     fake.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" > {argv_file}\nprintf "<nmaprun></nmaprun>"\n')
     fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
-    opts = options_from_dict({"timing": 4, "quick_mode": "discovery", "skip_dns": True, "host_timeout": 60})
+    opts = options_from_dict({"timing": 4, "quick_mode": "discovery", "skip_dns": True, "quick_host_timeout": 60})
     await run_nmap("quick", ["192.168.1.0/24"], nmap_path=str(fake), options=opts)
     assert argv_file.read_text().split() == ["-T4", "-sn", "-n", "--host-timeout", "60s", "-oX", "-", "192.168.1.0/24"]
 

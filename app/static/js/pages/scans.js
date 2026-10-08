@@ -7,7 +7,8 @@ const KIND_LABELS = {
   device_offline: "Device offline",
   ip_changed: "IP changed",
   port_opened: "Port opened",
-  os_changed: "OS changed"
+  os_changed: "OS changed",
+  host_timeout: "Host timeout"
 };
 
 const KIND_ORDER = [
@@ -16,13 +17,14 @@ const KIND_ORDER = [
   "device_offline",
   "ip_changed",
   "port_opened",
-  "os_changed"
+  "os_changed",
+  "host_timeout"
 ];
 
 function statusClass(status) {
   if (status === "done") return "ok";
   if (status === "failed") return "bad";
-  if (status === "running") return "warn";
+  if (status === "running" || status === "cancelled") return "warn";
   return "";
 }
 

@@ -5,8 +5,8 @@ from typing import Any
 
 PRESETS: dict[str, dict] = {
     "default": {},
-    "fast": {"timing": 4, "deep_top_ports": 200, "deep_version": "light"},
-    "fastest": {"timing": 4, "quick_top_ports": 50, "deep_top_ports": 100, "deep_version": "off", "deep_os": False, "skip_dns": True, "host_timeout": 120},
+    "fast": {"timing": 4, "deep_top_ports": 200, "deep_version": "light", "quick_host_timeout": 60, "deep_host_timeout": 600},
+    "fastest": {"timing": 4, "quick_top_ports": 50, "deep_top_ports": 100, "deep_version": "off", "deep_os": False, "skip_dns": True, "quick_host_timeout": 60, "deep_host_timeout": 120},
 }
 
 
@@ -22,7 +22,8 @@ class ScanOptions:
     deep_os: bool = True
     deep_traceroute: bool = True
     skip_dns: bool = False
-    host_timeout: int = 0
+    quick_host_timeout: int = 120   # seconds nmap may spend on one host in a quick scan; 0 = no limit
+    deep_host_timeout: int = 900    # same for a deep scan (stops one slow host from holding the scan for an hour)
 
 
 def normalize_ports(spec: str) -> str:
@@ -57,9 +58,22 @@ def normalize_ports(spec: str) -> str:
     return result
 
 
+def _check_host_timeout(key: str, value) -> int:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"{key}: must be 0 or between 10 and 86400")
+    if value != 0 and not (10 <= value <= 86400):
+        raise ValueError(f"{key}: must be 0 or between 10 and 86400")
+    return value
+
+
 def options_from_dict(data: dict, base: ScanOptions | None = None) -> ScanOptions:
     opts = base if base is not None else ScanOptions()
     field_names = {f.name for f in fields(opts)}
+    data = dict(data)
+    if "host_timeout" in data:  # older settings had one timeout for both kinds of scan
+        legacy = data.pop("host_timeout")
+        data.setdefault("quick_host_timeout", legacy)
+        data.setdefault("deep_host_timeout", legacy)
     for key, value in data.items():
         if key not in field_names:
             raise ValueError(f"unknown setting: {key}")
@@ -121,12 +135,8 @@ def options_from_dict(data: dict, base: ScanOptions | None = None) -> ScanOption
             if not isinstance(value, bool):
                 raise ValueError(f"{key}: must be true or false")
             opts = replace(opts, skip_dns=value)
-        elif key == "host_timeout":
-            if not isinstance(value, int) or isinstance(value, bool):
-                raise ValueError(f"{key}: must be 0 or between 10 and 86400")
-            if value != 0 and not (10 <= value <= 86400):
-                raise ValueError(f"{key}: must be 0 or between 10 and 86400")
-            opts = replace(opts, host_timeout=value)
+        elif key in ("quick_host_timeout", "deep_host_timeout"):
+            opts = replace(opts, **{key: _check_host_timeout(key, value)})
     return opts
 
 
@@ -168,8 +178,8 @@ def option_args(kind: str, opts: ScanOptions) -> list[str]:
                 args.extend(["--top-ports", str(opts.quick_top_ports)])
         if opts.skip_dns:
             args.append("-n")
-        if opts.host_timeout > 0:
-            args.extend(["--host-timeout", f"{opts.host_timeout}s"])
+        if opts.quick_host_timeout > 0:
+            args.extend(["--host-timeout", f"{opts.quick_host_timeout}s"])
     else:
         if opts.deep_version == "full":
             args.append("-sV")
@@ -185,8 +195,8 @@ def option_args(kind: str, opts: ScanOptions) -> list[str]:
             args.extend(["--top-ports", str(opts.deep_top_ports)])
         if opts.skip_dns:
             args.append("-n")
-        if opts.host_timeout > 0:
-            args.extend(["--host-timeout", f"{opts.host_timeout}s"])
+        if opts.deep_host_timeout > 0:
+            args.extend(["--host-timeout", f"{opts.deep_host_timeout}s"])
     return args
 
 

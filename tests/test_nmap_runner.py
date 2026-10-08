@@ -34,7 +34,7 @@ def _make_script_content(body: str) -> str:
 def test_build_args_quick() -> None:
     targets = ["192.168.1.1", "192.168.1.2"]
     args = build_args(kind="quick", targets=targets, timing=3)
-    expected = ["-T3", "--top-ports", "100", "-oX", "-", *targets]
+    expected = ["-T3", "--top-ports", "100", "--host-timeout", "120s", "-oX", "-", *targets]
     assert args == expected
 
 
@@ -49,6 +49,8 @@ def test_build_args_deep() -> None:
         "--traceroute",
         "--top-ports",
         "1000",
+        "--host-timeout",
+        "900s",
         "-oX",
         "-",
         *targets,
@@ -60,7 +62,7 @@ def test_build_args_timing_changes_t_value() -> None:
     targets = ["192.168.1.1"]
     args = build_args(kind="quick", targets=targets, timing=5)
     assert args[0] == "-T5"
-    assert args == ["-T5", "--top-ports", "100", "-oX", "-", *targets]
+    assert args == ["-T5", "--top-ports", "100", "--host-timeout", "120s", "-oX", "-", *targets]
 
 
 def test_build_args_invalid_kind_raises_value_error() -> None:
@@ -91,13 +93,13 @@ def test_build_args_injection_attempt_raises_value_error() -> None:
 def test_build_args_single_private_ip_accepted() -> None:
     targets = ["192.168.1.7"]
     args = build_args(kind="quick", targets=targets, timing=3)
-    assert args == ["-T3", "--top-ports", "100", "-oX", "-", *targets]
+    assert args == ["-T3", "--top-ports", "100", "--host-timeout", "120s", "-oX", "-", *targets]
 
 
 def test_build_args_private_cidr_accepted() -> None:
     targets = ["10.0.0.0/20"]
     args = build_args(kind="quick", targets=targets, timing=3)
-    assert args == ["-T3", "--top-ports", "100", "-oX", "-", *targets]
+    assert args == ["-T3", "--top-ports", "100", "--host-timeout", "120s", "-oX", "-", *targets]
 
 
 def test_build_args_private_cidr_8_rejected() -> None:

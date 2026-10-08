@@ -94,6 +94,7 @@ async function renderPage() {
   }
 }
 
+let cancelling = false; // a cancel request is in flight or the scan is shutting down
 let scanSnapshot = null; // last /api/scans/current response and when it arrived
 let tickTimer = null;
 
@@ -116,6 +117,38 @@ function setScanSnapshot(res) {
   }
 }
 
+function updateCancelButton(res) {
+  const btn = el("#scan-cancel");
+  if (!btn) return;
+  const running = !!(res && res.running);
+  btn.hidden = !running;
+  if (!running) {
+    cancelling = false;
+    btn.disabled = false;
+    btn.textContent = "Cancel scan";
+    btn.removeAttribute("title");
+    return;
+  }
+  btn.disabled = cancelling || res.cancellable === false;
+  btn.title = res.cancellable === false && !cancelling ? "The results are being saved; it is too late to cancel" : "";
+}
+
+async function handleCancel() {
+  const btn = el("#scan-cancel");
+  if (!btn || cancelling) return;
+  cancelling = true;
+  btn.disabled = true;
+  btn.textContent = "Cancelling…";
+  try {
+    await post("/api/scans/cancel");
+    toast("Scan cancelled", "info");
+  } catch (err) {
+    cancelling = false;
+    btn.textContent = "Cancel scan";
+    toast(err.message || "Could not cancel the scan", "error");
+  }
+}
+
 function startPoll() {
   if (pollTimer) return;
   wasRunning = false;
@@ -129,6 +162,7 @@ function startPoll() {
       if (stripEl) stripEl.hidden = !running;
       const info = describeScan(res);
       setScanSnapshot(res);
+      updateCancelButton(res);
       if (statusEl) {
         statusEl.textContent = running ? info.text || "Scanning…" : "";
       }
@@ -168,6 +202,7 @@ function stopPoll() {
   const stripEl = el("#scan-info");
   if (stripEl) stripEl.hidden = true;
   setScanSnapshot(null);
+  updateCancelButton(null);
   const quickBtn = el("#scan-quick");
   const deepBtn = el("#scan-deep");
   if (quickBtn) quickBtn.disabled = false;
@@ -275,6 +310,8 @@ async function init() {
     logoutBtn.addEventListener("click", handleLogout);
   }
 
+  const scanCancel = el("#scan-cancel");
+  if (scanCancel) scanCancel.addEventListener("click", handleCancel);
   const scanQuick = el("#scan-quick");
   const scanDeep = el("#scan-deep");
   if (scanQuick) {

@@ -14,7 +14,8 @@ from app.scanner.options import (
 
 def test_option_args_default():
     opts = ScanOptions()
-    assert option_args("quick", opts) == ["-T3", "--top-ports", "100"]
+    # defaults give up on a host after 2 minutes (quick) / 15 minutes (deep) so one slow host cannot hold a scan up
+    assert option_args("quick", opts) == ["-T3", "--top-ports", "100", "--host-timeout", "120s"]
     assert option_args("deep", opts) == [
         "-T3",
         "-sV",
@@ -23,28 +24,35 @@ def test_option_args_default():
         "--traceroute",
         "--top-ports",
         "1000",
+        "--host-timeout",
+        "900s",
     ]
     with pytest.raises(ValueError):
         option_args("unknown", opts)
 
 
+NO_LIMIT = {"quick_host_timeout": 0, "deep_host_timeout": 0}
+
+
 def test_option_args_quick_variations():
-    opts = ScanOptions(timing=4, quick_top_ports=50)
+    opts = ScanOptions(timing=4, quick_top_ports=50, quick_host_timeout=0)
     assert option_args("quick", opts) == ["-T4", "--top-ports", "50"]
 
-    opts = options_from_dict({"quick_ports": "22, 80,443"})
+    opts = options_from_dict({"quick_ports": "22, 80,443", **NO_LIMIT})
     assert option_args("quick", opts) == ["-T3", "-p", "22,80,443"]
 
-    opts = options_from_dict({"quick_mode": "discovery"})
+    opts = options_from_dict({"quick_mode": "discovery", **NO_LIMIT})
     assert option_args("quick", opts) == ["-T3", "-sn"]
 
-    opts = options_from_dict({"skip_dns": True, "host_timeout": 90})
+    opts = options_from_dict({"skip_dns": True, "quick_host_timeout": 90})
     args = option_args("quick", opts)
     assert args[-3:] == ["-n", "--host-timeout", "90s"]
+    # the deep timeout does not leak into quick scans, and 0 removes the limit
+    assert option_args("quick", options_from_dict({"deep_host_timeout": 30, **NO_LIMIT}))[-1] == "100"
 
 
 def test_option_args_deep_variations():
-    opts = options_from_dict({"deep_version": "light"})
+    opts = options_from_dict({"deep_version": "light", **NO_LIMIT})
     args = option_args("deep", opts)
     assert "-sV" in args
     idx = args.index("-sV")
@@ -57,11 +65,12 @@ def test_option_args_deep_variations():
             "deep_traceroute": False,
             "deep_top_ports": 100,
             "timing": 4,
+            **NO_LIMIT,
         }
     )
     assert option_args("deep", opts) == ["-T4", "--top-ports", "100"]
 
-    opts = options_from_dict({"deep_ports": "1-1024,8080"})
+    opts = options_from_dict({"deep_ports": "1-1024,8080", **NO_LIMIT})
     args = option_args("deep", opts)
     assert args == ["-T3", "-sV", "-O", "--osscan-guess", "--traceroute", "-p", "1-1024,8080"]
 
@@ -117,7 +126,10 @@ def test_options_from_dict():
         ({"quick_top_ports": 0}, "quick_top_ports"),
         ({"deep_top_ports": 10001}, "deep_top_ports"),
         ({"deep_version": "fast"}, "deep_version"),
-        ({"host_timeout": 5}, "host_timeout"),
+        ({"quick_host_timeout": 5}, "quick_host_timeout"),
+        ({"deep_host_timeout": True}, "deep_host_timeout"),
+        ({"deep_host_timeout": 86401}, "deep_host_timeout"),
+        ({"host_timeout": 5}, "host_timeout"),  # legacy name still validated
         ({"quick_ports": "99999"}, "quick_ports"),
     ],
 )
@@ -127,10 +139,25 @@ def test_options_from_dict_invalid(data, expected_msg):
     assert expected_msg in str(exc.value)
 
 
-def test_options_from_dict_valid_host_timeout():
+def test_options_from_dict_valid_host_timeouts():
     for val in (0, 10, 86400):
-        opts = options_from_dict({"host_timeout": val})
-        assert opts.host_timeout == val
+        opts = options_from_dict({"quick_host_timeout": val, "deep_host_timeout": val})
+        assert (opts.quick_host_timeout, opts.deep_host_timeout) == (val, val)
+
+
+def test_legacy_single_host_timeout_applies_to_both():
+    opts = options_from_dict({"host_timeout": 90})
+    assert (opts.quick_host_timeout, opts.deep_host_timeout) == (90, 90)
+    # an explicit per-kind value wins over the legacy name
+    opts = options_from_dict({"host_timeout": 90, "deep_host_timeout": 300})
+    assert (opts.quick_host_timeout, opts.deep_host_timeout) == (90, 300)
+    # settings saved by an older version still load
+    assert options_from_json('{"host_timeout": 45, "timing": 4}').deep_host_timeout == 45
+
+
+def test_default_timeouts():
+    opts = ScanOptions()
+    assert (opts.quick_host_timeout, opts.deep_host_timeout) == (120, 900)
 
 
 def test_options_to_dict_round_trip():
@@ -155,11 +182,12 @@ def test_presets():
     assert fast["deep_top_ports"] == 200
     assert fast["quick_top_ports"] == 100
     assert fast["deep_os"] is True
+    assert (fast["quick_host_timeout"], fast["deep_host_timeout"]) == (60, 600)
 
     fastest = preset_dict("fastest")
     assert fastest["skip_dns"] is True
     assert fastest["deep_os"] is False
-    assert fastest["host_timeout"] == 120
+    assert (fastest["quick_host_timeout"], fastest["deep_host_timeout"]) == (60, 120)
 
     for name in PRESETS:
         opts = options_from_dict(preset_dict(name))
@@ -171,4 +199,4 @@ def test_presets():
 
 def test_command_preview():
     opts = ScanOptions()
-    assert command_preview("quick", opts) == "nmap -T3 --top-ports 100 -oX - <ranges>"
+    assert command_preview("quick", opts) == "nmap -T3 --top-ports 100 --host-timeout 120s -oX - <ranges>"

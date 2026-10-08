@@ -11,6 +11,8 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 - **Backup and restore** of the whole database from Settings.
 - **Live scan progress** (current nmap step, percentage, hosts found) with elapsed time and the typical (median) duration of recent scans of the same type, shown in a strip under the header while a scan runs.
 - **Scan performance settings** (Settings → Scan performance): nmap timing, number of top ports or a custom port list for quick and deep scans, version detection (full/light/off), OS detection, traceroute, reverse DNS and a per-host timeout, with Default/Fast/Fastest presets, the resulting command lines and the duration of the last scans. A **Scan settings** button next to the scan buttons opens it.
+- **Host timeouts** for scans (default 120 s for quick and 900 s for deep scans, editable under Scan performance): nmap gives up on a host that takes too long, so one slow device can no longer hold a scan up for an hour. A timed-out host stays online, keeps its known ports, and logs a "Host timeout" event.
+- **Cancel scan** button in the scan strip (and `POST /api/scans/cancel`): kills nmap, marks the scan `cancelled`, saves nothing.
 - **Settings menu**: a sticky index on the left of the Settings page links to every section and follows your scrolling; sections can be deep-linked (`#/settings/proxmox`).
 - **Settings in the browser** for scan ranges, quick/deep scan interval and the web terminal switch (no restart needed).
 - Friendly scan error messages (missing capabilities, nmap missing, timeout, no ranges).
@@ -19,6 +21,7 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 - Static test that every browser module only imports helpers that exist and are imported.
 
 ### Changed
+- Scan options: the single host timeout became separate quick and deep timeouts (settings saved by earlier builds still load).
 - Static files are served with `Cache-Control: no-cache` so an update is picked up immediately.
 - The web terminal is switched on and off at runtime instead of at startup.
 - Database schema version 2 (migrates automatically; existing data is kept).

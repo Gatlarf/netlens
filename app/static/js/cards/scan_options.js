@@ -11,7 +11,7 @@ const PRESET_LABELS = {
 const PRESET_HINTS = {
   default: "The original behavior.",
   fast: "Aggressive timing, deep scans check the top 200 ports with light version detection.",
-  fastest: "Also no OS or version detection, no reverse DNS, quick scans check the top 50 ports, and slow hosts are abandoned after 2 minutes. You lose OS names, service versions and DNS names.",
+  fastest: "Also no OS or version detection, no reverse DNS, quick scans check the top 50 ports, and slow hosts are abandoned after 1 minute (quick) or 2 minutes (deep). You lose OS names, service versions and DNS names.",
 };
 
 function kvRow(label, value) {
@@ -241,19 +241,27 @@ export async function buildScanOptionsCard() {
     fieldSkipDns.appendChild(h("p", { class: "hint" }, "Faster, but hostnames that come from DNS are no longer updated. Names from mDNS/SSDP stay."));
     form.appendChild(fieldSkipDns);
 
-    const fieldHostTimeout = h("div", { class: "field" });
-    fieldHostTimeout.appendChild(h("label", {}, "Give up on a host after (seconds, 0 = never)"));
-    const inputHostTimeout = h("input", {
-      type: "number",
-      name: "host_timeout",
-      min: "0",
-      max: "86400",
-      step: "1",
-      value: String(options.host_timeout),
-    });
-    fieldHostTimeout.appendChild(inputHostTimeout);
-    fieldHostTimeout.appendChild(h("p", { class: "hint" }, "0 or at least 10."));
-    form.appendChild(fieldHostTimeout);
+    function timeoutField(labelText, name, value, hintText) {
+      const field = h("div", { class: "field" });
+      field.appendChild(h("label", {}, labelText));
+      const input = h("input", { type: "number", name, min: "0", max: "86400", step: "1", value: String(value) });
+      field.appendChild(input);
+      field.appendChild(h("p", { class: "hint" }, hintText));
+      form.appendChild(field);
+      return input;
+    }
+    const inputQuickHostTimeout = timeoutField(
+      "Give up on a host in a quick scan after (seconds, 0 = never)",
+      "quick_host_timeout",
+      options.quick_host_timeout,
+      "The host is skipped for that scan only: it stays online and keeps its known ports, and a \"Host timeout\" event is logged. 0 or at least 10."
+    );
+    const inputDeepHostTimeout = timeoutField(
+      "Give up on a host in a deep scan after (seconds, 0 = never)",
+      "deep_host_timeout",
+      options.deep_host_timeout,
+      "Stops one slow or rate-limiting device from holding a deep scan up for an hour. 0 or at least 10."
+    );
 
     form.appendChild(errorEl);
 
@@ -281,7 +289,8 @@ export async function buildScanOptionsCard() {
       inputDeepOs.checked = preset.deep_os;
       inputDeepTraceroute.checked = preset.deep_traceroute;
       inputSkipDns.checked = preset.skip_dns;
-      inputHostTimeout.value = String(preset.host_timeout);
+      inputQuickHostTimeout.value = String(preset.quick_host_timeout);
+      inputDeepHostTimeout.value = String(preset.deep_host_timeout);
     }
 
     function collectValues() {
@@ -296,7 +305,8 @@ export async function buildScanOptionsCard() {
         deep_os: inputDeepOs.checked,
         deep_traceroute: inputDeepTraceroute.checked,
         skip_dns: inputSkipDns.checked,
-        host_timeout: Number(inputHostTimeout.value),
+        quick_host_timeout: Number(inputQuickHostTimeout.value),
+        deep_host_timeout: Number(inputDeepHostTimeout.value),
       };
     }
 

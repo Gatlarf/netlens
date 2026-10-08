@@ -183,6 +183,13 @@ async def run_nmap(
     except asyncio.TimeoutError:
         process.kill()
         raise ScanError("nmap timed out")
+    except asyncio.CancelledError:  # the user cancelled the scan: do not leave nmap running
+        process.kill()
+        try:
+            await asyncio.shield(process.wait())
+        except Exception:
+            pass
+        raise
 
     if process.returncode != 0:
         stderr_text = stderr.decode("utf-8", errors="replace")

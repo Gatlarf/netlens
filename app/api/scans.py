@@ -35,11 +35,23 @@ def get_current_scan(
     progress = request.app.state.scan_manager.progress if scan is not None else None
     body: dict[str, Any] = {"running": scan is not None, "scan": scan, "progress": progress}
     if scan is not None:
+        body["cancellable"] = request.app.state.scan_manager.can_cancel()
         typical, samples = typical_duration(conn, scan["kind"])
         body["elapsed_seconds"] = elapsed_seconds(scan["started"])
         body["typical_seconds"] = typical  # median of recent finished scans of the same kind, None if no history
         body["typical_samples"] = samples
     return body
+
+
+@router.post("/scans/cancel")
+async def cancel_scan(request: Request) -> dict[str, Any]:
+    """Stop the running scan. Not possible once its results are being saved."""
+    manager = request.app.state.scan_manager
+    if not manager.is_running():
+        raise HTTPException(status_code=409, detail="no scan is running")
+    if not await manager.cancel():
+        raise HTTPException(status_code=409, detail="the scan is already saving its results and cannot be cancelled now")
+    return {"cancelled": True}
 
 
 @router.post("/scans", status_code=202)

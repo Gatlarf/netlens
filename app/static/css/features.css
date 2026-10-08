@@ -33,3 +33,6 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
   .settings-nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px; }
   .settings-nav a { border: 1px solid var(--border); background: var(--surface); }
 }
+
+/* long nmap command lines must wrap instead of widening the page */
+.card pre { white-space: pre-wrap; overflow-wrap: anywhere; }
