@@ -9,7 +9,11 @@ const KIND_LABELS = {
   port_opened: "Port opened",
   os_changed: "OS changed",
   host_timeout: "Host timeout",
-  device_deleted: "Device deleted"
+  device_deleted: "Device deleted",
+  ip_reused: "IP reused",
+  wifi_roamed: "Wi-Fi move",
+  service_down: "Service down",
+  service_up: "Service up"
 };
 
 const KIND_ORDER = [
@@ -20,7 +24,11 @@ const KIND_ORDER = [
   "port_opened",
   "os_changed",
   "host_timeout",
-  "device_deleted"
+  "device_deleted",
+  "ip_reused",
+  "wifi_roamed",
+  "service_down",
+  "service_up"
 ];
 
 function statusClass(status) {

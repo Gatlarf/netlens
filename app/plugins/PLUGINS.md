@@ -235,6 +235,8 @@ Return `{"nodes": [...], "clients": [...]}`. A *node* is a router, switch, acces
 | `node_mac` | no | The `mac` (or one of the `macs`) of the node it is connected to. Without it, the client hangs below the gateway. |
 | `medium` | no | `wired`, `wifi` or `unknown` (default). |
 | `band` | no | Text such as `5 GHz`. |
+| `rssi` | no | Wi-Fi signal in dBm (a whole number from -127 to 0). Netlens stores one sample per sync and shows signal history and roaming. |
+| `tx_mbps`, `rx_mbps` | no | Current Wi-Fi link rate in Mbit/s (numbers, 0 or more). |
 
 ```json
 {
@@ -256,7 +258,8 @@ General rules for both kinds: MAC addresses are `aa:bb:cc:dd:ee:ff` or `aa-bb-cc
 
 - **Matching.** Hosts and nodes are matched to scanned devices by IP then MAC (nodes: MAC first, then IP). Hypervisor guests: by MAC first, then IP. A host is never taken for a guest and a device is claimed only once. Entries Netlens has not scanned are simply not shown (they appear once a scan finds them).
 - **Links.** A `hypervisor` plugin creates `host-of` links (guest below host). A `topology` plugin creates `uplink` links (client below node, node below its parent). These are the strongest *automatic* sources for the network hierarchy: hypervisor links first, then uplinks, then traceroute and default-gateway guesses. A parent you set by hand always wins, and a link you delete on the map stays deleted.
-- **Device pages.** Hypervisor plugins add a *Virtualization* box (the guest's host, or a host's guests).
+- **Device pages.** Hypervisor plugins add a *Virtualization* box (the guest's host, or a host's guests). A topology plugin that reports `rssi` for Wi-Fi clients adds a *Wi-Fi* card (signal history, node, roaming).
+- **Names.** A client's `name` becomes an alias of the matching device (source `router`); a device that has no hostname of its own shows it.
 - **Turning a plugin off** removes its links and guests from the map and keeps its settings. **Turning it on** syncs immediately.
 
 ## Limits and security

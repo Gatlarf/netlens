@@ -28,6 +28,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Uptime history like Uptime Kuma: heartbeat bars, 24 h / 7 d / 30 d uptime and response times per device
 - E-mail notifications for new and offline devices, with an on/off switch per device
 - Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: Proxmox VE and ASUS AiMesh come built in (which VM runs on which host, which device is connected to which mesh node)
+- Known and unknown devices, better device identification (router names, mDNS and UPnP details, name hints), Wi-Fi signal history and roaming, service checks (HTTP, TCP, DNS), more notification channels (ntfy, Telegram, Discord, Pushover, webhook) with quiet hours, and Prometheus metrics with a Grafana dashboard
 - Statistics page: devices by type/vendor/OS, uptime and reliability, flapping devices, ports and services, scan performance, event history, hierarchy and plugin health, with 24 h to 90 day periods; a compact `/api/stats/summary` for integrations such as Home Assistant
 - Network hierarchy: which device depends on which (gateway, then Proxmox host, then its guests), as a tree page, a tree layout on the map, and a parent you can set per device
 - Live scan progress in the header
@@ -260,6 +261,30 @@ After each scan Netlens sends **one digest mail** listing the devices that appea
 You can switch the offline mails off **per device** with the checkbox "Send an e-mail when this device goes offline" on the device page (useful for phones and laptops that come and go). New-device mails always go out when that option is on.
 
 The SMTP password is stored in the database in plain text (like all settings) and is included in backups, so protect the data directory and the backup files.
+
+### Known and unknown devices
+
+Every device is either **known** (you recognise it) or **unknown**. Devices that exist when you upgrade are all marked known, so nothing changes at first; every device found afterwards starts as unknown, is tagged *unknown* in the Devices list, and its "new device" alert says so. Tick **Known device** on a device's page, or use **Trust all unknown** on the Devices page (it asks first). The Devices page can filter on *Unknown only*, and the Statistics page, the summary API and Home Assistant count them. Netlens also logs an **IP reused** event when an address that another device used in the last day is now used by a different one.
+
+### Device identification
+
+Netlens works out a device's name and type from everything it can see, in this order of trust: reverse DNS, the device's own **UPnP** description (name, make, model, kind of device), **mDNS** names (including the friendly name of casting devices) and service types (printers, AirPlay, Chromecast, HomeKit, cameras...), the **name your router** shows for it (from a topology plugin), and words in the name (`iphone`, `shelly1-...`, `laserjet`, `desktop-...`, `esxi`). Only the first part of a name counts (a domain such as `tv.example.com` says nothing), and an SSDP product token such as "Linux" is never used as a name. Discovery hints are kept per device, so a device keeps its type when a later scan does not hear from it again.
+
+### Wi-Fi details
+
+When a topology plugin reports the signal of Wi-Fi clients (the ASUS plugin does), Netlens stores one sample per scan for 14 days. The device page then shows a **Wi-Fi** card with the signal (excellent / good / fair / weak), node, band, link rate, a 24 hour signal chart and the last moves between nodes. A client that changes node logs a **Wi-Fi move** event. The Statistics page adds a Wi-Fi group (signal quality, weakest clients, moves in 7 days).
+
+### Service checks
+
+**Services** (top bar) watches things a ping cannot: an **HTTP(S) page** (any status 200-399, a chosen status, or text that must appear), a **TCP port**, or a **DNS lookup** against a chosen server (optionally with the address it must return). Pick the interval (15 seconds to a day) and the time-out, optionally attach it to a device, and see a heartbeat bar, 24 hour uptime and response time per check. A state change needs two identical results in a row (one lost packet is not an outage) and logs a **Service down / up** event, which goes to e-mail and the notification channels. A check can be run on demand, paused and edited; HTTPS certificates are not verified (devices on a LAN usually have self-signed ones). Results are kept for 30 days.
+
+### Notification channels and quiet hours
+
+Besides e-mail, **Settings → Channels & quiet hours** sends alerts to **ntfy**, **Telegram**, **Discord**, **Pushover** or any **webhook** (a JSON POST, which works with Home Assistant webhooks, n8n and Node-RED). Each channel chooses the events it wants (new unknown device, device offline or back, service down or recovered, new open port, IP change, IP reused, OS change, Wi-Fi move, scan time-out), has its own *Send test* button, and keeps its own place in the event log: a channel that fails catches up later without disturbing the others, and error messages never contain tokens. **Quiet hours** hold messages back and deliver them afterwards as one digest (a service going down can still break through). Tokens are stored in the database like the SMTP password.
+
+### Prometheus and Grafana
+
+`GET /metrics` (same token as the API, as a Bearer token) exposes Prometheus metrics: device presence and last seen, devices by state, uptime ratio, open ports, scan duration/hosts/last success per kind, events by kind, plugin health, service check state and response time, Wi-Fi signal per client, and a `netlens_problem` flag. `contrib/prometheus/prometheus.yml` has a scrape job and alert rule examples; `contrib/grafana/netlens-dashboard.json` is a dashboard you can import in Grafana.
 
 ### Statistics
 
