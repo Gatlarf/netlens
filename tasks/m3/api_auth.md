@@ -1,5 +1,0 @@
-Create app/api/auth.py (FastAPI). Uses app.auth: COOKIE_NAME, session_value, is_authorized, LoginLimiter (methods allowed(key), record_failure(key), reset(key)). State on the app: request.app.state.settings.token (str) and request.app.state.login_limiter (a LoginLimiter).
-router = APIRouter(prefix="/api", tags=["auth"]).
-- POST /login with pydantic body {"token": str}: key = request.client.host if request.client else "unknown"; if not limiter.allowed(key) -> HTTPException 429 detail "too many attempts"; if hmac.compare_digest(body.token.encode(), settings.token.encode()) is False -> limiter.record_failure(key) and HTTPException 401 detail "invalid token"; on success limiter.reset(key) and return JSONResponse({"ok": True}) with response.set_cookie(COOKIE_NAME, session_value(settings.token), httponly=True, samesite="strict", path="/", max_age=30*24*3600).
-- POST /logout: JSONResponse({"ok": True}) with delete_cookie(COOKIE_NAME, path="/").
-- GET /session: {"authenticated": bool} using is_authorized(settings.token, request.cookies.get(COOKIE_NAME), request.headers.get("authorization")). Never 401.

@@ -1,6 +1,0 @@
-Create app/static/index.html (HTML5, lang en). Head: meta charset, viewport, title "Netlens", link css/app.css, an inline-free setup (no inline scripts, no inline styles). Body structure:
-<header class="topbar"> brand link "Netlens" (href "#/"), <nav id="nav"> with links (class "nav-link", data-route attribute): Map (#/map, data-route="map"), Devices (#/devices, "devices"), Scans & events (#/scans, "scans"), Settings (#/settings, "settings"); on the right <div class="topbar-actions"> containing <span id="scan-status" class="scan-status"></span>, <button id="scan-quick" class="btn">Quick scan</button>, <button id="scan-deep" class="btn">Deep scan</button>, <button id="logout" class="btn ghost">Log out</button> </header>
-<main id="view" class="view" tabindex="-1"></main>
-<dialog id="login-dialog"> with a <form id="login-form" method="dialog"> containing an h2 "Sign in", a paragraph "Enter the access token configured in NETLENS_TOKEN.", a label+<input id="login-token" type="password" autocomplete="current-password" required>, a <p id="login-error" class="error" hidden></p> and a submit <button class="btn primary">Sign in</button> </dialog>
-<div id="toasts"></div>
-Last: <script type="module" src="js/app.js"></script>.

@@ -1,6 +1,0 @@
-Create app/scanner/scheduler.py (asyncio, stdlib). Uses app.scanner.orchestrator ScanManager (async start(kind) -> int, raises ScanBusy if busy, is_running()) and ScanBusy.
-def due_kind(now: float, started_at: float, last_quick: float | None, last_deep: float | None, quick_interval: float, deep_interval: float) -> str | None:
-- if last_quick is None and last_deep is None -> "quick" (immediately after start).
-- deep is due when (last_deep is not None and now - last_deep >= deep_interval) or (last_deep is None and now - started_at >= 600); return "deep" if deep is due.
-- else "quick" if last_quick is not None and now - last_quick >= quick_interval; else None.
-async def scheduler_loop(manager, quick_interval: float, deep_interval: float, *, poll: float = 15.0, clock=time.monotonic, sleep=asyncio.sleep) -> None: started_at = clock(); loop forever: kind = due_kind(...); if kind and not manager.is_running(): try: await manager.start(kind) except ScanBusy: pass; except Exception: log with logging.getLogger(__name__).exception and continue; on success set last_quick = now (and last_deep = now if kind == "deep"; a deep scan also counts as quick); then await sleep(poll). asyncio.CancelledError must propagate (do not catch BaseException).

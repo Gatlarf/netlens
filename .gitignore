@@ -1,5 +1,63 @@
+# Only the application's code, tests and build/deploy files belong in this repository.
+
+# --- secrets and local configuration (never commit these) -------------------------------------
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.smbcredentials
+.git-credentials
+
+# --- Python -----------------------------------------------------------------------------------
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- runtime data: the database, backups and logs live in the data directory, not in git -------
 /data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.pre-restore
+netlens-backup-*
+*.log
+
+# --- browser-test tooling, scratch files and backups -------------------------------------------
+node_modules/
+package.json
+package-lock.json
+*.bak
+*.tmp
+.scratch/
+scratchpad/
+
+# --- editors and operating systems ------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# --- local-LLM / AI-assisted workflow files: kept on disk, not published ------------------------
+# (the briefs and prompts sent to the local model, the token ledger, the LLM wrapper script and
+#  the internal requirements notes are not part of the application)
+/tasks/
+/ledger/
+/tools/
+/docs/
+.claude/
+CLAUDE.md
+claude.md
