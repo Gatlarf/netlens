@@ -1,0 +1,26 @@
+# Add this job to your prometheus.yml. Netlens needs the same token as its API.
+scrape_configs:
+  - job_name: netlens
+    metrics_path: /metrics
+    scrape_interval: 60s
+    authorization:
+      type: Bearer
+      credentials: YOUR_NETLENS_TOKEN
+    static_configs:
+      - targets: ["192.168.0.189:8080"]
+
+# Handy alert rules (put them in a rules file):
+# groups:
+#   - name: netlens
+#     rules:
+#       - alert: NetlensProblem
+#         expr: netlens_problem == 1
+#         for: 10m
+#       - alert: UnknownDevice
+#         expr: netlens_devices{state="unknown"} > 0
+#       - alert: ServiceDown
+#         expr: netlens_service_up == 0
+#         for: 2m
+#       - alert: WeakWifi
+#         expr: netlens_wifi_signal_dbm < -75
+#         for: 30m
