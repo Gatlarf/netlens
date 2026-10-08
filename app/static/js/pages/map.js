@@ -427,7 +427,7 @@ export async function render(container, params) {
 
     if (node.parent_id != null) {
       const parent = currentNodes.find((n) => n.id === node.parent_id);
-      const how = { manual: "set manually", proxmox: "Proxmox host", route: "traceroute", gateway: "gateway", uplink: "uplink", guess: "guess" }[node.parent_source] || node.parent_source;
+      const how = { manual: "set manually", hypervisor: "hypervisor host", route: "traceroute", gateway: "gateway", uplink: "uplink", guess: "guess" }[node.parent_source] || node.parent_source;
       panel.appendChild(h("p", {}, "Parent: ", h("a", { href: `#/device/${node.parent_id}` }, parent ? parent.label || parent.ip : `device ${node.parent_id}`), ` (${how})`));
     } else {
       panel.appendChild(h("p", {}, "Parent: none (top level)"));
@@ -559,12 +559,12 @@ export async function render(container, params) {
       const x1 = b.left;
       const y1 = (b.top + b.bottom) / 2;
       const trunk = Math.min(x0 + trunkGap, x1 - 4);
-      const style = edge.source === "proxmox" ? edges["host-of"] : edges.parent;
+      const style = edge.source === "hypervisor" ? edges["host-of"] : edges.parent;
       ctx.save();
       ctx.beginPath();
       ctx.strokeStyle = style.color;
-      ctx.lineWidth = edge.source === "proxmox" ? 2 : style.width;
-      ctx.setLineDash(edge.source === "proxmox" ? [6, 4] : []);
+      ctx.lineWidth = edge.source === "hypervisor" ? 2 : style.width;
+      ctx.setLineDash(edge.source === "hypervisor" ? [6, 4] : []);
       ctx.moveTo(x0, y0);
       if (Math.abs(y1 - y0) < 1) {
         ctx.lineTo(x1, y1);

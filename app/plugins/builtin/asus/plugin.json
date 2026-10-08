@@ -1,0 +1,18 @@
+{
+  "id": "asus",
+  "name": "ASUS router (AiMesh)",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) so the hierarchy and the map show every client's real network position. Read-only: one login, two reads and a logout per sync, never SSH, so no sessions are left open on the router. A refused login pauses automatic syncing so the router does not lock the account.",
+  "timeout": 60,
+  "config": [
+    {"key": "url", "type": "text", "label": "Router address", "placeholder": "https://192.168.0.1:8443", "required": true,
+     "help": "The router's web interface. HTTPS defaults to port 8443."},
+    {"key": "verify_tls", "type": "bool", "label": "Verify TLS certificate", "default": false,
+     "help": "Leave off: ASUS routers use a self-signed certificate."},
+    {"key": "username", "type": "text", "label": "Username", "required": true},
+    {"key": "password", "type": "password", "label": "Password", "required": true}
+  ]
+}

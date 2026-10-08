@@ -3,7 +3,7 @@ import { h, clear, toast, statusDot, typeBadge } from "../util.js";
 
 const SOURCE_LABEL = {
   manual: "set manually",
-  proxmox: "Proxmox",
+  hypervisor: "hypervisor",
   uplink: "uplink",
   guess: "guess",
   route: "traceroute",
@@ -46,7 +46,7 @@ export async function render(container, params) {
   clear(container);
   container.appendChild(h("h1", {}, "Network hierarchy"));
   container.appendChild(h("p", { class: "hint" },
-    "Which device depends on which. A device's parent comes from Proxmox, the traceroute path or the default gateway, " +
+    "Which device depends on which. A device's parent comes from your plugins (a hypervisor such as Proxmox, a router), the traceroute path or the default gateway, " +
     "or you set it by hand on the device page."));
 
   const card = h("div", { class: "card" });

@@ -27,11 +27,13 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .settings-nav a { display: block; padding: 7px 12px; border-radius: 6px; color: var(--text); text-decoration: none; font-size: 0.95em; border-left: 3px solid transparent; }
 .settings-nav a:hover { background: var(--bg); }
 .settings-nav a.active { background: var(--surface); border-left-color: var(--accent); font-weight: 600; box-shadow: 0 0 0 1px var(--border); }
-.settings-section { scroll-margin-top: calc(var(--topbar-h, 58px) + 12px); }
+.settings-nav .nav-group { margin: 12px 12px 2px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.settings-nav .nav-group:first-child { margin-top: 0; }
 @media (max-width: 800px) {
   .settings-layout { grid-template-columns: minmax(0, 1fr); }
   .settings-nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px; }
   .settings-nav a { border: 1px solid var(--border); background: var(--surface); }
+  .settings-nav .nav-group { flex-basis: 100%; margin: 6px 0 0; }
 }
 
 /* long nmap command lines must wrap instead of widening the page */
@@ -49,7 +51,7 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .tree-name { font-weight: 600; }
 .tree-count { font-size: 0.8em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; }
 .tree-source { font-size: 0.75em; border-radius: 999px; padding: 1px 8px; background: var(--bg); color: var(--muted); }
-.tree-source.src-proxmox { background: color-mix(in srgb, #7c3aed 18%, var(--surface)); color: color-mix(in srgb, #7c3aed 50%, var(--text)); }
+.tree-source.src-hypervisor { background: color-mix(in srgb, #7c3aed 18%, var(--surface)); color: color-mix(in srgb, #7c3aed 50%, var(--text)); }
 .tree-source.src-manual { background: color-mix(in srgb, #d97706 20%, var(--surface)); color: color-mix(in srgb, #d97706 50%, var(--text)); }
 .tree-source.src-uplink { background: color-mix(in srgb, #16a34a 20%, var(--surface)); color: color-mix(in srgb, #16a34a 50%, var(--text)); }
 .tree ul.tree { border-left: 1px dashed var(--border); margin-left: 10px; }
@@ -62,3 +64,10 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .confirm-box[hidden] { display: none; }
 label.check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+.markdown h2, .markdown h3, .markdown h4 { margin: 1.4em 0 0.4em; }
+.markdown pre { overflow-x: auto; }
+.markdown table { display: block; overflow-x: auto; max-width: 100%; }
+.markdown h2 { font-size: 1.5em; }
+.markdown h3 { font-size: 1.2em; padding-top: 0.4em; border-top: 1px solid var(--border); }
+.markdown h4 { font-size: 1.05em; }

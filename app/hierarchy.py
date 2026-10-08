@@ -3,8 +3,8 @@
 Every device gets at most one parent. The parent comes from, in order of priority:
 
   manual    the user chose it on the device page (or chose "no parent")
-  proxmox   the guest runs on this Proxmox host (exact, from the connector)
-  uplink    a switch / mesh node the device is connected to (reserved for future connectors)
+  hypervisor  the guest runs on this host (exact, reported by a hypervisor plugin such as Proxmox)
+  uplink    a switch / mesh node the device is connected to (reported by a topology plugin such as the ASUS router)
   guess     a heuristic "probably runs on this hypervisor" (only when exactly one hypervisor exists)
   route     the next router on the traceroute path to the device
   gateway   the default gateway
@@ -21,11 +21,11 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 # lower number = stronger
-SOURCE_RANK = {"manual": 0, "proxmox": 1, "uplink": 2, "guess": 3, "route": 4, "gateway": 5}
+SOURCE_RANK = {"manual": 0, "hypervisor": 1, "uplink": 2, "guess": 3, "route": 4, "gateway": 5}
 
 SOURCE_TEXT = {
     "manual": "Set manually",
-    "proxmox": "Runs on this Proxmox host",
+    "hypervisor": "Runs on this hypervisor host",
     "uplink": "Connected to this network device",
     "route": "Next router on the path (traceroute)",
     "gateway": "Default gateway",
@@ -44,12 +44,14 @@ class Parent:
 def _classify(rel: dict) -> tuple[str, str] | None:
     """(source, reason) of a relation as a parent link, or None if it is not hierarchical."""
     kind, source = rel["kind"], rel.get("source")
+    plugin = source[len("plugin:"):] if isinstance(source, str) and source.startswith("plugin:") else None
     if kind == "host-of":
-        if source == "proxmox":
-            return "proxmox", SOURCE_TEXT["proxmox"]
+        if plugin:
+            return "hypervisor", f"{SOURCE_TEXT['hypervisor']} ({plugin})"
         return "guess", SOURCE_TEXT["guess"]
     if kind == "uplink":
-        return "uplink", f"{SOURCE_TEXT['uplink']} ({source})" if source else SOURCE_TEXT["uplink"]
+        label = plugin or source
+        return "uplink", f"{SOURCE_TEXT['uplink']} ({label})" if label else SOURCE_TEXT["uplink"]
     if kind == "route":
         return "route", SOURCE_TEXT["route"]
     if kind == "gateway":

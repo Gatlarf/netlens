@@ -5,7 +5,7 @@ export function buildBackupCard() {
   card.appendChild(h("h2", {}, "Backup and restore"));
 
   card.appendChild(h("p", { class: "hint" },
-    "The backup contains all devices, history and settings, including saved e-mail and Proxmox credentials. Store it somewhere safe."));
+    "The backup contains all devices, history and settings, including saved e-mail and plugin credentials. Store it somewhere safe."));
 
   card.appendChild(h("a", { class: "btn", href: "/api/backup", download: "" }, "Download backup"));
 

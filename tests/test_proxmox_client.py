@@ -3,8 +3,8 @@ import urllib.parse
 
 import pytest
 
-from app.integrations.proxmox_client import ProxmoxClient, ProxmoxError, parse_net
-from app.integrations.proxmox_config import ProxmoxConfig
+from app.plugins.builtin.proxmox.client import ProxmoxClient, ProxmoxError, parse_net
+from app.plugins.builtin.proxmox.config import ProxmoxConfig
 
 # Synthetic data shaped like real Proxmox VE 9 responses (documentation addresses only).
 DATA = {

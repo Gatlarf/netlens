@@ -16,7 +16,7 @@ import urllib.parse
 import urllib.request
 from typing import Any, Callable
 
-from app.integrations.asus_config import AsusConfig, normalize_url
+from .config import AsusConfig, normalize_url
 
 USER_AGENT = "asusrouter-Android-DUTUtil-1.0.0.245"
 MAC_RE = re.compile(r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
@@ -32,6 +32,8 @@ class AsusError(Exception):
 
 class AsusAuthError(AsusError):
     """The router refused the login; do not retry automatically."""
+
+    auth_failed = True  # Netlens pauses the plugin until the user saves or syncs again
 
 
 def norm_mac(value: Any) -> str | None:

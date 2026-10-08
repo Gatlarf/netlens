@@ -186,25 +186,26 @@ function buildEditCard(device, onSaved) {
   return { card, isDirty: () => dirty, isFocused: () => focused };
 }
 
-function buildProxmoxCard(device) {
-  const info = device.proxmox;
+function buildVirtualizationCard(device) {
+  const info = device.virtualization;
   if (!info) return null;
   const card = h("div", { class: "card" });
-  card.appendChild(h("h2", {}, "Proxmox"));
+  card.appendChild(h("h2", {}, "Virtualization"));
 
   if (info.guest) {
     const g = info.guest;
     const kind = g.kind === "lxc" ? "Container (LXC)" : "Virtual machine";
-    card.appendChild(kvRow("Runs as", h("span", {}, `${kind} ${g.vmid}, ${g.name}`)));
+    card.appendChild(kvRow("Runs as", h("span", {}, `${kind} ${g.guest_id}, ${g.name}`)));
     card.appendChild(kvRow("Status", h("span", {}, g.status)));
-    card.appendChild(kvRow("Node", h("span", {}, g.node)));
+    if (g.node) card.appendChild(kvRow("Node", h("span", {}, g.node)));
     if (g.host_device_id) {
       card.appendChild(kvRow("Host", h("a", { href: `#/device/${g.host_device_id}` }, g.host_name || `device ${g.host_device_id}`)));
     }
+    card.appendChild(kvRow("Reported by", h("span", {}, g.plugin_id)));
   }
 
   if (info.guests && info.guests.length > 0) {
-    card.appendChild(h("p", { class: "hint" }, `Proxmox host with ${info.guests.length} guest${info.guests.length === 1 ? "" : "s"}:`));
+    card.appendChild(h("p", { class: "hint" }, `Hypervisor host with ${info.guests.length} guest${info.guests.length === 1 ? "" : "s"}:`));
     const table = h("table", { class: "data" });
     const headRow = h("tr");
     ["ID", "Name", "Type", "Status", "Device"].forEach((c) => headRow.appendChild(h("th", {}, c)));
@@ -215,7 +216,7 @@ function buildProxmoxCard(device) {
         ? h("td", {}, h("a", { href: `#/device/${g.device_id}` }, g.device_name || `device ${g.device_id}`))
         : h("td", { class: "hint" }, g.status === "running" ? "not seen on the network" : "not running");
       tbody.appendChild(h("tr", {},
-        h("td", {}, String(g.vmid)), h("td", {}, g.name), h("td", {}, g.kind === "lxc" ? "LXC" : "VM"),
+        h("td", {}, String(g.guest_id)), h("td", {}, g.name), h("td", {}, g.kind === "lxc" ? "LXC" : g.kind === "qemu" ? "VM" : g.kind),
         h("td", {}, g.status), deviceCell));
     }
     table.appendChild(tbody);
@@ -409,8 +410,8 @@ export async function render(container, params) {
     buildParentCard(device, (message) => { toast(message, "success"); load(); })
       .then((c) => { if (!disposed) parentSlot.appendChild(c); })
       .catch(() => {});
-    const proxmoxCard = buildProxmoxCard(device);
-    if (proxmoxCard) right.appendChild(proxmoxCard);
+    const virtualizationCard = buildVirtualizationCard(device);
+    if (virtualizationCard) right.appendChild(virtualizationCard);
     const uptimeSlot = h("div", {});
     right.appendChild(uptimeSlot);
     buildDeviceUptimeCard(device.id).then((c) => { if (!disposed) uptimeSlot.appendChild(c); }).catch(() => {});

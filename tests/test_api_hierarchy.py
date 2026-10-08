@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from pathlib import Path
 
@@ -7,7 +8,9 @@ from fastapi.testclient import TestClient
 from app.config import load_settings
 from app.db import SCHEMA_VERSION, connect, init_db
 from app.hierarchy import hierarchy_payload
-from app.integrations.proxmox_sync import apply_proxmox_relations, store_inventory
+from app.db import set_setting
+from app.plugins.registry import discover
+from app.plugins.service import apply_plugin
 from app.main import create_app
 from app.scanner.relations import Edge
 from app.scanner.relstore import replace_inferred
@@ -29,7 +32,7 @@ def _seed(db: Path) -> None:
     conn.executemany(
         "INSERT INTO relations (src_id, dst_id, kind, source, confidence, manual) VALUES (?, ?, ?, ?, 1.0, 0)",
         [(2, 1, "gateway", "default-route"), (3, 1, "gateway", "default-route"), (4, 1, "gateway", "default-route"),
-         (5, 1, "gateway", "default-route"), (3, 2, "host-of", "proxmox"), (4, 2, "host-of", "proxmox")],
+         (5, 1, "gateway", "default-route"), (3, 2, "host-of", "plugin:proxmox"), (4, 2, "host-of", "plugin:proxmox")],
     )
     conn.commit()
     conn.close()
@@ -50,12 +53,12 @@ def _parents(c):
 
 def test_hierarchy_endpoint(client):
     body = client.get("/api/hierarchy").json()
-    assert _parents(client) == {1: (None, "none"), 2: (1, "gateway"), 3: (2, "proxmox"), 4: (2, "proxmox"), 5: (1, "gateway")}
+    assert _parents(client) == {1: (None, "none"), 2: (1, "gateway"), 3: (2, "hypervisor"), 4: (2, "hypervisor"), 5: (1, "gateway")}
     by_id = {n["id"]: n for n in body["nodes"]}
     assert body["roots"] == [1]
     assert (by_id[1]["children"], by_id[1]["descendants"], by_id[3]["depth"]) == (2, 4, 2)
     assert by_id[3]["name"] == "web" and by_id[5]["name"] == "10.0.0.50"
-    assert body["stats"]["max_depth"] == 2 and "proxmox" in body["sources"]
+    assert body["stats"]["max_depth"] == 2 and "hypervisor" in body["sources"]
     assert client.get("/api/hierarchy", headers={"Authorization": "Bearer no"}).status_code == 401
 
 
@@ -63,9 +66,9 @@ def test_guests_are_below_the_proxmox_host_on_the_map(client):
     data = client.get("/api/map").json()
     parent_edges = {e["to"]: e for e in data["edges"] if e["kind"] == "parent"}
     assert {k: v["from"] for k, v in parent_edges.items()} == {2: 1, 3: 2, 4: 2, 5: 1}
-    assert parent_edges[3]["id"] == "p3" and parent_edges[3]["source"] == "proxmox" and parent_edges[3]["manual"] is False
+    assert parent_edges[3]["id"] == "p3" and parent_edges[3]["source"] == "hypervisor" and parent_edges[3]["manual"] is False
     nodes = {n["id"]: n for n in data["nodes"]}
-    assert (nodes[3]["parent_id"], nodes[3]["parent_source"]) == (2, "proxmox") and nodes[1]["parent_id"] is None
+    assert (nodes[3]["parent_id"], nodes[3]["parent_source"]) == (2, "hypervisor") and nodes[1]["parent_id"] is None
     assert any(e["kind"] == "gateway" and e["from"] == 3 for e in data["edges"])  # the raw links are still there
 
 
@@ -87,7 +90,7 @@ def test_none_and_auto(client):
     assert _parents(client)[3] == (None, "manual")
     assert client.get("/api/devices/3").json()["parent"]["mode"] == "none"
     client.patch("/api/devices/3", json={"parent_mode": "auto"})
-    assert _parents(client)[3] == (2, "proxmox")
+    assert _parents(client)[3] == (2, "hypervisor")
     # a bare parent_device_id means "this device"
     client.patch("/api/devices/3", json={"parent_device_id": 5})
     assert client.get("/api/devices/3").json()["parent"]["mode"] == "device" and _parents(client)[3] == (5, "manual")
@@ -142,18 +145,18 @@ def test_real_proxmox_sync_puts_guests_under_their_host(tmp_path):
     # what a scan infers: everything hangs off the gateway ...
     replace_inferred(conn, [Edge(i, 1, "gateway", "default-route", 1.0) for i in (2, 3, 4)])
     # ... then the Proxmox connector says devices 3 and 4 are guests of device 2
-    store_inventory(conn, {
-        "nodes": [{"name": "pve1", "ip": "10.0.0.5", "online": True}],
+    set_setting(conn, "plugin.proxmox.data", json.dumps({
+        "hosts": [{"id": "pve1", "name": "pve1", "ip": "10.0.0.5", "mac": None, "online": True}],
         "guests": [
-            {"vmid": 100, "name": "web", "kind": "lxc", "node": "pve1", "status": "running", "macs": ["02:00:00:00:00:64"], "ips": []},
-            {"vmid": 101, "name": "db", "kind": "qemu", "node": "pve1", "status": "running", "macs": ["02:00:00:00:00:65"], "ips": []},
+            {"id": "100", "name": "web", "kind": "lxc", "host_id": "pve1", "status": "running", "macs": ["02:00:00:00:00:64"], "ips": []},
+            {"id": "101", "name": "db", "kind": "qemu", "host_id": "pve1", "status": "running", "macs": ["02:00:00:00:00:65"], "ips": []},
         ],
-    })
-    apply_proxmox_relations(conn)
+    }))
+    apply_plugin(conn, discover(None)["proxmox"])
     payload = hierarchy_payload(conn)
     conn.close()
     parents = {n["id"]: (n["parent_id"], n["source"]) for n in payload["nodes"]}
-    assert parents == {1: (None, "none"), 2: (1, "gateway"), 3: (2, "proxmox"), 4: (2, "proxmox")}
+    assert parents == {1: (None, "none"), 2: (1, "gateway"), 3: (2, "hypervisor"), 4: (2, "hypervisor")}
 
 
 def test_v2_database_gets_the_parent_columns(tmp_path):

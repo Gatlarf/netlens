@@ -34,11 +34,11 @@ def test_proxmox_host_beats_the_gateway_for_guests():
     devices = [dev(1), dev(2), dev(3), dev(4)]  # 1 gateway, 2 Proxmox host, 3 and 4 guests
     relations = [
         rel(2, 1, "gateway"), rel(3, 1, "gateway"), rel(4, 1, "gateway"),
-        rel(3, 2, "host-of", "proxmox"), rel(4, 2, "host-of", "proxmox"),
+        rel(3, 2, "host-of", "plugin:proxmox"), rel(4, 2, "host-of", "plugin:proxmox"),
     ]
     h = build_hierarchy(devices, relations)
     assert parents(h) == {1: None, 2: 1, 3: 2, 4: 2}
-    assert h[3].source == "proxmox" and "Proxmox" in h[3].reason
+    assert h[3].source == "hypervisor" and "proxmox" in h[3].reason
     assert descendants(h, 1) == {2, 3, 4} and ancestors(h, 4) == [2, 1]
 
 
@@ -54,13 +54,13 @@ def test_heuristic_hypervisor_guess_beats_route_and_gateway_but_not_proxmox():
     devices = [dev(1), dev(2), dev(3)]
     relations = [rel(3, 1, "gateway"), rel(3, 2, "host-of", "heuristic", 0.5)]
     assert parents(build_hierarchy(devices, relations))[3] == 2
-    relations.append(rel(3, 1, "host-of", "proxmox"))
+    relations.append(rel(3, 1, "host-of", "plugin:proxmox"))
     h = build_hierarchy(devices, relations)
-    assert h[3].parent_id == 1 and h[3].source == "proxmox"
+    assert h[3].parent_id == 1 and h[3].source == "hypervisor"
 
 
 def test_uplink_sits_between_proxmox_and_the_heuristics():
-    assert SOURCE_RANK["proxmox"] < SOURCE_RANK["uplink"] < SOURCE_RANK["guess"] < SOURCE_RANK["route"] < SOURCE_RANK["gateway"]
+    assert SOURCE_RANK["hypervisor"] < SOURCE_RANK["uplink"] < SOURCE_RANK["guess"] < SOURCE_RANK["route"] < SOURCE_RANK["gateway"]
     h = build_hierarchy([dev(1), dev(2), dev(3)], [rel(3, 1, "gateway"), rel(3, 2, "uplink", "asus-mesh")])
     assert h[3].parent_id == 2 and h[3].source == "uplink" and "asus-mesh" in h[3].reason
 
@@ -79,7 +79,7 @@ def test_manual_and_service_links_do_not_define_a_parent():
 
 def test_user_choice_overrides_everything():
     devices = [dev(1), dev(2), dev(3, "device", 1)]
-    relations = [rel(3, 2, "host-of", "proxmox"), rel(2, 1, "gateway")]
+    relations = [rel(3, 2, "host-of", "plugin:proxmox"), rel(2, 1, "gateway")]
     h = build_hierarchy(devices, relations)
     assert h[3].parent_id == 1 and h[3].source == "manual" and h[3].locked is True
 
@@ -117,9 +117,9 @@ def test_loops_in_the_relations_never_form_cycles():
 
 def test_a_stronger_link_wins_the_loop_and_the_weaker_falls_back():
     # 1 runs on 2 (Proxmox, strong); 2's only other idea is that it is behind 1 via a route (weaker)
-    h = build_hierarchy([dev(1), dev(2), dev(3)], [rel(1, 2, "host-of", "proxmox"), rel(2, 1, "route"), rel(2, 3, "gateway")])
+    h = build_hierarchy([dev(1), dev(2), dev(3)], [rel(1, 2, "host-of", "plugin:proxmox"), rel(2, 1, "route"), rel(2, 3, "gateway")])
     _assert_forest(h)
-    assert h[1].parent_id == 2 and h[1].source == "proxmox"
+    assert h[1].parent_id == 2 and h[1].source == "hypervisor"
     assert h[2].parent_id == 3 and h[2].source == "gateway"  # the next-best candidate was used
 
 
@@ -151,12 +151,12 @@ def test_payload_from_the_database():
         )
     conn.executemany(
         "INSERT INTO relations (src_id, dst_id, kind, source, confidence, manual) VALUES (?, ?, ?, ?, 1.0, ?)",
-        [(2, 1, "gateway", "default-route", 0), (3, 2, "host-of", "proxmox", 0), (3, 1, "gateway", "default-route", 0), (2, 3, "route", "hidden", -1)],
+        [(2, 1, "gateway", "default-route", 0), (3, 2, "host-of", "plugin:proxmox", 0), (3, 1, "gateway", "default-route", 0), (2, 3, "route", "hidden", -1)],
     )
     conn.commit()
     payload = hierarchy_payload(conn)
     by_id = {n["id"]: n for n in payload["nodes"]}
     assert payload["roots"] == [1] and payload["stats"] == {"devices": 3, "with_parent": 2, "manual": 0, "max_depth": 2}
-    assert (by_id[3]["parent_id"], by_id[3]["source"], by_id[3]["depth"], by_id[3]["name"]) == (2, "proxmox", 2, "10.0.0.6")
+    assert (by_id[3]["parent_id"], by_id[3]["source"], by_id[3]["depth"], by_id[3]["name"]) == (2, "hypervisor", 2, "10.0.0.6")
     assert (by_id[1]["children"], by_id[1]["descendants"]) == (1, 2)  # the hidden relation (manual = -1) was ignored
-    assert "proxmox" in payload["sources"]
+    assert "hypervisor" in payload["sources"]

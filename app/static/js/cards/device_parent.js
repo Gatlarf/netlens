@@ -3,8 +3,8 @@ import { h, statusDot, typeBadge } from "../util.js";
 
 const SOURCE_NOTE = {
   manual: "set by you",
-  proxmox: "found through the Proxmox connector",
-  uplink: "found through a switch or mesh connection",
+  hypervisor: "reported by a hypervisor plugin (for example Proxmox)",
+  uplink: "reported by a network plugin (for example your router)",
   guess: "a guess based on this being a virtual machine",
   route: "found by traceroute",
   gateway: "the default gateway",
@@ -38,7 +38,7 @@ export async function buildParentCard(device, onSaved) {
   field.appendChild(h("label", {}, "Parent"));
   field.appendChild(select);
   field.appendChild(h("p", { class: "hint" },
-    "Automatic uses Proxmox, the traceroute path and the default gateway. Pick a device to fix the parent yourself, " +
+    "Automatic uses your plugins (hypervisors, routers), the traceroute path and the default gateway. Pick a device to fix the parent yourself, " +
     "for example the switch or mesh node this device is connected to. Devices below this one are not listed."));
   form.appendChild(field);
   form.appendChild(errorEl);

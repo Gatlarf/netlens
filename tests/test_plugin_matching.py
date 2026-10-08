@@ -1,46 +1,20 @@
 import pytest
-from app.db import connect, init_db
-from app.integrations.proxmox_config import ProxmoxConfig, load_config, save_config, normalize_url, public_dict, is_configured, uses_token
-from app.integrations.proxmox_match import norm_mac, match_inventory
+
+from app.plugins.builtin.proxmox.config import ProxmoxConfig, has_credentials, normalize_url, uses_token
+from app.plugins.matching import match_hypervisor, norm_mac, topology_links
 
 
-@pytest.fixture
-def conn():
-    c = connect(":memory:")
-    init_db(c)
-    yield c
-    c.close()
-
-
-def test_config_roundtrip(conn):
-    # Defaults on empty db
-    cfg = load_config(conn)
-    assert cfg.enabled is False
-    assert cfg.url == ""
-    assert cfg.verify_tls is True
-    assert cfg.username == ""
-    assert cfg.password == ""
-    assert cfg.token_id == ""
-    assert cfg.token_secret == ""
-
-    # Save and reload
-    cfg.enabled = True
-    cfg.url = "https://pve.lan:8006"
-    cfg.username = "user"
-    cfg.password = "pass"
-    save_config(conn, cfg)
-    loaded = load_config(conn)
-    assert loaded.enabled is True
-    assert loaded.url == "https://pve.lan:8006"
-    assert loaded.username == "user"
-    assert loaded.password == "pass"
-
-    # Garbage JSON
-    from app.db import set_setting
-    set_setting(conn, "proxmox", "oops")
-    loaded = load_config(conn)
-    assert loaded.enabled is False
-    assert loaded.url == ""
+def match_inventory(inventory, devices):
+    """The tests below describe a Proxmox-like inventory; convert it to the plugin contract."""
+    output = {
+        "hosts": [{"id": n["name"], "name": n["name"], "ip": n.get("ip"), "mac": None, "online": True} for n in inventory["nodes"]],
+        "guests": [
+            {"id": str(g["vmid"]), "name": g["name"], "kind": g["kind"], "host_id": g["node"], "status": g["status"],
+             "macs": g["macs"], "ips": g["ips"]}
+            for g in inventory["guests"]
+        ],
+    }
+    return match_hypervisor(output, devices)
 
 
 def test_normalize_url():
@@ -52,34 +26,23 @@ def test_normalize_url():
         normalize_url("ftp://x")
 
 
-def test_config_helpers(conn):
-    cfg = ProxmoxConfig(enabled=True, url="https://pve.lan:8006", username="user", password="s3cret")
-    assert is_configured(cfg)
-    assert uses_token(cfg) is False
-    pd = public_dict(cfg)
-    assert "password" not in pd
-    assert "token_secret" not in pd
-    assert pd["password_set"] is True
-    assert pd["token_secret_set"] is False
-    assert pd["auth_method"] == "password"
-    assert pd["configured"] is True
-    assert "s3cret" not in str(pd)
+def test_credentials_helpers():
+    assert has_credentials(ProxmoxConfig(username="u", password="p"))
+    assert has_credentials(ProxmoxConfig(token_id="t", token_secret="s"))
+    assert not has_credentials(ProxmoxConfig(username="u"))
+    assert not has_credentials(ProxmoxConfig(token_id="t"))
+    assert uses_token(ProxmoxConfig(token_id="t", token_secret="s")) and not uses_token(ProxmoxConfig(username="u", password="p"))
 
-    cfg2 = ProxmoxConfig(enabled=True, url="https://pve.lan:8006", token_id="tid", token_secret="s3cret")
-    assert is_configured(cfg2)
-    assert uses_token(cfg2) is True
-    pd2 = public_dict(cfg2)
-    assert pd2["auth_method"] == "token"
-    assert pd2["token_secret_set"] is True
-    assert "s3cret" not in str(pd2)
 
-    cfg3 = ProxmoxConfig(enabled=True, url="", username="user", password="pass")
-    assert not is_configured(cfg3)
-    assert uses_token(cfg3) is False
-    pd3 = public_dict(cfg3)
-    assert pd3["auth_method"] == "password"  # auth method reflects credentials, not the URL
-    assert pd3["configured"] is False
-    assert pd3["configured"] is False
+def test_host_found_by_mac_when_it_has_no_ip():
+    out = {"hosts": [{"id": "h", "name": "h", "ip": None, "mac": "AA-00-00-00-00-01", "online": True}], "guests": []}
+    assert match_hypervisor(out, [{"id": 7, "mac": "aa:00:00:00:00:01", "ips": ["10.0.0.9"]}])["hosts"] == {"h": 7}
+
+
+def test_guest_without_host_has_no_host_device():
+    out = {"hosts": [], "guests": [{"id": "1", "name": "g", "kind": "vm", "host_id": None, "status": "running", "macs": [], "ips": ["10.0.0.4"]}]}
+    g = match_hypervisor(out, [{"id": 3, "mac": None, "ips": ["10.0.0.4"]}])["guests"][0]
+    assert g["device_id"] == 3 and g["host_device_id"] is None
 
 
 def test_norm_mac():
@@ -163,8 +126,8 @@ def test_lowest_vmid_claim():
     result = match_inventory(inventory, devices)
     assert result["hosts"] == {"pve1": 1}
     # Guest with vmid 100 should claim device 2
-    guest_100 = next(g for g in result["guests"] if g["vmid"] == 100)
-    guest_101 = next(g for g in result["guests"] if g["vmid"] == 101)
+    guest_100 = next(g for g in result["guests"] if g["id"] == "100")
+    guest_101 = next(g for g in result["guests"] if g["id"] == "101")
     assert guest_100["device_id"] == 2
     assert guest_101["device_id"] is None
     assert guest_100["host_device_id"] == 1
@@ -197,8 +160,8 @@ def test_mac_wins_over_ip():
     ]
     result = match_inventory(inventory, devices)
     assert result["hosts"] == {"pve1": 1}
-    guest_a = next(g for g in result["guests"] if g["vmid"] == 100)
-    guest_b = next(g for g in result["guests"] if g["vmid"] == 101)
+    guest_a = next(g for g in result["guests"] if g["id"] == "100")
+    guest_b = next(g for g in result["guests"] if g["id"] == "101")
     assert guest_a["device_id"] == 3  # MAC match wins
     assert guest_b["device_id"] is None  # IP belongs to device 3, already claimed
     assert guest_a["host_device_id"] == 1

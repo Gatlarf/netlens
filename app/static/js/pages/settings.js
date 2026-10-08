@@ -3,8 +3,9 @@ import { h, clear, toast } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
 import { buildGeneralCard } from "../cards/general.js";
 import { buildNotificationsCard } from "../cards/notifications.js";
-import { buildProxmoxCard } from "../cards/proxmox.js";
-import { buildAsusCard } from "../cards/asus.js";
+import { buildPluginCard } from "../cards/plugin.js";
+import { buildPluginsCard } from "../cards/plugins.js";
+import { buildPluginGuideCard } from "../cards/plugin_guide.js";
 import { buildMapCard } from "../cards/map_settings.js";
 import { buildBackupCard } from "../cards/backup.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
@@ -91,102 +92,33 @@ function fillRangesCard(card, cfg) {
   card.appendChild(form);
 }
 
-// Sections of the page, in order. The side menu links to them and "#/settings/<key>" deep-links to one.
-const SECTIONS = [
-  { key: "ranges", label: "Scan ranges" },
-  { key: "nmap", label: "Scan performance" },
-  { key: "schedule", label: "Schedule & terminal" },
-  { key: "map", label: "Map" },
-  { key: "notifications", label: "E-mail notifications" },
-  { key: "proxmox", label: "Proxmox connector" },
-  { key: "asus", label: "ASUS router (AiMesh)" },
-  { key: "ignored", label: "Ignored devices" },
-  { key: "backup", label: "Backup & restore" },
-  { key: "about", label: "About" },
-  { key: "export", label: "Export" },
-  { key: "session", label: "Session" },
-];
+async function buildRangesCard() {
+  const card = h("div", { class: "card" });
+  fillRangesCard(card, await get("/api/config"));
+  return card;
+}
 
-export async function render(container, params) {
-  clear(container);
+async function buildAboutCard() {
+  const cfg = await get("/api/config");
+  const card = h("div", { class: "card" });
+  card.appendChild(h("h2", {}, "About"));
+  card.appendChild(kvRow("Version", cfg.version ?? ""));
+  card.appendChild(kvRow("SNMP", cfg.snmp_enabled ? "enabled" : "disabled"));
+  card.appendChild(kvRow("Listening on", cfg.bind ?? ""));
+  return card;
+}
 
-  // ---- layout: side menu + sections
-  const nav = h("nav", { class: "settings-nav", "aria-label": "Settings sections" });
-  const content = h("div", { class: "settings-content" });
-  container.appendChild(h("div", { class: "settings-layout" }, nav, content));
+function buildExportCard() {
+  const card = h("div", { class: "card" });
+  card.appendChild(h("h2", {}, "Export"));
+  card.appendChild(downloadLink("/api/export/devices.csv", "Devices CSV"));
+  card.appendChild(downloadLink("/api/export/devices.json", "Devices JSON"));
+  return card;
+}
 
-  const sections = {};
-  const links = {};
-  for (const { key, label } of SECTIONS) {
-    sections[key] = h("section", { class: "settings-section", id: `sec-${key}` });
-    content.appendChild(sections[key]);
-    links[key] = h("a", {
-      href: `#/settings/${key}`,
-      "data-section": key,
-      onclick: (e) => {
-        e.preventDefault();
-        lockUntil = Date.now() + 600; // keep the clicked entry highlighted while the page scrolls there
-        sections[key].scrollIntoView({ behavior: "smooth", block: "start" });
-        setActive(key);
-      },
-    }, label);
-    nav.appendChild(links[key]);
-  }
-
-  let active = null;
-  let lockUntil = 0;
-  function setActive(key) {
-    if (key === active) return;
-    active = key;
-    for (const [k, link] of Object.entries(links)) {
-      link.classList.toggle("active", k === key);
-      if (k === key) link.setAttribute("aria-current", "true");
-      else link.removeAttribute("aria-current");
-    }
-  }
-
-  // Highlight the section being read: the last one whose top has reached the upper part of the screen.
-  let frame = null;
-  function updateActive() {
-    frame = null;
-    if (Date.now() < lockUntil) {
-      lockUntil = Date.now() + 150; // still scrolling to the clicked section: let it settle
-      return;
-    }
-    const bottomReached = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
-    // a section counts as "being read" once its top is a little below the sticky top bar
-    const barHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--topbar-h"), 10) || 58;
-    let current = SECTIONS[0].key;
-    for (const { key } of SECTIONS) {
-      if (sections[key].getBoundingClientRect().top <= barHeight + 80) current = key;
-    }
-    setActive(bottomReached ? SECTIONS[SECTIONS.length - 1].key : current);
-  }
-  function onScroll() {
-    if (frame === null) frame = requestAnimationFrame(updateActive);
-  }
-  // the user scrolling by hand takes over from a menu click immediately
-  const unlock = () => { lockUntil = 0; };
-  window.addEventListener("scroll", onScroll, { passive: true });
-  for (const type of ["wheel", "touchstart", "keydown"]) window.addEventListener(type, unlock, { passive: true });
-  setActive(params && sections[params.section] ? params.section : SECTIONS[0].key);
-
-  // ---- cards
-  const rangesCard = h("div", { class: "card" });
-  sections.ranges.appendChild(rangesCard);
-
-  const configCard = h("div", { class: "card" });
-  configCard.appendChild(h("h2", {}, "About"));
-  sections.about.appendChild(configCard);
-
-  const exportCard = h("div", { class: "card" });
-  exportCard.appendChild(h("h2", {}, "Export"));
-  exportCard.appendChild(downloadLink("/api/export/devices.csv", "Devices CSV"));
-  exportCard.appendChild(downloadLink("/api/export/devices.json", "Devices JSON"));
-  sections.export.appendChild(exportCard);
-
-  const sessionCard = h("div", { class: "card" });
-  sessionCard.appendChild(h("h2", {}, "Session"));
+function buildSessionCard() {
+  const card = h("div", { class: "card" });
+  card.appendChild(h("h2", {}, "Session"));
   const logoutBtn = h("button", { class: "btn", type: "button" }, "Log out");
   logoutBtn.addEventListener("click", async () => {
     try {
@@ -197,52 +129,124 @@ export async function render(container, params) {
       toast(err.message || "Logout failed", "error");
     }
   });
-  sessionCard.appendChild(logoutBtn);
-  sections.session.appendChild(sessionCard);
+  card.appendChild(logoutBtn);
+  return card;
+}
 
-  sections.backup.appendChild(buildBackupCard());
-  for (const [key, build] of [
-    ["nmap", buildScanOptionsCard],
-    ["schedule", buildGeneralCard],
-    ["map", buildMapCard],
-    ["notifications", buildNotificationsCard],
-    ["proxmox", buildProxmoxCard],
-    ["asus", buildAsusCard],
-    ["ignored", buildIgnoredCard],
-  ]) {
-    build().then((card) => {
-      sections[key].appendChild(card);
-    }).catch((err) => {
-      sections[key].appendChild(h("div", { class: "card" }, h("p", { class: "error" }, err.message || "Failed to load")));
-    });
-  }
+// The pages of Settings, grouped in the side menu. Every page is its own address ("#/settings/<key>") and shows
+// only its card. A builder returns a card (or a promise of one). The Integrations group is built from the plugins
+// that are installed: one page per plugin, plus the Plugins list and the guide.
+const STATIC_GROUPS = [
+  {
+    title: "General",
+    items: [
+      { key: "ranges", label: "Scan ranges", build: buildRangesCard },
+      { key: "nmap", label: "Scan performance", build: buildScanOptionsCard },
+      { key: "schedule", label: "Schedule & terminal", build: buildGeneralCard },
+      { key: "map", label: "Map", build: buildMapCard },
+    ],
+  },
+  {
+    title: "Notifications",
+    items: [{ key: "notifications", label: "E-mail notifications", build: buildNotificationsCard }],
+  },
+  "integrations",
+  {
+    title: "Data",
+    items: [
+      { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
+      { key: "backup", label: "Backup & restore", build: buildBackupCard },
+      { key: "export", label: "Export", build: buildExportCard },
+    ],
+  },
+  {
+    title: "System",
+    items: [
+      { key: "about", label: "About", build: buildAboutCard },
+      { key: "session", label: "Session", build: buildSessionCard },
+    ],
+  },
+];
 
+const DEFAULT_PAGE = "ranges";
+// the connectors were plugins-to-be before: keep their old addresses working
+const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus" };
+
+function integrationsGroup(plugins) {
+  const items = [
+    { key: "plugins", label: "Plugins", build: buildPluginsCard },
+    ...plugins.map((p) => ({ key: `plugin-${p.id}`, label: p.name, build: () => buildPluginCard(p.id) })),
+    { key: "plugin-guide", label: "Plugin guide", build: buildPluginGuideCard },
+  ];
+  return { title: "Integrations", items };
+}
+
+async function loadGroups() {
+  let plugins = [];
   try {
-    const cfg = await get("/api/config");
-
-    configCard.appendChild(kvRow("Version", cfg.version ?? ""));
-
-    fillRangesCard(rangesCard, cfg);
-
-    configCard.appendChild(kvRow("SNMP", cfg.snmp_enabled ? "enabled" : "disabled"));
-    configCard.appendChild(kvRow("Listening on", cfg.bind ?? ""));
+    plugins = (await get("/api/plugins")).plugins;
   } catch (err) {
-    const errCard = h("div", { class: "card" });
-    errCard.appendChild(h("h2", {}, "Configuration"));
-    errCard.appendChild(h("p", { class: "error" }, err.message || "Failed to load configuration"));
-    sections.about.appendChild(errCard);
+    // the Plugins page shows the error itself; the rest of Settings still works
+  }
+  plugins = [...plugins].sort((a, b) => a.name.localeCompare(b.name));
+  return STATIC_GROUPS.map((g) => (g === "integrations" ? integrationsGroup(plugins) : g));
+}
+
+function fillNav(nav, groups, activeKey) {
+  clear(nav);
+  for (const group of groups) {
+    nav.appendChild(h("div", { class: "nav-group" }, group.title));
+    for (const entry of group.items) {
+      const link = h("a", { href: `#/settings/${entry.key}`, "data-section": entry.key }, entry.label);
+      if (entry.key === activeKey) {
+        link.classList.add("active");
+        link.setAttribute("aria-current", "page");
+      }
+      nav.appendChild(link);
+    }
+  }
+}
+
+export async function render(container, params) {
+  clear(container);
+  let groups = await loadGroups();
+  const items = () => groups.flatMap((g) => g.items);
+  const requested = params && (ALIASES[params.section] || params.section);
+  const item = items().find((i) => i.key === requested) || items().find((i) => i.key === DEFAULT_PAGE);
+  if (params && params.section && item.key !== params.section) {
+    // an address that does not exist (or an old one): show the right page under its own address, without a new history entry
+    history.replaceState(null, "", `#/settings/${item.key}`);
   }
 
-  // A deep link ("#/settings/proxmox", or the header's Scan settings button -> "#/settings/nmap")
-  // jumps to its section. Done last so the cards above have their final height.
-  if (params && sections[params.section]) {
-    sections[params.section].scrollIntoView({ block: "start" });
+  const nav = h("nav", { class: "settings-nav", "aria-label": "Settings pages" });
+  fillNav(nav, groups, item.key);
+  const content = h("div", { class: "settings-content", id: `sec-${item.key}` });
+  container.appendChild(h("div", { class: "settings-layout" }, nav, content));
+
+  // installing or removing a plugin changes the menu
+  let destroyed = false;
+  const onPluginsChanged = async () => {
+    const fresh = await loadGroups();
+    if (destroyed) return;
+    groups = fresh;
+    fillNav(nav, groups, item.key);
+  };
+  document.addEventListener("netlens:plugins-changed", onPluginsChanged);
+
+  content.appendChild(h("div", { class: "card" }, h("p", { class: "hint" }, "Loading...")));
+  try {
+    const card = await item.build();
+    if (destroyed) return;
+    clear(content);
+    content.appendChild(card);
+  } catch (err) {
+    if (destroyed) return;
+    clear(content);
+    content.appendChild(h("div", { class: "card" }, h("h2", {}, item.label), h("p", { class: "error" }, err.message || "Failed to load")));
   }
 
-  // the router calls this when the user leaves the page
   return () => {
-    window.removeEventListener("scroll", onScroll);
-    for (const type of ["wheel", "touchstart", "keydown"]) window.removeEventListener(type, unlock);
-    if (frame !== null) cancelAnimationFrame(frame);
+    destroyed = true;
+    document.removeEventListener("netlens:plugins-changed", onPluginsChanged);
   };
 }

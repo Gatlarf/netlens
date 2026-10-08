@@ -125,7 +125,7 @@ def test_restore_older_schema(tmp_path: Path) -> None:
     c = connect(old)
     init_db(c)
     c.execute("DROP TABLE checks")
-    c.execute("DROP TABLE proxmox_guests")
+    c.execute("DROP TABLE hypervisor_guests")
     c.execute("ALTER TABLE devices DROP COLUMN notify_offline")
     c.execute("UPDATE schema_version SET version = 1")
     c.commit()
@@ -135,7 +135,7 @@ def test_restore_older_schema(tmp_path: Path) -> None:
 
     c = connect(live)
     assert c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='checks'").fetchone() is not None
-    assert c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='proxmox_guests'").fetchone() is not None
+    assert c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='hypervisor_guests'").fetchone() is not None
     cols = [r[1] for r in c.execute("PRAGMA table_info(devices)").fetchall()]
     assert "notify_offline" in cols
     assert validate_backup(live) == SCHEMA_VERSION

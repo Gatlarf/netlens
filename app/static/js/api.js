@@ -53,6 +53,28 @@ export async function api(path, { method = "GET", body } = {}) {
   }
 }
 
+// Send a file as the raw request body (used for plugin zip uploads).
+export async function upload(path, file, contentType = "application/zip") {
+  let res;
+  try {
+    res = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": contentType }, body: file });
+  } catch (err) {
+    throw new ApiError(0, "network error");
+  }
+  let parsed = null;
+  try {
+    parsed = await res.json();
+  } catch (err) {
+    parsed = null;
+  }
+  if (!res.ok) {
+    if (res.status === 401) document.dispatchEvent(new CustomEvent("netlens:unauth"));
+    const detail = parsed && typeof parsed.detail === "string" ? parsed.detail : res.statusText;
+    throw new ApiError(res.status, detail);
+  }
+  return parsed;
+}
+
 export const get = (p) => api(p);
 export const post = (p, body = {}) => api(p, { method: "POST", body });
 export const put = (p, body) => api(p, { method: "PUT", body });

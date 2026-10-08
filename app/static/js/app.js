@@ -30,7 +30,7 @@ function parseRoute() {
     }
     return { name: "devices", params: {} };
   }
-  const settingsSection = /^#\/settings\/([a-z]+)$/.exec(hash);
+  const settingsSection = /^#\/settings\/([a-z0-9_-]+)$/.exec(hash);
   if (settingsSection) return { name: "settings", params: { section: settingsSection[1] } };
   const name = ROUTES[hash];
   return name ? { name, params: {} } : { name: "devices", params: {} };
@@ -337,15 +337,6 @@ fetch("/api/health").then((r) => r.json()).then((d) => {
   const el = document.getElementById("app-version");
   if (el && d.version) el.textContent = "v" + d.version;
 }).catch(() => {});
-
-// The header's "Scan settings" button deep-links to the nmap section. When the address is already
-// that link (so no hashchange follows), redraw the page so it jumps to the section again.
-const scanSettingsLink = document.getElementById("scan-settings");
-if (scanSettingsLink) {
-  scanSettingsLink.addEventListener("click", () => {
-    if (location.hash === "#/settings/nmap") renderPage();
-  });
-}
 
 initThemeToggle();
 

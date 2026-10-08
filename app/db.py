@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def utcnow() -> str:
@@ -45,6 +45,78 @@ def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, de
     cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
     if column not in cols:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
+def _migrate_to_plugins(conn: sqlite3.Connection) -> None:
+    """Schema v5: the Proxmox and ASUS connectors became plugins. Move their guests, settings and links over.
+
+    Runs on every start but only does something while old data exists. Nothing is lost if it is interrupted:
+    old rows are removed only after the new ones are written.
+    """
+    import json
+
+    def setting(key):
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def put(key, value):
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value if isinstance(value, str) else json.dumps(value)),
+        )
+
+    def load(key):
+        raw = setting(key)
+        try:
+            data = json.loads(raw) if raw else None
+        except ValueError:
+            return None
+        return data if isinstance(data, dict) else None
+
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "proxmox_guests" in tables:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO hypervisor_guests
+                (plugin_id, guest_id, name, kind, host_name, status, macs, ips, device_id, host_device_id, updated)
+            SELECT 'proxmox', CAST(vmid AS TEXT), name, kind, node, status, macs, ips, device_id, host_device_id, updated
+            FROM proxmox_guests
+            """
+        )
+        conn.execute("DROP TABLE proxmox_guests")
+
+    old = load("proxmox")
+    if old is not None and setting("plugin.proxmox") is None:
+        keys = ("url", "verify_tls", "username", "password", "token_id", "token_secret")
+        put("plugin.proxmox", {"enabled": bool(old.get("enabled")), "config": {k: old[k] for k in keys if k in old}})
+        status = load("proxmox_status")
+        if status is not None:
+            put("plugin.proxmox.status", status)
+    if old is not None or setting("proxmox_status") is not None:
+        conn.execute("DELETE FROM settings WHERE key IN ('proxmox', 'proxmox_status')")
+
+    old = load("asus")
+    if old is not None and setting("plugin.asus") is None:
+        keys = ("url", "verify_tls", "username", "password")
+        put("plugin.asus", {"enabled": bool(old.get("enabled")), "config": {k: old[k] for k in keys if k in old}})
+        status = load("asus_status")
+        if status is not None:
+            put("plugin.asus.status", status)
+        snapshot = load("asus_snapshot")
+        if snapshot is not None:
+            try:
+                from app.plugins.builtin.asus.plugin import to_topology
+
+                put("plugin.asus.data", to_topology(snapshot))
+            except Exception:  # noqa: BLE001 - the next sync rebuilds it
+                pass
+    for key in ("asus", "asus_status", "asus_snapshot"):
+        conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+
+    # relations created by the connectors carry the plugin id as their source
+    conn.execute("UPDATE relations SET source = 'plugin:proxmox' WHERE source = 'proxmox'")
+    conn.execute("UPDATE relations SET source = 'plugin:asus' WHERE source = 'asus-mesh'")
+    conn.commit()
 
 
 def init_db(conn: sqlite3.Connection) -> None:
@@ -236,23 +308,28 @@ def init_db(conn: sqlite3.Connection) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_checks_device_ts ON checks(device_id, ts)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_checks_ts ON checks(ts)")
 
-    # Proxmox guests (VMs / containers) from the last sync
+    # --- schema v5: guests reported by hypervisor plugins (replaces proxmox_guests) ---------
     cur.execute(
         """
-        CREATE TABLE IF NOT EXISTS proxmox_guests (
-            vmid INTEGER PRIMARY KEY,
+        CREATE TABLE IF NOT EXISTS hypervisor_guests (
+            plugin_id TEXT NOT NULL,
+            guest_id TEXT NOT NULL,
             name TEXT NOT NULL,
             kind TEXT NOT NULL,
-            node TEXT NOT NULL,
+            host_name TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL,
             macs TEXT NOT NULL DEFAULT '[]',
             ips TEXT NOT NULL DEFAULT '[]',
             device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
             host_device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
-            updated TEXT NOT NULL
+            updated TEXT NOT NULL,
+            PRIMARY KEY (plugin_id, guest_id)
         )
         """
     )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_hv_guests_device ON hypervisor_guests(device_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_hv_guests_host ON hypervisor_guests(host_device_id)")
+    _migrate_to_plugins(conn)
 
     # host_keys
     cur.execute(

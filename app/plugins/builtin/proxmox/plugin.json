@@ -1,0 +1,21 @@
+{
+  "id": "proxmox",
+  "name": "Proxmox VE",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Reads your Proxmox VMs and containers so the map and device pages show which devices run on which Proxmox host. Read-only.",
+  "timeout": 120,
+  "config": [
+    {"key": "url", "type": "text", "label": "Proxmox URL", "placeholder": "https://192.168.0.10:8006", "required": true,
+     "help": "The address of the web interface. HTTPS port 8006 is assumed when you leave the port out."},
+    {"key": "verify_tls", "type": "bool", "label": "Verify TLS certificate", "default": true,
+     "help": "Turn off for the self-signed certificate Proxmox uses by default."},
+    {"key": "token_id", "type": "text", "label": "Token ID", "placeholder": "user@pam!netlens", "section": "API token (recommended; give it the read-only PVEAuditor role)"},
+    {"key": "token_secret", "type": "password", "label": "Token secret", "section": "API token (recommended; give it the read-only PVEAuditor role)",
+     "help": "The token is used when both token fields are filled."},
+    {"key": "username", "type": "text", "label": "Username", "placeholder": "root@pam", "section": "Or a user and password"},
+    {"key": "password", "type": "password", "label": "Password", "section": "Or a user and password"}
+  ]
+}

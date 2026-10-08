@@ -44,7 +44,7 @@ def _seed(db):
     conn.execute("INSERT INTO checks (device_id, ts, up) VALUES (3, ?, 1)", (NOW,))
     conn.execute("INSERT INTO host_keys (device_id, fingerprint, first_seen) VALUES (3, 'SHA256:x', ?)", (NOW,))
     conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES (?, 3, 'device_new', '10.0.0.6')", (NOW,))
-    conn.execute("INSERT INTO proxmox_guests (vmid, name, kind, node, status, device_id, host_device_id, updated) VALUES (100, 'web', 'lxc', 'pve', 'running', 3, 2, ?)", (NOW,))
+    conn.execute("INSERT INTO hypervisor_guests (plugin_id, guest_id, name, kind, host_name, status, device_id, host_device_id, updated) VALUES ('proxmox', '100', 'web', 'lxc', 'pve', 'running', 3, 2, ?)", (NOW,))
     conn.executemany("INSERT INTO relations (src_id, dst_id, kind, source, confidence, manual) VALUES (?, ?, ?, ?, 1.0, 0)",
                      [(3, 2, "host-of", "proxmox"), (3, 1, "gateway", "default-route"), (5, 1, "gateway", "default-route"), (2, 1, "gateway", "default-route")])
     conn.commit()
@@ -79,7 +79,7 @@ def test_delete_removes_the_device_and_everything_attached_to_it(client):
     assert _count(db, "SELECT COUNT(*) FROM devices WHERE id = 3") == 0
     # the history keeps its events, without the link to the deleted device
     assert _count(db, "SELECT COUNT(*) FROM events WHERE kind = 'device_new' AND device_id IS NULL") == 1
-    assert _count(db, "SELECT device_id FROM proxmox_guests WHERE vmid = 100") is None
+    assert _count(db, "SELECT device_id FROM hypervisor_guests WHERE guest_id = '100'") is None
     # other devices are untouched
     assert _count(db, "SELECT COUNT(*) FROM devices") == 4 and _count(db, "SELECT COUNT(*) FROM ports WHERE device_id = 5") == 1
 
@@ -322,7 +322,7 @@ def test_v3_database_is_migrated_to_v4(tmp_path):
     conn.close()
     conn = connect(path)
     init_db(conn)
-    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == SCHEMA_VERSION == 4
+    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == SCHEMA_VERSION == 5
     conn.execute("INSERT INTO scans (kind, status, started, target) VALUES ('full', 'running', ?, '10.0.0.6')", (NOW,))
     conn.execute("INSERT INTO ignored_devices (mac, label, added) VALUES ('aa:00:00:00:00:01', 'x', ?)", (NOW,))
     with pytest.raises(sqlite3.IntegrityError):  # the MAC is unique

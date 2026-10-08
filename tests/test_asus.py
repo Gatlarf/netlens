@@ -1,17 +1,10 @@
 import json
 
 import pytest
-from fastapi.testclient import TestClient
 
-from app.config import load_settings
-from app.db import connect, get_or_create_device, init_db
-from app.hierarchy import build_hierarchy
-from app.integrations.asus_client import AsusAuthError, AsusClient, AsusError, build_snapshot, parse_onboarding
-from app.integrations.asus_config import AsusConfig, is_configured, normalize_url, save_config
-from app.integrations.asus_sync import apply_asus_relations, asus_after_scan, sync_now
-from app.main import create_app
-from app.scanner.relations import Edge
-from app.scanner.relstore import delete_relation, list_relations, replace_inferred
+from app.plugins.builtin.asus.client import AsusAuthError, AsusClient, AsusError, build_snapshot, parse_onboarding
+from app.plugins.builtin.asus.config import AsusConfig, normalize_url
+from app.plugins.builtin.asus.plugin import to_topology
 
 AUTH = {"Authorization": "Bearer secret"}
 MAIN, N1, N2 = "aa:00:00:00:00:10", "aa:00:00:00:00:20", "aa:00:00:00:00:30"
@@ -64,7 +57,7 @@ class FakeTransport:
 CFG = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw")
 
 
-def test_normalize_url_and_configured():
+def test_normalize_url():
     assert normalize_url("192.168.0.1") == "https://192.168.0.1:8443"
     assert normalize_url("https://r.lan:9443/") == "https://r.lan:9443"
     assert normalize_url("http://192.168.0.1") == "http://192.168.0.1"
@@ -72,7 +65,6 @@ def test_normalize_url_and_configured():
     for bad in ("ftp://x", "https://x/admin"):
         with pytest.raises(ValueError):
             normalize_url(bad)
-    assert is_configured(CFG) and not is_configured(AsusConfig(url="x"))
 
 
 def test_parse_onboarding_and_snapshot():
@@ -115,195 +107,25 @@ def test_refused_login_is_one_attempt_and_no_logout():
     assert "blocked" in str(exc.value)
 
 
-@pytest.fixture
-def db(tmp_path):
-    path = tmp_path / "t.db"
-    conn = connect(path)
-    init_db(conn)
-    ids = {
-        "main": get_or_create_device(conn, MAIN, "10.0.0.1"),
-        "garden": get_or_create_device(conn, N1, "10.0.0.50"),
-        "attic": get_or_create_device(conn, None, "10.0.0.60"),  # no MAC seen: matched by IP
-        "wired": get_or_create_device(conn, "02:00:00:00:00:01", "10.0.0.11"),
-        "wifi": get_or_create_device(conn, "02:00:00:00:00:02", "10.0.0.12"),
-        "gardenwired": get_or_create_device(conn, None, "10.0.0.13"),  # matched by IP
-        "stranger": get_or_create_device(conn, "02:00:00:00:00:99", "10.0.0.99"),
-    }
-    conn.close()
-    return path, ids
+def test_to_topology_follows_the_plugin_contract():
+    from app.plugins.contract import validate_output
+
+    topo = to_topology(build_snapshot(CLIENTS, parse_onboarding(ONBOARDING)))
+    out = validate_output("topology", topo)  # what the router plugin returns must pass the validator
+    roles = {n["name"]: (n["role"], n["parent_mac"]) for n in out["nodes"]}
+    assert roles == {"Main": ("gateway", None), "Garden": ("node", MAIN), "Attic": ("node", MAIN)}
+    by_mac = {c["mac"]: c for c in out["clients"]}
+    assert by_mac["02:00:00:00:00:01"]["node_mac"] == MAIN and by_mac["02:00:00:00:00:01"]["medium"] == "wired"  # no node = the router
+    assert by_mac["02:00:00:00:00:02"]["node_mac"] == N1 and by_mac["02:00:00:00:00:02"]["band"] == "5 GHz"
+    assert "02:00:00:00:00:04" not in by_mac  # offline clients are left out
 
 
-class FakeFactory:
-    error = None
-
-    def __init__(self, cfg):
-        pass
-
-    def snapshot(self):
-        if FakeFactory.error:
-            raise FakeFactory.error
-        return build_snapshot(CLIENTS, parse_onboarding(ONBOARDING))
+def test_a_node_wired_to_another_node_hangs_below_it():
+    nodes = [dict(n) for n in NODES]
+    nodes[1]["wired_mac"] = [N2.upper()]  # Garden is wired to... Attic is wired to Garden
+    topo = to_topology(build_snapshot(CLIENTS, parse_onboarding("get_cfg_clientlist = [" + json.dumps(nodes) + "];")))
+    assert {n["name"]: n["parent_mac"] for n in topo["nodes"]}["Attic"] == N1
 
 
-@pytest.fixture(autouse=True)
-def _reset():
-    FakeFactory.error = None
-
-
-def _edges(path):
-    conn = connect(path)
-    try:
-        return {(r["src_id"], r["dst_id"], r["kind"], r["source"], r["manual"]) for r in list_relations(conn)}
-    finally:
-        conn.close()
-
-
-def _enable(path):
-    conn = connect(path)
-    save_config(conn, CFG)
-    conn.close()
-
-
-@pytest.mark.asyncio
-async def test_sync_creates_uplinks_and_survives_reinference(db):
-    path, ids = db
-    _enable(path)
-    result = await sync_now(str(path), client_factory=FakeFactory)
-    assert result == {"nodes": 3, "clients": 3, "links": 5}
-    expected = {
-        (ids["garden"], ids["main"], "uplink", "asus-mesh", 0),  # node wired to the main router
-        (ids["attic"], ids["main"], "uplink", "asus-mesh", 0),  # node found by IP, no wired info: below the main router
-        (ids["wired"], ids["main"], "uplink", "asus-mesh", 0),  # no node = main router
-        (ids["wifi"], ids["garden"], "uplink", "asus-mesh", 0),
-        (ids["gardenwired"], ids["garden"], "uplink", "asus-mesh", 0),
-    }
-    assert _edges(path) == expected
-
-    conn = connect(path)  # a scan wipes every non-manual edge; the hook puts them back
-    replace_inferred(conn, [Edge(ids["wifi"], ids["stranger"], "gateway", "heuristic", 0.5)])
-    conn.close()
-    assert not expected <= _edges(path)
-    await asus_after_scan(str(path))
-    assert expected <= _edges(path)
-
-
-@pytest.mark.asyncio
-async def test_user_deleted_edge_stays_hidden(db):
-    path, ids = db
-    _enable(path)
-    await sync_now(str(path), client_factory=FakeFactory)
-    conn = connect(path)
-    rel = next(r for r in list_relations(conn) if r["src_id"] == ids["wifi"])
-    assert delete_relation(conn, rel["id"]) is True
-    apply_asus_relations(conn)
-    conn.close()
-    assert not any(e[0] == ids["wifi"] for e in _edges(path))
-
-
-@pytest.mark.asyncio
-async def test_hierarchy_ranks_uplink_above_gateway(db):
-    path, ids = db
-    _enable(path)
-    await sync_now(str(path), client_factory=FakeFactory)
-    conn = connect(path)
-    replace_inferred(conn, [Edge(ids["wifi"], ids["stranger"], "gateway", "heuristic", 0.9)])
-    apply_asus_relations(conn)
-    devices = [dict(r) for r in conn.execute("SELECT id, parent_mode, parent_device_id FROM devices")]
-    rels = [dict(r) for r in conn.execute("SELECT src_id, dst_id, kind, source, confidence FROM relations WHERE manual >= 0")]
-    conn.close()
-    parent = build_hierarchy(devices, rels)[ids["wifi"]]
-    assert (parent.parent_id, parent.source) == (ids["garden"], "uplink")
-
-
-@pytest.mark.asyncio
-async def test_failed_sync_keeps_links_and_refused_login_pauses_hook(db):
-    path, ids = db
-    _enable(path)
-    await sync_now(str(path), client_factory=FakeFactory)
-    before = _edges(path)
-
-    FakeFactory.error = AsusError("timed out")
-    assert await sync_now(str(path), client_factory=FakeFactory) == {"error": "timed out"}
-    assert _edges(path) == before  # last good links kept
-
-    FakeFactory.error = AsusAuthError("login refused")
-    await sync_now(str(path), client_factory=FakeFactory)
-    conn = connect(path)
-    status = json.loads(conn.execute("SELECT value FROM settings WHERE key='asus_status'").fetchone()[0])
-    conn.close()
-    assert status["ok"] is False and status["auth_failed"] is True
-
-    # the hook must not touch the router again, but still restores the links after a re-inference
-    calls = []
-
-    class Counting(FakeFactory):
-        def __init__(self, cfg):
-            calls.append(1)
-
-    import app.integrations.asus_sync as mod
-    orig = mod.AsusClient
-    mod.AsusClient = Counting
-    try:
-        conn = connect(path)
-        replace_inferred(conn, [])
-        conn.close()
-        await asus_after_scan(str(path))
-    finally:
-        mod.AsusClient = orig
-    assert calls == [] and _edges(path) == before
-
-
-@pytest.mark.asyncio
-async def test_hook_does_nothing_when_disabled(db):
-    path, ids = db
-    conn = connect(path)
-    save_config(conn, AsusConfig(enabled=False, url="10.0.0.1", username="u", password="pw"))
-    conn.close()
-    await asus_after_scan(str(path))
-    assert _edges(path) == set()
-
-
-def _api(path):
-    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=path)
-    app.state.asus_factory = FakeFactory
-    return TestClient(app, headers=AUTH)
-
-
-def test_api_masks_password_and_syncs_on_enable(db):
-    path, ids = db
-    with _api(path) as c:
-        r = c.put("/api/asus", json={"url": "10.0.0.1", "username": "admin", "password": "TOPSECRET", "enabled": True})
-        assert r.status_code == 200
-        out = r.json()
-        assert out["url"] == "https://10.0.0.1:8443" and out["password_set"] is True and "TOPSECRET" not in r.text
-        assert out["status"]["ok"] is True and out["status"]["links"] == 5
-
-        c.put("/api/asus", json={"verify_tls": True})  # partial update keeps the password
-        conn = connect(path)
-        assert json.loads(conn.execute("SELECT value FROM settings WHERE key='asus'").fetchone()[0])["password"] == "TOPSECRET"
-        conn.close()
-
-        assert (ids["wifi"], ids["garden"], "uplink") in {(e["from"], e["to"], e["kind"]) for e in c.get("/api/map").json()["edges"]}
-        c.put("/api/asus", json={"enabled": False})
-        assert not any(e[3] == "asus-mesh" for e in _edges(path))
-
-
-@pytest.mark.parametrize("payload", [{"enabled": True}, {"url": "ftp://x"}, {"enabled": True, "url": "10.0.0.1"}])
-def test_api_validation(db, payload):
-    path, _ = db
-    with _api(path) as c:
-        assert c.put("/api/asus", json=payload).status_code == 422
-
-
-def test_api_test_and_sync_endpoints(db):
-    path, _ = db
-    with _api(path) as c:
-        r = c.post("/api/asus/test", json={"url": "10.0.0.1", "username": "u", "password": "pw"})
-        assert r.json() == {"ok": True, "nodes": 3, "clients": 3}
-        assert c.get("/api/asus").json()["configured"] is False  # a test saves nothing
-        assert c.post("/api/asus/test", json={}).status_code == 422
-        FakeFactory.error = AsusAuthError("login refused")
-        r = c.post("/api/asus/test", json={"url": "10.0.0.1", "username": "u", "password": "pw"})
-        assert r.status_code == 502 and "refused" in r.json()["detail"]
-        assert c.post("/api/asus/sync").status_code == 502  # not configured
-        assert c.post("/api/asus/sync", headers={"Authorization": "Bearer no"}).status_code == 401
+def test_auth_error_is_flagged_for_the_core():
+    assert AsusAuthError.auth_failed is True

@@ -82,14 +82,14 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
-def _proxmox_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any] | None:
-    """Proxmox role of a device: it is a guest (VM/container) of a host and/or a host with guests."""
+def _virtualization_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any] | None:
+    """Hypervisor role of a device: it is a guest (VM/container) of a host and/or a host with guests."""
     guest = None
     row = conn.execute(
         """
-        SELECT g.vmid, g.name, g.kind, g.node, g.status, g.host_device_id,
+        SELECT g.plugin_id, g.guest_id, g.name, g.kind, g.host_name AS node, g.status, g.host_device_id,
                COALESCE(h.custom_name, h.hostname, h.primary_ip) AS host_name
-        FROM proxmox_guests g LEFT JOIN devices h ON h.id = g.host_device_id
+        FROM hypervisor_guests g LEFT JOIN devices h ON h.id = g.host_device_id
         WHERE g.device_id = ?
         """,
         (device_id,),
@@ -99,10 +99,10 @@ def _proxmox_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any] | 
 
     rows = conn.execute(
         """
-        SELECT g.vmid, g.name, g.kind, g.status, g.ips, g.device_id,
+        SELECT g.plugin_id, g.guest_id, g.name, g.kind, g.status, g.ips, g.device_id,
                COALESCE(d.custom_name, d.hostname, d.primary_ip) AS device_name
-        FROM proxmox_guests g LEFT JOIN devices d ON d.id = g.device_id
-        WHERE g.host_device_id = ? ORDER BY g.vmid
+        FROM hypervisor_guests g LEFT JOIN devices d ON d.id = g.device_id
+        WHERE g.host_device_id = ? ORDER BY g.plugin_id, g.name
         """,
         (device_id,),
     ).fetchall()
@@ -195,7 +195,7 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
         for r in events
     ]
 
-    result["proxmox"] = _proxmox_info(conn, device_id)
+    result["virtualization"] = _virtualization_info(conn, device_id)
     result["parent"] = _parent_info(conn, device_id)
 
     return result

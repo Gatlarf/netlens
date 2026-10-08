@@ -27,14 +27,13 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
 - Uptime history like Uptime Kuma: heartbeat bars, 24 h / 7 d / 30 d uptime and response times per device
 - E-mail notifications for new and offline devices, with an on/off switch per device
-- Proxmox connector: shows which VMs and containers run on which Proxmox host, on the map and on the device pages
-- ASUS router connector: shows which device is connected to which AiMesh node (stock ASUSWRT)
+- Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: Proxmox VE and ASUS AiMesh come built in (which VM runs on which host, which device is connected to which mesh node)
 - Network hierarchy: which device depends on which (gateway, then Proxmox host, then its guests), as a tree page, a tree layout on the map, and a parent you can set per device
 - Live scan progress in the header
 - Light and dark mode, switchable from the top bar
 - Delete a device (optionally ignoring it in future scans), and a full scan of a single host from its page
 - Backup and restore of everything from the Settings page
-- Every setting you need day to day (ranges, schedule, terminal, mail, Proxmox) is editable in the browser
+- Every setting you need day to day (ranges, schedule, terminal, mail, plugins) is editable in the browser
 
 ## Build and deploy with Docker Compose
 
@@ -206,7 +205,7 @@ Order of precedence: the web setting, then `NETLENS_RANGES`, then auto-detection
 
 ## Settings in the web interface
 
-A menu on the left of the Settings page jumps to each section and highlights the one you are reading (on a narrow screen it becomes a row of buttons on top). Sections can be linked directly: `#/settings/ranges`, `nmap`, `schedule`, `map`, `notifications`, `proxmox`, `asus`, `backup`, `about`, `export` and `session`, for example `http://<docker-host>:8080/#/settings/proxmox`.
+Settings has a menu on the left, grouped into General, Notifications, Integrations, Data and System. **Every entry is its own page** with its own address (so you can bookmark it or use Back): `#/settings/ranges`, `nmap`, `schedule`, `map`, `notifications`, `plugins`, `plugin-<id>` (for example `plugin-proxmox`, `plugin-asus`), `plugin-guide`, `ignored`, `backup`, `export`, `about` and `session`, for example `http://<docker-host>:8080/#/settings/plugin-proxmox`. On a narrow screen the menu becomes a row of buttons on top. The older addresses `#/settings/proxmox` and `#/settings/asus` still work.
 
 Everything below is saved in the data directory, so it survives updates and rebuilds. Values set in the browser take precedence over the matching environment variables; "Reset" returns to the environment value.
 
@@ -216,7 +215,7 @@ Everything below is saved in the data directory, so it survives updates and rebu
 | Scan performance (nmap) | ports, timing and detection used by quick and deep scans, with presets (see "Making scans faster"). The **Scan settings** button next to the scan buttons jumps straight to it |
 | Scan schedule and terminal | how often quick and deep scans run, and the web terminal on/off. Takes effect from the next scheduler cycle, no restart |
 | E-mail notifications | SMTP server and recipients (see below) |
-| Proxmox connector | Proxmox URL and credentials (see below) |
+| Plugins and one page per plugin | turn plugins on or off, upload your own, and each plugin's own settings (see "Plugins" below) |
 | Ignored devices | devices that scans skip, with a button to stop ignoring them |
 | Backup and restore | download a snapshot, restore one |
 
@@ -261,30 +260,41 @@ You can switch the offline mails off **per device** with the checkbox "Send an e
 
 The SMTP password is stored in the database in plain text (like all settings) and is included in backups, so protect the data directory and the backup files.
 
-### ASUS router (AiMesh) connector
+### Plugins
 
-Reads your ASUS router's client list and AiMesh node list and links every online device to the mesh node it is connected to (wired or Wi-Fi), and every mesh node to the router. These links appear in the hierarchy and on the map and rank above traceroute and gateway guesses. It is read-only and uses the router's HTTPS web interface (one login, two reads, a logout per sync; no SSH). Tested on an RT-AX92U with stock firmware.
+Netlens learns about your network from other systems through **plugins**. Two kinds exist: **hypervisor** plugins report VMs and containers and the host each runs on, and **topology** plugins report network nodes (router, switch, access point, mesh node) and which node each client is connected to. Netlens matches what a plugin reports to the devices it has scanned (by MAC address, then IP), and shows the result as links on the map and in the hierarchy.
 
-1. In Settings → *ASUS router (AiMesh)* enter the router's address (for example `192.168.0.1`; HTTPS uses port 8443 unless you give another), the admin username and password, and leave *Verify TLS certificate* off (the router's certificate is self-signed).
-2. Press *Test connection*, then tick *Enable the connector* and *Save*. It then syncs after every scan; *Sync now* does it on demand.
-3. If the router refuses the login, Netlens stops trying until you save or sync again, so a wrong password cannot get the account locked.
+Under **Settings → Integrations** you find:
+
+- **Plugins**: every installed plugin with its type, version, source (built in or uploaded) and last sync, a **Turn on / Turn off** button for each, and an **Upload plugin** box for a `.zip` of your own. A new plugin stays off until you turn it on. Turning one off removes its links from the map and keeps its settings.
+- **One page per plugin** with a settings form that Netlens builds from the plugin's manifest, *Test connection* (saves nothing), *Save* and *Sync now*. A plugin syncs when you turn it on and after every scan. A failing plugin never disturbs the others or the scan, and keeps its last good links; a refused login pauses that plugin until you save or sync it again, so a wrong password cannot get an account locked.
+- **Plugin guide**: how to write a plugin (package format, `plugin.json`, the two functions, the exact data a plugin must return, security notes). The same text is in the repository at [`app/plugins/PLUGINS.md`](app/plugins/PLUGINS.md), and **Download example plugin** gives a working template.
+
+**Uploaded plugins are Python code that runs inside the Netlens container.** Each runs in its own process with a stripped environment, a time limit and no database path, and everything it returns is validated, but this is not a sandbox: it runs as the same user and could read the data volume. Only install plugins you trust and have read. Uploading needs the Netlens login.
+
+#### ASUS router (AiMesh) plugin
+
+Reads your ASUS router's client list and AiMesh node list and links every online device to the mesh node it is connected to (wired or Wi-Fi), and every mesh node to the router. These links appear in the hierarchy and on the map and rank above traceroute and gateway guesses. It is read-only and uses the router's HTTPS web interface (one login, two reads, a logout per sync; no SSH, so no sessions are left open on the router). Tested on an RT-AX92U with stock firmware.
+
+1. Open **Settings → ASUS router (AiMesh)**, enter the router's address (for example `192.168.0.1`; HTTPS uses port 8443 unless you give another), the admin username and password, and leave *Verify TLS certificate* off (the router's certificate is self-signed).
+2. Press *Test connection*, then tick *Enable this plugin* and *Save*.
 
 The password is stored in Netlens' database (inside the data volume and in backups). A dedicated account is a good idea if your firmware allows it.
 
-### Proxmox connector
+#### Proxmox VE plugin
 
-The connector asks Proxmox which VMs and containers exist and which host they run on, and matches them to the devices Netlens found (by MAC address, then by IP). The result:
+The plugin asks Proxmox which VMs and containers exist and which host they run on, and matches them to the devices Netlens found (by MAC address, then by IP). The result:
 
-- the map shows a `host-of` link from every guest to its Proxmox host (confidence 100%, replacing the heuristic guess),
-- a guest's device page shows "Container (LXC) 105, name, on node X" with a link to the host,
+- the map shows a `host-of` link from every guest to its host (replacing the heuristic guess),
+- a guest's device page shows a *Virtualization* box ("Container (LXC) 105, name, on node X") with a link to the host,
 - the host's device page lists all its guests, including stopped ones and guests that are not on the scanned network.
 
 Netlens only reads from Proxmox; it never changes anything. To set it up:
 
 1. **Recommended: create a read-only API token** in Proxmox: *Datacenter → Permissions → API Tokens → Add* (user for example `root@pam`, token ID `netlens`, untick "Privilege Separation" or give the token the role below). Then *Datacenter → Permissions → Add → API Token Permission*: path `/`, the token, role **PVEAuditor**. A username and password work too, but a token limits what a leaked credential can do.
-2. In Netlens open **Settings → Proxmox connector**, enter the URL (`https://<proxmox-host>:8006`), the token ID (`user@realm!tokenname`) and its secret, or a username and password.
+2. In Netlens open **Settings → Proxmox VE**, enter the URL (`https://<proxmox-host>:8006`), the token ID (`user@realm!tokenname`) and its secret, or a username and password.
 3. Proxmox uses a self-signed certificate by default: untick **Verify TLS certificate**, or install a trusted certificate on Proxmox and keep it ticked.
-4. **Test connection** (nothing is saved by the test), then tick **Enable the connector** and **Save**. It syncs immediately and again after every scan; **Sync now** forces it.
+4. **Test connection**, then tick **Enable this plugin** and **Save**.
 
 Netlens must be able to see the guests' MAC addresses, so run it on the same network (host networking, as in the compose file). Guests whose MAC never shows up in a scan are listed on the host page as "not seen on the network".
 
@@ -295,8 +305,8 @@ Netlens works out which device sits below which, like the topology view of a net
 | Priority | Source | Example |
 |---|---|---|
 | 1 | **Set manually** on the device page | "this camera hangs off the garage switch" |
-| 2 | **Proxmox** connector | a VM or container sits below its Proxmox host |
-| 3 | an **uplink** from a switch or mesh connector (planned) | a laptop below the mesh node it is connected to |
+| 2 | a **hypervisor plugin** (for example Proxmox) | a VM or container sits below its host |
+| 3 | an **uplink** from a topology plugin (for example the ASUS router) | a laptop below the mesh node it is connected to |
 | 4 | a **guess** for virtual machines when exactly one hypervisor is known | |
 | 5 | the next router on the **traceroute** path | |
 | 6 | the default **gateway** | everything else |
@@ -323,7 +333,7 @@ The **Full scan** button next to a device's name runs one thorough scan of that 
 
 ### Backup and restore
 
-**Settings → Backup and restore → Download backup** gives you a consistent snapshot of the whole database (devices, history, settings, saved credentials) while Netlens keeps running. **Restore from file** replaces the current data with a backup; it asks for confirmation, refuses to run during a scan, keeps a safety copy of the previous data next to the database (`netlens.db.pre-restore`), and upgrades a backup made by an older version automatically. A backup from a newer Netlens version is refused. Treat backup files like passwords because they contain the saved SMTP and Proxmox credentials.
+**Settings → Backup and restore → Download backup** gives you a consistent snapshot of the whole database (devices, history, settings, saved credentials) while Netlens keeps running. **Restore from file** replaces the current data with a backup; it asks for confirmation, refuses to run during a scan, keeps a safety copy of the previous data next to the database (`netlens.db.pre-restore`), and upgrades a backup made by an older version automatically. A backup from a newer Netlens version is refused. Treat backup files like passwords because they contain the saved SMTP and plugin credentials.
 
 ### Scan progress
 
@@ -369,7 +379,7 @@ While a scan runs, the header shows what it is doing, for example `Deep scan · 
 
 - **gateway** — default route, confidence 1.0 or heuristic 0.5
 - **route** — traceroute hops
-- **host-of** — VM or container to its hypervisor: exact when the Proxmox connector is enabled, otherwise a heuristic guess
+- **host-of** — VM or container to its hypervisor: exact when a hypervisor plugin (for example Proxmox) is enabled, otherwise a heuristic guess
 - **manual** — drawn or deleted links in the UI; deleted inferred links stay hidden
 
 ### Map features
@@ -441,7 +451,7 @@ NETLENS_TOKEN=dev NETLENS_DATA_DIR=./data python -m app.main
 ```
 app/scanner      nmap runner, parsing, scheduling, relations
 app/notify       e-mail notifications (config, SMTP, digest, service)
-app/integrations Proxmox client, matching and sync
+app/plugins      plugin system: manifest and output contract, runner, registry, service; builtin/ has the Proxmox and ASUS plugins; PLUGINS.md is the plugin guide
 app/terminal     SSH/Telnet backends
 app/api          REST API routers
 app/uptime.py    uptime history, app/backup.py  backup and restore
@@ -469,7 +479,7 @@ tests
   | `address already in use` | Another service on the host already uses port 8080 (the container uses host networking). Change `NETLENS_BIND` |
 
   If `docker compose up` itself refuses to start, the message names the missing variable (for example `DOCKERDIR` or `NETLENS_TOKEN`). Run `docker compose config` to see the final configuration with all variables filled in.
-- **Proxmox sync fails:** the message in Settings says why. `the TLS certificate could not be verified`: untick *Verify TLS certificate* (Proxmox's default certificate is self-signed). `authentication failed`: check the token ID (`user@realm!tokenname`), the secret, or the password. `permission denied (... PVEAuditor)`: give the token or user the PVEAuditor role on `/`. `cannot connect`: wrong URL/port or a firewall.
+- **Proxmox sync fails:** the message on the plugin's settings page says why. `the TLS certificate could not be verified`: untick *Verify TLS certificate* (Proxmox's default certificate is self-signed). `authentication failed`: check the token ID (`user@realm!tokenname`), the secret, or the password. `permission denied (... PVEAuditor)`: give the token or user the PVEAuditor role on `/`. `cannot connect`: wrong URL/port or a firewall.
 - **No notification mails:** use **Send test email** first. Check that *Send e-mail notifications* is ticked, that the device has not opted out, and the status line under the card for the last problem. Gmail and most providers need an app password, not your normal password.
 - **A guest does not show under its Proxmox host:** the connector matches by MAC address, so Netlens must have scanned that guest at least once on the same network. Run a scan and press *Sync now*.
 - **No devices found:** Check ranges, host networking, and that nmap has capabilities. Check `docker logs netlens`; scan errors appear under "Scans & events".

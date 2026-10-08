@@ -12,7 +12,7 @@ import urllib.parse
 import urllib.request
 from typing import Any, Callable
 
-from app.integrations.proxmox_config import ProxmoxConfig, normalize_url, uses_token
+from .config import ProxmoxConfig, normalize_url, uses_token
 
 MAC_RE = re.compile(r"^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$")
 # Interfaces that only exist inside a guest (container networks, bridges, tunnels): their addresses
