@@ -28,6 +28,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Uptime history like Uptime Kuma: heartbeat bars, 24 h / 7 d / 30 d uptime and response times per device
 - E-mail notifications for new and offline devices, with an on/off switch per device
 - Proxmox connector: shows which VMs and containers run on which Proxmox host, on the map and on the device pages
+- Network hierarchy: which device depends on which (gateway, then Proxmox host, then its guests), as a tree page, a tree layout on the map, and a parent you can set per device
 - Live scan progress in the header
 - Backup and restore of everything from the Settings page
 - Every setting you need day to day (ranges, schedule, terminal, mail, Proxmox) is editable in the browser
@@ -272,6 +273,27 @@ Netlens only reads from Proxmox; it never changes anything. To set it up:
 4. **Test connection** (nothing is saved by the test), then tick **Enable the connector** and **Save**. It syncs immediately and again after every scan; **Sync now** forces it.
 
 Netlens must be able to see the guests' MAC addresses, so run it on the same network (host networking, as in the compose file). Guests whose MAC never shows up in a scan are listed on the host page as "not seen on the network".
+
+### Network hierarchy
+
+Netlens works out which device sits below which, like the topology view of a network controller. Every device gets at most one **parent**, taken from the first source that knows one:
+
+| Priority | Source | Example |
+|---|---|---|
+| 1 | **Set manually** on the device page | "this camera hangs off the garage switch" |
+| 2 | **Proxmox** connector | a VM or container sits below its Proxmox host |
+| 3 | an **uplink** from a switch or mesh connector (planned) | a laptop below the mesh node it is connected to |
+| 4 | a **guess** for virtual machines when exactly one hypervisor is known | |
+| 5 | the next router on the **traceroute** path | |
+| 6 | the default **gateway** | everything else |
+
+The result is always a tree: an assignment that would put a device below itself is skipped in favour of the next source. You see it in three places:
+
+- **Hierarchy** page (menu): a tree you can expand and collapse and filter. Each row shows the status, type, IP, how many devices are below it, and where its parent came from (Proxmox, gateway, traceroute, set manually). Devices nothing is known about are listed separately at the bottom.
+- **Map**: by default only each device's chosen parent link is drawn, so a Proxmox guest hangs under its host instead of also being linked to the router. *Hierarchy links / All links* switches between that and every inferred link, and *Free layout / Tree layout* arranges the devices as a top-down tree (the tree arranges itself, and dragging in it does not overwrite your saved free-layout positions). Clicking a device shows its parent.
+- **Device page**, card **Network position**: shows what the device sits below and why, lists the devices below it, and lets you choose the parent: *Automatic*, *None (top level)* or a specific device. Devices below the current one are not offered, so a loop is impossible. If a chosen parent is deleted, the device goes back to automatic.
+
+The same data is available as `GET /api/hierarchy`, and `PATCH /api/devices/<id>` accepts `parent_mode` (`auto`, `none`, `device`) and `parent_device_id`.
 
 ### Backup and restore
 

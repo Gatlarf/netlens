@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def utcnow() -> str:
@@ -197,6 +197,12 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     # --- schema v2 -------------------------------------------------------
     _add_column_if_missing(conn, "devices", "notify_offline", "INTEGER NOT NULL DEFAULT 1")
+
+    # --- schema v3: user-chosen parent in the network hierarchy -----------
+    # parent_mode: 'auto' (derived from Proxmox/route/gateway), 'none' (top level on purpose)
+    # or 'device' (parent_device_id is the chosen parent)
+    _add_column_if_missing(conn, "devices", "parent_mode", "TEXT NOT NULL DEFAULT 'auto'")
+    _add_column_if_missing(conn, "devices", "parent_device_id", "INTEGER REFERENCES devices(id) ON DELETE SET NULL")
 
     # uptime heartbeats: one row per device per completed scan covering it
     cur.execute(

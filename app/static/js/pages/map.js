@@ -21,7 +21,26 @@ const EDGE_STYLES = {
   route: { color: "#2563eb", width: 1, dashes: [8, 6] },
   "host-of": { color: "#7c3aed", width: 1, dashes: [2, 5] },
   manual: { color: "#f59e0b", width: 3, dashes: false },
+  parent: { color: "#334155", width: 2, dashes: false },
 };
+
+// Remembered view choices (the page is re-rendered when one changes).
+function readPref(key, allowed, fallback) {
+  try {
+    const v = localStorage.getItem(key);
+    return allowed.includes(v) ? v : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function savePref(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    // storage unavailable: the choice just is not remembered
+  }
+}
 
 function loadVis() {
   if (window.vis) return Promise.resolve();
@@ -51,7 +70,7 @@ function nodeColor(type) {
   return PALETTE[type] || PALETTE.unknown;
 }
 
-function buildNodeData(node) {
+function buildNodeData(node, treeLayout = false) {
   const color = nodeColor(node.type);
   const label = node.label && node.label !== node.ip ? `${node.label}\n${node.ip}` : node.ip;
   const data = {
@@ -63,14 +82,14 @@ function buildNodeData(node) {
     opacity: node.online ? 1 : 0.4,
     hidden: false,
   };
-  if (node.pos_x != null && node.pos_y != null) {
+  if (!treeLayout && node.pos_x != null && node.pos_y != null) {
     data.x = node.pos_x;
     data.y = node.pos_y;
   }
   return data;
 }
 
-function buildEdgeData(edge) {
+function buildEdgeData(edge, treeLayout = false) {
   const style = EDGE_STYLES[edge.kind] || EDGE_STYLES.gateway;
   return {
     id: edge.id,
@@ -80,8 +99,8 @@ function buildEdgeData(edge) {
     width: style.width,
     dashes: style.dashes,
     arrows: "to",
-    smooth: { type: "continuous" },
-    title: edgeTitle(edge),
+    smooth: treeLayout ? { type: "cubicBezier", forceDirection: "vertical", roundness: 0.5 } : { type: "continuous" },
+    title: edge.kind === "parent" ? edge.reason : edgeTitle(edge),
     hidden: false,
   };
 }
@@ -129,14 +148,39 @@ export async function render(container, params) {
   statusSelect.appendChild(h("option", { value: "Online" }, "Online"));
   statusSelect.appendChild(h("option", { value: "Offline" }, "Offline"));
 
+  const treeLayout = readPref("netlens.map.layout", ["free", "tree"], "free") === "tree";
+  // the tree layout needs the parent -> child links, so it always shows the hierarchy
+  const linksMode = treeLayout ? "hierarchy" : readPref("netlens.map.links", ["hierarchy", "all"], "hierarchy");
+  const refreshView = () => window.dispatchEvent(new Event("hashchange"));
+
+  const linksSelect = h("select", { class: "links-mode", title: "Which links to draw" });
+  linksSelect.appendChild(h("option", { value: "hierarchy" }, "Hierarchy links"));
+  linksSelect.appendChild(h("option", { value: "all" }, "All links"));
+  linksSelect.value = linksMode;
+  linksSelect.disabled = treeLayout;
+  linksSelect.addEventListener("change", () => {
+    savePref("netlens.map.links", linksSelect.value);
+    refreshView();
+  });
+  const layoutSelect = h("select", { class: "layout-mode", title: "How the devices are arranged" });
+  layoutSelect.appendChild(h("option", { value: "free" }, "Free layout"));
+  layoutSelect.appendChild(h("option", { value: "tree" }, "Tree layout"));
+  layoutSelect.value = treeLayout ? "tree" : "free";
+  layoutSelect.addEventListener("change", () => {
+    savePref("netlens.map.layout", layoutSelect.value);
+    refreshView();
+  });
+
   const addLinkBtn = h("button", { class: "btn" }, "Add link");
   const deleteLinkBtn = h("button", { class: "btn danger" }, "Delete link");
   deleteLinkBtn.disabled = true;
   const resetBtn = h("button", { class: "btn" }, "Reset layout");
+  resetBtn.disabled = treeLayout; // the tree arranges itself
   const exportBtn = h("button", { class: "btn" }, "Export PNG");
 
   const legend = h("div", { class: "legend" });
   const legendItems = [
+    { kind: "parent", label: "Parent → child" },
     { kind: "gateway", label: "Gateway" },
     { kind: "route", label: "Route" },
     { kind: "host-of", label: "Host-of" },
@@ -151,6 +195,8 @@ export async function render(container, params) {
   toolbar.appendChild(searchInput);
   toolbar.appendChild(typeSelect);
   toolbar.appendChild(statusSelect);
+  toolbar.appendChild(linksSelect);
+  toolbar.appendChild(layoutSelect);
   toolbar.appendChild(addLinkBtn);
   toolbar.appendChild(deleteLinkBtn);
   toolbar.appendChild(resetBtn);
@@ -181,7 +227,19 @@ export async function render(container, params) {
       arrows: "to",
       smooth: { type: "continuous" },
     },
-    physics: {
+    layout: treeLayout
+      ? {
+          hierarchical: {
+            enabled: true,
+            direction: "UD",
+            sortMethod: "directed",
+            levelSeparation: 120,
+            nodeSpacing: 150,
+            treeSpacing: 200,
+          },
+        }
+      : {},
+    physics: treeLayout ? { enabled: false } : {
       enabled: true,
       barnesHut: {
         gravitationalConstant: -3000,
@@ -241,6 +299,13 @@ export async function render(container, params) {
     const macEl = h("p", { class: "mono" }, `MAC: ${node.mac}`);
     panel.appendChild(macEl);
 
+    if (node.parent_id != null) {
+      const parent = currentNodes.find((n) => n.id === node.parent_id);
+      const how = { manual: "set manually", proxmox: "Proxmox host", route: "traceroute", gateway: "gateway", uplink: "uplink", guess: "guess" }[node.parent_source] || node.parent_source;
+      panel.appendChild(h("p", {}, "Parent: ", h("a", { href: `#/device/${node.parent_id}` }, parent ? parent.label || parent.ip : `device ${node.parent_id}`), ` (${how})`));
+    } else {
+      panel.appendChild(h("p", {}, "Parent: none (top level)"));
+    }
     panel.appendChild(h("p", {}, `Vendor: ${node.vendor || "Unknown"}`));
     panel.appendChild(h("p", {}, `Open ports: ${node.open_ports}`));
 
@@ -269,6 +334,14 @@ export async function render(container, params) {
     if (node) fillPanel(node);
   });
 
+  // Dragging selects a node without a click, and clicking an already selected node does nothing:
+  // open the details panel when a drag starts so it is not left closed.
+  network.on("dragStart", (params) => {
+    if (destroyed || params.nodes.length === 0) return;
+    const node = currentNodes.find((n) => n.id === params.nodes[0]);
+    if (node) fillPanel(node);
+  });
+
   network.on("deselectNode", () => {
     if (destroyed) return;
     closePanel();
@@ -277,7 +350,8 @@ export async function render(container, params) {
   network.on("selectEdge", (params) => {
     if (destroyed) return;
     selectedEdgeId = params.edges[0];
-    deleteLinkBtn.disabled = false;
+    // parent links ("p<id>") are derived: change them on the device page instead
+    deleteLinkBtn.disabled = typeof selectedEdgeId === "string";
   });
 
   network.on("deselectEdge", () => {
@@ -287,7 +361,7 @@ export async function render(container, params) {
   });
 
   network.on("dragEnd", (params) => {
-    if (destroyed) return;
+    if (destroyed || treeLayout) return;
     if (params.nodes.length === 0) return;
     const positions = network.getPositions(params.nodes);
     for (const id of params.nodes) {
@@ -394,7 +468,11 @@ export async function render(container, params) {
       const data = await get("/api/map");
       if (destroyed) return;
       const newNodes = data.nodes || [];
-      const newEdges = data.edges || [];
+      // "Hierarchy" draws each device's chosen parent link (plus links you drew by hand);
+      // "All links" draws every inferred relation like before.
+      const newEdges = (data.edges || []).filter((e) =>
+        linksMode === "hierarchy" ? e.kind === "parent" || e.kind === "manual" : e.kind !== "parent"
+      );
 
       const existingNodeIds = new Set(nodesDS.getIds());
       const existingEdgeIds = new Set(edgesDS.getIds());
@@ -415,7 +493,7 @@ export async function render(container, params) {
 
       for (const node of newNodes) {
         const existing = nodesDS.get(node.id);
-        const data = buildNodeData(node);
+        const data = buildNodeData(node, treeLayout);
         if (existing) {
           nodesDS.update(data);
         } else {
@@ -425,7 +503,7 @@ export async function render(container, params) {
 
       for (const edge of newEdges) {
         const existing = edgesDS.get(edge.id);
-        const data = buildEdgeData(edge);
+        const data = buildEdgeData(edge, treeLayout);
         if (existing) {
           edgesDS.update(data);
         } else {

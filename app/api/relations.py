@@ -4,6 +4,7 @@ import sqlite3
 from typing import Any
 
 from app.api.devices import get_conn
+from app.hierarchy import load_hierarchy
 from app.scanner.relstore import list_relations, add_manual, delete_relation
 
 
@@ -74,7 +75,26 @@ def get_map(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
             "tags": tags,
         })
 
+    # The chosen parent of every device as an edge parent -> child (the "hierarchy" view of the map)
+    _, hierarchy = load_hierarchy(conn)
+    by_id = {n["id"]: n for n in nodes}
+    for dev_id, info in hierarchy.items():
+        by_id[dev_id]["parent_id"] = info.parent_id
+        by_id[dev_id]["parent_source"] = info.source
+
     edges: list[dict[str, Any]] = []
+    for dev_id, info in sorted(hierarchy.items()):
+        if info.parent_id is not None:
+            edges.append({
+                "id": f"p{dev_id}",
+                "from": info.parent_id,
+                "to": dev_id,
+                "kind": "parent",
+                "source": info.source,
+                "confidence": 1.0,
+                "manual": info.locked,
+                "reason": info.reason,
+            })
     for rel in list_relations(conn):
         edges.append({
             "id": rel["id"],

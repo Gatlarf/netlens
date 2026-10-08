@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.db import connect
+from app.hierarchy import children_map, descendants, device_name, load_hierarchy, would_loop
 
 DEVICE_TYPES = {
     "router",
@@ -42,6 +43,8 @@ class DevicePatch(BaseModel):
     tags: list[str] | None = None
     type_override: str | None = None
     notify_offline: bool | None = None
+    parent_mode: str | None = None          # 'auto' | 'none' | 'device'
+    parent_device_id: int | None = None
     pos_x: float | None = None
     pos_y: float | None = None
 
@@ -116,6 +119,34 @@ def _proxmox_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any] | 
     return {"guest": guest, "guests": guests}
 
 
+def _parent_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any]:
+    """Where the device sits in the network hierarchy and what is below it."""
+    devs, hierarchy = load_hierarchy(conn)
+    d = devs[device_id]
+    info = hierarchy[device_id]
+    parent = None
+    if info.parent_id is not None:
+        parent = {"id": info.parent_id, "name": device_name(devs[info.parent_id])}
+    kids = children_map(hierarchy).get(device_id, [])
+    return {
+        "mode": d["parent_mode"],
+        "device_id": d["parent_device_id"] if d["parent_mode"] == "device" else None,
+        "effective": parent,
+        "source": info.source,
+        "reason": info.reason,
+        "children": [
+            {
+                "id": k,
+                "name": device_name(devs[k]),
+                "type": devs[k]["type_override"] or devs[k]["device_type"] or "unknown",
+                "online": bool(devs[k]["online"]),
+            }
+            for k in sorted(kids, key=lambda i: device_name(devs[i]).lower())
+        ],
+        "descendants": sorted(descendants(hierarchy, device_id)),
+    }
+
+
 def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.Row) -> dict[str, Any]:
     result = _device_dict(row)
 
@@ -164,6 +195,7 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
     ]
 
     result["proxmox"] = _proxmox_info(conn, device_id)
+    result["parent"] = _parent_info(conn, device_id)
 
     return result
 
@@ -335,6 +367,32 @@ def patch_device(
 
     if "notify_offline" in fields_set:
         updates["notify_offline"] = 0 if body.notify_offline is False else 1
+
+    if "parent_mode" in fields_set or "parent_device_id" in fields_set:
+        mode = body.parent_mode
+        parent_id = body.parent_device_id
+        if mode is None:  # a bare parent_device_id means "use this device"; neither means automatic
+            mode = "device" if parent_id is not None else "auto"
+        if mode not in ("auto", "none", "device"):
+            raise HTTPException(status_code=422, detail="parent_mode must be auto, none or device")
+        if mode == "device":
+            if parent_id is None:
+                raise HTTPException(status_code=422, detail="parent_device_id is required when parent_mode is device")
+            devs, hierarchy = load_hierarchy(conn)
+            if parent_id == device_id:
+                raise HTTPException(status_code=422, detail="a device cannot be its own parent")
+            if parent_id not in devs:
+                raise HTTPException(status_code=422, detail="parent device not found")
+            if would_loop(hierarchy, device_id, parent_id):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"{device_name(devs[parent_id])} sits below this device; choosing it as parent would create a loop",
+                )
+            updates["parent_mode"] = "device"
+            updates["parent_device_id"] = parent_id
+        else:
+            updates["parent_mode"] = mode
+            updates["parent_device_id"] = None
 
     if "pos_x" in fields_set:
         updates["pos_x"] = body.pos_x

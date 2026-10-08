@@ -2,6 +2,7 @@ import { get, patch, ApiError } from "../api.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS } from "../util.js";
 import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
+import { buildParentCard } from "../cards/device_parent.js";
 
 const WEB_PORTS = new Set([80, 443, 8080, 8443, 8006, 5000, 5001, 9000]);
 
@@ -325,6 +326,11 @@ export async function render(container, params) {
     const right = h("div", { class: "col-right" });
     const newEdit = buildEditCard(device, () => load());
     right.appendChild(newEdit.card);
+    const parentSlot = h("div", {});
+    right.appendChild(parentSlot);
+    buildParentCard(device, (message) => { toast(message, "success"); load(); })
+      .then((c) => { if (!disposed) parentSlot.appendChild(c); })
+      .catch(() => {});
     const proxmoxCard = buildProxmoxCard(device);
     if (proxmoxCard) right.appendChild(proxmoxCard);
     const uptimeSlot = h("div", {});
