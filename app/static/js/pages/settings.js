@@ -5,6 +5,7 @@ import { buildGeneralCard } from "../cards/general.js";
 import { buildNotificationsCard } from "../cards/notifications.js";
 import { buildProxmoxCard } from "../cards/proxmox.js";
 import { buildAsusCard } from "../cards/asus.js";
+import { buildMapCard } from "../cards/map_settings.js";
 import { buildBackupCard } from "../cards/backup.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 
@@ -95,6 +96,7 @@ const SECTIONS = [
   { key: "ranges", label: "Scan ranges" },
   { key: "nmap", label: "Scan performance" },
   { key: "schedule", label: "Schedule & terminal" },
+  { key: "map", label: "Map" },
   { key: "notifications", label: "E-mail notifications" },
   { key: "proxmox", label: "Proxmox connector" },
   { key: "asus", label: "ASUS router (AiMesh)" },
@@ -202,6 +204,7 @@ export async function render(container, params) {
   for (const [key, build] of [
     ["nmap", buildScanOptionsCard],
     ["schedule", buildGeneralCard],
+    ["map", buildMapCard],
     ["notifications", buildNotificationsCard],
     ["proxmox", buildProxmoxCard],
     ["asus", buildAsusCard],
