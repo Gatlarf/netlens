@@ -12,3 +12,4 @@
 3. Publish: push a tag like `v1.0.0`. The workflow in `.github/workflows/release.yml` builds `plugin.zip`, attaches it to a GitHub
    release and prints the SHA-256 you need for the index entry.
 4. Submit it: see [`plugin-index/README.md`](../README.md).
+
