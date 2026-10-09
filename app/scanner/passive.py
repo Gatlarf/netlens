@@ -11,10 +11,11 @@ The parsers are pure functions on bytes; `Listener` owns the raw socket (needs C
 from __future__ import annotations
 
 import asyncio
-import ctypes
 import logging
+import os
 import socket
 import struct
+import sys
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -258,19 +259,22 @@ def _bpf_program() -> bytes:
     return b"".join(struct.pack("HBBI", *i) for i in ins)
 
 
-def open_socket() -> socket.socket:
-    """A raw packet socket that only receives DHCP / mDNS / SSDP datagrams. Raises PermissionError / OSError without NET_RAW."""
-    sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003))
-    try:
-        program = _bpf_program()
-        buf = ctypes.create_string_buffer(program, len(program))
-        fprog = struct.pack("HL", len(program) // 8, ctypes.addressof(buf))
-        sock.setsockopt(socket.SOL_SOCKET, 26, fprog)   # SO_ATTACH_FILTER
-        sock.setblocking(False)
-        return sock
-    except Exception:
-        sock.close()
-        raise
+# The web application runs without privileges; only this small helper (the standard library, nothing of Netlens) needs
+# CAP_NET_RAW. In the Docker image it runs with a copy of Python that has that file capability. It writes every frame
+# the kernel filter lets through as <2 bytes length><frame> to its standard output.
+RAW_PYTHON = "/usr/local/bin/python-raw"
+SNIFFER = """
+import ctypes, socket, struct, sys
+program = bytes.fromhex(sys.argv[1])
+sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
+buf = ctypes.create_string_buffer(program, len(program))
+sock.setsockopt(socket.SOL_SOCKET, 26, struct.pack("HL", len(program) // 8, ctypes.addressof(buf)))
+out = sys.stdout.buffer
+while True:
+    frame = sock.recv(2048)
+    out.write(struct.pack("!H", len(frame)) + frame)
+    out.flush()
+"""
 
 
 def join_multicast() -> list[socket.socket]:
@@ -336,36 +340,37 @@ class Listener:
         return done
 
     async def run(self) -> None:
-        loop = asyncio.get_running_loop()
-        try:
-            sock = open_socket()
-        except (PermissionError, OSError) as exc:
-            self.stats["error"] = "needs the NET_RAW capability" if isinstance(exc, PermissionError) else str(exc)
-            log.info("passive listening is off: %s", self.stats["error"])
-            return
+        exe = RAW_PYTHON if os.path.exists(RAW_PYTHON) else sys.executable
+        proc = await asyncio.create_subprocess_exec(
+            exe, "-I", "-c", SNIFFER, _bpf_program().hex(),
+            stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
         groups = join_multicast()
-
-        def on_readable() -> None:
-            for _ in range(200):
-                try:
-                    self.feed(sock.recv(2048))
-                except BlockingIOError:
-                    break
-                except OSError:
-                    break
-
-        loop.add_reader(sock.fileno(), on_readable)
         self.stats["running"] = True
+        flusher = asyncio.create_task(self._flush_loop())
         try:
+            assert proc.stdout is not None
             while True:
-                await asyncio.sleep(FLUSH_EVERY)
-                await asyncio.to_thread(self.flush)
+                head = await proc.stdout.readexactly(2)
+                self.feed(await proc.stdout.readexactly(struct.unpack("!H", head)[0]))
+        except asyncio.IncompleteReadError:
+            err = (await proc.stderr.read()).decode("utf-8", "replace") if proc.stderr else ""
+            denied = "not permitted" in err or "Permission" in err
+            self.stats["error"] = "needs the NET_RAW capability" if denied else (err.strip().splitlines() or ["the listener stopped"])[-1][:200]
+            log.info("passive listening stopped: %s", self.stats["error"])
         finally:
             self.stats["running"] = False
-            loop.remove_reader(sock.fileno())
-            sock.close()
+            flusher.cancel()
+            if proc.returncode is None:
+                proc.kill()
+            await proc.wait()
             for g in groups:
                 g.close()
+
+    async def _flush_loop(self) -> None:
+        while True:
+            await asyncio.sleep(FLUSH_EVERY)
+            await asyncio.to_thread(self.flush)
 
 
 SETTING = "passive.enabled"

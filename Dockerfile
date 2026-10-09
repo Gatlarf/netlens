@@ -20,7 +20,12 @@ RUN apt-get update && \
         libcap2-bin \
         ca-certificates && \
     setcap cap_net_raw,cap_net_admin+eip "$(readlink -f "$(command -v nmap)")" && \
+    cp "$(readlink -f "$(command -v python3)")" /usr/local/bin/python-raw && \
+    setcap cap_net_raw+eip /usr/local/bin/python-raw && \
     rm -rf /var/lib/apt/lists/*
+
+# python-raw is a copy of Python with only CAP_NET_RAW, used by the small passive-listening helper
+# (app/scanner/passive.py) that reads DHCP / mDNS / SSDP broadcasts; the web application itself stays unprivileged.
 
 # Create non-root user and group for security.
 RUN groupadd -g 10001 netlens && \

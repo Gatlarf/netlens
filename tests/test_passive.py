@@ -165,3 +165,35 @@ def test_bpf_filter_rejects_tcp_arp_and_fragments():
     assert run_bpf(program, udp[:20] + b"\x00\x08" + udp[22:]) == 0                  # fragment
     with_options = eth_ip_udp(b"x" * 20, dport=5353, options_ihl=5)
     assert run_bpf(program, with_options) > 0
+
+
+import asyncio
+import os
+
+
+def test_listener_reports_a_missing_capability(tmp_path):
+    if os.geteuid() == 0:
+        pytest.skip("root may open raw sockets")
+    listener = passive.Listener(str(tmp_path / "x.db"))
+    asyncio.run(asyncio.wait_for(listener.run(), 10))
+    assert listener.stats["running"] is False and listener.stats["error"] == "needs the NET_RAW capability"
+
+
+def test_listener_reads_frames_from_the_helper(tmp_path, monkeypatch):
+    frame = eth_ip_udp(dhcp(hostname="from-helper", params=WINDOWS_PARAMS))
+    monkeypatch.setattr(passive, "SNIFFER", f"import struct, sys, time\nf = bytes.fromhex('{frame.hex()}')\nsys.stdout.buffer.write(struct.pack('!H', len(f)) + f)\nsys.stdout.buffer.flush()\ntime.sleep(30)\n")
+    monkeypatch.setattr(passive, "FLUSH_EVERY", 60)
+    listener = passive.Listener(str(tmp_path / "x.db"))
+
+    async def go():
+        task = asyncio.create_task(listener.run())
+        for _ in range(50):
+            await asyncio.sleep(0.1)
+            if listener.pending:
+                break
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(go())
+    assert listener.pending["02:aa:bb:cc:dd:01"].names == {"from-helper": "dhcp"}
