@@ -241,6 +241,13 @@ export async function buildScanOptionsCard() {
     const h3Both = h("h3", {}, "Both");
     form.appendChild(h3Both);
 
+    const fieldRecheck = h("div", { class: "field" });
+    fieldRecheck.appendChild(h("label", {}, "Look again before marking a device offline"));
+    const inputRecheck = h("input", { type: "checkbox", name: "recheck_missing", checked: options.recheck_missing !== false });
+    fieldRecheck.appendChild(inputRecheck);
+    fieldRecheck.appendChild(h("p", { class: "hint" }, "A device the scan did not see is asked for once more on its own before it is marked offline. Stops devices that answer slowly (some switches and access points) from flapping."));
+    form.appendChild(fieldRecheck);
+
     const fieldSkipDns = h("div", { class: "field" });
     fieldSkipDns.appendChild(h("label", {}, "Skip reverse DNS lookups"));
     const inputSkipDns = h("input", {
@@ -302,6 +309,7 @@ export async function buildScanOptionsCard() {
       inputDeepTraceroute.checked = preset.deep_traceroute;
       inputDeepScripts.checked = !!preset.deep_scripts;
       inputSkipDns.checked = preset.skip_dns;
+      inputRecheck.checked = preset.recheck_missing !== false;
       inputQuickHostTimeout.value = String(preset.quick_host_timeout);
       inputDeepHostTimeout.value = String(preset.deep_host_timeout);
     }
@@ -319,6 +327,7 @@ export async function buildScanOptionsCard() {
         deep_traceroute: inputDeepTraceroute.checked,
         deep_scripts: inputDeepScripts.checked,
         skip_dns: inputSkipDns.checked,
+        recheck_missing: inputRecheck.checked,
         quick_host_timeout: Number(inputQuickHostTimeout.value),
         deep_host_timeout: Number(inputDeepHostTimeout.value),
       };

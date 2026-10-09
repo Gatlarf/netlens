@@ -65,6 +65,7 @@ function renderProbe(box, r) {
   table.appendChild(h("thead", {}, h("tr", {}, h("th", {}, "Probe"), h("th", {}, "Answered"), h("th", {}, "Typical answer time"))));
   const body = h("tbody");
   for (const m of r.methods) body.appendChild(h("tr", {}, h("td", {}, m.method), h("td", {}, `${m.answered} of ${m.asked}`), h("td", {}, m.rtt_ms != null ? `${m.rtt_ms} ms` : "—")));
+  if (r.scan) body.appendChild(h("tr", {}, h("td", {}, "Netlens quick scan of just this device"), h("td", {}, r.scan.up ? "found it" : "did not find it"), h("td", {}, `${r.scan.seconds} s`)));
   table.appendChild(body);
   box.appendChild(table);
   box.appendChild(findingsList(r.findings));

@@ -630,7 +630,7 @@ async def flapping_probe(device_id: int, request: Request, conn: sqlite3.Connect
         raise HTTPException(status_code=409, detail="a live test is already running")
     request.app.state.flapping_probe_busy = True
     try:
-        return await flapping.probe(row["primary_ip"], runner=getattr(request.app.state, "action_runner", None), pause=getattr(request.app.state, "flapping_pause", 1.0))
+        return await flapping.probe(row["primary_ip"], runner=getattr(request.app.state, "action_runner", None), pause=getattr(request.app.state, "flapping_pause", 1.0), options=request.app.state.scan_manager.options)
     except actions.ActionError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     finally:

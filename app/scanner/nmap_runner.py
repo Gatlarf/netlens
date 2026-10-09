@@ -41,7 +41,7 @@ def build_args(
     if timing < 0 or timing > 5:
         raise ValueError(f"timing must be 0-5, got {timing}")
 
-    if kind not in ("quick", "deep", "full", "gentle"):
+    if kind not in ("quick", "deep", "full", "gentle", "recheck"):
         raise ValueError(f"invalid kind: {kind!r}")
     # `options` (set on the Settings page) decides the command line; without it the defaults
     # apply with the given timing template.

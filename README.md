@@ -643,9 +643,11 @@ While a scan runs, the header shows what it is doing, for example `Deep scan · 
 
 ### Investigating a device that keeps going offline
 
-A device that flaps is not always faulty: it may only stop answering Netlens. The **Stability** card on the device page (administrators) has an **Investigate** button that reads the scan history of the last 1-30 days and reports how often and for how long the device is missed, whether the devices behind it stayed online during its gaps (then it is running and merely not answering the probes; this needs the devices behind it to have it as their *Network position* parent), whether other devices were missed at the same moments (a scan problem rather than a device problem), whether it drops at a regular interval or at a certain time of day, and whether it slows down before it drops. **Run live test** then asks the device 8 times by ARP, ping and TCP and shows which probe goes unanswered: a device that answers ARP only now and then is the typical cause of a switch or access point that seems to flap while traffic through it is fine.
+A device that flaps is not always faulty: it may only stop answering Netlens. The **Stability** card on the device page (administrators) has an **Investigate** button that reads the scan history of the last 1-30 days and reports how often and for how long the device is missed, whether the devices behind it stayed online during its gaps (then it is running and merely not answering the probes; this needs the devices behind it to have it as their *Network position* parent), whether other devices were missed at the same moments (a scan problem rather than a device problem), whether it drops at a regular interval or at a certain time of day, and whether it slows down before it drops. **Run live test** then asks the device 8 times by ARP, ping and TCP, runs a real quick scan of just that device, and shows which probe goes unanswered: a device that answers ARP only now and then is the typical cause of a switch or access point that seems to flap while traffic through it is fine.
 
 ### Offline marking
+
+A device that was online and is not seen by a scan is asked for once more on its own (a short `nmap -sn` with retries) before it is marked offline, because a big sweep gives up on devices that answer late. *Settings → Scan performance → Look again before marking a device offline* switches this off.
 
 - Devices not seen inside scanned ranges are marked offline
 

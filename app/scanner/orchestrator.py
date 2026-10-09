@@ -136,6 +136,45 @@ class ScanManager:
             pass
         return True
 
+    async def _recheck_missing(self, conn: sqlite3.Connection, result: dict, targets: list[str], kwargs: dict[str, Any]) -> list:
+        """Ask once more, one by one, for the devices that were online but not seen by the sweep.
+
+        A big ARP sweep gives up on a host that answers late (a switch whose management processor is busy answered after
+        170 ms while the sweep had waited for 10); such a device would flap offline and online although it is fine.
+        """
+        networks = []
+        for target in targets:
+            try:
+                networks.append(ipaddress.ip_network(target, strict=False))
+            except ValueError:
+                pass
+        seen = set(result["device_ids"])
+        candidates: dict[str, int] = {}
+        for row in conn.execute("SELECT id, primary_ip FROM devices WHERE online = 1 AND primary_ip IS NOT NULL").fetchall():
+            if row["id"] in seen:
+                continue
+            try:
+                addr = ipaddress.ip_address(row["primary_ip"])
+            except ValueError:
+                continue
+            if addr.version == 4 and any(addr in n for n in networks):
+                candidates[row["primary_ip"]] = row["id"]
+        if not candidates or len(candidates) > 100:
+            return []
+        self._set_progress(phase="scanning", task=f"Checking {len(candidates)} missing device(s) again", percent=None)
+        options = {k: v for k, v in kwargs.items() if k in ("nmap_path", "options")}
+        try:
+            found = [h for h in parse_nmap_xml(await self.runner("recheck", list(candidates), **options)) if h.ip in candidates]
+        except (ScanError, ValueError):
+            logging.getLogger(__name__).warning("the second look for missing devices failed", exc_info=True)
+            return []
+        if found:
+            again = save_scan_results(conn, found, "quick", now=utcnow(), extra_names={})
+            result["device_ids"] = list(result["device_ids"]) + again["device_ids"]
+            result.setdefault("rtts", {}).update(again.get("rtts", {}))
+            logging.getLogger(__name__).info("the second look found %d of %d missing device(s)", len(found), len(candidates))
+        return found
+
     def _gentle_addresses(self) -> list[str]:
         """Addresses of the devices that are never probed (device page: Gentle scanning), within the scan ranges' reach."""
         conn = connect(self.db_path)
@@ -226,6 +265,8 @@ class ScanManager:
                 now=utcnow(),
                 extra_names=extra,
             )
+            if kind in ("quick", "deep") and self.options.recheck_missing:
+                hosts += await self._recheck_missing(conn, result, targets, kwargs)
             mark_offline(
                 conn,
                 result["device_ids"],

@@ -23,6 +23,7 @@ class ScanOptions:
     deep_traceroute: bool = True
     deep_scripts: bool = False      # extra nmap scripts that read names/OS/products from web pages, certificates, SMB, NetBIOS, UPnP
     skip_dns: bool = False
+    recheck_missing: bool = True    # before marking a device offline, ask for it once more on its own (slow ARP answers are missed in a big sweep)
     quick_host_timeout: int = 120   # seconds nmap may spend on one host in a quick scan; 0 = no limit
     deep_host_timeout: int = 900    # same for a deep scan (stops one slow host from holding the scan for an hour)
 
@@ -136,6 +137,10 @@ def options_from_dict(data: dict, base: ScanOptions | None = None) -> ScanOption
             if not isinstance(value, bool):
                 raise ValueError(f"{key}: must be true or false")
             opts = replace(opts, deep_scripts=value)
+        elif key == "recheck_missing":
+            if not isinstance(value, bool):
+                raise ValueError(f"{key}: must be true or false")
+            opts = replace(opts, recheck_missing=value)
         elif key == "skip_dns":
             if not isinstance(value, bool):
                 raise ValueError(f"{key}: must be true or false")
@@ -175,8 +180,11 @@ FULL_SCAN_HOST_TIMEOUT = 1800  # seconds: a full scan of one host may take a whi
 
 
 def option_args(kind: str, opts: ScanOptions) -> list[str]:
-    if kind not in ("quick", "deep", "full", "gentle"):
+    if kind not in ("quick", "deep", "full", "gentle", "recheck"):
         raise ValueError(f"unknown kind: {kind}")
+    if kind == "recheck":
+        # Devices the sweep did not see: ask each one on its own, patiently (ARP answers from a busy switch can come late)
+        return ["-sn", "-n", f"-T{min(opts.timing, 3)}", "--max-retries", "4", "--host-timeout", "30s"]
     if kind == "gentle":
         # Devices marked "gentle" (a TV asks its owner for permission when something connects to its remote-control port):
         # only find out which ports are open. No service detection, scripts, OS detection or traceroute.

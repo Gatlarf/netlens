@@ -17,6 +17,7 @@ import ipaddress
 import re
 import sqlite3
 import statistics
+import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -24,6 +25,7 @@ from typing import Any
 from app import actions
 from app.hierarchy import descendants, load_hierarchy
 from app.scanner.nmap_parser import parse_nmap_xml
+from app.scanner.nmap_runner import build_args
 
 DAYS = (1, 3, 7, 14, 30)
 MIN_OUTAGES = 3        # fewer than this is not "flapping"
@@ -204,7 +206,7 @@ METHODS = (
 )
 
 
-async def probe(ip: str | None, rounds: int = 8, pause: float = 1.0, runner=None) -> dict[str, Any]:
+async def probe(ip: str | None, rounds: int = 8, pause: float = 1.0, runner=None, options=None) -> dict[str, Any]:
     """Ask the device `rounds` times by ARP, ICMP and TCP (in parallel) and report how many answers each got."""
     if not ip:
         raise actions.ActionError("this device has no IP address")
@@ -233,11 +235,20 @@ async def probe(ip: str | None, rounds: int = 8, pause: float = 1.0, runner=None
                     tally[name]["rtts"].append(rtt)
         if i < rounds - 1:
             await asyncio.sleep(pause)
+    # ... and a real quick scan of just this device, the way Netlens scans: does it report the device as up?
+    scan: dict[str, Any] = {"up": False, "seconds": None}
+    started = time.monotonic()
+    try:
+        xml = await actions.nmap_output(build_args("quick", [ip], 3, options=options) + [], 150, runner)
+        scan["up"] = bool(parse_nmap_xml(xml))
+    except (actions.ActionError, ValueError):
+        pass
+    scan["seconds"] = round(time.monotonic() - started, 1)
     methods = [{"method": name, "answered": t["answered"], "asked": rounds, "rtt_ms": round(statistics.median(t["rtts"]), 2) if t["rtts"] else None} for name, t in tally.items()]
-    return {"ip": ip, "rounds": rounds, "methods": methods, "findings": probe_findings(methods)}
+    return {"ip": ip, "rounds": rounds, "methods": methods, "scan": scan, "findings": probe_findings(methods, scan)}
 
 
-def probe_findings(methods: list[dict[str, Any]]) -> list[dict[str, str]]:
+def probe_findings(methods: list[dict[str, Any]], scan: dict[str, Any] | None = None) -> list[dict[str, str]]:
     by_name = {m["method"]: m for m in methods}
     arp, icmp, tcp = by_name["ARP"], by_name["ICMP ping"], by_name["TCP 80/443/22"]
     asked = arp["asked"]
@@ -252,6 +263,13 @@ def probe_findings(methods: list[dict[str, Any]]) -> list[dict[str, str]]:
         out.append(_finding("warn", f"ARP: answered only {arp['answered']} of {asked}", "It mostly ignores ARP requests. Netlens will keep thinking it is offline. A busy management processor or a rate limit on the device is likely."))
     if icmp["answered"] < asked and arp["answered"] > icmp["answered"]:
         out.append(_finding("info", f"Ping: answered {icmp['answered']} of {asked}", "It answers ARP better than ping; it gives ICMP a low priority, which is normal for switches."))
+    if scan is not None and scan["up"] and (arp["answered"] or icmp["answered"]):
+        out.append(_finding(
+            "info", f"A scan aimed only at this device sees it ({scan['seconds']} s)",
+            "So the device is reachable and Netlens can find it. If it is still missed in the regular scans, the big sweep gives up on it before its (late) answer arrives. "
+            "Netlens now asks for a device the sweep missed once more on its own before marking it offline (Settings → Scan performance → Look again before marking a device offline)."))
+    elif scan is not None and not scan["up"] and (arp["answered"] or icmp["answered"]):
+        out.append(_finding("warn", "A scan aimed only at this device did NOT see it", "It answers the probes above, yet a Netlens quick scan of it reports nothing. Check the scan settings (Settings → Scan performance), for example a very short host time-out."))
     if tcp["answered"] == 0 and arp["answered"] > 0:
         out.append(_finding("info", "No TCP answer on ports 80, 443 and 22", "It has no (reachable) web or SSH service on these ports, so TCP probes cannot be used as a backup."))
     return out

@@ -152,9 +152,19 @@ def test_probe_counts_answers_per_method():
         return XML_DOWN
 
     result = asyncio.run(flapping.probe("10.0.0.1", rounds=6, pause=0, runner=runner))
+    assert result["scan"] == {"up": False, "seconds": result["scan"]["seconds"]}
     arp = next(m for m in result["methods"] if m["method"] == "ARP")
     assert arp["answered"] == 3 and arp["asked"] == 6 and arp["rtt_ms"] == 2.0
     assert any(f["title"].startswith("ARP: answered 3 of 6") and f["level"] == "warn" for f in result["findings"])
+
+
+def test_probe_says_when_a_scan_of_just_this_device_sees_it():
+    async def runner(args):
+        return XML_UP if "-PR" in args or "--top-ports" in args else XML_DOWN
+
+    result = asyncio.run(flapping.probe("10.0.0.1", rounds=3, pause=0, runner=runner))
+    assert result["scan"]["up"] is True
+    assert any(f["title"].startswith("A scan aimed only at this device sees it") for f in result["findings"])
 
 
 def test_probe_with_no_answer_and_bad_input():

@@ -5,6 +5,7 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 ## 0.2
 
 ### Added
+- **Second look before marking a device offline** (Settings → Scan performance, on by default): a previously online device that the sweep did not see is asked for once more on its own (`nmap -sn`, 4 retries) before it is marked offline. A switch whose management processor answers ARP late was missed by the big sweep in most scans while it answered 8 of 8 when asked alone; such devices no longer flap. The live test of the Stability card also runs a real quick scan of the single device.
 - **Flapping investigation**: the device page has a **Stability** card (administrators). *Investigate* analyses the scan history (gaps, whether the devices behind it stayed up, whether the whole network missed the same scans, periodicity, time of day, slow answers before a gap) and lists findings; *Run live test* asks the device 8 times by ARP, ping and TCP.
 
 ### Changed

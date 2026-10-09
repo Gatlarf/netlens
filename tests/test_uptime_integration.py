@@ -50,6 +50,8 @@ async def test_scans_record_heartbeats_and_api_serves_them(tmp_path):
     xmls = [_xml(_host(*A, 2500), _host(*B, None)), _xml(_host(*A, 3500))]
 
     async def runner(kind, targets, **kw):
+        if kind == "recheck":  # the second look for a device the sweep missed: it does not answer
+            return _xml()
         return xmls.pop(0)
 
     manager = ScanManager(db, settings, runner=runner, names_provider=_noop_names, ranges_provider=_ranges)
