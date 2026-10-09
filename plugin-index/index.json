@@ -81,6 +81,18 @@
      "review": {
       "level": "community"
      }
+    },
+    {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.0.2/omada.zip",
+     "sha256": "ab042c001323534c1d3ec34ab302096601fdc878f176b0d6bde3dd7a8f26a764",
+     "api_version": 1,
+     "min_netlens": "0.2.45",
+     "released": "2026-10-09",
+     "changelog": "Adds a diagnostic report: the plugin's page has a Run diagnostic button (Netlens 0.2.67 or newer) that produces an anonymised description of what the controller answers, to copy or download.",
+     "review": {
+      "level": "community"
+     }
     }
    ]
   },
