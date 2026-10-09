@@ -1,0 +1,5 @@
+# Review records and the review rules need the repository owner (turn on "Require review from Code Owners" in the branch protection to enforce this on GitHub).
+/plugin-index/reviews/ @Gatlarf
+/plugin-index/REVIEWERS @Gatlarf
+/plugin-index/tools/ @Gatlarf
+/.github/ @Gatlarf

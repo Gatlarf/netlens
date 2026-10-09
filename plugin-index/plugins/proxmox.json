@@ -1,0 +1,13 @@
+{
+  "id": "proxmox",
+  "name": "Proxmox VE",
+  "kind": "hypervisor",
+  "builtin": true,
+  "description": "Built into Netlens: shows which VMs and containers run on which Proxmox host (read-only, API token or password).",
+  "author": "Netlens",
+  "license": "MIT",
+  "homepage": "https://github.com/Gatlarf/netlens",
+  "supports": [
+    "Proxmox VE 8 and 9"
+  ]
+}

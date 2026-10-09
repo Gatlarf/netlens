@@ -203,7 +203,7 @@ async function loadGroups() {
     // the Plugins page shows the error itself; the rest of Settings still works
   }
   try {
-    updates = (await get("/api/stats/summary")).update.plugin_updates || 0; // from the cache only: opening Settings never waits for the internet
+    updates = (await get("/api/plugin-index?cache_only=true")).updates || 0; // from the cache only: opening Settings never waits for the internet
   } catch (err) {
     updates = 0;
   }

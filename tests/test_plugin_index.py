@@ -393,3 +393,23 @@ def test_a_manual_upload_is_remembered_for_rollback(client):
     for z, params in ((z1, {}), (z2, {"replace": "true"})):
         assert client.post("/api/plugins", content=z, headers={"Content-Type": "application/zip"}, params=params).status_code == 200
     assert client.post("/api/plugin-index/manual/rollback").json()["version"] == "1.0.0"
+
+
+def test_offline_only_uses_what_is_cached(conn):
+    server = Server()
+    z = make_zip()
+    server.put_index(index_doc(entry(releases=[release(z)])))
+    assert get_index(conn, getter=server, offline=True)["entries"] == [] and server.calls == []  # nothing cached: no request either
+    get_index(conn, getter=server, now="2026-03-10T12:00:00Z")
+    n = len(server.calls)
+    old = get_index(conn, getter=server, offline=True, now="2026-04-10T12:00:00Z")  # a month later: still no request
+    assert [e["id"] for e in old["entries"]] == ["omada"] and len(server.calls) == n
+
+
+def test_api_cache_only(client):
+    s = client.server
+    s.put_index(index_doc(entry("omada", releases=[publish(s, "1.0.0", "verified")])))
+    assert client.get("/api/plugin-index", params={"cache_only": "true"}).json()["plugins"] == []
+    assert s.calls == []
+    client.get("/api/plugin-index")
+    assert len(client.get("/api/plugin-index", params={"cache_only": "true"}).json()["plugins"]) == 1

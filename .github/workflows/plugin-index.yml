@@ -1,0 +1,70 @@
+name: Plugin index
+
+# Pull requests: validate the entries, verify the downloads, scan the code, protect published versions and review records.
+# Pushes to main: rebuild plugin-index/index.json (commits made with GITHUB_TOKEN do not start other workflows).
+# Weekly: re-verify every release in the index (a release asset that changed or vanished is reported).
+on:
+  pull_request:
+    paths: ["plugin-index/**", ".github/workflows/plugin-index.yml", "app/plugins/**"]
+  push:
+    branches: [main]
+    paths: ["plugin-index/plugins/**", "plugin-index/reviews/**", "plugin-index/tools/**"]
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Entries are valid
+        run: python plugin-index/tools/build_index.py --validate
+      - name: Downloads match their checksums and the code scan passes
+        run: python plugin-index/tools/verify_release.py | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Published versions did not change
+        if: github.event_name == 'pull_request'
+        run: python plugin-index/tools/check_immutable.py --base "origin/${{ github.base_ref }}"
+      - name: Review records come from trusted reviewers
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          git diff --name-only "origin/${{ github.base_ref }}...HEAD" > changed.txt
+          APPROVERS=$(gh api "repos/${{ github.repository }}/pulls/${PR}/reviews" --jq '[.[] | select(.state=="APPROVED") | .user.login] | join(",")')
+          python plugin-index/tools/review_gate.py --author "$AUTHOR" --approvers "$APPROVERS" --changed changed.txt
+
+  publish:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python plugin-index/tools/build_index.py
+      - name: Commit the rebuilt index
+        run: |
+          if git diff --quiet -- plugin-index/index.json; then
+            echo "index.json is up to date"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add plugin-index/index.json
+            git commit -m "Rebuild the plugin index [skip ci]"
+            git push
+          fi

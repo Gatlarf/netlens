@@ -1,0 +1,14 @@
+{
+  "id": "asus",
+  "name": "ASUS router (AiMesh)",
+  "kind": "topology",
+  "builtin": true,
+  "description": "Built into Netlens: which device is connected to which AiMesh node, with Wi-Fi signal and roaming (stock ASUSWRT, read-only, no SSH).",
+  "author": "Netlens",
+  "license": "MIT",
+  "homepage": "https://github.com/Gatlarf/netlens",
+  "supports": [
+    "ASUS RT-AX92U (tested)",
+    "other stock ASUSWRT/AiMesh routers"
+  ]
+}

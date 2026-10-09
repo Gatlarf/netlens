@@ -16,11 +16,11 @@ def _getter(request: Request):
     return getattr(request.app.state, "index_getter", idx.http_get)
 
 
-def _build(request: Request, force: bool = False) -> dict:
+def _build(request: Request, force: bool = False, offline: bool = False) -> dict:
     conn = connect(request.app.state.db_path)
     try:
         data_dir = request.app.state.settings.data_dir
-        index = idx.get_index(conn, force=force, getter=_getter(request))
+        index = idx.get_index(conn, force=force, getter=_getter(request), offline=offline)
         installed = inst.installed_map(conn, discover(data_dir), data_dir)
         plugins = idx.view(index["entries"], installed, VERSION)
         return {
@@ -35,9 +35,9 @@ def _build(request: Request, force: bool = False) -> dict:
 
 
 @router.get("/plugin-index")
-async def get_plugin_index(request: Request, refresh: bool = False) -> dict:
-    """The index joined with what is installed. Served from a six-hour cache unless `refresh` is set."""
-    return await asyncio.to_thread(_build, request, refresh)
+async def get_plugin_index(request: Request, refresh: bool = False, cache_only: bool = False) -> dict:
+    """The index joined with what is installed. Served from a six-hour cache unless `refresh` is set; `cache_only` never uses the network."""
+    return await asyncio.to_thread(_build, request, refresh, cache_only)
 
 
 class IndexSettings(BaseModel):

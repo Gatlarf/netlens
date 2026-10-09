@@ -1,0 +1,37 @@
+{
+  "id": "my-device",
+  "name": "My device",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Your name",
+  "description": "Describe what your plugin reads and from which device.",
+  "timeout": 30,
+  "config": [
+    {
+      "key": "host",
+      "type": "text",
+      "label": "Router address",
+      "placeholder": "192.168.0.1",
+      "required": true,
+      "help": "Shown in the settings form Netlens builds from this file."
+    },
+    {
+      "key": "username",
+      "type": "text",
+      "label": "Username"
+    },
+    {
+      "key": "password",
+      "type": "password",
+      "label": "Password"
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false
+    }
+  ],
+  "homepage": "https://github.com/you/netlens-plugin-my-device"
+}

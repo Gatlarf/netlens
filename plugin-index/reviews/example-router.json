@@ -1,0 +1,14 @@
+{
+  "id": "example-router",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "0850487b4d426141e3c30d2008f723f6b23b4aa0fcb05e7451b29562e07e9cec",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-09",
+      "tested_on": [],
+      "notes": "Maintainer-written template: the code is about 40 lines, contacts nothing and returns made-up data."
+    }
+  ]
+}

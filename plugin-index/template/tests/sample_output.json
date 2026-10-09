@@ -1,0 +1,28 @@
+{
+  "nodes": [
+    {
+      "mac": "aa:bb:cc:00:00:01",
+      "ip": "192.168.0.1",
+      "name": "Router",
+      "role": "gateway"
+    },
+    {
+      "mac": "aa:bb:cc:00:00:02",
+      "ip": "192.168.0.2",
+      "name": "Access point",
+      "role": "ap",
+      "parent_mac": "aa:bb:cc:00:00:01"
+    }
+  ],
+  "clients": [
+    {
+      "mac": "11:22:33:44:55:01",
+      "ip": "192.168.0.50",
+      "name": "Laptop",
+      "node_mac": "aa:bb:cc:00:00:02",
+      "medium": "wifi",
+      "band": "5 GHz",
+      "rssi": -61
+    }
+  ]
+}

@@ -162,7 +162,7 @@ def load_cache(conn) -> dict | None:
     return data if isinstance(data, dict) and isinstance(data.get("index"), dict) else None
 
 
-def get_index(conn, *, force: bool = False, getter=http_get, now: str | None = None) -> dict:
+def get_index(conn, *, force: bool = False, getter=http_get, now: str | None = None, offline: bool = False) -> dict:
     """The index with its freshness: {"entries", "skipped", "url", "fetched", "stale", "error", "enabled"}.
 
     Uses the cache for six hours (or until `force`), asks the server only when needed, and falls back to the old copy
@@ -177,6 +177,11 @@ def get_index(conn, *, force: bool = False, getter=http_get, now: str | None = N
     if cache and cache.get("url") != settings["url"]:
         cache = None
     now = now or utcnow()
+    if offline:  # only what is already known (the menu uses this so opening Settings never waits for the internet)
+        if not cache:
+            return result
+        entries, skipped = parse_index(cache["index"], official)
+        return {**result, "entries": entries, "skipped": skipped, "fetched": cache["fetched"]}
     if cache and not force:
         age = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ") - datetime.strptime(cache["fetched"], "%Y-%m-%dT%H:%M:%SZ")).total_seconds()
         if 0 <= age < CACHE_TTL_SECONDS:

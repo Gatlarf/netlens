@@ -292,6 +292,10 @@ The **Statistics** page (top bar) shows what Netlens knows, in groups: *History*
 
 The history charts use the uptime checks (kept 90 days) and a **daily snapshot** (devices, online, new devices, open ports, events, scans) that Netlens stores after every scan and keeps for 400 days, so "devices over time" fills in as the days go by. The data comes from `GET /api/stats?range=7d` (24h, 7d, 30d or 90d). `GET /api/stats/summary` is a small, versioned document (`api: 1`) with the headline numbers, scan state, plugin health, a `problem` flag and a compact device list; it is what the Home Assistant integration polls. Both answers are cached for 30 seconds. `GET /api/events?since_id=<id>` returns only events newer than an id.
 
+### Update notice
+
+When a newer Netlens image has been published, an **Update x.y.z available** badge appears next to the version in the top bar and **Settings → About → Updates** shows what changed and how to update (the steps are under *Updating* above). Netlens only asks the container registry once a day for the list of published version numbers; nothing is installed automatically. The check can be switched off on the same card. `GET /api/update` and the statistics summary report it, and the Home Assistant integration has an update entity.
+
 ### Plugins
 
 Netlens learns about your network from other systems through **plugins**. Two kinds exist: **hypervisor** plugins report VMs and containers and the host each runs on, and **topology** plugins report network nodes (router, switch, access point, mesh node) and which node each client is connected to. Netlens matches what a plugin reports to the devices it has scanned (by MAC address, then IP), and shows the result as links on the map and in the hierarchy.
@@ -302,7 +306,9 @@ Under **Settings → Integrations** you find:
 - **One page per plugin** with a settings form that Netlens builds from the plugin's manifest, *Test connection* (saves nothing), *Save* and *Sync now*. A plugin syncs when you turn it on and after every scan. A failing plugin never disturbs the others or the scan, and keeps its last good links; a refused login pauses that plugin until you save or sync it again, so a wrong password cannot get an account locked.
 - **Plugin guide**: how to write a plugin (package format, `plugin.json`, the two functions, the exact data a plugin must return, security notes). The same text is in the repository at [`app/plugins/PLUGINS.md`](app/plugins/PLUGINS.md), and **Download example plugin** gives a working template.
 
-**Uploaded plugins are Python code that runs inside the Netlens container.** Each runs in its own process with a stripped environment, a time limit and no database path, and everything it returns is validated, but this is not a sandbox: it runs as the same user and could read the data volume. Only install plugins you trust and have read. Uploading needs the Netlens login.
+- **Browse plugins**: the **plugin index** lists plugins from the community with a **review level**: *Verified* (a trusted reviewer read the code of that exact version and tested it on real hardware), *Reviewed* (code read, not tested on hardware) or *Community* (only automatic checks; installing it needs an extra confirmation with a warning). *Install* downloads the plugin, checks it against the SHA-256 pinned in the index and applies the same safety checks as an upload; a new plugin starts switched off. Installed plugins show **update available** (nothing updates by itself), updating keeps the settings, and **Go back to the previous version** restores the last one. The index is a file in this repository (`plugin-index/index.json`, read once every six hours); its address can be changed or switched off under *Plugin index settings*. To publish your own plugin see [`plugin-index/README.md`](plugin-index/README.md) (entry format, review process, templates and a local checker).
+
+**Uploaded and downloaded plugins are Python code that runs inside the Netlens container.** Each runs in its own process with a stripped environment, a time limit and no database path, and everything it returns is validated, but this is not a sandbox: it runs as the same user and could read the data volume. Only install plugins you trust and have read. Uploading needs the Netlens login.
 
 #### ASUS router (AiMesh) plugin
 

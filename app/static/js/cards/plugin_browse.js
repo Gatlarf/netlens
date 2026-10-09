@@ -92,6 +92,7 @@ export async function buildBrowseCard() {
 
   async function load(refresh = false) {
     const data = await get(`/api/plugin-index${refresh ? "?refresh=true" : ""}`);
+    document.dispatchEvent(new CustomEvent("netlens:plugins-changed")); // the menu shows how many updates there are
     clear(wrap);
     const card = h("div", { class: "card" }, h("h2", {}, "Browse plugins"));
     card.appendChild(h("p", { class: "hint" },

@@ -262,6 +262,14 @@ General rules for both kinds: MAC addresses are `aa:bb:cc:dd:ee:ff` or `aa-bb-cc
 - **Names.** A client's `name` becomes an alias of the matching device (source `router`); a device that has no hostname of its own shows it.
 - **Turning a plugin off** removes its links and guests from the map and keeps its settings. **Turning it on** syncs immediately.
 
+## Publishing your plugin
+
+Plugins can be listed in the **plugin index** so that other people can find and install them under *Settings → Browse plugins*.
+Release your plugin as a zip on GitHub, check it with `plugin-index/tools/check_plugin.py` (a copy of the Netlens repository is
+enough; it runs the same checks Netlens runs), and submit an entry by pull request. Reviewers read the code and set the review level
+(*Verified*, *Reviewed* or *Community*). The whole process, the entry format and a plugin template are in
+`plugin-index/README.md` in the Netlens repository.
+
 ## Limits and security
 
 An uploaded plugin is **Python code that runs inside the Netlens container** with the rights of the application.

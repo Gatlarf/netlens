@@ -1,0 +1,23 @@
+{
+  "id": "example-router",
+  "name": "Example router",
+  "kind": "topology",
+  "description": "A template plugin that reports a made-up router, access point and two clients. Install it to see how plugins work, then copy it as a starting point for your own.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugin-index/template",
+  "license": "MIT",
+  "supports": [
+    "no real device (made-up data)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-example-router-v1.0.0/example-router.zip",
+      "sha256": "0850487b4d426141e3c30d2008f723f6b23b4aa0fcb05e7451b29562e07e9cec",
+      "api_version": 1,
+      "min_netlens": "0.2.45",
+      "released": "2026-10-09",
+      "changelog": "First release."
+    }
+  ]
+}

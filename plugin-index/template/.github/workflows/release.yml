@@ -1,0 +1,26 @@
+name: Release the plugin
+
+# Push a tag such as v1.0.0: this builds plugin.zip (plugin.json + plugin.py + any extra .py files), attaches it to a
+# GitHub release and shows the SHA-256 to put in your plugin index entry.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the zip
+        run: |
+          zip -j plugin.zip plugin.json plugin.py $(ls *.py | grep -v '^plugin.py$' || true)
+          sha256sum plugin.zip | tee sha256.txt
+          echo "### SHA-256" >> "$GITHUB_STEP_SUMMARY"
+          cat sha256.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" plugin.zip --title "${GITHUB_REF_NAME}" --notes "Plugin release ${GITHUB_REF_NAME}"
