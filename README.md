@@ -34,7 +34,9 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Live scan progress in the header
 - Light and dark mode, switchable from the top bar
 - Delete a device (optionally ignoring it in future scans), and a full scan of a single host from its page
-- Backup and restore of everything from the Settings page
+- Backup and restore of everything from the Settings page, with scheduled backups and retention
+- Port baselines (alert when a port opens that is not normal for the device), Wake-on-LAN, ping and traceroute from the device page
+- Several users (administrator or read-only viewer) with API tokens, and read-only share links for the map or a status page
 - Every setting you need day to day (ranges, schedule, terminal, mail, plugins) is editable in the browser
 
 ## Build and deploy with Docker Compose
@@ -291,6 +293,28 @@ Besides e-mail, **Settings → Channels & quiet hours** sends alerts to **ntfy**
 The **Statistics** page (top bar) shows what Netlens knows, in groups: *History* (devices online per hour or day, devices over time, events per day), *What is on the network* (by type, vendor, operating system, subnet, wired versus Wi-Fi and clients per mesh node when a router plugin is on), *Availability* (network uptime 24 h/7 d/30 d, least and most reliable devices, flapping devices, who has been offline longest, slowest responders), *Ports and services* (counts only: open ports, most common ports and services, devices with the most open ports, newly opened ports), *Network structure* (depth, busiest parents, where the hierarchy comes from, guests per hypervisor host), *Scans* (counts, median/95th percentile/longest duration per kind, hosts found per scan, host timeouts), *Events* and *System* (version, database size, rows, plugin health). The period buttons (24 hours to 90 days) set the window of the history, scan and event groups and are remembered per browser; the page refreshes itself every minute.
 
 The history charts use the uptime checks (kept 90 days) and a **daily snapshot** (devices, online, new devices, open ports, events, scans) that Netlens stores after every scan and keeps for 400 days, so "devices over time" fills in as the days go by. The data comes from `GET /api/stats?range=7d` (24h, 7d, 30d or 90d). `GET /api/stats/summary` is a small, versioned document (`api: 1`) with the headline numbers, scan state, plugin health, a `problem` flag and a compact device list; it is what the Home Assistant integration polls. Both answers are cached for 30 seconds. `GET /api/events?since_id=<id>` returns only events newer than an id.
+
+### Scheduled backups
+
+**Settings → Backup & restore** can make a backup by itself: every 6 hours to every week, keeping the newest 1 to 60 copies in the `backups` folder of the data directory (readable only by Netlens). The page lists them with *Download*, *Restore* and *Delete* and has a *Back up now* button. A failed backup is retried after an hour, shows in the card and raises a **Backup failed** event that the notification channels can send. The copies live on the same disk as the database, so download one now and then as well. A backup holds everything, including saved passwords, users and share links.
+
+### Port baselines
+
+On a device page, **Accept as normal** stores the device's current open ports as its baseline (**Set baselines** on the Devices page does it for all devices without one; devices that have none are never judged). From then on a new port logs **Unexpected port** (instead of *Port opened*), a baseline port that disappears logs **Baseline port gone**, and the device page and Devices list show the difference. Closed ports are noticed by deep scans, which list a port that vanished as **Port closed**. These events go to the notification channels like any other (Unexpected port and Baseline port gone are on for new channels).
+
+### Wake-on-LAN, ping and traceroute
+
+The device page has **Wake** (a Wake-on-LAN magic packet to the device's MAC address, sent to the broadcast address and to the /24 of its IP; the device must have Wake-on-LAN switched on), **Ping** (does it answer now, and how fast) and **Trace** (the hops from Netlens to the device). Ping and trace go through nmap and only accept private addresses.
+
+### Users and API tokens
+
+Without any users, Netlens works as before: the `NETLENS_TOKEN` access token signs you in as administrator. **Settings → Users & tokens** adds named users: an **administrator** can do everything, a **viewer** can look at the map, devices, hierarchy, statistics, uptime and services but cannot change anything, open the terminal, read settings, exports or backups, or see credentials. Sign in with a user name instead of the token from the login dialog. Passwords need at least 8 characters; changing one (Settings → Account, or by an administrator) ends that user's other logins. The access token cannot be locked out, so a forgotten password is fixed by signing in with the token.
+
+An administrator can create **API tokens** for a user (shown once). They are Bearer tokens that act with the role of their user, for scripts, Prometheus (`/metrics`) and the Home Assistant integration; a viewer's token is enough for those because they only read.
+
+### Share links
+
+**Settings → Share links** creates a secret address (`/share/<token>`) that shows the network read-only without a login: either the **map and device list** or only a **status page** (devices online and offline, service states). IP and MAC addresses are left out of the page and the data unless you tick them for that link, and a name that is only an address is shown as "Device N". A link can end after 1 to 90 days and stops working the moment you delete it; the card shows how often each was opened. Netlens itself should not be exposed to the internet without protection; share links are meant for people on your network or behind your own reverse proxy.
 
 ### Update notice
 

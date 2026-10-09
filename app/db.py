@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 def utcnow() -> str:
@@ -376,6 +376,23 @@ def init_db(conn: sqlite3.Connection) -> None:
             token_hash TEXT NOT NULL UNIQUE,
             created TEXT NOT NULL,
             last_used TEXT
+        )
+        """
+    )
+    # --- schema v10: read-only share links ---------------------------------------------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS share_links (
+            id INTEGER PRIMARY KEY,
+            token TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            mode TEXT NOT NULL CHECK (mode IN ('view', 'status')),
+            show_ips INTEGER NOT NULL DEFAULT 0,
+            show_macs INTEGER NOT NULL DEFAULT 0,
+            created TEXT NOT NULL,
+            expires TEXT,
+            last_used TEXT,
+            views INTEGER NOT NULL DEFAULT 0
         )
         """
     )

@@ -1,0 +1,13 @@
+.share-title { margin-left: 16px; font-weight: 600; }
+.share-page .view { max-width: 1100px; margin: 0 auto; padding: 16px; }
+.share-tiles { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+.share-tile { flex: 1 1 140px; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; background: var(--surface); }
+.share-tile .num { font-size: 1.8rem; font-weight: 700; }
+.share-tile .label { color: var(--muted); }
+.share-ok { color: var(--good, #15803d); }
+.share-bad { color: var(--bad); }
+.share-map { height: 460px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin: 12px 0; }
+.share-services { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.share-services li { border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; }
+.share-footer { margin-top: 16px; color: var(--muted); font-size: 0.9rem; }
+@media (max-width: 600px) { .share-map { height: 320px; } }

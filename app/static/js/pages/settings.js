@@ -13,6 +13,7 @@ import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
 import { buildAccountCard } from "../cards/account.js";
 import { buildUsersCard } from "../cards/users.js";
+import { buildSharesCard } from "../cards/shares.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 
 function kvRow(label, value) {
@@ -154,6 +155,7 @@ const STATIC_GROUPS = [
       { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
       { key: "backup", label: "Backup & restore", build: buildBackupCard },
       { key: "export", label: "Export", build: buildExportCard },
+      { key: "shares", label: "Share links", build: buildSharesCard },
     ],
   },
   {
