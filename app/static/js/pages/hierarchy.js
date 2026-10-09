@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { h, clear, toast, statusDot, typeBadge } from "../util.js";
+import { h, clear, toast, statusDot, typeBadge, shortName } from "../util.js";
 
 const SOURCE_LABEL = {
   manual: "set manually",
@@ -94,7 +94,7 @@ export async function render(container, params) {
       line.appendChild(h("span", { class: "tree-toggle placeholder" }, ""));
     }
     line.appendChild(statusDot(node.online));
-    line.appendChild(h("a", { href: `#/device/${node.id}`, class: "tree-name" }, node.name));
+    line.appendChild(h("a", { href: `#/device/${node.id}`, class: "tree-name", title: node.name }, shortName(node.name)));
     line.appendChild(typeBadge(node.type));
     if (node.ip && node.ip !== node.name) line.appendChild(h("span", { class: "mono hint" }, node.ip));
     if (node.descendants > 0) {

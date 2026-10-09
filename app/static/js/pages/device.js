@@ -1,5 +1,5 @@
 import { get, patch, post, del, ApiError } from "../api.js";
-import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS } from "../util.js";
+import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, shortName } from "../util.js";
 import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
@@ -381,7 +381,7 @@ export async function render(container, params) {
 
     const heading = h("div", { class: "heading-row" });
     heading.appendChild(statusDot(device.online));
-    heading.appendChild(h("h1", {}, device.name || device.primary_ip || "Unknown"));
+    heading.appendChild(h("h1", { title: device.name || null }, shortName(device.name) || device.primary_ip || "Unknown"));
     heading.appendChild(typeBadge(device.type));
     heading.appendChild(h("a", { href: "#/devices" }, "← Devices"));
     if (device.primary_ip) {

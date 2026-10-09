@@ -1,5 +1,5 @@
 import { get, post } from "../api.js";
-import { h, clear, toast, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS } from "../util.js";
+import { h, clear, toast, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS, shortName } from "../util.js";
 
 const REFRESH_MS = 15000;
 
@@ -203,7 +203,7 @@ function renderRows() {
     tr.appendChild(h("td", {}, statusDot(d.online)));
 
     const nameCell = h("td", {});
-    nameCell.appendChild(h("span", { class: "device-name" }, d.name || "—"));
+    nameCell.appendChild(h("span", { class: "device-name", title: d.name || null }, shortName(d.name) || "—"));
     if (!d.trusted) nameCell.appendChild(h("span", { class: "tag unknown-tag", title: "Not marked as a known device yet" }, "unknown"));
     if (Array.isArray(d.tags) && d.tags.length) {
       const chips = h("div", { class: "tags" });

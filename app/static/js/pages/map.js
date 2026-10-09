@@ -1,6 +1,6 @@
 import { cssVar, isDark } from "../theme.js";
 import { get, post, patch, del, ApiError } from "../api.js";
-import { h, clear, toast, typeBadge, statusDot, TYPE_LABELS } from "../util.js";
+import { h, clear, toast, typeBadge, statusDot, TYPE_LABELS, shortName } from "../util.js";
 import { buildTree, defaultCollapsed, layoutHorizontal, leafIds } from "../layout_horizontal.js";
 
 const LAYOUTS = ["free", "tree", "horizontal"];
@@ -109,6 +109,18 @@ function nodeColor(type) {
   return nodes[type] || nodes.unknown;
 }
 
+// How a device is named on the map: "both" = name and address, "ip" = address only,
+// "name" = name only (the address when the device has no name). Chosen in the toolbar, kept per browser.
+const LABEL_MODES = ["both", "ip", "name"];
+let labelMode = "both";
+
+// the lines shown for a device; a device without a name always shows its address
+function labelLines(node) {
+  const name = node.label && node.label !== node.ip ? shortName(node.label) : null;
+  if (labelMode === "ip" || !name) return [node.ip || ""];
+  return labelMode === "name" ? [name] : [name, node.ip];
+}
+
 function shorten(text, max) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
@@ -117,7 +129,7 @@ function shorten(text, max) {
 function buildNodeData(node, mode = "free", extra = {}) {
   const treeLayout = mode !== "free";
   const color = nodeColor(node.type);
-  const label = node.label && node.label !== node.ip ? `${node.label}\n${node.ip}` : node.ip;
+  const label = labelLines(node).join("\n");
   const dark = isDark();
   // dark mode: a light outline keeps every dot clear of the dark canvas; offline devices get a
   // dashed outline as well as the faded fill, so they are recognisable without relying on colour
@@ -147,9 +159,7 @@ function buildNodeData(node, mode = "free", extra = {}) {
   if (mode === "horizontal") {
     // a card per device (name and address inside it) so labels never run into each other
     const surface = cssVar("--surface", dark ? "#1b2230" : "#ffffff");
-    const named = node.label && node.label !== node.ip;
-    const lines = [named ? shorten(node.label, 24) : node.ip];
-    if (named) lines.push(node.ip);
+    const lines = labelLines(node).map((line) => shorten(line, 24));
     if (extra.folded) lines.push(`▸ ${extra.folded} more`);
     Object.assign(data, {
       label: lines.join("\n"),
@@ -261,6 +271,7 @@ export async function render(container, params) {
   const horizontal = layoutMode === "horizontal";
   // the tree layout needs the parent -> child links, so it always shows the hierarchy
   const linksMode = treeLayout ? "hierarchy" : readPref("netlens.map.links", ["hierarchy", "all"], "hierarchy");
+  labelMode = readPref("netlens.map.labels", LABEL_MODES, "both");
   const refreshView = () => window.dispatchEvent(new Event("hashchange"));
 
   const linksSelect = h("select", { class: "links-mode", title: "Which links to draw" });
@@ -279,6 +290,16 @@ export async function render(container, params) {
   layoutSelect.value = layoutMode;
   layoutSelect.addEventListener("change", () => {
     savePref("netlens.map.layout", layoutSelect.value);
+    refreshView();
+  });
+
+  const labelSelect = h("select", { class: "label-mode", title: "What is written under each device" });
+  labelSelect.appendChild(h("option", { value: "both" }, "Name + IP"));
+  labelSelect.appendChild(h("option", { value: "ip" }, "IP only"));
+  labelSelect.appendChild(h("option", { value: "name" }, "Name only"));
+  labelSelect.value = labelMode;
+  labelSelect.addEventListener("change", () => {
+    savePref("netlens.map.labels", labelSelect.value);
     refreshView();
   });
 
@@ -314,6 +335,7 @@ export async function render(container, params) {
   toolbar.appendChild(statusSelect);
   toolbar.appendChild(linksSelect);
   toolbar.appendChild(layoutSelect);
+  toolbar.appendChild(labelSelect);
   toolbar.appendChild(addLinkBtn);
   toolbar.appendChild(deleteLinkBtn);
   toolbar.appendChild(resetBtn);
@@ -412,7 +434,7 @@ export async function render(container, params) {
     clear(panel);
     panel.classList.add("open");
 
-    const nameEl = h("h2", {}, node.label || node.ip);
+    const nameEl = h("h2", { title: node.label || null }, shortName(node.label) || node.ip);
     panel.appendChild(nameEl);
 
     const typeEl = typeBadge(node.type);
@@ -428,7 +450,7 @@ export async function render(container, params) {
     if (node.parent_id != null) {
       const parent = currentNodes.find((n) => n.id === node.parent_id);
       const how = { manual: "set manually", hypervisor: "hypervisor host", route: "traceroute", gateway: "gateway", uplink: "uplink", guess: "guess" }[node.parent_source] || node.parent_source;
-      panel.appendChild(h("p", {}, "Parent: ", h("a", { href: `#/device/${node.parent_id}` }, parent ? parent.label || parent.ip : `device ${node.parent_id}`), ` (${how})`));
+      panel.appendChild(h("p", {}, "Parent: ", h("a", { href: `#/device/${node.parent_id}` }, parent ? shortName(parent.label) || parent.ip : `device ${node.parent_id}`), ` (${how})`));
     } else {
       panel.appendChild(h("p", {}, "Parent: none (top level)"));
     }

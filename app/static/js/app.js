@@ -2,7 +2,7 @@ import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
 import { initUpdateBadge } from "./update.js";
 import { get, post, ApiError } from "./api.js";
-import { clear, toast, el } from "./util.js";
+import { clear, toast, el, setDomainSuffix } from "./util.js";
 
 const ROUTES = {
   "": "map",
@@ -45,9 +45,22 @@ function updateNav(name) {
   });
 }
 
+let displayLoaded = false;
+
+async function loadDisplaySettings() {
+  if (displayLoaded) return;
+  try {
+    setDomainSuffix((await get("/api/map-settings")).domain_suffix);
+    displayLoaded = true;
+  } catch (e) {
+    // names are then shown in full
+  }
+}
+
 async function renderPage() {
   const view = el("#view");
   if (!view) return;
+  await loadDisplaySettings();
 
   const gen = ++renderGen;
 

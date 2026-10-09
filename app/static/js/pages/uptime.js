@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { h, clear, toast, statusDot } from "../util.js";
+import { h, clear, toast, statusDot, shortName } from "../util.js";
 import { heartbeatBar, uptimeText, uptimeClass } from "../heartbeat.js";
 
 export async function render(container, params) {
@@ -31,7 +31,7 @@ export async function render(container, params) {
     tr.appendChild(tdStatus);
 
     const tdDevice = h("td", {});
-    tdDevice.appendChild(h("a", { href: `#/device/${item.id}` }, item.name || ""));
+    tdDevice.appendChild(h("a", { href: `#/device/${item.id}`, title: item.name || null }, shortName(item.name) || ""));
     if (item.ip && item.ip !== item.name) {
       tdDevice.appendChild(h("div", { class: "mono hint" }, item.ip));
     }

@@ -125,3 +125,18 @@ export function statusDot(online) {
     title: online ? "online" : "offline",
   });
 }
+// Domain suffix hidden in displayed names ("blueiris.home.example.com" shows as "blueiris").
+// The stored name is untouched; the full name stays available as a tooltip where a name is shown.
+let domainSuffix = "";
+
+export function setDomainSuffix(value) {
+  domainSuffix = String(value || "").trim().toLowerCase().replace(/^\.+|\.+$/g, "");
+}
+
+export function shortName(name) {
+  if (!name || !domainSuffix) return name;
+  const text = String(name);
+  const tail = "." + domainSuffix;
+  if (text.length > tail.length && text.toLowerCase().endsWith(tail)) return text.slice(0, -tail.length);
+  return text;
+}

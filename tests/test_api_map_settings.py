@@ -15,7 +15,7 @@ def client(tmp_path):
 
 
 def test_default_is_free_and_choice_is_saved(client):
-    assert client.get("/api/map-settings").json() == {"default_layout": "free", "layouts": ["free", "tree", "horizontal"]}
+    assert client.get("/api/map-settings").json() == {"default_layout": "free", "layouts": ["free", "tree", "horizontal"], "domain_suffix": ""}
     r = client.put("/api/map-settings", json={"default_layout": "horizontal"})
     assert r.status_code == 200 and r.json()["default_layout"] == "horizontal"
     assert client.get("/api/map-settings").json()["default_layout"] == "horizontal"
@@ -39,3 +39,17 @@ def test_corrupt_stored_value_falls_back(client, tmp_path):
     set_setting(conn, "map_default_layout", "garbage")
     conn.close()
     assert client.get("/api/map-settings").json()["default_layout"] == "free"
+
+
+def test_domain_suffix_is_cleaned_saved_and_independent_of_layout(client):
+    r = client.put("/api/map-settings", json={"domain_suffix": "  .Home.CodeShrimp.com. "})
+    assert r.status_code == 200 and r.json()["domain_suffix"] == "home.codeshrimp.com"
+    assert r.json()["default_layout"] == "free"
+    client.put("/api/map-settings", json={"default_layout": "tree"})
+    assert client.get("/api/map-settings").json()["domain_suffix"] == "home.codeshrimp.com"
+    assert client.put("/api/map-settings", json={"domain_suffix": ""}).json()["domain_suffix"] == ""
+
+
+@pytest.mark.parametrize("value", ["bad suffix", "a..b", "-x.com", "x_y.com", "a" * 300])
+def test_bad_domain_suffix_rejected(client, value):
+    assert client.put("/api/map-settings", json={"domain_suffix": value}).status_code == 422

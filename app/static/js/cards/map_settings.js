@@ -1,5 +1,5 @@
 import { get, put } from "../api.js";
-import { h, clear, toast } from "../util.js";
+import { h, clear, toast, setDomainSuffix } from "../util.js";
 
 const LAYOUT_LABELS = {
   free: "Free layout (drag devices where you like)",
@@ -38,6 +38,14 @@ function fillMapCard(card, cfg) {
     "Used in every browser where nobody picked a layout in the map's own layout menu. A layout chosen in the map is remembered per browser and wins over this setting."));
   form.appendChild(field);
 
+  const suffixInput = h("input", { type: "text", name: "domain_suffix", placeholder: "home.example.com", value: cfg.domain_suffix || "", autocomplete: "off" });
+  const suffixField = h("div", { class: "field" });
+  suffixField.appendChild(h("label", {}, "Domain suffix to hide"));
+  suffixField.appendChild(suffixInput);
+  suffixField.appendChild(h("p", { class: "hint" },
+    "Names ending in this suffix are shown without it (blueiris.home.example.com becomes blueiris) on the map, the device list and the other pages. The full name is kept and shown as a tooltip and on the device page. Leave empty to show full names."));
+  form.appendChild(suffixField);
+
   const saveBtn = h("button", { type: "submit", class: "btn" }, "Save");
   form.appendChild(saveBtn);
 
@@ -57,7 +65,8 @@ function fillMapCard(card, cfg) {
     e.preventDefault();
     saveBtn.disabled = true;
     try {
-      const updated = await put("/api/map-settings", { default_layout: select.value });
+      const updated = await put("/api/map-settings", { default_layout: select.value, domain_suffix: suffixInput.value });
+      setDomainSuffix(updated.domain_suffix);
       toast("Map settings saved", "success");
       fillMapCard(card, updated);
     } catch (err) {
