@@ -36,9 +36,9 @@ class _Out:
         self.lines.append(f"{name}{label_text} {value:g}" if isinstance(value, float) else f"{name}{label_text} {value}")
 
 
-def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_running: bool = False) -> str:
+def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_running: bool = False, data_dir=None) -> str:
     now = now or utcnow()
-    doc = summary(conn, now, scan_running=scan_running)
+    doc = summary(conn, now, scan_running=scan_running, data_dir=data_dir)
     stats = compute_stats(conn, "24h", now)
     out = _Out()
     out.sample("netlens_info", 1, "Netlens version", version=VERSION)
@@ -49,6 +49,8 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
     out.sample("netlens_uptime_ratio", None if doc["uptime"]["7d"] is None else doc["uptime"]["7d"] / 100, "Share of successful presence checks", window="7d")
     out.sample("netlens_open_ports", doc["ports"]["open"], "Open ports found on all devices")
     out.sample("netlens_events_24h", doc["events"]["24h"], "Events logged in the last 24 hours")
+    out.sample("netlens_update_available", 1 if doc["update"]["available"] else 0, "1 when a newer Netlens version has been published")
+    out.sample("netlens_plugin_updates_available", doc["update"]["plugin_updates"], "Installed plugins that have a newer release in the plugin index")
     out.sample("netlens_problem", 1 if doc["problem"] else 0, "1 when Netlens sees a problem (failed scan, failing plugin or service, old scan)")
 
     for d in doc["device_list"]:

@@ -325,6 +325,18 @@ def prune_results(conn, now: str | None = None) -> None:
     conn.commit()
 
 
+def _housekeeping_checks(conn) -> None:
+    """Once an hour: look for a newer Netlens and newer plugins (each answers from its own cache for a day / six hours)."""
+    from app import updates
+    from app.plugins import index as plugin_index
+
+    try:
+        updates.check(conn)
+        plugin_index.get_index(conn)
+    except Exception:  # noqa: BLE001 - offline is normal
+        log.debug("update check failed", exc_info=True)
+
+
 async def service_loop(db_path: str, interval: float = 10.0) -> None:
     """Background task: run due checks every few seconds, prune old results hourly."""
     last_prune = 0.0
@@ -341,6 +353,7 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                 conn = connect(db_path)
                 try:
                     prune_results(conn)
+                    await asyncio.to_thread(_housekeeping_checks, conn)
                 finally:
                     conn.close()
         except asyncio.CancelledError:

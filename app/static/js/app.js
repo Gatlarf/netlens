@@ -1,5 +1,6 @@
 import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
+import { initUpdateBadge } from "./update.js";
 import { get, post, ApiError } from "./api.js";
 import { clear, toast, el } from "./util.js";
 
@@ -341,6 +342,7 @@ fetch("/api/health").then((r) => r.json()).then((d) => {
 }).catch(() => {});
 
 initThemeToggle();
+initUpdateBadge();
 
 // The top bar is sticky and changes height when it wraps on a small screen. Publish its height so
 // scrolled-to sections and the settings menu can stay below it instead of hiding behind it.

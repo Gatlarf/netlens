@@ -46,7 +46,7 @@ def get_summary(request: Request) -> dict:
     def build():
         conn = connect(db_path)
         try:
-            return summary(conn, scan_running=running_scan(conn) is not None)
+            return summary(conn, scan_running=running_scan(conn) is not None, data_dir=request.app.state.settings.data_dir)
         finally:
             conn.close()
 

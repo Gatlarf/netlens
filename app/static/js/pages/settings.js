@@ -8,6 +8,8 @@ import { buildPluginsCard } from "../cards/plugins.js";
 import { buildPluginGuideCard } from "../cards/plugin_guide.js";
 import { buildMapCard } from "../cards/map_settings.js";
 import { buildChannelsCard } from "../cards/channels.js";
+import { buildUpdateCard } from "../update.js";
+import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 
@@ -106,7 +108,13 @@ async function buildAboutCard() {
   card.appendChild(kvRow("Version", cfg.version ?? ""));
   card.appendChild(kvRow("SNMP", cfg.snmp_enabled ? "enabled" : "disabled"));
   card.appendChild(kvRow("Listening on", cfg.bind ?? ""));
-  return card;
+  const wrap = h("div", {}, card);
+  try {
+    wrap.appendChild(await buildUpdateCard());
+  } catch (err) {
+    // the About card still works without the update card
+  }
+  return wrap;
 }
 
 function buildExportCard() {
@@ -176,9 +184,10 @@ const DEFAULT_PAGE = "ranges";
 // the connectors were plugins-to-be before: keep their old addresses working
 const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus" };
 
-function integrationsGroup(plugins) {
+function integrationsGroup(plugins, updates = 0) {
   const items = [
     { key: "plugins", label: "Plugins", build: buildPluginsCard },
+    { key: "plugin-browse", label: updates ? `Browse plugins (${updates} update${updates === 1 ? "" : "s"})` : "Browse plugins", build: buildBrowseCard },
     ...plugins.map((p) => ({ key: `plugin-${p.id}`, label: p.name, build: () => buildPluginCard(p.id) })),
     { key: "plugin-guide", label: "Plugin guide", build: buildPluginGuideCard },
   ];
@@ -187,13 +196,19 @@ function integrationsGroup(plugins) {
 
 async function loadGroups() {
   let plugins = [];
+  let updates = 0;
   try {
     plugins = (await get("/api/plugins")).plugins;
   } catch (err) {
     // the Plugins page shows the error itself; the rest of Settings still works
   }
+  try {
+    updates = (await get("/api/stats/summary")).update.plugin_updates || 0; // from the cache only: opening Settings never waits for the internet
+  } catch (err) {
+    updates = 0;
+  }
   plugins = [...plugins].sort((a, b) => a.name.localeCompare(b.name));
-  return STATIC_GROUPS.map((g) => (g === "integrations" ? integrationsGroup(plugins) : g));
+  return STATIC_GROUPS.map((g) => (g === "integrations" ? integrationsGroup(plugins, updates) : g));
 }
 
 function fillNav(nav, groups, activeKey) {

@@ -390,7 +390,7 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
     }
 
 
-def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool = False, stale_after_s: int = 3 * 3600) -> dict:
+def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool = False, stale_after_s: int = 3 * 3600, data_dir=None) -> dict:
     """The small, versioned document Home Assistant polls (see SUMMARY_API). Keys never disappear within one API version."""
     now = now or utcnow()
     overview = _overview(conn, now)
@@ -421,8 +421,24 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     # the last scan failed (a single failure in the past day that later scans recovered from is not a problem), a plugin is failing, or no scan finished for a while
     services = _services(conn, now)
     problems = (1 if services["down"] else 0) + (1 if last_info and last_info["status"] == "failed" else 0) + len(failing) + (1 if age is not None and age > stale_after_s else 0)
+    from app import updates
+    from app.plugins import index as plugin_index
+
+    upd = updates.status(conn)
+    cached = plugin_index.load_cache(conn)
+    plugin_updates = 0
+    if cached:
+        try:
+            from app.plugins.index_install import installed_map
+            from app.plugins.registry import discover
+
+            entries, _ = plugin_index.parse_index(cached["index"], cached.get("url") == plugin_index.OFFICIAL_URL)
+            plugin_updates = sum(1 for v in plugin_index.view(entries, installed_map(conn, discover(data_dir), data_dir or ""), VERSION) if v["update_available"])
+        except Exception:  # noqa: BLE001 - a broken cache must not break the summary
+            plugin_updates = 0
     return {
         "api": SUMMARY_API,
+        "update": {"current": upd["current"], "latest": upd["latest"], "available": upd["available"], "plugin_updates": plugin_updates},
         "version": VERSION,
         "generated": now,
         "devices": {k: overview[k] for k in ("total", "online", "offline", "new_24h", "new_7d", "stale_30d", "unknown")},

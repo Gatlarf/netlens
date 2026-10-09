@@ -3,7 +3,10 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from app.db import connect
+import json
+
+from app.db import connect, set_setting, utcnow
+from app.plugins import index_install as inst
 from app.plugins import registry
 from app.plugins.contract import API_VERSION, ContractError, KINDS, clean_config, missing_required
 from app.plugins.example import build_example_zip
@@ -191,6 +194,8 @@ async def upload_plugin(request: Request, replace: bool = False) -> dict:
     try:
         if not result["replaced"]:
             save_state(conn, manifest["id"], False, clean_config(manifest, {}))
+        inst.remember_zip(request.app.state.settings.data_dir, manifest["id"], manifest["version"], bytes(data))
+        set_setting(conn, f"plugin.{manifest['id']}.install", json.dumps({"source": "upload", "version": manifest["version"], "sha256": result["sha256"], "level": None, "installed": utcnow()}))
     finally:
         conn.close()
     return {"id": manifest["id"], "name": manifest["name"], "version": manifest["version"], "kind": manifest["kind"],

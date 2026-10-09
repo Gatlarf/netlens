@@ -66,7 +66,7 @@ def set_status(conn: sqlite3.Connection, plugin_id: str, **fields) -> None:
 
 def forget_plugin(conn: sqlite3.Connection, plugin_id: str) -> None:
     """Remove everything stored for a plugin (used when an uploaded plugin is removed)."""
-    for part in ("", "status", "data"):
+    for part in ("", "status", "data", "install"):
         delete_setting(conn, _key(plugin_id, part))
     clear_plugin_data(conn, plugin_id)
 
