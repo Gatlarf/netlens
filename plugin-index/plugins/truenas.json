@@ -1,0 +1,24 @@
+{
+  "id": "truenas",
+  "name": "TrueNAS",
+  "kind": "hypervisor",
+  "description": "Shows a TrueNAS (Community Edition 25.04 or newer) as a host with its containers, virtual machines and apps as guests, matched to your network devices by IP or MAC. Read-only, with an API key over TLS. Tested on TrueNAS 25.10.6 (VMs with simulated data).",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/truenas",
+  "license": "MIT",
+  "supports": [
+    "TrueNAS Community Edition 25.10 (tested)",
+    "TrueNAS 25.04 (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.0.0/truenas.zip",
+      "sha256": "debc4644c1bf3d6eec78911fe39a638d1375685f8caa9126c12843247000e4b7",
+      "api_version": 1,
+      "min_netlens": "0.2.45",
+      "released": "2026-10-09",
+      "changelog": "First release. Containers, VMs and apps of a TrueNAS as guests of the NAS."
+    }
+  ]
+}
