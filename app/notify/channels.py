@@ -60,6 +60,9 @@ EVENT_LABELS = {
     "service_down": "A service check goes down",
     "service_up": "A service check recovers",
     "port_opened": "A new port opens on a device",
+    "port_closed": "A port closes on a device",
+    "port_unexpected": "A port outside the device's baseline opens",
+    "port_missing": "A port from the device's baseline is gone",
     "ip_changed": "A device changes its IP address",
     "ip_reused": "An IP address is taken over by another device",
     "os_changed": "A device's operating system changes",
@@ -67,7 +70,7 @@ EVENT_LABELS = {
     "host_timeout": "A host times out during a scan",
     "backup_failed": "A scheduled backup fails",
 }
-DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "port_opened"]
+DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "port_opened", "port_unexpected", "port_missing"]
 
 
 class ChannelError(Exception):
@@ -208,6 +211,9 @@ def _line(e: dict) -> str:
         "device_offline": f"Offline: {where}",
         "device_online": f"Back online: {where}",
         "port_opened": f"Port opened on {where}: {detail}",
+        "port_closed": f"Port closed on {where}: {detail}",
+        "port_unexpected": f"UNEXPECTED port on {where}: {detail} (not in its baseline)",
+        "port_missing": f"Baseline port gone on {where}: {detail}",
         "ip_changed": f"{name}: IP changed {detail}",
         "os_changed": f"{where}: system changed {detail}",
         "wifi_roamed": f"{name} moved: {detail}",
@@ -222,7 +228,7 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
         counts[e["kind"]] = counts.get(e["kind"], 0) + 1
     short = {
         "device_new": "new device", "device_offline": "offline", "device_online": "back online", "service_down": "service down",
-        "service_up": "service up", "port_opened": "port opened", "ip_changed": "IP changed", "ip_reused": "IP reused",
+        "service_up": "service up", "port_opened": "port opened", "port_closed": "port closed", "port_unexpected": "unexpected port", "port_missing": "port missing", "ip_changed": "IP changed", "ip_reused": "IP reused",
         "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "backup_failed": "backup failed",
     }
     title = f"[{app_name}] " + ", ".join(f"{n} {short.get(k, k)}" for k, n in counts.items())

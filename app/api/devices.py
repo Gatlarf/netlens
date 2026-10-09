@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app import baselines
 from app.db import add_event, connect, utcnow
 from app.scanner.orchestrator import ScanBusy
 from app.hierarchy import children_map, descendants, device_name, load_hierarchy, would_loop
@@ -197,6 +198,7 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
         for r in events
     ]
 
+    result["baseline"] = baselines.drift(conn, device_id)
     result["virtualization"] = _virtualization_info(conn, device_id)
     result["parent"] = _parent_info(conn, device_id)
 
@@ -259,7 +261,15 @@ def list_devices(
     sql += " ORDER BY primary_ip, id"
 
     rows = conn.execute(sql, params).fetchall()
-    return [_device_dict(row) for row in rows]
+    drift = baselines.drift_counts(conn)
+    result = []
+    for row in rows:
+        d = _device_dict(row)
+        counts = drift.get(row["id"])
+        # None = no baseline; otherwise how many ports differ from it
+        d["ports_drift"] = None if counts is None else counts["unexpected"] + counts["missing"]
+        result.append(d)
+    return result
 
 
 class TrustBody(BaseModel):
@@ -277,6 +287,18 @@ def trust_devices(body: TrustBody, conn: sqlite3.Connection = Depends(get_conn))
         marks = ",".join("?" for _ in body.ids) or "NULL"
         changed = conn.execute(f"UPDATE devices SET trusted = ? WHERE trusted != ? AND id IN ({marks})", (value, value, *body.ids)).rowcount
     conn.commit()
+    return {"changed": changed}
+
+
+class BaselineBody(BaseModel):
+    ids: list[int] | None = None  # these devices; omit to apply to every device
+    accept: bool = True  # False removes the baseline
+
+
+@router.post("/devices/baseline")
+def set_baselines(body: BaselineBody, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, int]:
+    """Take the current open ports of devices as their normal ones (or forget the baseline)."""
+    changed = baselines.accept(conn, body.ids) if body.accept else baselines.clear(conn, body.ids)
     return {"changed": changed}
 
 

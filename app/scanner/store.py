@@ -2,6 +2,7 @@ import json
 from dataclasses import replace
 from typing import Any, Optional
 
+from app.baselines import baseline_ports
 from app.db import add_event, get_or_create_device, utcnow
 from app.plugins.enrich import refresh_hostname
 from app.scanner.classify import classify_device
@@ -195,7 +196,10 @@ def save_scan_results(
             # Port opened event for existing devices only
             if not is_new and (port.proto, port.port) not in existing_ports:
                 detail = f"{port.proto}/{port.port} {port.service or ''}".strip()
-                add_event(conn, "port_opened", detail, device_id=device_id, now=now)
+                expected = baseline_ports(conn, device_id)
+                # a device with a baseline reports a port outside it as unexpected
+                unexpected = expected is not None and (port.proto, port.port) not in expected
+                add_event(conn, "port_unexpected" if unexpected else "port_opened", detail, device_id=device_id, now=now)
 
         if host.timed_out:
             add_event(
@@ -211,12 +215,18 @@ def save_scan_results(
         if kind == "deep" and not host.timed_out:
             result_ports = {(p.proto, p.port) for p in host.ports}
             existing_port_ids = conn.execute(
-                "SELECT id, proto, port FROM ports WHERE device_id = ?",
+                "SELECT id, proto, port, state, service FROM ports WHERE device_id = ?",
                 (device_id,),
             ).fetchall()
+            expected = baseline_ports(conn, device_id)
             for pr in existing_port_ids:
                 if (pr["proto"], pr["port"]) not in result_ports:
                     conn.execute("DELETE FROM ports WHERE id = ?", (pr["id"],))
+                    if not str(pr["state"]).startswith("open"):
+                        continue
+                    detail = f"{pr['proto']}/{pr['port']} {pr['service'] or ''}".strip()
+                    kind_name = "port_missing" if expected is not None and (pr["proto"], pr["port"]) in expected else "port_closed"
+                    add_event(conn, kind_name, detail, device_id=device_id, now=now)
 
         # Classification
         # Get open ports for classification

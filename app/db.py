@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 
 def utcnow() -> str:
@@ -341,6 +341,18 @@ def init_db(conn: sqlite3.Connection) -> None:
         conn.execute("UPDATE devices SET trusted = 1")
     # hints: what discovery told us about the device (mDNS service types, UPnP device types, models), JSON list
     _add_column_if_missing(conn, "devices", "hints", "TEXT NOT NULL DEFAULT '[]'")
+    # --- schema v8: port baselines (baseline_at NULL = the device has none) ---------------------
+    _add_column_if_missing(conn, "devices", "baseline_at", "TEXT")
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS port_baselines (
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            proto TEXT NOT NULL,
+            port INTEGER NOT NULL,
+            PRIMARY KEY (device_id, proto, port)
+        )
+        """
+    )
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS wifi_samples (

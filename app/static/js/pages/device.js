@@ -60,7 +60,7 @@ function buildDetailsCard(device) {
   return card;
 }
 
-function buildPortsCard(device) {
+function buildPortsCard(device, onChanged) {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Open ports"));
 
@@ -95,12 +95,47 @@ function buildPortsCard(device) {
       row.appendChild(h("td", {}, p.service || ""));
       row.appendChild(h("td", {}, p.product || ""));
       row.appendChild(h("td", {}, p.version || ""));
-      row.appendChild(h("td", {}, p.state && p.state !== "open" ? p.state : ""));
+      const note = p.state && p.state !== "open" ? p.state : "";
+      const stateCell = h("td", {}, note);
+      if (device.baseline && device.baseline.unexpected.includes(`${p.proto}/${p.port}`)) {
+        stateCell.appendChild(h("span", { class: "tag unknown-tag", title: "This port is not in the device's baseline" }, "not in baseline"));
+      }
+      row.appendChild(stateCell);
       tbody.appendChild(row);
     }
   }
   table.appendChild(tbody);
   card.appendChild(table);
+
+  const base = device.baseline;
+  const box = h("div", { class: "baseline-box" });
+  if (base) {
+    box.appendChild(h("p", { class: base.unexpected.length || base.missing.length ? "error" : "hint", id: "baseline-state" },
+      `Baseline from ${fmtTime(base.at)}: ${base.expected.length ? base.expected.join(", ") : "no open ports"}.` +
+      (base.unexpected.length ? ` Not in baseline: ${base.unexpected.join(", ")}.` : "") +
+      (base.missing.length ? ` Gone: ${base.missing.join(", ")}.` : "") +
+      (base.unexpected.length || base.missing.length ? "" : " Nothing has changed.")));
+  } else {
+    box.appendChild(h("p", { class: "hint" }, "No baseline. Accept the current ports as normal and Netlens will warn when they change."));
+  }
+  const act = async (accept, done) => {
+    try {
+      await post("/api/devices/baseline", { ids: [device.id], accept });
+      toast(done, "success");
+      onChanged();
+    } catch (err) {
+      toast(err.message || "Failed", "error");
+    }
+  };
+  const acceptBtn = h("button", { type: "button", class: "btn", id: "baseline-accept" }, base ? "Accept current ports" : "Accept as normal");
+  acceptBtn.addEventListener("click", () => act(true, "Baseline saved"));
+  box.appendChild(acceptBtn);
+  if (base) {
+    const removeBtn = h("button", { type: "button", class: "btn", id: "baseline-clear" }, "Remove baseline");
+    removeBtn.addEventListener("click", () => act(false, "Baseline removed"));
+    box.appendChild(removeBtn);
+  }
+  card.appendChild(box);
 
   return card;
 }
@@ -408,7 +443,7 @@ export async function render(container, params) {
     const grid = h("div", { class: "grid-2" });
     const left = h("div", { class: "col-left" });
     left.appendChild(buildDetailsCard(device));
-    left.appendChild(buildPortsCard(device));
+    left.appendChild(buildPortsCard(device, () => load()));
     grid.appendChild(left);
 
     const right = h("div", { class: "col-right" });

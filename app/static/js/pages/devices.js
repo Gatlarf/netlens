@@ -113,6 +113,18 @@ function buildToolbar(state) {
   });
   toolbar.appendChild(trustSel);
 
+  const portsSel = h("select", { "aria-label": "Ports compared with the baseline", class: "ports-filter" });
+  portsSel.appendChild(h("option", { value: "" }, "Any ports"));
+  portsSel.appendChild(h("option", { value: "changed" }, "Ports changed from baseline"));
+  portsSel.appendChild(h("option", { value: "baseline" }, "With a baseline"));
+  portsSel.appendChild(h("option", { value: "none" }, "Without a baseline"));
+  portsSel.value = state.ports;
+  portsSel.addEventListener("change", () => {
+    state.ports = portsSel.value;
+    load();
+  });
+  toolbar.appendChild(portsSel);
+
   const trustAll = h("button", { type: "button", class: "btn trust-all", title: "Mark every device on the list as known" }, "Trust all unknown");
   trustAll.addEventListener("click", async () => {
     const unknown = devices.filter((d) => !d.trusted);
@@ -130,6 +142,24 @@ function buildToolbar(state) {
     }
   });
   toolbar.appendChild(trustAll);
+
+  const baselineAll = h("button", { type: "button", class: "btn baseline-all", title: "Take the open ports of the listed devices without a baseline as their normal ones" }, "Set baselines");
+  baselineAll.addEventListener("click", async () => {
+    const without = devices.filter((d) => d.ports_drift === null);
+    if (!without.length) {
+      toast("Every device here already has a baseline", "info");
+      return;
+    }
+    if (!window.confirm(`Take the current open ports of ${without.length} device(s) as normal? Netlens then reports ports that appear or vanish.`)) return;
+    try {
+      const res = await post("/api/devices/baseline", { ids: without.map((d) => d.id) });
+      toast(`${res.changed} baseline(s) saved`, "success");
+      load();
+    } catch (err) {
+      toast(err.message || "Could not save the baselines", "error");
+    }
+  });
+  toolbar.appendChild(baselineAll);
 
   const count = h("span", { class: "count" }, "0 devices");
   toolbar.appendChild(count);
@@ -219,7 +249,9 @@ function renderRows() {
     tr.appendChild(h("td", {}, d.vendor || "—"));
     tr.appendChild(h("td", {}, typeBadge(d.type)));
     tr.appendChild(h("td", {}, d.os_name || "—"));
-    tr.appendChild(h("td", {}, String(d.open_ports ?? 0)));
+    const portsCell = h("td", {}, String(d.open_ports ?? 0));
+    if (d.ports_drift > 0) portsCell.appendChild(h("span", { class: "tag unknown-tag", title: "Open ports differ from the baseline" }, `${d.ports_drift} changed`));
+    tr.appendChild(portsCell);
     tr.appendChild(h("td", { title: fmtTime(d.last_seen) }, timeAgo(d.last_seen)));
 
     tbody.appendChild(tr);
@@ -243,6 +275,9 @@ async function load() {
   if (state.type) {
     devices = devices.filter((d) => d.type === state.type);
   }
+  if (state.ports === "changed") devices = devices.filter((d) => d.ports_drift > 0);
+  else if (state.ports === "baseline") devices = devices.filter((d) => d.ports_drift !== null);
+  else if (state.ports === "none") devices = devices.filter((d) => d.ports_drift === null);
 
   if (!devices.length) {
     clear(tbody);
@@ -268,6 +303,7 @@ const state = {
   online: "",
   trusted: "",
   type: "",
+  ports: "",
   sortKey: "primary_ip",
   sortDir: "asc"
 };

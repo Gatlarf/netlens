@@ -238,7 +238,7 @@ def _ports(conn, now: str) -> dict:
         "top_ports": _top(by_port),
         "top_services": _top(by_service),
         "most_open": [{"id": d, "name": names.get(d, str(d)), "count": n} for d, n in sorted(per_device.items(), key=lambda kv: (-kv[1], kv[0]))[:5]],
-        "opened_7d": conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'port_opened' AND ts >= ?", (_ago(now, days=7),)).fetchone()[0],
+        "opened_7d": conn.execute("SELECT COUNT(*) FROM events WHERE kind IN ('port_opened', 'port_unexpected') AND ts >= ?", (_ago(now, days=7),)).fetchone()[0],
     }
 
 
