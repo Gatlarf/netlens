@@ -46,6 +46,7 @@ services:
       NETLENS_DEEP_INTERVAL: ${NETLENS_DEEP_INTERVAL:-86400}
       # Enable terminal UI (on/off).
       NETLENS_TERMINAL: ${NETLENS_TERMINAL:-on}
+      NETLENS_TERMINAL_REMOTE: ${NETLENS_TERMINAL_REMOTE:-off}
       # Optional SNMP community string; empty means disabled.
       NETLENS_SNMP_COMMUNITY: ${NETLENS_SNMP_COMMUNITY:-}
       # Bind address for the web server (default 0.0.0.0:8080).

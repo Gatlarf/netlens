@@ -171,12 +171,12 @@
   text-decoration: underline;
 }
 
-.terminal-slot {
-  margin-top: 16px;
+.terminal-slot:empty {
+  display: none;
 }
 
-.terminal-slot:empty {
-  margin-top: 0;
+.terminal-slot + .grid-2 {
+  margin-top: 16px;
 }
 
 .count {

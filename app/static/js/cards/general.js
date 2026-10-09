@@ -51,6 +51,16 @@ function fillGeneralCard(card, cfg) {
   });
   termField.appendChild(termCheck);
   termField.appendChild(h("p", { class: "hint" }, sourceHint(cfg.terminal_source, "NETLENS_TERMINAL", cfg.env_terminal_enabled, "bool")));
+  const remoteText = {
+    off: "The terminal only works on a direct connection from the local network (http://<this machine>:8080). Through a reverse proxy / HTTPS address it is blocked.",
+    lan: "The terminal works on a direct local connection and through a reverse proxy when the proxy reports a local client address (NETLENS_TERMINAL_REMOTE=lan).",
+    any: "The terminal works from anywhere (NETLENS_TERMINAL_REMOTE=any). Make sure something else protects Netlens, such as a VPN.",
+  }[cfg.terminal_remote] || "";
+  termField.appendChild(h("p", { class: "hint", id: "terminal-reach" }, remoteText + " This is set with the environment variable NETLENS_TERMINAL_REMOTE (off, lan or any) and cannot be changed here, so nobody who reaches the web interface from outside can open it up."));
+  if (!cfg.terminal_allowed_here) {
+    termCheck.disabled = true;
+    termField.appendChild(h("p", { class: "error" }, `You are connected from outside the local network (${cfg.terminal_here}); the terminal switch can only be changed from the local network.`));
+  }
   form.appendChild(termField);
 
   const errorEl = h("p", { class: "error" }, "");

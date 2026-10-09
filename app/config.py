@@ -22,6 +22,7 @@ class Settings:
     bind_host: str
     bind_port: int
     data_dir: Path
+    terminal_remote: str = "off"   # where the terminal may be used from, see app/terminal/access.py
 
 
 def is_scannable_range(cidr: str) -> bool:
@@ -121,6 +122,10 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     else:
         raise ConfigError("NETLENS_TERMINAL must be 'on' or 'off'")
 
+    terminal_remote = env.get("NETLENS_TERMINAL_REMOTE", "off").strip().lower() or "off"
+    if terminal_remote not in ("off", "lan", "any"):
+        raise ConfigError("NETLENS_TERMINAL_REMOTE must be 'off', 'lan' or 'any'")
+
     snmp_community = env.get("NETLENS_SNMP_COMMUNITY", "")
     snmp_community = snmp_community if snmp_community else None
 
@@ -147,4 +152,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         bind_host=host,
         bind_port=port,
         data_dir=data_dir,
+        terminal_remote=terminal_remote,
     )

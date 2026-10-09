@@ -3,8 +3,9 @@ import { h, clear, toast } from "./util.js";
 
 const activeTerminals = new WeakMap();
 
+// busy = a session is running, or the user is filling in the connection form (a page refresh would wipe it)
 export function isTerminalActive(slot) {
-  return activeTerminals.has(slot);
+  return activeTerminals.has(slot) || !!slot.querySelector(".ssh-form, .terminal-wrap, .connect-pending");
 }
 
 let xtermLoaded = null;
@@ -40,7 +41,7 @@ function loadXterm() {
   return xtermLoaded;
 }
 
-export async function mountTerminal(slot, device) {
+export async function mountTerminal(slot, device, { onWideChange } = {}) {
   let cfg;
   try {
     cfg = await get("/api/config");
@@ -48,7 +49,7 @@ export async function mountTerminal(slot, device) {
     return null;
   }
 
-  if (!cfg.terminal_enabled) return null;
+  if (!cfg.terminal_available) return null;
 
   const ports = device.ports || [];
   let sshPort = null;
@@ -70,8 +71,22 @@ export async function mountTerminal(slot, device) {
   const card = h("div", { class: "card" });
   const h2 = h("h2", {}, "Console");
   card.appendChild(h2);
+  if (onWideChange) {
+    let wide = false;
+    const wideBtn = h("button", { type: "button", class: "btn terminal-wide-btn", title: "Show the console across the whole page width" }, "Wide view");
+    wideBtn.addEventListener("click", () => {
+      wide = !wide;
+      wideBtn.textContent = wide ? "Narrow view" : "Wide view";
+      onWideChange(wide);
+      card.scrollIntoView({ block: "nearest" });
+    });
+    h2.appendChild(wideBtn);
+  }
 
   const btnRow = h("div", { class: "btn-row" });
+  const protos = [];
+  if (sshPort) protos.push({ proto: "ssh", port: sshPort.port, label: `SSH (${sshPort.port})` });
+  if (telnetPort) protos.push({ proto: "telnet", port: telnetPort.port, label: `Telnet (${telnetPort.port})` });
   if (sshPort) {
     const btn = h("button", { class: "btn" }, `SSH (${sshPort.port})`);
     btn.addEventListener("click", () => showConnectionArea("ssh", sshPort.port));
@@ -139,13 +154,15 @@ export async function mountTerminal(slot, device) {
       });
 
       connectionArea.appendChild(form);
+      usernameInput.focus();
     } else {
-      const connectBtn = h("button", { class: "btn" }, "Connect");
+      const connectBtn = h("button", { class: "btn connect-pending" }, "Connect");
       connectBtn.addEventListener("click", async () => {
         clear(connectionArea);
         await startTerminal(proto, port, null, null, null, null);
       });
       connectionArea.appendChild(connectBtn);
+      connectBtn.focus();
     }
   }
 
@@ -299,6 +316,13 @@ export async function mountTerminal(slot, device) {
   }
 
   return {
+    protos,
+    // jump to the console and open the connection form (used by the buttons at the top of the page)
+    open(proto) {
+      const wanted = protos.find((p) => p.proto === proto) || protos[0];
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (!activeTerminals.has(slot)) showConnectionArea(wanted.proto, wanted.port);
+    },
     dispose() {
       const ws = activeTerminals.get(slot);
       if (ws) {

@@ -28,8 +28,13 @@ from app.version import VERSION
 
 
 async def require_terminal_enabled(conn: HTTPConnection) -> None:
+    from app.terminal.access import classify
+
     if not conn.app.state.settings.terminal_enabled:
         raise HTTPException(status_code=404, detail="web terminal is disabled")
+    allowed, why = classify(conn, conn.app.state.settings.terminal_remote)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=f"the web terminal is not available here: {why}")
 
 
 @contextlib.asynccontextmanager

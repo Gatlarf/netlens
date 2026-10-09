@@ -94,7 +94,10 @@ def _source(request: Request, key: str, env_value) -> str:
 
 
 async def _config_payload(request: Request) -> dict:
+    from app.terminal.access import classify
+
     settings = request.app.state.settings
+    allowed_here, why_here = classify(request, settings.terminal_remote)
     env = request.app.state.env_settings
     return {
         "version": VERSION,
@@ -110,6 +113,10 @@ async def _config_payload(request: Request) -> dict:
         "terminal_enabled": settings.terminal_enabled,
         "terminal_source": _source(request, "terminal_enabled", env.terminal_enabled),
         "env_terminal_enabled": env.terminal_enabled,
+        "terminal_remote": settings.terminal_remote,
+        "terminal_allowed_here": allowed_here,
+        "terminal_available": settings.terminal_enabled and allowed_here,   # for THIS request
+        "terminal_here": why_here,
         "snmp_enabled": settings.snmp_community is not None,
         "bind": f"{settings.bind_host}:{settings.bind_port}",
     }
@@ -172,6 +179,13 @@ async def put_general(request: Request, body: GeneralBody) -> dict:
             else:
                 set_setting(conn, key, str(value))
         if "terminal_enabled" in fields:
+            from app.terminal.access import classify
+
+            settings = request.app.state.settings
+            allowed_here, why_here = classify(request, settings.terminal_remote)
+            wanted = request.app.state.env_settings.terminal_enabled if body.terminal_enabled is None else body.terminal_enabled
+            if wanted != settings.terminal_enabled and not allowed_here:  # whoever can reach Netlens from outside must not be able to switch a shell on
+                raise HTTPException(status_code=403, detail=f"the terminal setting can only be changed from the local network: {why_here}")
             if body.terminal_enabled is None:
                 delete_setting(conn, TERMINAL_KEY)
             else:

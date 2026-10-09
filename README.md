@@ -374,6 +374,7 @@ Restoring the backup matters because a newer version may have changed the databa
 | `NETLENS_QUICK_INTERVAL` | `900` | Quick scan interval in seconds |
 | `NETLENS_DEEP_INTERVAL` | `86400` | Deep scan interval in seconds |
 | `NETLENS_TERMINAL` | `on` | Enable/disable web terminal |
+| `NETLENS_TERMINAL_REMOTE` | `off` | Where the terminal may be used from: `off` = direct local connections only (not through a reverse proxy / HTTPS address), `lan` = also through a proxy for local clients, `any` = anywhere |
 | `NETLENS_SNMP_COMMUNITY` | *(reserved/unused)* | SNMP community string |
 | `NETLENS_BIND` | `0.0.0.0:8080` | Bind address and port |
 | `NETLENS_DATA_DIR` | `/data` | Data directory |
@@ -668,6 +669,8 @@ While a scan runs, the header shows what it is doing, for example `Deep scan · 
 - Idle timeout: 15 minutes
 - Max 5 concurrent sessions
 - `NETLENS_TERMINAL=off` disables it
+- **Only on the local network by default.** A request that came through a reverse proxy (it carries `X-Forwarded-*` headers) is treated as coming from outside, so the terminal does not work on your HTTPS address; open `http://<netlens>:8080` on the local network instead. `NETLENS_TERMINAL_REMOTE` widens this: `off` (default), `lan` (also through a proxy when the client address the proxy reports is a local one; the proxy must set `X-Forwarded-For`, which the recipes above do or do by default) or `any`. It is an environment variable on purpose: nobody who reaches the web interface from outside can change it, and the on/off switch for the terminal (Settings) can only be changed from the local network either. The device page's console is in the left column (with a *Wide view* button) and the top bar has an **SSH** button that jumps to it.
+- For a guarantee that does not depend on Netlens, also block it in the reverse proxy, for example nginx `location /api/terminal { return 404; }` or Caddy `respond /api/terminal/* 404`. Nginx Proxy Manager: *Custom Locations* with `/api/terminal` and an advanced `return 404;`.
 - HTTP/HTTPS admin UIs opened via plain links ("Open" next to ports 80/443/...)
 
 ## Security notes
@@ -755,7 +758,7 @@ tests
 - **A guest does not show under its Proxmox host:** the connector matches by MAC address, so Netlens must have scanned that guest at least once on the same network. Run a scan and press *Sync now*.
 - **No devices found:** Check ranges, host networking, and that nmap has capabilities. Check `docker logs netlens`; scan errors appear under "Scans & events".
 - **OS detection empty:** Needs deep scan and root-capable nmap.
-- **Terminal button missing:** Port 22/23 not seen open yet, or `NETLENS_TERMINAL=off`.
+- **Terminal button missing:** Port 22/23 not seen open yet, `NETLENS_TERMINAL=off`, or you opened Netlens through a reverse proxy (see *Web terminal*).
 
 ## Third-party
 

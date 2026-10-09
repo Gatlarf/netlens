@@ -39,3 +39,5 @@
   font-family: monospace;
   width: 100%;
 }
+.terminal-slot h2 { display: flex; align-items: center; gap: 12px; }
+.terminal-wide-btn { margin-left: auto; font-size: 0.8rem; padding: 2px 10px; }

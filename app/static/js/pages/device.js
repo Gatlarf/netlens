@@ -520,6 +520,8 @@ export async function render(container, params) {
     const grid = h("div", { class: "grid-2" });
     const left = h("div", { class: "col-left" });
     left.appendChild(buildDetailsCard(device));
+    const newSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
+    left.appendChild(newSlot);  // the console sits in the left column, right below the details
     const why = buildWhyCard(device);
     if (why) left.appendChild(why);
     left.appendChild(buildPortsCard(device, () => load()));
@@ -553,9 +555,6 @@ export async function render(container, params) {
     grid.appendChild(right);
     page.appendChild(grid);
 
-    const newSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
-    page.appendChild(newSlot);
-
     disposeTerminal();
     editResult = newEdit;
     terminalSlot = newSlot;
@@ -564,11 +563,26 @@ export async function render(container, params) {
 
     if (!isAdmin()) return; // the terminal is for administrators
     try {
-      const handle = await mountTerminal(newSlot, device);
+      // "Wide view" lifts the console above both columns, "Narrow view" puts it back under the details
+      const placeWide = (wide) => {
+        if (wide) page.insertBefore(newSlot, grid);
+        else left.insertBefore(newSlot, left.children[1] || null);
+      };
+      const handle = await mountTerminal(newSlot, device, { onWideChange: placeWide });
       if (disposed || terminalSlot !== newSlot) {
         if (handle && typeof handle.dispose === "function") handle.dispose();
       } else {
         terminalHandle = handle;
+        // jump straight to the console from the top of the page
+        for (const p of (handle && handle.protos) || []) {
+          heading.appendChild(h("button", {
+            class: "btn admin-only",
+            type: "button",
+            id: `jump-${p.proto}`,
+            title: `Open the ${p.proto.toUpperCase()} console below`,
+            onclick: () => handle.open(p.proto),
+          }, p.proto === "ssh" ? "SSH" : "Telnet"));
+        }
       }
     } catch (err) {
       if (!disposed) toast("Terminal failed to load", "error");
