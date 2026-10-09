@@ -267,7 +267,7 @@ def view(entries: list[dict], installed: dict[str, dict], netlens_version: str) 
             "can_rollback": bool(have and have.get("can_rollback")),
             "update_available": update,
             "latest": best or latest,
-            "incompatible": None if best else reason,
+            "incompatible": None if (best or e["builtin"]) else reason,
             "releases": [{"version": r["version"], "released": r["released"], "level": r["review"]["level"], "incompatible": incompatible_reason(r, netlens_version)} for r in e["releases"]],
         })
     out.sort(key=lambda x: (not x["update_available"], x["builtin"], x["name"].lower()))
