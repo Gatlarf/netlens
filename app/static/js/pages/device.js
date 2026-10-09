@@ -251,7 +251,7 @@ function buildVirtualizationCard(device) {
 
   if (info.guest) {
     const g = info.guest;
-    const kind = g.kind === "lxc" ? "Container (LXC)" : "Virtual machine";
+    const kind = g.kind === "lxc" ? "Container (LXC)" : g.kind === "app" ? "App" : "Virtual machine";
     card.appendChild(kvRow("Runs as", h("span", {}, `${kind} ${g.guest_id}, ${g.name}`)));
     card.appendChild(kvRow("Status", h("span", {}, g.status)));
     if (g.node) card.appendChild(kvRow("Node", h("span", {}, g.node)));
@@ -273,7 +273,7 @@ function buildVirtualizationCard(device) {
         ? h("td", {}, h("a", { href: `#/device/${g.device_id}` }, g.device_name || `device ${g.device_id}`))
         : h("td", { class: "hint" }, g.status === "running" ? "not seen on the network" : "not running");
       tbody.appendChild(h("tr", {},
-        h("td", {}, String(g.guest_id)), h("td", {}, g.name), h("td", {}, g.kind === "lxc" ? "LXC" : g.kind === "qemu" ? "VM" : g.kind),
+        h("td", {}, String(g.guest_id)), h("td", {}, g.name), h("td", {}, g.kind === "lxc" ? "LXC" : g.kind === "qemu" || g.kind === "vm" ? "VM" : g.kind === "app" ? "App" : g.kind),
         h("td", {}, g.status), deviceCell));
     }
     table.appendChild(tbody);

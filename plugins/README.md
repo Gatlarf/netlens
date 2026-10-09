@@ -7,8 +7,9 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 |---|---|---|---|
 | [`omada/`](omada/README.md) | TP-Link Omada | Omada controller 5.1 or newer: gateway, switches, access points, clients | written from the public API, **not yet tested on hardware** |
 | [`unifi/`](unifi/README.md) | Ubiquiti UniFi | UniFi Network on a UniFi OS console or a classic controller | written from the public API, **not yet tested on hardware** |
+| [`truenas/`](truenas/README.md) | TrueNAS | TrueNAS Community 25.04+: containers, VMs and apps as guests of the NAS (a `hypervisor` plugin) | tested on a real TrueNAS 25.10.6 (VMs with simulated data) |
 
-Both are `topology` plugins: they tell Netlens which switch or access point every device is connected to, and which device hangs
+Omada and UniFi are `topology` plugins: they tell Netlens which switch or access point every device is connected to, and which device hangs
 below which, so the hierarchy and the map show the real network position. They only read.
 
 ## Build a release zip

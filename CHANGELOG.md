@@ -5,6 +5,7 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 ## 0.2
 
 ### Added
+- **TrueNAS plugin** (`plugins/truenas`, in the plugin index as *Community*): shows a TrueNAS Community Edition (25.04 or newer) as a host with its containers, VMs and apps as guests, over the JSON-RPC WebSocket API with a read-only API key (always over TLS: TrueNAS revokes keys used over plain http). The device page labels app and VM guests.
 - **Network checks** (Settings → Network checks): a periodic DHCP discover lists every DHCP server on the network and raises **Rogue DHCP?** for a new, untrusted one; **Gateway changed** when the MAC address behind the default gateway changes. Both break through quiet hours; schema version 11.
 - **Groups** (rooms, floors, owners): Settings → Groups, a group per device (device page, Devices page filter, column and bulk *Set group*), *Colour by group* and a group filter on the map, `group` in the summary API and as the suggested area in Home Assistant; schema version 12.
 - **HTTPS guidance** in the README: reverse proxy recipes for Synology, Caddy, nginx, Nginx Proxy Manager and Traefik, with the WebSocket and `Host` details the terminal needs.

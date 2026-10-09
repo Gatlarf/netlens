@@ -1,0 +1,35 @@
+{
+  "id": "truenas",
+  "name": "TrueNAS",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Reads a TrueNAS (Community Edition 25.04 or newer) and shows it as a host with what runs on it: containers and virtual machines (matched to the devices on your network by IP or MAC address) and apps. Read-only: one login with an API key, a few reads, then it disconnects.",
+  "timeout": 60,
+  "config": [
+    {
+      "key": "url",
+      "type": "text",
+      "label": "TrueNAS address",
+      "placeholder": "https://192.168.0.200",
+      "required": true,
+      "help": "The address of the TrueNAS web interface. Always use https: TrueNAS revokes an API key that is used over an unencrypted connection, so this plugin refuses plain http (an http:// address is changed to https://)."
+    },
+    {
+      "key": "api_key",
+      "type": "password",
+      "label": "API key",
+      "required": true,
+      "help": "Create a separate user for Netlens with a read-only role (for example Readonly Admin), then in the user menu at the top right choose API Keys > Add for that user and paste the key here."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "TrueNAS uses a self-signed certificate until you install your own. Leave this off in that case."
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/truenas"
+}
