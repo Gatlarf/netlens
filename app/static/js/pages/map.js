@@ -1,6 +1,6 @@
 import { cssVar, isDark } from "../theme.js";
 import { get, post, patch, del, ApiError } from "../api.js";
-import { h, clear, toast, typeBadge, statusDot, TYPE_LABELS, shortName } from "../util.js";
+import { h, clear, toast, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin } from "../util.js";
 import { buildTree, defaultCollapsed, layoutHorizontal, leafIds } from "../layout_horizontal.js";
 
 const LAYOUTS = ["free", "tree", "horizontal"];
@@ -303,10 +303,10 @@ export async function render(container, params) {
     refreshView();
   });
 
-  const addLinkBtn = h("button", { class: "btn" }, "Add link");
-  const deleteLinkBtn = h("button", { class: "btn danger" }, "Delete link");
+  const addLinkBtn = h("button", { class: "btn admin-only" }, "Add link");
+  const deleteLinkBtn = h("button", { class: "btn danger admin-only" }, "Delete link");
   deleteLinkBtn.disabled = true;
-  const resetBtn = h("button", { class: "btn" }, "Reset layout");
+  const resetBtn = h("button", { class: "btn admin-only" }, "Reset layout");
   resetBtn.disabled = treeLayout; // the tree arranges itself
   const exportBtn = h("button", { class: "btn" }, "Export PNG");
   const collapseAllBtn = h("button", { class: "btn", title: "Fold the client devices of every branch" }, "Collapse clients");
@@ -531,7 +531,7 @@ export async function render(container, params) {
   });
 
   network.on("dragEnd", (params) => {
-    if (destroyed || treeLayout) return;
+    if (destroyed || treeLayout || !isAdmin()) return; // a viewer cannot save positions
     if (params.nodes.length === 0) return;
     const positions = network.getPositions(params.nodes);
     for (const id of params.nodes) {

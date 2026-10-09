@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, hierarchy as hierarchy_api, ignored, mapsettings, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, stats as stats_api, update as update_api, uptime, wifi
+from app.api import backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, hierarchy as hierarchy_api, ignored, mapsettings, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, stats as stats_api, update as update_api, users as users_api, uptime, wifi
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, require_auth
@@ -96,6 +96,7 @@ def create_app(
     app.include_router(notifications.router, dependencies=auth_deps)
     app.include_router(backup_api.router, dependencies=auth_deps)
     app.include_router(backups_api.router, dependencies=auth_deps)
+    app.include_router(users_api.router, dependencies=auth_deps)
     app.include_router(plugin_index.router, dependencies=auth_deps)
     app.include_router(update_api.router, dependencies=auth_deps)
     app.include_router(plugins.router, dependencies=auth_deps)

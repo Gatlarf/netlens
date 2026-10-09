@@ -2,7 +2,7 @@ import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
 import { initUpdateBadge } from "./update.js";
 import { get, post, ApiError } from "./api.js";
-import { clear, toast, el, setDomainSuffix } from "./util.js";
+import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
 
 const ROUTES = {
   "": "map",
@@ -261,15 +261,38 @@ function clearLoginError() {
   }
 }
 
+let loginByUser = false;
+
+function setLoginMode(byUser) {
+  loginByUser = byUser;
+  el("#login-token-fields").hidden = byUser;
+  el("#login-user-fields").hidden = !byUser;
+  el("#login-switch").textContent = byUser ? "Sign in with the access token instead" : "Sign in with a user name instead";
+  const focus = el(byUser ? "#login-user" : "#login-token");
+  if (focus) focus.focus();
+}
+
+async function applySession() {
+  const session = await get("/api/session");
+  setSessionUser(session.authenticated ? session.user : null);
+  const out = el("#logout");
+  if (out && session.user) out.title = `Signed in as ${session.user.username} (${session.user.role})`;
+  return session;
+}
+
 async function handleLogin(e) {
   e.preventDefault();
-  const tokenInput = el("#login-token");
-  const token = tokenInput ? tokenInput.value.trim() : "";
+  const body = loginByUser
+    ? { username: el("#login-user").value.trim(), password: el("#login-password").value }
+    : { token: (el("#login-token").value || "").trim() };
 
   try {
-    await post("/api/login", { token });
+    await post("/api/login", body);
     closeLoginDialog();
     clearLoginError();
+    el("#login-password").value = "";
+    await applySession();
+    displayLoaded = false;
     startPoll();
     renderPage();
   } catch (err) {
@@ -302,7 +325,7 @@ async function handleScan(kind) {
 }
 
 async function init() {
-  const session = await get("/api/session");
+  const session = await applySession();
 
   if (!session.authenticated) {
     openLoginDialog();
@@ -310,6 +333,9 @@ async function init() {
     startPoll();
     renderPage();
   }
+
+  const switchBtn = el("#login-switch");
+  if (switchBtn) switchBtn.addEventListener("click", () => setLoginMode(!loginByUser));
 
   const loginForm = el("#login-form");
   if (loginForm) {

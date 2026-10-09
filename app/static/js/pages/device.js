@@ -1,5 +1,5 @@
 import { get, patch, post, del, ApiError } from "../api.js";
-import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, shortName } from "../util.js";
+import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, shortName, isAdmin } from "../util.js";
 import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
@@ -108,7 +108,7 @@ function buildPortsCard(device, onChanged) {
   card.appendChild(table);
 
   const base = device.baseline;
-  const box = h("div", { class: "baseline-box" });
+  const box = h("div", { class: "baseline-box admin-only" });
   if (base) {
     box.appendChild(h("p", { class: base.unexpected.length || base.missing.length ? "error" : "hint", id: "baseline-state" },
       `Baseline from ${fmtTime(base.at)}: ${base.expected.length ? base.expected.join(", ") : "no open ports"}.` +
@@ -387,7 +387,7 @@ function buildEventsCard(device) {
 
 // A heading button that runs one action and shows its answer in a toast.
 function actionButton(label, title, run, id) {
-  const btn = h("button", { class: "btn", type: "button", title, id: `action-${id}` }, label);
+  const btn = h("button", { class: "btn admin-only", type: "button", title, id: `action-${id}` }, label);
   btn.addEventListener("click", async () => {
     btn.disabled = true;
     btn.textContent = `${label}…`;
@@ -439,7 +439,7 @@ export async function render(container, params) {
     heading.appendChild(h("a", { href: "#/devices" }, "← Devices"));
     if (device.primary_ip) {
       const scanBtn = h("button", {
-        class: "btn",
+        class: "btn admin-only",
         type: "button",
         title: "All 65535 TCP ports, service versions, OS detection and traceroute for this host only. Can take a few minutes.",
         onclick: async () => {
@@ -481,8 +481,9 @@ export async function render(container, params) {
 
     const right = h("div", { class: "col-right" });
     const newEdit = buildEditCard(device, () => load());
+    newEdit.card.classList.add("admin-only");
     right.appendChild(newEdit.card);
-    const parentSlot = h("div", {});
+    const parentSlot = h("div", { class: "admin-only" });
     right.appendChild(parentSlot);
     buildParentCard(device, (message) => { toast(message, "success"); load(); })
       .then((c) => { if (!disposed) parentSlot.appendChild(c); })
@@ -500,7 +501,9 @@ export async function render(container, params) {
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
     right.appendChild(buildNamesCard(device));
     right.appendChild(buildEventsCard(device));
-    right.appendChild(buildDeleteCard(device, (open) => { deleteOpen = open; }));
+    const deleteCard = buildDeleteCard(device, (open) => { deleteOpen = open; });
+    deleteCard.classList.add("admin-only");
+    right.appendChild(deleteCard);
     grid.appendChild(right);
     page.appendChild(grid);
 
@@ -513,6 +516,7 @@ export async function render(container, params) {
     clear(container);
     container.appendChild(page);
 
+    if (!isAdmin()) return; // the terminal is for administrators
     try {
       const handle = await mountTerminal(newSlot, device);
       if (disposed || terminalSlot !== newSlot) {

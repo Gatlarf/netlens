@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from fastapi.responses import Response
 
-from app.auth import COOKIE_NAME, is_authorized, require_auth
+from app.auth import identify, require_auth
 from app.db import connect
 from app.terminal.base import AuthFailed, ConnectFailed, HostKeyMismatch
 from app.terminal.hostkeys import forget_fingerprint, get_fingerprint, remember_fingerprint
@@ -46,10 +46,8 @@ async def terminal_ws(
             return
 
     # Auth check
-    token = websocket.app.state.settings.token
-    cookie = websocket.cookies.get(COOKIE_NAME)
-    authorization = websocket.headers.get("authorization")
-    if not is_authorized(token, cookie, authorization):
+    principal = identify(websocket)
+    if principal is None or not principal.is_admin:  # a terminal is a shell on the network: administrators only
         await websocket.close(code=1008)
         return
 

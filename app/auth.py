@@ -1,10 +1,16 @@
 import hmac
 import hashlib
+import re
 import time
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Optional
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
+from starlette.requests import HTTPConnection
+
+from app import users
+from app.db import connect
 
 
 COOKIE_NAME = "netlens_session"
@@ -64,7 +70,66 @@ class LoginLimiter:
         self._failures[key] = []
 
 
-def require_auth(request: Request) -> None:
-    token = request.app.state.settings.token
-    if not is_authorized(token, request.cookies.get(COOKIE_NAME), request.headers.get("authorization")):
+@dataclass(frozen=True)
+class Principal:
+    username: str
+    role: str  # "admin" | "viewer"
+    user_id: Optional[int] = None  # None = the built-in NETLENS_TOKEN login
+    builtin: bool = False
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == "admin"
+
+
+BUILTIN = Principal(username="access token", role="admin", builtin=True)
+
+# What a viewer may read. Everything else, and every request that changes something, needs an administrator.
+VIEWER_READABLE = re.compile(
+    r"^/(metrics"
+    r"|api/(session|update|map|map-settings|hierarchy|relations|events|uptime|scans|scans/current|service-checks|service-checks/\d+/results"
+    r"|stats|stats/summary|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
+)
+VIEWER_MAY_POST = ("/api/logout", "/api/me/password")
+
+
+def identify(conn: HTTPConnection) -> Optional[Principal]:
+    """Who is making this request (cookie or bearer token), or None."""
+    token = conn.app.state.settings.token
+    cookie = conn.cookies.get(COOKIE_NAME)
+    authorization = conn.headers.get("authorization")
+    if is_authorized(token, cookie, authorization):
+        return BUILTIN
+    bearer = authorization[7:] if authorization and authorization.startswith("Bearer ") else None
+    if (cookie and cookie.startswith(users.SESSION_PREFIX)) or (bearer and bearer.startswith(users.TOKEN_PREFIX)):
+        db = connect(conn.app.state.db_path)
+        try:
+            row = users.user_for_session(db, cookie) if cookie and cookie.startswith(users.SESSION_PREFIX) else None
+            row = row or (users.user_for_token(db, bearer) if bearer else None)
+        finally:
+            db.close()
+        if row:
+            return Principal(username=row["username"], role=row["role"], user_id=row["id"])
+    return None
+
+
+def require_auth(request: HTTPConnection) -> None:
+    principal = identify(request)
+    if principal is None:
         raise HTTPException(status_code=401, detail="authentication required")
+    request.state.user = principal
+    if principal.role != "admin":
+        method = request.scope.get("method", "GET")
+        path = request.url.path
+        allowed = (method in ("GET", "HEAD") and VIEWER_READABLE.match(path)) or (method == "POST" and path in VIEWER_MAY_POST)
+        if not allowed:
+            raise HTTPException(status_code=403, detail="this needs an administrator")
+
+
+def require_admin(request: HTTPConnection) -> None:
+    """For routes outside require_auth's role filter that must also be administrator-only."""
+    principal = getattr(request.state, "user", None) or identify(request)
+    if principal is None:
+        raise HTTPException(status_code=401, detail="authentication required")
+    if not principal.is_admin:
+        raise HTTPException(status_code=403, detail="this needs an administrator")

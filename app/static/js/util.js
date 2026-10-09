@@ -140,3 +140,23 @@ export function shortName(name) {
   if (text.length > tail.length && text.toLowerCase().endsWith(tail)) return text.slice(0, -tail.length);
   return text;
 }
+
+// Who is signed in (set from /api/session). The server enforces the role; the page only hides what would be refused.
+let sessionUser = null;
+
+export function setSessionUser(user) {
+  sessionUser = user || null;
+  try {
+    document.body.dataset.role = sessionUser ? sessionUser.role : "";
+  } catch (e) {
+    // no document: nothing to mark
+  }
+}
+
+export function sessionInfo() {
+  return sessionUser;
+}
+
+export function isAdmin() {
+  return !sessionUser || sessionUser.role === "admin";
+}

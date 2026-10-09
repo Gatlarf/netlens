@@ -15,7 +15,7 @@ export async function buildDeviceServicesCard(device) {
       card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, stateDot(c), " ", c.name),
         h("span", {}, `${c.target} · ${c.state === "down" ? c.last_detail : c.state === "up" ? `${Math.round(c.last_ms ?? 0)} ms` : "waiting"}${c.last_ts ? `, ${timeAgo(c.last_ts)}` : ""}`)));
     }
-    const add = h("button", { class: "btn", type: "button" }, "Add check");
+    const add = h("button", { class: "btn admin-only", type: "button" }, "Add check");
     const slot = h("div", {});
     add.addEventListener("click", async () => {
       add.disabled = true;

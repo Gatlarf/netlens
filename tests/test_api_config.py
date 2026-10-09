@@ -146,7 +146,7 @@ def test_session_reports_authenticated(tmp_path: Path) -> None:
 
         resp = client.get("/api/session")
         assert resp.status_code == 200
-        assert resp.json() == {"authenticated": True}
+        assert resp.json() == {"authenticated": True, "user": {"username": "access token", "role": "admin", "builtin": True}}
 
 
 def test_logout_clears_cookie(tmp_path: Path) -> None:

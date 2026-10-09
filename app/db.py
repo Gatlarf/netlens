@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 def utcnow() -> str:
@@ -343,6 +343,42 @@ def init_db(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "devices", "hints", "TEXT NOT NULL DEFAULT '[]'")
     # --- schema v8: port baselines (baseline_at NULL = the device has none) ---------------------
     _add_column_if_missing(conn, "devices", "baseline_at", "TEXT")
+    # --- schema v9: users, login sessions and API tokens ---------------------------------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('admin', 'viewer')),
+            disabled INTEGER NOT NULL DEFAULT 0,
+            created TEXT NOT NULL,
+            last_login TEXT
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sessions (
+            token_hash TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created TEXT NOT NULL,
+            expires TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS api_tokens (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            created TEXT NOT NULL,
+            last_used TEXT
+        )
+        """
+    )
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS port_baselines (

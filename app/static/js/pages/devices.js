@@ -125,7 +125,7 @@ function buildToolbar(state) {
   });
   toolbar.appendChild(portsSel);
 
-  const trustAll = h("button", { type: "button", class: "btn trust-all", title: "Mark every device on the list as known" }, "Trust all unknown");
+  const trustAll = h("button", { type: "button", class: "btn trust-all admin-only", title: "Mark every device on the list as known" }, "Trust all unknown");
   trustAll.addEventListener("click", async () => {
     const unknown = devices.filter((d) => !d.trusted);
     if (!unknown.length) {
@@ -143,7 +143,7 @@ function buildToolbar(state) {
   });
   toolbar.appendChild(trustAll);
 
-  const baselineAll = h("button", { type: "button", class: "btn baseline-all", title: "Take the open ports of the listed devices without a baseline as their normal ones" }, "Set baselines");
+  const baselineAll = h("button", { type: "button", class: "btn baseline-all admin-only", title: "Take the open ports of the listed devices without a baseline as their normal ones" }, "Set baselines");
   baselineAll.addEventListener("click", async () => {
     const without = devices.filter((d) => d.ports_drift === null);
     if (!without.length) {

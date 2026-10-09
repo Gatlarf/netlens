@@ -22,7 +22,7 @@ async function heartbeats(check) {
 export async function render(container) {
   let destroyed = false;
   const top = h("div", { class: "toolbar" }, h("strong", {}, "Service checks"), h("span", { class: "hint" }, "HTTP pages, TCP ports and DNS lookups, checked at the interval you choose."));
-  const addBtn = h("button", { class: "btn", type: "button" }, "Add check");
+  const addBtn = h("button", { class: "btn admin-only", type: "button" }, "Add check");
   top.appendChild(addBtn);
   const formSlot = h("div", {});
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
@@ -57,10 +57,10 @@ export async function render(container) {
     for (const c of checks) {
       const hb = h("td", {});
       heartbeats(c).then((bar) => { if (!destroyed) hb.appendChild(bar); });
-      const run = h("button", { class: "btn", type: "button" }, "Run now");
-      const edit = h("button", { class: "btn", type: "button" }, "Edit");
-      const pause = h("button", { class: "btn", type: "button" }, c.enabled ? "Pause" : "Resume");
-      const remove = h("button", { class: "btn danger", type: "button" }, "Delete");
+      const run = h("button", { class: "btn admin-only", type: "button" }, "Run now");
+      const edit = h("button", { class: "btn admin-only", type: "button" }, "Edit");
+      const pause = h("button", { class: "btn admin-only", type: "button" }, c.enabled ? "Pause" : "Resume");
+      const remove = h("button", { class: "btn danger admin-only", type: "button" }, "Delete");
       run.addEventListener("click", async () => {
         run.disabled = true;
         try {

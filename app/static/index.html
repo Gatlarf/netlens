@@ -25,9 +25,9 @@
       <a class="nav-link" href="#/settings" data-route="settings">Settings</a>
     </nav>
     <div class="topbar-actions">
-      <a id="scan-settings" class="btn" href="#/settings/nmap" title="Change which ports and checks nmap uses">&#9881; Scan settings</a>
-      <button id="scan-quick" class="btn">Quick scan</button>
-      <button id="scan-deep" class="btn">Deep scan</button>
+      <a id="scan-settings" class="btn admin-only" href="#/settings/nmap" title="Change which ports and checks nmap uses">&#9881; Scan settings</a>
+      <button id="scan-quick" class="btn admin-only">Quick scan</button>
+      <button id="scan-deep" class="btn admin-only">Deep scan</button>
       <button id="logout" class="btn ghost">Log out</button>
       <button id="theme-toggle" class="btn ghost theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">&#9790;</button>
     </div>
@@ -38,7 +38,7 @@
     <span id="scan-status" class="scan-status"></span>
     <progress id="scan-progress" class="scan-progress" max="100"></progress>
     <span id="scan-time" class="scan-time"></span>
-    <button id="scan-cancel" class="btn" type="button">Cancel scan</button>
+    <button id="scan-cancel" class="btn admin-only" type="button">Cancel scan</button>
   </div>
 
   <main id="view" class="view" tabindex="-1"></main>
@@ -46,11 +46,20 @@
   <dialog id="login-dialog">
     <form id="login-form" method="dialog">
       <h2>Sign in</h2>
-      <p>Enter the access token configured in NETLENS_TOKEN.</p>
-      <label for="login-token">Access token</label>
-      <input id="login-token" type="password" autocomplete="current-password" required>
+      <div id="login-token-fields">
+        <p>Enter the access token configured in NETLENS_TOKEN.</p>
+        <label for="login-token">Access token</label>
+        <input id="login-token" type="password" autocomplete="current-password">
+      </div>
+      <div id="login-user-fields" hidden>
+        <label for="login-user">User name</label>
+        <input id="login-user" type="text" autocomplete="username">
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" autocomplete="current-password">
+      </div>
       <p id="login-error" class="error" hidden></p>
       <button class="btn primary" type="submit">Sign in</button>
+      <button id="login-switch" class="btn ghost" type="button">Sign in with a user name instead</button>
     </form>
   </dialog>
 

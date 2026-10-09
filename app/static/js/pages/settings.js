@@ -1,5 +1,5 @@
 import { get, post, put } from "../api.js";
-import { h, clear, toast } from "../util.js";
+import { h, clear, toast, isAdmin } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
 import { buildGeneralCard } from "../cards/general.js";
 import { buildNotificationsCard } from "../cards/notifications.js";
@@ -11,6 +11,8 @@ import { buildChannelsCard } from "../cards/channels.js";
 import { buildUpdateCard } from "../update.js";
 import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
+import { buildAccountCard } from "../cards/account.js";
+import { buildUsersCard } from "../cards/users.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 
 function kvRow(label, value) {
@@ -125,23 +127,6 @@ function buildExportCard() {
   return card;
 }
 
-function buildSessionCard() {
-  const card = h("div", { class: "card" });
-  card.appendChild(h("h2", {}, "Session"));
-  const logoutBtn = h("button", { class: "btn", type: "button" }, "Log out");
-  logoutBtn.addEventListener("click", async () => {
-    try {
-      await post("/api/logout");
-      toast("Logged out", "info");
-      document.dispatchEvent(new CustomEvent("netlens:unauth"));
-    } catch (err) {
-      toast(err.message || "Logout failed", "error");
-    }
-  });
-  card.appendChild(logoutBtn);
-  return card;
-}
-
 // The pages of Settings, grouped in the side menu. Every page is its own address ("#/settings/<key>") and shows
 // only its card. A builder returns a card (or a promise of one). The Integrations group is built from the plugins
 // that are installed: one page per plugin, plus the Plugins list and the guide.
@@ -175,12 +160,14 @@ const STATIC_GROUPS = [
     title: "System",
     items: [
       { key: "about", label: "About", build: buildAboutCard },
-      { key: "session", label: "Session", build: buildSessionCard },
+      { key: "users", label: "Users & tokens", build: buildUsersCard },
+      { key: "session", label: "Account", build: buildAccountCard },
     ],
   },
 ];
 
 const DEFAULT_PAGE = "ranges";
+const VIEWER_PAGE = "session";
 // the connectors were plugins-to-be before: keep their old addresses working
 const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus" };
 
@@ -195,6 +182,7 @@ function integrationsGroup(plugins, updates = 0) {
 }
 
 async function loadGroups() {
+  if (!isAdmin()) return [{ title: "Account", items: [{ key: "session", label: "Account", build: buildAccountCard }] }];
   let plugins = [];
   let updates = 0;
   try {
@@ -231,7 +219,7 @@ export async function render(container, params) {
   let groups = await loadGroups();
   const items = () => groups.flatMap((g) => g.items);
   const requested = params && (ALIASES[params.section] || params.section);
-  const item = items().find((i) => i.key === requested) || items().find((i) => i.key === DEFAULT_PAGE);
+  const item = items().find((i) => i.key === requested) || items().find((i) => i.key === DEFAULT_PAGE) || items().find((i) => i.key === VIEWER_PAGE);
   if (params && params.section && item.key !== params.section) {
     // an address that does not exist (or an old one): show the right page under its own address, without a new history entry
     history.replaceState(null, "", `#/settings/${item.key}`);
