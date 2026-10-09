@@ -69,6 +69,18 @@
      "review": {
       "level": "community"
      }
+    },
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.0.1/omada.zip",
+     "sha256": "79f65fce9dc60ae7aa8272804e8b0a6727b23cda3b0e018153764b86720b11aa",
+     "api_version": 1,
+     "min_netlens": "0.2.45",
+     "released": "2026-10-09",
+     "changelog": "Errors now name the step that failed. The client list is requested the way more controller versions accept it (fixes 'general error -1' reported by a tester).",
+     "review": {
+      "level": "community"
+     }
     }
    ]
   },
