@@ -1,0 +1,21 @@
+# Netlens plugins
+
+Plugins that are **not built into Netlens**. They are installed from *Settings → Integrations → Browse plugins* (they are listed in
+[`plugin-index/`](../plugin-index/README.md)) or uploaded as a zip, and start switched off.
+
+| Folder | Plugin | Reads | Status |
+|---|---|---|---|
+| [`omada/`](omada/README.md) | TP-Link Omada | Omada controller 5.1 or newer: gateway, switches, access points, clients | written from the public API, **not yet tested on hardware** |
+| [`unifi/`](unifi/README.md) | Ubiquiti UniFi | UniFi Network on a UniFi OS console or a classic controller | written from the public API, **not yet tested on hardware** |
+
+Both are `topology` plugins: they tell Netlens which switch or access point every device is connected to, and which device hangs
+below which, so the hierarchy and the map show the real network position. They only read.
+
+## Build a release zip
+
+```
+python plugins/build_zip.py omada      # writes plugins/dist/omada-<version>.zip and prints its SHA-256
+python plugins/build_zip.py unifi
+```
+
+The zip holds only `plugin.json` and `plugin.py`. `diagnose.py`, the README and the tests stay in the repository.

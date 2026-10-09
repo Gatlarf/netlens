@@ -1,0 +1,48 @@
+{
+  "id": "omada",
+  "name": "TP-Link Omada",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads the Omada controller (software controller, OC200/OC300 or Omada Cloud-less hardware, version 5.1 or newer): your gateway, switches and access points, which device hangs below which, and which switch or access point every client is connected to, with Wi-Fi signal and link rate. Read-only: one login, a few reads and a logout per sync.",
+  "timeout": 90,
+  "config": [
+    {
+      "key": "url",
+      "type": "text",
+      "label": "Controller address",
+      "placeholder": "https://192.168.0.10:8043",
+      "required": true,
+      "help": "The address you open the Omada web interface at, including the port (8043 for the software controller, 443 for an OC200/OC300 or when a reverse proxy is used)."
+    },
+    {
+      "key": "username",
+      "type": "text",
+      "label": "Username",
+      "required": true,
+      "help": "Use a separate account with the Viewer role (Omada: Settings > Admin). It never needs to change anything."
+    },
+    {
+      "key": "password",
+      "type": "password",
+      "label": "Password",
+      "required": true
+    },
+    {
+      "key": "site",
+      "type": "text",
+      "label": "Site",
+      "placeholder": "Default",
+      "help": "The name of one site, exactly as shown in Omada. Leave empty to read every site the account may see."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Omada controllers use a self-signed certificate unless you installed your own. Leave this off in that case."
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/omada"
+}

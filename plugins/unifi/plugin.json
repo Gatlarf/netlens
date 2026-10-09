@@ -1,0 +1,59 @@
+{
+  "id": "unifi",
+  "name": "Ubiquiti UniFi",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine, Cloud Key Gen2+, Cloud Gateway, or a self-hosted classic controller): your gateway, switches and access points, which device hangs below which, and which switch or access point every client is connected to, with Wi-Fi signal and link rate. Read-only: one login, a few reads and a logout per sync.",
+  "timeout": 90,
+  "config": [
+    {
+      "key": "url",
+      "type": "text",
+      "label": "Controller address",
+      "placeholder": "https://192.168.1.1",
+      "required": true,
+      "help": "The address you open UniFi at: https://<console> for a UniFi OS console (port 443), https://<server>:8443 for a classic self-hosted controller."
+    },
+    {
+      "key": "mode",
+      "type": "select",
+      "label": "Type of controller",
+      "options": [
+        {"value": "auto", "label": "Detect automatically"},
+        {"value": "unifi_os", "label": "UniFi OS console (Dream Machine, Cloud Key Gen2+, Cloud Gateway)"},
+        {"value": "classic", "label": "Classic controller (self-hosted, port 8443)"}
+      ],
+      "default": "auto"
+    },
+    {
+      "key": "username",
+      "type": "text",
+      "label": "Username",
+      "required": true,
+      "help": "Use a separate local account with read-only access, without two-factor authentication (a cloud / Ubiquiti SSO account does not work)."
+    },
+    {
+      "key": "password",
+      "type": "password",
+      "label": "Password",
+      "required": true
+    },
+    {
+      "key": "site",
+      "type": "text",
+      "label": "Site",
+      "placeholder": "Default",
+      "help": "The name of one site as shown in UniFi (or its short id, usually default). Leave empty to read every site the account may see."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "UniFi consoles use a self-signed certificate unless you installed your own. Leave this off in that case."
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unifi"
+}
