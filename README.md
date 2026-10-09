@@ -140,6 +140,12 @@ location / {
 
 **Traefik:** route the host name to `http://<device-ip>:8080` with TLS on the router; WebSockets work without extra settings.
 
+**For the installable app (see *Installing Netlens as an app*):**
+- The certificate must be **trusted by the device** (Let's Encrypt or your own CA installed on it). With a self-signed certificate the browser refuses the service worker, so there is no install option.
+- Do **not** switch on the proxy's own caching of static files (Nginx Proxy Manager: *Cache Assets*; Cloudflare: cache rules for the site). Netlens sends `Cache-Control: no-cache` so that an update shows at once, and an extra cache would keep serving the old `sw.js` and interface files.
+- If something in front of Netlens asks for a login (Authelia, Authentik, Cloudflare Access, basic auth), it must also let `/manifest.webmanifest`, `/sw.js` and `/img/*` through, or at least accept the same session for them; otherwise the browser cannot read the manifest and silently offers no install. Netlens has its own login, so the simplest setup is no second login in front of it.
+- Keep the path as it is: Netlens works under a sub-path (`https://example.com/netlens/`) as long as the proxy strips the prefix.
+
 Things to know: behind a proxy every request comes from the proxy's address, so the login rate limit then counts per user name instead of per address; Home Assistant and Prometheus use
 the same HTTPS address (Home Assistant: *Reconfigure*; tick *Verify the TLS certificate* when the certificate is a normal one).
 
