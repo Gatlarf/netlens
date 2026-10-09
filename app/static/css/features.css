@@ -145,3 +145,11 @@ td.actions .btn { padding: 2px 8px; font-size: 0.85em; }
 .group-legend:empty { display: none; }
 
 .diagnose-text { width: 100%; box-sizing: border-box; font-family: var(--mono); font-size: 0.85rem; margin: 8px 0; }
+
+/* Statistics: section navigation */
+.stats-nav { position: sticky; top: var(--topbar-h, 0px); z-index: 10; display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 8px; background: var(--bg); border-bottom: 1px solid var(--border); scrollbar-width: thin; }
+.stats-nav:empty { display: none; }
+.stat-chip { flex: 0 0 auto; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
+.stat-chip:hover { border-color: var(--accent); }
+.stat-chip.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.stat-section { scroll-margin-top: calc(var(--topbar-h, 0px) + var(--statsnav-h, 0px) + 8px); }

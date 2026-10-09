@@ -24,3 +24,12 @@ scrape_configs:
 #       - alert: WeakWifi
 #         expr: netlens_wifi_signal_dbm < -75
 #         for: 30m
+#       - alert: DeviceFlapping
+#         expr: netlens_devices_flapping > 0
+#         for: 1h
+#       - alert: BackupFailed
+#         expr: netlens_backup_last_ok == 0
+#       - alert: RogueDhcp
+#         expr: netlens_dhcp_servers{trusted="false"} > 0
+#       - alert: ScansFailing
+#         expr: netlens_scans_failed_24h > 3

@@ -67,3 +67,29 @@ def test_endpoint_needs_the_token(db):
         r = c.get("/metrics", headers=AUTH)
         assert r.status_code == 200 and r.headers["content-type"].startswith("text/plain; version=0.0.4")
         parse(r.text)
+
+
+def test_identification_backup_and_system_metrics(db):
+    conn, _ = db
+    s = parse(render_metrics(conn, NOW, passive={"enabled": True, "running": True, "frames": 12, "applied": 3, "error": None}))
+    assert s["netlens_devices_flapping"] == 1
+    assert s['netlens_devices_by_type{type="router"}'] == 1
+    assert s['netlens_devices_by_group{group="(no group)"}'] == 5
+    assert s['netlens_identification_devices{kind="unknown_type"}'] >= 0 and 'netlens_identification_devices{kind="gentle"}' in s
+    assert s['netlens_dhcp_servers{trusted="true"}'] == 0 and s['netlens_dhcp_servers{trusted="false"}'] == 0
+    assert s["netlens_database_size_bytes"] > 0
+    assert s["netlens_vendor_registry_entries"] > 50000 and s['netlens_database_rows{table="devices"}'] == 5
+    assert s["netlens_passive_running"] == 1 and s["netlens_passive_announcements_total"] == 12 and s["netlens_passive_devices_updated_total"] == 3
+    assert s["netlens_backup_enabled"] in (0, 1) and s["netlens_scans_failed_24h"] >= 0
+
+
+def test_backup_result_is_exported(db):
+    import json
+
+    from app.db import set_setting
+
+    conn, _ = db
+    set_setting(conn, "backup.last", json.dumps({"ok": False, "at": "2026-10-09T10:00:00Z", "name": None, "error": "disk full"}))
+    conn.commit()
+    s = parse(render_metrics(conn, NOW))
+    assert s["netlens_backup_last_ok"] == 0 and s["netlens_backup_last_timestamp_seconds"] > 0 and s["netlens_problem"] == 1

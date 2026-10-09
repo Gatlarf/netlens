@@ -21,6 +21,11 @@ def _cached(request: Request, key: tuple, build):
     return value
 
 
+def _passive(request: Request) -> dict | None:
+    control = getattr(request.app.state, "passive", None)
+    return control.status() if control is not None else None
+
+
 @router.get("/stats")
 def get_stats(request: Request, range: str = Query("7d")) -> dict:
     """Everything for the Statistics page. `range` is 24h, 7d, 30d or 90d (the window of the history groups)."""
@@ -31,7 +36,7 @@ def get_stats(request: Request, range: str = Query("7d")) -> dict:
     def build():
         conn = connect(db_path)
         try:
-            return compute_stats(conn, range, db_path=db_path)
+            return compute_stats(conn, range, db_path=db_path, passive=_passive(request))
         finally:
             conn.close()
 
@@ -46,7 +51,7 @@ def get_summary(request: Request) -> dict:
     def build():
         conn = connect(db_path)
         try:
-            return summary(conn, scan_running=running_scan(conn) is not None, data_dir=request.app.state.settings.data_dir)
+            return summary(conn, scan_running=running_scan(conn) is not None, data_dir=request.app.state.settings.data_dir, passive=_passive(request))
         finally:
             conn.close()
 

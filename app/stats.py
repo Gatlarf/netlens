@@ -145,6 +145,7 @@ def _composition(conn, devs: dict, hierarchy: dict) -> dict:
     top_level = sum(1 for p in hierarchy.values() if p.parent_id is None)
     return {
         "by_type": _top(types, 20),
+        "by_group": _groups(conn),
         "by_vendor": _top(vendors),
         "by_os": _top(systems),
         "by_subnet": _top(subnets),
@@ -179,7 +180,8 @@ def _availability(conn, now: str) -> dict:
     ranked = [r for r in rows if r["checks"] >= MIN_CHECKS]
     least = sorted(ranked, key=lambda r: (r["uptime"], -r["outages"], r["name"]))[:5]
     most = sorted(ranked, key=lambda r: (-r["uptime"], r["outages"], r["name"]))[:5]
-    flapping = sorted((r for r in rows if r["flaps_24h"] >= FLAP_TRANSITIONS), key=lambda r: -r["flaps_24h"])[:5]
+    flapping_all = [r for r in rows if r["flaps_24h"] >= FLAP_TRANSITIONS]
+    flapping = sorted(flapping_all, key=lambda r: -r["flaps_24h"])[:5]
 
     outages_now = []
     for r in conn.execute(f"SELECT d.id, {NAME} AS n, d.last_seen FROM devices d WHERE d.online = 0 ORDER BY d.last_seen"):
@@ -198,9 +200,68 @@ def _availability(conn, now: str) -> dict:
     ]
     return {
         "uptime_24h": network(1), "uptime_7d": network(7), "uptime_30d": network(30),
-        "least_reliable": least, "most_reliable": most, "flapping": flapping,
+        "least_reliable": least, "most_reliable": most, "flapping": flapping, "flapping_total": len(flapping_all),
         "longest_outages": outages_now[:5], "avg_rtt_ms": round(rtt, 1) if rtt is not None else None, "slowest": slow,
     }
+
+
+def _identification(conn) -> dict:
+    """How well Netlens knows its devices: what is still unknown, hidden behind a private address, or decided by hand."""
+    from app.scanner import vendor as vendor_db
+
+    kinds = Counter()
+    for r in conn.execute(f"SELECT d.mac, d.vendor, d.custom_name, d.hostname, d.os_name, d.type_override, d.gentle, {TYPE} AS t FROM devices d"):
+        kinds["unknown_type"] += 1 if r["t"] == "unknown" else 0
+        mac_kind = vendor_db.mac_kind(r["mac"])
+        kinds["private_mac"] += 1 if mac_kind == "randomized" else 0
+        kinds["no_vendor"] += 1 if (not r["vendor"] and mac_kind == "universal") else 0
+        kinds["manual_type"] += 1 if r["type_override"] else 0
+        kinds["gentle"] += 1 if r["gentle"] else 0
+        kinds["nameless"] += 1 if not (r["custom_name"] or r["hostname"]) else 0
+        kinds["no_os"] += 1 if not r["os_name"] else 0
+    keys = ("unknown_type", "private_mac", "no_vendor", "manual_type", "gentle", "nameless", "no_os")
+    return {k: kinds.get(k, 0) for k in keys}
+
+
+def _groups(conn) -> list[dict]:
+    rows = conn.execute(
+        "SELECT COALESCE(g.name, '(no group)') AS label, COUNT(*) AS count FROM devices d LEFT JOIN device_groups g ON g.id = d.group_id GROUP BY label ORDER BY count DESC, label"
+    ).fetchall()
+    return [{"label": r["label"], "count": r["count"]} for r in rows]
+
+
+def _backups(conn, now: str) -> dict:
+    from app import backup_schedule
+
+    schedule = backup_schedule.get_schedule(conn)
+    last = backup_schedule.get_last(conn)
+    return {
+        "enabled": bool(schedule.get("enabled")), "every_hours": schedule.get("every_hours"), "keep": schedule.get("keep"),
+        "last_at": (last or {}).get("at"), "last_ok": None if last is None else bool(last.get("ok")), "last_error": (last or {}).get("error"),
+        "last_ok_at": last["at"] if last and last.get("ok") else None,
+        "age_s": int((_parse(now) - _parse(last["at"])).total_seconds()) if last and last.get("at") else None,
+    }
+
+
+def _netchecks(conn) -> dict:
+    from app import netchecks
+
+    servers = netchecks.list_servers(conn)
+    last = netchecks.get_last(conn)
+    return {
+        "enabled": bool(netchecks.get_settings(conn).get("enabled")),
+        "dhcp_servers": len(servers), "untrusted": sum(1 for s in servers if not s["trusted"]),
+        "last_run": (last or {}).get("at"), "last_ok": None if not last else bool(last.get("ok")),
+    }
+
+
+def flapping_devices(conn, now: str) -> int:
+    """Devices with FLAP_TRANSITIONS or more up/down changes in the last 24 hours."""
+    since = _ago(now, hours=24)
+    per_device: dict[int, list[int]] = defaultdict(list)
+    for r in conn.execute("SELECT device_id, up FROM checks WHERE ts >= ? ORDER BY device_id, ts, id", (since,)):
+        per_device[r["device_id"]].append(r["up"])
+    return sum(1 for ups in per_device.values() if sum(1 for a, b in zip(ups, ups[1:]) if a != b) >= FLAP_TRANSITIONS)
 
 
 def _history(conn, now: str, days: int) -> dict:
@@ -346,7 +407,10 @@ def _plugin_status(conn) -> list[dict]:
     return sorted(out, key=lambda p: p["id"])
 
 
-def _system(conn, db_path: str | None) -> dict:
+def _system(conn, db_path: str | None, passive: dict | None = None) -> dict:
+    from app.db import SCHEMA_VERSION
+    from app.scanner import vendor as vendor_db
+
     size = None
     try:
         size = os.path.getsize(db_path) if db_path and db_path != ":memory:" else None
@@ -362,11 +426,14 @@ def _system(conn, db_path: str | None) -> dict:
         "oldest_check": conn.execute("SELECT MIN(ts) FROM checks").fetchone()[0],
         "oldest_event": conn.execute("SELECT MIN(ts) FROM events").fetchone()[0],
         "plugins": _plugin_status(conn),
+        "schema": SCHEMA_VERSION,
+        "vendor_entries": vendor_db.info()["entries"],
+        "passive": passive,
     }
 
 
 # ----------------------------------------------------------------------------- public API
-def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | None = None, db_path: str | None = None) -> dict:
+def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | None = None, db_path: str | None = None, passive: dict | None = None) -> dict:
     """Everything the Statistics page shows. `range_key` (24h, 7d, 30d, 90d) sets the window of the history groups."""
     if range_key not in RANGES:
         raise ValueError(f"range must be one of {', '.join(RANGES)}")
@@ -386,11 +453,14 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
         "scans": _scans(conn, now, days),
         "events": _events(conn, now, days),
         "services": _services(conn, now),
-        "system": _system(conn, db_path),
+        "identification": _identification(conn),
+        "backups": _backups(conn, now),
+        "netchecks": _netchecks(conn),
+        "system": _system(conn, db_path, passive),
     }
 
 
-def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool = False, stale_after_s: int = 3 * 3600, data_dir=None) -> dict:
+def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool = False, stale_after_s: int = 3 * 3600, data_dir=None, passive: dict | None = None) -> dict:
     """The small, versioned document Home Assistant polls (see SUMMARY_API). Keys never disappear within one API version."""
     now = now or utcnow()
     overview = _overview(conn, now)
@@ -421,7 +491,9 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     failing = [p for p in plugins if p["enabled"] and p["ok"] is False]
     # the last scan failed (a single failure in the past day that later scans recovered from is not a problem), a plugin is failing, or no scan finished for a while
     services = _services(conn, now)
-    problems = (1 if services["down"] else 0) + (1 if last_info and last_info["status"] == "failed" else 0) + len(failing) + (1 if age is not None and age > stale_after_s else 0)
+    backups = _backups(conn, now)
+    problems = ((1 if services["down"] else 0) + (1 if last_info and last_info["status"] == "failed" else 0) + len(failing)
+                + (1 if age is not None and age > stale_after_s else 0) + (1 if backups["last_ok"] is False else 0))
     from app import updates
     from app.plugins import index as plugin_index
 
@@ -442,7 +514,11 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "update": {"current": upd["current"], "latest": upd["latest"], "available": upd["available"], "plugin_updates": plugin_updates},
         "version": VERSION,
         "generated": now,
-        "devices": {k: overview[k] for k in ("total", "online", "offline", "new_24h", "new_7d", "stale_30d", "unknown")},
+        "devices": {**{k: overview[k] for k in ("total", "online", "offline", "new_24h", "new_7d", "stale_30d", "unknown")}, "flapping": flapping_devices(conn, now)},
+        "identification": _identification(conn),
+        "backup": {k: backups[k] for k in ("enabled", "last_at", "last_ok", "last_error", "age_s")},
+        "netchecks": _netchecks(conn),
+        "passive": None if passive is None else {k: passive.get(k) for k in ("enabled", "running", "frames", "applied")},
         "wifi": {k: wifi[k] for k in ("clients", "weak", "avg_rssi")},
         "uptime": {"24h": _pct(day["u"] or 0, day["n"]), "7d": _pct(week["u"] or 0, week["n"])},
         "ports": {"open": conn.execute("SELECT COUNT(*) FROM ports WHERE state = 'open'").fetchone()[0]},

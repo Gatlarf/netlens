@@ -166,7 +166,7 @@ def test_summary_document(db):
     conn, _ = db
     doc = summary(conn, NOW, scan_running=True)
     assert doc["api"] == 1 and doc["generated"] == NOW and doc["scans"]["running"] is True
-    assert doc["devices"] == {"total": 5, "online": 3, "offline": 2, "new_24h": 1, "new_7d": 1, "stale_30d": 1, "unknown": 5}
+    assert doc["devices"] == {"total": 5, "online": 3, "offline": 2, "new_24h": 1, "new_7d": 1, "stale_30d": 1, "unknown": 5, "flapping": 1}
     assert doc["wifi"] == {"clients": 0, "weak": 0, "avg_rssi": None}
     assert doc["ports"] == {"open": 5} and doc["events"]["24h"] == 1 and doc["events"]["last_id"] == 5
     assert doc["uptime"]["24h"] is not None and doc["scans"]["last"]["kind"] == "quick" and doc["scans"]["last_ok_age_s"] == 3600 - 10
@@ -283,3 +283,21 @@ def test_service_checks_in_the_statistics_and_the_summary(db):
     assert {c["name"]: c["uptime_24h"] for c in svc["checks"]} == {"DB": 0.0, "Paused": None, "Web": 50.0}
     doc = summary(conn, NOW)
     assert doc["services"] == {"total": 3, "up": 1, "down": 1} and doc["problems"] >= 1 and doc["problem"] is True
+
+
+def test_summary_carries_identification_backup_and_passive(db):
+    conn, _ = db
+    doc = summary(conn, NOW, passive={"enabled": True, "running": False, "frames": 4, "applied": 1, "error": "x"})
+    assert set(doc["identification"]) == {"unknown_type", "private_mac", "no_vendor", "manual_type", "gentle", "nameless", "no_os"}
+    assert doc["backup"] == {"enabled": False, "last_at": None, "last_ok": None, "last_error": None, "age_s": None}
+    assert doc["passive"] == {"enabled": True, "running": False, "frames": 4, "applied": 1}   # the error text stays out
+    assert doc["netchecks"]["dhcp_servers"] == 0 and doc["devices"]["flapping"] == 1
+    assert summary(conn, NOW)["passive"] is None
+
+
+def test_stats_page_data_has_the_new_groups(db):
+    conn, _ = db
+    s = compute_stats(conn, "7d", NOW)
+    assert {"identification", "backups", "netchecks"} <= set(s)
+    assert s["composition"]["by_group"][0]["label"] == "(no group)"
+    assert s["availability"]["flapping_total"] == 1 and "schema" in s["system"] and s["system"]["vendor_entries"] > 50000
