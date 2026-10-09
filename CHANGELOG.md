@@ -4,6 +4,9 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 
 ## 0.2
 
+### Added
+- **Flapping investigation**: the device page has a **Stability** card (administrators). *Investigate* analyses the scan history (gaps, whether the devices behind it stayed up, whether the whole network missed the same scans, periodicity, time of day, slow answers before a gap) and lists findings; *Run live test* asks the device 8 times by ARP, ping and TCP.
+
 ### Changed
 - **Device page layout**: uptime and service checks come first in the right column, the Edit card is collapsed by default (and compact when open) and now contains *Network position*, and the console is the last card of the left column.
 

@@ -197,3 +197,22 @@
 .parent-section h3 { margin: 0 0 8px; font-size: 1.05rem; }
 .parent-section h4 { margin: 12px 0 6px; font-size: 0.95rem; }
 @media (max-width: 520px) { .edit-form.compact .edit-grid { grid-template-columns: 1fr; } }
+
+/* Stability card: findings, facts and the hour chart */
+.stability-report { margin-top: 12px; }
+.stability-report:empty { display: none; }
+.stability-report h3 { margin: 14px 0 6px; font-size: 1rem; }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-bottom: 8px; }
+.facts div { display: flex; flex-direction: column; min-width: 7em; }
+.facts b { font-size: 1.25rem; }
+.facts span { color: var(--muted); font-size: 0.8rem; }
+.findings { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.finding { border-left: 4px solid var(--border); background: var(--bg-alt, rgba(127, 127, 127, 0.08)); padding: 8px 12px; border-radius: 4px; }
+.finding.warn { border-left-color: #d97706; }
+.finding.info { border-left-color: var(--accent); }
+.finding.ok { border-left-color: #16a34a; }
+.finding p { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
+.finding-level { float: right; font-size: 0.75rem; color: var(--muted); }
+.hour-chart { display: flex; align-items: flex-end; gap: 2px; height: 70px; }
+.hour-col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; font-size: 0.65rem; color: var(--muted); }
+.hour-col i { display: block; width: 100%; background: var(--accent); min-height: 1px; border-radius: 2px 2px 0 0; }

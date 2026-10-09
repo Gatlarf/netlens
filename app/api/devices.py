@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app import actions, baselines, groups as groups_mod
+from app import actions, baselines, flapping, groups as groups_mod
 from app.db import add_event, connect, utcnow
 from app.scanner import store, vendor as vendor_db
 from app.scanner.classify import DEVICE_TYPES as CLASSIFY_TYPES
@@ -608,6 +608,33 @@ async def ping_device(device_id: int, request: Request, conn: sqlite3.Connection
         return await actions.ping(row["primary_ip"], getattr(request.app.state, "action_runner", None))
     except actions.ActionError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/devices/{device_id}/flapping")
+def flapping_report(device_id: int, days: int = 7, tz: int = 0, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Why a device keeps going offline: analysis of the scan history (tz = the browser's offset from UTC in minutes)."""
+    try:
+        return flapping.analyze(conn, device_id, days, tz_minutes=max(-840, min(840, tz)))
+    except KeyError:
+        raise HTTPException(status_code=404, detail="device not found")
+
+
+@router.post("/devices/{device_id}/flapping/probe")
+async def flapping_probe(device_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """The live test: ask the device now, several times, by ARP, ICMP and TCP."""
+    row = conn.execute("SELECT primary_ip FROM devices WHERE id = ?", (device_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    busy = getattr(request.app.state, "flapping_probe_busy", False)
+    if busy:
+        raise HTTPException(status_code=409, detail="a live test is already running")
+    request.app.state.flapping_probe_busy = True
+    try:
+        return await flapping.probe(row["primary_ip"], runner=getattr(request.app.state, "action_runner", None), pause=getattr(request.app.state, "flapping_pause", 1.0))
+    except actions.ActionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    finally:
+        request.app.state.flapping_probe_busy = False
 
 
 @router.post("/devices/{device_id}/trace")
