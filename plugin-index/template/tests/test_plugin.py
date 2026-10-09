@@ -23,6 +23,14 @@ def test_a_missing_host_is_a_clear_error():
         raise AssertionError("expected an error")
 
 
+def test_diagnose_describes_the_shape_and_hides_the_content():
+    report = plugin.diagnose({"host": "192.168.0.1"})
+    text = json.dumps(report)
+    assert report["result"] == {"nodes": 2, "clients": 2} and report["steps"]["clients"]["ok"]
+    for private in ("Laptop", "Printer", "192.168.0.", "11:22:33", "aa:bb:cc"):
+        assert private not in text, private
+
+
 def test_fetch_has_nodes_and_clients():
     out = plugin.fetch({"host": "192.168.0.1"})
     assert out["nodes"] and out["clients"]

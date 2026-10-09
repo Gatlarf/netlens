@@ -54,3 +54,53 @@ def test(config: dict) -> dict:
 
 def fetch(config: dict) -> dict:
     return to_topology(_client(config).snapshot())
+
+
+def diagnose(config: dict) -> dict:
+    """What this router answers, described by field names and types (no names, addresses or MACs), for the plugin's author."""
+    import json
+
+    from app.plugins.builtin.diag import SAMPLES, describe, make_step, problem
+
+    from .client import AsusAuthError, AsusError, build_snapshot, parse_onboarding
+
+    client = _client(config)
+    report: dict = {"steps": {}}
+    step = make_step(report)
+    client.login()  # a refused login is reported as such (and stops automatic syncing), like test()
+    clientlist = onboarding = None
+    try:
+        def read_clientlist():
+            status, text = client._send("/appGet.cgi?hook=get_clientlist()")
+            if status != 200:
+                raise AsusError(f"HTTP {status}")
+            return json.loads(text)
+
+        def read_onboarding():
+            status, text = client._send("/ajax_onboarding.asp")
+            if status != 200:
+                raise AsusError(f"HTTP {status}")
+            return text
+
+        clientlist = step("clientlist", read_clientlist)
+        raw = step("onboarding", read_onboarding, lambda t: {"length": len(t), "lines": t.count("\n") + 1})
+        if raw is not None:
+            nodes = parse_onboarding(raw)
+            onboarding = nodes
+            report["steps"]["onboarding"]["nodes_parsed"] = len(nodes)
+            report["steps"]["onboarding"]["first_node"] = [describe(n) for n in nodes[:SAMPLES]]
+        if clientlist is not None and onboarding is not None:
+            snapshot = build_snapshot(clientlist, onboarding)
+            report["result"] = {
+                "nodes": len(snapshot["nodes"]), "main_nodes": sum(1 for n in snapshot["nodes"] if n["main"]),
+                "clients": len(snapshot["clients"]), "wired": sum(1 for c in snapshot["clients"] if c["wired"]),
+                "with_rssi": sum(1 for c in snapshot["clients"] if c.get("rssi") is not None), "with_rates": sum(1 for c in snapshot["clients"] if c.get("tx_mbps") is not None),
+                "with_node": sum(1 for c in snapshot["clients"] if c["node_mac"]),
+            }
+    except AsusAuthError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        report["error"] = problem(exc)
+    finally:
+        client.logout()
+    return report

@@ -286,3 +286,34 @@ def test_guest_ids_are_unique_and_odd_entries_are_skipped():
     out = plugin.to_hypervisor(snapshot, "10.0.0.1")
     assert [g["id"] for g in out["guests"]] == ["instance:a", "vm:1", "app:x"] and out["hosts"][0]["id"] == "nas"
     validate_output("hypervisor", out)
+
+
+def test_diagnose_describes_shapes_and_leaks_nothing(fake):
+    server = fake(vms=VMS)
+    report = run(server, plugin.diagnose)
+    text = json.dumps(report)
+    for private in ("proxmox-pbs", "192.168.0.", "0e:01:06", "00:A0:98", "dns-server", "plex", "secret", "good-key", "ubuntu"):
+        assert private not in text, private
+    assert report["steps"]["system_info"]["shape"]["hostname"].startswith("<text") and report["steps"]["system_info"]["shape"]["version"].startswith("25.")
+    assert report["steps"]["instances"]["shape"]["count"] == 2 and report["steps"]["instances"]["shape"]["first"][0]["status"] == "RUNNING"
+    assert report["steps"]["interfaces"]["ok"] and report["steps"]["apps"]["shape"]["count"] == 2
+    assert report["result"]["by_kind"] == {"lxc": 1, "qemu": 2, "app": 2} and report["result"]["host_has_mac"] is True and report["result"]["host_has_ip"] is True
+    assert server.methods.count("auth.login_with_api_key") == 1
+
+
+def test_diagnose_records_unavailable_features_as_failed_steps(fake):
+    server = fake(errors={"virt.instance.query": {"code": -32601, "message": "Method does not exist"},
+                          "app.query": {"code": 22, "message": "x", "data": {"reason": "[ENOENT] Apps are not configured"}}})
+    report = run(server, plugin.diagnose)
+    assert report["steps"]["instances"]["ok"] is False and "does not exist" in report["steps"]["instances"]["error"]
+    assert report["steps"]["apps"]["ok"] is False and "Apps are not configured" in report["steps"]["apps"]["error"]
+    assert report["steps"]["system_info"]["ok"] and "result" in report
+
+
+def test_diagnose_with_a_wrong_key_is_a_refused_login(fake):
+    with pytest.raises(plugin.LoginRefused):
+        run(fake(key="other"), plugin.diagnose)
+
+
+def test_the_manifest_announces_the_diagnostic():
+    assert validate_manifest(json.loads((ROOT / "plugin.json").read_text()))["diagnose"] is True

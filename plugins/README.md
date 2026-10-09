@@ -12,6 +12,10 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 Omada and UniFi are `topology` plugins: they tell Netlens which switch or access point every device is connected to, and which device hangs
 below which, so the hierarchy and the map show the real network position. They only read.
 
+## Diagnostics
+
+Every plugin here has a `diagnose(config)`: the plugin's page in Netlens shows a **Run diagnostic** button that produces an anonymised report (field names and types, which step failed) to copy or download and send to the maintainer. New plugins should include one too, see `app/plugins/PLUGINS.md`.
+
 ## Build a release zip
 
 ```
@@ -19,4 +23,4 @@ python plugins/build_zip.py omada      # writes plugins/dist/omada-<version>.zip
 python plugins/build_zip.py unifi
 ```
 
-The zip holds only `plugin.json` and `plugin.py`. `diagnose.py`, the README and the tests stay in the repository.
+The zip holds only `plugin.json` and `plugin.py`. The README and the tests stay in the repository.

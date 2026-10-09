@@ -5,6 +5,7 @@ into the form (the keys come from "config" in plugin.json):
 
     test(config)   -> {"message": "text shown after Test connection"}
     fetch(config)  -> the data described in PLUGINS.md for your plugin's kind
+    diagnose(config) -> a small report of what your device answered (shapes, not content) for the "Run diagnostic" button
 
 Raise an exception with a clear message when something goes wrong; Netlens shows it to the user. If the
 login was refused, set `auth_failed = True` on the exception so Netlens stops retrying until the user acts
@@ -43,4 +44,40 @@ def fetch(config):
             {"mac": "11:22:33:44:55:02", "ip": "192.168.0.51", "name": "Printer", "node_mac": "aa:bb:cc:00:00:01",
              "medium": "wired"},
         ],
+    }
+
+
+# ---- diagnostic report ---------------------------------------------------------------------------------------------
+# Testers press "Run diagnostic" on the plugin's page and send you the result, so describe the SHAPE of what the device
+# returned (field names, types, counts), never names, addresses or MACs. See "diagnose(config)" in PLUGINS.md.
+import re
+
+
+def describe(value, key=""):
+    """The shape of a value: types and sizes, never the content (except a few harmless enumerations)."""
+    if isinstance(value, dict):
+        return {k: describe(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [describe(v, key) for v in value[:2]] + ([f"... {len(value)} items"] if len(value) > 2 else [])
+    if isinstance(value, bool) or value is None:
+        return value
+    if key in ("type", "status", "state"):  # words that are the same on every device and help to understand the data
+        return value
+    if isinstance(value, (int, float)):
+        return f"<number {'negative' if value < 0 else 'positive' if value > 0 else 'zero'}, {len(str(abs(value)))} digits>"
+    if isinstance(value, str):
+        if re.fullmatch(r"([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}", value):
+            return "<mac " + ("dashes" if "-" in value else "colons") + ">"
+        if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", value):
+            return "<ipv4>"
+        return f"<text {len(value)} chars>"
+    return f"<{type(value).__name__}>"
+
+
+def diagnose(config):
+    _connect(config)
+    data = fetch(config)  # replace with the raw answers of your device, one step at a time, recording failures
+    return {
+        "steps": {"clients": {"ok": True, "count": len(data["clients"]), "first": [describe(c) for c in data["clients"][:3]]}},
+        "result": {"nodes": len(data["nodes"]), "clients": len(data["clients"])},
     }

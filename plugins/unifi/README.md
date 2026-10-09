@@ -44,15 +44,8 @@ Please check after a sync, and tell us what is wrong:
 - [ ] Both a UniFi OS console and a classic controller, if you have access to both.
 - [ ] Several sites, if you have them.
 
-If something is off, run the diagnostic and send us the file:
-
-```
-python diagnose.py --url https://<console> --username <read-only account> --site default
-```
-
-It asks for the password (not stored), logs in once and writes `unifi-diagnostic.json` with the **names and types of the fields** the controller
-returned and a summary of what the plugin made of them. Names, MAC and IP addresses and all other text are replaced by placeholders. Read the file
-before sending it. (Python 3.9 or newer, nothing to install.)
+If something is off, press **Run diagnostic** on the plugin's page in Netlens (Netlens 0.2.67 or newer, plugin 1.0.1 or newer). It logs in once like a normal sync with the values in the form and shows a report of what the controller
+answered: the controller kind, which steps worked, and the **names and types of the fields** (not their content). Names, MAC and IP addresses and your settings are removed. Press **Copy** or **Download**, read it, and send it to whoever maintains the plugin.
 
 ## Known limits
 

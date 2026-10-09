@@ -25,6 +25,7 @@ plugin needs no user-interface code.
 3. Zip `plugin.json` and `plugin.py` (at the top of the zip, or together inside a single folder).
 4. **Settings -> Plugins -> Upload plugin**. The plugin starts **off**.
 5. Open its settings page, fill in the form and press **Test connection**. When it works, tick **Enable** and **Save**. Netlens syncs at once and after every scan.
+6. Add a `diagnose(config)` (see below) before you share the plugin: it lets testers send you a report of what their device answers.
 
 To change a plugin, upload the new zip again; Netlens asks whether to replace it and keeps its settings.
 
@@ -56,6 +57,7 @@ my-router/            (the folder is optional)
 | `description` | no | A sentence or two (max 500). |
 | `author`, `homepage` | no | Shown in the plugin list. |
 | `timeout` | no | Seconds, 5-600, default 60. Netlens stops the plugin after this long. |
+| `diagnose` | no, but recommended | `true` when `plugin.py` has `diagnose(config)`: the plugin's page then shows a **Run diagnostic** button (see below). |
 | `config` | no | The settings form: a list of fields (below). |
 
 ### Settings fields (`config`)
@@ -173,19 +175,68 @@ def fetch(config):
     }
 ```
 
-### Optional: `diagnose(config)`, a report for you when something fails on somebody else's device
+### `diagnose(config)`: please include it
 
-If you cannot test your plugin on every device it supports, let it describe what a device answered. Add `"diagnose": true` to `plugin.json` and a function
+Nobody can test a plugin on every device, firmware or version. A `diagnose(config)` lets a tester press **Run diagnostic** on your plugin's settings page in Netlens and send you a
+report of what their device answered, without running any script. **Every plugin should have one**: it is what turns "it does not work" into a fix. Add `"diagnose": true` to
+`plugin.json` and a function that returns a dictionary:
 
 ```python
 def diagnose(config):
-    return {"controller_version": "5.14", "steps": {"clients": {"ok": True, "shape": {"count": 12, "first": [{"mac": "<mac dashes>", "name": "<text 7 chars>"}]}}}}
+    controller = connect(config)             # a refused login raises the same exceptions as test(): it must not retry either
+    report = {"steps": {}}
+    try:
+        report["controller_version"] = controller.version
+        for name, call in (("devices", controller.devices), ("clients", controller.clients)):
+            try:
+                rows = call()
+                report["steps"][name] = {"ok": True, "count": len(rows), "first": [describe(r) for r in rows[:3]]}
+            except Exception as exc:               # record the step that failed and go on with the others
+                report["steps"][name] = {"ok": False, "error": str(exc)[:300]}
+        result = fetch(config)                    # what the plugin makes of it, as counts
+        report["result"] = {"nodes": len(result["nodes"]), "clients": len(result["clients"])}
+    finally:
+        controller.logout()
+    return report
 ```
 
-Netlens then shows a **Run diagnostic** button on the plugin's settings page. It runs `diagnose(config)` in the same isolated process as `test()` with the values in the form, removes
-the values of the plugin's own settings (addresses, user names, keys, passwords) and every MAC address from the result, and shows it in a box to **copy or download** and send to you.
-Describe the **shape** of what you received (field names, types, how many items, a few harmless enumerations), never the content: the scrub is a second line of defence. Keep the report under
-a few hundred KB, record which step failed and why (without addresses), and raise your usual exceptions for a refused login. `python plugin-index/tools/check_plugin.py <plugin> --config cfg.json` also runs it.
+Netlens runs `diagnose(config)` in the same isolated process as `test()` and `fetch()`, with the values in the form, and shows the report in a box to **copy or download**.
+Rules for what goes in it:
+
+- Describe the **shape** of what the device returned: field names, types, counts, and a few harmless enumerations (`type`, `status`...). **Never content**: no names, addresses, MAC addresses, serial numbers or free text.
+  Copy this helper (it replaces numbers, MAC and IP addresses and text by placeholders):
+
+```python
+import re
+
+
+def describe(value, key=""):
+    """The shape of a value: types and sizes, never the content (except a few harmless enumerations)."""
+    if isinstance(value, dict):
+        return {k: describe(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [describe(v, key) for v in value[:2]] + ([f"... {len(value)} items"] if len(value) > 2 else [])
+    if isinstance(value, bool) or value is None:
+        return value
+    if key in ("type", "status", "state"):  # words that are the same on every device and help to understand the data
+        return value
+    if isinstance(value, (int, float)):
+        return f"<number {'negative' if value < 0 else 'positive' if value > 0 else 'zero'}, {len(str(abs(value)))} digits>"
+    if isinstance(value, str):
+        if re.fullmatch(r"([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}", value):
+            return "<mac " + ("dashes" if "-" in value else "colons") + ">"
+        if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", value):
+            return "<ipv4>"
+        return f"<text {len(value)} chars>"
+    return f"<{type(value).__name__}>"
+```
+
+- Record which **step failed and why** (without addresses) and carry on with the other steps, so one report shows everything that is wrong. Raise your usual exceptions for a refused login.
+- Log in **once**, like `fetch()`, and log out again.
+- Keep the report small (a few hundred KB at most).
+- Netlens removes the values of the plugin's own settings (addresses, user names, keys, passwords) and every MAC address from the report before showing it. That is a second line of defence, not a licence to send content.
+
+`python plugin-index/tools/check_plugin.py <plugin> --config cfg.json` runs your `diagnose()` too, and prints a note when a plugin has none.
 
 ## Errors and refused logins
 
@@ -279,7 +330,7 @@ General rules for both kinds: MAC addresses are `aa:bb:cc:dd:ee:ff` or `aa-bb-cc
 ## Publishing your plugin
 
 Plugins can be listed in the **plugin index** so that other people can find and install them under *Settings → Browse plugins*.
-Release your plugin as a zip on GitHub, check it with `plugin-index/tools/check_plugin.py` (a copy of the Netlens repository is
+Include a `diagnose(config)` (see above) so that people who try your plugin can report problems with one click. Release your plugin as a zip on GitHub, check it with `plugin-index/tools/check_plugin.py` (a copy of the Netlens repository is
 enough; it runs the same checks Netlens runs), and submit an entry by pull request. Reviewers read the code and set the review level
 (*Verified*, *Reviewed* or *Community*). The whole process, the entry format and a plugin template are in
 `plugin-index/README.md` in the Netlens repository.

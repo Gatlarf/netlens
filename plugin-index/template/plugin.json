@@ -7,6 +7,7 @@
   "author": "Your name",
   "description": "Describe what your plugin reads and from which device.",
   "timeout": 30,
+  "diagnose": true,
   "config": [
     {
       "key": "host",

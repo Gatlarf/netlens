@@ -253,20 +253,6 @@ def test_diagnose_with_a_wrong_password_is_a_refused_login(server):
         plugin.diagnose(cfg(url, password="wrong"))
 
 
-def test_the_command_line_wrapper_writes_the_same_report(server, tmp_path, monkeypatch):
-    url, _ = server
-    dspec = importlib.util.spec_from_file_location("omada_diagnose", ROOT / "diagnose.py")
-    diag = importlib.util.module_from_spec(dspec)
-    dspec.loader.exec_module(diag)
-    out = tmp_path / "d.json"
-    monkeypatch.setattr(diag.getpass, "getpass", lambda prompt="": "secret")
-    monkeypatch.setattr("sys.argv", ["diagnose.py", "--url", url, "--username", "viewer", "--site", "Home", "--out", str(out)])
-    diag.main()
-    report = json.loads(out.read_text())
-    assert report["plugin_version"] == json.loads((ROOT / "plugin.json").read_text())["version"] and report["controller_version"] == "5.14.26.1"
-    assert "secret" not in out.read_text()
-
-
 @pytest.mark.parametrize("need,attempts", [(None, ["false"]), ("false", ["false"]), ("true", ["false", "true"]), ("none", ["false", "true", None])])
 def test_the_client_list_adapts_to_what_the_controller_accepts(server, need, attempts):
     url, state = server

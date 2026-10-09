@@ -1,12 +1,13 @@
 {
   "id": "unifi",
   "name": "Ubiquiti UniFi",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",
   "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine, Cloud Key Gen2+, Cloud Gateway, or a self-hosted classic controller): your gateway, switches and access points, which device hangs below which, and which switch or access point every client is connected to, with Wi-Fi signal and link rate. Read-only: one login, a few reads and a logout per sync.",
   "timeout": 90,
+  "diagnose": true,
   "config": [
     {
       "key": "url",

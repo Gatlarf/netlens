@@ -1,12 +1,13 @@
 {
   "id": "truenas",
   "name": "TrueNAS",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
   "description": "Reads a TrueNAS (Community Edition 25.04 or newer) and shows it as a host with what runs on it: containers and virtual machines (matched to the devices on your network by IP or MAC address) and apps. Read-only: one login with an API key, a few reads, then it disconnects.",
   "timeout": 60,
+  "diagnose": true,
   "config": [
     {
       "key": "url",

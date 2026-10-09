@@ -9,6 +9,7 @@
    python plugin-index/tools/check_plugin.py path/to/your-plugin --output tests/sample_output.json   # validate recorded output
    python plugin-index/tools/check_plugin.py path/to/your-plugin --config my-settings.json           # call your real device
    ```
-3. Publish: push a tag like `v1.0.0`. The workflow in `.github/workflows/release.yml` builds `plugin.zip`, attaches it to a GitHub
+3. **Keep `diagnose(config)`** (and `"diagnose": true` in `plugin.json`): it powers the *Run diagnostic* button, so testers can send you a report of what their device answered. Replace the example with your device's real answers, shapes only (see `diagnose(config)` in `PLUGINS.md`).
+4. Publish: push a tag like `v1.0.0`. The workflow in `.github/workflows/release.yml` builds `plugin.zip`, attaches it to a GitHub
    release and prints the SHA-256 you need for the index entry.
-4. Submit it: see [`plugin-index/README.md`](../README.md).
+5. Submit it: see [`plugin-index/README.md`](../README.md).

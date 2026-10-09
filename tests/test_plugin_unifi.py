@@ -235,22 +235,35 @@ def test_helpers():
     assert plugin._rate_mbps(866700) == 866.7 and plugin._rate_mbps(0) is None and plugin._rate_mbps(None) is None
 
 
-def test_diagnose_writes_an_anonymised_report(tmp_path, monkeypatch):
+def test_diagnose_describes_shapes_and_leaks_nothing():
     httpd, url = start(os_console=True)
     try:
-        dspec = importlib.util.spec_from_file_location("unifi_diagnose", ROOT / "diagnose.py")
-        diag = importlib.util.module_from_spec(dspec)
-        dspec.loader.exec_module(diag)
-        out = tmp_path / "d.json"
-        monkeypatch.setattr(diag.getpass, "getpass", lambda prompt="": "secret")
-        monkeypatch.setattr("sys.argv", ["diagnose.py", "--url", url, "--username", "viewer", "--site", "default", "--out", str(out)])
-        diag.main()
-        text = out.read_text()
-        report = json.loads(text)
+        report = plugin.diagnose(cfg(url))
+        text = json.dumps(report)
         for private in ("annas-iphone", "Anna", "192.168.1", "aa:bb:cc", "11:22:33", "secret", "127.0.0.1", "Dream Machine", "Hall AP"):
             assert private not in text, private
         assert report["controller_kind"] == "unifi_os" and report["steps"]["devices"]["shape"]["count"] == 6
         assert report["steps"]["clients"]["ok"] and report["result"]["nodes"] == 5 and report["result"]["clients"] == 5
         assert report["steps"]["devices"]["shape"]["first"][0]["mac"] == "<mac colons>"
+        assert Fake.state["logouts"] == 1
+    finally:
+        httpd.shutdown()
+
+
+def test_diagnose_with_a_wrong_password_is_a_refused_login():
+    httpd, url = start(os_console=False)
+    try:
+        with pytest.raises(plugin.LoginRefused):
+            plugin.diagnose(cfg(url, password="wrong"))
+    finally:
+        httpd.shutdown()
+
+
+def test_diagnose_records_a_failing_step_and_still_logs_out():
+    httpd, url = start(os_console=True)
+    try:
+        report = plugin.diagnose(cfg(url, site="branch"))  # the fake answers this site with an empty list
+        assert report["steps"]["devices"]["ok"] and report["steps"]["devices"]["shape"]["count"] == 0
+        assert Fake.state["logouts"] == 1
     finally:
         httpd.shutdown()

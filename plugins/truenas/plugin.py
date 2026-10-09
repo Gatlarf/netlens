@@ -19,6 +19,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import socket
 import ssl
 import struct
@@ -339,3 +340,74 @@ def fetch(config):
     finally:
         truenas.close()
     return to_hypervisor(snapshot, truenas.host)
+
+
+# ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
+KEEP_WORDS = {"version", "type", "status", "state", "dev_type", "dtype", "nic_type", "link_state", "autostart", "model"}
+SAMPLES = 2
+
+
+def describe(value, key=""):
+    """The shape of a value: types and sizes, never the content (except a few harmless enumerations)."""
+    if isinstance(value, dict):
+        return {k: describe(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [describe(v, key) for v in value[:2]] + ([f"... {len(value)} items"] if len(value) > 2 else [])
+    if isinstance(value, bool) or value is None:
+        return value
+    if key in KEEP_WORDS:
+        return value
+    if isinstance(value, (int, float)):
+        return f"<number {'negative' if value < 0 else 'positive' if value > 0 else 'zero'}, {len(str(abs(value)))} digits>"
+    if isinstance(value, str):
+        if re.fullmatch(r"([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}", value):
+            return "<mac " + ("dashes" if "-" in value else "colons") + (", UPPER" if value.upper() == value and re.search("[A-F]", value) else "") + ">"
+        if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", value):
+            return "<ipv4>"
+        return f"<text {len(value)} chars>"
+    return f"<{type(value).__name__}>"
+
+
+def _problem(exc):
+    return type(exc).__name__ + ": " + re.sub(r"https?://\S+", "<url>", str(exc))[:300]
+
+
+def diagnose(config):
+    """What this TrueNAS answers, described by field names and types, and what the plugin made of it (no names, MACs or IPs)."""
+    truenas = _session(config)  # a refused key is reported as such (and stops automatic syncing), like test()
+    report = {"steps": {}}
+
+    def step(name, method, *params):
+        try:
+            result = truenas.call(method, *params)
+        except Exception as exc:  # noqa: BLE001 - the point is to record what failed
+            report["steps"][name] = {"ok": False, "error": _problem(exc)}
+            return None
+        if isinstance(result, list):
+            report["steps"][name] = {"ok": True, "shape": {"count": len(result), "first": [describe(x) for x in result[:SAMPLES]]}}
+        else:
+            report["steps"][name] = {"ok": True, "shape": describe(result)}
+        return result
+
+    try:
+        step("system_info", "system.info")
+        step("interfaces", "interface.query")
+        instances = step("instances", "virt.instance.query")
+        step("vms", "vm.query")
+        step("apps", "app.query")
+        first = next((i for i in instances or [] if isinstance(i, dict) and i.get("id")), None)
+        if first:
+            step("instance_devices", "virt.instance.device_list", first["id"])
+        snapshot = truenas.snapshot()
+        out = to_hypervisor(snapshot, truenas.host)
+        report["result"] = {
+            "host_has_ip": "ip" in out["hosts"][0], "host_has_mac": "mac" in out["hosts"][0],
+            "guests": len(out["guests"]), "by_kind": {k: sum(1 for g in out["guests"] if g["kind"] == k) for k in ("lxc", "qemu", "app")},
+            "guests_with_ip": sum(1 for g in out["guests"] if g["ips"]), "guests_with_mac": sum(1 for g in out["guests"] if g["macs"]),
+            "not_available": snapshot["notes"],
+        }
+    except Exception as exc:  # noqa: BLE001
+        report["error"] = _problem(exc)
+    finally:
+        truenas.close()
+    return report

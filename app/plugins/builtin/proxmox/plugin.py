@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from .client import ProxmoxClient
 from .config import ProxmoxConfig, has_credentials
 
@@ -49,3 +51,35 @@ def fetch(config: dict) -> dict:
             for g in inventory["guests"]
         ],
     }
+
+
+def diagnose(config: dict) -> dict:
+    """What this Proxmox answers, described by field names and types (no names, addresses or MACs), for the plugin's author."""
+    from app.plugins.builtin.diag import SAMPLES, describe, make_step, mask, problem
+
+    client = _client(config)
+    report: dict = {"steps": {}}
+    step = make_step(report)
+    step("version", lambda: client.get("/version"))
+    step("cluster_status", lambda: client.get("/cluster/status"), lambda v: {"count": len(v), "first": [describe(x) for x in v[:SAMPLES]]})
+    step("nodes", lambda: client.get("/nodes"), lambda v: {"count": len(v), "first": [describe(x) for x in v[:SAMPLES]]})
+    resources = step("resources", lambda: client.get("/cluster/resources?type=vm"), lambda v: {"count": len(v), "first": [describe(x) for x in v[:SAMPLES]]})
+    for kind in ("qemu", "lxc"):
+        guest = next((g for g in resources or [] if isinstance(g, dict) and g.get("type") == kind and not g.get("template") and g.get("vmid") is not None), None)
+        if guest:
+            # the network lines of a guest keep their structure (`virtio=<mac>,bridge=vmbr0`); every other value is only described
+            def read_config(guest=guest, kind=kind):
+                cfg = client.get(f"/nodes/{guest['node']}/{kind}/{guest['vmid']}/config")
+                return {k: (mask(v) if isinstance(v, str) and re.fullmatch(r"(net|ipconfig)\d+", k) else describe(v, k)) for k, v in cfg.items()}
+
+            step(f"{kind}_config", read_config, lambda v: v)
+    try:
+        inventory = client.inventory()
+        report["result"] = {
+            "nodes": len(inventory["nodes"]), "nodes_with_ip": sum(1 for n in inventory["nodes"] if n.get("ip")),
+            "guests": len(inventory["guests"]), "by_kind": {k: sum(1 for g in inventory["guests"] if g["kind"] == k) for k in ("qemu", "lxc")},
+            "guests_with_mac": sum(1 for g in inventory["guests"] if g["macs"]), "guests_with_ip": sum(1 for g in inventory["guests"] if g["ips"]),
+        }
+    except Exception as exc:  # noqa: BLE001
+        report["error"] = problem(exc)
+    return report

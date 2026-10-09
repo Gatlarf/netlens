@@ -22,6 +22,11 @@ It only reads. It uses the TrueNAS **JSON-RPC WebSocket API** (`wss://<truenas>/
 
 A refused login (wrong, revoked or expired key) stops automatic syncing until you save the settings or press *Sync now* again.
 
+## If something does not work
+
+Press **Run diagnostic** on the plugin's page (Netlens 0.2.67 or newer, plugin 1.0.1 or newer). It logs in once with the values in the form and shows a report of what TrueNAS answered: which steps worked
+(system, interfaces, containers, virtual machines, apps) and the **names and types of the fields**, not their content. Names, addresses, MAC addresses and your settings are removed. **Copy** or **Download** it and send it to whoever maintains the plugin.
+
 ## What was tested
 
 Written against and tested on a real **TrueNAS 25.10.6** (a LXC container under *Instances/Containers*, one app) and against a simulated TrueNAS (WebSocket frames, pings, large messages, an old version

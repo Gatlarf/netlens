@@ -59,6 +59,8 @@ def main() -> int:
         bad(f"package: {exc}")
         return 1
     ok(f"package: {manifest['name']} {manifest['version']} ({manifest['kind']}, plugin API {manifest['api_version']}, {len(files)} file(s))")
+    if not manifest.get("diagnose"):
+        print("  note   no diagnose(config): add one (and \"diagnose\": true in plugin.json) so testers can send you a report of what their device answers; see PLUGINS.md")
     flags = scan_files(files)
     for f in flags:
         print(f"  {f}")
