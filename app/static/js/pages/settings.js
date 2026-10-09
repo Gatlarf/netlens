@@ -14,6 +14,7 @@ import { buildBackupCard } from "../cards/backup.js";
 import { buildAccountCard } from "../cards/account.js";
 import { buildUsersCard } from "../cards/users.js";
 import { buildSharesCard } from "../cards/shares.js";
+import { buildNetchecksCard } from "../cards/netchecks.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 
 function kvRow(label, value) {
@@ -139,6 +140,7 @@ const STATIC_GROUPS = [
       { key: "nmap", label: "Scan performance", build: buildScanOptionsCard },
       { key: "schedule", label: "Schedule & terminal", build: buildGeneralCard },
       { key: "map", label: "Map", build: buildMapCard },
+      { key: "netchecks", label: "Network checks", build: buildNetchecksCard },
     ],
   },
   {

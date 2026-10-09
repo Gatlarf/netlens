@@ -18,7 +18,9 @@ const KIND_LABELS = {
   wifi_roamed: "Wi-Fi move",
   service_down: "Service down",
   service_up: "Service up",
-  backup_failed: "Backup failed"
+  backup_failed: "Backup failed",
+  dhcp_rogue: "Rogue DHCP?",
+  gateway_changed: "Gateway changed"
 };
 
 const KIND_ORDER = [
@@ -38,7 +40,9 @@ const KIND_ORDER = [
   "wifi_roamed",
   "service_down",
   "service_up",
-  "backup_failed"
+  "backup_failed",
+  "dhcp_rogue",
+  "gateway_changed"
 ];
 
 function statusClass(status) {

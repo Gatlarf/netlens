@@ -53,7 +53,7 @@ class ScanManager:
     ) -> None:
         # Async callables f(db_path) run after every successful scan; failures never fail the scan.
         self.plugin_runner = None  # tests replace the subprocess runner of the plugins
-        self.after_scan = [self._plugins_after_scan, self._stats_after_scan, process_notifications, process_channels] if after_scan is None else list(after_scan)
+        self.after_scan = [self._plugins_after_scan, self._stats_after_scan, self._netchecks_after_scan, process_notifications, process_channels] if after_scan is None else list(after_scan)
         self.db_path = db_path
         self.settings = settings
         self.runner = runner
@@ -148,6 +148,19 @@ class ScanManager:
 
     async def _plugins_after_scan(self, db_path: str) -> None:
         await PluginService(db_path, self.settings.data_dir, self.plugin_runner).after_scan()
+
+    async def _netchecks_after_scan(self, db_path: str) -> None:
+        from app import netchecks
+
+        try:
+            gateway_ip = await self.gateway_provider()
+        except Exception:  # noqa: BLE001
+            gateway_ip = None
+        conn = connect(db_path)
+        try:
+            netchecks.check_gateway(conn, gateway_ip)
+        finally:
+            conn.close()
 
     async def _stats_after_scan(self, db_path: str) -> None:
         conn = connect(db_path)

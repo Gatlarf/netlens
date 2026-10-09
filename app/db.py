@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 
 def utcnow() -> str:
@@ -393,6 +393,21 @@ def init_db(conn: sqlite3.Connection) -> None:
             expires TEXT,
             last_used TEXT,
             views INTEGER NOT NULL DEFAULT 0
+        )
+        """
+    )
+    # --- schema v11: DHCP servers seen on the network (network checks) ----------------------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS dhcp_servers (
+            ip TEXT PRIMARY KEY,
+            trusted INTEGER NOT NULL DEFAULT 0,
+            first_seen TEXT NOT NULL,
+            last_seen TEXT NOT NULL,
+            router TEXT,
+            dns TEXT NOT NULL DEFAULT '[]',
+            domain TEXT,
+            offered_ip TEXT
         )
         """
     )

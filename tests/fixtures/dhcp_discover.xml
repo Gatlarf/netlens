@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nmaprun scanner="nmap" version="7.95">
+<prescript><script id="broadcast-dhcp-discover" output="..."><table key="Response 1 of 1">
+<elem key="Interface">eth0</elem>
+<elem key="IP Offered">192.168.0.185</elem>
+<elem key="DHCP Message Type">DHCPOFFER</elem>
+<elem key="Server Identifier">192.168.0.1</elem>
+<elem key="IP Address Lease Time">1d00h00m00s</elem>
+<elem key="Subnet Mask">255.255.255.0</elem>
+<elem key="Domain Name">home.codeshrimp.com</elem>
+<table key="Domain Name Server">
+<elem>192.168.0.181</elem>
+<elem>192.168.0.200</elem>
+</table>
+<elem key="Router">192.168.0.1</elem>
+</table>
+</script></prescript><runstats><finished summary="Nmap done" elapsed="10.15" exit="success"/><hosts up="0" down="0" total="0"/></runstats>
+</nmaprun>

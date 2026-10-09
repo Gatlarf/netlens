@@ -362,6 +362,16 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
 
                         await process_channels(db_path)
                         await process_notifications(db_path)
+                    from app import netchecks
+
+                    if netchecks.dhcp_due(conn):
+                        checked = await netchecks.check_dhcp(conn)
+                        if checked["rogue"]:
+                            from app.notify.channels import process_channels
+                            from app.notify.service import process_notifications
+
+                            await process_channels(db_path)
+                            await process_notifications(db_path)
                     await asyncio.to_thread(_housekeeping_checks, conn)
                 finally:
                     conn.close()

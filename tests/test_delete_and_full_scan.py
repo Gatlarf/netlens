@@ -322,7 +322,7 @@ def test_v3_database_is_migrated_to_v4(tmp_path):
     conn.close()
     conn = connect(path)
     init_db(conn)
-    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == SCHEMA_VERSION == 10
+    assert conn.execute("SELECT version FROM schema_version").fetchone()[0] == SCHEMA_VERSION == 11
     conn.execute("INSERT INTO scans (kind, status, started, target) VALUES ('full', 'running', ?, '10.0.0.6')", (NOW,))
     conn.execute("INSERT INTO ignored_devices (mac, label, added) VALUES ('aa:00:00:00:00:01', 'x', ?)", (NOW,))
     with pytest.raises(sqlite3.IntegrityError):  # the MAC is unique

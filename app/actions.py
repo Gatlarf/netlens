@@ -62,7 +62,8 @@ def _send_udp_broadcast(packet: bytes, target: str, port: int) -> None:
         sock.sendto(packet, (target, port))
 
 
-async def _nmap(args: list[str], timeout: float, runner=None) -> str:
+async def nmap_output(args: list[str], timeout: float, runner=None) -> str:
+    """Run nmap with these arguments and return its output (tests pass a `runner`)."""
     if runner is not None:
         return await runner(args)
     try:
@@ -91,7 +92,7 @@ def _check(ip: str | None) -> str:
 async def ping(ip: str | None, runner=None) -> dict:
     """Is the host answering right now (ARP/ICMP/TCP probes), and how fast."""
     ip = _check(ip)
-    xml = await _nmap(["-sn", "-n", "-oX", "-", ip], 30, runner)
+    xml = await nmap_output(["-sn", "-n", "-oX", "-", ip], 30, runner)
     try:
         hosts = parse_nmap_xml(xml)
     except ValueError as exc:
@@ -104,7 +105,7 @@ async def ping(ip: str | None, runner=None) -> dict:
 async def trace(ip: str | None, runner=None) -> dict:
     """The hops between Netlens and the host."""
     ip = _check(ip)
-    xml = await _nmap(["-sn", "-n", "--traceroute", "-oX", "-", ip], 60, runner)
+    xml = await nmap_output(["-sn", "-n", "--traceroute", "-oX", "-", ip], 60, runner)
     try:
         hosts = parse_nmap_xml(xml)
     except ValueError as exc:

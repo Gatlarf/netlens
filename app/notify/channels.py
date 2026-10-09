@@ -26,7 +26,7 @@ CHANNELS_KEY = "notify.channels"
 QUIET_KEY = "notify.quiet"
 MAX_CHANNELS = 20
 MAX_EVENTS_PER_MESSAGE = 40
-CRITICAL = {"service_down"}
+CRITICAL = {"service_down", "dhcp_rogue", "gateway_changed"}  # these break through quiet hours
 _lock = asyncio.Lock()
 
 TYPES: dict[str, dict[str, Any]] = {
@@ -69,8 +69,10 @@ EVENT_LABELS = {
     "wifi_roamed": "A Wi-Fi device moves to another mesh node",
     "host_timeout": "A host times out during a scan",
     "backup_failed": "A scheduled backup fails",
+    "dhcp_rogue": "A new, untrusted DHCP server answers on the network",
+    "gateway_changed": "The MAC address behind the gateway changes",
 }
-DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "port_opened", "port_unexpected", "port_missing"]
+DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed"]
 
 
 class ChannelError(Exception):
@@ -219,6 +221,8 @@ def _line(e: dict) -> str:
         "wifi_roamed": f"{name} moved: {detail}",
         "host_timeout": f"Scan timeout: {detail}",
         "backup_failed": f"Scheduled backup failed: {detail}",
+        "dhcp_rogue": f"ROGUE DHCP? {detail}",
+        "gateway_changed": f"GATEWAY CHANGED: {detail}",
     }.get(kind, detail or kind)
 
 
@@ -229,7 +233,7 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
     short = {
         "device_new": "new device", "device_offline": "offline", "device_online": "back online", "service_down": "service down",
         "service_up": "service up", "port_opened": "port opened", "port_closed": "port closed", "port_unexpected": "unexpected port", "port_missing": "port missing", "ip_changed": "IP changed", "ip_reused": "IP reused",
-        "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "backup_failed": "backup failed",
+        "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "backup_failed": "backup failed", "dhcp_rogue": "rogue DHCP", "gateway_changed": "gateway changed",
     }
     title = f"[{app_name}] " + ", ".join(f"{n} {short.get(k, k)}" for k, n in counts.items())
     lines = [_line(e) for e in events[:MAX_EVENTS_PER_MESSAGE]]
