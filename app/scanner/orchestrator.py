@@ -136,6 +136,15 @@ class ScanManager:
             pass
         return True
 
+    def _gentle_addresses(self) -> list[str]:
+        """Addresses of the devices that are never probed (device page: Gentle scanning), within the scan ranges' reach."""
+        conn = connect(self.db_path)
+        try:
+            rows = conn.execute("SELECT primary_ip FROM devices WHERE gentle = 1 AND primary_ip IS NOT NULL").fetchall()
+        finally:
+            conn.close()
+        return [r["primary_ip"] for r in rows if _is_single_private_host(r["primary_ip"])]
+
     def _set_progress(self, **fields: Any) -> None:
         self.progress = {**(self.progress or {}), **fields}
 
@@ -188,8 +197,17 @@ class ScanManager:
                 kwargs["progress"] = lambda update: self._set_progress(**update)
             if self._runner_accepts("options"):
                 kwargs["options"] = self.options
+            gentle_ips = self._gentle_addresses() if kind in ("quick", "deep") and self._runner_accepts("exclude") else []
+            if gentle_ips:
+                kwargs["exclude"] = gentle_ips  # these are checked separately below, without probing their services
             xml = await self.runner(kind, targets, **kwargs)
             hosts = parse_nmap_xml(xml)
+            if gentle_ips:
+                kwargs.pop("exclude")
+                try:
+                    hosts += parse_nmap_xml(await self.runner("gentle", gentle_ips, **kwargs))
+                except ScanError:
+                    logging.getLogger(__name__).warning("the gentle scan failed", exc_info=True)
             self._set_progress(phase="names", task=None, percent=None, hosts_found=len(hosts))
 
             try:

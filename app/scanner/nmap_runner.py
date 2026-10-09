@@ -23,6 +23,7 @@ def build_args(
     timing: int = 3,
     stats_every: str | None = None,
     options: ScanOptions | None = None,
+    exclude: list[str] | None = None,
 ) -> list[str]:
     """Build nmap argument list (without executable name).
 
@@ -40,7 +41,7 @@ def build_args(
     if timing < 0 or timing > 5:
         raise ValueError(f"timing must be 0-5, got {timing}")
 
-    if kind not in ("quick", "deep", "full"):
+    if kind not in ("quick", "deep", "full", "gentle"):
         raise ValueError(f"invalid kind: {kind!r}")
     # `options` (set on the Settings page) decides the command line; without it the defaults
     # apply with the given timing template.
@@ -52,12 +53,25 @@ def build_args(
         # --stats-every adds <taskprogress> percentages for long steps; both feed the live progress.
         args[0:0] = ["-v", "--stats-every", stats_every]
 
+    for address in exclude or []:
+        if not _is_single_address(address):
+            raise ValueError(f"invalid address to exclude: {address}")
+    if exclude:
+        args.extend(["--exclude", ",".join(exclude)])
+
     for target in targets:
         if not _is_valid_target(target):
             raise ValueError(f"invalid target: {target}")
         args.append(target)
 
     return args
+
+
+def _is_single_address(value: str) -> bool:
+    try:
+        return ipaddress.ip_address(value).version == 4
+    except ValueError:
+        return False
 
 
 def _is_valid_target(target: str) -> bool:
@@ -122,6 +136,7 @@ async def run_nmap(
     timeout: float = 3600.0,
     progress=None,
     options: ScanOptions | None = None,
+    exclude: list[str] | None = None,
 ) -> str:
     """Run nmap and return stdout as UTF-8 string.
 
@@ -140,7 +155,7 @@ async def run_nmap(
     Raises:
         ScanError: If nmap fails, times out, or is not found.
     """
-    args = build_args(kind, targets, timing, stats_every="2s" if progress else None, options=options)
+    args = build_args(kind, targets, timing, stats_every="2s" if progress else None, options=options, exclude=exclude)
 
     try:
         process = await asyncio.create_subprocess_exec(

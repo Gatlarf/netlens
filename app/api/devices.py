@@ -35,6 +35,7 @@ class DevicePatch(BaseModel):
     type_override: str | None = None
     notify_offline: bool | None = None
     trusted: bool | None = None             # True = a device the user knows
+    gentle: bool | None = None              # True = scans only check its ports, they never probe its services
     group_id: int | None = None             # a group from /api/groups, or null for none
     parent_mode: str | None = None          # 'auto' | 'none' | 'device'
     parent_device_id: int | None = None
@@ -72,6 +73,7 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
         "open_ports": row["open_ports"],
         "notify_offline": bool(row["notify_offline"]),
         "trusted": bool(row["trusted"]),
+        "gentle": bool(row["gentle"]),
         "group_id": row["group_id"],
         "mac_kind": vendor_db.mac_kind(row["mac"]),  # "universal", "randomized" (a private Wi-Fi address), "virtual" or None
     }
@@ -237,6 +239,7 @@ def list_devices(
             pos_y,
             notify_offline,
             trusted,
+            gentle,
             group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
@@ -348,6 +351,7 @@ def get_device(
             pos_y,
             notify_offline,
             trusted,
+            gentle,
             group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
@@ -390,6 +394,7 @@ def patch_device(
             pos_y,
             notify_offline,
             trusted,
+            gentle,
             group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
@@ -441,6 +446,9 @@ def patch_device(
         if body.group_id is not None and not groups_mod.exists(conn, body.group_id):
             raise HTTPException(status_code=422, detail="no such group")
         updates["group_id"] = body.group_id
+
+    if "gentle" in fields_set:
+        updates["gentle"] = 1 if body.gentle else 0
 
     if "notify_offline" in fields_set:
         updates["notify_offline"] = 0 if body.notify_offline is False else 1
@@ -510,6 +518,7 @@ def patch_device(
             pos_y,
             notify_offline,
             trusted,
+            gentle,
             group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices

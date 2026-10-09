@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 
 def utcnow() -> str:
@@ -343,6 +343,7 @@ def init_db(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "devices", "hints", "TEXT NOT NULL DEFAULT '[]'")
     # --- schema v8: port baselines (baseline_at NULL = the device has none) ---------------------
     _add_column_if_missing(conn, "devices", "baseline_at", "TEXT")
+    _add_column_if_missing(conn, "devices", "gentle", "INTEGER NOT NULL DEFAULT 0")  # v14: scans never probe this device's services
     # --- schema v9: users, login sessions and API tokens ---------------------------------------
     cur.execute(
         """

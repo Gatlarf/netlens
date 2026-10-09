@@ -341,6 +341,8 @@ def classify_evidence(
             kw = next((k for k in group if k in vendor_lower), None)
             if kw:
                 add(device_type, W_VENDOR_SPECIFIC, f"vendor {kw}")
+        if "samsung" in vendor_lower and {8001, 8002} <= ports:
+            add("tv", W_VENDOR_SPECIFIC + 2, "Samsung with its remote-control ports (8001, 8002) open")
         kw = next((k for k in VENDOR_PRINTER_KEYWORDS if k in vendor_lower), None)
         if kw and ports & PRINTER_PORTS:
             add("printer", W_VENDOR_SPECIFIC, f"vendor {kw} with a printer port")

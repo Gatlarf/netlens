@@ -66,3 +66,11 @@ def test_evidence_lists_every_clue_strongest_first_with_a_reason():
 
 def test_all_types_the_classifier_can_return_are_known_types():
     assert {"tablet", "tv", "speaker", "console", "appliance"} <= set(DEVICE_TYPES) and DEVICE_TYPES[-1] == "unknown"
+
+
+def test_samsung_with_remote_control_ports_is_a_tv():
+    # two Samsung TVs seen on a live network were typed "server" because of their web ports
+    from app.scanner.classify import classify_device
+
+    assert classify_device(vendor="Samsung Electronics", open_ports=[8080, 8001, 8002, 9080]) == "tv"
+    assert classify_device(vendor="Samsung Electronics", open_ports=[8001]) != "tv"

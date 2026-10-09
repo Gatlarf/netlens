@@ -175,8 +175,21 @@ FULL_SCAN_HOST_TIMEOUT = 1800  # seconds: a full scan of one host may take a whi
 
 
 def option_args(kind: str, opts: ScanOptions) -> list[str]:
-    if kind not in ("quick", "deep", "full"):
+    if kind not in ("quick", "deep", "full", "gentle"):
         raise ValueError(f"unknown kind: {kind}")
+    if kind == "gentle":
+        # Devices marked "gentle" (a TV asks its owner for permission when something connects to its remote-control port):
+        # only find out which ports are open. No service detection, scripts, OS detection or traceroute.
+        args = [f"-T{opts.timing}"]
+        if opts.deep_ports:
+            args.extend(["-p", opts.deep_ports])
+        else:
+            args.extend(["--top-ports", str(opts.deep_top_ports)])
+        if opts.skip_dns:
+            args.append("-n")
+        if opts.deep_host_timeout > 0:
+            args.extend(["--host-timeout", f"{opts.deep_host_timeout}s"])
+        return args
     if kind == "full":
         # Everything about ONE host: all 65535 TCP ports, service versions, OS and the route to it.
         # Aggressive timing is fine for a single host; the reverse-DNS preference is respected.

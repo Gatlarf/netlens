@@ -220,6 +220,12 @@ function buildEditCard(device, onSaved) {
   notifyField.appendChild(h("p", { class: "hint" }, "Needs e-mail notifications to be set up under Settings."));
   form.appendChild(notifyField);
 
+  const gentleField = h("div", { class: "field" });
+  const gentleInput = h("input", { type: "checkbox", name: "gentle", checked: device.gentle === true });
+  gentleField.appendChild(h("label", {}, gentleInput, " Gentle scanning"));
+  gentleField.appendChild(h("p", { class: "hint" }, "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself."));
+  form.appendChild(gentleField);
+
   const trustField = h("div", { class: "field" });
   const trustInput = h("input", { type: "checkbox", name: "trusted", checked: device.trusted === true });
   trustField.appendChild(h("label", {}, trustInput, " Known device"));
@@ -250,6 +256,7 @@ function buildEditCard(device, onSaved) {
       notes: notesTextarea.value,
       notify_offline: notifyInput.checked,
       trusted: trustInput.checked,
+      gentle: gentleInput.checked,
     };
     try {
       await patch(`/api/devices/${device.id}`, body);
