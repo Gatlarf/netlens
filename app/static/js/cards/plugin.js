@@ -104,6 +104,43 @@ function fillPluginCard(card, plugin, onChange) {
   const resultEl = h("p", { class: "hint" }, "");
   form.appendChild(resultEl);
 
+  // plugins that offer a diagnostic get a button that produces a report to send to the plugin's author
+  const diagnoseBox = h("div", { class: "diagnose-box", id: "diagnose-box" });
+  if (manifest.diagnose) {
+    const diagBtn = h("button", { type: "button", class: "btn", id: "diagnose-run" }, "Run diagnostic");
+    form.insertBefore(diagBtn, resultEl);
+    diagBtn.addEventListener("click", async () => {
+      diagBtn.disabled = true;
+      diagBtn.textContent = "Running…";
+      clear(diagnoseBox);
+      try {
+        const res = await post(`/api/plugins/${plugin.id}/diagnose`, { config: readConfig(form, manifest) });
+        const text = JSON.stringify({ plugin: res.plugin, version: res.version, ...res.report }, null, 2);
+        const area = h("textarea", { readonly: true, rows: "14", class: "diagnose-text", "aria-label": "Diagnostic report" });
+        area.value = text;
+        const copy = h("button", { type: "button", class: "btn" }, "Copy");
+        copy.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            toast("Copied", "success");
+          } catch (e) {
+            area.select();
+            toast("Press Ctrl+C to copy the selected text", "info");
+          }
+        });
+        const link = h("a", { class: "btn", href: URL.createObjectURL(new Blob([text], { type: "application/json" })), download: `${plugin.id}-diagnostic.json` }, "Download");
+        diagnoseBox.append(
+          h("p", { class: "hint" }, "This describes what the device answered (field names and types). Names, addresses, MAC addresses and your settings are left out. Read it, then send it to whoever maintains the plugin."),
+          area, copy, " ", link);
+      } catch (err) {
+        diagnoseBox.appendChild(h("p", { class: "error" }, err.message || "The diagnostic failed"));
+      }
+      diagBtn.disabled = false;
+      diagBtn.textContent = "Run diagnostic";
+    });
+  }
+  form.appendChild(diagnoseBox);
+
   const status = statusText(plugin);
   if (status) card.appendChild(h("p", { class: status.error ? "error" : "hint" }, status.text));
 

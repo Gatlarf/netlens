@@ -193,6 +193,7 @@ def validate_manifest(data: Any) -> dict:
         "author": _text(data.get("author"), "author", max_len=100),
         "homepage": _text(data.get("homepage"), "homepage", max_len=200),
         "timeout": timeout,
+        "diagnose": bool(data.get("diagnose", False)),  # the plugin has diagnose(config): a report for its author
         "config": fields,
     }
 

@@ -17,6 +17,7 @@ Standard library only. A refused login is reported with `auth_failed`, so Netlen
 
 import http.cookiejar
 import json
+import re
 import ssl
 import urllib.error
 import urllib.parse
@@ -317,3 +318,92 @@ def fetch(config):
     finally:
         controller.logout()
     return to_topology(nodes, clients)
+
+
+# ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
+KEEP_WORDS = {"type", "status", "statusCategory", "connectDevType", "connectType", "radioId", "wireless", "active", "wifiMode", "controllerVer"}
+SAMPLES = 3
+
+
+def describe(value, key=""):
+    """The shape of a value: types and sizes, never the content (except a few harmless enumerations)."""
+    if isinstance(value, dict):
+        return {k: describe(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [describe(v, key) for v in value[:2]] + ([f"... {len(value)} items"] if len(value) > 2 else [])
+    if isinstance(value, bool) or value is None:
+        return value
+    if key in KEEP_WORDS:
+        return value
+    if isinstance(value, (int, float)):
+        return f"<number {'negative' if value < 0 else 'positive' if value > 0 else 'zero'}, {len(str(abs(value)))} digits>"
+    if isinstance(value, str):
+        if re.fullmatch(r"([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}", value):
+            return "<mac " + ("dashes" if "-" in value else "colons") + (", UPPER" if value.upper() == value and re.search("[A-F]", value) else "") + ">"
+        if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", value):
+            return "<ipv4>"
+        return f"<text {len(value)} chars>"
+    return f"<{type(value).__name__}>"
+
+
+def _problem(exc):
+    return type(exc).__name__ + ": " + re.sub(r"https?://\S+", "<url>", str(exc))[:300]
+
+
+def diagnose(config):
+    """What this controller answers, described by field names and types, and what the plugin made of it (no names, MACs or IPs)."""
+    controller = Controller(config)
+    report = {"steps": {}}
+
+    def step(name, call):
+        try:
+            report["steps"][name] = {"ok": True, "shape": call()}
+        except Exception as exc:  # noqa: BLE001 - the point is to record what failed
+            report["steps"][name] = {"ok": False, "error": _problem(exc)}
+
+    controller.login()  # a refused login is reported as such (and stops automatic syncing), like test()
+    try:
+        report["controller_version"] = controller.version
+        sites = controller.sites()
+        report["site_count"] = len(sites)
+        site = sites[0]
+        devices = []
+
+        def read_devices():
+            nonlocal devices
+            devices = controller._api(f"sites/{site['key']}/devices") or []
+            return {"count": len(devices), "first": [describe(d) for d in devices[:SAMPLES]]}
+
+        step("devices", read_devices)
+        for kind, path in (("switch", "switches"), ("ap", "eaps")):
+            first = next((d for d in devices if isinstance(d, dict) and d.get("type") == kind), None)
+            if first:
+                step(f"{kind}_detail", lambda first=first, path=path: describe(controller._api(f"sites/{site['key']}/{path}/{first['mac']}")))
+
+        def read_clients():
+            attempts = []
+            for extra in controller.CLIENT_FILTERS:
+                try:
+                    rows = list(controller.paged(f"sites/{site['key']}/clients", [extra]))
+                    return {"filter_used": extra or "none", "count": len(rows), "first": [describe(r) for r in rows[:SAMPLES]], "rejected": attempts}
+                except OmadaError as exc:
+                    attempts.append({"filter": extra or "none", "error": _problem(exc)})
+            raise OmadaError("every variant of the client request was rejected: " + json.dumps(attempts))
+
+        step("clients", read_clients)
+        nodes, clients = controller.snapshot()
+        out = to_topology(nodes, clients)
+        report["result"] = {
+            "nodes": len(out["nodes"]), "nodes_with_parent": sum(1 for n in out["nodes"] if n["parent_mac"]),
+            "roles": sorted({n["role"] for n in out["nodes"]}),
+            "clients": len(out["clients"]), "clients_with_node": sum(1 for c in out["clients"] if c["node_mac"]),
+            "wifi_clients": sum(1 for c in out["clients"] if c["medium"] == "wifi"), "with_rssi": sum(1 for c in out["clients"] if c["rssi"] is not None),
+            "with_rates": sum(1 for c in out["clients"] if c["tx_mbps"] is not None),
+        }
+    except LoginRefused:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        report["error"] = _problem(exc)
+    finally:
+        controller.logout()
+    return report

@@ -1,12 +1,13 @@
 {
   "id": "omada",
   "name": "TP-Link Omada",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",
   "description": "Reads the Omada controller (software controller, OC200/OC300 or Omada Cloud-less hardware, version 5.1 or newer): your gateway, switches and access points, which device hangs below which, and which switch or access point every client is connected to, with Wi-Fi signal and link rate. Read-only: one login, a few reads and a logout per sync.",
   "timeout": 90,
+  "diagnose": true,
   "config": [
     {
       "key": "url",

@@ -217,7 +217,43 @@ def test_unreadable_output_would_fail_the_contract():
         validate_output("topology", {"nodes": [{"mac": "bad"}], "clients": []})
 
 
-def test_diagnose_writes_an_anonymised_report(server, tmp_path, monkeypatch):
+def test_diagnose_describes_shapes_and_leaks_nothing(server):
+    url, state = server
+    report = plugin.diagnose(cfg(url))
+    text = json.dumps(report)
+    for private in ("laptop", "192.168.0", "AA-BB-CC", "11-22-33", "secret", "127.0.0.1", "Living room", "ER605"):
+        assert private not in text, private
+    assert report["controller_version"] == "5.14.26.1" and report["steps"]["devices"]["shape"]["count"] == 4
+    assert report["steps"]["clients"]["ok"] and report["steps"]["switch_detail"]["ok"]
+    assert report["steps"]["clients"]["shape"]["filter_used"] == {"filters.active": "false"} and report["steps"]["clients"]["shape"]["rejected"] == []
+    assert report["result"]["nodes"] == 4 and report["result"]["wifi_clients"] == 2 and report["result"]["with_rssi"] == 2
+    assert report["steps"]["devices"]["shape"]["first"][0]["mac"] == "<mac dashes, UPPER>"
+    assert state["logouts"] == 1
+
+
+def test_diagnose_records_which_client_variants_were_rejected(server):
+    url, state = server
+    state["clients_need"] = "none"
+    shape = plugin.diagnose(cfg(url))["steps"]["clients"]["shape"]
+    assert shape["filter_used"] == "none" and [r["filter"] for r in shape["rejected"]] == [{"filters.active": "false"}, {"filters.active": "true"}]
+    assert "General error" in shape["rejected"][0]["error"] and "sites/<site>/clients" in shape["rejected"][0]["error"]
+
+
+def test_diagnose_reports_a_failing_step_and_still_finishes(server):
+    url, state = server
+    state["clients_need"] = "never"
+    report = plugin.diagnose(cfg(url))
+    assert report["steps"]["clients"]["ok"] is False and "every variant" in report["steps"]["clients"]["error"] and state["logouts"] == 1
+    assert report["steps"]["devices"]["ok"] is True
+
+
+def test_diagnose_with_a_wrong_password_is_a_refused_login(server):
+    url, state = server
+    with pytest.raises(plugin.LoginRefused):
+        plugin.diagnose(cfg(url, password="wrong"))
+
+
+def test_the_command_line_wrapper_writes_the_same_report(server, tmp_path, monkeypatch):
     url, _ = server
     dspec = importlib.util.spec_from_file_location("omada_diagnose", ROOT / "diagnose.py")
     diag = importlib.util.module_from_spec(dspec)
@@ -226,14 +262,9 @@ def test_diagnose_writes_an_anonymised_report(server, tmp_path, monkeypatch):
     monkeypatch.setattr(diag.getpass, "getpass", lambda prompt="": "secret")
     monkeypatch.setattr("sys.argv", ["diagnose.py", "--url", url, "--username", "viewer", "--site", "Home", "--out", str(out)])
     diag.main()
-    text = out.read_text()
-    report = json.loads(text)
-    for private in ("laptop", "192.168.0", "AA-BB-CC", "11-22-33", "secret", "127.0.0.1", "Living room", "ER605"):
-        assert private not in text, private
-    assert report["controller_version"] == "5.14.26.1" and report["steps"]["devices"]["shape"]["count"] == 4
-    assert report["steps"]["clients"]["ok"] and report["steps"]["switch_detail"]["ok"]
-    assert report["result"]["nodes"] == 4 and report["result"]["wifi_clients"] == 2 and report["result"]["with_rssi"] == 2
-    assert report["steps"]["devices"]["shape"]["first"][0]["mac"] == "<mac dashes, UPPER>"
+    report = json.loads(out.read_text())
+    assert report["plugin_version"] == json.loads((ROOT / "plugin.json").read_text())["version"] and report["controller_version"] == "5.14.26.1"
+    assert "secret" not in out.read_text()
 
 
 @pytest.mark.parametrize("need,attempts", [(None, ["false"]), ("false", ["false"]), ("true", ["false", "true"]), ("none", ["false", "true", None])])

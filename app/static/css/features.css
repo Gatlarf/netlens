@@ -143,3 +143,5 @@ td.actions .btn { padding: 2px 8px; font-size: 0.85em; }
 
 .legend-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--border); }
 .group-legend:empty { display: none; }
+
+.diagnose-text { width: 100%; box-sizing: border-box; font-family: var(--mono); font-size: 0.85rem; margin: 8px 0; }

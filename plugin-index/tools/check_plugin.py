@@ -84,10 +84,15 @@ def main() -> int:
                 (folder / rel).parent.mkdir(parents=True, exist_ok=True)
                 (folder / rel).write_bytes(content)
             plugin = registry.discover(tmp)[manifest["id"]]
-            for action in ("test", "fetch"):
+            for action in ("test", "fetch", *(["diagnose"] if manifest.get("diagnose") else [])):
                 try:
                     result = run_subprocess(plugin, action, config)
-                    if action == "fetch":
+                    if action == "diagnose":
+                        from app.plugins.diagnose import prepare
+
+                        prepare(result, manifest, config)
+                        ok(f"diagnose() ran and its report is a small dictionary ({len(json.dumps(result))} bytes before scrubbing)")
+                    elif action == "fetch":
                         out = validate_output(kind, result)
                         ok(f"fetch() ran and follows the contract ({', '.join(f'{len(v)} {k}' for k, v in out.items())})")
                     else:

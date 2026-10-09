@@ -221,6 +221,12 @@ class PluginService:
         message = result.get("message") if isinstance(result, dict) else None
         return {"ok": True, "message": message if isinstance(message, str) and message else "Connection successful"}
 
+    async def diagnose(self, plugin: Plugin, config: dict) -> dict:
+        """The plugin's diagnostic report with everything private removed. Raises PluginRunError / DiagnoseError."""
+        from app.plugins.diagnose import prepare
+
+        return prepare(await self._call(plugin, "diagnose", config), plugin.manifest, config)
+
     async def sync(self, plugin_id: str) -> dict:
         """Fetch, validate, store and apply. Returns the summary, or {'error': ..., 'auth_failed': bool}."""
         plugin = self.plugins().get(plugin_id)

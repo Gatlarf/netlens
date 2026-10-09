@@ -173,6 +173,20 @@ def fetch(config):
     }
 ```
 
+### Optional: `diagnose(config)`, a report for you when something fails on somebody else's device
+
+If you cannot test your plugin on every device it supports, let it describe what a device answered. Add `"diagnose": true` to `plugin.json` and a function
+
+```python
+def diagnose(config):
+    return {"controller_version": "5.14", "steps": {"clients": {"ok": True, "shape": {"count": 12, "first": [{"mac": "<mac dashes>", "name": "<text 7 chars>"}]}}}}
+```
+
+Netlens then shows a **Run diagnostic** button on the plugin's settings page. It runs `diagnose(config)` in the same isolated process as `test()` with the values in the form, removes
+the values of the plugin's own settings (addresses, user names, keys, passwords) and every MAC address from the result, and shows it in a box to **copy or download** and send to you.
+Describe the **shape** of what you received (field names, types, how many items, a few harmless enumerations), never the content: the scrub is a second line of defence. Keep the report under
+a few hundred KB, record which step failed and why (without addresses), and raise your usual exceptions for a refused login. `python plugin-index/tools/check_plugin.py <plugin> --config cfg.json` also runs it.
+
 ## Errors and refused logins
 
 - Raise any exception. Its text (cut at 500 characters) is shown to the user.

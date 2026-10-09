@@ -42,20 +42,15 @@ Please check after a sync, and tell us what is wrong:
 - [ ] Access points connected **wirelessly (mesh)** and devices behind a router that is not Omada.
 - [ ] Several sites, if you have them.
 
-If something is off, run the diagnostic and send us the file:
+If something is off, press **Run diagnostic** on the plugin's page in Netlens (needs a Netlens version with the button, 0.2.65 or newer; update the image if you do not see it). It logs in once like a normal sync with the values in the form, and shows a report of what the controller
+answered: the controller version, which steps worked, and the **names and types of the fields** (not their content). Names, MAC and IP addresses and your settings are removed. Press **Copy** or **Download**, read it, and send it to whoever maintains the plugin.
 
-```
-python diagnose.py --url https://<controller>:8043 --username <viewer account> --site <site>
-```
-
-It asks for the password (not stored), logs in once and writes `omada-diagnostic.json` with the **names and types of the fields** the controller
-returned and a summary of what the plugin made of them. Names, MAC and IP addresses and all other text are replaced by placeholders. Read the file
-before sending it. (Python 3.9 or newer, nothing to install.)
+(From a terminal the same report is written by `python diagnose.py --url https://<controller>:8043 --username <viewer account>`; Python 3.9 or newer, nothing to install.)
 
 ## Troubleshooting
 
 - **"... (error -1)" / "General error"**: the controller rejected one request. Since 1.0.1 the message starts with the step that failed (for example `sites/<site>/clients: General error. (error -1)`).
-  1.0.1 also retries the client list with the other filter variants controllers expect. If it still fails, run the diagnostic below and send us the file: it records which step fails and what the controller answers.
+  1.0.1 also retries the client list with the other filter variants controllers expect. If it still fails, press **Run diagnostic** (see above) and send us the report: it records which step fails and what the controller answers.
 - **"login refused"**: wrong user name or password, or the account may not log in to the web interface (use an account of the *Viewer* role). The plugin stops retrying until you save the settings again.
 - **"cannot reach the controller"**: wrong address or port (8043 for the software controller), or a firewall.
 

@@ -160,6 +160,30 @@ async def test_plugin(request: Request, plugin_id: str, body: PluginBody) -> dic
         raise HTTPException(status_code=502, detail=str(exc))
 
 
+@router.post("/plugins/{plugin_id}/diagnose")
+async def diagnose_plugin(request: Request, plugin_id: str, body: PluginBody) -> dict:
+    """Run the plugin's diagnostic with the values in the form (saved secrets are used when none is typed). Saves nothing."""
+    from app.plugins.diagnose import DiagnoseError
+
+    service = _service(request)
+    plugin = _plugin(service, plugin_id)
+    if not plugin.manifest.get("diagnose"):
+        raise HTTPException(status_code=404, detail="this plugin has no diagnostic")
+    conn = connect(request.app.state.db_path)
+    try:
+        config = _merged(plugin, conn, body)
+    finally:
+        conn.close()
+    missing = missing_required(plugin.manifest, config)
+    if missing:
+        raise HTTPException(status_code=422, detail="fill in: " + ", ".join(missing))
+    try:
+        report = await service.diagnose(plugin, config)
+    except (PluginRunError, DiagnoseError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"report": report, "plugin": plugin.id, "version": plugin.manifest["version"]}
+
+
 @router.post("/plugins/{plugin_id}/sync")
 async def sync_plugin(request: Request, plugin_id: str) -> dict:
     service = _service(request)
