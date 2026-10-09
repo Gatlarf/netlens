@@ -113,6 +113,8 @@ def build_snapshot(clientlist: Any, onboarding_nodes: list[dict]) -> dict:
             "wired": wl == "0",
             "band": {"1": "2.4 GHz", "2": "5 GHz", "3": "5 GHz", "4": "6 GHz"}.get(wl),
             "node_mac": norm_mac(c.get("amesh_papMac")),
+            "vendor": (c.get("vendor") or "").strip() or None,
+            "printer": str(c.get("isPrinter")) == "1",
             "rssi": _int(c.get("rssi"), -127, -1) if wl != "0" else None,
             "tx_mbps": _number(c.get("curTx")) if wl != "0" else None,
             "rx_mbps": _number(c.get("curRx")) if wl != "0" else None,

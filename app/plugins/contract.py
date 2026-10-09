@@ -240,6 +240,17 @@ def missing_required(manifest: dict, config: dict) -> list[str]:
 
 
 # ----------------------------------------------------------------------------- outputs
+def _client_type(value: Any, path: str) -> str | None:
+    """A device type from Netlens' own list; a type this version does not know is ignored rather than refused."""
+    from app.scanner.classify import DEVICE_TYPES
+
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        _fail(path, f"must be text, got {type(value).__name__}")
+    return value if value in DEVICE_TYPES and value != "unknown" else None
+
+
 def validate_output(kind: str, data: Any) -> dict:
     if kind == "hypervisor":
         return _hypervisor(data)
@@ -338,5 +349,10 @@ def _topology(data: Any) -> dict:
             "rssi": _optional_number(raw.get("rssi"), f"{path}.rssi", -127, 0, integer=True),
             "tx_mbps": _optional_number(raw.get("tx_mbps"), f"{path}.tx_mbps", 0, 100000),
             "rx_mbps": _optional_number(raw.get("rx_mbps"), f"{path}.rx_mbps", 0, 100000),
+            # what the router / controller has worked out about the device (all optional; used as evidence, never trusted blindly)
+            "vendor": _text(raw.get("vendor"), f"{path}.vendor", max_len=100) or None,
+            "os": _text(raw.get("os"), f"{path}.os", max_len=100) or None,
+            "model": _text(raw.get("model"), f"{path}.model", max_len=100) or None,
+            "device_type": _client_type(raw.get("device_type"), f"{path}.device_type"),
         })
     return {"nodes": nodes, "clients": clients}

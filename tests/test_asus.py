@@ -79,7 +79,7 @@ def test_parse_onboarding_and_snapshot():
     assert {c["mac"] for c in snap["clients"]} == {"02:00:00:00:00:01", "02:00:00:00:00:02", "02:00:00:00:00:03"}  # offline one dropped
     wifi = next(c for c in snap["clients"] if c["mac"].endswith(":02"))
     assert wifi == {"mac": "02:00:00:00:00:02", "ip": "10.0.0.12", "name": "wifi on garden", "wired": False, "band": "5 GHz", "node_mac": N1,
-                    "rssi": -61, "tx_mbps": 72.2, "rx_mbps": 1.0}
+                    "rssi": -61, "tx_mbps": 72.2, "rx_mbps": 1.0, "vendor": None, "printer": False}
     assert next(c for c in snap["clients"] if c["mac"].endswith(":01"))["rssi"] is None  # wired: no signal
     assert next(c for c in snap["clients"] if c["mac"].endswith(":01"))["node_mac"] is None
     with pytest.raises(AsusError):

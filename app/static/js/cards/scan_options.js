@@ -226,6 +226,17 @@ export async function buildScanOptionsCard() {
     fieldDeepTraceroute.appendChild(h("p", { class: "hint" }, "Needed for the route links on the map."));
     form.appendChild(fieldDeepTraceroute);
 
+    const fieldDeepScripts = h("div", { class: "field" });
+    fieldDeepScripts.appendChild(h("label", {}, "Identification scripts"));
+    const inputDeepScripts = h("input", {
+      type: "checkbox",
+      name: "deep_scripts",
+      checked: options.deep_scripts,
+    });
+    fieldDeepScripts.appendChild(inputDeepScripts);
+    fieldDeepScripts.appendChild(h("p", { class: "hint" }, "Reads the web page title, certificate owner, Windows version and computer name (SMB/NetBIOS), UPnP model and service banners. They only read, never change anything. A deep scan takes a little longer."));
+    form.appendChild(fieldDeepScripts);
+
     // Section 4: Both
     const h3Both = h("h3", {}, "Both");
     form.appendChild(h3Both);
@@ -289,6 +300,7 @@ export async function buildScanOptionsCard() {
       selectDeepVersion.value = preset.deep_version;
       inputDeepOs.checked = preset.deep_os;
       inputDeepTraceroute.checked = preset.deep_traceroute;
+      inputDeepScripts.checked = !!preset.deep_scripts;
       inputSkipDns.checked = preset.skip_dns;
       inputQuickHostTimeout.value = String(preset.quick_host_timeout);
       inputDeepHostTimeout.value = String(preset.deep_host_timeout);
@@ -305,6 +317,7 @@ export async function buildScanOptionsCard() {
         deep_version: selectDeepVersion.value,
         deep_os: inputDeepOs.checked,
         deep_traceroute: inputDeepTraceroute.checked,
+        deep_scripts: inputDeepScripts.checked,
         skip_dns: inputSkipDns.checked,
         quick_host_timeout: Number(inputQuickHostTimeout.value),
         deep_host_timeout: Number(inputDeepHostTimeout.value),

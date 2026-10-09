@@ -21,6 +21,7 @@ class ScanOptions:
     deep_version: str = "full"
     deep_os: bool = True
     deep_traceroute: bool = True
+    deep_scripts: bool = False      # extra nmap scripts that read names/OS/products from web pages, certificates, SMB, NetBIOS, UPnP
     skip_dns: bool = False
     quick_host_timeout: int = 120   # seconds nmap may spend on one host in a quick scan; 0 = no limit
     deep_host_timeout: int = 900    # same for a deep scan (stops one slow host from holding the scan for an hour)
@@ -131,6 +132,10 @@ def options_from_dict(data: dict, base: ScanOptions | None = None) -> ScanOption
             if not isinstance(value, bool):
                 raise ValueError(f"{key}: must be true or false")
             opts = replace(opts, deep_traceroute=value)
+        elif key == "deep_scripts":
+            if not isinstance(value, bool):
+                raise ValueError(f"{key}: must be true or false")
+            opts = replace(opts, deep_scripts=value)
         elif key == "skip_dns":
             if not isinstance(value, bool):
                 raise ValueError(f"{key}: must be true or false")
@@ -163,6 +168,9 @@ def preset_dict(name: str) -> dict:
     return options_to_dict(options_from_dict(PRESETS[name]))
 
 
+# Read-only scripts from nmap's "safe" category that tell what a device is (see app/scanner/nse.py for how the output is used)
+IDENTIFY_SCRIPTS = "http-title,ssl-cert,nbstat,smb-os-discovery,upnp-info,banner"
+
 FULL_SCAN_HOST_TIMEOUT = 1800  # seconds: a full scan of one host may take a while, but not forever
 
 
@@ -173,6 +181,8 @@ def option_args(kind: str, opts: ScanOptions) -> list[str]:
         # Everything about ONE host: all 65535 TCP ports, service versions, OS and the route to it.
         # Aggressive timing is fine for a single host; the reverse-DNS preference is respected.
         args = [f"-T{max(4, opts.timing)}", "-p-", "-sV", "-O", "--osscan-guess", "--traceroute"]
+        if opts.deep_scripts:
+            args.extend(["--script", IDENTIFY_SCRIPTS, "--script-timeout", "15s"])
         if opts.skip_dns:
             args.append("-n")
         args.extend(["--host-timeout", f"{FULL_SCAN_HOST_TIMEOUT}s"])
@@ -200,6 +210,8 @@ def option_args(kind: str, opts: ScanOptions) -> list[str]:
             args.extend(["-O", "--osscan-guess"])
         if opts.deep_traceroute:
             args.append("--traceroute")
+        if opts.deep_scripts:
+            args.extend(["--script", IDENTIFY_SCRIPTS, "--script-timeout", "15s"])
         if opts.deep_ports:
             args.extend(["-p", opts.deep_ports])
         else:

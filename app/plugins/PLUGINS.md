@@ -302,6 +302,12 @@ Return `{"nodes": [...], "clients": [...]}`. A *node* is a router, switch, acces
 | `band` | no | Text such as `5 GHz`. |
 | `rssi` | no | Wi-Fi signal in dBm (a whole number from -127 to 0). Netlens stores one sample per sync and shows signal history and roaming. |
 | `tx_mbps`, `rx_mbps` | no | Current Wi-Fi link rate in Mbit/s (numbers, 0 or more). |
+| `vendor` | no | The manufacturer as the router knows it. If it is really a DHCP vendor class (`MSFT 5.0`, `android-dhcp-13`), Netlens recognises that and uses it as the operating system. |
+| `os` | no | The operating system, if the router has fingerprinted it (`Windows 11`, `Android 13`). |
+| `model` | no | A model or product name (`iPhone14,2`, `Chromecast`). |
+| `device_type` | no | One of `router`, `switch`, `ap`, `server`, `pc`, `phone`, `tablet`, `tv`, `speaker`, `console`, `appliance`, `printer`, `iot`, `camera`, `nas`, `vm`. Any other value is ignored. |
+
+The last four are evidence, not facts: Netlens weighs them against what its own scans found, and the device page shows why it chose a type. Only send what the router actually knows; leave a field out rather than guessing.
 
 ```json
 {

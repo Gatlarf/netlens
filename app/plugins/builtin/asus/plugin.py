@@ -43,6 +43,7 @@ def to_topology(snapshot: dict) -> dict:
             "mac": c["mac"], "ip": c["ip"], "name": c["name"], "node_mac": node,
             "medium": "wired" if c["wired"] else "wifi", "band": c["band"],
             "rssi": c.get("rssi"), "tx_mbps": c.get("tx_mbps"), "rx_mbps": c.get("rx_mbps"),
+            "vendor": c.get("vendor"), "device_type": "printer" if c.get("printer") else None,
         })
     return {"nodes": out_nodes, "clients": clients}
 

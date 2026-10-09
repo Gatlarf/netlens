@@ -9,7 +9,7 @@ from app.plugins.matching import norm_mac
 
 WIFI_RETENTION_DAYS = 14
 ROAM_WINDOW_HOURS = 24  # a node change counts as roaming only when the previous sample is this recent
-ALIAS_PRIORITY = ("ptr", "upnp", "mdns", "router")  # which name wins as a device's hostname when it has none
+ALIAS_PRIORITY = ("ptr", "upnp", "mdns", "dhcp", "router", "smb", "netbios")  # which name wins as a device's hostname when it has none
 MAX_NAME = 80
 
 
@@ -61,6 +61,46 @@ def record_router_names(conn: sqlite3.Connection, data: dict, now: str | None = 
         count += 1
     conn.commit()
     return count
+
+
+def record_client_hints(conn: sqlite3.Connection, data: dict) -> int:
+    """What the router / controller worked out about its clients (manufacturer, OS, model, type) becomes evidence for the classifier.
+
+    The router's own type is weaker than a clear name or a scan, but it is free and it sees devices Netlens cannot scan.
+    Returns how many devices received something.
+    """
+    from app.scanner import fingerprint, store
+
+    by_mac, by_ip = device_lookup(conn)
+    touched = 0
+    for client in data.get("clients", []):
+        device_id = by_mac.get(client["mac"]) or by_ip.get(client.get("ip") or "")
+        if device_id is None:
+            continue
+        hints: list[str] = []
+        os_text = client.get("os")
+        vendor = (client.get("vendor") or "").strip()
+        if vendor and not os_text:  # routers often put the DHCP vendor class ("MSFT 5.0", "android-dhcp-13") in the vendor field
+            os_text = fingerprint.os_from_dhcp_class(vendor)
+            if os_text:
+                vendor = ""
+        if os_text:
+            hints.append(f"os:{os_text}")
+        if client.get("model"):
+            hints.append(f"model:{client['model']}")
+        if client.get("device_type"):
+            hints.append(f"ctl:{client['device_type']}")
+        changed = store.add_hints(conn, device_id, hints, replace_prefix=("ctl:",))
+        if vendor and vendor.lower() not in ("others", "unknown", "-"):
+            known = conn.execute("SELECT vendor FROM devices WHERE id = ?", (device_id,)).fetchone()["vendor"]
+            if not known:
+                conn.execute("UPDATE devices SET vendor = ? WHERE id = ?", (vendor, device_id))
+                changed = True
+        if changed:
+            store.reclassify_device(conn, device_id)
+            touched += 1
+    conn.commit()
+    return touched
 
 
 def record_wifi(conn: sqlite3.Connection, data: dict, now: str | None = None) -> dict:

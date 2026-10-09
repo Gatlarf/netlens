@@ -17,6 +17,7 @@ import { buildSharesCard } from "../cards/shares.js";
 import { buildNetchecksCard } from "../cards/netchecks.js";
 import { buildGroupsCard } from "../cards/groups.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
+import { buildPassiveCard } from "../cards/passive.js";
 
 function kvRow(label, value) {
   const row = h("div", { class: "kv" });
@@ -154,6 +155,20 @@ async function buildAboutCard() {
   return wrap;
 }
 
+// "Scan performance" also holds what widens the identification beyond scans
+async function buildScanPage() {
+  const wrap = h("div", {});
+  wrap.appendChild(await buildScanOptionsCard());
+  if (isAdmin()) {
+    try {
+      wrap.appendChild(await buildPassiveCard());
+    } catch (err) {
+      // the scan settings still work without it
+    }
+  }
+  return wrap;
+}
+
 function buildExportCard() {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Export"));
@@ -170,7 +185,7 @@ const STATIC_GROUPS = [
     title: "General",
     items: [
       { key: "ranges", label: "Scan ranges", build: buildRangesCard },
-      { key: "nmap", label: "Scan performance", build: buildScanOptionsCard },
+      { key: "nmap", label: "Scan performance", build: buildScanPage },
       { key: "schedule", label: "Schedule & terminal", build: buildGeneralCard },
       { key: "map", label: "Map", build: buildMapCard },
       { key: "groups", label: "Groups", build: buildGroupsCard },

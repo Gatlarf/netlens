@@ -60,6 +60,30 @@ function buildDetailsCard(device) {
   return card;
 }
 
+function buildWhyCard(device) {
+  const info = device.identification;
+  if (!info) return null;
+  const card = h("div", { class: "card", id: "why-card" });
+  card.appendChild(h("h2", {}, "Why this type?"));
+  if (device.type_override) {
+    card.appendChild(h("p", { class: "hint" }, `You set this device to ${TYPE_LABELS[device.type_override] || device.type_override}; that choice wins. Netlens' own guess was ${TYPE_LABELS[device.device_type] || device.device_type || "unknown"}.`));
+  }
+  if (!info.evidence.length) {
+    card.appendChild(h("p", { class: "hint" }, "Nothing known about this device points to a type yet. A deep scan, or a name, usually helps."));
+    return card;
+  }
+  const list = h("ul", { class: "evidence" });
+  info.evidence.slice(0, 8).forEach((e, i) => {
+    list.appendChild(h("li", { class: i === 0 ? "top" : "" },
+      h("span", { class: "ev-type" }, TYPE_LABELS[e.type] || e.type),
+      h("span", { class: "ev-bar", title: `weight ${e.weight}` }, h("i", { style: `width:${Math.min(100, e.weight)}%` })),
+      h("span", { class: "ev-why" }, e.why)));
+  });
+  card.appendChild(list);
+  card.appendChild(h("p", { class: "hint" }, "The strongest clue decides. If it is wrong, set the type by hand under Edit: after two devices of the same manufacturer you corrected the same way, Netlens applies that to the others."));
+  return card;
+}
+
 function buildPortsCard(device, onChanged) {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Open ports"));
@@ -489,6 +513,8 @@ export async function render(container, params) {
     const grid = h("div", { class: "grid-2" });
     const left = h("div", { class: "col-left" });
     left.appendChild(buildDetailsCard(device));
+    const why = buildWhyCard(device);
+    if (why) left.appendChild(why);
     left.appendChild(buildPortsCard(device, () => load()));
     grid.appendChild(left);
 

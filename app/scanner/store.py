@@ -6,7 +6,7 @@ from app.baselines import baseline_ports
 from app.db import add_event, get_or_create_device, utcnow
 from app.plugins.enrich import refresh_hostname
 from app.scanner import vendor as vendor_db
-from app.scanner.classify import classify_device
+from app.scanner.classify import classify_device, classify_evidence
 from app.scanner.nmap_parser import ScanHost
 
 
@@ -247,33 +247,95 @@ def save_scan_results(
     return {"new": new_count, "updated": updated_count, "device_ids": device_ids, "rtts": rtts}
 
 
-def reclassify_device(conn: Any, device_id: int) -> str:
-    """Work out the type of a device from everything stored about it (ports, names, hints, vendor, OS) and save it."""
+def add_hints(conn: Any, device_id: int, hints: list[str], replace_prefix: tuple[str, ...] = ()) -> bool:
+    """Keep discovery hints on a device (newest last, MAX_HINTS at most). Hints starting with `replace_prefix` replace older ones of that kind."""
+    row = conn.execute("SELECT hints FROM devices WHERE id = ?", (device_id,)).fetchone()
+    if row is None or not hints:
+        return False
+    try:
+        kept = json.loads(row["hints"] or "[]")
+    except ValueError:
+        kept = []
+    before = list(kept)
+    for prefix in replace_prefix:
+        if any(h.startswith(prefix) for h in hints):
+            kept = [h for h in kept if not h.startswith(prefix)]
+    merged = (kept + [h for h in hints if h not in kept])[-MAX_HINTS:]
+    if merged == before:
+        return False
+    conn.execute("UPDATE devices SET hints = ? WHERE id = ?", (json.dumps(merged), device_id))
+    return True
+
+
+def learned_types(conn: Any) -> dict[str, tuple[str, int]]:
+    """What the user taught us: a manufacturer whose devices were (almost) always set to one type by hand -> (type, how many)."""
+    counts: dict[str, dict[str, int]] = {}
+    for row in conn.execute("SELECT vendor, type_override FROM devices WHERE type_override IS NOT NULL AND vendor IS NOT NULL").fetchall():
+        by_type = counts.setdefault(row["vendor"].lower(), {})
+        by_type[row["type_override"]] = by_type.get(row["type_override"], 0) + 1
+    rules: dict[str, tuple[str, int]] = {}
+    for vendor, by_type in counts.items():
+        best, n = max(by_type.items(), key=lambda kv: kv[1])
+        if n >= 2 and n >= 0.75 * sum(by_type.values()):  # two agreeing overrides, and hardly any disagreeing
+            rules[vendor] = (best, n)
+    return rules
+
+
+def classification_inputs(conn: Any, device_id: int, learned: dict[str, tuple[str, int]] | None = None) -> dict[str, Any]:
+    """Everything stored about a device that the classifier looks at."""
     open_ports_rows = conn.execute(
         "SELECT proto, port, service FROM ports WHERE device_id = ? AND state LIKE 'open%'",
         (device_id,),
     ).fetchall()
-    open_ports = [r["port"] for r in open_ports_rows]
-    services = [r["service"] for r in open_ports_rows if r["service"]]
     names = [r["name"] for r in conn.execute("SELECT name FROM device_names WHERE device_id = ?", (device_id,)).fetchall()]
-    dev_row = conn.execute("SELECT mac, vendor, os_name, os_type, os_confidence, hints FROM devices WHERE id = ?", (device_id,)).fetchone()
+    dev_row = conn.execute("SELECT mac, vendor, os_name, os_type, os_confidence, hints, type_override FROM devices WHERE id = ?", (device_id,)).fetchone()
     try:
         stored_hints = json.loads(dev_row["hints"] or "[]")
     except ValueError:
         stored_hints = []
-    device_type = classify_device(
-        vendor=dev_row["vendor"],
-        os_name=dev_row["os_name"],
-        os_type=dev_row["os_type"],
-        os_confidence=dev_row["os_confidence"],
-        open_ports=open_ports,
-        services=services,
-        hostnames=names,
-        mac=dev_row["mac"],
-        hints=stored_hints,
-    )
+    if learned is None:
+        learned = learned_types(conn)
+    rule = learned.get((dev_row["vendor"] or "").lower())
+    return {
+        "vendor": dev_row["vendor"],
+        "os_name": dev_row["os_name"],
+        "os_type": dev_row["os_type"],
+        "os_confidence": dev_row["os_confidence"],
+        "open_ports": [r["port"] for r in open_ports_rows],
+        "services": [r["service"] for r in open_ports_rows if r["service"]],
+        "hostnames": names,
+        "mac": dev_row["mac"],
+        "hints": stored_hints,
+        "learned": rule,
+    }
+
+
+def reclassify_device(conn: Any, device_id: int, learned: dict[str, tuple[str, int]] | None = None) -> str:
+    """Work out the type of a device from everything stored about it (ports, names, hints, vendor, OS) and save it."""
+    device_type = classify_device(**classification_inputs(conn, device_id, learned))
     conn.execute("UPDATE devices SET device_type = ? WHERE id = ?", (device_type, device_id))
     return device_type
+
+
+def relearn_vendor(conn: Any, device_id: int) -> int:
+    """After a manual type: re-classify the other devices of that manufacturer (the user may have taught a rule). Returns how many changed."""
+    row = conn.execute("SELECT vendor FROM devices WHERE id = ?", (device_id,)).fetchone()
+    if row is None or not row["vendor"]:
+        return 0
+    learned = learned_types(conn)
+    changed = 0
+    for other in conn.execute("SELECT id, device_type FROM devices WHERE vendor = ? AND type_override IS NULL", (row["vendor"],)).fetchall():
+        if reclassify_device(conn, other["id"], learned) != other["device_type"]:
+            changed += 1
+    return changed
+
+
+def identification_report(conn: Any, device_id: int) -> dict[str, Any]:
+    """Why the device has its type: every clue (strongest first) and what the user overrode."""
+    evidence = classify_evidence(**classification_inputs(conn, device_id))
+    return {
+        "evidence": [{"type": t, "weight": round(w), "why": why} for t, w, why in evidence],
+    }
 
 
 def refresh_identification(conn: Any) -> dict[str, int]:
@@ -285,8 +347,9 @@ def refresh_identification(conn: Any) -> dict[str, int]:
             conn.execute("UPDATE devices SET vendor = ? WHERE id = ?", (resolved, row["id"]))
             filled += 1
     changed = 0
+    learned = learned_types(conn)
     for row in conn.execute("SELECT id, device_type FROM devices").fetchall():
-        if reclassify_device(conn, row["id"]) != row["device_type"]:
+        if reclassify_device(conn, row["id"], learned) != row["device_type"]:
             changed += 1
     conn.commit()
     return {"vendors_filled": filled, "types_changed": changed}

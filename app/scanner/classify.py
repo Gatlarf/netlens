@@ -237,6 +237,10 @@ W_PORT_ROUTER = 55
 W_OS_CLASS_VAGUE = 40   # "specialized", "pda"...
 W_WEAK_HINT = 40
 W_SERVER_PORT = 30
+W_DESCRIPTOR = 80      # a model name ("iPhone14,2") or a page / certificate text that names the product
+W_CONTROLLER = 64      # the router or controller (ASUS, UniFi, Omada) classified the device itself
+W_LEARNED = 68         # the user set other devices of this manufacturer to this type
+W_OS_EXACT = 62        # an exact OS string from SMB or a DHCP fingerprint
 
 
 def classify_evidence(
@@ -250,6 +254,7 @@ def classify_evidence(
     mac: str | None = None,
     hints: Iterable[str] = (),
     os_confidence: int | None = None,
+    learned: tuple[str, int] | None = None,
 ) -> list[tuple[str, float, str]]:
     """Every clue about what the device is, as (type, weight, why), strongest first.
 
@@ -278,6 +283,16 @@ def classify_evidence(
             add("vm", W_VM, f"vendor {kw}")
             break
 
+    def hint_values(prefix: str) -> list[str]:
+        return [h[len(prefix):].strip() for h in sorted(hint_set) if h.startswith(prefix) and h[len(prefix):].strip()]
+
+    # What the router / controller says (ASUS, UniFi, Omada), and what the user taught us about this manufacturer
+    for value in hint_values("ctl:"):
+        if value in DEVICE_TYPES and value != "unknown":
+            add(value, W_CONTROLLER, "your router / controller says so")
+    if learned and learned[0] in DEVICE_TYPES:
+        add(learned[0], W_LEARNED, f"you set {learned[1]} other {vendor} devices to {learned[0]}")
+
     # Discovery hints that name the kind of device outright
     for token, device_type in STRONG_HINTS:
         if token in hint_set:
@@ -289,6 +304,20 @@ def classify_evidence(
         word = next((w for t in sorted(name_tokens) for w in sorted(words) if _token_matches(t, w)), None)
         if word:
             add(device_type, W_NAME_WORD - index * 0.01, f"name contains {word}")
+
+    # Model names ("iPhone14,2") read like device names; page titles, certificate owners and banners name products
+    for model in hint_values("model:"):
+        model_tokens = {t for t in re.split(r"[^a-z0-9]+", model) if t}
+        for index, (device_type, words) in enumerate(HOSTNAME_TOKENS):
+            word = next((w for t in sorted(model_tokens) for w in sorted(words) if _token_matches(t, w)), None)
+            if word:
+                add(device_type, W_DESCRIPTOR - index * 0.01, f"model name contains {word}")
+    descriptor = " ".join(hint_values("title:") + hint_values("cert:") + hint_values("banner:"))
+    if descriptor:
+        for device_type, words in OS_NAME_WORDS:
+            word = next((w for w in words if w in descriptor), None)
+            if word:
+                add(device_type, W_DESCRIPTOR - 5, f"its web page, certificate or banner says {word}")
 
     # nmap's class of the matched OS, and product words in its name (only when nmap is sure of its guess: TP-Link switches
     # matched as "Silicondust HDHomeRun" and a solar inverter as "HP LaserJet", both at 85-89 %, were wrong)
@@ -351,6 +380,20 @@ def classify_evidence(
             add("server" if ports & LINUX_SERVER_PORTS else "pc", W_SERVER_PORT + 15 if ports & LINUX_SERVER_PORTS else W_SERVER_PORT, "Linux / BSD")
         elif "mac os" in os_name_lower or "macos" in os_name_lower:
             add("pc", W_OS_FAMILY - 5, "macOS")
+
+    # An exact OS string (SMB's "Windows 10 Pro", a DHCP fingerprint): better than nmap's guess, weaker than a product clue
+    exact_os = " ".join(hint_values("os:"))
+    if exact_os:
+        if "windows" in exact_os:
+            add("server" if "server" in exact_os else "pc", W_OS_EXACT, f"reported OS: {exact_os[:40]}")
+        elif re.search(r"\b(android|iphone|ios|ipados)\b", exact_os):
+            add("phone", W_OS_EXACT - 4, f"reported OS: {exact_os[:40]}")
+        elif "mac" in exact_os:
+            add("pc", W_OS_EXACT - 5, f"reported OS: {exact_os[:40]}")
+        for device_type, words in OS_NAME_WORDS:
+            word = next((w for w in words if w in exact_os), None)
+            if word:
+                add(device_type, W_OS_NAME_WORD, f"reported OS says {word}")
 
     # Weak discovery hints and general server ports
     for token, device_type in WEAK_HINTS:

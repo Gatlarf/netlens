@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from app import actions, baselines, groups as groups_mod
 from app.db import add_event, connect, utcnow
-from app.scanner import vendor as vendor_db
+from app.scanner import store, vendor as vendor_db
 from app.scanner.classify import DEVICE_TYPES as CLASSIFY_TYPES
 from app.scanner.orchestrator import ScanBusy
 from app.hierarchy import children_map, descendants, device_name, load_hierarchy, would_loop
@@ -155,6 +155,7 @@ def _parent_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any]:
 def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.Row) -> dict[str, Any]:
     result = _device_dict(row)
     _add_group(conn, [result])
+    result["identification"] = store.identification_report(conn, device_id)
 
     ips = conn.execute(
         "SELECT ip, first_seen, last_seen FROM device_ips WHERE device_id = ? ORDER BY last_seen DESC",
@@ -483,6 +484,8 @@ def patch_device(
         set_clause = ", ".join(f"{col} = ?" for col in updates)
         params = list(updates.values()) + [device_id]
         conn.execute(f"UPDATE devices SET {set_clause} WHERE id = ?", params)
+        if "type_override" in updates:  # what the user just taught us may change the guess for similar devices
+            store.relearn_vendor(conn, device_id)
         conn.commit()
 
     row = conn.execute(

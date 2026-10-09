@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 import xml.etree.ElementTree as ET
 
+from app.scanner import nse
+
 
 @dataclass
 class ScanPort:
@@ -85,6 +87,8 @@ def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
                 htype = hostname.get("type", "")
                 if name:
                     hostnames.append((name, htype))
+
+        hostnames += nse.names_and_hints(host)  # identification scripts (only present when the deep scan ran them)
 
         # Ports
         ports: list[ScanPort] = []
