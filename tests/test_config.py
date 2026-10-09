@@ -26,16 +26,10 @@ def test_load_settings_defaults():
     assert settings.data_dir == Path("/data")
 
 
-def test_load_settings_token_required():
-    with pytest.raises(ConfigError) as exc:
-        load_settings({})
-    assert "NETLENS_TOKEN" in str(exc.value)
-
-
-def test_load_settings_token_non_empty():
-    with pytest.raises(ConfigError) as exc:
-        load_settings({"NETLENS_TOKEN": ""})
-    assert "NETLENS_TOKEN" in str(exc.value)
+def test_load_settings_token_is_optional():
+    # without it people sign in with a user name; the first user is made by the setup wizard
+    assert load_settings({}).token == ""
+    assert load_settings({"NETLENS_TOKEN": ""}).token == ""
 
 
 def test_config_error_does_not_leak_token():

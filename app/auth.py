@@ -21,6 +21,8 @@ def session_value(token: str) -> str:
 
 
 def is_authorized(token: str, cookie: Optional[str], authorization: Optional[str]) -> bool:
+    if not token:  # no access token configured: nothing can match it (an empty cookie or bearer must not)
+        return False
     if cookie is not None:
         try:
             if hmac.compare_digest(cookie.encode(), session_value(token).encode()):

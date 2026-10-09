@@ -105,6 +105,12 @@ function fill(card, data, shown) {
     "Administrators can change everything. Viewers can look at the map, devices, statistics and services but change nothing and see no settings. " +
     "The NETLENS_TOKEN access token always works as an administrator, so you cannot lock yourself out. " +
     "API tokens are for scripts, Home Assistant and Prometheus and act with the role of their user: give Home Assistant a viewer's token."));
+  if (data.token_configured) {
+    const haveAdmin = data.users.some((u) => u.role === "admin" && !u.disabled);
+    card.appendChild(h("p", { class: "hint", id: "token-note" }, haveAdmin
+      ? "NETLENS_TOKEN is still set in your container settings. Now that you have an administrator account you can remove it (and sign in with your user name); it keeps working until you do."
+      : "NETLENS_TOKEN is set in your container settings. Create an administrator below and sign in with it; after that you can remove NETLENS_TOKEN, which is no longer needed. Nothing changes until you do."));
+  }
   const refresh = (users, res) => {
     const newToken = res && res.token ? { token: res.token, name: users.flatMap((u) => u.tokens).find((t) => t.id === res.id)?.name || "", userId: users.find((u) => u.tokens.some((t) => t.id === res.id))?.id } : null;
     fill(card, { ...data, users }, newToken);

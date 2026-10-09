@@ -139,7 +139,7 @@ def test_session_reports_authenticated(tmp_path: Path) -> None:
     with _make_client(settings, tmp_path / "t.db", headers={"Authorization": "Bearer wrong"}) as client:
         resp = client.get("/api/session")
         assert resp.status_code == 200
-        assert resp.json() == {"authenticated": False}
+        assert resp.json() == {"authenticated": False, "setup_required": False, "token_login": True}
 
         resp = client.post("/api/login", json={"token": "secret"})
         assert resp.status_code == 200

@@ -95,6 +95,24 @@ def create_user(conn: sqlite3.Connection, username: str, password: str, role: st
     return cur.lastrowid
 
 
+def has_users(conn: sqlite3.Connection) -> bool:
+    return conn.execute("SELECT 1 FROM users LIMIT 1").fetchone() is not None
+
+
+def create_first_admin(conn: sqlite3.Connection, username: str, password: str) -> int | None:
+    """Create the first administrator, but only if there is no user yet (atomic: two setups at once cannot both win).
+
+    Returns the new id, or None when somebody else was first.
+    """
+    username, password = check_username(username), check_password(password)
+    cur = conn.execute(
+        "INSERT INTO users (username, password_hash, role, created) SELECT ?, ?, 'admin', ? WHERE NOT EXISTS (SELECT 1 FROM users)",
+        (username, hash_password(password), _iso(_now())),
+    )
+    conn.commit()
+    return cur.lastrowid if cur.rowcount == 1 else None
+
+
 def get_user(conn: sqlite3.Connection, user_id: int):
     return conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
 

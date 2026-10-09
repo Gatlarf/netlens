@@ -4,6 +4,10 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 
 ## 0.2
 
+### Changed
+- **Simpler install**: `docker-compose.simple.yml` runs the pre-built image with a Docker volume, needing no `.env` file, no `DOCKERDIR` folder (and no `chown`) and no token; the README has short recipes for Docker, Portainer (for example on DietPi) and Synology Container Manager. The earlier files stay as the *advanced* routes (host folder, build from source).
+- **`NETLENS_TOKEN` is optional.** A new install shows a **first-start wizard** (administrator account, networks to scan, first scan); installs that already set the token keep working unchanged with no wizard, and the Users page suggests moving to a user account. `python -m app.cli reset-password | create-admin | list-users` recovers a forgotten password from inside the container. Prometheus and Home Assistant should use an API token from Settings → Users & tokens.
+
 ### Added
 - **Omada and UniFi plugins** (in `plugins/`, listed in the plugin index as *Community*): **TP-Link Omada** (controller 5.1 or newer) and **Ubiquiti UniFi** (UniFi OS consoles and classic controllers) read which switch or access point every client and device is connected to, with Wi-Fi signal, band and link rate. Read-only, one login per sync. They were written from the public APIs and tested against simulated controllers only, so they are marked *not yet tested on hardware*; each has a tester checklist and a `diagnose.py` that writes an anonymised description of what the controller answers. `plugins/build_zip.py` builds the release zip.
 - **Logo and favicon**: a Netlens mark in the top bar, the browser tab, the Apple touch icon, the README and the Home Assistant integration.

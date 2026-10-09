@@ -260,12 +260,13 @@ def test_device_wifi_endpoint(client, db):
     conn, _ = db
     for i, (node, rssi) in enumerate((("Garden", -60), ("Garden", -62), ("Attic", -70))):
         conn.execute("INSERT INTO wifi_samples (device_id, ts, node, band, rssi, tx_mbps) VALUES (3, ?, ?, '5 GHz', ?, 72.2)", (_real_ago(hours=2 - i * 0.5), node, rssi))
-    conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES (?, 3, 'wifi_roamed', 'Garden -> Attic (5 GHz)')", (_real_ago(hours=1),))
+    roam_ts = _real_ago(hours=1)  # computed once: asking the clock twice can straddle a second
+    conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES (?, 3, 'wifi_roamed', 'Garden -> Attic (5 GHz)')", (roam_ts,))
     conn.commit()
     body = client.get("/api/devices/3/wifi", params={"hours": 24}).json()
     assert [s["rssi"] for s in body["samples"]] == [-60, -62, -70]
     assert body["current"]["node"] == "Attic" and body["current"]["quality"] == "fair" and body["current"]["tx_mbps"] == 72.2
-    assert body["roams"] == [{"ts": _real_ago(hours=1), "detail": "Garden -> Attic (5 GHz)"}]
+    assert body["roams"] == [{"ts": roam_ts, "detail": "Garden -> Attic (5 GHz)"}]
     assert client.get("/api/devices/1/wifi").json() == {"current": None, "samples": [], "roams": []}
     assert client.get("/api/devices/99/wifi").status_code == 404
     assert client.get("/api/devices/3/wifi", headers={"Authorization": "Bearer no"}).status_code == 401

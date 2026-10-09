@@ -73,7 +73,7 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
         _session_cookie(response, request, cookie)
         return response
 
-    if body.token is None or not hmac.compare_digest(body.token.encode(), settings.token.encode()):
+    if not settings.token or body.token is None or not hmac.compare_digest(body.token.encode(), settings.token.encode()):
         limiter.record_failure(host)
         raise HTTPException(status_code=401, detail="invalid token")
 
@@ -105,7 +105,18 @@ async def logout(request: Request) -> JSONResponse:
 async def session(request: Request) -> JSONResponse:
     principal = identify(request)
     if principal is None:
-        return JSONResponse({"authenticated": False})
+        from app.api.setup import setup_required
+
+        db = connect(request.app.state.db_path)
+        try:
+            needs_setup = setup_required(request, db)
+        finally:
+            db.close()
+        return JSONResponse({
+            "authenticated": False,
+            "setup_required": needs_setup,
+            "token_login": bool(request.app.state.settings.token),  # False: only user name and password sign in
+        })
     return JSONResponse({
         "authenticated": True,
         "user": {"username": principal.username, "role": principal.role, "builtin": principal.builtin},

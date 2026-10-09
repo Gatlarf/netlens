@@ -78,9 +78,9 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     if env is None:
         env = os.environ
 
+    # Optional: a shared access token that always signs in as administrator (the way older installs work). Without it,
+    # people sign in with a user name and password; the first one is created by the setup wizard.
     token = env.get("NETLENS_TOKEN", "").strip()
-    if not token:
-        raise ConfigError("NETLENS_TOKEN is required and must be non-empty")
 
     ranges_str = env.get("NETLENS_RANGES", "")
     ranges: tuple[str, ...] = ()

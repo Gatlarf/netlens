@@ -1,0 +1,33 @@
+# Netlens: the simplest way to run it. No .env file, no folders to create, no token.
+#
+#   docker compose -f docker-compose.simple.yml up -d
+#
+# Then open http://<this-device>:8080 and follow the first-start steps (you create your own account).
+# Works the same in Portainer (Stacks > Add stack > Web editor: paste this file) and in Synology Container Manager
+# (Project > Create). Your data lives in the Docker volume "netlens-data" and survives updates and re-creating the container.
+#
+# Optional: set TZ to your time zone (for example Europe/Brussels) so times in e-mails and charts match your clock.
+
+services:
+  netlens:
+    image: ghcr.io/gatlarf/netlens:latest
+    container_name: netlens
+    restart: unless-stopped
+    # Host networking is required to see the devices on your network (ARP, mDNS, SSDP). The web page is on port 8080 of this device.
+    network_mode: host
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - netlens-data:/data
+    environment:
+      - TZ=${TZ:-UTC}
+      # Rarely needed: NETLENS_BIND=0.0.0.0:8081 if port 8080 is taken on this device.
+
+volumes:
+  netlens-data:

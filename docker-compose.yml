@@ -36,8 +36,8 @@ services:
 
     # Environment variables sourced from .env with sensible defaults.
     environment:
-      # Required token for API access; must be set in .env.
-      NETLENS_TOKEN: ${NETLENS_TOKEN:?Set NETLENS_TOKEN in .env (a long random string)}
+      # Optional access token (signs in as administrator). Leave it empty to create your own account in the first-start wizard.
+      NETLENS_TOKEN: ${NETLENS_TOKEN:-}
       # Optional scan ranges; empty string means auto-detect.
       NETLENS_RANGES: ${NETLENS_RANGES:-}
       # Quick scan interval in seconds (default 15 minutes).

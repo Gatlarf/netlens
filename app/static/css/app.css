@@ -513,3 +513,10 @@ body[data-role="viewer"] .admin-only { display: none !important; }
 #login-dialog .btn { margin-top: 12px; }
 
 .brand-icon { vertical-align: -6px; margin-right: 8px; border-radius: 6px; }
+
+/* first-run wizard */
+body.setup-mode #nav, body.setup-mode .topbar-actions { display: none; }
+.setup-wrap { max-width: 520px; margin: 32px auto; padding: 0 16px; }
+.setup-card h1 { margin-top: 0; }
+.setup-steps { color: var(--muted); margin-top: -8px; }
+#login-dialog [hidden] { display: none !important; }

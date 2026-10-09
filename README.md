@@ -41,34 +41,99 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Several users (administrator or read-only viewer) with API tokens, and read-only share links for the map or a status page
 - Every setting you need day to day (ranges, schedule, terminal, mail, plugins) is editable in the browser
 
-## Build and deploy with Docker Compose
+## Install
 
-### Requirements
+Netlens runs as one container. It needs to see your network, so it uses the host's network: install it **on a device that is connected to the
+network you want to scan** (a NAS, a mini PC, a Raspberry Pi, a server), not on Docker Desktop for Mac or Windows. It needs **no `.env` file, no
+folders to create and no token**. The image is published for 64-bit Intel/AMD (amd64) and 64-bit ARM (arm64, for example a Raspberry Pi 3/4/5
+running a 64-bit OS) at `ghcr.io/gatlarf/netlens`; no account is needed to pull it.
 
-- A Linux Docker host on the network you want to scan, with Docker Engine and the Compose plugin (`docker compose version`).
-- The container uses **host networking** (needed for ARP/L2 discovery and mDNS/SSDP), so it must run on a host that is directly attached to the LAN. Docker Desktop on macOS/Windows will not work for scanning.
+### Docker Compose (any Linux device with Docker)
 
-### Option A: standalone (this repository's compose file)
+```bash
+mkdir netlens && cd netlens
+curl -O https://raw.githubusercontent.com/Gatlarf/netlens/main/docker-compose.simple.yml
+docker compose -f docker-compose.simple.yml up -d
+```
+
+Open `http://<this-device>:8080` and follow [First start](#first-start). Your data lives in the Docker volume `netlens-data`, which survives updates and
+re-creating the container. Set `TZ` (for example `TZ=Europe/Brussels` in the environment or a `.env` file) to have times in your own time zone.
+
+### Docker without Compose
+
+```bash
+docker run -d --name netlens --restart unless-stopped --network host \
+  --cap-drop ALL --cap-add NET_RAW --cap-add NET_ADMIN --read-only --tmpfs /tmp \
+  -e TZ=Europe/Brussels -v netlens-data:/data ghcr.io/gatlarf/netlens:latest
+```
+
+### Portainer (for example on DietPi or any other device)
+
+1. **Stacks → Add stack**, give it a name (`netlens`), choose **Web editor**.
+2. Paste the contents of [`docker-compose.simple.yml`](docker-compose.simple.yml), optionally set `TZ` under *Environment variables*, and press **Deploy the stack**.
+3. Open `http://<this-device>:8080`.
+
+To update later: open the stack and press **Update the stack** with **Re-pull image** switched on.
+
+### Synology NAS (DSM 7.2 or newer, Container Manager)
+
+1. Open **Container Manager → Project → Create**. Name it `netlens`, choose a path for the project (any shared folder), and as source choose **Create docker-compose.yml**.
+2. Paste the contents of [`docker-compose.simple.yml`](docker-compose.simple.yml), press **Next** and finish; the project starts the container.
+3. Open `http://<nas-address>:8080`. (DSM itself uses ports 5000 and 5001. If something else on the NAS already uses 8080, add `NETLENS_BIND=0.0.0.0:8081` to the `environment:` list and use that port.)
+
+To update later: **Project → netlens → Action → Build** (it pulls the newest image) and start it again. The data is in a Docker volume, so there are no folder permissions to set up.
+(Older DSM versions with the *Docker* package can use the same compose file under *Project* if available, or create the container by hand with: host network, the two capabilities
+`NET_RAW` and `NET_ADMIN` added, the image above, and a volume mounted at `/data`.)
+
+### First start
+
+The first time you open Netlens it asks you to **create the administrator account** and to confirm **which networks to scan** (it suggests the ones the device is
+connected to), then starts the first scan. After that, everyone signs in with a user name and password; add more users, read-only viewers and API tokens under
+**Settings → Users & tokens**.
+
+Until you have created the account, anyone who can open the page can create it, so do this step right after starting the container.
+
+**Forgot the password?** Create a new administrator (or reset a password) from the device that runs Netlens:
+
+```bash
+docker exec -it netlens python -m app.cli list-users
+docker exec -it netlens python -m app.cli reset-password <user>
+docker exec -it netlens python -m app.cli create-admin <user>
+```
+
+### Advanced: a host folder, building from source, an existing compose stack
+
+These are for people who want the data in a folder they choose (for backups with their own tools) or want to build the image themselves. They use the
+`DOCKERDIR` variable from a `.env` file. Existing installations that were set up this way keep working unchanged.
+
+#### Pre-built image with a host folder
+
+```bash
+mkdir netlens && cd netlens
+curl -O https://raw.githubusercontent.com/Gatlarf/netlens/main/docker-compose.image.yml
+printf 'DOCKERDIR=/home/you/docker\n' > .env
+mkdir -p /home/you/docker/appdata/netlens
+sudo chown 10001:10001 /home/you/docker/appdata/netlens   # the container runs as uid 10001
+docker compose -f docker-compose.image.yml up -d
+```
+
+To pin a specific version instead of following `latest`, change the image line, for example `ghcr.io/gatlarf/netlens:1.2.3`.
+
+#### Build from source
 
 ```bash
 git clone https://github.com/Gatlarf/netlens.git
 cd netlens
-cp .env.example .env
-# Edit .env:
-#   NETLENS_TOKEN  a long random string (generate with: openssl rand -hex 32)
-#   DOCKERDIR      base directory for application data, e.g. /home/you/docker
+cp .env.example .env            # set DOCKERDIR (and optionally NETLENS_TOKEN)
 mkdir -p "$DOCKERDIR/appdata/netlens"
-sudo chown 10001:10001 "$DOCKERDIR/appdata/netlens"   # the container runs as uid 10001
+sudo chown 10001:10001 "$DOCKERDIR/appdata/netlens"
 docker compose up -d --build
 ```
 
-Open `http://<docker-host>:8080`, log in with the token, and press **Quick scan**.
+#### Add Netlens to an existing compose stack
 
-Application data (the SQLite database) is stored in `$DOCKERDIR/appdata/netlens`, mounted as `/data`, so it survives rebuilds and container removal.
-
-### Option B: add Netlens to an existing compose stack
-
-If you already keep all your services in one `docker-compose.yml` with a shared `.env` (defining `DOCKERDIR`), clone this repository to `$DOCKERDIR/build/netlens` (`git clone https://github.com/Gatlarf/netlens.git $DOCKERDIR/build/netlens`), add `NETLENS_TOKEN` to the shared `.env`, and append this service:
+If you already keep all your services in one `docker-compose.yml` with a shared `.env` (defining `DOCKERDIR`), clone this repository to `$DOCKERDIR/build/netlens`
+(`git clone https://github.com/Gatlarf/netlens.git $DOCKERDIR/build/netlens`) and append this service:
 
 ```yaml
   netlens:
@@ -92,28 +157,18 @@ If you already keep all your services in one `docker-compose.yml` with a shared 
       - $DOCKERDIR/appdata/netlens:/data
     environment:
       - TZ=${TZ}
-      - NETLENS_TOKEN=${NETLENS_TOKEN:?Set NETLENS_TOKEN in .env}
       - NETLENS_BIND=0.0.0.0:8080
 ```
 
-Create and chown the data directory as in option A, then run `docker compose up -d --build netlens` from the directory that holds your compose file. The other `NETLENS_*` variables in the table below can be added to `environment:` as needed.
+Create and chown the data directory as above, then run `docker compose up -d --build netlens` from the directory that holds your compose file.
+`NETLENS_TOKEN` is optional: set it to keep a shared administrator token (see *Access token* below); leave it out to create your account in the first-start wizard.
+The other `NETLENS_*` variables in the table below can be added to `environment:` as needed.
 
-### Option C: pre-built image (no build, works with Portainer)
+#### Existing installations
 
-A multi-architecture image (amd64 and arm64) is published to GitHub Container Registry on every push to `main` and for every `v*` release tag: `ghcr.io/gatlarf/netlens` (tags: `latest`, a version such as `1.2.3`, and the commit `sha-...`). No source code or Dockerfile is needed on the host, and no registry account is needed to pull it.
-
-```bash
-mkdir netlens && cd netlens
-curl -O https://raw.githubusercontent.com/Gatlarf/netlens/main/docker-compose.image.yml
-printf 'DOCKERDIR=/home/you/docker\nNETLENS_TOKEN=%s\n' "$(openssl rand -hex 32)" > .env
-mkdir -p /home/you/docker/appdata/netlens
-sudo chown 10001:10001 /home/you/docker/appdata/netlens
-docker compose -f docker-compose.image.yml up -d
-```
-
-**Portainer:** under **Stacks → Add stack → Web editor**, paste the contents of [`docker-compose.image.yml`](docker-compose.image.yml) and add `DOCKERDIR` and `NETLENS_TOKEN` as environment variables. (The regular `docker-compose.yml` has a `build:` section and fails in the web editor with `failed to read dockerfile: open Dockerfile: no such file or directory`, because there is no source to build from. Use this file, or deploy the stack from the Git repository instead.)
-
-To pin a specific version instead of following `latest`, change the image line, for example `ghcr.io/gatlarf/netlens:1.2.3`.
+Nothing changes when you update: a `NETLENS_TOKEN` you already set keeps working as an administrator login, your data is migrated automatically and no
+first-start wizard appears. When you want to leave the shared token behind, create an administrator under **Settings → Users & tokens**, sign in with it, and
+then remove `NETLENS_TOKEN` from your compose file.
 
 ### Operating it
 
@@ -128,7 +183,17 @@ Do not use `--no-new-privileges` or remove the `NET_RAW`/`NET_ADMIN` capabilitie
 
 ## Updating to a new version
 
-Netlens is built from source, so updating means pulling the new code and rebuilding the image. Your data lives in `$DOCKERDIR/appdata/netlens` and is not touched by a rebuild. Releases and changes are listed at https://github.com/Gatlarf/netlens/commits/main; while the project is in development, check for changes to the data format or configuration before updating.
+**Simple install** (`docker-compose.simple.yml`, Portainer, Synology): pull the newest image and recreate the container; the data volume is untouched.
+
+```bash
+docker compose -f docker-compose.simple.yml pull
+docker compose -f docker-compose.simple.yml up -d
+```
+
+In Portainer press **Update the stack** with **Re-pull image** on; on a Synology use **Project → netlens → Action → Build**. Download a backup first if you like
+(**Settings → Backup & restore**). Netlens shows an **Update available** badge when a newer image exists.
+
+**Installs built from source** (the *Advanced* routes above): Netlens is built from source, so updating means pulling the new code and rebuilding the image. Your data lives in `$DOCKERDIR/appdata/netlens` and is not touched by a rebuild. Releases and changes are listed at https://github.com/Gatlarf/netlens/commits/main; while the project is in development, check for changes to the data format or configuration before updating.
 
 1. **Back up the data** (recommended before every update). The easiest way is **Settings → Backup and restore → Download backup**. From the command line:
 
@@ -191,7 +256,7 @@ Restoring the backup matters because a newer version may have changed the databa
 
 | Variable | Default | Description |
 |---|---|---|
-| `NETLENS_TOKEN` | *(required)* | Access token for login |
+| `NETLENS_TOKEN` | *(empty)* | Optional shared access token that signs in as administrator (older installs use it; new ones create an account in the first-start wizard). Not needed for Home Assistant or Prometheus: use an API token from Settings → Users & tokens |
 | `NETLENS_RANGES` | auto-detect | Private ranges only, prefix >= /20. Can also be changed at runtime in the web UI (see below); the web setting takes precedence |
 | `NETLENS_QUICK_INTERVAL` | `900` | Quick scan interval in seconds |
 | `NETLENS_DEEP_INTERVAL` | `86400` | Deep scan interval in seconds |
@@ -288,7 +353,7 @@ Besides e-mail, **Settings → Channels & quiet hours** sends alerts to **ntfy**
 
 ### Prometheus and Grafana
 
-`GET /metrics` (same token as the API, as a Bearer token) exposes Prometheus metrics: device presence and last seen, devices by state, uptime ratio, open ports, scan duration/hosts/last success per kind, events by kind, plugin health, service check state and response time, Wi-Fi signal per client, and a `netlens_problem` flag. `contrib/prometheus/prometheus.yml` has a scrape job and alert rule examples; `contrib/grafana/netlens-dashboard.json` is a dashboard you can import in Grafana.
+`GET /metrics` (an API token from Settings → Users & tokens, as a Bearer token; a viewer's token is enough) exposes Prometheus metrics: device presence and last seen, devices by state, uptime ratio, open ports, scan duration/hosts/last success per kind, events by kind, plugin health, service check state and response time, Wi-Fi signal per client, and a `netlens_problem` flag. `contrib/prometheus/prometheus.yml` has a scrape job and alert rule examples; `contrib/grafana/netlens-dashboard.json` is a dashboard you can import in Grafana.
 
 ### Statistics
 
@@ -310,7 +375,9 @@ The device page has **Wake** (a Wake-on-LAN magic packet to the device's MAC add
 
 ### Users and API tokens
 
-Without any users, Netlens works as before: the `NETLENS_TOKEN` access token signs you in as administrator. **Settings → Users & tokens** adds named users: an **administrator** can do everything, a **viewer** can look at the map, devices, hierarchy, statistics, uptime and services but cannot change anything, open the terminal, read settings, exports or backups, or see credentials. Sign in with a user name instead of the token from the login dialog. Passwords need at least 8 characters; changing one (Settings → Account, or by an administrator) ends that user's other logins. The access token cannot be locked out, so a forgotten password is fixed by signing in with the token.
+New installs have no shared token: you create the first administrator in the [first-start wizard](#first-start). **Settings → Users & tokens** adds more named users: an **administrator** can do everything, a **viewer** can look at the map, devices, hierarchy, statistics, uptime and services but cannot change anything, open the terminal, read settings, exports or backups, or see credentials. Passwords need at least 8 characters; changing one (Settings → Account, or by an administrator) ends that user's other logins. A forgotten password is fixed from the device that runs Netlens with `docker exec -it netlens python -m app.cli reset-password <user>`.
+
+**Access token (older installs):** if `NETLENS_TOKEN` is set in the container's environment, it keeps signing in as administrator (login dialog: "Sign in with the access token instead") and the first-start wizard does not appear. Remove it once you have an administrator account of your own; the Users page reminds you.
 
 An administrator can create **API tokens** for a user (shown once). They are Bearer tokens that act with the role of their user, for scripts, Prometheus (`/metrics`) and the Home Assistant integration; a viewer's token is enough for those because they only read.
 
@@ -505,7 +572,7 @@ python -m pytest
 Run locally:
 
 ```bash
-NETLENS_TOKEN=dev NETLENS_DATA_DIR=./data python -m app.main
+NETLENS_DATA_DIR=./data python -m app.main   # open http://localhost:8080 and create your account (or set NETLENS_TOKEN=dev to skip the wizard)
 ```
 
 > nmap must be installed for real scans.
@@ -537,12 +604,12 @@ tests
   | Log message | Fix |
   |---|---|
   | `PermissionError: [Errno 13] Permission denied: '/data...'` | The data directory is not writable by the container user. Run `sudo chown 10001:10001 $DOCKERDIR/appdata/netlens` |
-  | `NETLENS_TOKEN is required and must be non-empty` | Set `NETLENS_TOKEN` in `.env` |
+  | `Is a directory` / the page asks for a token you never set | Old files: the token is optional now. Use `docker-compose.simple.yml`, or leave `NETLENS_TOKEN` empty to get the first-start wizard |
   | `NETLENS_RANGES contains non-scannable range` | Use private ranges only, no larger than /20 |
   | `NETLENS_BIND must be in format host:port` | Fix the value, e.g. `0.0.0.0:8080` |
   | `address already in use` | Another service on the host already uses port 8080 (the container uses host networking). Change `NETLENS_BIND` |
 
-  If `docker compose up` itself refuses to start, the message names the missing variable (for example `DOCKERDIR` or `NETLENS_TOKEN`). Run `docker compose config` to see the final configuration with all variables filled in.
+  If `docker compose up` itself refuses to start, the message names the missing variable (for example `DOCKERDIR`, which only the advanced compose files need). Run `docker compose config` to see the final configuration with all variables filled in.
 - **Proxmox sync fails:** the message on the plugin's settings page says why. `the TLS certificate could not be verified`: untick *Verify TLS certificate* (Proxmox's default certificate is self-signed). `authentication failed`: check the token ID (`user@realm!tokenname`), the secret, or the password. `permission denied (... PVEAuditor)`: give the token or user the PVEAuditor role on `/`. `cannot connect`: wrong URL/port or a firewall.
 - **No notification mails:** use **Send test email** first. Check that *Send e-mail notifications* is ticked, that the device has not opted out, and the status line under the card for the last problem. Gmail and most providers need an app password, not your normal password.
 - **A guest does not show under its Proxmox host:** the connector matches by MAC address, so Netlens must have scanned that guest at least once on the same network. Run a scan and press *Sync now*.

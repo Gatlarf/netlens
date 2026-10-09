@@ -35,7 +35,10 @@ def _fail(exc: users.UserError, status: int = 422) -> HTTPException:
 def get_users(request: Request) -> dict:
     db = _db(request)
     try:
-        return {"users": users.list_users(db), "roles": list(users.ROLES), "min_password": users.MIN_PASSWORD}
+        return {
+            "users": users.list_users(db), "roles": list(users.ROLES), "min_password": users.MIN_PASSWORD,
+            "token_configured": bool(request.app.state.settings.token),  # NETLENS_TOKEN is set in the environment
+        }
     finally:
         db.close()
 

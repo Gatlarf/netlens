@@ -1,6 +1,7 @@
 import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
 import { initUpdateBadge } from "./update.js";
+import { renderSetup } from "./setup.js";
 import { get, post, ApiError } from "./api.js";
 import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
 
@@ -57,9 +58,11 @@ async function loadDisplaySettings() {
   }
 }
 
+let setupMode = false;
+
 async function renderPage() {
   const view = el("#view");
-  if (!view) return;
+  if (!view || setupMode) return;
   await loadDisplaySettings();
 
   const gen = ++renderGen;
@@ -324,10 +327,35 @@ async function handleScan(kind) {
   }
 }
 
+// No user exists yet (and no NETLENS_TOKEN): the first-run wizard instead of the pages.
+function startSetup() {
+  setupMode = true;
+  document.body.classList.add("setup-mode");
+  renderSetup(el("#view"), async () => {
+    setupMode = false;
+    document.body.classList.remove("setup-mode");
+    await applySession();
+    displayLoaded = false;
+    location.hash = "#/map";
+    startPoll();
+    renderPage();
+  });
+}
+
+// Without NETLENS_TOKEN only a user name and password sign in: show just that form.
+function hideTokenLogin() {
+  setLoginMode(true);
+  const switchBtn = el("#login-switch");
+  if (switchBtn) switchBtn.hidden = true;
+}
+
 async function init() {
   const session = await applySession();
 
-  if (!session.authenticated) {
+  if (!session.authenticated && session.setup_required) {
+    startSetup();
+  } else if (!session.authenticated) {
+    if (session.token_login === false) hideTokenLogin();
     openLoginDialog();
   } else {
     startPoll();
@@ -366,6 +394,7 @@ async function init() {
   }
 
   document.addEventListener("netlens:unauth", () => {
+    if (setupMode) return; // a background request before the first account exists must not cover the wizard
     stopPoll();
     openLoginDialog();
   });

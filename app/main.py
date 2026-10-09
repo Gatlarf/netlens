@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, hierarchy as hierarchy_api, ignored, mapsettings, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, stats as stats_api, public_share, shares as shares_api, update as update_api, users as users_api, uptime, wifi
+from app.api import backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, hierarchy as hierarchy_api, ignored, mapsettings, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, stats as stats_api, public_share, setup as setup_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, require_auth
@@ -85,6 +85,7 @@ def create_app(
     app.state.terminal_sessions = 0
 
     app.include_router(auth_router)
+    app.include_router(setup_api.router)  # public only while no user exists (it checks that itself)
     app.include_router(public_share.router)  # the only routes that need no login: they check the link token themselves
 
     auth_deps = [Depends(require_auth)]
