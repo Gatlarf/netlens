@@ -421,3 +421,8 @@ function syncTopbarHeight() {
 syncTopbarHeight();
 window.addEventListener("resize", syncTopbarHeight);
 if (topbar && window.ResizeObserver) new ResizeObserver(syncTopbarHeight).observe(topbar);
+
+// Installable app (needs HTTPS or localhost); the worker only caches the public interface files, see sw.js
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}

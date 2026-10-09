@@ -540,3 +540,6 @@ body.setup-mode #nav, body.setup-mode .topbar-actions { display: none; }
 .plugin-state.on { border-color: #16a34a; background: rgba(22, 163, 74, 0.12); }
 .plugin-state.off { border-color: #d97706; background: rgba(217, 119, 6, 0.16); }
 .tag.off { opacity: 0.7; }
+
+/* installed app on a phone with a notch / rounded corners */
+@media (display-mode: standalone) { body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); } .topbar { padding-top: env(safe-area-inset-top); } }

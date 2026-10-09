@@ -393,6 +393,10 @@ Netlens works out a device's name and type from everything it can see, in this o
 
 **Learning from you.** When two or more devices of the same manufacturer were set to the same type by hand (and hardly any to another), Netlens applies that type to the manufacturer's other devices that have no manual type, and says so under *Why this type?*.
 
+### Installing Netlens as an app
+
+Behind HTTPS (see the HTTPS section; plain `http://` only works on `localhost`) your browser offers **Install** (Chrome, Edge) or **Add to Home Screen** (Safari, Chrome on Android). Netlens then opens in its own window with its own icon. Only the public interface files are cached, to open faster and to show the app frame when the server is unreachable: data, share links and metrics are never cached and always need a login. If something looks stale, reload once or clear the site data.
+
 ### Wi-Fi details
 
 When a topology plugin reports the signal of Wi-Fi clients (the ASUS plugin does), Netlens stores one sample per scan for 14 days. The device page then shows a **Wi-Fi** card with the signal (excellent / good / fair / weak), node, band, link rate, a 24 hour signal chart and the last moves between nodes. A client that changes node logs a **Wi-Fi move** event. The Statistics page adds a Wi-Fi group (signal quality, weakest clients, moves in 7 days).
