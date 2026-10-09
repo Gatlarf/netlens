@@ -67,47 +67,53 @@ body {
 }
 
 /* ---------- topbar ---------- */
+/* One row: brand, page links, then the Scan menu and the account menu. Below 1040 px the page links (and the account
+   menu) move into one panel behind the burger button; on a phone the bar also slides away while scrolling down. */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 10px 16px;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 16px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
+  transition: transform 0.18s ease-out;
 }
+.topbar.bar-hidden { transform: translateY(-100%); }
 
 .topbar .brand {
   font-weight: 700;
   font-size: 16px;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  margin-right: 4px;
 }
 
 .topbar .nav {
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
-.topbar .actions {
+.topbar-actions {
   margin-left: auto;
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-wrap: wrap;
 }
 
 .nav-link {
   display: inline-block;
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-radius: var(--radius);
   color: var(--text);
   text-decoration: none;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .nav-link:hover { background: var(--bg); }
@@ -115,6 +121,102 @@ body {
 .nav-link.active {
   background: var(--accent);
   color: var(--accent-text);
+}
+
+.menu-wrap { position: relative; }
+.popmenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  min-width: 230px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+.popmenu[hidden] { display: none; }
+.popmenu hr { border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
+.menu-item, .menu-row {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+.menu-item { cursor: pointer; }
+.menu-item:hover:not(:disabled) { background: var(--bg); }
+.menu-item:disabled { color: var(--muted); cursor: default; }
+.menu-item:focus-visible, .nav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.menu-row { color: var(--muted); font-size: 0.85rem; }
+.menu-row .app-version { margin: 0; font-size: inherit; }
+.menu-row.update-badge { color: var(--warn, #b45309); font-weight: 600; margin: 0; border: 0; border-radius: 6px; background: none; font-size: 0.85rem; padding: 8px 10px; }
+.menu-who { padding: 6px 10px; }
+.menu-who small { display: block; color: var(--muted); }
+
+/* a dot on the account / page menu button while an update is available */
+.user-btn, .burger { position: relative; }
+body.has-update .user-btn::after, body.has-update .burger::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d97706;
+  border: 2px solid var(--surface);
+}
+.topbar .burger { display: none; padding: 6px 12px; font-size: 1.1rem; line-height: 1.2; }
+
+@media (max-width: 1040px) {
+  .topbar .burger { display: inline-block; }
+  .topbar .user-btn { display: none; }
+  /* the page links and the account menu share one panel under the bar */
+  .topbar .nav {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    flex-direction: column;
+    gap: 0;
+    padding: 6px 8px 10px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.16);
+    max-height: calc(100vh - 64px);
+    max-height: calc(100dvh - 64px);
+    overflow-y: auto;
+  }
+  .topbar.nav-open .nav { display: flex; }
+  .topbar .nav .nav-link { display: block; padding: 12px; font-size: 1rem; }
+  .topbar .nav .popmenu {
+    position: static;
+    min-width: 0;
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: none;
+  }
+  .topbar .nav .popmenu .menu-item { padding: 12px; font-size: 1rem; }
+}
+@media (max-width: 700px) {
+  .topbar { padding: 0 12px; min-height: 48px; }
+  .topbar .brand { font-size: 15px; }
+  .topbar .nav { max-height: calc(100vh - 56px); max-height: calc(100dvh - 56px); }
+  .popmenu { min-width: 200px; }
 }
 
 /* ---------- buttons ---------- */
@@ -491,18 +593,16 @@ dialog#login-dialog::backdrop {
 
 /* ---------- responsive ---------- */
 @media (max-width: 700px) {
-  .topbar { flex-wrap: wrap; }
-  .topbar .actions { margin-left: 0; }
   .grid-2 { grid-template-columns: 1fr; }
   .table-wrap { overflow-x: auto; }
   .map-panel { width: 100%; }
 }
 .hint { color: var(--muted); font-size: 0.85em; margin: 0.4em 0 0; }
 .error:empty { display: none; }
-.app-version { color: var(--muted); font-size: 0.75em; margin-left: 6px; }
+.app-version { color: var(--muted); font-size: 0.75em; }
 
 /* theme switch in the top bar */
-.theme-toggle { font-size: 1.1em; line-height: 1; padding: 6px 10px; min-width: 38px; color: var(--text); }
+.theme-toggle { color: var(--text); }
 
 /* Links: one themed colour (no washed-out browser defaults, visited links look the same).
    :where() gives these rules zero specificity so every class rule (.btn, .nav-link, ...) still wins. */

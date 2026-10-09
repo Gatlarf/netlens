@@ -1,6 +1,8 @@
 .legend {
   display: inline-flex;
-  gap: 14px;
+  flex-wrap: wrap;
+  max-width: 100%;
+  gap: 4px 14px;
   align-items: center;
   margin-left: auto;
   font-size: .85rem;

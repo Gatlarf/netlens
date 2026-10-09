@@ -23,17 +23,28 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 
 /* Settings page: side menu + sections */
 .settings-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 20px; align-items: start; }
-.settings-nav { position: sticky; top: calc(var(--topbar-h, 58px) + 12px); display: flex; flex-direction: column; gap: 2px; }
+.settings-side { position: sticky; top: calc(var(--topbar-vis, var(--topbar-h, 52px)) + 12px); transition: top 0.18s ease-out; max-height: calc(100vh - var(--topbar-h, 52px) - 24px); overflow-y: auto; }
+.settings-nav { display: flex; flex-direction: column; gap: 2px; }
 .settings-nav a { display: block; padding: 7px 12px; border-radius: 6px; color: var(--text); text-decoration: none; font-size: 0.95em; border-left: 3px solid transparent; }
 .settings-nav a:hover { background: var(--bg); }
 .settings-nav a.active { background: var(--surface); border-left-color: var(--accent); font-weight: 600; box-shadow: 0 0 0 1px var(--border); }
 .settings-nav .nav-group { margin: 12px 12px 2px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .settings-nav .nav-group:first-child { margin-top: 0; }
+.settings-nav-toggle { display: none; }
 @media (max-width: 800px) {
-  .settings-layout { grid-template-columns: minmax(0, 1fr); }
-  .settings-nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px; }
-  .settings-nav a { border: 1px solid var(--border); background: var(--surface); }
-  .settings-nav .nav-group { flex-basis: 100%; margin: 6px 0 0; }
+  .settings-layout { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  /* the list of settings pages is long: show only the current page, the rest opens on request */
+  .settings-side { position: static; max-height: none; overflow: visible; display: flex; flex-direction: column; gap: 6px; }
+  .settings-nav-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; }
+  .settings-nav-toggle .caret { color: var(--accent); font-size: 1.2rem; line-height: 1; }
+  .settings-nav { display: none; position: static; flex-direction: column; gap: 2px; max-height: 60vh; max-height: 60dvh; overflow-y: auto; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  .settings-side.open .settings-nav { display: flex; }
+  .settings-nav a { padding: 11px 12px; }
+  .settings-nav .nav-group { margin: 10px 12px 2px; }
+}
+@media (max-width: 700px) {
+  .scan-info { gap: 6px 10px; padding: 4px 12px; font-size: 0.85rem; }
+  .scan-progress { width: 100%; max-width: none; order: 3; flex-basis: 100%; }
 }
 
 /* long nmap command lines must wrap instead of widening the page */
@@ -147,7 +158,7 @@ td.actions .btn { padding: 2px 8px; font-size: 0.85em; }
 .diagnose-text { width: 100%; box-sizing: border-box; font-family: var(--mono); font-size: 0.85rem; margin: 8px 0; }
 
 /* Statistics: section navigation */
-.stats-nav { position: sticky; top: var(--topbar-h, 0px); z-index: 10; display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 8px; background: var(--bg); border-bottom: 1px solid var(--border); scrollbar-width: thin; }
+.stats-nav { position: sticky; top: var(--topbar-vis, var(--topbar-h, 0px)); transition: top 0.18s ease-out; z-index: 10; display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 8px; background: var(--bg); border-bottom: 1px solid var(--border); scrollbar-width: thin; }
 .stats-nav:empty { display: none; }
 .stat-chip { flex: 0 0 auto; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
 .stat-chip:hover { border-color: var(--accent); }

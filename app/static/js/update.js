@@ -9,12 +9,14 @@ export async function initUpdateBadge() {
     try {
       const u = await get("/api/update");
       badge.hidden = !u.available;
+      document.body.classList.toggle("has-update", !!u.available);  // a dot on the menu buttons
       if (u.available) {
         badge.textContent = `Update ${u.latest} available`;
         badge.title = `You run ${u.current}. Click for how to update.`;
       }
     } catch (err) {
       badge.hidden = true;
+      document.body.classList.remove("has-update");
     }
   }
   refresh();

@@ -1,6 +1,7 @@
 import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
 import { initUpdateBadge } from "./update.js";
+import { initTopbar } from "./topbar.js";
 import { renderSetup } from "./setup.js";
 import { get, post, ApiError } from "./api.js";
 import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
@@ -280,6 +281,20 @@ async function applySession() {
   setSessionUser(session.authenticated ? session.user : null);
   const out = el("#logout");
   if (out && session.user) out.title = `Signed in as ${session.user.username} (${session.user.role})`;
+  const name = session.user ? session.user.username : "Account";
+  if (el("#user-name")) el("#user-name").textContent = name;
+  if (el("#user-who")) {
+    el("#user-who").textContent = "";
+    if (session.user) {
+      const who = document.createElement("div");
+      who.append("Signed in as ", Object.assign(document.createElement("b"), { textContent: session.user.username }));
+      const role = document.createElement("small");
+      role.textContent = session.user.role === "admin" ? "administrator" : session.user.role;
+      el("#user-who").append(who, role);
+    } else {
+      el("#user-who").textContent = "Not signed in";
+    }
+  }
   return session;
 }
 
@@ -411,16 +426,7 @@ fetch("/api/health").then((r) => r.json()).then((d) => {
 
 initThemeToggle();
 initUpdateBadge();
-
-// The top bar is sticky and changes height when it wraps on a small screen. Publish its height so
-// scrolled-to sections and the settings menu can stay below it instead of hiding behind it.
-const topbar = document.querySelector("header.topbar");
-function syncTopbarHeight() {
-  if (topbar) document.documentElement.style.setProperty("--topbar-h", `${topbar.offsetHeight}px`);
-}
-syncTopbarHeight();
-window.addEventListener("resize", syncTopbarHeight);
-if (topbar && window.ResizeObserver) new ResizeObserver(syncTopbarHeight).observe(topbar);
+initTopbar();
 
 // Installable app (needs HTTPS or localhost); the worker only caches the public interface files, see sw.js
 if ("serviceWorker" in navigator && window.isSecureContext) {

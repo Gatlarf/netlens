@@ -181,7 +181,6 @@ export async function render(container) {
 
   const topbar = document.querySelector(".topbar");
   const setOffsets = () => {
-    container.style.setProperty("--topbar-h", `${topbar ? topbar.offsetHeight : 0}px`);
     container.style.setProperty("--statsnav-h", `${nav.offsetHeight}px`);
   };
   const sections = () => [...body.querySelectorAll("section.stat-section")];
@@ -216,7 +215,13 @@ export async function render(container) {
     clear(nav);
     for (const sec of sections()) {
       const chip = h("button", { type: "button", class: "stat-chip", "data-target": sec.id }, sec.dataset.title);
-      chip.addEventListener("click", () => sec.scrollIntoView({ behavior: "smooth", block: "start" }));
+      chip.addEventListener("click", () => {
+        // scrolling down hides the bar on a phone, so leave no room for it then
+        const target = sec.getBoundingClientRect().top + window.scrollY;
+        const barHidesOnTheWay = window.matchMedia("(max-width: 700px)").matches && target > window.scrollY;
+        const bar = barHidesOnTheWay ? 0 : (topbar ? topbar.offsetHeight : 0);
+        window.scrollTo({ top: Math.max(0, target - bar - nav.offsetHeight - 8), behavior: "smooth" });
+      });
       nav.appendChild(chip);
     }
     active = null;

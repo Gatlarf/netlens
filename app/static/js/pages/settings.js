@@ -281,7 +281,17 @@ export async function render(container, params) {
   const nav = h("nav", { class: "settings-nav", "aria-label": "Settings pages" });
   fillNav(nav, groups, item.key);
   const content = h("div", { class: "settings-content", id: `sec-${item.key}` });
-  container.appendChild(h("div", { class: "settings-layout" }, nav, content));
+  // narrow screens: the page list folds into one button that names the current page
+  const toggle = h("button", { type: "button", class: "btn settings-nav-toggle", "aria-expanded": "false", id: "settings-nav-toggle" },
+    h("span", {}, `Settings: ${item.label}`), h("span", { class: "caret" }, "▾"));
+  const side = h("div", { class: "settings-side" }, toggle, nav);
+  toggle.addEventListener("click", () => {
+    const open = !side.classList.contains("open");
+    side.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.querySelector(".caret").textContent = open ? "▴" : "▾";
+  });
+  container.appendChild(h("div", { class: "settings-layout" }, side, content));
 
   // installing or removing a plugin changes the menu
   let destroyed = false;

@@ -18,9 +18,9 @@
   <link rel="stylesheet" href="css/features.css">
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="#/"><img class="brand-icon" src="img/favicon.svg" alt="" width="24" height="24">Netlens</a><span id="app-version" class="app-version"></span><a id="update-badge" class="update-badge" href="#/settings/about" hidden></a>
-    <nav id="nav">
+  <header class="topbar" id="topbar">
+    <a class="brand" href="#/"><img class="brand-icon" src="img/favicon.svg" alt="" width="24" height="24">Netlens</a>
+    <nav id="nav" class="nav" aria-label="Pages">
       <a class="nav-link" href="#/map" data-route="map">Map</a>
       <a class="nav-link" href="#/devices" data-route="devices">Devices</a>
       <a class="nav-link" href="#/hierarchy" data-route="hierarchy">Hierarchy</a>
@@ -31,11 +31,29 @@
       <a class="nav-link" href="#/settings" data-route="settings">Settings</a>
     </nav>
     <div class="topbar-actions">
-      <a id="scan-settings" class="btn admin-only" href="#/settings/nmap" title="Change which ports and checks nmap uses">&#9881; Scan settings</a>
-      <button id="scan-quick" class="btn admin-only">Quick scan</button>
-      <button id="scan-deep" class="btn admin-only">Deep scan</button>
-      <button id="logout" class="btn ghost">Log out</button>
-      <button id="theme-toggle" class="btn ghost theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">&#9790;</button>
+      <div class="menu-wrap admin-only" id="scan-menu-wrap">
+        <button id="scan-menu-btn" class="btn primary" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="scan-menu">Scan &#9662;</button>
+        <div id="scan-menu" class="popmenu" hidden>
+          <button id="scan-quick" class="menu-item" type="button">Quick scan</button>
+          <button id="scan-deep" class="menu-item" type="button">Deep scan</button>
+          <hr>
+          <a id="scan-settings" class="menu-item" href="#/settings/nmap" title="Change which ports and checks nmap uses">&#9881; Scan settings</a>
+        </div>
+      </div>
+      <div class="menu-wrap" id="user-menu-wrap">
+        <button id="user-menu-btn" class="btn user-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu"><span id="user-name">Account</span> &#9662;</button>
+        <div id="user-menu" class="popmenu" hidden>
+          <div class="menu-who" id="user-who"></div>
+          <hr>
+          <button id="theme-toggle" class="menu-item theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">&#9790; Dark mode</button>
+          <hr>
+          <div class="menu-row"><span>Version</span><span id="app-version" class="app-version"></span></div>
+          <a id="update-badge" class="menu-row update-badge" href="#/settings/about" hidden></a>
+          <hr>
+          <button id="logout" class="menu-item" type="button">Log out</button>
+        </div>
+      </div>
+      <button id="nav-toggle" class="btn burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav">&#9776;</button>
     </div>
   </header>
 

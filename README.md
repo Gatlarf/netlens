@@ -99,7 +99,8 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Statistics page: devices by type/vendor/OS, uptime and reliability, flapping devices, ports and services, scan performance, event history, hierarchy and plugin health, with 24 h to 90 day periods; a compact `/api/stats/summary` for integrations such as Home Assistant
 - Network hierarchy: which device depends on which (gateway, then Proxmox host, then its guests), as a tree page, a tree layout on the map, and a parent you can set per device
 - Live scan progress in the header
-- Light and dark mode, switchable from the top bar
+- Light and dark mode, switchable from the account menu in the top bar
+- A slim one-row top bar (a **Scan** menu with quick scan, deep scan and scan settings, and an account menu with dark mode, version, update notice and log out); on iPad and phone the pages fold into one menu, and on a phone the bar slides away while you scroll down. The Settings pages fold into one button on a phone
 - Delete a device (optionally ignoring it in future scans), and a full scan of a single host from its page
 - Backup and restore of everything from the Settings page, with scheduled backups and retention
 - Port baselines (alert when a port opens that is not normal for the device), Wake-on-LAN, ping and traceroute from the device page
@@ -397,7 +398,7 @@ Everything below is saved in the data directory, so it survives updates and rebu
 | Card | What you can change |
 |---|---|
 | Scan ranges | which networks are scanned (see "Choosing what to scan") |
-| Scan performance (nmap) | ports, timing and detection used by quick and deep scans, with presets (see "Making scans faster"). The **Scan settings** button next to the scan buttons jumps straight to it |
+| Scan performance (nmap) | ports, timing and detection used by quick and deep scans, with presets (see "Making scans faster"). The **Scan settings** item in the **Scan** menu of the top bar jumps straight to it |
 | Scan schedule and terminal | how often quick and deep scans run, and the web terminal on/off. Takes effect from the next scheduler cycle, no restart |
 | E-mail notifications | SMTP server and recipients (see below) |
 | Plugins and one page per plugin | turn plugins on or off, upload your own, and each plugin's own settings (see "Plugins" below) |
@@ -406,7 +407,7 @@ Everything below is saved in the data directory, so it survives updates and rebu
 
 ### Making scans faster
 
-Quick scans are normally a few seconds. **Deep scans are the slow part**: they probe the top 1000 ports of every host and run service version detection, OS detection and traceroute. On a network with about 35 devices a default deep scan took 5 to 8 minutes (and occasionally much longer when a device answers slowly). Under **Settings → Scan performance (nmap)** (or the **Scan settings** button in the header) you can trade detail for speed; the page shows how long your last quick and deep scan took so you can see the effect. Changes apply from the next scan.
+Quick scans are normally a few seconds. **Deep scans are the slow part**: they probe the top 1000 ports of every host and run service version detection, OS detection and traceroute. On a network with about 35 devices a default deep scan took 5 to 8 minutes (and occasionally much longer when a device answers slowly). Under **Settings → Scan performance (nmap)** (or **Scan → Scan settings** in the top bar) you can trade detail for speed; the page shows how long your last quick and deep scan took so you can see the effect. Changes apply from the next scan.
 
 | Setting | Effect on speed | What you give up |
 |---|---|---|
@@ -528,7 +529,7 @@ An administrator can create **API tokens** for a user (shown once). They are Bea
 
 ### Update notice
 
-When a newer Netlens image has been published, an **Update x.y.z available** badge appears next to the version in the top bar and **Settings → About → Updates** shows what changed and how to update (the steps are under *Updating* above). Netlens only asks the container registry once a day for the list of published version numbers; nothing is installed automatically. The check can be switched off on the same card. `GET /api/update` and the statistics summary report it, and the Home Assistant integration has an update entity.
+When a newer Netlens image has been published, an **Update x.y.z available** notice appears in the account menu of the top bar (the menu button shows a small orange dot) and **Settings → About → Updates** shows what changed and how to update (the steps are under *Updating* above). Netlens only asks the container registry once a day for the list of published version numbers; nothing is installed automatically. The check can be switched off on the same card. `GET /api/update` and the statistics summary report it, and the Home Assistant integration has an update entity.
 
 ### Plugins
 
@@ -593,7 +594,7 @@ The same data is available as `GET /api/hierarchy`, and `PATCH /api/devices/<id>
 
 ### Dark mode
 
-The **moon / sun button** at the right end of the top bar switches between light and dark mode. Without a choice Netlens follows your operating system's setting; once you click the button your choice is remembered in that browser (it is not shared between browsers or users). Charts and the map follow the theme too (the map draws brighter device colours and links with outlined dots and haloed labels in dark mode, and offline devices get a dashed outline).
+**Dark mode / Light mode** in the account menu (the menu button at the right end of the top bar) switches between light and dark mode. Without a choice Netlens follows your operating system's setting; once you click the button your choice is remembered in that browser (it is not shared between browsers or users). Charts and the map follow the theme too (the map draws brighter device colours and links with outlined dots and haloed labels in dark mode, and offline devices get a dashed outline).
 
 ### Deleting a device and ignoring devices
 
