@@ -42,7 +42,7 @@ Please check after a sync, and tell us what is wrong:
 - [ ] Access points connected **wirelessly (mesh)** and devices behind a router that is not Omada.
 - [ ] Several sites, if you have them.
 
-If something is off, press **Run diagnostic** on the plugin's page in Netlens (needs a Netlens version with the button, 0.2.65 or newer; update the image if you do not see it). It logs in once like a normal sync with the values in the form, and shows a report of what the controller
+If something is off, press **Run diagnostic** on the plugin's page in Netlens (needs a Netlens version with the button, 0.2.67 or newer; update the image if you do not see it). It logs in once like a normal sync with the values in the form, and shows a report of what the controller
 answered: the controller version, which steps worked, and the **names and types of the fields** (not their content). Names, MAC and IP addresses and your settings are removed. Press **Copy** or **Download**, read it, and send it to whoever maintains the plugin.
 
 (From a terminal the same report is written by `python diagnose.py --url https://<controller>:8043 --username <viewer account>`; Python 3.9 or newer, nothing to install.)
