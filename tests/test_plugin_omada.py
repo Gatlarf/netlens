@@ -90,6 +90,10 @@ class Fake(BaseHTTPRequestHandler):
         if p == f"sites/site1/eaps/{AP2}":
             return self._send({"errorCode": -1, "msg": "not available"})  # a failing detail must not break the sync
         if p == "sites/site1/clients":
+            need, got = s.get("clients_need"), q.get("filters.active", [None])[0]
+            s.setdefault("client_attempts", []).append(got)
+            if need == "never" or (need == "none" and got is not None) or (need in ("false", "true") and got != need):
+                return self._send({"errorCode": -1, "msg": "General error."})  # what some controllers answer to a request they do not like
             size, page = int(q["currentPageSize"][0]), int(q["currentPage"][0])
             s["pages"].append(page)
             rows = CLIENTS[(page - 1) * size: page * size]
@@ -230,3 +234,30 @@ def test_diagnose_writes_an_anonymised_report(server, tmp_path, monkeypatch):
     assert report["steps"]["clients"]["ok"] and report["steps"]["switch_detail"]["ok"]
     assert report["result"]["nodes"] == 4 and report["result"]["wifi_clients"] == 2 and report["result"]["with_rssi"] == 2
     assert report["steps"]["devices"]["shape"]["first"][0]["mac"] == "<mac dashes, UPPER>"
+
+
+@pytest.mark.parametrize("need,attempts", [(None, ["false"]), ("false", ["false"]), ("true", ["false", "true"]), ("none", ["false", "true", None])])
+def test_the_client_list_adapts_to_what_the_controller_accepts(server, need, attempts):
+    url, state = server
+    state["clients_need"] = need
+    out = plugin.fetch(cfg(url))
+    assert len(out["clients"]) == 4
+    assert state["client_attempts"][: len(attempts)] == attempts and set(state["client_attempts"][len(attempts):]) <= {attempts[-1]}
+
+
+def test_a_controller_that_rejects_every_client_request_gives_an_error_that_names_the_step(server):
+    url, state = server
+    state["clients_need"] = "never"
+    with pytest.raises(plugin.OmadaError) as err:
+        plugin.fetch(cfg(url))
+    text = str(err.value)
+    assert text.startswith("sites/<site>/clients: General error. (error -1)") and "site1" not in text
+    assert state["logouts"] == 1  # it still logs out
+    assert state["client_attempts"] == ["false", "true", None]
+
+
+def test_other_failures_name_their_step_too(server):
+    url, state = server
+    state["sites"] = [{"name": "Home", "key": "siteX"}]  # a site the fake does not know: its devices request answers an error
+    with pytest.raises(plugin.OmadaError, match=r"sites/<site>/devices: unknown sites/siteX/devices"):
+        plugin.fetch(cfg(url, site=""))

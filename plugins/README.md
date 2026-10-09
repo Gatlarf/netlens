@@ -5,7 +5,7 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 
 | Folder | Plugin | Reads | Status |
 |---|---|---|---|
-| [`omada/`](omada/README.md) | TP-Link Omada | Omada controller 5.1 or newer: gateway, switches, access points, clients | written from the public API, **not yet tested on hardware** |
+| [`omada/`](omada/README.md) | TP-Link Omada | Omada controller 5.1 or newer: gateway, switches, access points, clients | written from the public API, **testing started** (1.0.1 fixes a first controller error) |
 | [`unifi/`](unifi/README.md) | Ubiquiti UniFi | UniFi Network on a UniFi OS console or a classic controller | written from the public API, **not yet tested on hardware** |
 | [`truenas/`](truenas/README.md) | TrueNAS | TrueNAS Community 25.04+: containers, VMs and apps as guests of the NAS (a `hypervisor` plugin) | tested on a real TrueNAS 25.10.6 (VMs with simulated data) |
 

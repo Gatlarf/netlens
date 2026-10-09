@@ -122,7 +122,15 @@ class Controller:
         return payload.get("result", payload) if isinstance(payload, dict) else payload
 
     def _api(self, path, params=None):
-        return self._call("GET", f"{self.base}/{self.controller_id}/api/v2/{path}", params=params)
+        try:
+            return self._call("GET", f"{self.base}/{self.controller_id}/api/v2/{path}", params=params)
+        except ConnectError:
+            raise
+        except OmadaError as exc:
+            # say which request failed (the site id and MAC addresses are left out of the text)
+            parts = ["<site>" if i and segments[i - 1] == "sites" else "<id>" if i and segments[i - 1] in ("switches", "eaps") else p
+                     for segments in [path.split("/")] for i, p in enumerate(segments)]
+            raise OmadaError(f"{'/'.join(parts)}: {exc}") from None
 
     # ---- session -------------------------------------------------------------------------------------------
     def login(self):
@@ -163,10 +171,34 @@ class Controller:
             raise OmadaError("this account cannot see any site")
         return sites
 
-    def paged(self, path):
+    # Controller versions differ in what the client list wants: the filter the open-source client always sends first,
+    # then the other values, then none at all. The first variant the controller accepts is used for every page.
+    CLIENT_FILTERS = ({"filters.active": "false"}, {"filters.active": "true"}, {})
+
+    def paged(self, path, variants=None):
+        variants = list(variants if variants is not None else [{}])
+        for position, extra in enumerate(variants):
+            try:
+                yield from self._pages(path, extra)
+                return
+            except OmadaError as exc:
+                if position == len(variants) - 1 or isinstance(exc, ConnectError):
+                    raise
+                # a rejected request ("general error", -1) on the first page: try the next variant. A failure after rows
+                # were produced cannot be retried without duplicates, so only the very first page may fall through.
+                if getattr(exc, "after_rows", False):
+                    raise
+
+    def _pages(self, path, extra):
         page, seen = 1, 0
         while page <= MAX_PAGES:
-            result = self._api(path, {"currentPage": page, "currentPageSize": PAGE_SIZE})
+            try:
+                result = self._api(path, {**extra, "currentPage": page, "currentPageSize": PAGE_SIZE})
+            except ConnectError:
+                raise
+            except OmadaError as exc:
+                exc.after_rows = seen > 0
+                raise
             rows = result.get("data") if isinstance(result, dict) else result
             if not isinstance(rows, list) or not rows:
                 return
@@ -217,7 +249,7 @@ class Controller:
                     "model": device.get("showModel") or device.get("model") or "",
                     "parent_mac": self.uplink_of(site, device),  # asked for with the MAC exactly as the controller wrote it
                 })
-            for client in self.paged(f"sites/{site['key']}/clients"):
+            for client in self.paged(f"sites/{site['key']}/clients", self.CLIENT_FILTERS):
                 mac = _mac(client.get("mac"))
                 if not mac or mac in seen_clients or client.get("active") is False:
                     continue

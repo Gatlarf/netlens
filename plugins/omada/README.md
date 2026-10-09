@@ -52,6 +52,13 @@ It asks for the password (not stored), logs in once and writes `omada-diagnostic
 returned and a summary of what the plugin made of them. Names, MAC and IP addresses and all other text are replaced by placeholders. Read the file
 before sending it. (Python 3.9 or newer, nothing to install.)
 
+## Troubleshooting
+
+- **"... (error -1)" / "General error"**: the controller rejected one request. Since 1.0.1 the message starts with the step that failed (for example `sites/<site>/clients: General error. (error -1)`).
+  1.0.1 also retries the client list with the other filter variants controllers expect. If it still fails, run the diagnostic below and send us the file: it records which step fails and what the controller answers.
+- **"login refused"**: wrong user name or password, or the account may not log in to the web interface (use an account of the *Viewer* role). The plugin stops retrying until you save the settings again.
+- **"cannot reach the controller"**: wrong address or port (8043 for the software controller), or a firewall.
+
 ## Known limits
 
 - Controllers older than 5.1 are refused with a clear message.
