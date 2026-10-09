@@ -4,6 +4,9 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 
 ## 0.2
 
+### Changed
+- **Device page layout**: uptime and service checks come first in the right column, the Edit card is collapsed by default (and compact when open) and now contains *Network position*, and the console is the last card of the left column.
+
 ### Added
 - **Web terminal: safer and easier to reach**: it now works only on a direct connection from the local network; requests through a reverse proxy / HTTPS address are refused unless `NETLENS_TERMINAL_REMOTE` is `lan` or `any` (environment only, so nobody connecting from outside can open it up), and the terminal switch in Settings can only be changed from the local network. The console moved to the left column under the details (with a *Wide view* button), the device page has an **SSH** (and Telnet) button at the top that jumps to it and focuses the username, Enter connects, and the page's automatic refresh no longer wipes the connection form.
 - **Gentle scanning** (device page): a device marked gentle is only checked for open ports; scans never connect to them to identify the service, and skip scripts, OS detection and traceroute for it. Stops devices such as Samsung TVs from asking "a smart device wants to connect" after every deep scan. Schema version 14. Samsung devices with ports 8001 and 8002 open are now recognised as TVs.

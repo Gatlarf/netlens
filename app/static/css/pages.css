@@ -183,3 +183,17 @@
   color: var(--muted);
   font-size: 0.9rem;
 }
+/* Edit card: collapsed by default, compact when open */
+.edit-details > summary { cursor: pointer; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; list-style: none; }
+.edit-details > summary::-webkit-details-marker { display: none; }
+.edit-details > summary h2 { margin: 0; }
+.edit-details > summary::before { content: "▸"; color: var(--muted); }
+.edit-details[open] > summary::before { content: "▾"; }
+.edit-details[open] > summary { margin-bottom: 12px; }
+.edit-form.compact .edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.edit-form.compact .field { margin-bottom: 8px; }
+.edit-form.compact textarea { min-height: 0; }
+.parent-section { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.parent-section h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.parent-section h4 { margin: 12px 0 6px; font-size: 0.95rem; }
+@media (max-width: 520px) { .edit-form.compact .edit-grid { grid-template-columns: 1fr; } }

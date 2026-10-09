@@ -10,11 +10,11 @@ const SOURCE_NOTE = {
   gateway: "the default gateway",
 };
 
-// Card "Network position": who this device sits below, who sits below it, and a way to choose the parent.
-// `onSaved` is called after a successful change so the page can reload its data.
+// Section "Network position" (shown inside the Edit card): who this device sits below, who sits below it, and a way to
+// choose the parent. `onSaved` is called after a successful change so the page can reload its data.
 export async function buildParentCard(device, onSaved) {
-  const card = h("div", { class: "card" });
-  card.appendChild(h("h2", {}, "Network position"));
+  const card = h("div", { class: "parent-section" });
+  card.appendChild(h("h3", {}, "Network position"));
   const info = device.parent;
   if (!info) return card;
 
@@ -82,7 +82,7 @@ export async function buildParentCard(device, onSaved) {
 
   // ---- what sits below it
   if (info.children && info.children.length > 0) {
-    card.appendChild(h("h3", {}, `Devices below this one (${info.children.length}${info.descendants.length > info.children.length ? `, ${info.descendants.length} in total` : ""})`));
+    card.appendChild(h("h4", {}, `Devices below this one (${info.children.length}${info.descendants.length > info.children.length ? `, ${info.descendants.length} in total` : ""})`));
     const list = h("ul", { class: "children-list" });
     for (const c of info.children) {
       list.appendChild(h("li", {}, statusDot(c.online), " ", h("a", { href: `#/device/${c.id}` }, c.name), " ", typeBadge(c.type)));

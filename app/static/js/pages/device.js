@@ -166,17 +166,23 @@ function buildPortsCard(device, onChanged) {
 
 let groupChoices = []; // the groups to pick from, read before the page is built
 
-function buildEditCard(device, onSaved) {
-  const card = h("div", { class: "card" });
-  card.appendChild(h("h2", {}, "Edit"));
+let editOpen = false; // the Edit card stays open (or closed) when the page refreshes itself
 
-  const form = h("form", { class: "edit-form" });
+function buildEditCard(device, onSaved) {
+  const card = h("div", { class: "card edit-card" });
+  const details = h("details", { class: "edit-details", open: editOpen });
+  details.appendChild(h("summary", {}, h("h2", {}, "Edit"), h("span", { class: "hint" }, "name, type, group, notes, scanning, network position")));
+  details.addEventListener("toggle", () => { editOpen = details.open; });
+  card.appendChild(details);
+
+  const form = h("form", { class: "edit-form compact" });
+  const grid = h("div", { class: "edit-grid" });
 
   const nameField = h("div", { class: "field" });
   nameField.appendChild(h("label", {}, "Custom name"));
   const nameInput = h("input", { type: "text", name: "custom_name", value: device.custom_name || "" });
   nameField.appendChild(nameInput);
-  form.appendChild(nameField);
+  grid.appendChild(nameField);
 
   const typeField = h("div", { class: "field" });
   typeField.appendChild(h("label", {}, "Type override"));
@@ -189,7 +195,7 @@ function buildEditCard(device, onSaved) {
     typeSelect.appendChild(opt);
   }
   typeField.appendChild(typeSelect);
-  form.appendChild(typeField);
+  grid.appendChild(typeField);
 
   const groupField = h("div", { class: "field" });
   groupField.appendChild(h("label", {}, "Group (room, floor, owner...)"));
@@ -198,38 +204,36 @@ function buildEditCard(device, onSaved) {
   for (const g of groupChoices) groupSelect.appendChild(h("option", { value: String(g.id) }, g.name));
   groupSelect.value = device.group_id != null ? String(device.group_id) : "";
   groupField.appendChild(groupSelect);
-  groupField.appendChild(h("p", { class: "hint" }, groupChoices.length ? "Groups are managed under Settings → Groups." : "No groups yet: create them under Settings → Groups."));
-  form.appendChild(groupField);
+  groupSelect.title = groupChoices.length ? "Groups are managed under Settings → Groups." : "No groups yet: create them under Settings → Groups.";
+  grid.appendChild(groupField);
 
   const tagsField = h("div", { class: "field" });
   tagsField.appendChild(h("label", {}, "Tags"));
   const tagsInput = h("input", { type: "text", name: "tags", value: (device.tags || []).join(", ") });
   tagsField.appendChild(tagsInput);
-  form.appendChild(tagsField);
+  grid.appendChild(tagsField);
+  form.appendChild(grid);
 
   const notesField = h("div", { class: "field" });
   notesField.appendChild(h("label", {}, "Notes"));
-  const notesTextarea = h("textarea", { name: "notes", rows: "4" });
+  const notesTextarea = h("textarea", { name: "notes", rows: "2" });
   notesTextarea.value = device.notes || "";
   notesField.appendChild(notesTextarea);
   form.appendChild(notesField);
 
   const notifyField = h("div", { class: "field" });
   const notifyInput = h("input", { type: "checkbox", name: "notify_offline", checked: device.notify_offline !== false });
-  notifyField.appendChild(h("label", {}, notifyInput, " Send an e-mail when this device goes offline"));
-  notifyField.appendChild(h("p", { class: "hint" }, "Needs e-mail notifications to be set up under Settings."));
+  notifyField.appendChild(h("label", { title: "Needs e-mail notifications to be set up under Settings." }, notifyInput, " E-mail me when it goes offline"));
   form.appendChild(notifyField);
 
   const gentleField = h("div", { class: "field" });
   const gentleInput = h("input", { type: "checkbox", name: "gentle", checked: device.gentle === true });
-  gentleField.appendChild(h("label", {}, gentleInput, " Gentle scanning"));
-  gentleField.appendChild(h("p", { class: "hint" }, "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself."));
+  gentleField.appendChild(h("label", { title: "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself." }, gentleInput, " Gentle scanning (don't probe its services)"));
   form.appendChild(gentleField);
 
   const trustField = h("div", { class: "field" });
   const trustInput = h("input", { type: "checkbox", name: "trusted", checked: device.trusted === true });
-  trustField.appendChild(h("label", {}, trustInput, " Known device"));
-  trustField.appendChild(h("p", { class: "hint" }, "Tick it for devices you recognise. Devices that appear later start as unknown, so you can spot newcomers."));
+  trustField.appendChild(h("label", { title: "Tick it for devices you recognise. Devices that appear later start as unknown, so you can spot newcomers." }, trustInput, " Known device"));
   form.appendChild(trustField);
 
   const saveBtn = h("button", { type: "submit" }, "Save");
@@ -269,9 +273,11 @@ function buildEditCard(device, onSaved) {
     onSaved();
   });
 
-  card.appendChild(form);
+  details.appendChild(form);
+  const parentSlot = h("div", { class: "parent-slot" });  // "Network position", filled in by the page
+  details.appendChild(parentSlot);
 
-  return { card, isDirty: () => dirty, isFocused: () => focused };
+  return { card, parentSlot, isDirty: () => dirty, isFocused: () => focused };
 }
 
 function buildVirtualizationCard(device) {
@@ -520,24 +526,14 @@ export async function render(container, params) {
     const grid = h("div", { class: "grid-2" });
     const left = h("div", { class: "col-left" });
     left.appendChild(buildDetailsCard(device));
-    const newSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
-    left.appendChild(newSlot);  // the console sits in the left column, right below the details
     const why = buildWhyCard(device);
     if (why) left.appendChild(why);
     left.appendChild(buildPortsCard(device, () => load()));
+    const newSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
+    left.appendChild(newSlot);  // the console is the last card of the left column
     grid.appendChild(left);
 
     const right = h("div", { class: "col-right" });
-    const newEdit = buildEditCard(device, () => load());
-    newEdit.card.classList.add("admin-only");
-    right.appendChild(newEdit.card);
-    const parentSlot = h("div", { class: "admin-only" });
-    right.appendChild(parentSlot);
-    buildParentCard(device, (message) => { toast(message, "success"); load(); })
-      .then((c) => { if (!disposed) parentSlot.appendChild(c); })
-      .catch(() => {});
-    const virtualizationCard = buildVirtualizationCard(device);
-    if (virtualizationCard) right.appendChild(virtualizationCard);
     const uptimeSlot = h("div", {});
     right.appendChild(uptimeSlot);
     buildDeviceUptimeCard(device.id).then((c) => { if (!disposed) uptimeSlot.appendChild(c); }).catch(() => {});
@@ -547,6 +543,14 @@ export async function render(container, params) {
     const wifiSlot = h("div", {});
     right.appendChild(wifiSlot);
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
+    const virtualizationCard = buildVirtualizationCard(device);
+    if (virtualizationCard) right.appendChild(virtualizationCard);
+    const newEdit = buildEditCard(device, () => load());
+    newEdit.card.classList.add("admin-only");
+    right.appendChild(newEdit.card);
+    buildParentCard(device, (message) => { toast(message, "success"); load(); })
+      .then((c) => { if (!disposed) newEdit.parentSlot.appendChild(c); })
+      .catch(() => {});
     right.appendChild(buildNamesCard(device));
     right.appendChild(buildEventsCard(device));
     const deleteCard = buildDeleteCard(device, (open) => { deleteOpen = open; });
@@ -566,7 +570,7 @@ export async function render(container, params) {
       // "Wide view" lifts the console above both columns, "Narrow view" puts it back under the details
       const placeWide = (wide) => {
         if (wide) page.insertBefore(newSlot, grid);
-        else left.insertBefore(newSlot, left.children[1] || null);
+        else left.appendChild(newSlot);
       };
       const handle = await mountTerminal(newSlot, device, { onWideChange: placeWide });
       if (disposed || terminalSlot !== newSlot) {
