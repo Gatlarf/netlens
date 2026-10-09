@@ -1,3 +1,5 @@
+<p align="center"><img src="app/static/img/logo.png" alt="Netlens" width="360"></p>
+
 # Netlens
 
 Self-hosted LAN scanner and network map. Runs as a single Docker container.

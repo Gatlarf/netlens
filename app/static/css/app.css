@@ -511,3 +511,5 @@ body[data-role="viewer"] .admin-only { display: none !important; }
 #login-dialog label { display: block; margin-top: 10px; }
 #login-dialog input { width: 100%; box-sizing: border-box; }
 #login-dialog .btn { margin-top: 12px; }
+
+.brand-icon { vertical-align: -6px; margin-right: 8px; border-radius: 6px; }
