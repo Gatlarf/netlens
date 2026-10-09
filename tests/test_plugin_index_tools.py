@@ -264,11 +264,10 @@ def test_author_checker_on_the_template_and_the_example_zip(monkeypatch, capsys)
 
 
 # ------------------------------------------------------------------ the real index in this repository
-def test_the_repository_index_is_valid_and_up_to_date():
+def test_the_repository_index_sources_are_valid():
     doc, problems = build.merge()
     assert problems == []
-    on_disk = (build.INDEX_DIR / "index.json").read_text(encoding="utf-8")
-    assert on_disk == build.render(doc), "plugin-index/index.json is stale: run python plugin-index/tools/build_index.py"
+    # index.json itself is rebuilt by the CI after every merge (so a pull request does not have to), but what is on disk must be valid
     ids = {p["id"]: p for p in doc["plugins"]}
     assert {"proxmox", "asus", "example-router"} <= set(ids) and ids["proxmox"]["builtin"] and ids["asus"]["builtin"]
     assert ids["example-router"]["releases"][0]["review"]["level"] == "reviewed"

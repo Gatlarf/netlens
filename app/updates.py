@@ -18,7 +18,7 @@ IMAGE = "gatlarf/netlens"
 TOKEN_URL = f"https://ghcr.io/token?scope=repository:{IMAGE}:pull&service=ghcr.io"
 TAGS_URL = f"https://ghcr.io/v2/{IMAGE}/tags/list?n=1000"
 CHANGELOG_URL = "https://github.com/Gatlarf/netlens/blob/main/CHANGELOG.md"
-HOW_TO_URL = "https://github.com/Gatlarf/netlens#updating"
+HOW_TO_URL = "https://github.com/Gatlarf/netlens#updating-to-a-new-version"
 SETTINGS_KEY = "update_check.settings"
 CACHE_KEY = "update_check.cache"
 TTL_SECONDS = 24 * 3600
