@@ -385,6 +385,24 @@ function buildEventsCard(device) {
   return card;
 }
 
+// A heading button that runs one action and shows its answer in a toast.
+function actionButton(label, title, run, id) {
+  const btn = h("button", { class: "btn", type: "button", title, id: `action-${id}` }, label);
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = `${label}…`;
+    try {
+      toast(await run(), "info");
+    } catch (err) {
+      toast(err.message || `${label} failed`, "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  });
+  return btn;
+}
+
 function buildNotFound() {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Device not found"));
@@ -437,6 +455,21 @@ export async function render(container, params) {
         },
       }, "Full scan");
       heading.appendChild(scanBtn);
+      heading.appendChild(actionButton("Ping", "Is the device answering right now?", async () => {
+        const r = await post(`/api/devices/${device.id}/ping`);
+        return r.up ? `${device.primary_ip} answers${r.rtt_ms != null ? ` (${r.rtt_ms.toFixed(1)} ms)` : ""}` : `${device.primary_ip} does not answer`;
+      }, "ping"));
+      heading.appendChild(actionButton("Trace", "The hops between Netlens and this device", async () => {
+        const r = await post(`/api/devices/${device.id}/trace`);
+        if (!r.up) return `${device.primary_ip} does not answer`;
+        return r.hops.length ? `Route: ${r.hops.join(" → ")} → ${device.primary_ip}` : `${device.primary_ip} is on the same network (no hops)`;
+      }, "trace"));
+    }
+    if (device.mac) {
+      heading.appendChild(actionButton("Wake", "Send a Wake-on-LAN packet to this device's MAC address", async () => {
+        await post(`/api/devices/${device.id}/wake`);
+        return "Wake-on-LAN packet sent. The device must have Wake-on-LAN enabled; it shows online after the next scan.";
+      }, "wake"));
     }
     page.appendChild(heading);
 

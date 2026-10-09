@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app import baselines
+from app import actions, baselines
 from app.db import add_event, connect, utcnow
 from app.scanner.orchestrator import ScanBusy
 from app.hierarchy import children_map, descendants, device_name, load_hierarchy, would_loop
@@ -541,3 +541,41 @@ async def scan_device(device_id: int, request: Request, conn: sqlite3.Connection
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"id": scan_id}
+
+
+def _action_target(conn: sqlite3.Connection, device_id: int):
+    row = conn.execute("SELECT mac, primary_ip, custom_name, hostname FROM devices WHERE id = ?", (device_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    return row
+
+
+@router.post("/devices/{device_id}/wake")
+def wake_device(device_id: int, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Send a Wake-on-LAN magic packet to the device's MAC address."""
+    row = _action_target(conn, device_id)
+    try:
+        sent = actions.wake(row["mac"], row["primary_ip"])
+    except actions.ActionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    label = row["custom_name"] or row["hostname"] or row["primary_ip"] or row["mac"]
+    add_event(conn, "wake_sent", f"Wake-on-LAN sent to {label}", device_id=device_id)
+    return {"ok": True, "sent_to": sent}
+
+
+@router.post("/devices/{device_id}/ping")
+async def ping_device(device_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    row = _action_target(conn, device_id)
+    try:
+        return await actions.ping(row["primary_ip"], getattr(request.app.state, "action_runner", None))
+    except actions.ActionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/devices/{device_id}/trace")
+async def trace_device(device_id: int, request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    row = _action_target(conn, device_id)
+    try:
+        return await actions.trace(row["primary_ip"], getattr(request.app.state, "action_runner", None))
+    except actions.ActionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))

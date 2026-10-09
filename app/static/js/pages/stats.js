@@ -5,7 +5,7 @@ import { barList, columnChart, donut, emptyNote, fmtBytes, fmtDuration, fmtNumbe
 const RANGES = [["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["90d", "90 days"]];
 const EVENT_LABELS = {
   device_new: "New device", device_offline: "Went offline", device_online: "Came online", ip_changed: "IP changed",
-  os_changed: "OS changed", port_opened: "Port opened", port_closed: "Port closed", port_unexpected: "Unexpected port", port_missing: "Baseline port gone", host_timeout: "Host timeout", device_deleted: "Deleted",
+  os_changed: "OS changed", port_opened: "Port opened", wake_sent: "Wake-on-LAN sent", port_closed: "Port closed", port_unexpected: "Unexpected port", port_missing: "Baseline port gone", host_timeout: "Host timeout", device_deleted: "Deleted",
   service_down: "Service down", service_up: "Service up", wifi_roamed: "Wi-Fi move", ip_reused: "IP reused", backup_failed: "Backup failed",
 };
 
