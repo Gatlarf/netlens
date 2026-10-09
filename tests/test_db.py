@@ -9,7 +9,7 @@ def test_init_db_creates_tables():
     init_db(conn)
     cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
     tables = {row[0] for row in cursor.fetchall()}
-    expected = {"devices", "device_ips", "device_names", "ports", "scans", "events", "relations", "settings", "host_keys", "schema_version", "checks", "hypervisor_guests", "ignored_devices", "stats_daily", "wifi_samples", "service_checks", "service_results", "port_baselines", "dhcp_servers", "users", "sessions", "api_tokens", "share_links"}
+    expected = {"devices", "device_ips", "device_names", "ports", "scans", "events", "relations", "settings", "host_keys", "schema_version", "checks", "hypervisor_guests", "ignored_devices", "stats_daily", "wifi_samples", "service_checks", "service_results", "port_baselines", "dhcp_servers", "device_groups", "users", "sessions", "api_tokens", "share_links"}
     assert expected == tables
 
 
@@ -19,7 +19,7 @@ def test_init_db_idempotent():
     init_db(conn)
     cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
     tables = {row[0] for row in cursor.fetchall()}
-    expected = {"devices", "device_ips", "device_names", "ports", "scans", "events", "relations", "settings", "host_keys", "schema_version", "checks", "hypervisor_guests", "ignored_devices", "stats_daily", "wifi_samples", "service_checks", "service_results", "port_baselines", "dhcp_servers", "users", "sessions", "api_tokens", "share_links"}
+    expected = {"devices", "device_ips", "device_names", "ports", "scans", "events", "relations", "settings", "host_keys", "schema_version", "checks", "hypervisor_guests", "ignored_devices", "stats_daily", "wifi_samples", "service_checks", "service_results", "port_baselines", "dhcp_servers", "device_groups", "users", "sessions", "api_tokens", "share_links"}
     assert expected == tables
 
 

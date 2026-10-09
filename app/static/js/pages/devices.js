@@ -10,6 +10,7 @@ const SORT_KEYS = [
   { key: "mac", label: "MAC", sortable: true },
   { key: "vendor", label: "Vendor", sortable: true },
   { key: "type", label: "Type", sortable: true },
+  { key: "group", label: "Group", sortable: true },
   { key: "os_name", label: "OS", sortable: true },
   { key: "open_ports", label: "Open ports", sortable: true },
   { key: "last_seen", label: "Last seen", sortable: true }
@@ -42,6 +43,8 @@ function sortValue(device, key) {
       return String(device.vendor || "").toLowerCase();
     case "type":
       return String(device.type || "").toLowerCase();
+    case "group":
+      return String(device.group || "").toLowerCase();
     case "os_name":
       return String(device.os_name || "").toLowerCase();
     case "open_ports":
@@ -142,6 +145,41 @@ function buildToolbar(state) {
     }
   });
   toolbar.appendChild(trustAll);
+
+  const groupSel = h("select", { "aria-label": "Group filter", class: "group-filter" });
+  groupSel.appendChild(h("option", { value: "" }, "Any group"));
+  groupSel.appendChild(h("option", { value: "none" }, "No group"));
+  for (const g of groupList) groupSel.appendChild(h("option", { value: String(g.id) }, g.name));
+  groupSel.value = state.group;
+  groupSel.addEventListener("change", () => {
+    state.group = groupSel.value;
+    load();
+  });
+  toolbar.appendChild(groupSel);
+
+  if (groupList.length) {
+    // put every device that is listed (after the filters) in one group
+    const assignSel = h("select", { "aria-label": "Group for the listed devices", class: "group-assign admin-only" });
+    assignSel.appendChild(h("option", { value: "" }, "Set group of listed…"));
+    for (const g of groupList) assignSel.appendChild(h("option", { value: String(g.id) }, g.name));
+    assignSel.appendChild(h("option", { value: "none" }, "(remove from group)"));
+    assignSel.addEventListener("change", async () => {
+      const value = assignSel.value;
+      assignSel.value = "";
+      if (!value || !devices.length) return;
+      const target = value === "none" ? null : Number(value);
+      const label = value === "none" ? "no group" : groupList.find((g) => g.id === target).name;
+      if (!window.confirm(`Put the ${devices.length} listed device(s) in: ${label}?`)) return;
+      try {
+        const res = await post("/api/devices/group", { ids: devices.map((d) => d.id), group_id: target });
+        toast(`${res.changed} device(s) updated`, "success");
+        load();
+      } catch (err) {
+        toast(err.message || "Could not set the group", "error");
+      }
+    });
+    toolbar.appendChild(assignSel);
+  }
 
   const baselineAll = h("button", { type: "button", class: "btn baseline-all admin-only", title: "Take the open ports of the listed devices without a baseline as their normal ones" }, "Set baselines");
   baselineAll.addEventListener("click", async () => {
@@ -248,6 +286,13 @@ function renderRows() {
     tr.appendChild(h("td", { class: "mono" }, d.mac || "—"));
     tr.appendChild(h("td", {}, d.vendor || "—"));
     tr.appendChild(h("td", {}, typeBadge(d.type)));
+    const groupCell = h("td", {});
+    if (d.group) {
+      const dot = h("span", { class: "legend-dot" });
+      dot.style.background = d.group_color;
+      groupCell.append(dot, d.group);
+    }
+    tr.appendChild(groupCell);
     tr.appendChild(h("td", {}, d.os_name || "—"));
     const portsCell = h("td", {}, String(d.open_ports ?? 0));
     if (d.ports_drift > 0) portsCell.appendChild(h("span", { class: "tag unknown-tag", title: "Open ports differ from the baseline" }, `${d.ports_drift} changed`));
@@ -275,6 +320,8 @@ async function load() {
   if (state.type) {
     devices = devices.filter((d) => d.type === state.type);
   }
+  if (state.group === "none") devices = devices.filter((d) => d.group_id == null);
+  else if (state.group) devices = devices.filter((d) => String(d.group_id) === state.group);
   if (state.ports === "changed") devices = devices.filter((d) => d.ports_drift > 0);
   else if (state.ports === "baseline") devices = devices.filter((d) => d.ports_drift !== null);
   else if (state.ports === "none") devices = devices.filter((d) => d.ports_drift === null);
@@ -293,6 +340,7 @@ async function load() {
 }
 
 let devices = [];
+let groupList = [];
 let tbody;
 let thead;
 let count;
@@ -304,12 +352,18 @@ const state = {
   trusted: "",
   type: "",
   ports: "",
+  group: "",
   sortKey: "primary_ip",
   sortDir: "asc"
 };
 
 export async function render(container, params) {
   clear(container);
+  try {
+    groupList = (await get("/api/groups")).groups;
+  } catch (e) {
+    groupList = [];
+  }
 
   const built = buildToolbar(state);
   const toolbar = built.toolbar;

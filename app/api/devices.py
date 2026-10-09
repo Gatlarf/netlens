@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app import actions, baselines
+from app import actions, baselines, groups as groups_mod
 from app.db import add_event, connect, utcnow
 from app.scanner.orchestrator import ScanBusy
 from app.hierarchy import children_map, descendants, device_name, load_hierarchy, would_loop
@@ -46,6 +46,7 @@ class DevicePatch(BaseModel):
     type_override: str | None = None
     notify_offline: bool | None = None
     trusted: bool | None = None             # True = a device the user knows
+    group_id: int | None = None             # a group from /api/groups, or null for none
     parent_mode: str | None = None          # 'auto' | 'none' | 'device'
     parent_device_id: int | None = None
     pos_x: float | None = None
@@ -82,7 +83,17 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
         "open_ports": row["open_ports"],
         "notify_offline": bool(row["notify_offline"]),
         "trusted": bool(row["trusted"]),
+        "group_id": row["group_id"],
     }
+
+
+def _add_group(conn: sqlite3.Connection, devices: list[dict[str, Any]]) -> None:
+    """Add the group's name and colour next to `group_id`."""
+    known = groups_mod.lookup(conn)
+    for d in devices:
+        g = known.get(d.get("group_id"))
+        d["group"] = g["name"] if g else None
+        d["group_color"] = g["color"] if g else None
 
 
 def _virtualization_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any] | None:
@@ -153,6 +164,7 @@ def _parent_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any]:
 
 def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.Row) -> dict[str, Any]:
     result = _device_dict(row)
+    _add_group(conn, [result])
 
     ips = conn.execute(
         "SELECT ip, first_seen, last_seen FROM device_ips WHERE device_id = ? ORDER BY last_seen DESC",
@@ -234,6 +246,7 @@ def list_devices(
             pos_y,
             notify_offline,
             trusted,
+            group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
     """
@@ -269,6 +282,7 @@ def list_devices(
         # None = no baseline; otherwise how many ports differ from it
         d["ports_drift"] = None if counts is None else counts["unexpected"] + counts["missing"]
         result.append(d)
+    _add_group(conn, result)
     return result
 
 
@@ -293,6 +307,20 @@ def trust_devices(body: TrustBody, conn: sqlite3.Connection = Depends(get_conn))
 class BaselineBody(BaseModel):
     ids: list[int] | None = None  # these devices; omit to apply to every device
     accept: bool = True  # False removes the baseline
+
+
+class GroupAssignBody(BaseModel):
+    ids: list[int] | None = None  # these devices; omit to apply to every device
+    group_id: int | None = None  # null takes them out of their group
+
+
+@router.post("/devices/group")
+def assign_group(body: GroupAssignBody, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, int]:
+    """Put devices in a group (or none)."""
+    try:
+        return {"changed": groups_mod.assign(conn, body.ids, body.group_id)}
+    except KeyError:
+        raise HTTPException(status_code=422, detail="no such group")
 
 
 @router.post("/devices/baseline")
@@ -329,6 +357,7 @@ def get_device(
             pos_y,
             notify_offline,
             trusted,
+            group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
         WHERE id = ?
@@ -370,6 +399,7 @@ def patch_device(
             pos_y,
             notify_offline,
             trusted,
+            group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
         WHERE id = ?
@@ -415,6 +445,11 @@ def patch_device(
             if any(len(t) > 40 for t in cleaned):
                 raise HTTPException(status_code=422, detail="max 40 chars per tag")
             updates["tags"] = ",".join(cleaned) if cleaned else None
+
+    if "group_id" in fields_set:
+        if body.group_id is not None and not groups_mod.exists(conn, body.group_id):
+            raise HTTPException(status_code=422, detail="no such group")
+        updates["group_id"] = body.group_id
 
     if "notify_offline" in fields_set:
         updates["notify_offline"] = 0 if body.notify_offline is False else 1
@@ -482,6 +517,7 @@ def patch_device(
             pos_y,
             notify_offline,
             trusted,
+            group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
         WHERE id = ?

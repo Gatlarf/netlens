@@ -397,12 +397,13 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     wifi = _wifi(conn, now)
     devs, hierarchy = load_hierarchy(conn)
     names = {i: (d["custom_name"] or d["hostname"] or d["primary_ip"] or str(i)) for i, d in devs.items()}
-    rows = {r["id"]: r for r in conn.execute("SELECT id, mac, vendor, last_seen, trusted, " + TYPE + " AS t FROM devices d")}
+    rows = {r["id"]: r for r in conn.execute("SELECT id, mac, vendor, last_seen, trusted, group_id, " + TYPE + " AS t FROM devices d")}
+    group_names = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM device_groups")}
     devices = [
         {
             "id": i, "name": names[i], "ip": devs[i]["primary_ip"], "mac": rows[i]["mac"], "online": bool(devs[i]["online"]),
             "type": rows[i]["t"], "vendor": rows[i]["vendor"], "last_seen": rows[i]["last_seen"], "trusted": bool(rows[i]["trusted"]),
-            "parent_id": hierarchy[i].parent_id, "parent_name": names.get(hierarchy[i].parent_id),
+            "parent_id": hierarchy[i].parent_id, "parent_name": names.get(hierarchy[i].parent_id), "group": group_names.get(rows[i]["group_id"]),
         }
         for i in sorted(devs)
     ]

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 
 def utcnow() -> str:
@@ -411,6 +411,17 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    # --- schema v12: device groups (rooms, floors, owners) ---------------------------------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS device_groups (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            color TEXT NOT NULL
+        )
+        """
+    )
+    _add_column_if_missing(conn, "devices", "group_id", "INTEGER REFERENCES device_groups(id) ON DELETE SET NULL")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS port_baselines (

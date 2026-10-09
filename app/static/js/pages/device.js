@@ -140,6 +140,8 @@ function buildPortsCard(device, onChanged) {
   return card;
 }
 
+let groupChoices = []; // the groups to pick from, read before the page is built
+
 function buildEditCard(device, onSaved) {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Edit"));
@@ -164,6 +166,16 @@ function buildEditCard(device, onSaved) {
   }
   typeField.appendChild(typeSelect);
   form.appendChild(typeField);
+
+  const groupField = h("div", { class: "field" });
+  groupField.appendChild(h("label", {}, "Group (room, floor, owner...)"));
+  const groupSelect = h("select", { name: "group_id" });
+  groupSelect.appendChild(h("option", { value: "" }, "(none)"));
+  for (const g of groupChoices) groupSelect.appendChild(h("option", { value: String(g.id) }, g.name));
+  groupSelect.value = device.group_id != null ? String(device.group_id) : "";
+  groupField.appendChild(groupSelect);
+  groupField.appendChild(h("p", { class: "hint" }, groupChoices.length ? "Groups are managed under Settings → Groups." : "No groups yet: create them under Settings → Groups."));
+  form.appendChild(groupField);
 
   const tagsField = h("div", { class: "field" });
   tagsField.appendChild(h("label", {}, "Tags"));
@@ -196,7 +208,7 @@ function buildEditCard(device, onSaved) {
   let dirty = false;
   let focused = false;
 
-  const fields = [nameInput, typeSelect, tagsInput, notesTextarea, notifyInput, trustInput];
+  const fields = [nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, trustInput];
   for (const f of fields) {
     f.addEventListener("input", () => { dirty = true; });
     f.addEventListener("change", () => { dirty = true; });
@@ -209,6 +221,7 @@ function buildEditCard(device, onSaved) {
     const body = {
       custom_name: nameInput.value,
       type_override: typeSelect.value || null,
+      group_id: groupSelect.value ? Number(groupSelect.value) : null,
       tags: tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean),
       notes: notesTextarea.value,
       notify_offline: notifyInput.checked,
@@ -534,6 +547,11 @@ export async function render(container, params) {
     loading = true;
     try {
       const device = await get(`/api/devices/${params.id}`);
+      try {
+        groupChoices = (await get("/api/groups")).groups;
+      } catch (e) {
+        groupChoices = [];
+      }
       if (disposed) return;
       failing = false;
       await show(device);

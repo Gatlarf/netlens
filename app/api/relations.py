@@ -4,6 +4,7 @@ import sqlite3
 from typing import Any
 
 from app.api.devices import get_conn
+from app import groups as groups_mod
 from app.hierarchy import load_hierarchy
 from app.scanner.relstore import list_relations, add_manual, delete_relation
 
@@ -49,14 +50,16 @@ def get_map(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     rows = conn.execute(
         """
         SELECT id, mac, primary_ip, hostname, vendor, device_type, type_override,
-               online, pos_x, pos_y, tags, custom_name,
+               online, pos_x, pos_y, tags, custom_name, group_id,
                (SELECT COUNT(*) FROM ports WHERE device_id = devices.id AND state LIKE 'open%') AS open_ports
         FROM devices
         ORDER BY id
         """
     ).fetchall()
 
+    known_groups = groups_mod.lookup(conn)
     for row in rows:
+        group = known_groups.get(row["group_id"])
         tags_raw = row["tags"]
         tags = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else []
         label = row["custom_name"] or row["hostname"] or row["primary_ip"]
@@ -73,6 +76,9 @@ def get_map(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
             "pos_y": row["pos_y"],
             "open_ports": row["open_ports"],
             "tags": tags,
+            "group_id": row["group_id"],
+            "group": group["name"] if group else None,
+            "group_color": group["color"] if group else None,
         })
 
     # The chosen parent of every device as an edge parent -> child (the "hierarchy" view of the map)

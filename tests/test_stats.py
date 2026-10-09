@@ -172,7 +172,7 @@ def test_summary_document(db):
     assert doc["uptime"]["24h"] is not None and doc["scans"]["last"]["kind"] == "quick" and doc["scans"]["last_ok_age_s"] == 3600 - 10
     dev = {d["id"]: d for d in doc["device_list"]}
     assert dev[2] == {"id": 2, "name": "NAS", "ip": "10.0.0.2", "mac": "aa:00:00:00:00:02", "online": True, "type": "nas", "vendor": "Synology",
-                      "last_seen": ago(hours=1), "trusted": False, "parent_id": 1, "parent_name": "Router"}
+                      "last_seen": ago(hours=1), "trusted": False, "parent_id": 1, "parent_name": "Router", "group": None}
     assert dev[1]["parent_id"] is None and len(dev) == 5
     assert doc["scans"]["failed_24h"] == 1 and doc["problems"] == 0 and doc["problem"] is False  # an old failure that later scans recovered from
 

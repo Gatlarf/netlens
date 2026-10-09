@@ -114,6 +114,12 @@ function nodeColor(type) {
 const LABEL_MODES = ["both", "ip", "name"];
 let labelMode = "both";
 
+// Colour devices by their type (default) or by the group (room, floor...) they are in; ungrouped devices are grey.
+const COLOR_MODES = ["type", "group"];
+let colorMode = "type";
+const NO_GROUP_COLOR = "#94a3b8";
+let groupFilter = "All"; // "All", "none" (no group) or a group id
+
 // the lines shown for a device; a device without a name always shows its address
 function labelLines(node) {
   const name = node.label && node.label !== node.ip ? shortName(node.label) : null;
@@ -128,7 +134,7 @@ function shorten(text, max) {
 // mode: "free" | "tree" | "horizontal"; extra.folded = number of hidden client devices below this one
 function buildNodeData(node, mode = "free", extra = {}) {
   const treeLayout = mode !== "free";
-  const color = nodeColor(node.type);
+  const color = colorMode === "group" ? node.group_color || NO_GROUP_COLOR : nodeColor(node.type);
   const label = labelLines(node).join("\n");
   const dark = isDark();
   // dark mode: a light outline keeps every dot clear of the dark canvas; offline devices get a
@@ -230,6 +236,8 @@ function applyFilters(nodesDS, edgesDS, nodes, edges, search, typeFilter, status
       }
     }
     if (typeFilter !== "All" && node.type !== typeFilter) hidden = true;
+    if (groupFilter === "none" && node.group_id != null) hidden = true;
+    else if (groupFilter !== "All" && groupFilter !== "none" && String(node.group_id) !== groupFilter) hidden = true;
     if (statusFilter === "Online" && !node.online) hidden = true;
     if (statusFilter === "Offline" && node.online) hidden = true;
     if (hidden || folded.has(node.id)) hiddenNodes.add(node.id);
@@ -272,6 +280,8 @@ export async function render(container, params) {
   // the tree layout needs the parent -> child links, so it always shows the hierarchy
   const linksMode = treeLayout ? "hierarchy" : readPref("netlens.map.links", ["hierarchy", "all"], "hierarchy");
   labelMode = readPref("netlens.map.labels", LABEL_MODES, "both");
+  colorMode = readPref("netlens.map.color", COLOR_MODES, "type");
+  groupFilter = "All";
   const refreshView = () => window.dispatchEvent(new Event("hashchange"));
 
   const linksSelect = h("select", { class: "links-mode", title: "Which links to draw" });
@@ -302,6 +312,45 @@ export async function render(container, params) {
     savePref("netlens.map.labels", labelSelect.value);
     refreshView();
   });
+
+  const colorSelect = h("select", { class: "color-mode", title: "What the colour of a device means" });
+  colorSelect.appendChild(h("option", { value: "type" }, "Colour by type"));
+  colorSelect.appendChild(h("option", { value: "group" }, "Colour by group"));
+  colorSelect.value = colorMode;
+  colorSelect.addEventListener("change", () => {
+    savePref("netlens.map.color", colorSelect.value);
+    refreshView();
+  });
+  const groupSelect = h("select", { class: "group-filter", title: "Show only the devices of one group" });
+  groupSelect.appendChild(h("option", { value: "All" }, "All groups"));
+  groupSelect.addEventListener("change", () => {
+    groupFilter = groupSelect.value;
+    applyFilters(nodesDS, edgesDS, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value, foldedIds, horizontal);
+  });
+  const groupLegend = h("div", { class: "legend group-legend" });
+  // the group choices and the colour key follow the groups that are in use
+  function fillGroups(nodes) {
+    const seen = new Map();
+    for (const n of nodes) if (n.group_id != null) seen.set(n.group_id, { name: n.group, color: n.group_color });
+    const keep = groupFilter;
+    clear(groupSelect);
+    groupSelect.appendChild(h("option", { value: "All" }, "All groups"));
+    for (const [id, g] of [...seen].sort((a, b) => a[1].name.localeCompare(b[1].name))) groupSelect.appendChild(h("option", { value: String(id) }, g.name));
+    groupSelect.appendChild(h("option", { value: "none" }, "No group"));
+    groupSelect.value = [...groupSelect.options].some((o) => o.value === keep) ? keep : "All";
+    groupFilter = groupSelect.value;
+    clear(groupLegend);
+    if (colorMode === "group") {
+      for (const [, g] of [...seen].sort((a, b) => a[1].name.localeCompare(b[1].name))) {
+        const dot = h("span", { class: "legend-dot" });
+        dot.style.background = g.color;
+        groupLegend.appendChild(h("div", { class: "legend-item" }, dot, h("span", {}, g.name)));
+      }
+      const none = h("span", { class: "legend-dot" });
+      none.style.background = NO_GROUP_COLOR;
+      groupLegend.appendChild(h("div", { class: "legend-item" }, none, h("span", {}, "No group")));
+    }
+  }
 
   const addLinkBtn = h("button", { class: "btn admin-only" }, "Add link");
   const deleteLinkBtn = h("button", { class: "btn danger admin-only" }, "Delete link");
@@ -336,6 +385,8 @@ export async function render(container, params) {
   toolbar.appendChild(linksSelect);
   toolbar.appendChild(layoutSelect);
   toolbar.appendChild(labelSelect);
+  toolbar.appendChild(colorSelect);
+  toolbar.appendChild(groupSelect);
   toolbar.appendChild(addLinkBtn);
   toolbar.appendChild(deleteLinkBtn);
   toolbar.appendChild(resetBtn);
@@ -346,6 +397,7 @@ export async function render(container, params) {
   }
   toolbar.appendChild(exportBtn);
   toolbar.appendChild(legend);
+  toolbar.appendChild(groupLegend);
 
   const mapWrap = h("div", { class: "map-wrap" });
   const canvasEl = h("div", { id: "map-canvas" });
@@ -760,6 +812,7 @@ export async function render(container, params) {
 
       currentNodes = newNodes;
       currentEdges = newEdges;
+      fillGroups(newNodes);
 
       applyFilters(nodesDS, edgesDS, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value, foldedIds, horizontal);
 

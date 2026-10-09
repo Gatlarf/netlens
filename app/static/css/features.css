@@ -140,3 +140,6 @@ td.actions .btn { padding: 2px 8px; font-size: 0.85em; }
 .browse-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
 .warn-note { color: color-mix(in srgb, #d97706 55%, var(--text)); font-weight: 600; }
 .btn.primary { background: var(--accent); color: var(--accent-text, #fff); }
+
+.legend-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--border); }
+.group-legend:empty { display: none; }
