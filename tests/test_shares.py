@@ -11,6 +11,7 @@ ADMIN = {"Authorization": "Bearer secret"}
 
 @pytest.fixture
 def env(tmp_path):
+    shares._cache.clear()
     path = tmp_path / "t.db"
     app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=path)
     with TestClient(app) as c:

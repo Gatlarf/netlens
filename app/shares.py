@@ -8,6 +8,7 @@ A link can expire and be revoked at any time.
 import re
 import secrets
 import sqlite3
+import time
 from datetime import datetime, timedelta, timezone
 
 from app import stats
@@ -16,6 +17,8 @@ from app.db import utcnow
 MODES = ("view", "status")
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{20,80}$")
 MAX_DAYS = 3650
+CACHE_SECONDS = 10  # a public page may be refreshed by many visitors; compute its data once in a while
+_cache: dict = {}
 
 
 class ShareError(ValueError):
@@ -79,7 +82,18 @@ def find(conn: sqlite3.Connection, token: str, count: bool = True):
 
 
 def public_data(conn: sqlite3.Connection, link) -> dict:
-    """What a visitor of the link gets, with everything the link hides left out."""
+    """What a visitor of the link gets, with everything the link hides left out (cached for a few seconds)."""
+    key = (link["id"], link["mode"], link["show_ips"], link["show_macs"], link["name"])
+    hit = _cache.get(key)
+    if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
+        return hit[1]
+    data = _build(conn, link)
+    _cache.clear() if len(_cache) > 50 else None
+    _cache[key] = (time.monotonic(), data)
+    return data
+
+
+def _build(conn: sqlite3.Connection, link) -> dict:
     s = stats.summary(conn)
     base = {
         "name": link["name"], "mode": link["mode"], "generated": s["generated"],
