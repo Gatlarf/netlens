@@ -256,7 +256,7 @@ def reclassify_device(conn: Any, device_id: int) -> str:
     open_ports = [r["port"] for r in open_ports_rows]
     services = [r["service"] for r in open_ports_rows if r["service"]]
     names = [r["name"] for r in conn.execute("SELECT name FROM device_names WHERE device_id = ?", (device_id,)).fetchall()]
-    dev_row = conn.execute("SELECT mac, vendor, os_name, os_type, hints FROM devices WHERE id = ?", (device_id,)).fetchone()
+    dev_row = conn.execute("SELECT mac, vendor, os_name, os_type, os_confidence, hints FROM devices WHERE id = ?", (device_id,)).fetchone()
     try:
         stored_hints = json.loads(dev_row["hints"] or "[]")
     except ValueError:
@@ -265,6 +265,7 @@ def reclassify_device(conn: Any, device_id: int) -> str:
         vendor=dev_row["vendor"],
         os_name=dev_row["os_name"],
         os_type=dev_row["os_type"],
+        os_confidence=dev_row["os_confidence"],
         open_ports=open_ports,
         services=services,
         hostnames=names,

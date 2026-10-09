@@ -40,6 +40,22 @@ def test_scoring(kwargs, expected):
     assert result in DEVICE_TYPES and result == expected, classify_evidence(**kwargs)
 
 
+@pytest.mark.parametrize("kwargs,expected", [
+    # real cases from a live network: nmap's wrong guesses carry accuracies of 85-89 %
+    (dict(vendor="TP-Link Limited", hostnames=["sw_bureau"], os_name="Silicondust HDHomeRun set top box", os_confidence=85, open_ports=[80]), "switch"),
+    (dict(vendor="SMA Regelsysteme Gmbh", hostnames=["SMA"], os_name="HP LaserJet 4250 printer", os_confidence=89, open_ports=[80]), "server"),
+    (dict(os_name="Lovebox (lwIP 2.1.0 - 2.2.0)", os_confidence=88, os_type="specialized", open_ports=[80]), "server"),
+    # the same guesses when nmap is sure (or nothing is known about its accuracy) count
+    (dict(os_name="Vimtag CP3 PTZ camera", os_confidence=100, open_ports=[22]), "camera"),
+    (dict(os_name="Vimtag CP3 PTZ camera", os_confidence=90, open_ports=[22]), "camera"),
+    (dict(os_name="Silicondust HDHomeRun set top box", os_confidence=None), "tv"),
+    # a low accuracy only silences the product guess: the OS family still counts
+    (dict(os_name="Linux 4.15 - 5.19", os_confidence=60, open_ports=[22]), "server"),
+])
+def test_nmap_guesses_count_only_when_nmap_is_confident(kwargs, expected):
+    assert classify_device(**kwargs) == expected, classify_evidence(**kwargs)
+
+
 def test_evidence_lists_every_clue_strongest_first_with_a_reason():
     ev = classify_evidence(hostnames=["hp-laserjet.lan"], os_name="Android 4.1.1", os_type="phone", vendor="HP Inc.", open_ports=[22])
     assert [e[0] for e in ev][:2] == ["printer", "phone"] or ev[0][0] == "printer"

@@ -219,6 +219,7 @@ def _token_matches(token: str, word: str) -> bool:
 
 
 # How much each kind of evidence counts. The strongest evidence decides; on a tie the one found first (above) wins.
+MIN_OS_ACCURACY = 90   # nmap's product-style guesses ("HP LaserJet", "HDHomeRun") only count when it is this sure: below that they are often wrong
 W_VM = 100
 W_STRONG_HINT = 95
 W_NAME_WORD = 85
@@ -248,6 +249,7 @@ def classify_evidence(
     hostnames: Iterable[str] = (),
     mac: str | None = None,
     hints: Iterable[str] = (),
+    os_confidence: int | None = None,
 ) -> list[tuple[str, float, str]]:
     """Every clue about what the device is, as (type, weight, why), strongest first.
 
@@ -288,14 +290,16 @@ def classify_evidence(
         if word:
             add(device_type, W_NAME_WORD - index * 0.01, f"name contains {word}")
 
-    # nmap's class of the matched OS, and product words in its name
-    if os_type_lower:
+    # nmap's class of the matched OS, and product words in its name (only when nmap is sure of its guess: TP-Link switches
+    # matched as "Silicondust HDHomeRun" and a solar inverter as "HP LaserJet", both at 85-89 %, were wrong)
+    trusted_guess = os_confidence is None or os_confidence >= MIN_OS_ACCURACY
+    if os_type_lower and trusted_guess:
         mapped = OS_TYPE_MAP.get(os_type_lower)
         if mapped:
             weight = W_OS_CLASS_PHONE if mapped == "phone" else W_OS_CLASS_VAGUE if os_type_lower in ("specialized", "power-device", "pda", "terminal") else W_OS_CLASS
             add(mapped, weight, f"nmap class {os_type_lower}")
     for device_type, words in OS_NAME_WORDS:
-        word = next((w for w in words if w in os_name_lower), None)
+        word = next((w for w in words if w in os_name_lower), None) if trusted_guess else None
         if word:
             add(device_type, W_OS_NAME_WORD, f"OS name says {word}")
 
