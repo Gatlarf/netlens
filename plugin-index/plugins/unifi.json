@@ -1,0 +1,24 @@
+{
+  "id": "unifi",
+  "name": "Ubiquiti UniFi",
+  "kind": "topology",
+  "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine and Cloud Key Gen2+, or a classic self-hosted controller): gateway, switches and access points, which device hangs below which, and which switch or access point each client is connected to, with Wi-Fi signal, band and link rate. Read-only. Not yet tested on real hardware.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unifi",
+  "license": "MIT",
+  "supports": [
+    "UniFi OS consoles (Dream Machine, Cloud Gateway, Cloud Key Gen2+) (not yet tested)",
+    "Classic self-hosted controller, port 8443 (not yet tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.0.0/unifi.zip",
+      "sha256": "7ef3b9ece28bf52024e941034193ae2024f6123872612758b859ba02b58e2ef5",
+      "api_version": 1,
+      "min_netlens": "0.2.45",
+      "released": "2026-10-09",
+      "changelog": "First release. Written from the public API and tested against a simulated controller only: please test it on real hardware and report back (see the README)."
+    }
+  ]
+}
