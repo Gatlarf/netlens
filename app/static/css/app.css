@@ -533,3 +533,10 @@ body.setup-mode #nav, body.setup-mode .topbar-actions { display: none; }
 .evidence .ev-bar { height: 0.5em; background: var(--border); border-radius: 0.25em; overflow: hidden; display: block; }
 .evidence .ev-bar i { display: block; height: 100%; background: var(--accent); }
 @media (max-width: 520px) { .evidence li { grid-template-columns: 5em 3em 1fr; } }
+
+/* plugin on/off banner */
+.plugin-state { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5em; padding: 0.7em 0.9em; margin: 0.6em 0; border-radius: 6px; border: 1px solid; }
+.plugin-state .btn { margin-left: auto; }
+.plugin-state.on { border-color: #16a34a; background: rgba(22, 163, 74, 0.12); }
+.plugin-state.off { border-color: #d97706; background: rgba(217, 119, 6, 0.16); }
+.tag.off { opacity: 0.7; }

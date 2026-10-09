@@ -41,7 +41,7 @@ function fillPluginsCard(card, data, notice = null) {
       }
     });
     body.appendChild(h("tr", {},
-      h("td", {}, h("a", { href: `#/settings/plugin-${p.id}` }, p.name), p.enabled ? h("span", { class: "tag" }, "on") : null),
+      h("td", {}, h("a", { href: `#/settings/plugin-${p.id}` }, p.name), h("span", { class: p.enabled ? "tag" : "tag off" }, p.enabled ? "on" : "off")),
       h("td", {}, KIND_LABEL[p.kind] || p.kind || ""),
       h("td", {}, p.version || ""),
       h("td", {}, p.builtin ? "built in" : "uploaded"),

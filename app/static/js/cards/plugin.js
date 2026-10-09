@@ -75,9 +75,31 @@ function fillPluginCard(card, plugin, onChange) {
   if (manifest.description) card.appendChild(h("p", { class: "hint" }, manifest.description));
   if (plugin.problem) card.appendChild(h("p", { class: "error" }, plugin.problem));
 
+  // A clear on/off banner: an installed plugin does nothing until it is turned on
+  const banner = h("div", { class: `plugin-state ${plugin.enabled ? "on" : "off"}`, id: "plugin-state" });
+  banner.appendChild(h("strong", {}, plugin.enabled ? "This plugin is ON" : "This plugin is OFF"));
+  banner.appendChild(h("span", {}, plugin.enabled
+    ? " It syncs after every scan."
+    : plugin.configured ? " It does nothing until you turn it on." : " Fill in the settings below, save, then turn it on."));
+  const stateBtn = h("button", { type: "button", class: "btn", id: "plugin-state-toggle" }, plugin.enabled ? "Turn off" : "Turn on");
+  stateBtn.addEventListener("click", async () => {
+    stateBtn.disabled = true;
+    try {
+      const updated = await put(`/api/plugins/${plugin.id}`, { enabled: !plugin.enabled });
+      toast(`${manifest.name} turned ${updated.enabled ? "on" : "off"}`, "success");
+      fillPluginCard(card, updated, onChange);
+      if (onChange) onChange(updated);
+    } catch (err) {
+      toast(err.message || "Failed", "error");
+      stateBtn.disabled = false;
+    }
+  });
+  banner.appendChild(stateBtn);
+  card.appendChild(banner);
+
   const form = h("form", { class: "edit-form" });
   const enabledField = h("div", { class: "field" });
-  enabledField.appendChild(h("label", {}, "Enable this plugin"));
+  enabledField.appendChild(h("label", {}, "Enabled"));
   enabledField.appendChild(h("input", { type: "checkbox", name: "__enabled", checked: plugin.enabled }));
   enabledField.appendChild(h("p", { class: "hint" }, "When on, it syncs now and after every scan. Turning it off removes its links from the map and keeps these settings."));
   form.appendChild(enabledField);
