@@ -65,6 +65,7 @@ EVENT_LABELS = {
     "os_changed": "A device's operating system changes",
     "wifi_roamed": "A Wi-Fi device moves to another mesh node",
     "host_timeout": "A host times out during a scan",
+    "backup_failed": "A scheduled backup fails",
 }
 DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "port_opened"]
 
@@ -211,6 +212,7 @@ def _line(e: dict) -> str:
         "os_changed": f"{where}: system changed {detail}",
         "wifi_roamed": f"{name} moved: {detail}",
         "host_timeout": f"Scan timeout: {detail}",
+        "backup_failed": f"Scheduled backup failed: {detail}",
     }.get(kind, detail or kind)
 
 
@@ -221,7 +223,7 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
     short = {
         "device_new": "new device", "device_offline": "offline", "device_online": "back online", "service_down": "service down",
         "service_up": "service up", "port_opened": "port opened", "ip_changed": "IP changed", "ip_reused": "IP reused",
-        "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout",
+        "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "backup_failed": "backup failed",
     }
     title = f"[{app_name}] " + ", ".join(f"{n} {short.get(k, k)}" for k, n in counts.items())
     lines = [_line(e) for e in events[:MAX_EVENTS_PER_MESSAGE]]

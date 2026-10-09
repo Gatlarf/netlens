@@ -13,7 +13,8 @@ const KIND_LABELS = {
   ip_reused: "IP reused",
   wifi_roamed: "Wi-Fi move",
   service_down: "Service down",
-  service_up: "Service up"
+  service_up: "Service up",
+  backup_failed: "Backup failed"
 };
 
 const KIND_ORDER = [
@@ -28,7 +29,8 @@ const KIND_ORDER = [
   "ip_reused",
   "wifi_roamed",
   "service_down",
-  "service_up"
+  "service_up",
+  "backup_failed"
 ];
 
 function statusClass(status) {

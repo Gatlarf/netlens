@@ -353,6 +353,15 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                 conn = connect(db_path)
                 try:
                     prune_results(conn)
+                    from app import backup_schedule
+
+                    outcome = await asyncio.to_thread(backup_schedule.run_if_due, conn, db_path)
+                    if outcome and not outcome["ok"]:
+                        from app.notify.channels import process_channels
+                        from app.notify.service import process_notifications
+
+                        await process_channels(db_path)
+                        await process_notifications(db_path)
                     await asyncio.to_thread(_housekeeping_checks, conn)
                 finally:
                     conn.close()
