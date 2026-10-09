@@ -1,0 +1,16 @@
+{
+  "id": "omada",
+  "reviews": [
+    {
+      "version": "1.0.2",
+      "sha256": "ab042c001323534c1d3ec34ab302096601fdc878f176b0d6bde3dd7a8f26a764",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-09",
+      "tested_on": [
+        "TP-Link Omada controller (tested on real hardware by a colleague of the maintainer; model and version to be added)"
+      ],
+      "notes": "Connection, devices and clients confirmed working on real hardware by a tester; level set by the maintainer. Read-only: one login, a few reads and a logout."
+    }
+  ]
+}

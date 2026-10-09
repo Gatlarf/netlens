@@ -91,7 +91,13 @@
      "released": "2026-10-09",
      "changelog": "Adds a diagnostic report: the plugin's page has a Run diagnostic button (Netlens 0.2.67 or newer) that produces an anonymised description of what the controller answers, to copy or download.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-09",
+      "tested_on": [
+       "TP-Link Omada controller (tested on real hardware by a colleague of the maintainer; model and version to be added)"
+      ],
+      "notes": "Connection, devices and clients confirmed working on real hardware by a tester; level set by the maintainer. Read-only: one login, a few reads and a logout."
      }
     }
    ]
@@ -133,6 +139,18 @@
      "review": {
       "level": "community"
      }
+    },
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.0.1/truenas.zip",
+     "sha256": "7cea4eaebc6fac0c56d05350562f85ba1785849cf8616ab7a71d1616d64b2159",
+     "api_version": 1,
+     "min_netlens": "0.2.45",
+     "released": "2026-10-09",
+     "changelog": "Adds a diagnostic report: a Run diagnostic button on the plugin's page (Netlens 0.2.67 or newer) shows an anonymised description of what TrueNAS answers, to copy or download.",
+     "review": {
+      "level": "community"
+     }
     }
    ]
   },
@@ -157,6 +175,18 @@
      "min_netlens": "0.2.45",
      "released": "2026-10-09",
      "changelog": "First release. Written from the public API and tested against a simulated controller only: please test it on real hardware and report back (see the README).",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.0.1/unifi.zip",
+     "sha256": "9224a410b5d8022205fac9201201f0d02fbe6f43bdc924a436958703dd4b88d1",
+     "api_version": 1,
+     "min_netlens": "0.2.45",
+     "released": "2026-10-09",
+     "changelog": "Adds a diagnostic report: a Run diagnostic button on the plugin's page (Netlens 0.2.67 or newer) shows an anonymised description of what the controller answers, to copy or download.",
      "review": {
       "level": "community"
      }
