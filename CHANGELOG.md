@@ -4,6 +4,11 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 
 ## 0.2
 
+### Added
+- **Network checks** (Settings → Network checks): a periodic DHCP discover lists every DHCP server on the network and raises **Rogue DHCP?** for a new, untrusted one; **Gateway changed** when the MAC address behind the default gateway changes. Both break through quiet hours; schema version 11.
+- **Groups** (rooms, floors, owners): Settings → Groups, a group per device (device page, Devices page filter, column and bulk *Set group*), *Colour by group* and a group filter on the map, `group` in the summary API and as the suggested area in Home Assistant; schema version 12.
+- **HTTPS guidance** in the README: reverse proxy recipes for Synology, Caddy, nginx, Nginx Proxy Manager and Traefik, with the WebSocket and `Host` details the terminal needs.
+
 ### Changed
 - **Simpler install**: `docker-compose.simple.yml` runs the pre-built image with a Docker volume, needing no `.env` file, no `DOCKERDIR` folder (and no `chown`) and no token; the README has short recipes for Docker, Portainer (for example on DietPi) and Synology Container Manager. The earlier files stay as the *advanced* routes (host folder, build from source).
 - **`NETLENS_TOKEN` is optional.** A new install shows a **first-start wizard** (administrator account, networks to scan, first scan); installs that already set the token keep working unchanged with no wizard, and the Users page suggests moving to a user account. `python -m app.cli reset-password | create-admin | list-users` recovers a forgotten password from inside the container. Prometheus and Home Assistant should use an API token from Settings → Users & tokens.

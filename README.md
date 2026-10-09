@@ -101,6 +101,48 @@ docker exec -it netlens python -m app.cli reset-password <user>
 docker exec -it netlens python -m app.cli create-admin <user>
 ```
 
+### HTTPS
+
+Netlens itself speaks plain HTTP on port 8080. Passwords, sessions and (if you use the web terminal) SSH passwords then travel unencrypted, so on a network
+where others could listen in, or if you open Netlens from outside, put it behind a **reverse proxy that does HTTPS**. Use a proxy that can keep WebSocket
+connections open (the web terminal needs them) and that passes the original `Host` header. When a request arrives over HTTPS (the proxy sends
+`X-Forwarded-Proto: https`), Netlens marks its session cookie `Secure` by itself. Do **not** forward Netlens straight to the internet without HTTPS and strong passwords.
+
+If the proxy runs on the same device as Netlens (a Synology's built-in one, Caddy, nginx), add `NETLENS_BIND=127.0.0.1:8080` to the environment so that only the proxy can reach
+Netlens. If the proxy runs in its own container (Nginx Proxy Manager, Traefik), leave the default and point the proxy at `http://<device-ip>:8080`.
+
+**Synology (built-in reverse proxy):**
+1. *Control Panel → Security → Certificate*: get or import a certificate for the name you will use (for example `netlens.example.com`, or a Let's Encrypt one via your DDNS name).
+2. *Control Panel → Login Portal → Advanced → Reverse Proxy → Create*: source `HTTPS`, that host name, port `443`; destination `HTTP`, `localhost`, port `8080`.
+3. Edit the rule → *Custom Header → Create → WebSocket* (adds the headers the terminal needs). Then assign the certificate to the rule under *Security → Certificate → Settings*.
+
+**Caddy** (gets and renews the certificate itself): a `Caddyfile` of
+```
+netlens.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+**nginx:**
+```
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 3600s;   # long web terminal sessions
+}
+```
+
+**Nginx Proxy Manager:** *Proxy Hosts → Add*: scheme `http`, forward host the device's IP, port `8080`, switch **Websockets Support** on, and request a certificate on the *SSL* tab (tick *Force SSL*).
+
+**Traefik:** route the host name to `http://<device-ip>:8080` with TLS on the router; WebSockets work without extra settings.
+
+Things to know: behind a proxy every request comes from the proxy's address, so the login rate limit then counts per user name instead of per address; Home Assistant and Prometheus use
+the same HTTPS address (Home Assistant: *Reconfigure*; tick *Verify the TLS certificate* when the certificate is a normal one).
+
 ### Advanced: a host folder, building from source, an existing compose stack
 
 These are for people who want the data in a folder they choose (for backups with their own tools) or want to build the image themselves. They use the
@@ -384,6 +426,17 @@ An administrator can create **API tokens** for a user (shown once). They are Bea
 ### Share links
 
 **Settings → Share links** creates a secret address (`/share/<token>`) that shows the network read-only without a login: either the **map and device list** or only a **status page** (devices online and offline, service states). IP and MAC addresses are left out of the page and the data unless you tick them for that link, and a name that is only an address is shown as "Device N". A link can end after 1 to 90 days and stops working the moment you delete it; the card shows how often each was opened. Netlens itself should not be exposed to the internet without protection; share links are meant for people on your network or behind your own reverse proxy.
+
+### Network checks
+
+**Settings → Network checks** watches for two things that should not change by themselves.
+
+- **Rogue DHCP server:** every 12 hours (changeable, or switched off) Netlens broadcasts one DHCP discover, like a device that has just been plugged in, and lists every server that answers, with the router and DNS servers it hands out. The servers found the first time are taken as normal; a server that appears later is reported as a **Rogue DHCP?** event (e-mail, notification channels and Home Assistant, and it breaks through quiet hours) until you press **Trust** for it. *Check now* listens for about ten seconds. (A rogue DHCP server hands out wrong gateways or DNS servers and is a classic way to redirect traffic.)
+- **Gateway MAC changed:** Netlens remembers which MAC address answers for your default gateway. If it changes, a **Gateway changed** event is raised: either you replaced the router or someone pretends to be it (ARP spoofing).
+
+### Groups
+
+**Settings → Groups** creates groups with a name and colour (rooms, floors, owners...). A device is in one group: set it in the *Group* field on its page, or on the **Devices** page, which has a group column and filter and a *Set group of listed…* box that puts all devices currently listed (after your filters) in a group at once. On the **map**, *Colour by group* paints devices by group (ungrouped ones are grey, with a colour key) and the group filter shows one group at a time. The Home Assistant integration uses the group as the suggested area of a tracked device. Deleting a group keeps its devices. The group name is part of the statistics summary (`device_list[].group`).
 
 ### Update notice
 
