@@ -602,7 +602,7 @@ dialog#login-dialog::backdrop {
 .app-version { color: var(--muted); font-size: 0.75em; }
 
 /* theme switch in the top bar */
-.theme-toggle { color: var(--text); }
+.topbar .theme-toggle { font-size: 1.1rem; line-height: 1; padding: 6px 10px; min-width: 38px; color: var(--text); }
 
 /* Links: one themed colour (no washed-out browser defaults, visited links look the same).
    :where() gives these rules zero specificity so every class rule (.btn, .nav-link, ...) still wins. */

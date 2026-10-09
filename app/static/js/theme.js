@@ -1,6 +1,6 @@
 // Light / dark switch. The choice is remembered in this browser; without one the system setting applies.
 const KEY = "netlens.theme";
-const ICON = { dark: "☀ Light mode", light: "☾ Dark mode" }; // shows the mode a click switches to: sun / moon
+const ICON = { dark: "☀", light: "☾" }; // shows the mode a click switches to: sun / moon
 
 export function currentTheme() {
   const attr = document.documentElement.getAttribute("data-theme");
