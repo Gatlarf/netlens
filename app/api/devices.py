@@ -9,23 +9,12 @@ from pydantic import BaseModel, Field
 
 from app import actions, baselines, groups as groups_mod
 from app.db import add_event, connect, utcnow
+from app.scanner import vendor as vendor_db
+from app.scanner.classify import DEVICE_TYPES as CLASSIFY_TYPES
 from app.scanner.orchestrator import ScanBusy
 from app.hierarchy import children_map, descendants, device_name, load_hierarchy, would_loop
 
-DEVICE_TYPES = {
-    "router",
-    "switch",
-    "ap",
-    "server",
-    "pc",
-    "phone",
-    "printer",
-    "iot",
-    "camera",
-    "nas",
-    "vm",
-    "unknown",
-}
+DEVICE_TYPES = set(CLASSIFY_TYPES)
 
 
 def get_conn(request: Request):
@@ -84,6 +73,7 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
         "notify_offline": bool(row["notify_offline"]),
         "trusted": bool(row["trusted"]),
         "group_id": row["group_id"],
+        "mac_kind": vendor_db.mac_kind(row["mac"]),  # "universal", "randomized" (a private Wi-Fi address), "virtual" or None
     }
 
 

@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, mapsettings, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, stats as stats_api, netchecks as netchecks_api, public_share, setup as setup_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi
+from app.api import backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, mapsettings, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, stats as stats_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, require_auth
@@ -38,6 +38,18 @@ async def lifespan(app: FastAPI):
     init_db(conn)
     config.apply_overrides(app)
     app.state.scan_manager.recover()
+    # identification: use the vendor registry copy in the data directory, and apply the current rules to what is already known
+    # (new vendor table, new device types), so an update shows its effect without waiting for the next scan
+    from app.scanner import vendor as vendor_db
+    from app.scanner.store import refresh_identification
+
+    vendor_db.configure(app.state.settings.data_dir)
+    try:
+        refresh_identification(conn)
+    except Exception:  # noqa: BLE001 - never block the start
+        import logging
+
+        logging.getLogger(__name__).exception("could not refresh the device identification")
 
     tasks = []
     if getattr(app.state, "scheduler", False):
@@ -102,6 +114,7 @@ def create_app(
     app.include_router(users_api.router, dependencies=auth_deps)
     app.include_router(netchecks_api.router, dependencies=auth_deps)
     app.include_router(groups_api.router, dependencies=auth_deps)
+    app.include_router(vendor_db_api.router, dependencies=auth_deps)
     app.include_router(shares_api.router, dependencies=auth_deps)
     app.include_router(plugin_index.router, dependencies=auth_deps)
     app.include_router(update_api.router, dependencies=auth_deps)

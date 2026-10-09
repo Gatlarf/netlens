@@ -1,5 +1,5 @@
 import { get, patch, post, del, ApiError } from "../api.js";
-import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, shortName, isAdmin } from "../util.js";
+import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
@@ -28,7 +28,7 @@ function buildDetailsCard(device) {
 
   card.appendChild(kvRow("IP", h("span", { class: "mono" }, device.primary_ip || "—")));
   card.appendChild(kvRow("MAC", h("span", { class: "mono" }, device.mac || "—")));
-  card.appendChild(kvRow("Vendor", h("span", {}, device.vendor || "—")));
+  card.appendChild(kvRow("Vendor", h("span", { title: vendorTitle(device) }, vendorText(device))));
   card.appendChild(kvRow("Hostname", h("span", {}, device.hostname || "—")));
 
   const osNode = h("span", {});

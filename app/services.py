@@ -18,6 +18,7 @@ import struct
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -363,6 +364,13 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                         await process_channels(db_path)
                         await process_notifications(db_path)
                     from app import netchecks
+                    from app.api import vendor_db as vendor_db_api
+
+                    if vendor_db_api.due(conn):  # the IEEE vendor registry, once a month; offline is normal
+                        try:
+                            await asyncio.to_thread(vendor_db_api.refresh_now, conn, Path(db_path).resolve().parent)
+                        except Exception:  # noqa: BLE001
+                            log.debug("vendor registry refresh failed", exc_info=True)
 
                     if netchecks.dhcp_due(conn):
                         checked = await netchecks.check_dhcp(conn)

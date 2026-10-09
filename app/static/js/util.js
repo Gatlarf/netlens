@@ -106,7 +106,12 @@ export const TYPE_LABELS = {
   ap: "Access point",
   server: "Server",
   pc: "Computer",
-  phone: "Phone/tablet",
+  phone: "Phone",
+  tablet: "Tablet",
+  tv: "TV / media",
+  speaker: "Speaker",
+  console: "Game console",
+  appliance: "Appliance",
   printer: "Printer",
   iot: "IoT",
   camera: "Camera",
@@ -114,6 +119,19 @@ export const TYPE_LABELS = {
   vm: "Virtual machine",
   unknown: "Unknown",
 };
+
+// The vendor of a device. Without one: a private (randomized) Wi-Fi address is explained instead of called unknown.
+export function vendorText(device) {
+  if (device.vendor) return device.vendor;
+  if (device.mac_kind === "randomized") return "Private address";
+  return device.mac ? "Unknown" : "—";
+}
+
+export function vendorTitle(device) {
+  return !device.vendor && device.mac_kind === "randomized"
+    ? "This device uses a private (randomized) address, so the manufacturer cannot be read from its MAC address"
+    : null;
+}
 
 export function typeBadge(type) {
   return h("span", { class: `badge type-${type}` }, TYPE_LABELS[type] || type);

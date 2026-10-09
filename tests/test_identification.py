@@ -33,7 +33,7 @@ def host(ip="10.0.0.9", mac="aa:bb:cc:00:00:09", hostnames=(), vendor=None):
     (dict(hostnames=["DESKTOP-9F2K.home"], vendor="ASUSTek Computer"), "pc"),  # the name beats "ASUS means router"
     (dict(hostnames=["esxi.home.codeshrimp.com"]), "server"),
     (dict(hostnames=["somebox.tv.example.com"]), "unknown"),  # only the first label counts: the domain says nothing
-    (dict(hostnames=["living-room-tv.lan"]), "iot"),
+    (dict(hostnames=["living-room-tv.lan"]), "tv"),
 ])
 def test_hints_and_names_classify(kwargs, expected):
     if expected == "unknown" and kwargs.get("hostnames") == ["Bert-iPhone.home.lan"]:

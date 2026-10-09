@@ -1,5 +1,5 @@
 import { get, post } from "../api.js";
-import { h, clear, toast, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS, shortName } from "../util.js";
+import { h, clear, toast, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS, shortName, vendorText, vendorTitle } from "../util.js";
 
 const REFRESH_MS = 15000;
 
@@ -284,7 +284,7 @@ function renderRows() {
 
     tr.appendChild(h("td", {}, d.primary_ip || "—"));
     tr.appendChild(h("td", { class: "mono" }, d.mac || "—"));
-    tr.appendChild(h("td", {}, d.vendor || "—"));
+    tr.appendChild(h("td", { title: vendorTitle(d) }, vendorText(d)));
     tr.appendChild(h("td", {}, typeBadge(d.type)));
     const groupCell = h("td", {});
     if (d.group) {

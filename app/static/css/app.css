@@ -270,6 +270,11 @@ th.sortable.sorted-desc::after { content: "\2193"; color: var(--accent); }
 .badge.type-camera { background: color-mix(in srgb, #dc2626 18%, var(--surface)); color: color-mix(in srgb, #dc2626 50%, var(--text)); }
 .badge.type-nas { background: color-mix(in srgb, #0d9488 18%, var(--surface)); color: color-mix(in srgb, #0d9488 50%, var(--text)); }
 .badge.type-vm { background: color-mix(in srgb, #6366f1 18%, var(--surface)); color: color-mix(in srgb, #6366f1 50%, var(--text)); }
+.badge.type-tablet { background: color-mix(in srgb, #c026d3 18%, var(--surface)); color: color-mix(in srgb, #c026d3 50%, var(--text)); }
+.badge.type-tv { background: color-mix(in srgb, #0284c7 18%, var(--surface)); color: color-mix(in srgb, #0284c7 50%, var(--text)); }
+.badge.type-speaker { background: color-mix(in srgb, #4d7c0f 18%, var(--surface)); color: color-mix(in srgb, #4d7c0f 50%, var(--text)); }
+.badge.type-console { background: color-mix(in srgb, #9f1239 18%, var(--surface)); color: color-mix(in srgb, #9f1239 50%, var(--text)); }
+.badge.type-appliance { background: color-mix(in srgb, #b45309 18%, var(--surface)); color: color-mix(in srgb, #b45309 50%, var(--text)); }
 .badge.type-unknown { background: color-mix(in srgb, var(--muted) 15%, var(--surface)); color: var(--text); }
 
 /* ---------- dots ---------- */

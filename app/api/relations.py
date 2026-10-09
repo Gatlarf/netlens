@@ -5,6 +5,7 @@ from typing import Any
 
 from app.api.devices import get_conn
 from app import groups as groups_mod
+from app.scanner import vendor as vendor_db
 from app.hierarchy import load_hierarchy
 from app.scanner.relstore import list_relations, add_manual, delete_relation
 
@@ -76,6 +77,7 @@ def get_map(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
             "pos_y": row["pos_y"],
             "open_ports": row["open_ports"],
             "tags": tags,
+            "mac_kind": vendor_db.mac_kind(row["mac"]),
             "group_id": row["group_id"],
             "group": group["name"] if group else None,
             "group_color": group["color"] if group else None,

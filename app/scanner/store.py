@@ -5,6 +5,7 @@ from typing import Any, Optional
 from app.baselines import baseline_ports
 from app.db import add_event, get_or_create_device, utcnow
 from app.plugins.enrich import refresh_hostname
+from app.scanner import vendor as vendor_db
 from app.scanner.classify import classify_device
 from app.scanner.nmap_parser import ScanHost
 
@@ -132,6 +133,17 @@ def save_scan_results(
                 (host.vendor, device_id),
             )
 
+        # A vendor nmap did not know: the IEEE registry (nmap's own table is older), or the label of a virtual machine prefix
+        if host.vendor is None and mac is not None:
+            known = conn.execute("SELECT vendor FROM devices WHERE id = ?", (device_id,)).fetchone()["vendor"]
+            resolved = None if known else vendor_db.resolve(mac)
+            if resolved:
+                conn.execute("UPDATE devices SET vendor = ? WHERE id = ?", (resolved, device_id))
+
+        # nmap's device class is only reported when the scan ran OS detection: keep it, so a quick scan classifies the same way
+        if host.os_type:
+            conn.execute("UPDATE devices SET os_type = ? WHERE id = ?", (host.os_type, device_id))
+
         # Update os_name and os_confidence if host.os_name is not None
         if host.os_name is not None:
             conn.execute(
@@ -228,47 +240,52 @@ def save_scan_results(
                     kind_name = "port_missing" if expected is not None and (pr["proto"], pr["port"]) in expected else "port_closed"
                     add_event(conn, kind_name, detail, device_id=device_id, now=now)
 
-        # Classification
-        # Get open ports for classification
-        open_ports_rows = conn.execute(
-            "SELECT proto, port, service FROM ports WHERE device_id = ? AND state LIKE 'open%'",
-            (device_id,),
-        ).fetchall()
-        open_ports = [r["port"] for r in open_ports_rows]
-        services = [r["service"] for r in open_ports_rows if r["service"]]
-
-        # Get all names from device_names
-        name_rows = conn.execute(
-            "SELECT name FROM device_names WHERE device_id = ?",
-            (device_id,),
-        ).fetchall()
-        names = [r["name"] for r in name_rows]
-
-        # Get current device values for classification
-        dev_row = conn.execute(
-            "SELECT vendor, os_name, type_override, hints FROM devices WHERE id = ?",
-            (device_id,),
-        ).fetchone()
-        try:
-            stored_hints = json.loads(dev_row["hints"] or "[]")
-        except ValueError:
-            stored_hints = []
-
-        device_type = classify_device(
-            vendor=dev_row["vendor"],
-            os_name=dev_row["os_name"],
-            os_type=host.os_type,
-            open_ports=open_ports,
-            services=services,
-            hostnames=names,
-            mac=mac,
-            hints=stored_hints,
-        )
-        conn.execute(
-            "UPDATE devices SET device_type = ? WHERE id = ?",
-            (device_type, device_id),
-        )
+        reclassify_device(conn, device_id)
 
     conn.commit()
 
     return {"new": new_count, "updated": updated_count, "device_ids": device_ids, "rtts": rtts}
+
+
+def reclassify_device(conn: Any, device_id: int) -> str:
+    """Work out the type of a device from everything stored about it (ports, names, hints, vendor, OS) and save it."""
+    open_ports_rows = conn.execute(
+        "SELECT proto, port, service FROM ports WHERE device_id = ? AND state LIKE 'open%'",
+        (device_id,),
+    ).fetchall()
+    open_ports = [r["port"] for r in open_ports_rows]
+    services = [r["service"] for r in open_ports_rows if r["service"]]
+    names = [r["name"] for r in conn.execute("SELECT name FROM device_names WHERE device_id = ?", (device_id,)).fetchall()]
+    dev_row = conn.execute("SELECT mac, vendor, os_name, os_type, hints FROM devices WHERE id = ?", (device_id,)).fetchone()
+    try:
+        stored_hints = json.loads(dev_row["hints"] or "[]")
+    except ValueError:
+        stored_hints = []
+    device_type = classify_device(
+        vendor=dev_row["vendor"],
+        os_name=dev_row["os_name"],
+        os_type=dev_row["os_type"],
+        open_ports=open_ports,
+        services=services,
+        hostnames=names,
+        mac=dev_row["mac"],
+        hints=stored_hints,
+    )
+    conn.execute("UPDATE devices SET device_type = ? WHERE id = ?", (device_type, device_id))
+    return device_type
+
+
+def refresh_identification(conn: Any) -> dict[str, int]:
+    """After an update (or a new vendor table): fill in vendors that are now known and re-classify every device with the current rules."""
+    filled = 0
+    for row in conn.execute("SELECT id, mac FROM devices WHERE vendor IS NULL AND mac IS NOT NULL").fetchall():
+        resolved = vendor_db.resolve(row["mac"])
+        if resolved:
+            conn.execute("UPDATE devices SET vendor = ? WHERE id = ?", (resolved, row["id"]))
+            filled += 1
+    changed = 0
+    for row in conn.execute("SELECT id, device_type FROM devices").fetchall():
+        if reclassify_device(conn, row["id"]) != row["device_type"]:
+            changed += 1
+    conn.commit()
+    return {"vendors_filled": filled, "types_changed": changed}

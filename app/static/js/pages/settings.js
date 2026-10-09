@@ -1,5 +1,5 @@
 import { get, post, put } from "../api.js";
-import { h, clear, toast, isAdmin } from "../util.js";
+import { h, clear, toast, isAdmin, fmtTime } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
 import { buildGeneralCard } from "../cards/general.js";
 import { buildNotificationsCard } from "../cards/notifications.js";
@@ -106,6 +106,33 @@ async function buildRangesCard() {
   return card;
 }
 
+// "Vendor database": which copy of the IEEE registry names the manufacturers, with an update button
+async function buildVendorDbRow() {
+  const info = await get("/api/vendor-db");
+  const row = h("div", { id: "vendor-db-row" });
+  const text = () => `${info.entries.toLocaleString()} manufacturers (${info.source}${info.refreshed ? `, updated ${fmtTime(info.refreshed)}` : ""}). It updates itself every month.`;
+  const line = kvRow("Vendor database", text());
+  const btn = h("button", { type: "button", class: "btn admin-only", id: "vendor-db-update" }, "Update now");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Downloading…";
+    try {
+      const res = await post("/api/vendor-db/refresh", {});
+      Object.assign(info, res);
+      toast(`Vendor database updated (${res.result.vendors_filled} vendor(s) filled in, ${res.result.types_changed} type(s) changed)`, "success");
+      clear(row);
+      row.append(kvRow("Vendor database", text()), btn);
+    } catch (err) {
+      toast(err.message || "Update failed", "error");
+    }
+    btn.disabled = false;
+    btn.textContent = "Update now";
+  });
+  row.append(line, btn);
+  if (info.error) row.appendChild(h("p", { class: "hint" }, `Last attempt failed: ${info.error}`));
+  return row;
+}
+
 async function buildAboutCard() {
   const cfg = await get("/api/config");
   const card = h("div", { class: "card" });
@@ -114,6 +141,11 @@ async function buildAboutCard() {
   card.appendChild(kvRow("SNMP", cfg.snmp_enabled ? "enabled" : "disabled"));
   card.appendChild(kvRow("Listening on", cfg.bind ?? ""));
   const wrap = h("div", {}, card);
+  try {
+    card.appendChild(await buildVendorDbRow());
+  } catch (err) {
+    // the About card still works without it
+  }
   try {
     wrap.appendChild(await buildUpdateCard());
   } catch (err) {

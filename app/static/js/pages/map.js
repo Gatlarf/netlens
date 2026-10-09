@@ -1,6 +1,6 @@
 import { cssVar, isDark } from "../theme.js";
 import { get, post, patch, del, ApiError } from "../api.js";
-import { h, clear, toast, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin } from "../util.js";
+import { h, clear, toast, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { buildTree, defaultCollapsed, layoutHorizontal, leafIds } from "../layout_horizontal.js";
 
 const LAYOUTS = ["free", "tree", "horizontal"];
@@ -15,6 +15,11 @@ const PALETTE_LIGHT = {
   server: "#475569",
   pc: "#059669",
   phone: "#db2777",
+  tablet: "#c026d3",
+  tv: "#0284c7",
+  speaker: "#4d7c0f",
+  console: "#9f1239",
+  appliance: "#b45309",
   printer: "#ea580c",
   iot: "#a16207",
   camera: "#dc2626",
@@ -30,6 +35,11 @@ const PALETTE_DARK = {
   server: "#94a3b8",
   pc: "#34d399",
   phone: "#f472b6",
+  tablet: "#e879f9",
+  tv: "#38bdf8",
+  speaker: "#a3e635",
+  console: "#fb7185",
+  appliance: "#fdba74",
   printer: "#fb923c",
   iot: "#facc15",
   camera: "#f87171",
@@ -506,7 +516,7 @@ export async function render(container, params) {
     } else {
       panel.appendChild(h("p", {}, "Parent: none (top level)"));
     }
-    panel.appendChild(h("p", {}, `Vendor: ${node.vendor || "Unknown"}`));
+    panel.appendChild(h("p", { title: vendorTitle(node) }, `Vendor: ${vendorText(node)}`));
     panel.appendChild(h("p", {}, `Open ports: ${node.open_ports}`));
 
     if (node.tags && node.tags.length) {

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 
 def utcnow() -> str:
@@ -411,6 +411,8 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    # --- schema v13: nmap's device class ("webcam", "printer", "media device"...) is kept between scans -------
+    _add_column_if_missing(conn, "devices", "os_type", "TEXT")
     # --- schema v12: device groups (rooms, floors, owners) ---------------------------------------
     cur.execute(
         """
