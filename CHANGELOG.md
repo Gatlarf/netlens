@@ -6,7 +6,7 @@ The version is `<major.minor from VERSION>.<commit count>`; the list below group
 
 ### Added
 - **Second look before marking a device offline** (Settings → Scan performance, on by default): a previously online device that the sweep did not see is asked for once more on its own (`nmap -sn`, 4 retries) before it is marked offline. A switch whose management processor answers ARP late was missed by the big sweep in most scans while it answered 8 of 8 when asked alone; such devices no longer flap. The live test of the Stability card also runs a real quick scan of the single device.
-- **Flapping investigation**: the device page has a **Stability** card (administrators). *Investigate* analyses the scan history (gaps, whether the devices behind it stayed up, whether the whole network missed the same scans, periodicity, time of day, slow answers before a gap) and lists findings; *Run live test* asks the device 8 times by ARP, ping and TCP.
+- **Flapping investigation**: the Uptime card on the device page has a collapsible **Stability** section (administrators; the page stops refreshing while it is open). *Investigate* analyses the scan history (gaps, whether the devices behind it stayed up, whether the whole network missed the same scans, periodicity, time of day, slow answers before a gap) and lists findings; *Run live test* asks the device 8 times by ARP, ping and TCP.
 
 ### Changed
 - **Device page layout**: uptime and service checks come first in the right column, the Edit card is collapsed by default (and compact when open) and now contains *Network position*, and the console is the last card of the left column.

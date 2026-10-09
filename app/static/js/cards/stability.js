@@ -71,18 +71,29 @@ function renderProbe(box, r) {
   box.appendChild(findingsList(r.findings));
 }
 
-export function buildStabilityCard(device) {
-  const card = h("div", { class: "card", id: "stability-card" });
-  card.appendChild(h("h2", {}, "Stability"));
-  card.appendChild(h("p", { class: "hint" }, "Does this device keep going offline and online? Netlens looks at its scan history, at the devices behind it and at the rest of the network, and can ask the device directly."));
+let sectionOpen = false;
+// While the Stability section is open the device page must not refresh itself, or the report would vanish
+export function isStabilityOpen() {
+  return sectionOpen;
+}
+
+// Collapsible section at the bottom of the Uptime card
+export function buildStabilitySection(device) {
+  sectionOpen = false;
+  const details = h("details", { class: "stability-details", id: "stability-card" });
+  details.appendChild(h("summary", {}, h("strong", {}, "Stability"), h("span", { class: "hint" }, "Does it keep going offline? Find out why. (The page stops refreshing while this is open.)")));
+  details.addEventListener("toggle", () => { sectionOpen = details.open; });
+  const body = h("div", { class: "stability-body" });
+  details.appendChild(body);
+  body.appendChild(h("p", { class: "hint" }, "Netlens looks at the scan history of this device, at the devices behind it and at the rest of the network, and can ask the device directly."));
   const days = h("select", { name: "days" });
   for (const d of [1, 3, 7, 14, 30]) days.appendChild(h("option", { value: String(d), selected: d === 7 }, d === 1 ? "last day" : `last ${d} days`));
   const run = h("button", { type: "button", class: "btn", id: "investigate" }, "Investigate");
   const live = h("button", { type: "button", class: "btn", id: "live-test", title: "Asks the device 8 times by ARP, ping and TCP (about 10 seconds)" }, "Run live test");
-  card.appendChild(h("div", { class: "btn-row" }, days, run, live));
+  body.appendChild(h("div", { class: "btn-row" }, days, run, live));
   const report = h("div", { class: "stability-report", id: "stability-report" });
   const probe = h("div", { class: "stability-report", id: "stability-probe" });
-  card.append(report, probe);
+  body.append(report, probe);
 
   run.addEventListener("click", async () => {
     run.disabled = true;
@@ -107,5 +118,5 @@ export function buildStabilityCard(device) {
     live.textContent = "Run live test";
   });
   if (!device.primary_ip) live.disabled = true;
-  return card;
+  return details;
 }

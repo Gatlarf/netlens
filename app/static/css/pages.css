@@ -184,11 +184,11 @@
   font-size: 0.9rem;
 }
 /* Edit card: collapsed by default, compact when open */
-.edit-details > summary { cursor: pointer; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; list-style: none; }
-.edit-details > summary::-webkit-details-marker { display: none; }
+.edit-details > summary, .stability-details > summary { cursor: pointer; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; list-style: none; }
+.edit-details > summary::-webkit-details-marker, .stability-details > summary::-webkit-details-marker { display: none; }
 .edit-details > summary h2 { margin: 0; }
-.edit-details > summary::before { content: "▸"; color: var(--accent); font-size: 1.6rem; line-height: 1; width: 1.2em; text-align: center; align-self: center; }
-.edit-details[open] > summary::before { content: "▾"; }
+.edit-details > summary::before, .stability-details > summary::before { content: "▸"; color: var(--accent); font-size: 1.6rem; line-height: 1; width: 1.2em; text-align: center; align-self: center; }
+.edit-details[open] > summary::before, .stability-details[open] > summary::before { content: "▾"; }
 .edit-details[open] > summary { margin-bottom: 12px; }
 .edit-form.compact .edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
 .edit-form.compact .field { margin-bottom: 8px; }
@@ -216,3 +216,6 @@
 .hour-chart { display: flex; align-items: flex-end; gap: 2px; height: 70px; }
 .hour-col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; font-size: 0.65rem; color: var(--muted); }
 .hour-col i { display: block; width: 100%; background: var(--accent); min-height: 1px; border-radius: 2px 2px 0 0; }
+
+.stability-details { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+.stability-details[open] > summary { margin-bottom: 8px; }
