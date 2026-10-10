@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.2.0/technitium.zip",
+      "sha256": "e70fb03ab0023cd82830438e65697e65059c18c8710c11c7c21676ef68682ba1",
+      "api_version": 1,
+      "min_netlens": "0.3.109",
+      "released": "2026-10-11",
+      "changelog": "Servers are entered as a list: one line per server with its own address and token, a Test button per line, and Test all. Existing settings carry over. Needs Netlens 0.3.109 or newer."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.1.0/technitium.zip",
       "sha256": "ec4522dde525b84cacad32adf2352be32c8749d50dc37e06f09dd90adc1383bc",

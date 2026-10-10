@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.2.0/docker.zip",
+      "sha256": "6fdd724a7f8f39ef744f93593329cb3e5051c91370c5bc2aee92f76b03a989c1",
+      "api_version": 1,
+      "min_netlens": "0.3.109",
+      "released": "2026-10-11",
+      "changelog": "Hosts are entered as a list: one line per Docker host (proxy address, and the host's own address under More), a Test button per line, and Test all. Existing settings carry over. Needs Netlens 0.3.109 or newer."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.1.0/docker.zip",
       "sha256": "bf26f9ffb5c6e1d2d9b2f54b02e87e05d938efeb17b39532f34ca67e47424d02",

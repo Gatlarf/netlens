@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.2.0/truenas.zip",
+      "sha256": "084f106d5fafe6700436e89c6b26a056b2de3ae4ad7de1d4879f26e4a95565d4",
+      "api_version": 1,
+      "min_netlens": "0.3.109",
+      "released": "2026-10-11",
+      "changelog": "Several TrueNAS systems can be read: one line per system with its own address and API key, a Test button per line, and Test all. Existing settings carry over. Needs Netlens 0.3.109 or newer."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.1.0/truenas.zip",
       "sha256": "192a1669230c27a3a3552b3fc4ca20a6c34c4096b3867954498a656f1a591f7c",

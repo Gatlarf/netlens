@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-snmp-v1.1.0/snmp.zip",
+      "sha256": "9cd00ce3caa59ac5e16ae61a1124665440f6dd4de4d9890b850d7846e8debfc1",
+      "api_version": 1,
+      "min_netlens": "0.3.109",
+      "released": "2026-10-11",
+      "changelog": "Switches are entered as a list: one line per switch with an optional community of its own (the default community covers the others), a Test button per line, and Test all. Existing settings carry over. Needs Netlens 0.3.109 or newer."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-snmp-v1.0.0/snmp.zip",
       "sha256": "90f3af8a90c9e3a883375b253fca5971c7823c426871ee0872e2566cdc1bbbca",

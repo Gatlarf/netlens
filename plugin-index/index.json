@@ -29,6 +29,18 @@
    ],
    "releases": [
     {
+     "version": "1.2.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.2.0/docker.zip",
+     "sha256": "6fdd724a7f8f39ef744f93593329cb3e5051c91370c5bc2aee92f76b03a989c1",
+     "api_version": 1,
+     "min_netlens": "0.3.109",
+     "released": "2026-10-11",
+     "changelog": "Hosts are entered as a list: one line per Docker host (proxy address, and the host's own address under More), a Test button per line, and Test all. Existing settings carry over. Needs Netlens 0.3.109 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.1.0/docker.zip",
      "sha256": "bf26f9ffb5c6e1d2d9b2f54b02e87e05d938efeb17b39532f34ca67e47424d02",
@@ -156,6 +168,18 @@
    ],
    "releases": [
     {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-snmp-v1.1.0/snmp.zip",
+     "sha256": "9cd00ce3caa59ac5e16ae61a1124665440f6dd4de4d9890b850d7846e8debfc1",
+     "api_version": 1,
+     "min_netlens": "0.3.109",
+     "released": "2026-10-11",
+     "changelog": "Switches are entered as a list: one line per switch with an optional community of its own (the default community covers the others), a Test button per line, and Test all. Existing settings carry over. Needs Netlens 0.3.109 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-snmp-v1.0.0/snmp.zip",
      "sha256": "90f3af8a90c9e3a883375b253fca5971c7823c426871ee0872e2566cdc1bbbca",
@@ -182,6 +206,24 @@
     "Technitium DNS cluster (not yet tested on a real server)"
    ],
    "releases": [
+    {
+     "version": "1.2.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.2.0/technitium.zip",
+     "sha256": "e70fb03ab0023cd82830438e65697e65059c18c8710c11c7c21676ef68682ba1",
+     "api_version": 1,
+     "min_netlens": "0.3.109",
+     "released": "2026-10-11",
+     "changelog": "Servers are entered as a list: one line per server with its own address and token, a Test button per line, and Test all. Existing settings carry over. Needs Netlens 0.3.109 or newer.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-11",
+      "tested_on": [
+       "Technitium DNS Server 15.5.1, primary and secondary pair (real servers)"
+      ],
+      "notes": "Only the way servers are entered changed (a list with a token per server instead of two comma-separated lists). Checked on the real servers: both lines migrated from the older settings, each tested with its own token, and a sync read both. The write path is unchanged from 1.1.0, which was verified with real writes in a scratch zone."
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.1.0/technitium.zip",
@@ -245,6 +287,18 @@
     "TrueNAS 25.04 (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.2.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.2.0/truenas.zip",
+     "sha256": "084f106d5fafe6700436e89c6b26a056b2de3ae4ad7de1d4879f26e4a95565d4",
+     "api_version": 1,
+     "min_netlens": "0.3.109",
+     "released": "2026-10-11",
+     "changelog": "Several TrueNAS systems can be read: one line per system with its own address and API key, a Test button per line, and Test all. Existing settings carry over. Needs Netlens 0.3.109 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.1.0/truenas.zip",
