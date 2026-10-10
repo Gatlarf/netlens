@@ -25,6 +25,7 @@ data
 # Documentation
 *.md
 !README.md
+!CHANGELOG.md
 
 # Development dependencies
 requirements-dev.txt

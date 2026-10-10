@@ -77,3 +77,8 @@ def test_api(tmp_path, monkeypatch):
         assert client.get("/api/changelog?since=0.2.96").json()["releases"] == []
     with TestClient(app, headers={"Authorization": "Bearer wrong"}) as anonymous:
         assert anonymous.get("/api/changelog").status_code == 401
+
+
+def test_dockerignore_lets_the_changelog_into_the_image():
+    lines = (Path(__file__).resolve().parents[1] / ".dockerignore").read_text().splitlines()
+    assert "!CHANGELOG.md" in lines or "*.md" not in lines
