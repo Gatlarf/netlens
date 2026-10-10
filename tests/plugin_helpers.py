@@ -14,11 +14,11 @@ def make_runner(**fakes):
     """
     calls = []
 
-    def runner(plugin, action, config, timeout=None):
+    def runner(plugin, action, config, timeout=None, payload=None):
         calls.append((plugin.id, action, dict(config)))
         fake = fakes[plugin.id]
         try:
-            return getattr(fake, action)(config)
+            return getattr(fake, action)(config) if payload is None else getattr(fake, action)(config, payload)
         except PluginRunError:
             raise
         except Exception as exc:  # noqa: BLE001

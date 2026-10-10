@@ -17,7 +17,7 @@ from app.plugins.registry import Plugin, discover
 from app.plugins.runner import PluginRunError, run_subprocess
 
 log = logging.getLogger(__name__)
-KIND_ORDER = {"hypervisor": 0, "topology": 1}  # hypervisor links first: they rank higher in the hierarchy anyway
+KIND_ORDER = {"hypervisor": 0, "topology": 1, "dns": 2}  # hypervisor links first: they rank higher in the hierarchy anyway
 
 
 def source_of(plugin_id: str) -> str:
@@ -158,6 +158,8 @@ def apply_plugin(conn: sqlite3.Connection, plugin: Plugin) -> dict:
     data = _load_json(conn, _key(plugin.id, "data"))
     if not isinstance(data, dict):
         return {}  # nothing fetched yet: leave whatever is stored (for example data carried over from an older version)
+    if kind == "dns":  # a DNS plugin makes no links: its snapshot is only stored (the DNS page works from it)
+        return {"zones": len(data["zones"]), "records": len(data["records"]), "managed": sum(1 for r in data["records"] if r["managed"])}
     conn.execute("DELETE FROM relations WHERE source = ? AND manual = 0", (source_of(plugin.id),))
     if kind == "hypervisor":
         conn.execute("DELETE FROM hypervisor_guests WHERE plugin_id = ?", (plugin.id,))
@@ -212,8 +214,10 @@ class PluginService:
     def plugins(self) -> dict[str, Plugin]:
         return discover(self.data_dir)
 
-    async def _call(self, plugin: Plugin, action: str, config: dict):
-        return await asyncio.to_thread(lambda: self.runner(plugin, action, config))
+    async def _call(self, plugin: Plugin, action: str, config: dict, payload=None):
+        if payload is None:
+            return await asyncio.to_thread(lambda: self.runner(plugin, action, config))
+        return await asyncio.to_thread(lambda: self.runner(plugin, action, config, payload=payload))
 
     async def test(self, plugin: Plugin, config: dict) -> dict:
         """Try a configuration without saving anything. Raises PluginRunError / ContractError."""

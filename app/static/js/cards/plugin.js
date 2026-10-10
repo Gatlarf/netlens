@@ -1,7 +1,7 @@
 import { get, put, post, del } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
-const KIND_LABEL = { hypervisor: "Hypervisor", topology: "Network topology" };
+const KIND_LABEL = { hypervisor: "Hypervisor", topology: "Network topology", dns: "DNS" };
 
 function statusText(plugin) {
   const s = plugin.status;

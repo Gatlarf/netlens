@@ -28,12 +28,14 @@ def main() -> int:
     sys.stdout = sys.stderr  # whatever the plugin prints must not corrupt the result line
     try:
         plugin_dir, mode, action = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
-        config = json.loads(sys.stdin.read() or "{}").get("config", {})
+        request = json.loads(sys.stdin.read() or "{}")
+        config = request.get("config", {})
+        payload_in = request.get("payload")
         module = _load(plugin_dir, mode == "builtin")
         function = getattr(module, action, None)
         if not callable(function):
             raise RuntimeError(f"the plugin has no {action}(config) function")
-        result = function(config)
+        result = function(config) if payload_in is None else function(config, payload_in)
         payload = {"ok": True, "result": result}
     except BaseException as exc:  # noqa: BLE001 - everything the plugin raises is reported, not crashed on
         payload = {

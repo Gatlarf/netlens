@@ -11,7 +11,10 @@ import re
 from typing import Any
 
 API_VERSION = 1
-KINDS = ("hypervisor", "topology")
+KINDS = ("hypervisor", "topology", "dns")
+DNS_CAPABILITIES = ("marker", "delete")   # what a DNS plugin can do besides adding and updating records
+DNS_TYPES = ("A", "AAAA", "PTR", "CNAME")
+MAX_DNS_RECORDS = 50000
 FIELD_TYPES = ("text", "password", "bool", "number", "select")
 ID_RE = re.compile(r"^[a-z][a-z0-9_-]{1,30}$")
 KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
@@ -107,6 +110,20 @@ def _id(value: Any, path: str) -> str:
     return text
 
 
+def _capabilities(value: Any, kind: str) -> list[str]:
+    """DNS plugins say what the server can do: `marker` (a comment on each record, so Netlens can tell its own records
+    from others) and `delete` (it can remove records)."""
+    if value is None:
+        return []
+    if kind != "dns":
+        _fail("capabilities", "only a dns plugin has capabilities")
+    items = _list(value, "capabilities")
+    for item in items:
+        if item not in DNS_CAPABILITIES:
+            _fail("capabilities", f"{item!r} is not one of {', '.join(DNS_CAPABILITIES)}")
+    return sorted(set(items))
+
+
 # ----------------------------------------------------------------------------- manifest
 def validate_manifest(data: Any) -> dict:
     """Check plugin.json and return it in normalised form."""
@@ -194,6 +211,7 @@ def validate_manifest(data: Any) -> dict:
         "homepage": _text(data.get("homepage"), "homepage", max_len=200),
         "timeout": timeout,
         "diagnose": bool(data.get("diagnose", False)),  # the plugin has diagnose(config): a report for its author
+        "capabilities": _capabilities(data.get("capabilities"), kind),
         "config": fields,
     }
 
@@ -256,7 +274,74 @@ def validate_output(kind: str, data: Any) -> dict:
         return _hypervisor(data)
     if kind == "topology":
         return _topology(data)
+    if kind == "dns":
+        return _dns(data)
     raise ContractError(f"unknown plugin kind {kind!r}")
+
+
+def _dns_name(value: Any, path: str) -> str:
+    name = _text(value, path, required=True, max_len=253).strip().rstrip(".").lower()
+    if not name:
+        _fail(path, "is empty")
+    return name
+
+
+def _dns(data: Any) -> dict:
+    """A DNS plugin's snapshot of what the server has: its zones and the records in them."""
+    data = _dict(data, "output")
+    zones, seen = [], set()
+    for i, raw in enumerate(_list(data.get("zones"), "zones")):
+        raw = _dict(raw, f"zones[{i}]")
+        name = _dns_name(raw.get("name"), f"zones[{i}].name")
+        if name in seen:
+            _fail(f"zones[{i}].name", f"{name} is listed twice")
+        seen.add(name)
+        kind = raw.get("kind", "forward")
+        if kind not in ("forward", "reverse"):
+            _fail(f"zones[{i}].kind", "must be forward or reverse")
+        zones.append({"name": name, "kind": kind, "writable": bool(raw.get("writable", False))})
+    records = []
+    raw_records = _list(data.get("records"), "records")
+    if len(raw_records) > MAX_DNS_RECORDS:
+        _fail("records", f"at most {MAX_DNS_RECORDS} records")
+    for i, raw in enumerate(raw_records):
+        raw = _dict(raw, f"records[{i}]")
+        zone = _dns_name(raw.get("zone"), f"records[{i}].zone")
+        if zone not in seen:
+            _fail(f"records[{i}].zone", f"{zone} is not one of the zones")
+        rtype = _text(raw.get("type"), f"records[{i}].type", required=True, max_len=10).upper()
+        ttl = raw.get("ttl")
+        if ttl is not None and (isinstance(ttl, bool) or not isinstance(ttl, int) or ttl < 0):
+            _fail(f"records[{i}].ttl", "must be a whole number of seconds")
+        records.append({
+            "zone": zone,
+            "name": _dns_name(raw.get("name"), f"records[{i}].name"),
+            "type": rtype,
+            "value": _text(raw.get("value"), f"records[{i}].value", max_len=500).strip().rstrip(".").lower() if rtype in ("PTR", "CNAME") else _text(raw.get("value"), f"records[{i}].value", max_len=500).strip(),
+            "ttl": ttl,
+            "managed": bool(raw.get("managed", False)),
+            "comment": _text(raw.get("comment"), f"records[{i}].comment", max_len=200),
+        })
+    return {"zones": zones, "records": records, "server": _text(data.get("server"), "server", max_len=100) or None}
+
+
+def validate_dns_results(data: Any, expected_ids: list[str]) -> list[dict]:
+    """What a DNS plugin answers to apply(): one result per change it was given."""
+    items = _list(data, "results")
+    out, seen = [], set()
+    for i, raw in enumerate(items):
+        raw = _dict(raw, f"results[{i}]")
+        cid = _text(raw.get("id"), f"results[{i}].id", required=True, max_len=100)
+        if cid not in expected_ids:
+            _fail(f"results[{i}].id", f"{cid!r} was not asked for")
+        if cid in seen:
+            _fail(f"results[{i}].id", f"{cid!r} is answered twice")
+        seen.add(cid)
+        out.append({"id": cid, "ok": bool(raw.get("ok")), "error": _text(raw.get("error"), f"results[{i}].error", max_len=300) or None})
+    for cid in expected_ids:
+        if cid not in seen:
+            out.append({"id": cid, "ok": False, "error": "the plugin gave no answer for this change"})
+    return out
 
 
 def _hypervisor(data: Any) -> dict:

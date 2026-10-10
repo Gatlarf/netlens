@@ -31,8 +31,8 @@ def _clean_env() -> dict[str, str]:
     return env
 
 
-def run_subprocess(plugin: Plugin, action: str, config: dict, timeout: float | None = None):
-    """Call plugin.<action>(config) and return its result (blocking)."""
+def run_subprocess(plugin: Plugin, action: str, config: dict, timeout: float | None = None, payload=None):
+    """Call plugin.<action>(config) (or <action>(config, payload) when there is one) and return its result (blocking)."""
     if plugin.manifest is None:
         raise PluginRunError(plugin.problem or "the plugin is broken")
     timeout = timeout or plugin.manifest["timeout"]
@@ -40,7 +40,7 @@ def run_subprocess(plugin: Plugin, action: str, config: dict, timeout: float | N
     try:
         proc = subprocess.run(
             cmd,
-            input=json.dumps({"config": config}).encode(),
+            input=json.dumps({"config": config, **({"payload": payload} if payload is not None else {})}).encode(),
             capture_output=True,
             timeout=timeout,
             env=_clean_env(),

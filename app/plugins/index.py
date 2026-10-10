@@ -120,7 +120,7 @@ def parse_index(data: Any, official: bool = False) -> tuple[list[dict], int]:
             skipped += 1
             continue
         kind = raw.get("kind")
-        if kind not in ("hypervisor", "topology") or not _text(raw.get("name"), 60):
+        if kind not in ("hypervisor", "topology", "dns") or not _text(raw.get("name"), 60):
             skipped += 1
             continue
         builtin = bool(raw.get("builtin"))
