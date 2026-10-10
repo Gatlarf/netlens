@@ -6,7 +6,7 @@ const RANGES = [["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["90d
 const EVENT_LABELS = {
   device_new: "New device", device_offline: "Went offline", device_online: "Came online", ip_changed: "IP changed",
   os_changed: "OS changed", port_opened: "Port opened", wake_sent: "Wake-on-LAN sent", port_closed: "Port closed", port_unexpected: "Unexpected port", port_missing: "Baseline port gone", host_timeout: "Host timeout", device_deleted: "Deleted",
-  service_down: "Service down", service_up: "Service up", wifi_roamed: "Wi-Fi move", ip_reused: "IP reused", backup_failed: "Backup failed", dhcp_rogue: "Rogue DHCP?", gateway_changed: "Gateway changed", dns_registered: "Registered in DNS", dns_updated: "DNS updated", dns_removed: "DNS record removed", dns_failed: "DNS write failed",
+  service_down: "Service down", service_up: "Service up", wifi_roamed: "Wi-Fi move", ip_reused: "IP reused", backup_failed: "Backup failed", dhcp_rogue: "Rogue DHCP?", gateway_changed: "Gateway changed", dns_registered: "Registered in DNS", dns_updated: "DNS updated", dns_removed: "DNS record removed", dns_failed: "DNS write failed", container_unhealthy: "Container unhealthy", container_restarting: "Container restarting", container_stopped: "Container stopped",
 };
 
 const dev = (item) => ({ ...item, href: `#/device/${item.id}` });
@@ -89,6 +89,19 @@ function build(s) {
       tile(fmtNumber(idn.no_os), "operating system unknown"), tile(fmtNumber(idn.manual_type), "type set by hand"), tile(fmtNumber(idn.gentle), "scanned gently")),
     card("Passive listening", pa ? table(["", ""], [["State", !pa.enabled ? "off" : pa.running ? "listening" : `not running${pa.error ? `: ${pa.error}` : ""}`], ["Announcements heard", fmtNumber(pa.frames)], ["Devices updated", fmtNumber(pa.applied)], ["Waiting for a scan to find their device", fmtNumber(pa.pending)]]) : emptyNote("Not available here."),
       h("p", { class: "hint" }, "Names and operating systems that devices announce in DHCP, mDNS and UPnP (Settings → Scan performance)."))));
+
+  // ------------------------------------------------------------------ containers (only when a plugin reports some)
+  const ct = s.containers;
+  if (ct && ct.total) {
+    root.appendChild(section("containers", "Containers",
+      h("div", { class: "tiles inline" },
+        tile(fmtNumber(ct.running), `running on ${ct.hosts} host${ct.hosts === 1 ? "" : "s"}`), tile(fmtNumber(ct.stopped), "stopped"),
+        tile(fmtNumber(ct.restarting), "restarting", { tone: ct.restarting ? "warn" : "" }), tile(fmtNumber(ct.unhealthy), "unhealthy", { tone: ct.unhealthy ? "warn" : "" }),
+        tile(fmtNumber(ct.exposed), "publish a port on all interfaces")),
+      card("Containers with a problem", ct.problems.length
+        ? table(["Container", "Host", "Problem", "Restarts"], ct.problems.map((r) => [r.device_id ? link({ id: r.device_id }, r.name) : r.name, r.host || "", r.problem, r.restarts === null || r.restarts === undefined ? "" : String(r.restarts)]))
+        : emptyNote("All containers are healthy."))));
+  }
 
   // ------------------------------------------------------------------ availability
   const rel = (list) => table(["Device", "Uptime (7 d)", "Outages"], list.map((r) => [link(r), fmtPct(r.uptime), String(r.outages)]));

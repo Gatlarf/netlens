@@ -9,7 +9,7 @@ from app.plugins.matching import norm_mac
 
 WIFI_RETENTION_DAYS = 14
 ROAM_WINDOW_HOURS = 24  # a node change counts as roaming only when the previous sample is this recent
-ALIAS_PRIORITY = ("ptr", "upnp", "mdns", "dhcp", "router", "smb", "netbios")  # which name wins as a device's hostname when it has none
+ALIAS_PRIORITY = ("ptr", "upnp", "mdns", "dhcp", "router", "smb", "netbios", "docker")  # which name wins as a device's hostname when it has none
 MAX_NAME = 80
 
 
@@ -38,6 +38,27 @@ def refresh_hostname(conn: sqlite3.Connection, device_id: int) -> None:
             if n["source"] == source and n["name"].strip():
                 conn.execute("UPDATE devices SET hostname = ? WHERE id = ?", (n["name"].strip(), device_id))
                 return
+
+
+def record_guest_names(conn: sqlite3.Connection, plugin_id: str, guests: list[dict], now: str | None = None) -> int:
+    """A container that has its own address on the network is a device: its container name becomes one of the device's names
+    (source 'docker'), and the device's hostname when it has none, so it is not shown by its address only."""
+    now = now or utcnow()
+    count = 0
+    for g in guests:
+        name = (g.get("name") or "").strip()[:MAX_NAME]
+        if g.get("kind") != "container" or g.get("device_id") is None or not name:
+            continue
+        conn.execute(
+            """
+            INSERT INTO device_names (device_id, name, source, first_seen, last_seen) VALUES (?, ?, 'docker', ?, ?)
+            ON CONFLICT(device_id, name, source) DO UPDATE SET last_seen = excluded.last_seen
+            """,
+            (g["device_id"], name, now, now),
+        )
+        refresh_hostname(conn, g["device_id"])
+        count += 1
+    return count
 
 
 def record_router_names(conn: sqlite3.Connection, data: dict, now: str | None = None) -> int:

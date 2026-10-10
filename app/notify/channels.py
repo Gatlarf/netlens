@@ -74,8 +74,11 @@ EVENT_LABELS = {
     "dns_registered": "A device is registered in DNS",
     "dns_updated": "A device's DNS record is updated (its address changed)",
     "dns_failed": "Writing to DNS fails",
+    "container_unhealthy": "A container's health check starts failing",
+    "container_restarting": "A container keeps restarting",
+    "container_stopped": "A container crashes (stops with an error code)",
 }
-DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed", "dns_failed"]
+DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting"]
 
 
 class ChannelError(Exception):
@@ -229,6 +232,9 @@ def _line(e: dict) -> str:
         "dns_registered": f"Registered in DNS: {detail}",
         "dns_updated": f"DNS record updated: {detail}",
         "dns_failed": f"DNS write FAILED: {detail}",
+        "container_unhealthy": f"Container unhealthy: {detail}",
+        "container_restarting": f"Container restarting: {detail}",
+        "container_stopped": f"Container stopped: {detail}",
     }.get(kind, detail or kind)
 
 
@@ -241,6 +247,7 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
         "service_up": "service up", "port_opened": "port opened", "port_closed": "port closed", "port_unexpected": "unexpected port", "port_missing": "port missing", "ip_changed": "IP changed", "ip_reused": "IP reused",
         "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "backup_failed": "backup failed", "dhcp_rogue": "rogue DHCP", "gateway_changed": "gateway changed",
         "dns_registered": "registered in DNS", "dns_updated": "DNS updated", "dns_failed": "DNS write failed",
+        "container_unhealthy": "container unhealthy", "container_restarting": "container restarting", "container_stopped": "container stopped",
     }
     title = f"[{app_name}] " + ", ".join(f"{n} {short.get(k, k)}" for k, n in counts.items())
     lines = [_line(e) for e in events[:MAX_EVENTS_PER_MESSAGE]]

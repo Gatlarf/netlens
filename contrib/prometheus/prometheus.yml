@@ -36,3 +36,6 @@ scrape_configs:
 #       - alert: DnsConflict
 #         expr: netlens_dns_devices{state="conflicts"} > 0
 #         for: 1h
+#       - alert: ContainerUnhealthy
+#         expr: netlens_containers_unhealthy > 0 or netlens_containers{state="restarting"} > 0
+#         for: 10m

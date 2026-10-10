@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.2.105 — 2026-10-11
+
+### Added
+- ★ **Container health everywhere**: a container whose health check starts failing, that keeps restarting, or that crashes raises an event (`container_unhealthy`, `container_restarting`, `container_stopped`) that your notification channels can send, once per change. Statistics has a **Containers** section (running, stopped, restarting, unhealthy, published on all interfaces, and the containers with a problem), the summary API carries `containers` (additive), Prometheus has `netlens_containers{state}`, `netlens_containers_unhealthy`, `netlens_containers_exposed` and `netlens_container_hosts` (a Grafana panel and an alert example are included), and the Home Assistant integration (0.9.0) has *Containers running*, *Unhealthy containers* and *Restarting containers* sensors. Unhealthy or restarting containers count as a problem.
+- **Container names for devices**: a macvlan / ipvlan container that Netlens matched to a device gives that device its container name (as a name, and as its host name when it had none), so it is shown and registered in DNS under that name instead of its address.
+
 ## 0.2.103 — 2026-10-10
 
 ### Added

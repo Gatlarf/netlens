@@ -9,8 +9,10 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Callable
 
-from app.db import connect, delete_setting, get_setting, set_setting, utcnow
+from app import containers
+from app.db import add_event, connect, delete_setting, get_setting, set_setting, utcnow
 from app.plugins.contract import ContractError, clean_config, default_config, missing_required, validate_output
+from app.plugins import enrich
 from app.plugins.enrich import device_lookup, record_client_hints, record_client_links, record_router_names, record_wifi
 from app.plugins.matching import match_hypervisor, norm_mac, topology_links
 from app.plugins.registry import Plugin, discover
@@ -161,6 +163,7 @@ def apply_plugin(conn: sqlite3.Connection, plugin: Plugin) -> dict:
     if kind == "dns":  # a DNS plugin makes no links: its snapshot is only stored (the DNS page works from it)
         return {"zones": len(data["zones"]), "records": len(data["records"]), "managed": sum(1 for r in data["records"] if r["managed"])}
     conn.execute("DELETE FROM relations WHERE source = ? AND manual = 0", (source_of(plugin.id),))
+    before = containers.previous_state(conn, plugin.id) if kind == "hypervisor" else {}
     if kind == "hypervisor":
         conn.execute("DELETE FROM hypervisor_guests WHERE plugin_id = ?", (plugin.id,))
     summary: dict[str, int]
@@ -183,6 +186,9 @@ def apply_plugin(conn: sqlite3.Connection, plugin: Plugin) -> dict:
             if g["device_id"] is not None and g["host_device_id"] is not None and g["device_id"] != g["host_device_id"]:
                 pairs.append((g["device_id"], g["host_device_id"]))
         _insert_links(conn, plugin.id, kind, pairs)
+        enrich.record_guest_names(conn, plugin.id, matched["guests"], now)
+        for event_kind, text, device_id in containers.changes(before, matched["guests"], {h["id"]: h["name"] for h in data["hosts"]}):
+            add_event(conn, event_kind, text, device_id=device_id, now=now)
         summary = {
             "hosts": len(data["hosts"]),
             "hosts_matched": sum(1 for v in matched["hosts"].values() if v is not None),

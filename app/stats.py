@@ -15,6 +15,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from app import containers
 from app.db import get_setting, utcnow
 from app.hierarchy import children_map, load_hierarchy
 from app.version import VERSION
@@ -465,6 +466,7 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
         "identification": _identification(conn),
         "backups": _backups(conn, now),
         "netchecks": _netchecks(conn),
+        "containers": containers.summary(conn),
         "system": _system(conn, db_path, passive),
     }
 
@@ -501,7 +503,8 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     # the last scan failed (a single failure in the past day that later scans recovered from is not a problem), a plugin is failing, or no scan finished for a while
     services = _services(conn, now)
     backups = _backups(conn, now)
-    problems = ((1 if services["down"] else 0) + (1 if last_info and last_info["status"] == "failed" else 0) + len(failing)
+    container_numbers = containers.summary(conn)
+    problems = ((1 if services["down"] else 0) + (1 if container_numbers["problems"] else 0) + (1 if last_info and last_info["status"] == "failed" else 0) + len(failing)
                 + (1 if age is not None and age > stale_after_s else 0) + (1 if backups["last_ok"] is False else 0))
     from app import updates
     from app.plugins import index as plugin_index
@@ -528,6 +531,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "backup": {k: backups[k] for k in ("enabled", "last_at", "last_ok", "last_error", "age_s")},
         "netchecks": _netchecks(conn),
         "dns": _dns(conn),
+        "containers": {k: container_numbers[k] for k in ("total", "running", "stopped", "restarting", "unhealthy", "exposed", "hosts")},
         "passive": None if passive is None else {k: passive.get(k) for k in ("enabled", "running", "frames", "applied")},
         "wifi": {k: wifi[k] for k in ("clients", "weak", "avg_rssi")},
         "uptime": {"24h": _pct(day["u"] or 0, day["n"]), "7d": _pct(week["u"] or 0, week["n"])},

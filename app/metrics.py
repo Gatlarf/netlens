@@ -90,6 +90,14 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
     for state, count in doc["dns"].items():
         out.sample("netlens_dns_devices", count, "Devices by DNS registration state (registered, pending, conflicts, registers_itself, waiting)", state=state)
 
+    c = doc["containers"]
+    if c["total"]:
+        for state in ("running", "stopped", "restarting"):
+            out.sample("netlens_containers", c[state], "Containers reported by container plugins (Docker), by state", state=state)
+        out.sample("netlens_containers_unhealthy", c["unhealthy"], "Containers whose health check is failing")
+        out.sample("netlens_containers_exposed", c["exposed"], "Running containers that publish a port on all interfaces")
+        out.sample("netlens_container_hosts", c["hosts"], "Container hosts reported by container plugins")
+
     sys_info = stats["system"]
     out.sample("netlens_database_size_bytes", sys_info["db_bytes"], "Size of the Netlens database file")
     out.sample("netlens_vendor_registry_entries", sys_info["vendor_entries"], "Manufacturers in the MAC address registry")

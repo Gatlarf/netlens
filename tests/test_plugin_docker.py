@@ -180,3 +180,60 @@ def test_netlens_stores_container_details_and_shows_them(tmp_path):
             assert names["app"]["device_id"] == lan and names["web"]["device_id"] is None
             guest = client.get(f"/api/devices/{lan}").json()["virtualization"]["guest"]
             assert guest["kind"] == "container" and guest["host_device_id"] == host and guest["details"]["network_driver"] == "macvlan"
+
+
+# ----------------------------------------------------------------------------- step 2: events, names, numbers
+from app import containers as container_module
+from app.stats import summary as stats_summary
+
+
+def _sync(client, expect_ok=True):
+    r = client.post("/api/plugins/docker/sync")
+    assert r.status_code == 200 and r.json().get("error") is None, r.text
+
+
+def test_events_names_and_numbers(tmp_path):
+    data = tmp_path / "data"
+    shutil.copytree(ROOT, data / "plugins" / "docker", ignore=shutil.ignore_patterns("__pycache__", "README.md"))
+    first = containers()
+    with FakeDocker(containers=first, inspect=INSPECT) as d:
+        app = create_app(load_settings({"NETLENS_TOKEN": "t", "NETLENS_DATA_DIR": str(data)}), db_path=tmp_path / "t.db")
+        with TestClient(app, headers={"Authorization": "Bearer t"}) as client:
+            conn = connect(tmp_path / "t.db")
+            host = get_or_create_device(conn, "aa:aa:aa:aa:aa:01", "192.168.0.189")
+            lan = get_or_create_device(conn, LAN_MAC, "192.168.0.50")
+            conn.commit()
+            client.put("/api/plugins/docker", json={"enabled": True, "config": {"hosts": d.url + "=192.168.0.189", "timeout": 5}})
+            _sync(client)
+            events = lambda: [r["kind"] for r in conn.execute("SELECT kind FROM events WHERE kind LIKE 'container_%' ORDER BY id")]
+            assert events() == []                                              # the first sync only learns the state
+            # the macvlan container's name becomes the device's name (it had none)
+            assert conn.execute("SELECT hostname FROM devices WHERE id = ?", (lan,)).fetchone()[0] == "app"
+            assert conn.execute("SELECT source FROM device_names WHERE device_id = ?", (lan,)).fetchone()[0] == "docker"
+            # now the web container turns unhealthy, "app" crashes and "old" had already stopped
+            d.inspect_data["c1"] = {"RestartCount": 0, "State": {"Health": {"Status": "unhealthy"}}}
+            d.containers[1]["State"] = "exited"
+            d.inspect_data["c2"] = {"RestartCount": 0, "State": {"ExitCode": 1}}
+            _sync(client)
+            assert sorted(events()) == ["container_stopped", "container_unhealthy"]
+            _sync(client)
+            assert sorted(events()) == ["container_stopped", "container_unhealthy"]      # nothing new, nothing repeated
+            d.inspect_data["c6"] = {"RestartCount": 19, "State": {"Restarting": True}}
+            _sync(client)
+            assert events().count("container_restarting") == 1                           # 5 more restarts: a loop
+            # numbers
+            numbers = container_module.summary(conn)
+            assert numbers["total"] == 7 and numbers["unhealthy"] == 1 and numbers["restarting"] == 1 and numbers["hosts"] == 1
+            assert {p["name"] for p in numbers["problems"]} == {"web", "flaky"}
+            doc = stats_summary(conn)
+            assert doc["containers"]["unhealthy"] == 1 and doc["problems"] >= 1
+            conn.close()
+            body = client.get("/metrics").text
+            assert 'netlens_containers{state="running"}' in body and "netlens_containers_unhealthy 1" in body and "netlens_containers_exposed" in body
+
+
+def test_no_container_metrics_without_containers(tmp_path):
+    app = create_app(load_settings({"NETLENS_TOKEN": "t", "NETLENS_DATA_DIR": str(tmp_path)}), db_path=tmp_path / "t.db")
+    with TestClient(app, headers={"Authorization": "Bearer t"}) as client:
+        assert "netlens_containers" not in client.get("/metrics").text
+        assert client.get("/api/stats/summary").json()["containers"]["total"] == 0
