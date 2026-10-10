@@ -1,7 +1,7 @@
 import { get, post, put } from "../api.js";
 import { h, clear, toast, isAdmin, fmtTime } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
-import { buildGeneralCard } from "../cards/general.js";
+import { buildScheduleCard, buildTerminalCard } from "../cards/general.js";
 import { buildNotificationsCard } from "../cards/notifications.js";
 import { buildPluginCard } from "../cards/plugin.js";
 import { buildPluginsCard } from "../cards/plugins.js";
@@ -193,7 +193,7 @@ const STATIC_GROUPS = [
     items: [
       { key: "ranges", label: "Scan ranges", build: buildRangesCard },
       { key: "nmap", label: "Scan performance", build: buildScanPage },
-      { key: "schedule", label: "Schedule & terminal", build: buildGeneralCard },
+      { key: "schedule", label: "Scan schedule", build: buildScheduleCard },
       { key: "map", label: "Map", build: buildMapCard },
       { key: "groups", label: "Groups", build: buildGroupsCard },
       { key: "netchecks", label: "Network checks", build: buildNetchecksCard },
@@ -220,6 +220,7 @@ const STATIC_GROUPS = [
     title: "System",
     items: [
       { key: "about", label: "About", build: buildAboutCard },
+      { key: "terminal", label: "Web terminal", build: buildTerminalCard },
       { key: "users", label: "Users & tokens", build: buildUsersCard },
       { key: "session", label: "Account", build: buildAccountCard },
     ],

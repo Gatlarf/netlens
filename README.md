@@ -399,7 +399,8 @@ Everything below is saved in the data directory, so it survives updates and rebu
 |---|---|
 | Scan ranges | which networks are scanned (see "Choosing what to scan") |
 | Scan performance (nmap) | ports, timing and detection used by quick and deep scans, with presets (see "Making scans faster"). The **Scan settings** item in the **Scan** menu of the top bar jumps straight to it |
-| Scan schedule and terminal | how often quick and deep scans run, and the web terminal on/off. Takes effect from the next scheduler cycle, no restart |
+| Scan schedule | how often quick and deep scans run. Takes effect from the next scheduler cycle, no restart |
+| Web terminal | the web terminal on/off (System group) |
 | E-mail notifications | SMTP server and recipients (see below) |
 | Plugins and one page per plugin | turn plugins on or off, upload your own, and each plugin's own settings (see "Plugins" below) |
 | Ignored devices | devices that scans skip, with a button to stop ignoring them |
