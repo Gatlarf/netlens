@@ -1,0 +1,55 @@
+{
+  "id": "snmp",
+  "name": "SNMP switches",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Asks managed switches (SNMP v1 / v2c, read-only) which devices are plugged into which port: the MAC address table of every switch, and LLDP to see how the switches are connected to each other. Netlens then shows each device's switch and port and places the switches in the hierarchy. Works with any switch that has SNMP and the standard bridge MIB (TP-Link, Netgear, HP / Aruba, Cisco, Zyxel, MikroTik, Ubiquiti and others).",
+  "timeout": 120,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "hosts",
+      "type": "text",
+      "label": "Switch addresses",
+      "placeholder": "192.168.1.2, 192.168.1.3",
+      "required": true,
+      "help": "The IP address of every managed switch to read, separated by commas or spaces. Add a port after a colon if it is not 161 (192.168.1.2:1161)."
+    },
+    {
+      "key": "community",
+      "type": "password",
+      "label": "Read community",
+      "required": true,
+      "help": "The SNMP read community string you set on the switches (many ship with public). A read-only community is enough; this plugin never writes."
+    },
+    {
+      "key": "version",
+      "type": "select",
+      "label": "SNMP version",
+      "options": [
+        {"value": "2c", "label": "v2c (most switches)"},
+        {"value": "1", "label": "v1 (very old switches)"}
+      ],
+      "default": "2c"
+    },
+    {
+      "key": "root",
+      "type": "text",
+      "label": "Core switch",
+      "placeholder": "192.168.1.2",
+      "help": "Optional. The switch closest to your router, from which the others hang. Without it the switch with the most neighbours is used."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 3,
+      "min": 1,
+      "max": 30,
+      "help": "How long to wait for an answer before asking again (twice). Raise it for slow switches."
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/snmp"
+}

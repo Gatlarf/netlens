@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 
 def utcnow() -> str:
@@ -450,6 +450,20 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_wifi_device_ts ON wifi_samples(device_id, ts)")
+    # --- schema v15: where a client is connected (switch and port), as reported by a topology plugin ---
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS client_links (
+            device_id INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+            plugin_id TEXT NOT NULL,
+            node_mac TEXT,
+            node_name TEXT,
+            port TEXT,
+            medium TEXT,
+            updated TEXT NOT NULL
+        )
+        """
+    )
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS service_checks (

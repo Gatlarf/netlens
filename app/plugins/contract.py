@@ -354,5 +354,6 @@ def _topology(data: Any) -> dict:
             "os": _text(raw.get("os"), f"{path}.os", max_len=100) or None,
             "model": _text(raw.get("model"), f"{path}.model", max_len=100) or None,
             "device_type": _client_type(raw.get("device_type"), f"{path}.device_type"),
+            "port": _text(raw.get("port"), f"{path}.port", max_len=60) or None,   # the switch port a wired client sits on ("Gi1/0/5")
         })
     return {"nodes": nodes, "clients": clients}

@@ -58,6 +58,14 @@ function buildDetailsCard(device) {
 
   card.appendChild(kvRow("Status", statusDot(device.online)));
 
+  // where it is plugged in / connected, from a router or switch plugin (SNMP, Omada, UniFi, ASUS...)
+  const link = device.connection;
+  if (link && (link.node_name || link.node_mac || link.port)) {
+    const where = h("span", { id: "connection-info" }, link.node_name || link.node_mac || "");
+    if (link.port) where.appendChild(h("span", { class: "mono" }, `${link.node_name || link.node_mac ? " · " : ""}port ${link.port}`));
+    card.appendChild(kvRow("Connected to", where));
+  }
+
   return card;
 }
 

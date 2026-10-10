@@ -103,6 +103,34 @@ def record_client_hints(conn: sqlite3.Connection, data: dict) -> int:
     return touched
 
 
+def record_client_links(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None) -> int:
+    """Remember which node (switch, access point) and port each client is connected to; clients this plugin no longer reports are forgotten."""
+    now = now or utcnow()
+    by_mac, by_ip = device_lookup(conn)
+    node_name = {mac: n.get("name") for n in data.get("nodes", []) for mac in (n.get("macs") or [n["mac"]])}
+    seen: set[int] = set()
+    for client in data.get("clients", []):
+        device_id = by_mac.get(client["mac"]) or by_ip.get(client.get("ip") or "")
+        if device_id is None or device_id in seen or not (client.get("node_mac") or client.get("port")):
+            continue
+        seen.add(device_id)
+        conn.execute(
+            """
+            INSERT INTO client_links (device_id, plugin_id, node_mac, node_name, port, medium, updated) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(device_id) DO UPDATE SET plugin_id = excluded.plugin_id, node_mac = excluded.node_mac, node_name = excluded.node_name,
+                port = excluded.port, medium = excluded.medium, updated = excluded.updated
+            """,
+            (device_id, plugin_id, client.get("node_mac"), node_name.get(client.get("node_mac")), client.get("port"), client.get("medium"), now),
+        )
+    if seen:
+        marks = ",".join("?" for _ in seen)
+        conn.execute(f"DELETE FROM client_links WHERE plugin_id = ? AND device_id NOT IN ({marks})", (plugin_id, *seen))
+    else:
+        conn.execute("DELETE FROM client_links WHERE plugin_id = ?", (plugin_id,))
+    conn.commit()
+    return len(seen)
+
+
 def record_wifi(conn: sqlite3.Connection, data: dict, now: str | None = None) -> dict:
     """Store one signal sample per Wi-Fi client and log a `wifi_roamed` event when a client changed node.
 

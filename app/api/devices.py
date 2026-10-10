@@ -158,6 +158,8 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
     result = _device_dict(row)
     _add_group(conn, [result])
     result["identification"] = store.identification_report(conn, device_id)
+    link = conn.execute("SELECT plugin_id, node_mac, node_name, port, medium, updated FROM client_links WHERE device_id = ?", (device_id,)).fetchone()
+    result["connection"] = {k: link[k] for k in link.keys()} if link else None
 
     ips = conn.execute(
         "SELECT ip, first_seen, last_seen FROM device_ips WHERE device_id = ? ORDER BY last_seen DESC",

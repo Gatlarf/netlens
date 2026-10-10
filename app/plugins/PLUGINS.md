@@ -305,6 +305,7 @@ Return `{"nodes": [...], "clients": [...]}`. A *node* is a router, switch, acces
 | `vendor` | no | The manufacturer as the router knows it. If it is really a DHCP vendor class (`MSFT 5.0`, `android-dhcp-13`), Netlens recognises that and uses it as the operating system. |
 | `os` | no | The operating system, if the router has fingerprinted it (`Windows 11`, `Android 13`). |
 | `model` | no | A model or product name (`iPhone14,2`, `Chromecast`). |
+| `port` | no | The switch port a wired client is plugged into (`Gi1/0/5`, up to 60 characters). Netlens shows it on the device page next to the node's name. |
 | `device_type` | no | One of `router`, `switch`, `ap`, `server`, `pc`, `phone`, `tablet`, `tv`, `speaker`, `console`, `appliance`, `printer`, `iot`, `camera`, `nas`, `vm`. Any other value is ignored. |
 
 The last four are evidence, not facts: Netlens weighs them against what its own scans found, and the device page shows why it chose a type. Only send what the router actually knows; leave a field out rather than guessing.

@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 from app.db import connect, delete_setting, get_setting, set_setting, utcnow
 from app.plugins.contract import ContractError, clean_config, default_config, missing_required, validate_output
-from app.plugins.enrich import device_lookup, record_client_hints, record_router_names, record_wifi
+from app.plugins.enrich import device_lookup, record_client_hints, record_client_links, record_router_names, record_wifi
 from app.plugins.matching import match_hypervisor, norm_mac, topology_links
 from app.plugins.registry import Plugin, discover
 from app.plugins.runner import PluginRunError, run_subprocess
@@ -256,6 +256,7 @@ class PluginService:
                 try:  # what the router tells us besides the links; a failure here must not fail the sync
                     record_router_names(conn, data)
                     record_client_hints(conn, data)
+                    record_client_links(conn, plugin.id, data)
                     summary.update(record_wifi(conn, data))
                 except sqlite3.Error:
                     log.exception("could not store the router's names and Wi-Fi samples")

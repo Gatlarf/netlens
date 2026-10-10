@@ -78,3 +78,21 @@ def test_teaching_by_overriding(conn):
     assert device(conn)["device_type"] == "speaker"
     report = store.identification_report(conn, 1)
     assert report["evidence"][0]["type"] == "speaker" and "set 3 other Acme" in report["evidence"][0]["why"]
+
+
+def test_connection_is_stored_shown_and_forgotten(conn):
+    from app.plugins.enrich import record_client_links
+
+    data = validate_output("topology", {
+        "nodes": [{"mac": "02:00:00:00:00:99", "name": "SW_TUIN", "role": "switch"}],
+        "clients": [{"mac": "02:00:00:00:10:01", "node_mac": "02:00:00:00:00:99", "medium": "wired", "port": "gi1/0/5"}],
+    })
+    assert data["clients"][0]["port"] == "gi1/0/5"
+    assert record_client_links(conn, "snmp", data) == 1
+    row = conn.execute("SELECT node_name, port, medium FROM client_links").fetchone()
+    assert (row["node_name"], row["port"], row["medium"]) == ("SW_TUIN", "gi1/0/5", "wired")
+    data["clients"][0]["port"] = "gi1/0/7"          # moved to another port
+    record_client_links(conn, "snmp", data)
+    assert conn.execute("SELECT port FROM client_links").fetchone()["port"] == "gi1/0/7"
+    record_client_links(conn, "snmp", {"nodes": [], "clients": []})   # the plugin no longer reports it
+    assert conn.execute("SELECT COUNT(*) FROM client_links").fetchone()[0] == 0
