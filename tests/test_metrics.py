@@ -93,3 +93,11 @@ def test_backup_result_is_exported(db):
     conn.commit()
     s = parse(render_metrics(conn, NOW))
     assert s["netlens_backup_last_ok"] == 0 and s["netlens_backup_last_timestamp_seconds"] > 0 and s["netlens_problem"] == 1
+
+
+def test_dns_metrics(db):
+    conn, _ = db
+    conn.execute("INSERT INTO dns_state (device_id, state) SELECT id, 'add' FROM devices LIMIT 3")
+    conn.commit()
+    s = parse(render_metrics(conn, NOW))
+    assert s['netlens_dns_devices{state="pending"}'] == 3 and s['netlens_dns_devices{state="conflicts"}'] == 0

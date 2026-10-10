@@ -301,3 +301,12 @@ def test_stats_page_data_has_the_new_groups(db):
     assert {"identification", "backups", "netchecks"} <= set(s)
     assert s["composition"]["by_group"][0]["label"] == "(no group)"
     assert s["availability"]["flapping_total"] == 1 and "schema" in s["system"] and s["system"]["vendor_entries"] > 50000
+
+
+def test_summary_has_the_dns_block(db):
+    conn, _ = db
+    assert summary(conn, NOW)["dns"] == {"registered": 0, "pending": 0, "conflicts": 0, "registers_itself": 0, "waiting": 0}
+    conn.execute("INSERT INTO dns_state (device_id, state) SELECT id, 'ok' FROM devices LIMIT 2")
+    conn.execute("INSERT INTO dns_state (device_id, state) SELECT id, 'conflict' FROM devices WHERE id NOT IN (SELECT device_id FROM dns_state) LIMIT 1")
+    conn.commit()
+    assert summary(conn, NOW)["dns"]["registered"] == 2 and summary(conn, NOW)["dns"]["conflicts"] == 1

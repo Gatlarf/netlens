@@ -33,3 +33,6 @@ scrape_configs:
 #         expr: netlens_dhcp_servers{trusted="false"} > 0
 #       - alert: ScansFailing
 #         expr: netlens_scans_failed_24h > 3
+#       - alert: DnsConflict
+#         expr: netlens_dns_devices{state="conflicts"} > 0
+#         for: 1h

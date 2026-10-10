@@ -87,6 +87,9 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
     out.sample("netlens_dhcp_servers", nc["dhcp_servers"] - nc["untrusted"], "DHCP servers found on the network, by whether they are trusted", trusted="true")
     out.sample("netlens_dhcp_servers", nc["untrusted"], "DHCP servers found on the network, by whether they are trusted", trusted="false")
 
+    for state, count in doc["dns"].items():
+        out.sample("netlens_dns_devices", count, "Devices by DNS registration state (registered, pending, conflicts, registers_itself, waiting)", state=state)
+
     sys_info = stats["system"]
     out.sample("netlens_database_size_bytes", sys_info["db_bytes"], "Size of the Netlens database file")
     out.sample("netlens_vendor_registry_entries", sys_info["vendor_entries"], "Manufacturers in the MAC address registry")

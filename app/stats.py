@@ -255,6 +255,15 @@ def _netchecks(conn) -> dict:
     }
 
 
+def _dns(conn) -> dict:
+    """DNS registration in numbers (from the last plan Netlens made after a scan)."""
+    counts = {r["state"]: r["n"] for r in conn.execute("SELECT state, COUNT(*) AS n FROM dns_state WHERE state IS NOT NULL GROUP BY state")}
+    return {
+        "registered": counts.get("ok", 0), "pending": counts.get("add", 0) + counts.get("update", 0) + counts.get("delete", 0),
+        "conflicts": counts.get("conflict", 0), "registers_itself": counts.get("self", 0), "waiting": counts.get("wait", 0),
+    }
+
+
 def flapping_devices(conn, now: str) -> int:
     """Devices with FLAP_TRANSITIONS or more up/down changes in the last 24 hours."""
     since = _ago(now, hours=24)
@@ -518,6 +527,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "identification": _identification(conn),
         "backup": {k: backups[k] for k in ("enabled", "last_at", "last_ok", "last_error", "age_s")},
         "netchecks": _netchecks(conn),
+        "dns": _dns(conn),
         "passive": None if passive is None else {k: passive.get(k) for k in ("enabled", "running", "frames", "applied")},
         "wifi": {k: wifi[k] for k in ("clients", "weak", "avg_rssi")},
         "uptime": {"24h": _pct(day["u"] or 0, day["n"]), "7d": _pct(week["u"] or 0, week["n"])},
