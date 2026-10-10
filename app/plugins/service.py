@@ -51,7 +51,7 @@ def get_state(conn: sqlite3.Connection, plugin: Plugin) -> dict:
     config = default_config(manifest)
     config.update({k: v for k, v in values.items() if k in config})
     for f in manifest["config"]:
-        if f["type"] == "servers" and not config.get(f["key"]):
+        if f["type"] == "servers" and not (isinstance(config.get(f["key"]), list) and config[f["key"]]):
             config[f["key"]] = migrate_servers(f, values)         # settings saved by an older version of the plugin
     return {"enabled": bool(saved.get("enabled", False)) and plugin.manifest is not None, "config": config}
 

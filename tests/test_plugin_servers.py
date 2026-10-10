@@ -67,3 +67,20 @@ def test_older_settings_become_rows():
     pair = manifest(columns=[{"key": "host"}, {"key": "lan"}], legacy={"split": " ", "map": {"host": "hosts"}, "pair": {"sep": "=", "column": "lan"}})["config"][0]
     assert migrate_servers(pair, {"hosts": "http://127.0.0.1:2375=192.168.0.5 http://10.0.0.9:2375"}) == [
         {"id": "s1", "host": "http://127.0.0.1:2375", "lan": "192.168.0.5"}, {"id": "s2", "host": "http://10.0.0.9:2375"}]
+
+
+def test_a_saved_setting_with_the_same_key_as_the_new_list_is_carried_over(tmp_path):
+    """Technitium's older `servers` was one comma-separated text, and the new list has the same key."""
+    from app.db import connect, init_db, set_setting
+    from app.plugins.service import get_state, public_state
+    import json
+
+    m = manifest(legacy={"split": ",", "map": {"host": "servers", "token": "tokens"}})
+    plugin = Plugin(id="demo", manifest=m, builtin=False, path=None, problem=None)
+    conn = connect(tmp_path / "t.db")
+    init_db(conn)
+    set_setting(conn, "plugin.demo", json.dumps({"enabled": True, "config": {"servers": "http://a:1, http://b:2", "tokens": "t1,t2"}}))
+    rows = get_state(conn, plugin)["config"]["servers"]
+    assert [(r["host"], r["token"]) for r in rows] == [("http://a:1", "t1"), ("http://b:2", "t2")]
+    shown = public_state(conn, plugin)
+    assert [r["host"] for r in shown["config"]["servers"]] == ["http://a:1", "http://b:2"] and "t1" not in json.dumps(shown)
