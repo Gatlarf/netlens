@@ -173,12 +173,12 @@ def apply_plugin(conn: sqlite3.Connection, plugin: Plugin) -> dict:
             conn.execute(
                 """
                 INSERT INTO hypervisor_guests
-                    (plugin_id, guest_id, name, kind, host_name, status, macs, ips, device_id, host_device_id, updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (plugin_id, guest_id, name, kind, host_name, status, macs, ips, device_id, host_device_id, updated, details)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (plugin.id, g["id"], g["name"], g["kind"],
                  hosts_by_id.get(g["host_id"], {}).get("name", g["host_id"] or ""), g["status"],
-                 json.dumps(g["macs"]), json.dumps(g["ips"]), g["device_id"], g["host_device_id"], now),
+                 json.dumps(g["macs"]), json.dumps(g["ips"]), g["device_id"], g["host_device_id"], now, json.dumps(g.get("details") or {})),
             )
             if g["device_id"] is not None and g["host_device_id"] is not None and g["device_id"] != g["host_device_id"]:
                 pairs.append((g["device_id"], g["host_device_id"]))

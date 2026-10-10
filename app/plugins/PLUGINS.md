@@ -395,3 +395,9 @@ no record; never fall back to writing on a read-only (secondary) server; and rep
 
 The manifest may list `"capabilities": ["marker", "delete"]` (the server can mark records, and can remove them). `technitium` in `plugins/` is a
 complete example, and `tests/fake_technitium.py` shows how to test one against a simulated server.
+
+### Guest details (hypervisor plugins)
+
+A guest may carry `details`, an object Netlens stores and shows on the device page: `image`, `project`, `service`, `health`,
+`started`, `network`, `network_driver` (text), `restarts`, `exit_code` (numbers), `exposed`, `restarting` (yes/no) and `ports`
+(a list of `{container_port, host_port, proto, bind}`). Unknown keys are dropped. The Docker plugin uses them for containers.

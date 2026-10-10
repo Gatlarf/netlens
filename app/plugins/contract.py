@@ -344,6 +344,41 @@ def validate_dns_results(data: Any, expected_ids: list[str]) -> list[dict]:
     return out
 
 
+MAX_DETAIL_PORTS = 100
+DETAIL_TEXT_KEYS = ("image", "project", "service", "health", "started", "network", "network_driver", "exit_code_text")
+
+
+def _guest_details(value: Any, path: str) -> dict:
+    """Optional extras about a guest (a container's image, health, published ports ...). Only these keys are kept."""
+    if value is None:
+        return {}
+    value = _dict(value, path)
+    out: dict[str, Any] = {}
+    for key in DETAIL_TEXT_KEYS:
+        if value.get(key) not in (None, ""):
+            out[key] = _text(value.get(key), f"{path}.{key}", max_len=200)
+    for key in ("restarts", "exit_code"):
+        number = _optional_number(value.get(key), f"{path}.{key}", 0, 1_000_000, integer=True) if key == "restarts" else _optional_number(value.get(key), f"{path}.{key}", -1000, 1000, integer=True)
+        if number is not None:
+            out[key] = number
+    for key in ("exposed", "restarting"):
+        if key in value:
+            out[key] = bool(value[key])
+    ports = []
+    for j, raw in enumerate(_list(value.get("ports"), f"{path}.ports")[:MAX_DETAIL_PORTS]):
+        raw = _dict(raw, f"{path}.ports[{j}]")
+        proto = _text(raw.get("proto"), f"{path}.ports[{j}].proto", max_len=5, default="tcp").lower()
+        ports.append({
+            "container_port": _optional_number(raw.get("container_port"), f"{path}.ports[{j}].container_port", 0, 65535, integer=True),
+            "host_port": _optional_number(raw.get("host_port"), f"{path}.ports[{j}].host_port", 0, 65535, integer=True),
+            "proto": proto if proto in ("tcp", "udp", "sctp") else "tcp",
+            "bind": _text(raw.get("bind"), f"{path}.ports[{j}].bind", max_len=45),
+        })
+    if ports:
+        out["ports"] = ports
+    return out
+
+
 def _hypervisor(data: Any) -> dict:
     data = _dict(data, "output")
     hosts, host_ids = [], set()
@@ -381,6 +416,7 @@ def _hypervisor(data: Any) -> dict:
             "status": _text(raw.get("status"), f"{path}.status", max_len=30, default="unknown"),
             "macs": [_mac(m, f"{path}.macs[{j}]", required=True) for j, m in enumerate(_list(raw.get("macs"), f"{path}.macs"))],
             "ips": [_ipv4(a, f"{path}.ips[{j}]") for j, a in enumerate(_list(raw.get("ips"), f"{path}.ips"))],
+            "details": _guest_details(raw.get("details"), f"{path}.details"),
         })
     return {"hosts": hosts, "guests": guests}
 

@@ -1,0 +1,35 @@
+{
+  "id": "docker",
+  "name": "Docker hosts",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows your Docker hosts with their containers: state, health, restarts, image, compose project, the ports each container publishes, and containers that have their own address on your network (macvlan / ipvlan) matched to the devices Netlens found. Read-only: it only lists containers and networks. Docker's API gives full control of a host, so talk to it through a read-only socket proxy (see the README), never through an open Docker port.",
+  "timeout": 60,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "hosts",
+      "type": "text",
+      "label": "Docker hosts",
+      "placeholder": "http://192.168.0.189:2375 http://192.168.0.190:2375",
+      "required": true,
+      "help": "The address of the read-only Docker socket proxy on each host, separated by spaces or commas (https:// works too)."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only matters for https:// addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/docker"
+}

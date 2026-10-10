@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 
 
 def utcnow() -> str:
@@ -450,6 +450,8 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_wifi_device_ts ON wifi_samples(device_id, ts)")
+    # --- schema v17: what a plugin reports about a guest (a container's image, health, published ports), JSON ---
+    _add_column_if_missing(conn, "hypervisor_guests", "details", "TEXT NOT NULL DEFAULT '{}'")
     # --- schema v16: DNS registration (see app/dns) -------------------------------------------
     _add_column_if_missing(conn, "devices", "dns_mode", "TEXT NOT NULL DEFAULT 'auto'")   # auto | always | never
     _add_column_if_missing(conn, "devices", "dns_name", "TEXT")                           # the user's own DNS name

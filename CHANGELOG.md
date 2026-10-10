@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.2.103 — 2026-10-10
+
+### Added
+- ★ **Docker plugin** (`plugins/docker`): shows your Docker hosts with their containers (state, health, restarts, image, compose project, published ports). Containers on a macvlan / ipvlan network are matched to the device their scans found, bridge containers are listed under their host, and the host's *Open ports* table names the container behind each port. Read-only, through a read-only socket proxy (the README has the recipe; the Docker API itself gives full control of a host). Plugins can now report extra details about a guest (schema version 17).
+
 ## 0.2.102 — 2026-10-10
 
 ### Changed

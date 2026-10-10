@@ -92,12 +92,20 @@ def _add_group(conn: sqlite3.Connection, devices: list[dict[str, Any]]) -> None:
         d["group_color"] = g["color"] if g else None
 
 
+def _details(raw: Any) -> dict:
+    try:
+        value = json.loads(raw or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
 def _virtualization_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any] | None:
     """Hypervisor role of a device: it is a guest (VM/container) of a host and/or a host with guests."""
     guest = None
     row = conn.execute(
         """
-        SELECT g.plugin_id, g.guest_id, g.name, g.kind, g.host_name AS node, g.status, g.host_device_id,
+        SELECT g.plugin_id, g.guest_id, g.name, g.kind, g.host_name AS node, g.status, g.host_device_id, g.details,
                COALESCE(h.custom_name, h.hostname, h.primary_ip) AS host_name
         FROM hypervisor_guests g LEFT JOIN devices h ON h.id = g.host_device_id
         WHERE g.device_id = ?
@@ -106,10 +114,11 @@ def _virtualization_info(conn: sqlite3.Connection, device_id: int) -> dict[str, 
     ).fetchone()
     if row is not None:
         guest = {k: row[k] for k in row.keys()}
+        guest["details"] = _details(guest.get("details"))
 
     rows = conn.execute(
         """
-        SELECT g.plugin_id, g.guest_id, g.name, g.kind, g.status, g.ips, g.device_id,
+        SELECT g.plugin_id, g.guest_id, g.name, g.kind, g.status, g.ips, g.device_id, g.details,
                COALESCE(d.custom_name, d.hostname, d.primary_ip) AS device_name
         FROM hypervisor_guests g LEFT JOIN devices d ON d.id = g.device_id
         WHERE g.host_device_id = ? ORDER BY g.plugin_id, g.name
@@ -119,6 +128,7 @@ def _virtualization_info(conn: sqlite3.Connection, device_id: int) -> dict[str, 
     guests = []
     for r in rows:
         item = {k: r[k] for k in r.keys()}
+        item["details"] = _details(item.get("details"))
         try:
             item["ips"] = json.loads(item["ips"])
         except (TypeError, ValueError):

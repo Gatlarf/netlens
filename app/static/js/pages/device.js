@@ -99,6 +99,20 @@ function buildWhyCard(device) {
   return card;
 }
 
+// proto/port -> the containers of this Docker host that publish it
+function containerPortOwners(device) {
+  const owners = new Map();
+  for (const g of (device.virtualization && device.virtualization.guests) || []) {
+    for (const p of (g.details && g.details.ports) || []) {
+      if (!p.host_port) continue;
+      const key = `${p.proto || "tcp"}/${p.host_port}`;
+      if (!owners.has(key)) owners.set(key, []);
+      if (!owners.get(key).includes(g)) owners.get(key).push(g);
+    }
+  }
+  return owners;
+}
+
 function buildPortsCard(device, onChanged) {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Open ports"));
@@ -106,7 +120,9 @@ function buildPortsCard(device, onChanged) {
   const table = h("table", { class: "data" });
   const thead = h("thead");
   const headRow = h("tr");
-  ["Port", "Proto", "Service", "Product", "Version", "State"].forEach((col) => {
+  const owners = containerPortOwners(device);
+  const withOwner = owners.size > 0;
+  ["Port", "Proto", "Service", "Product", "Version", "State", ...(withOwner ? ["Container"] : [])].forEach((col) => {
     headRow.appendChild(h("th", {}, col));
   });
   thead.appendChild(headRow);
@@ -116,7 +132,7 @@ function buildPortsCard(device, onChanged) {
   const ports = device.ports || [];
   if (ports.length === 0) {
     const emptyRow = h("tr");
-    const emptyCell = h("td", { colspan: "6" }, "No open ports");
+    const emptyCell = h("td", { colspan: withOwner ? "7" : "6" }, "No open ports");
     emptyRow.appendChild(emptyCell);
     tbody.appendChild(emptyRow);
   } else {
@@ -140,6 +156,10 @@ function buildPortsCard(device, onChanged) {
         stateCell.appendChild(h("span", { class: "tag unknown-tag", title: "This port is not in the device's baseline" }, "not in baseline"));
       }
       row.appendChild(stateCell);
+      if (withOwner) {
+        const who = owners.get(`${p.proto}/${p.port}`) || [];
+        row.appendChild(h("td", {}, ...who.map((g, i) => [i ? ", " : "", h("span", { class: "tag", title: g.details.image || "" }, g.name)]).flat()));
+      }
       tbody.appendChild(row);
     }
   }
@@ -306,6 +326,43 @@ function buildEditCard(device, onSaved) {
   return { card, parentSlot, isDirty: () => dirty, isFocused: () => focused };
 }
 
+const KIND_LABELS = { lxc: "LXC", qemu: "VM", vm: "VM", app: "App", container: "Container" };
+
+function portText(ports) {
+  const shown = (ports || []).filter((p) => p.host_port).map((p) => `${p.host_port}${p.container_port && p.container_port !== p.host_port ? "→" + p.container_port : ""}${p.proto && p.proto !== "tcp" ? "/" + p.proto : ""}${p.bind && p.bind !== "0.0.0.0" && p.bind !== "::" ? " (" + p.bind + ")" : ""}`);
+  return shown.join(", ");
+}
+
+// the state of a container, with its health and restarts when they are worth a look
+function containerState(g) {
+  const d = g.details || {};
+  const bits = [h("span", {}, g.status)];
+  if (d.health && d.health !== "healthy") bits.push(h("span", { class: "tag unknown-tag", title: "Docker health check" }, d.health));
+  if (d.restarts >= 3) bits.push(h("span", { class: "tag unknown-tag", title: "Restarts since the container was created" }, `${d.restarts} restarts`));
+  return h("span", { class: "container-state" }, ...bits.flatMap((b, i) => (i ? [" ", b] : [b])));
+}
+
+// why a running container has no device of its own
+function containerAddressNote(g) {
+  const driver = (g.details && g.details.network_driver) || "";
+  if (driver === "host") return "shares the host's address";
+  if (driver === "macvlan" || driver === "ipvlan") return "not seen on the network";
+  return "inside the host";
+}
+
+function containerRows(card, g) {
+  const d = g.details || {};
+  if (d.image) card.appendChild(kvRow("Image", h("span", {}, d.image)));
+  if (d.project) card.appendChild(kvRow("Compose", h("span", {}, d.service ? `${d.project} / ${d.service}` : d.project)));
+  if (d.network) card.appendChild(kvRow("Network", h("span", {}, d.network_driver && d.network_driver !== d.network ? `${d.network} (${d.network_driver})` : d.network)));
+  if (d.health) card.appendChild(kvRow("Health", h("span", {}, d.health)));
+  if (d.restarts !== undefined) card.appendChild(kvRow("Restarts", h("span", {}, String(d.restarts))));
+  if (d.started) card.appendChild(kvRow("Started", h("span", {}, fmtTime(d.started))));
+  if (d.exit_code !== undefined) card.appendChild(kvRow("Exit code", h("span", {}, String(d.exit_code))));
+  const ports = portText(d.ports);
+  if (ports) card.appendChild(kvRow("Published ports", h("span", {}, ports, d.exposed ? h("span", { class: "tag unknown-tag", title: "Reachable from the whole network" }, "all interfaces") : null)));
+}
+
 function buildVirtualizationCard(device) {
   const info = device.virtualization;
   if (!info) return null;
@@ -314,30 +371,38 @@ function buildVirtualizationCard(device) {
 
   if (info.guest) {
     const g = info.guest;
-    const kind = g.kind === "lxc" ? "Container (LXC)" : g.kind === "app" ? "App" : "Virtual machine";
-    card.appendChild(kvRow("Runs as", h("span", {}, `${kind} ${g.guest_id}, ${g.name}`)));
-    card.appendChild(kvRow("Status", h("span", {}, g.status)));
-    if (g.node) card.appendChild(kvRow("Node", h("span", {}, g.node)));
+    const isContainer = g.kind === "container";
+    const kind = isContainer ? "Container (Docker)" : g.kind === "lxc" ? "Container (LXC)" : g.kind === "app" ? "App" : "Virtual machine";
+    card.appendChild(kvRow("Runs as", h("span", {}, isContainer ? `${kind} ${g.name}` : `${kind} ${g.guest_id}, ${g.name}`)));
+    card.appendChild(kvRow("Status", containerState(g)));
+    if (g.node && !isContainer) card.appendChild(kvRow("Node", h("span", {}, g.node)));
     if (g.host_device_id) {
       card.appendChild(kvRow("Host", h("a", { href: `#/device/${g.host_device_id}` }, g.host_name || `device ${g.host_device_id}`)));
     }
+    containerRows(card, g);
     card.appendChild(kvRow("Reported by", h("span", {}, g.plugin_id)));
   }
 
   if (info.guests && info.guests.length > 0) {
-    card.appendChild(h("p", { class: "hint" }, `Hypervisor host with ${info.guests.length} guest${info.guests.length === 1 ? "" : "s"}:`));
+    const docker = info.guests.some((g) => g.kind === "container");
+    card.appendChild(h("p", { class: "hint" }, docker && info.guests.every((g) => g.kind === "container")
+      ? `Docker host with ${info.guests.length} container${info.guests.length === 1 ? "" : "s"}:`
+      : `Hypervisor host with ${info.guests.length} guest${info.guests.length === 1 ? "" : "s"}:`));
     const table = h("table", { class: "data" });
     const headRow = h("tr");
-    ["ID", "Name", "Type", "Status", "Device"].forEach((c) => headRow.appendChild(h("th", {}, c)));
+    (docker ? ["Name", "Status", "Image", "Ports", "Device"] : ["ID", "Name", "Type", "Status", "Device"]).forEach((c) => headRow.appendChild(h("th", {}, c)));
     table.appendChild(h("thead", {}, headRow));
     const tbody = h("tbody");
     for (const g of info.guests) {
+      const isContainer = g.kind === "container";
       const deviceCell = g.device_id
         ? h("td", {}, h("a", { href: `#/device/${g.device_id}` }, g.device_name || `device ${g.device_id}`))
-        : h("td", { class: "hint" }, g.status === "running" ? "not seen on the network" : "not running");
-      tbody.appendChild(h("tr", {},
-        h("td", {}, String(g.guest_id)), h("td", {}, g.name), h("td", {}, g.kind === "lxc" ? "LXC" : g.kind === "qemu" || g.kind === "vm" ? "VM" : g.kind === "app" ? "App" : g.kind),
-        h("td", {}, g.status), deviceCell));
+        : h("td", { class: "hint" }, g.status !== "running" && g.status !== "restarting" ? "not running" : isContainer ? containerAddressNote(g) : "not seen on the network");
+      if (docker) {
+        tbody.appendChild(h("tr", {}, h("td", {}, g.name), h("td", {}, containerState(g)), h("td", {}, (g.details && g.details.image) || ""), h("td", {}, portText(g.details && g.details.ports)), deviceCell));
+      } else {
+        tbody.appendChild(h("tr", {}, h("td", {}, String(g.guest_id)), h("td", {}, g.name), h("td", {}, KIND_LABELS[g.kind] || g.kind), h("td", {}, g.status), deviceCell));
+      }
     }
     table.appendChild(tbody);
     card.appendChild(table);
