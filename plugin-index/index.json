@@ -146,15 +146,33 @@
    "id": "technitium",
    "name": "Technitium DNS",
    "kind": "dns",
-   "description": "Registers your devices in Technitium DNS Server (A and reverse records) and follows address changes, after a preview and your approval. Works with a primary and secondary server and with a Technitium cluster. It only changes records it created itself and never touches records made by anything else, such as Windows machines that register themselves. Tested against a simulated server only.",
+   "description": "Registers your devices in Technitium DNS Server (A and reverse records) and follows address changes, after a preview and your approval. Works with a primary and secondary server and with a Technitium cluster. It only changes records it created itself and never touches records made by anything else, such as Windows machines that register themselves. Tested on real Technitium 15.5.1 servers (primary and secondary).",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/technitium",
    "license": "MIT",
    "supports": [
-    "Technitium DNS Server with primary and secondary zones (not yet tested on a real server)",
+    "Technitium DNS Server 15.5.1 with primary and secondary zones (tested on real servers)",
     "Technitium DNS cluster (not yet tested on a real server)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.0.1/technitium.zip",
+     "sha256": "2ecd6833a7f807bdc75a9d16c05f7572fb8e91c666af5507f996946d69a1eca4",
+     "api_version": 1,
+     "min_netlens": "0.2.96",
+     "released": "2026-10-10",
+     "changelog": "Tested on real Technitium 15.5.1 servers. A PTR delete that finds nothing left (Technitium removes the PTR together with its A record) now counts as done.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-10",
+      "tested_on": [
+       "Technitium DNS Server 15.5.1, primary and secondary pair (real servers, scratch zone)"
+      ],
+      "notes": "Read: zones and records with comments. Write: one A and one PTR record added, then removed. Only touches records carrying the Netlens marker or tracked by Netlens."
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.0.0/technitium.zip",
