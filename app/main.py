@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, mapsettings, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, stats as stats_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi
+from app.api import dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, mapsettings, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, stats as stats_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, require_auth
@@ -128,6 +128,7 @@ def create_app(
     app.include_router(groups_api.router, dependencies=auth_deps)
     app.include_router(vendor_db_api.router, dependencies=auth_deps)
     app.include_router(passive_api.router, dependencies=auth_deps)
+    app.include_router(dns_api.router, dependencies=auth_deps)
     app.include_router(shares_api.router, dependencies=auth_deps)
     app.include_router(plugin_index.router, dependencies=auth_deps)
     app.include_router(update_api.router, dependencies=auth_deps)

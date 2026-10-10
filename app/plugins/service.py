@@ -214,7 +214,20 @@ class PluginService:
     def plugins(self) -> dict[str, Plugin]:
         return discover(self.data_dir)
 
+    def _with_extras(self, plugin: Plugin, config: dict) -> dict:
+        """A DNS plugin also gets the zones to read and the marker, from the DNS settings."""
+        if (plugin.manifest or {}).get("kind") != "dns":
+            return config
+        from app.dns.service import plugin_config_extra
+
+        conn = connect(self.db_path)
+        try:
+            return {**config, **plugin_config_extra(conn)}
+        finally:
+            conn.close()
+
     async def _call(self, plugin: Plugin, action: str, config: dict, payload=None):
+        config = self._with_extras(plugin, config)
         if payload is None:
             return await asyncio.to_thread(lambda: self.runner(plugin, action, config))
         return await asyncio.to_thread(lambda: self.runner(plugin, action, config, payload=payload))
@@ -224,6 +237,18 @@ class PluginService:
         result = await self._call(plugin, "test", config)
         message = result.get("message") if isinstance(result, dict) else None
         return {"ok": True, "message": message if isinstance(message, str) and message else "Connection successful"}
+
+    async def apply_dns(self, plugin: Plugin, changes: list[dict]) -> list[dict]:
+        """Hand approved changes to a DNS plugin. Raises PluginRunError / ContractError; per-change failures are in the results."""
+        from app.plugins.contract import validate_dns_results
+
+        conn = connect(self.db_path)
+        try:
+            config = get_state(conn, plugin)["config"]
+        finally:
+            conn.close()
+        raw = await self._call(plugin, "apply", config, payload=changes)
+        return validate_dns_results(raw, [c["id"] for c in changes])
 
     async def diagnose(self, plugin: Plugin, config: dict) -> dict:
         """The plugin's diagnostic report with everything private removed. Raises PluginRunError / DiagnoseError."""
@@ -256,6 +281,16 @@ class PluginService:
                 return {"error": message, "auth_failed": False}
             set_setting(conn, _key(plugin.id, "data"), json.dumps(data))
             summary = apply_plugin(conn, plugin)
+            if plugin.manifest["kind"] == "dns":
+                try:  # the grace clock and the generated names are kept per scan, not when somebody looks at the page
+                    from app.dns.service import get_settings as dns_settings, make_plan
+
+                    if not dns_settings(conn)["networks"].strip():
+                        raise ValueError("no network and zone configured yet")
+                    plan = make_plan(conn, plugin.id, data, persist=True)
+                    summary.update({"planned": sum(1 for i in plan["items"] if i["state"] in ("add", "update", "delete")), "conflicts": plan["counts"].get("conflict", 0)})
+                except (sqlite3.Error, ValueError):
+                    log.exception("could not work out the DNS plan")
             if plugin.manifest["kind"] == "topology":
                 try:  # what the router tells us besides the links; a failure here must not fail the sync
                     record_router_names(conn, data)
