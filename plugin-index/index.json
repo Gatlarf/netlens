@@ -116,6 +116,33 @@
    ]
   },
   {
+   "id": "snmp",
+   "name": "SNMP switches",
+   "kind": "topology",
+   "description": "Asks managed switches over SNMP v1 / v2c (read-only) which device is plugged into which port: the MAC address table and LLDP. Netlens shows each device's switch and port and places the switches in the hierarchy. Works with switches that have the standard bridge MIB (TP-Link, Netgear, HP / Aruba, Cisco, Zyxel, MikroTik, Ubiquiti and others). Tested against simulated switches only.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/snmp",
+   "license": "MIT",
+   "supports": [
+    "Managed switches with SNMP v1/v2c and the BRIDGE-MIB or Q-BRIDGE-MIB (not yet tested on hardware)",
+    "LLDP-MIB for links between switches (optional)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-snmp-v1.0.0/snmp.zip",
+     "sha256": "90f3af8a90c9e3a883375b253fca5971c7823c426871ee0872e2566cdc1bbbca",
+     "api_version": 1,
+     "min_netlens": "0.2.90",
+     "released": "2026-10-10",
+     "changelog": "First release. Written from the standard MIBs and tested against simulated switches only: please test it on a real switch and report back (see the README).",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
    "id": "truenas",
    "name": "TrueNAS",
    "kind": "hypervisor",
