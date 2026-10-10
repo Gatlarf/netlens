@@ -285,10 +285,9 @@ class PluginService:
                 try:  # the grace clock and the generated names are kept per scan, not when somebody looks at the page
                     from app.dns.service import get_settings as dns_settings, make_plan
 
-                    if not dns_settings(conn)["networks"].strip():
-                        raise ValueError("no network and zone configured yet")
-                    plan = make_plan(conn, plugin.id, data, persist=True)
-                    summary.update({"planned": sum(1 for i in plan["items"] if i["state"] in ("add", "update", "delete")), "conflicts": plan["counts"].get("conflict", 0)})
+                    if dns_settings(conn)["networks"].strip():       # nothing to plan until a network and zone are set
+                        plan = make_plan(conn, plugin.id, data, persist=True)
+                        summary.update({"planned": sum(1 for i in plan["items"] if i["state"] in ("add", "update", "delete")), "conflicts": plan["counts"].get("conflict", 0)})
                 except (sqlite3.Error, ValueError):
                     log.exception("could not work out the DNS plan")
             if plugin.manifest["kind"] == "topology":
@@ -333,6 +332,11 @@ class PluginService:
             if not paused:
                 try:
                     ok = "error" not in await self.sync(plugin.id)
+                    if ok and plugin.manifest["kind"] == "dns":
+                        from app.dns.service import auto_apply
+
+                        if await auto_apply(self, plugin):
+                            await self.sync(plugin.id)      # read back what the server has now
                 except Exception:  # noqa: BLE001 - one plugin must never break the others or the scan
                     log.exception("plugin %s crashed the sync", plugin.id)
             if not ok:

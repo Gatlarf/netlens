@@ -280,7 +280,7 @@ def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, 
                     claimed.add((mine_ptr[0]["zone"], mine_ptr[0]["name"], "PTR", mine_ptr[0]["value"]))
                 else:
                     changes.append(change("add", rz["name"], rname, "PTR", host))
-                if len(changes) > 1 or not reasons:
+                if not reasons:
                     reasons.append("the reverse record is missing or wrong")
         if not changes:
             done("ok", "registered by Netlens")

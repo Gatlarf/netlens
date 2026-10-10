@@ -164,3 +164,15 @@ td.actions .btn { padding: 2px 8px; font-size: 0.85em; }
 .stat-chip:hover { border-color: var(--accent); }
 .stat-chip.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .stat-section { scroll-margin-top: calc(var(--topbar-h, 0px) + var(--statsnav-h, 0px) + 8px); }
+
+/* DNS registration */
+.dns-counts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.dns-chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.8rem; border: 1px solid var(--border); background: var(--surface); white-space: nowrap; }
+.dns-chip.add, .dns-chip.update, .dns-chip.delete { border-color: var(--accent); color: var(--accent); }
+.dns-chip.conflict { border-color: #dc2626; color: #dc2626; }
+.dns-chip.wait { border-color: var(--warn, #d97706); color: var(--warn, #d97706); }
+.dns-chip.ok, .dns-chip.self { border-color: #16a34a; color: #16a34a; }
+.dns-chip.skip, .dns-chip.orphan { color: var(--muted); }
+.dns-plan td { vertical-align: top; }
+.dns-change { margin: 2px 0 0; }
+.dns-row.ok td, .dns-row.skip td { color: var(--muted); }

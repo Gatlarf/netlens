@@ -36,6 +36,8 @@ class DevicePatch(BaseModel):
     notify_offline: bool | None = None
     trusted: bool | None = None             # True = a device the user knows
     gentle: bool | None = None              # True = scans only check its ports, they never probe its services
+    dns_mode: str | None = None             # 'auto' | 'always' | 'never' (DNS registration)
+    dns_name: str | None = Field(default=None, max_length=100)   # the user's own DNS name ("" clears it)
     group_id: int | None = None             # a group from /api/groups, or null for none
     parent_mode: str | None = None          # 'auto' | 'none' | 'device'
     parent_device_id: int | None = None
@@ -74,6 +76,8 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
         "notify_offline": bool(row["notify_offline"]),
         "trusted": bool(row["trusted"]),
         "gentle": bool(row["gentle"]),
+        "dns_mode": row["dns_mode"] or "auto",
+        "dns_name": row["dns_name"],
         "group_id": row["group_id"],
         "mac_kind": vendor_db.mac_kind(row["mac"]),  # "universal", "randomized" (a private Wi-Fi address), "virtual" or None
     }
@@ -160,6 +164,8 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
     result["identification"] = store.identification_report(conn, device_id)
     link = conn.execute("SELECT plugin_id, node_mac, node_name, port, medium, updated FROM client_links WHERE device_id = ?", (device_id,)).fetchone()
     result["connection"] = {k: link[k] for k in link.keys()} if link else None
+    dns = conn.execute("SELECT state, reason, fqdn FROM dns_state WHERE device_id = ?", (device_id,)).fetchone()
+    result["dns"] = {k: dns[k] for k in dns.keys()} if dns else None
 
     ips = conn.execute(
         "SELECT ip, first_seen, last_seen FROM device_ips WHERE device_id = ? ORDER BY last_seen DESC",
@@ -242,6 +248,8 @@ def list_devices(
             notify_offline,
             trusted,
             gentle,
+            dns_mode,
+            dns_name,
             group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
@@ -354,6 +362,8 @@ def get_device(
             notify_offline,
             trusted,
             gentle,
+            dns_mode,
+            dns_name,
             group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
@@ -397,6 +407,8 @@ def patch_device(
             notify_offline,
             trusted,
             gentle,
+            dns_mode,
+            dns_name,
             group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices
@@ -448,6 +460,19 @@ def patch_device(
         if body.group_id is not None and not groups_mod.exists(conn, body.group_id):
             raise HTTPException(status_code=422, detail="no such group")
         updates["group_id"] = body.group_id
+
+    if "dns_mode" in fields_set:
+        if body.dns_mode not in ("auto", "always", "never"):
+            raise HTTPException(status_code=422, detail="dns_mode must be auto, always or never")
+        updates["dns_mode"] = body.dns_mode
+
+    if "dns_name" in fields_set:
+        from app.dns.names import clean_label
+
+        text = (body.dns_name or "").strip()
+        if text and clean_label(text) is None:
+            raise HTTPException(status_code=422, detail="that is not a valid host name (use letters, digits and hyphens)")
+        updates["dns_name"] = text or None
 
     if "gentle" in fields_set:
         updates["gentle"] = 1 if body.gentle else 0
@@ -521,6 +546,8 @@ def patch_device(
             notify_offline,
             trusted,
             gentle,
+            dns_mode,
+            dns_name,
             group_id,
             (SELECT COUNT(*) FROM ports WHERE device_id = devices.id) AS open_ports
         FROM devices

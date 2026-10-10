@@ -38,7 +38,7 @@ def env(tmp_path):
                 ids[key] = d
             conn.commit()
             conn.close()
-            client.ids, client.server, client.path = ids, dnsserver, tmp_path / "t.db"
+            client.ids, client.server, client.path, client.data = ids, dnsserver, tmp_path / "t.db", data
             r = client.put("/api/plugins/technitium", json={"enabled": True, "config": {"servers": dnsserver.url, "tokens": "tok", "timeout": 5}})
             assert r.status_code == 200, r.text
             yield client
@@ -145,3 +145,31 @@ def test_a_server_that_is_down_gives_a_clear_error(env):
     env.server.stop()
     r = env.post("/api/dns/refresh")
     assert r.status_code == 502 and "cannot reach" in r.json()["detail"]
+
+
+def test_automatic_mode_writes_after_a_scan_but_never_removes(env):
+    import asyncio
+
+    from app.plugins.service import PluginService
+
+    setup_dns(env, auto_apply=True)
+    asyncio.run(PluginService(str(env.path), env.data).after_scan())
+    assert any(r["name"] == f"printer.{Z}" for r in env.server.records(Z))
+    assert [r["rData"]["ipAddress"] for r in env.server.records(Z) if r["name"] == f"desktop-abc.{Z}"] == ["192.168.0.20"]
+    # a record Netlens made for a device that is gone stays (removal is off)
+    conn = connect(env.path)
+    conn.execute("DELETE FROM devices WHERE id = ?", (env.ids["printer"],))
+    conn.commit()
+    conn.close()
+    asyncio.run(PluginService(str(env.path), env.data).after_scan())
+    assert any(r["name"] == f"printer.{Z}" for r in env.server.records(Z))
+
+
+def test_device_fields_for_dns(env):
+    d = env.ids["printer"]
+    assert env.get(f"/api/devices/{d}").json()["dns_mode"] == "auto"
+    r = env.patch(f"/api/devices/{d}", json={"dns_mode": "never", "dns_name": "Print Server"})
+    assert r.status_code == 200 and r.json()["dns_mode"] == "never" and r.json()["dns_name"] == "Print Server"
+    assert env.patch(f"/api/devices/{d}", json={"dns_mode": "sometimes"}).status_code == 422
+    assert env.patch(f"/api/devices/{d}", json={"dns_name": "!!!"}).status_code == 422
+    assert env.patch(f"/api/devices/{d}", json={"dns_name": ""}).json()["dns_name"] is None

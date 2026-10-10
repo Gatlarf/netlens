@@ -58,6 +58,12 @@ function buildDetailsCard(device) {
 
   card.appendChild(kvRow("Status", statusDot(device.online)));
 
+  // DNS: what Netlens knows about this device's record (only once the DNS feature has looked at it)
+  if (device.dns && device.dns.state && device.dns.state !== "skip") {
+    const label = { ok: "registered", self: "registers itself", add: "not registered yet", update: "record needs updating", wait: "waiting to register", conflict: "name conflict" }[device.dns.state] || device.dns.state;
+    card.appendChild(kvRow("DNS", h("span", { id: "dns-info", title: device.dns.reason || "" }, `${device.dns.fqdn || ""} · ${label}`)));
+  }
+
   // where it is plugged in / connected, from a router or switch plugin (SNMP, Omada, UniFi, ASUS...)
   const link = device.connection;
   if (link && (link.node_name || link.node_mac || link.port)) {
@@ -240,6 +246,15 @@ function buildEditCard(device, onSaved) {
   gentleField.appendChild(h("label", { title: "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself." }, gentleInput, " Gentle scanning (don't probe its services)"));
   form.appendChild(gentleField);
 
+  const dnsField = h("div", { class: "field" });
+  const dnsMode = h("select", { name: "dns_mode", title: "Automatic follows the DNS settings. Always registers the device even when it would be skipped (a Windows machine, a unknown device). Never keeps it out of DNS." },
+    h("option", { value: "auto" }, "Automatic"), h("option", { value: "always" }, "Always register"), h("option", { value: "never" }, "Never register"));
+  dnsMode.value = device.dns_mode || "auto";
+  const dnsName = h("input", { type: "text", name: "dns_name", value: device.dns_name || "", placeholder: "(automatic)", maxlength: "100", title: "The host name Netlens registers for this device. Leave empty for the automatic name." });
+  dnsField.appendChild(h("label", {}, "DNS registration"));
+  dnsField.appendChild(h("div", { class: "edit-grid" }, dnsMode, dnsName));
+  form.appendChild(dnsField);
+
   const trustField = h("div", { class: "field" });
   const trustInput = h("input", { type: "checkbox", name: "trusted", checked: device.trusted === true });
   trustField.appendChild(h("label", { title: "Tick it for devices you recognise. Devices that appear later start as unknown, so you can spot newcomers." }, trustInput, " Known device"));
@@ -251,7 +266,7 @@ function buildEditCard(device, onSaved) {
   let dirty = false;
   let focused = false;
 
-  const fields = [nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, trustInput];
+  const fields = [nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, trustInput, dnsMode, dnsName];
   for (const f of fields) {
     f.addEventListener("input", () => { dirty = true; });
     f.addEventListener("change", () => { dirty = true; });
@@ -270,6 +285,8 @@ function buildEditCard(device, onSaved) {
       notify_offline: notifyInput.checked,
       trusted: trustInput.checked,
       gentle: gentleInput.checked,
+      dns_mode: dnsMode.value,
+      dns_name: dnsName.value,
     };
     try {
       await patch(`/api/devices/${device.id}`, body);

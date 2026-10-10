@@ -18,6 +18,7 @@ import { buildNetchecksCard } from "../cards/netchecks.js";
 import { buildGroupsCard } from "../cards/groups.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 import { buildPassiveCard } from "../cards/passive.js";
+import { buildDnsCard } from "../cards/dns.js";
 
 function kvRow(label, value) {
   const row = h("div", { class: "kv" });
@@ -227,6 +228,7 @@ const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus" };
 function integrationsGroup(plugins, updates = 0) {
   const items = [
     { key: "plugins", label: "Plugins", build: buildPluginsCard },
+    { key: "dns", label: "DNS registration", build: buildDnsCard },
     { key: "plugin-browse", label: updates ? `Browse plugins (${updates} update${updates === 1 ? "" : "s"})` : "Browse plugins", build: buildBrowseCard },
     ...plugins.map((p) => ({ key: `plugin-${p.id}`, label: p.name, build: () => buildPluginCard(p.id) })),
     { key: "plugin-guide", label: "Plugin guide", build: buildPluginGuideCard },

@@ -57,6 +57,9 @@ def _view(service: PluginService, conn) -> dict:
         if not out["needs_setup"]:
             try:
                 out["plan"] = dns.make_plan(conn, active.id, validate_output("dns", data))
+                labels = {r["id"]: r["n"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices")}
+                for item in out["plan"]["items"]:
+                    item["device"] = labels.get(item["device_id"])
             except (ValueError, ContractError) as exc:
                 out["plan_error"] = str(exc)
     return out

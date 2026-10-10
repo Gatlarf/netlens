@@ -6,6 +6,7 @@ Netlens can learn about your network from other systems through **plugins**. A p
 | Kind | Reports | Examples |
 | :--- | :--- | :--- |
 | `hypervisor` | hosts, and the VMs/containers that run on them | Proxmox VE (built in), ESXi, Hyper-V, libvirt |
+| `dns` | a DNS server that Netlens writes device names and addresses to | Technitium DNS (more welcome: BIND with RFC 2136, Pi-hole, AdGuard Home, dnsmasq) |
 | `topology` | network nodes (router, switch, access point, mesh node) and the clients connected to them | ASUS AiMesh (built in), Omada, UniFi, Fritz!Box, MikroTik |
 
 Plugin API version: **1**.
@@ -365,3 +366,32 @@ user and could read the data volume, which holds the database with saved credent
 | `the plugin returned data that is not JSON` | Return plain dicts, lists, strings and numbers (no sets, bytes or custom objects). |
 | `not configured yet: ...` | Fill in the required fields on the plugin's settings page. |
 | Status says automatic syncing is paused | The login was refused (`auth_failed`). Fix the credentials, then **Save** or **Sync now**. |
+
+
+## DNS plugins (kind `dns`)
+
+A DNS plugin lets Netlens register devices in a DNS server. Netlens does the thinking (which names and addresses should exist, what is already
+there, what is safe to change, the preview and the approval); the plugin only talks to the server. Unlike the other kinds it also **writes**, so
+its page says so, and nothing is written before the administrator approves it (or switches on automatic mode).
+
+**Entry points** (all `def f(config)`, except `apply`):
+
+* `test(config)` returns `{"message": ...}`, as always.
+* `fetch(config)` returns a **snapshot** of the server: `{"zones": [{"name": "home.example.com", "kind": "forward", "writable": true}, ...],
+  "records": [{"zone": ..., "name": "nas.home.example.com", "type": "A", "value": "192.168.0.7", "ttl": 3600, "managed": true, "comment": "..."}],
+  "server": "dns1"}`. Types are `A`, `AAAA`, `PTR` (value = the target name) and `CNAME`. `writable` says whether this account can write the zone
+  (a secondary zone is not writable). Include the reverse zones (`...in-addr.arpa`) you find. Names are compared in lower case without a final dot.
+  `managed` is true when the record carries Netlens' marker.
+* `apply(config, changes)` gets a list of changes and returns `[{"id": ..., "ok": true|false, "error": "..."}]`, one per change. A change is
+  `{"id", "action": "add"|"update"|"delete", "zone", "name", "type", "value", "old_value", "comment"}`: `value` is the new value, `old_value` the
+  current one of an update, `comment` the marker to put on the record. Write A and PTR records exactly as given (the reverse record is a separate
+  change). Do not send a TTL unless the server needs one: the zone default is wanted.
+
+Netlens adds two settings next to the user's: `zones` (the forward zones to read) and `marker` (the comment that marks Netlens' own records).
+
+**Rules for authors** (they protect other people's DNS): put the marker on every record you write and report it back as `managed`; select the exact
+record to update or delete by its current value so a record that changed meanwhile is not overwritten; before an add, check that the name still has
+no record; never fall back to writing on a read-only (secondary) server; and report a refused login with `auth_failed`.
+
+The manifest may list `"capabilities": ["marker", "delete"]` (the server can mark records, and can remove them). `technitium` in `plugins/` is a
+complete example, and `tests/fake_technitium.py` shows how to test one against a simulated server.

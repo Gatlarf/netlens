@@ -185,3 +185,39 @@ def record_results(conn: sqlite3.Connection, plugin_id: str, changes: list[dict]
             add_event(conn, kind, label, device_id=device_id, now=now)
     conn.commit()
     return counts
+
+
+async def auto_apply(service, plugin) -> dict[str, int] | None:
+    """After a scan, when the administrator switched automatic mode on: write the missing and changed records (never remove any),
+    at most `max_changes` per run (the rest follows on the next scan). Returns the counts, or None when there was nothing to do."""
+    from app.db import connect
+    from app.plugins.contract import ContractError, validate_output
+    from app.plugins.runner import PluginRunError
+
+    conn = connect(service.db_path)
+    try:
+        values = get_settings(conn)
+        if not values["auto_apply"] or not values["networks"].strip():
+            return None
+        raw = get_setting(conn, f"plugin.{plugin.id}.data")
+        try:
+            snapshot = validate_output("dns", json.loads(raw)) if raw else None
+        except (ValueError, ContractError):
+            return None
+        if snapshot is None:
+            return None
+        plan = make_plan(conn, plugin.id, snapshot)
+        changes = [c for item in plan["items"] if item["state"] in ("add", "update") for c in item["changes"]][: int(values["max_changes"])]
+    finally:
+        conn.close()
+    if not changes:
+        return None
+    try:
+        results = await service.apply_dns(plugin, changes)
+    except (PluginRunError, ContractError):
+        return None
+    conn = connect(service.db_path)
+    try:
+        return record_results(conn, plugin.id, changes, results)
+    finally:
+        conn.close()
