@@ -178,3 +178,16 @@ export function sessionInfo() {
 export function isAdmin() {
   return !sessionUser || sessionUser.role === "admin";
 }
+
+// On a phone a toolbar with many controls folds behind one button (the first control, usually the search box, stays;
+// so does anything marked class "keep"). The button is hidden on wider screens, see css/phone.css.
+export function foldToolbarOnPhone(toolbar, label = "Filters & options") {
+  const toggle = h("button", { class: "btn toolbar-toggle", type: "button", "aria-expanded": "false" }, label + " ▾");
+  toggle.addEventListener("click", () => {
+    const open = toolbar.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.textContent = label + (open ? " ▴" : " ▾");
+  });
+  toolbar.classList.add("has-toggle");
+  toolbar.insertBefore(toggle, toolbar.children[1] || null);
+}

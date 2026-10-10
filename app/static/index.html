@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="css/map.css">
   <link rel="stylesheet" href="css/terminal.css">
   <link rel="stylesheet" href="css/features.css">
+  <link rel="stylesheet" href="css/phone.css">
 </head>
 <body>
   <header class="topbar" id="topbar">
@@ -46,7 +47,7 @@
         <div id="user-menu" class="popmenu" hidden>
           <div class="menu-who" id="user-who"></div>
           <hr>
-          <div class="menu-row"><span>Version</span><span id="app-version" class="app-version"></span></div>
+          <a class="menu-row version-link" href="#/settings/about" title="About this version and what changed"><span>Version</span><span id="app-version" class="app-version"></span></a>
           <a id="update-badge" class="menu-row update-badge" href="#/settings/about" hidden></a>
           <hr>
           <button id="logout" class="menu-item" type="button">Log out</button>

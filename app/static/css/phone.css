@@ -1,0 +1,67 @@
+/* Phones only (up to 700 px wide): tighter spacing, nothing wider than the screen, long tables turned into lists.
+   Everything here sits inside the media query, so tablets (iPad) and computers look exactly as before. */
+.sort-phone { display: none; gap: 6px; align-items: center; flex: 1 1 100%; }
+.sort-phone select { flex: 1 1 auto; min-width: 0; }
+@media (min-width: 701px) { .toolbar-toggle { display: none; } }
+@media (max-width: 700px) {
+  html { -webkit-text-size-adjust: 100%; }
+  body { font-size: 14px; }
+  .view { padding: 10px 10px 24px; }
+  .view h1 { font-size: 1.3rem; margin: 6px 0 6px; line-height: 1.25; }
+  .view h2 { font-size: 1.05rem; }
+  .card h2, .card-title { margin: 0 0 8px; }
+  .card h3 { margin: 10px 0 4px; }
+  .view > p.hint, .view > .hint { margin: 2px 0 8px; }
+
+  /* never wider than the screen: grid / flex children may shrink, tables scroll inside their card */
+  .view, .view > *, .col-left, .col-right, .card, .card-body, .grid-2 > *, .stat-grid > *, .settings-layout > * { min-width: 0; max-width: 100%; }
+  .card { padding: 12px; }
+  .card table.data, .card .table-wrap table.data { display: block; max-width: 100%; overflow-x: auto; }
+  .col-left, .col-right { gap: 10px; }
+  .grid-2 { gap: 10px; }
+  .kv { gap: 8px; }
+  .kv dt, .kv-key, .kv-label { flex-basis: 96px; }
+  .kv-value, .kv dd { min-width: 0; overflow-wrap: anywhere; }
+
+  /* smaller controls (still 36 px tall) */
+  .btn { padding: 6px 11px; }
+  input, select, textarea { padding: 6px 8px; }
+  .toolbar { gap: 6px; margin-bottom: 10px; }
+  .toolbar > input[type="search"], .toolbar > input[type="text"] { flex: 1 1 100%; min-width: 0; }
+  .toolbar > select { flex: 1 1 calc(50% - 6px); min-width: 0; }
+  table.data th, table.data td { padding: 6px 8px; }
+  .tile { padding: 8px 10px; }
+  .tile-value { font-size: 1.4em; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+  /* a toolbar with many controls folds behind one button */
+  .toolbar-toggle { flex: 1 1 100%; text-align: left; }
+  .toolbar.has-toggle:not(.open) > :not(:first-child):not(.toolbar-toggle):not(.keep) { display: none; }
+  .toolbar .count { color: var(--muted); }
+  table.data { font-size: 13px; }
+  table.data th, table.data td { padding: 5px 6px; }
+  table.data thead th { white-space: normal; }
+
+  /* the device list becomes a list of two-line rows */
+  .view table.devices-table { display: block; border: 0; background: none; overflow: visible; }
+  .view table.devices-table thead { display: none; }
+  .view table.devices-table tbody { display: block; }
+  .view table.devices-table tbody tr { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .view table.devices-table tbody tr:nth-child(even), .view table.devices-table tbody tr:hover { background: var(--surface); }
+  .view table.devices-table td { display: block; padding: 0; border: 0; min-width: 0; }
+  .view table.devices-table td:nth-child(1) { grid-row: 1 / span 2; grid-column: 1; }
+  .view table.devices-table td:nth-child(2) { grid-row: 1; grid-column: 2; font-weight: 600; overflow-wrap: anywhere; }
+  .view table.devices-table td:nth-child(10) { grid-row: 1; grid-column: 3; color: var(--muted); font-size: 0.85em; white-space: nowrap; }
+  .view table.devices-table td:nth-child(3) { grid-row: 2; grid-column: 2; color: var(--muted); font-size: 0.9em; }
+  .view table.devices-table td:nth-child(6) { grid-row: 2; grid-column: 3; justify-self: end; }
+  .view table.devices-table td:nth-child(4), .view table.devices-table td:nth-child(5), .view table.devices-table td:nth-child(7), .view table.devices-table td:nth-child(8), .view table.devices-table td:nth-child(9) { display: none; }
+  .view table.devices-table td.empty { grid-column: 1 / -1; display: block; }
+  .sort-phone { display: flex; }
+
+  /* the uptime bars: the newest 30 scans fit */
+  .hb-bar { min-width: 0; }
+  .hb-bar .hb:nth-last-child(n+31) { display: none; }
+  .hb { max-width: none; min-width: 4px; }
+  .wide-only { display: none; }
+}
+@media (min-width: 701px) { .narrow-only, .sort-phone { display: none; } }

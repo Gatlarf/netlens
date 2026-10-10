@@ -1,6 +1,6 @@
 import { cssVar, isDark } from "../theme.js";
 import { get, post, patch, del, ApiError } from "../api.js";
-import { h, clear, toast, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
+import { h, clear, toast, foldToolbarOnPhone, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { buildTree, defaultCollapsed, layoutHorizontal, leafIds } from "../layout_horizontal.js";
 
 const LAYOUTS = ["free", "tree", "horizontal"];
@@ -415,6 +415,7 @@ export async function render(container, params) {
   mapWrap.appendChild(canvasEl);
   mapWrap.appendChild(panel);
 
+  foldToolbarOnPhone(toolbar, "Filters & layout");
   container.appendChild(toolbar);
   container.appendChild(mapWrap);
 

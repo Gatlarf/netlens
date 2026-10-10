@@ -1,5 +1,5 @@
 import { get, post } from "../api.js";
-import { h, clear, toast, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS, shortName, vendorText, vendorTitle } from "../util.js";
+import { h, clear, toast, foldToolbarOnPhone, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS, shortName, vendorText, vendorTitle } from "../util.js";
 
 const REFRESH_MS = 15000;
 
@@ -199,7 +199,7 @@ function buildToolbar(state) {
   });
   toolbar.appendChild(baselineAll);
 
-  const count = h("span", { class: "count" }, "0 devices");
+  const count = h("span", { class: "count keep" }, "0 devices");
   toolbar.appendChild(count);
 
   const csv = h("a", { href: "/api/export/devices.csv", download: "devices.csv" }, "Export CSV");
@@ -207,11 +207,25 @@ function buildToolbar(state) {
   toolbar.appendChild(csv);
   toolbar.appendChild(json);
 
+  // phones show the list without column headers: this picks the sort order instead
+  const sortSel = h("select", { "aria-label": "Sort by" });
+  for (const col of SORT_KEYS.filter((c) => c.sortable)) sortSel.appendChild(h("option", { value: col.key }, "Sort: " + col.label));
+  sortSel.value = state.sortKey;
+  const dirBtn = h("button", { class: "btn", type: "button", "aria-label": "Reverse the order" }, state.sortDir === "asc" ? "↑" : "↓");
+  sortSel.addEventListener("change", () => { state.sortKey = sortSel.value; renderRows(); });
+  dirBtn.addEventListener("click", () => {
+    state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+    dirBtn.textContent = state.sortDir === "asc" ? "↑" : "↓";
+    renderRows();
+  });
+  toolbar.appendChild(h("div", { class: "sort-phone keep" }, sortSel, dirBtn));
+  foldToolbarOnPhone(toolbar, "Filters");
+
   return { toolbar, count };
 }
 
 function buildTable(state) {
-  const table = h("table", { class: "data" });
+  const table = h("table", { class: "data devices-table" });
   const thead = h("thead");
   const tr = h("tr");
   for (const col of SORT_KEYS) {

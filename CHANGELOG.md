@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.2.102 — 2026-10-10
+
+### Changed
+- ★ **Easier to read on a phone**: nothing is wider than the screen any more (the uptime, scans and device pages used to scroll sideways), the device list is a list of two-line rows with a *Sort* menu instead of a ten-column table, the filters of the Devices and Map pages fold behind a *Filters* button, and spacing and sizes are tighter. Screens wider than 700 px (computers, iPad) look exactly as before.
+- **The version in the account menu is a link** to Settings → About (and its changelog).
+
 ## 0.2.100 — 2026-10-10
 
 ### Added

@@ -104,7 +104,7 @@ export async function render(container, params) {
   const headRow = h("tr", {});
   headRow.appendChild(h("th", {}, "Status"));
   headRow.appendChild(h("th", {}, "Device"));
-  headRow.appendChild(h("th", {}, "Last 60 scans"));
+  headRow.appendChild(h("th", {}, h("span", { class: "wide-only" }, "Last 60 scans"), h("span", { class: "narrow-only" }, "Last 30 scans")));
   headRow.appendChild(h("th", {}, "24 h"));
   headRow.appendChild(h("th", {}, "7 days"));
   thead.appendChild(headRow);

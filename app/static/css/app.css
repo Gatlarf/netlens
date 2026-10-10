@@ -160,6 +160,8 @@ body {
 .menu-item:focus-visible, .nav-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .menu-row { color: var(--muted); font-size: 0.85rem; }
 .menu-row .app-version { margin: 0; font-size: inherit; }
+.menu-row.version-link { cursor: pointer; text-decoration: none; }
+.menu-row.version-link:hover { background: var(--bg); color: var(--text); }
 .menu-row.update-badge { color: var(--warn, #b45309); font-weight: 600; margin: 0; border: 0; border-radius: 6px; background: none; font-size: 0.85rem; padding: 8px 10px; }
 .menu-who { padding: 6px 10px; }
 .menu-who small { display: block; color: var(--muted); }
