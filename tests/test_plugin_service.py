@@ -341,7 +341,7 @@ def test_v4_database_is_migrated_to_plugins(tmp_path):
     assert tuple(row) == ("proxmox", "100", "pve1", web)
     pm = discover(None)["proxmox"]
     state = get_state(conn, pm)
-    assert state["enabled"] is True and state["config"]["token_id"] == "t" and state["config"]["verify_tls"] is False
+    assert state["enabled"] is True and state["config"]["servers"][0]["token_id"] == "t" and state["config"]["verify_tls"] is False
     assert get_status(conn, "proxmox")["guests"] == 1
     assert get_state(conn, discover(None)["asus"])["config"]["username"] == "u"
     data = json.loads(get_setting(conn, "plugin.asus.data"))

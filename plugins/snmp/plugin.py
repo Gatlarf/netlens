@@ -378,21 +378,28 @@ class Switch:
 
 
 # ----------------------------------------------------------------------------- turning several switches into a topology
-def parse_hosts(text):
-    return [h for h in re.split(r"[,;\s]+", str(text or "").strip()) if h]
+def parse_hosts(config):
+    """[(switch address, read community)]: the rows of the server list (a row without its own community uses the default one),
+    or the list of addresses of an older Netlens."""
+    default = str(config.get("community") or "")
+    rows = config.get("servers")
+    if isinstance(rows, list):
+        return [(str(r["host"]).strip(), str(r.get("community") or "") or default) for r in rows if isinstance(r, dict) and str(r.get("host") or "").strip()]
+    return [(h, default) for h in re.split(r"[,;\s]+", str(config.get("hosts") or "").strip()) if h]
 
 
 def read_switches(config):
-    hosts = parse_hosts(config.get("hosts"))
+    hosts = parse_hosts(config)
     if not hosts:
         raise ValueError("enter the address of at least one switch")
-    if not str(config.get("community") or ""):
-        raise ValueError("enter the read community")
+    for host, community in hosts:
+        if not community:
+            raise ValueError(f"{host}: enter the read community (on the switch's line or as the default one)")
     timeout = config.get("timeout") or 3
     switches, problems = [], []
-    for host in hosts:
+    for host, community in hosts:
         try:
-            switches.append(Switch(Agent(host, config["community"], config.get("version") or "2c", timeout)).read())
+            switches.append(Switch(Agent(host, community, config.get("version") or "2c", timeout)).read())
         except (SnmpError, ValueError) as exc:
             problems.append(f"{host}: {exc}")
     if not switches:
@@ -471,7 +478,7 @@ def test(config):
 
 def fetch(config):
     switches, problems = read_switches(config)
-    if problems and len(problems) == len(parse_hosts(config.get("hosts"))):
+    if problems and len(problems) == len(parse_hosts(config)):
         raise SnmpError("; ".join(problems))
     return to_topology(switches, (config.get("root") or "").strip() or None)
 
@@ -484,14 +491,14 @@ def _problem(exc):
 def diagnose(config):
     """What each switch answers, counted and typed; names, MAC addresses and IP addresses are left out."""
     report = {"switches": []}
-    hosts = parse_hosts(config.get("hosts"))
+    hosts = parse_hosts(config)
     report["host_count"] = len(hosts)
     switches = []
-    for host in hosts:
+    for host, community in hosts:
         entry = {"steps": {}}
         report["switches"].append(entry)
         try:
-            agent = Agent(host, config.get("community", ""), config.get("version") or "2c", config.get("timeout") or 3)
+            agent = Agent(host, community, config.get("version") or "2c", config.get("timeout") or 3)
         except (SnmpError, ValueError) as exc:
             entry["error"] = _problem(exc)
             continue

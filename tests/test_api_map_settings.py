@@ -15,7 +15,7 @@ def client(tmp_path):
 
 
 def test_default_is_free_and_choice_is_saved(client):
-    assert client.get("/api/map-settings").json() == {"default_layout": "free", "layouts": ["free", "tree", "horizontal"], "domain_suffix": ""}
+    assert client.get("/api/map-settings").json() == {"default_layout": "free", "layouts": ["free", "tree", "horizontal"], "domain_suffix": "", "show_guests": False}
     r = client.put("/api/map-settings", json={"default_layout": "horizontal"})
     assert r.status_code == 200 and r.json()["default_layout"] == "horizontal"
     assert client.get("/api/map-settings").json()["default_layout"] == "horizontal"
@@ -53,3 +53,34 @@ def test_domain_suffix_is_cleaned_saved_and_independent_of_layout(client):
 @pytest.mark.parametrize("value", ["bad suffix", "a..b", "-x.com", "x_y.com", "a" * 300])
 def test_bad_domain_suffix_rejected(client, value):
     assert client.put("/api/map-settings", json={"domain_suffix": value}).status_code == 422
+
+
+def test_containers_on_the_map_are_an_option(tmp_path):
+    import json
+
+    from app.db import connect, get_or_create_device
+
+    path = tmp_path / "t.db"
+    app = create_app(load_settings({"NETLENS_TOKEN": "t", "NETLENS_DATA_DIR": str(tmp_path)}), db_path=path)
+    with TestClient(app, headers={"Authorization": "Bearer t"}) as c:
+        conn = connect(path)
+        host = get_or_create_device(conn, "aa:00:00:00:00:01", "10.0.0.5")
+        own = get_or_create_device(conn, "aa:00:00:00:00:02", "10.0.0.6")
+        for gid, name, kind, status, device in (("h/web", "web", "container", "running", None), ("h/off", "off", "container", "exited", None),
+                                                ("h/own", "own", "container", "running", own), ("pve/100", "vm", "qemu", "running", None),
+                                                ("h/sick", "sick", "container", "running", None), ("h/app", "app", "app", "running", None)):
+            conn.execute("INSERT INTO hypervisor_guests (plugin_id, guest_id, name, kind, host_name, status, updated, details, device_id, host_device_id) VALUES ('docker', ?, ?, ?, 'h', ?, 'now', ?, ?, ?)",
+                         (gid, name, kind, status, json.dumps({"health": "unhealthy", "image": "x:1"}) if name == "sick" else "{}", device, host))
+        conn.commit()
+        conn.close()
+        assert c.get("/api/map-settings").json()["show_guests"] is False
+        plain = c.get("/api/map").json()
+        assert not any(n.get("virtual") for n in plain["nodes"])                       # off: the map is what it was
+        shown = c.get("/api/map?guests=true").json()
+        virtual = {n["label"]: n for n in shown["nodes"] if n.get("virtual")}
+        assert set(virtual) == {"web", "sick", "app"}                                  # not stopped, not a device already, not a virtual machine
+        assert virtual["sick"]["health"] == "unhealthy" and virtual["web"]["parent_id"] == host and virtual["web"]["online"] is True
+        edge = next(e for e in shown["edges"] if e["to"] == virtual["web"]["id"])
+        assert edge["from"] == host and edge["kind"] == "parent"
+        assert c.put("/api/map-settings", json={"show_guests": True}).json()["show_guests"] is True
+        assert c.put("/api/map-settings", json={"show_guests": False}).json()["show_guests"] is False

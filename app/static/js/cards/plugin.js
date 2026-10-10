@@ -17,8 +17,69 @@ function statusText(plugin) {
   return { error: false, text: `Last sync ${timeAgo(s.ts)}: ${parts.join(", ")}` };
 }
 
+// The list of servers: one line per server with its own test button, and a plus button for another line
+function serverRow(field, plugin, saved, testRow) {
+  const row = h("div", { class: "server-row" });
+  row.dataset.id = saved.id || "";
+  const grid = h("div", { class: "server-fields" });
+  const more = h("div", { class: "server-more" });
+  for (const col of field.columns) {
+    const isSecret = col.type === "password";
+    const input = h("input", {
+      type: isSecret ? "password" : "text", name: col.key, autocomplete: isSecret ? "new-password" : "off",
+      value: isSecret ? "" : saved[col.key] ?? "",
+      placeholder: isSecret && saved[col.key + "_set"] ? "unchanged" : col.placeholder || "",
+      "aria-label": col.label, title: col.help ? `${col.label}: ${col.help}` : col.label,
+    });
+    const cell = h("label", { class: "server-cell" }, h("span", {}, col.label + (col.required ? " *" : "")), input);
+    (col.optional ? more : grid).appendChild(cell);
+  }
+  row.appendChild(grid);
+  const hasMore = more.children.length > 0;
+  if (hasMore) {
+    const details = h("details", { class: "server-optional" }, h("summary", {}, "More"), more);
+    details.open = field.columns.some((c) => c.optional && (c.type === "password" ? saved[c.key + "_set"] : saved[c.key]));
+    row.appendChild(details);
+  }
+  const result = h("span", { class: "server-result hint", "aria-live": "polite" });
+  const testBtn = h("button", { type: "button", class: "btn server-test" }, "Test");
+  const removeBtn = h("button", { type: "button", class: "btn server-remove", title: "Remove this server", "aria-label": "Remove this server" }, "−");
+  row.appendChild(h("div", { class: "server-actions" }, testBtn, removeBtn, result));
+  testBtn.addEventListener("click", () => testRow(row));
+  removeBtn.addEventListener("click", () => {
+    const list = row.parentElement;
+    row.remove();
+    if (!list.querySelector(".server-row")) list.appendChild(serverRow(field, plugin, {}, testRow));
+  });
+  return row;
+}
+
+function readServers(wrap, field) {
+  return [...wrap.querySelectorAll(".server-row")].map((row) => {
+    const out = { id: row.dataset.id || "" };
+    for (const col of field.columns) out[col.key] = row.querySelector(`[name="${col.key}"]`).value;
+    return out;
+  });
+}
+
+function serversInput(field, plugin, testRow) {
+  const wrap = h("div", { class: "servers", "data-field": field.key });
+  const list = h("div", { class: "server-list" });
+  const saved = plugin.config[field.key] || [];
+  for (const entry of saved.length ? saved : [{}]) list.appendChild(serverRow(field, plugin, entry, testRow));
+  const add = h("button", { type: "button", class: "btn server-add", title: "Add another server", "aria-label": "Add another server" }, "+ Add server");
+  add.addEventListener("click", () => {
+    const row = serverRow(field, plugin, {}, testRow);
+    list.appendChild(row);
+    row.querySelector("input").focus();
+  });
+  wrap.append(list, add);
+  return wrap;
+}
+
 // One input for one field of the plugin's settings form
-function fieldInput(field, plugin) {
+function fieldInput(field, plugin, testRow) {
+  if (field.type === "servers") return serversInput(field, plugin, testRow);
   const saved = plugin.config[field.key];
   if (field.type === "bool") {
     return h("input", { type: "checkbox", name: field.key, checked: saved === true });
@@ -47,6 +108,10 @@ function fieldInput(field, plugin) {
 function readConfig(form, manifest) {
   const config = {};
   for (const field of manifest.config) {
+    if (field.type === "servers") {
+      config[field.key] = readServers(form.querySelector(`.servers[data-field="${field.key}"]`), field);
+      continue;
+    }
     const input = form.querySelector(`[name="${field.key}"]`);
     if (!input) continue;
     if (field.type === "bool") config[field.key] = input.checked;
@@ -104,18 +169,42 @@ function fillPluginCard(card, plugin, onChange) {
   enabledField.appendChild(h("p", { class: "hint" }, "When on, it syncs now and after every scan. Turning it off removes its links from the map and keeps these settings."));
   form.appendChild(enabledField);
 
+  // Tests one line of a server list with the other settings of the form; the answer is shown on that line
+  const serversField = manifest.config.find((f) => f.type === "servers");
+  async function testRow(row) {
+    const result = row.querySelector(".server-result");
+    const button = row.querySelector(".server-test");
+    button.disabled = true;
+    result.className = "server-result hint";
+    result.textContent = "Testing…";
+    let ok = false;
+    try {
+      const entry = { id: row.dataset.id || "" };
+      for (const col of serversField.columns) entry[col.key] = row.querySelector(`[name="${col.key}"]`).value;
+      const res = await post(`/api/plugins/${plugin.id}/test`, { config: { ...readConfig(form, manifest), [serversField.key]: [entry] } });
+      result.textContent = "✓ " + res.message;
+      result.className = "server-result ok";
+      ok = true;
+    } catch (err) {
+      result.textContent = "✗ " + (err.message || "Test failed");
+      result.className = "server-result error";
+    }
+    button.disabled = false;
+    return ok;
+  }
+
   let section = null;
   for (const field of manifest.config) {
     if (field.section && field.section !== section) form.appendChild(h("h3", {}, field.section));
     section = field.section;
     const wrap = h("div", { class: "field" });
     wrap.appendChild(h("label", {}, field.label + (field.required && field.type !== "bool" ? " *" : "")));
-    wrap.appendChild(fieldInput(field, plugin));
+    wrap.appendChild(fieldInput(field, plugin, testRow));
     if (field.help) wrap.appendChild(h("p", { class: "hint" }, field.help));
     form.appendChild(wrap);
   }
 
-  const testBtn = h("button", { type: "button", class: "btn" }, "Test connection");
+  const testBtn = h("button", { type: "button", class: "btn" }, serversField ? "Test all connections" : "Test connection");
   const saveBtn = h("button", { type: "submit", class: "btn" }, "Save");
   const syncBtn = h("button", { type: "button", class: "btn" }, "Sync now");
   syncBtn.disabled = !plugin.configured;
@@ -169,6 +258,23 @@ function fillPluginCard(card, plugin, onChange) {
   testBtn.addEventListener("click", async () => {
     testBtn.disabled = true;
     resultEl.textContent = "";
+    if (serversField) {
+      // every line in turn, each answer next to its own line
+      const rows = [...form.querySelectorAll(".server-row")].filter((r) => [...r.querySelectorAll("input")].some((i) => i.value) || r.dataset.id);
+      if (!rows.length) {
+        resultEl.textContent = `fill in: ${serversField.label}`;
+        resultEl.className = "error";
+        testBtn.disabled = false;
+        return;
+      }
+      let good = 0;
+      for (const row of rows) if (await testRow(row)) good += 1;
+      resultEl.textContent = good === rows.length ? `All ${rows.length} connection${rows.length === 1 ? "" : "s"} work` : `${good} of ${rows.length} connections work`;
+      resultEl.className = good === rows.length ? "hint" : "error";
+      toast(resultEl.textContent, good === rows.length ? "success" : "error");
+      testBtn.disabled = false;
+      return;
+    }
     try {
       const res = await post(`/api/plugins/${plugin.id}/test`, { config: readConfig(form, manifest) });
       resultEl.textContent = res.message;

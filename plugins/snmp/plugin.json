@@ -1,7 +1,7 @@
 {
   "id": "snmp",
   "name": "SNMP switches",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",
@@ -10,18 +10,37 @@
   "diagnose": true,
   "config": [
     {
-      "key": "hosts",
-      "type": "text",
-      "label": "Switch addresses",
-      "placeholder": "192.168.1.2, 192.168.1.3",
+      "key": "servers",
+      "type": "servers",
+      "label": "Switches",
       "required": true,
-      "help": "The IP address of every managed switch to read, separated by commas or spaces. Add a port after a colon if it is not 161 (192.168.1.2:1161)."
+      "help": "Every managed switch to read. Add a port after a colon if it is not 161 (192.168.1.2:1161). A switch without its own community uses the default one below.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Switch address",
+          "placeholder": "192.168.1.2",
+          "required": true
+        },
+        {
+          "key": "community",
+          "label": "Read community",
+          "type": "password",
+          "placeholder": "default",
+          "optional": true
+        }
+      ],
+      "legacy": {
+        "split": ",",
+        "map": {
+          "host": "hosts"
+        }
+      }
     },
     {
       "key": "community",
       "type": "password",
-      "label": "Read community",
-      "required": true,
+      "label": "Default read community",
       "help": "The SNMP read community string you set on the switches (many ship with public). A read-only community is enough; this plugin never writes."
     },
     {
@@ -29,8 +48,14 @@
       "type": "select",
       "label": "SNMP version",
       "options": [
-        {"value": "2c", "label": "v2c (most switches)"},
-        {"value": "1", "label": "v1 (very old switches)"}
+        {
+          "value": "2c",
+          "label": "v2c (most switches)"
+        },
+        {
+          "value": "1",
+          "label": "v1 (very old switches)"
+        }
       ],
       "default": "2c"
     },

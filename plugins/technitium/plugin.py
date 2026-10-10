@@ -94,17 +94,30 @@ class Server:
 
 
 def parse_servers(config):
-    urls = [u for u in re.split(r"[,;\s]+", str(config.get("servers") or "").strip()) if u]
-    if not urls:
-        raise ValueError("enter the address of at least one Technitium server")
-    tokens = [t for t in re.split(r"[,;\s]+", str(config.get("tokens") or "").strip()) if t]
-    if not tokens:
-        raise ValueError("enter an API token")
-    if len(tokens) not in (1, len(urls)):
-        raise ValueError(f"enter one token for all servers or one for each of the {len(urls)} servers")
+    rows = config.get("servers")
+    if isinstance(rows, list):            # one row per server: {"host": ..., "token": ...}
+        pairs = [(str(r.get("host") or "").strip(), str(r.get("token") or "").strip()) for r in rows if isinstance(r, dict)]
+        pairs = [p for p in pairs if p[0] or p[1]]
+        if not pairs:
+            raise ValueError("enter the address of at least one Technitium server")
+        for i, (url, token) in enumerate(pairs, 1):
+            if not url:
+                raise ValueError(f"server {i}: enter its address")
+            if not token:
+                raise ValueError(f"{url}: enter an API token")
+    else:                                 # older Netlens: two comma-separated lists
+        urls = [u for u in re.split(r"[,;\s]+", str(rows or "").strip()) if u]
+        if not urls:
+            raise ValueError("enter the address of at least one Technitium server")
+        tokens = [t for t in re.split(r"[,;\s]+", str(config.get("tokens") or "").strip()) if t]
+        if not tokens:
+            raise ValueError("enter an API token")
+        if len(tokens) not in (1, len(urls)):
+            raise ValueError(f"enter one token for all servers or one for each of the {len(urls)} servers")
+        pairs = [(url, tokens[0] if len(tokens) == 1 else tokens[i]) for i, url in enumerate(urls)]
     timeout = config.get("timeout") or 15
     verify = config.get("verify_tls", True)
-    return [Server(url, tokens[0] if len(tokens) == 1 else tokens[i], verify, timeout) for i, url in enumerate(urls)]
+    return [Server(url, token, verify, timeout) for url, token in pairs]
 
 
 def connect(config):

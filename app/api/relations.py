@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 import sqlite3
@@ -45,8 +47,38 @@ def remove_relation(
         raise HTTPException(status_code=404, detail="relation not found")
 
 
+SHOWN_STATES = ("running", "restarting", "paused")
+
+
+def _guest_nodes(conn: sqlite3.Connection, known: set[int]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Containers and apps that are not a device themselves, as nodes under their host. A virtual machine is left out:
+    it is a device, or it has not been seen on the network."""
+    nodes, edges = [], []
+    rows = conn.execute(
+        """SELECT plugin_id, guest_id, name, kind, status, host_device_id, details FROM hypervisor_guests
+           WHERE device_id IS NULL AND host_device_id IS NOT NULL AND kind NOT IN ('qemu', 'vm') ORDER BY plugin_id, name"""
+    ).fetchall()
+    for r in rows:
+        if r["host_device_id"] not in known or r["status"] not in SHOWN_STATES:
+            continue
+        try:
+            details = json.loads(r["details"]) if r["details"] else {}
+        except ValueError:
+            details = {}
+        node_id = f"g:{r['plugin_id']}:{r['guest_id']}"
+        nodes.append({
+            "id": node_id, "label": r["name"], "ip": None, "mac": None, "vendor": None, "type": "container", "online": r["status"] == "running",
+            "pos_x": None, "pos_y": None, "open_ports": 0, "tags": [], "mac_kind": None, "group_id": None, "group": None, "group_color": None,
+            "virtual": True, "guest_kind": r["kind"], "status": r["status"], "health": details.get("health"), "image": details.get("image"),
+            "plugin": r["plugin_id"], "parent_id": r["host_device_id"], "parent_source": "hypervisor",
+        })
+        edges.append({"id": f"v{node_id}", "from": r["host_device_id"], "to": node_id, "kind": "parent", "source": "hypervisor", "confidence": 1.0,
+                      "manual": False, "reason": "runs on this host", "virtual": True})
+    return nodes, edges
+
+
 @router.get("/map")
-def get_map(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def get_map(guests: bool = False, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     nodes: list[dict[str, Any]] = []
     rows = conn.execute(
         """
@@ -114,4 +146,8 @@ def get_map(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
             "manual": bool(rel["manual"]),
         })
 
+    if guests:
+        extra_nodes, extra_edges = _guest_nodes(conn, {n["id"] for n in nodes})
+        nodes += extra_nodes
+        edges += extra_edges
     return {"nodes": nodes, "edges": edges}

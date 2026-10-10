@@ -91,3 +91,29 @@ def test_both_manifests_announce_the_diagnostic():
     for pid in ("proxmox", "asus"):
         path = __import__("pathlib").Path(__file__).resolve().parents[1] / "app" / "plugins" / "builtin" / pid / "plugin.json"
         assert validate_manifest(json.loads(path.read_text()))["diagnose"] is True
+
+
+def test_proxmox_reads_every_server_in_the_list_and_keeps_clashing_vm_numbers_apart(monkeypatch):
+    from app.plugins.builtin.proxmox import plugin as px
+
+    class Client:
+        def __init__(self, cfg):
+            self.url = cfg.url
+
+        def version(self):
+            return "8.2"
+
+        def inventory(self):
+            node = "pve-" + self.url[-1]
+            return {"nodes": [{"name": node, "ip": None, "online": True}],
+                    "guests": [{"vmid": 100, "name": "vm" + self.url[-1], "kind": "qemu", "node": node, "status": "running", "macs": [], "ips": []}]}
+
+    monkeypatch.setattr(px, "CLIENT_FACTORY", Client)
+    rows = {"servers": [{"id": "a", "host": "https://pve1", "token_id": "u@pam!n", "token_secret": "s"},
+                        {"id": "b", "host": "https://pve2", "token_id": "u@pam!n", "token_secret": "s"}], "verify_tls": True}
+    out = px.fetch(rows)
+    assert [h["name"] for h in out["hosts"]] == ["pve-1", "pve-2"] and [g["id"] for g in out["guests"]] == ["100", "pve-2/100"]
+    assert px.test(rows)["message"].startswith("2 Proxmox servers answered")
+    with pytest.raises(ValueError, match="at least one"):
+        px.fetch({"servers": []})
+    assert px.test({"url": "https://old", "token_id": "a", "token_secret": "b"})["message"].startswith("Connected: Proxmox VE 8.2")

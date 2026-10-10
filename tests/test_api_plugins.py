@@ -89,7 +89,7 @@ def test_enable_syncs_immediately_and_secrets_survive_partial_updates(env):
     assert out["enabled"] is True and out["status"]["ok"] is True and out["status"]["guests"] == 3 and out["status"]["links"] == 1
     c.put("/api/plugins/proxmox", json={"config": {"verify_tls": False}})  # partial update keeps the secret
     conn = connect(tmp / "t.db")
-    assert json.loads(get_setting(conn, "plugin.proxmox"))["config"]["token_secret"] == "SECRET"
+    assert json.loads(get_setting(conn, "plugin.proxmox"))["config"]["servers"][0]["token_secret"] == "SECRET"
     conn.close()
     edges = {(e["from"], e["to"], e["kind"]) for e in c.get("/api/map").json()["edges"]}
     assert (ids["web"], ids["host"], "host-of") in edges
@@ -216,3 +216,27 @@ def test_everything_requires_login(env):
     for method, url in [("get", "/api/plugins"), ("get", "/api/plugins/guide"), ("get", "/api/plugins/example.zip"),
                         ("put", "/api/plugins/asus"), ("post", "/api/plugins"), ("delete", "/api/plugins/demo")]:
         assert getattr(c, method)(url, headers=bad).status_code == 401, url
+
+
+def test_server_list_rows_hide_secrets_keep_them_per_row_and_test_one_row(env):
+    c, _, tmp = env
+    rows = [{"host": "10.0.0.5", "token_id": "u@pam!n", "token_secret": "SECRET1"}, {"host": "10.0.0.6", "token_id": "u@pam!n", "token_secret": "SECRET2"}]
+    r = c.put("/api/plugins/proxmox", json={"config": {"servers": rows}})
+    assert r.status_code == 200 and "SECRET" not in r.text
+    got = r.json()["config"]["servers"]
+    assert [x["host"] for x in got] == ["10.0.0.5", "10.0.0.6"] and all(x["token_secret_set"] is True for x in got)
+    # edit the second row without retyping its secret; drop the first; add a new one
+    ids = [x["id"] for x in got]
+    c.put("/api/plugins/proxmox", json={"config": {"servers": [{"id": ids[1], "host": "10.0.0.7", "token_id": "u@pam!n", "token_secret": ""},
+                                                                {"host": "10.0.0.8", "token_id": "x", "token_secret": "SECRET3"}]}})
+    conn = connect(tmp / "t.db")
+    saved = json.loads(get_setting(conn, "plugin.proxmox"))["config"]["servers"]
+    conn.close()
+    assert [(x["host"], x["token_secret"]) for x in saved] == [("10.0.0.7", "SECRET2"), ("10.0.0.8", "SECRET3")]
+    # testing one row sends just that row; its saved secret is used
+    t = c.post("/api/plugins/proxmox/test", json={"config": {"servers": [{"id": ids[1], "host": "10.0.0.7", "token_id": "u@pam!n", "token_secret": ""}]}})
+    assert t.status_code == 200 and t.json()["message"].startswith("Connected")
+    empty = c.post("/api/plugins/proxmox/test", json={"config": {"servers": [{"host": "", "token_id": ""}]}})
+    assert empty.status_code == 422 and "fill in" in empty.json()["detail"]
+    # a client that still sends the single-server settings keeps working
+    assert c.put("/api/plugins/proxmox", json={"config": {"url": "10.9.9.9", "token_id": "a", "token_secret": "b"}}).json()["config"]["servers"][0]["host"] == "10.9.9.9"

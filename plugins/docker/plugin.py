@@ -77,7 +77,15 @@ class Host:
 
 
 def parse_hosts(config):
-    urls = [u for u in re.split(r"[,;\s]+", str(config.get("hosts") or "").strip()) if u]
+    rows = config.get("servers")
+    if isinstance(rows, list):            # one row per host: {"host": the proxy address, "lan": the host's LAN address (optional)}
+        urls = []
+        for row in rows:
+            if isinstance(row, dict) and str(row.get("host") or "").strip():
+                lan = str(row.get("lan") or "").strip()
+                urls.append(str(row["host"]).strip() + (f"={lan}" if lan else ""))
+    else:                                 # older Netlens: one list of addresses
+        urls = [u for u in re.split(r"[,;\s]+", str(config.get("hosts") or "").strip()) if u]
     if not urls:
         raise ValueError("enter the address of at least one Docker host (its socket proxy)")
     return [Host(u, config.get("verify_tls", True), config.get("timeout") or 15) for u in urls]
@@ -235,7 +243,7 @@ def test(config):
     if own:
         message += f", {own} with their own network address"
     if any(h["ip"] is None for h in hosts):
-        message += ". A host reached through 127.0.0.1 or localhost needs its network address so Netlens can find its device: write http://127.0.0.1:2375=192.168.0.189"
+        message += ". A host reached through 127.0.0.1 or localhost needs its network address so Netlens can find its device: fill in 'Host\'s own address' on its line"
     if problems:
         message += ". Not reachable: " + "; ".join(problems)
     return {"message": message}

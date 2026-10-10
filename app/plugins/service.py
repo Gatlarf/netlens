@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 from app import containers
 from app.db import add_event, connect, delete_setting, get_setting, set_setting, utcnow
-from app.plugins.contract import ContractError, clean_config, default_config, missing_required, validate_output
+from app.plugins.contract import ContractError, clean_config, default_config, migrate_servers, missing_required, validate_output
 from app.plugins import enrich
 from app.plugins.enrich import device_lookup, record_client_hints, record_client_links, record_router_names, record_wifi
 from app.plugins.matching import match_hypervisor, norm_mac, topology_links
@@ -50,6 +50,9 @@ def get_state(conn: sqlite3.Connection, plugin: Plugin) -> dict:
     values = saved.get("config") if isinstance(saved.get("config"), dict) else {}
     config = default_config(manifest)
     config.update({k: v for k, v in values.items() if k in config})
+    for f in manifest["config"]:
+        if f["type"] == "servers" and not config.get(f["key"]):
+            config[f["key"]] = migrate_servers(f, values)         # settings saved by an older version of the plugin
     return {"enabled": bool(saved.get("enabled", False)) and plugin.manifest is not None, "config": config}
 
 
@@ -80,7 +83,9 @@ def public_state(conn: sqlite3.Connection, plugin: Plugin) -> dict:
     config, secrets_set = {}, {}
     if manifest:
         for f in manifest["config"]:
-            if f["secret"]:
+            if f["type"] == "servers":
+                config[f["key"]] = [public_server(f, r) for r in state["config"].get(f["key"]) or []]
+            elif f["secret"]:
                 secrets_set[f["key"]] = bool(state["config"].get(f["key"]))
             else:
                 config[f["key"]] = state["config"].get(f["key"])
@@ -97,10 +102,26 @@ def public_state(conn: sqlite3.Connection, plugin: Plugin) -> dict:
     }
 
 
+def public_server(field: dict, row: dict) -> dict:
+    """A server row for the browser: a secret column is replaced by a `<column>_set` flag."""
+    out = {"id": row.get("id")}
+    for col in field["columns"]:
+        if col["secret"]:
+            out[col["key"] + "_set"] = bool(row.get(col["key"]))
+        else:
+            out[col["key"]] = row.get(col["key"], "")
+    return out
+
+
 def merge_config(plugin: Plugin, current: dict, changes: dict) -> dict:
     """Apply form values to the saved config. A secret that is left empty keeps its saved value."""
     manifest = plugin.manifest
     merged = dict(current)
+    changes = dict(changes)
+    for f in manifest["config"]:
+        legacy = f["type"] == "servers" and f.get("legacy")
+        if legacy and not isinstance(changes.get(f["key"]), list) and any(old in changes for old in legacy["map"].values()):
+            changes[f["key"]] = migrate_servers(f, changes)       # the settings of an older version, sent by an old client
     for f in manifest["config"]:
         if f["key"] not in changes:
             continue
@@ -108,7 +129,7 @@ def merge_config(plugin: Plugin, current: dict, changes: dict) -> dict:
         if f["secret"] and value in (None, ""):
             continue
         merged[f["key"]] = value
-    return clean_config(manifest, merged)
+    return clean_config(manifest, merged, current)
 
 
 # ----------------------------------------------------------------------------- applying results

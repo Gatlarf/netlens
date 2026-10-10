@@ -213,3 +213,16 @@ def test_cname_add_replace_and_delete(primary):
     assert not plugin.apply(cfg, [change("update", f"x.{Z}", f"host.{Z}")])[0]["ok"]
     assert plugin.apply(cfg, [change("delete", f"other.{Z}")])[0]["ok"]
     assert not [r for r in plugin.fetch(cfg)["records"] if r["name"] == f"web.{Z}"]
+
+
+def test_the_server_list_rows_carry_their_own_token(pair):
+    p, sec = pair
+    rows = {"servers": [{"id": "a", "host": p.url, "token": "tok1"}, {"id": "b", "host": sec.url, "token": "tok2"}], "zones": [Z], "marker": MARK, "timeout": 5}
+    assert "Connected to 2 server(s)" in plugin.test(rows)["message"]
+    wrong = {**rows, "servers": [{"host": p.url, "token": "tok1"}, {"host": sec.url, "token": "nope"}]}
+    with pytest.raises(Exception):
+        plugin.test(wrong)
+    with pytest.raises(ValueError, match="API token"):
+        plugin.parse_servers({"servers": [{"host": p.url, "token": ""}]})
+    with pytest.raises(ValueError, match="at least one"):
+        plugin.parse_servers({"servers": []})

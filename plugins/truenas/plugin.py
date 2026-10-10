@@ -365,13 +365,43 @@ def to_hypervisor(snapshot, connect_host=""):
     return {"hosts": [host], "guests": unique}
 
 
+def _servers(config):
+    """One flat config per TrueNAS: the rows of the server list, or the single url and key of an older Netlens."""
+    rows = config.get("servers")
+    if not isinstance(rows, list):
+        return [config]
+    out = [{"url": r.get("host"), "api_key": r.get("api_key"), "verify_tls": config.get("verify_tls")} for r in rows if isinstance(r, dict) and (r.get("host") or r.get("api_key"))]
+    if not out:
+        raise ValueError("enter the address and API key of at least one TrueNAS")
+    return out
+
+
+def _label(one, many):
+    return urllib.parse.urlsplit(str(one.get("url") or "")).netloc or str(one.get("url") or "") if many else ""
+
+
+def _each(config, work):
+    """Run `work(one_config)` on every server; the first failure stops with a message that names the server."""
+    servers = _servers(config)
+    results = []
+    for one in servers:
+        try:
+            results.append(work(one))
+        except Exception as exc:  # noqa: BLE001 - the exception keeps its type (a refused key must stay recognisable)
+            label = _label(one, len(servers) > 1)
+            if label and exc.args:
+                exc.args = (f"{label}: {exc.args[0]}",) + tuple(exc.args[1:])
+            raise
+    return results
+
+
 def _session(config):
     truenas = TrueNAS(config)
     truenas.open()
     return truenas
 
 
-def test(config):
+def _test_one(config):
     truenas = _session(config)
     try:
         snapshot = truenas.snapshot()
@@ -383,16 +413,36 @@ def test(config):
                f"{kinds.count('qemu')} virtual machine(s), {kinds.count('app')} app(s)")
     if snapshot["notes"]:
         message += ". Not available: " + "; ".join(snapshot["notes"])
-    return {"message": message}
+    return message
 
 
-def fetch(config):
+def test(config):
+    messages = _each(config, _test_one)
+    return {"message": messages[0] if len(messages) == 1 else f"{len(messages)} TrueNAS systems answered. " + " | ".join(messages)}
+
+
+def _fetch_one(config):
     truenas = _session(config)
     try:
         snapshot = truenas.snapshot()
     finally:
         truenas.close()
     return to_hypervisor(snapshot, truenas.host)
+
+
+def fetch(config):
+    results = _each(config, _fetch_one)
+    if len(results) == 1:
+        return results[0]
+    hosts, guests, taken = [], [], set()
+    for out in results:
+        hosts += out["hosts"]
+        for g in out["guests"]:
+            if g["id"] in taken:                      # the same name on two systems: keep both apart
+                g = {**g, "id": f"{g['host_id']}/{g['id']}"}
+            taken.add(g["id"])
+            guests.append(g)
+    return {"hosts": hosts, "guests": guests}
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
@@ -427,7 +477,7 @@ def _problem(exc):
 
 def diagnose(config):
     """What this TrueNAS answers, described by field names and types, and what the plugin made of it (no names, MACs or IPs)."""
-    truenas = _session(config)  # a refused key is reported as such (and stops automatic syncing), like test()
+    truenas = _session(_servers(config)[0])  # a refused key is reported as such (and stops automatic syncing), like test(); the first system is described
     report = {"steps": {}}
 
     def step(name, method, *params):

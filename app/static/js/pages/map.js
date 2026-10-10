@@ -25,6 +25,7 @@ const PALETTE_LIGHT = {
   camera: "#dc2626",
   nas: "#0d9488",
   vm: "#6366f1",
+  container: "#0d9488",
   unknown: "#7b8aa0",
 };
 
@@ -45,6 +46,7 @@ const PALETTE_DARK = {
   camera: "#f87171",
   nas: "#2dd4bf",
   vm: "#818cf8",
+  container: "#5eead4",
   unknown: "#cbd5e1",
 };
 
@@ -168,6 +170,15 @@ function buildNodeData(node, mode = "free", extra = {}) {
     opacity: node.online ? 1 : dark ? 0.6 : 0.4,
     hidden: false,
   };
+  if (node.virtual) {
+    // a container or app under its host: smaller, dashed, and unhealthy ones outlined in red
+    data.size = 11;
+    data.shapeProperties = { borderDashes: [3, 3] };
+    data.borderWidth = 2;
+    if (node.health === "unhealthy" || node.status === "restarting") data.color.border = dark ? "#f87171" : "#dc2626";
+    data.label = shorten(node.label || "", 22);
+    data.font = { size: 11 };
+  }
   if (!treeLayout && node.pos_x != null && node.pos_y != null) {
     data.x = node.pos_x;
     data.y = node.pos_y;
@@ -191,9 +202,13 @@ function buildNodeData(node, mode = "free", extra = {}) {
       },
       borderWidth: 3,
       borderWidthSelected: 4,
-      shapeProperties: { borderDashes: node.online ? false : [4, 3], borderRadius: 8 },
+      shapeProperties: { borderDashes: node.online && !node.virtual ? false : [4, 3], borderRadius: 8 },
       fixed: { x: true, y: true },
     });
+    if (node.virtual) {
+      data.label = shorten(node.label || "", 24);
+      data.widthConstraint = { minimum: 110, maximum: 150 };
+    }
     if (extra.pos) {
       data.x = extra.pos.x;
       data.y = extra.pos.y;
@@ -264,8 +279,11 @@ function applyFilters(nodesDS, edgesDS, nodes, edges, search, typeFilter, status
 export async function render(container, params) {
   await loadVis();
   let serverLayout = "free";
+  let serverGuests = false;
   try {
-    serverLayout = (await get("/api/map-settings")).default_layout;
+    const mapSettings = await get("/api/map-settings");
+    serverLayout = mapSettings.default_layout;
+    serverGuests = !!mapSettings.show_guests;
   } catch (e) {
     // the map still works with the built-in default
   }
@@ -289,6 +307,16 @@ export async function render(container, params) {
   const horizontal = layoutMode === "horizontal";
   // the tree layout needs the parent -> child links, so it always shows the hierarchy
   const linksMode = treeLayout ? "hierarchy" : readPref("netlens.map.links", ["hierarchy", "all"], "hierarchy");
+  // containers and apps under their host: the default is set under Settings -> Map, a choice made here is kept per browser
+  const showGuests = readPref("netlens.map.guests", ["on", "off"], serverGuests ? "on" : "off") === "on";
+  const guestSelect = h("select", { class: "guests-mode", title: "Show containers and apps under their host" });
+  guestSelect.appendChild(h("option", { value: "off" }, "Hide containers"));
+  guestSelect.appendChild(h("option", { value: "on" }, "Show containers"));
+  guestSelect.value = showGuests ? "on" : "off";
+  guestSelect.addEventListener("change", () => {
+    savePref("netlens.map.guests", guestSelect.value);
+    window.dispatchEvent(new Event("hashchange"));
+  });
   labelMode = readPref("netlens.map.labels", LABEL_MODES, "both");
   colorMode = readPref("netlens.map.color", COLOR_MODES, "type");
   groupFilter = "All";
@@ -396,6 +424,7 @@ export async function render(container, params) {
   toolbar.appendChild(layoutSelect);
   toolbar.appendChild(labelSelect);
   toolbar.appendChild(colorSelect);
+  toolbar.appendChild(guestSelect);
   toolbar.appendChild(groupSelect);
   toolbar.appendChild(addLinkBtn);
   toolbar.appendChild(deleteLinkBtn);
@@ -461,6 +490,11 @@ export async function render(container, params) {
       enabled: false,
       addEdge: (data, callback) => {
         if (destroyed) return;
+        if (typeof data.from !== "number" || typeof data.to !== "number") {
+          toast("Containers cannot be linked by hand: they follow their host");
+          callback(null);
+          return;
+        }
         post("/api/relations", { src_id: data.from, dst_id: data.to })
           .then(() => {
             if (destroyed) return;
@@ -499,6 +533,17 @@ export async function render(container, params) {
 
     const nameEl = h("h2", { title: node.label || null }, shortName(node.label) || node.ip);
     panel.appendChild(nameEl);
+
+    if (node.virtual) {
+      const host = currentNodes.find((n) => n.id === node.parent_id);
+      panel.appendChild(h("span", { class: "badge" }, { container: "Container", lxc: "Container (LXC)", app: "App" }[node.guest_kind] || "Guest"));
+      panel.appendChild(statusDot(node.online));
+      panel.appendChild(h("p", {}, `Status: ${node.status}${node.health ? `, ${node.health}` : ""}`));
+      if (node.image) panel.appendChild(h("p", { class: "mono" }, `Image: ${node.image}`));
+      panel.appendChild(h("p", {}, "Runs on: ", h("a", { href: `#/device/${node.parent_id}` }, host ? shortName(host.label) || host.ip : `device ${node.parent_id}`)));
+      panel.appendChild(h("a", { href: `#/device/${node.parent_id}` }, "Open the host's page"));
+      return;
+    }
 
     const typeEl = typeBadge(node.type);
     panel.appendChild(typeEl);
@@ -598,6 +643,7 @@ export async function render(container, params) {
     if (params.nodes.length === 0) return;
     const positions = network.getPositions(params.nodes);
     for (const id of params.nodes) {
+      if (typeof id !== "number") continue;      // a container under its host has no saved position
       const pos = positions[id];
       patch(`/api/devices/${id}`, { pos_x: pos.x, pos_y: pos.y }).catch((err) => {
         if (destroyed) return;
@@ -608,7 +654,7 @@ export async function render(container, params) {
 
   network.on("stabilizationIterationsDone", () => {
     if (destroyed) return;
-    const allHavePos = currentNodes.every((n) => n.pos_x != null && n.pos_y != null);
+    const allHavePos = currentNodes.filter((n) => !n.virtual).every((n) => n.pos_x != null && n.pos_y != null);
     if (allHavePos) {
       network.setOptions({ physics: false });
     }
@@ -767,13 +813,13 @@ export async function render(container, params) {
   async function reload() {
     if (destroyed) return;
     try {
-      const data = await get("/api/map");
+      const data = await get(showGuests ? "/api/map?guests=true" : "/api/map");
       if (destroyed) return;
       const newNodes = data.nodes || [];
       // "Hierarchy" draws each device's chosen parent link (plus links you drew by hand);
       // "All links" draws every inferred relation like before.
       const newEdges = (data.edges || []).filter((e) =>
-        linksMode === "hierarchy" ? e.kind === "parent" || e.kind === "manual" : e.kind !== "parent"
+        e.virtual || (linksMode === "hierarchy" ? e.kind === "parent" || e.kind === "manual" : e.kind !== "parent")
       );
 
       const existingNodeIds = new Set(nodesDS.getIds());

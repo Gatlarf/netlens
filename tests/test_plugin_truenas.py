@@ -317,3 +317,27 @@ def test_diagnose_with_a_wrong_key_is_a_refused_login(fake):
 
 def test_the_manifest_announces_the_diagnostic():
     assert validate_manifest(json.loads((ROOT / "plugin.json").read_text()))["diagnose"] is True
+
+
+def test_several_systems_are_read_one_by_one_and_name_clashes_are_kept_apart(monkeypatch):
+    rows = {"servers": [{"id": "a", "host": "https://nas1", "api_key": "k1"}, {"id": "b", "host": "https://nas2", "api_key": "k2"}, {"id": "c", "host": "", "api_key": ""}], "verify_tls": False}
+    assert [(c["url"], c["api_key"]) for c in plugin._servers(rows)] == [("https://nas1", "k1"), ("https://nas2", "k2")]
+    answers = {"https://nas1": {"hosts": [{"id": "nas1"}], "guests": [{"id": "app:plex", "host_id": "nas1"}]},
+               "https://nas2": {"hosts": [{"id": "nas2"}], "guests": [{"id": "app:plex", "host_id": "nas2"}, {"id": "app:other", "host_id": "nas2"}]}}
+    monkeypatch.setattr(plugin, "_fetch_one", lambda one: answers[one["url"]])
+    out = plugin.fetch(rows)
+    assert [h["id"] for h in out["hosts"]] == ["nas1", "nas2"]
+    assert [g["id"] for g in out["guests"]] == ["app:plex", "nas2/app:plex", "app:other"]
+    # a failure names the system but keeps its type (a refused key must stay recognisable)
+    class Refused(Exception):
+        auth_failed = True
+
+    def boom(one):
+        raise Refused("the API key was refused")
+    monkeypatch.setattr(plugin, "_fetch_one", boom)
+    with pytest.raises(Refused) as caught:
+        plugin.fetch(rows)
+    assert str(caught.value) == "nas1: the API key was refused" and caught.value.auth_failed
+    with pytest.raises(ValueError, match="at least one"):
+        plugin._servers({"servers": []})
+    assert plugin._servers({"url": "https://old", "api_key": "k"}) == [{"url": "https://old", "api_key": "k"}]       # an older Netlens

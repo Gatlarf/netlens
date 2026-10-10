@@ -12,6 +12,32 @@ from .config import ProxmoxConfig, has_credentials
 CLIENT_FACTORY = ProxmoxClient  # replaced by tests
 
 
+def _servers(config: dict) -> list[dict]:
+    """One flat config per Proxmox: the rows of the server list, or the single url and credentials of an older Netlens."""
+    rows = config.get("servers")
+    if not isinstance(rows, list):
+        return [config]
+    keep = ("token_id", "token_secret", "username", "password")
+    out = [{"url": r.get("host"), "verify_tls": config.get("verify_tls", True), **{k: r.get(k) or "" for k in keep}}
+           for r in rows if isinstance(r, dict) and any(r.get(k) for k in ("host", *keep))]
+    if not out:
+        raise ValueError("enter the address and credentials of at least one Proxmox server")
+    return out
+
+
+def _each(config: dict, work):
+    servers = _servers(config)
+    results = []
+    for one in servers:
+        try:
+            results.append(work(one))
+        except Exception as exc:  # noqa: BLE001 - keeps its type; only the message gets the server's name
+            if len(servers) > 1 and exc.args:
+                exc.args = (f"{one.get('url')}: {exc.args[0]}",) + tuple(exc.args[1:])
+            raise
+    return results
+
+
 def _client(config: dict):
     cfg = ProxmoxConfig(
         url=config.get("url", ""),
@@ -36,14 +62,34 @@ def _details(g: dict) -> dict:
     return {k: v for k, v in details.items() if v not in (None, "")}
 
 
-def test(config: dict) -> dict:
+def _test_one(config: dict) -> str:
     client = _client(config)
     version = client.version()
     inventory = client.inventory()
-    return {"message": f"Connected: Proxmox VE {version}, {len(inventory['nodes'])} node(s), {len(inventory['guests'])} guest(s)"}
+    return f"Connected: Proxmox VE {version}, {len(inventory['nodes'])} node(s), {len(inventory['guests'])} guest(s)"
+
+
+def test(config: dict) -> dict:
+    messages = _each(config, _test_one)
+    return {"message": messages[0] if len(messages) == 1 else f"{len(messages)} Proxmox servers answered. " + " | ".join(messages)}
 
 
 def fetch(config: dict) -> dict:
+    results = _each(config, _fetch_one)
+    if len(results) == 1:
+        return results[0]
+    hosts, guests, taken = [], [], set()
+    for out in results:
+        hosts += out["hosts"]
+        for g in out["guests"]:
+            if g["id"] in taken:                      # the same VM number on two clusters: keep both apart
+                g = {**g, "id": f"{g['host_id']}/{g['id']}"}
+            taken.add(g["id"])
+            guests.append(g)
+    return {"hosts": hosts, "guests": guests}
+
+
+def _fetch_one(config: dict) -> dict:
     inventory = _client(config).inventory()
     return {
         "hosts": [
@@ -70,7 +116,7 @@ def diagnose(config: dict) -> dict:
     """What this Proxmox answers, described by field names and types (no names, addresses or MACs), for the plugin's author."""
     from app.plugins.builtin.diag import SAMPLES, describe, make_step, mask, problem
 
-    client = _client(config)
+    client = _client(_servers(config)[0])      # the first server is described
     report: dict = {"steps": {}}
     step = make_step(report)
     step("version", lambda: client.get("/version"))

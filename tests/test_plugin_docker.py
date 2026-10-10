@@ -100,7 +100,7 @@ def test_a_local_proxy_needs_the_lan_address_of_its_host(docker):
     out = plugin.fetch(config(docker.url + "=192.168.0.189"))
     assert out["hosts"][0]["ip"] == "192.168.0.189"
     assert plugin.fetch(config(docker.url))["hosts"][0]["ip"] is None
-    assert ":2375=192.168.0.189" in plugin.test(config(docker.url))["message"]
+    assert "own address" in plugin.test(config(docker.url))["message"]
     with pytest.raises(plugin.DockerError, match="not an IPv4"):
         plugin.parse_hosts({"hosts": docker.url + "=nonsense"})
 
@@ -252,3 +252,13 @@ def test_no_image_permission_is_fine():
     with FakeDocker(containers=[container("c1", "web")], images=None) as d:       # the fake answers 403 for /images
         guests = plugin.fetch(config(d.url))["guests"]
     assert guests[0]["name"] == "web" and "image_created" not in guests[0]["details"]
+
+
+def test_the_server_list_rows_are_the_hosts(docker):
+    rows = {"servers": [{"id": "a", "host": docker.url, "lan": "192.168.0.189"}, {"id": "b", "host": "", "lan": ""}], "timeout": 5}
+    out = plugin.fetch(rows)
+    assert out["hosts"][0]["ip"] == "192.168.0.189" and len(out["hosts"]) == 1
+    with pytest.raises(ValueError, match="at least one"):
+        plugin.parse_hosts({"servers": [{"id": "a", "host": ""}]})
+    with pytest.raises(plugin.DockerError, match="not an IPv4"):
+        plugin.parse_hosts({"servers": [{"host": docker.url, "lan": "nonsense"}]})

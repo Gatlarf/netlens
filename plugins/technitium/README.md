@@ -22,8 +22,8 @@ mode on).
 1. **A user with limited rights on each Technitium server** (*Administration → Users*): *View* and *Modify* on your zone (for example
    `home.example.com`) and on the reverse zones (`0.168.192.in-addr.arpa`), nothing else, and no Delete permission. Make a **token** for it
    (*Administration → Sessions → Create token*). Do not use your admin account.
-2. In Netlens install **Technitium DNS** (*Settings → Integrations → Browse plugins*) and open its page: enter the address of **every** server
-   (`http://192.168.0.2:5380, http://192.168.0.3:5380`) and the token for each (comma separated, in the same order; one token if it is the same for all).
+2. In Netlens install **Technitium DNS** (*Settings → Integrations → Browse plugins*) and open its page: add a line for **every** server
+   (its address, `http://192.168.0.2:5380`, and its own token; **+ Add server** adds a line, **Test** on a line tests that server).
    *Verify TLS certificate* only matters for https addresses.
 3. Open *Settings → Integrations → DNS registration*: enter your network and zone (`192.168.0.0/24 = home.example.com`; several lines for
    several networks), save, press **Read the DNS server now** and look at the preview.

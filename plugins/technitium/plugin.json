@@ -1,29 +1,45 @@
 {
   "id": "technitium",
   "name": "Technitium DNS",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "api_version": 1,
   "kind": "dns",
   "author": "Netlens",
   "description": "Registers your devices in Technitium DNS Server: an A record and a reverse (PTR) record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Works with a primary and secondary server and with a Technitium cluster. It only writes records it created itself (marked with a comment) and never changes or removes records made by anything else, such as Windows machines that register themselves.",
   "timeout": 120,
   "diagnose": true,
-  "capabilities": ["marker", "delete"],
+  "capabilities": [
+    "marker",
+    "delete"
+  ],
   "config": [
     {
       "key": "servers",
-      "type": "text",
+      "type": "servers",
       "label": "Servers",
-      "placeholder": "http://192.168.0.2:5380, http://192.168.0.3:5380",
       "required": true,
-      "help": "The address of the web interface of every Technitium server, separated by commas (http://host:5380 or https://host:53443). List the primary and the secondary, or all cluster nodes; Netlens finds out where it can write."
-    },
-    {
-      "key": "tokens",
-      "type": "password",
-      "label": "API token(s)",
-      "required": true,
-      "help": "A token for each server, in the same order and separated by commas, or one token for all. Create a separate user on each server with View and Modify permission on your zone and its reverse zones (no Delete permission needed) and make a token for it (Administration → Sessions → Create token)."
+      "help": "Every Technitium server: list the primary and the secondary, or all cluster nodes; Netlens finds out where it can write. Create a separate user on each server with View and Modify permission on your zone and its reverse zones (no Delete permission needed) and make a token for it (Administration → Sessions → Create token).",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Server address",
+          "placeholder": "http://192.168.0.2:5380",
+          "required": true
+        },
+        {
+          "key": "token",
+          "label": "API token",
+          "type": "password",
+          "required": true
+        }
+      ],
+      "legacy": {
+        "split": ",",
+        "map": {
+          "host": "servers",
+          "token": "tokens"
+        }
+      }
     },
     {
       "key": "verify_tls",

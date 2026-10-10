@@ -1,7 +1,7 @@
 {
   "id": "docker",
   "name": "Docker hosts",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
@@ -10,12 +10,36 @@
   "diagnose": true,
   "config": [
     {
-      "key": "hosts",
-      "type": "text",
+      "key": "servers",
+      "type": "servers",
       "label": "Docker hosts",
-      "placeholder": "http://192.168.0.189:2375 http://192.168.0.190:2375",
       "required": true,
-      "help": "The address of the read-only Docker socket proxy on each host, separated by spaces or commas (https:// works too). When the proxy runs on the Docker host itself and is reached as 127.0.0.1, add the host's own network address after an equals sign, for example http://127.0.0.1:2375=192.168.0.189."
+      "help": "The read-only Docker socket proxy on each host (https:// works too). When the proxy runs on the Docker host itself and is reached as 127.0.0.1, fill in the host's own network address as well.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Proxy address",
+          "placeholder": "http://192.168.0.189:2375",
+          "required": true
+        },
+        {
+          "key": "lan",
+          "label": "Host's own address",
+          "placeholder": "192.168.0.189",
+          "help": "Only needed when the proxy is reached as 127.0.0.1",
+          "optional": true
+        }
+      ],
+      "legacy": {
+        "split": " ",
+        "map": {
+          "host": "hosts"
+        },
+        "pair": {
+          "sep": "=",
+          "column": "lan"
+        }
+      }
     },
     {
       "key": "verify_tls",

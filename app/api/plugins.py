@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
@@ -101,7 +103,7 @@ class PluginBody(BaseModel):
     """Only what is sent changes. Secret fields left empty keep their saved value."""
 
     enabled: bool | None = None
-    config: dict[str, str | int | float | bool | None] | None = Field(default=None)
+    config: dict[str, Any] | None = Field(default=None)
 
 
 def _merged(plugin, conn, body: PluginBody) -> dict:

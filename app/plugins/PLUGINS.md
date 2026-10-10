@@ -66,7 +66,7 @@ my-router/            (the folder is optional)
 | Field | Meaning |
 | :--- | :--- |
 | `key` | Required. Lowercase letters, digits, `_`, starts with a letter, max 32, unique. The key in the `config` dict your code receives. |
-| `type` | `text` (default), `password`, `bool`, `number` or `select`. |
+| `type` | `text` (default), `password`, `bool`, `number`, `select` or `servers` (a list of servers, below). |
 | `label`, `help`, `placeholder` | Texts in the form. |
 | `section` | Optional heading; fields with the same section are grouped. |
 | `required` | The plugin cannot be switched on until every required field is filled (ignored for `bool`). |
@@ -75,6 +75,25 @@ my-router/            (the folder is optional)
 | `options` | For `select`: a list of strings or `{"value": ..., "label": ...}`. The first is the default. |
 
 `password` fields are secrets: they are masked in the interface and the API, and leaving the field blank when saving keeps the saved value.
+
+#### A list of servers (`"type": "servers"`)
+
+For a plugin that talks to one or more servers, a `servers` field shows one line per server with its own **Test** button, a **+** button for another line, and **Test all connections**. Your code receives a list of objects under the field's key, one per server, each with an `id` and a value for every column:
+
+```json
+{"key": "servers", "type": "servers", "label": "Servers", "required": true,
+ "columns": [
+   {"key": "host", "label": "Address", "placeholder": "https://192.168.0.10", "required": true},
+   {"key": "api_key", "label": "API key", "type": "password", "required": true},
+   {"key": "site", "label": "Site", "optional": true}],
+ "legacy": {"split": ",", "map": {"host": "url", "api_key": "api_key"}}}
+```
+
+- The first column must be `host`. A column is `text` or `password` (masked; blank keeps the saved value of the same line); `optional` columns sit under *More* on the line; `required` columns must be filled on every line.
+- **Test** on a line calls your `test(config)` with a list that holds just that line, so `test` should simply test every server it is given. `fetch` receives all lines. Fail with a message that names the server, and keep exception types such as `auth_failed`.
+- `legacy` (optional) says how an older version of your plugin saved the same servers (separate settings, optionally separated by commas or spaces, `pair` splits `a=b`), so existing setups become lines by themselves.
+- Give every guest or host id a prefix when two servers can hand out the same id (two Proxmox clusters both have VM 100).
+- A plugin with a `servers` field needs Netlens 0.3.109 or newer (`min_netlens` in the plugin index).
 
 ### Example
 

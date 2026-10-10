@@ -38,6 +38,14 @@ function fillMapCard(card, cfg) {
     "Used in every browser where nobody picked a layout in the map's own layout menu. A layout chosen in the map is remembered per browser and wins over this setting."));
   form.appendChild(field);
 
+  const guestsBox = h("input", { type: "checkbox", name: "show_guests", checked: !!cfg.show_guests });
+  const guestsField = h("div", { class: "field" });
+  guestsField.appendChild(h("label", {}, "Containers on the map"));
+  guestsField.appendChild(h("label", { class: "check" }, guestsBox, " Show containers and apps under their host"));
+  guestsField.appendChild(h("p", { class: "hint" },
+    "Draws the running containers and apps that are not a device themselves (a bridge container, a TrueNAS app) as small dashed dots under the host they run on. Virtual machines are devices and are always on the map. The map's own menu can override this per browser."));
+  form.appendChild(guestsField);
+
   const suffixInput = h("input", { type: "text", name: "domain_suffix", placeholder: "home.example.com", value: cfg.domain_suffix || "", autocomplete: "off" });
   const suffixField = h("div", { class: "field" });
   suffixField.appendChild(h("label", {}, "Domain suffix to hide"));
@@ -65,7 +73,7 @@ function fillMapCard(card, cfg) {
     e.preventDefault();
     saveBtn.disabled = true;
     try {
-      const updated = await put("/api/map-settings", { default_layout: select.value, domain_suffix: suffixInput.value });
+      const updated = await put("/api/map-settings", { default_layout: select.value, domain_suffix: suffixInput.value, show_guests: guestsBox.checked });
       setDomainSuffix(updated.domain_suffix);
       toast("Map settings saved", "success");
       fillMapCard(card, updated);

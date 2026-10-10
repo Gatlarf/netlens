@@ -298,7 +298,10 @@ def test_the_diagnostic_survives_a_dead_switch(network):
 
 
 def test_hosts_with_ports_and_separators():
-    assert plugin.parse_hosts("10.0.0.2:1161, 10.0.0.3;10.0.0.4\n10.0.0.5") == ["10.0.0.2:1161", "10.0.0.3", "10.0.0.4", "10.0.0.5"]
+    old = plugin.parse_hosts({"hosts": "10.0.0.2:1161, 10.0.0.3;10.0.0.4\n10.0.0.5", "community": "c"})
+    assert old == [("10.0.0.2:1161", "c"), ("10.0.0.3", "c"), ("10.0.0.4", "c"), ("10.0.0.5", "c")]
+    rows = {"servers": [{"host": "10.0.0.2", "community": "own"}, {"host": "10.0.0.3", "community": ""}, {"host": ""}], "community": "default"}
+    assert plugin.parse_hosts(rows) == [("10.0.0.2", "own"), ("10.0.0.3", "default")]
     assert plugin.Agent("10.0.0.2:1161", "x").address == ("10.0.0.2", 1161)
 
 

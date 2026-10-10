@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.109 — 2026-10-11
+
+### Added
+- ★ **One way to enter servers in every plugin**: Technitium, Docker, TrueNAS, Proxmox and SNMP now have a list with one line per server (its address and its own key or token), a **Test** button on every line that tests just that server, a **+ Add server** button for another line and a **−** button to remove one, and **Test all connections** at the bottom tests every line and shows each answer on its own line. TrueNAS and Proxmox can now read several systems (VMs numbered the same on two clusters are kept apart). Existing settings are carried over automatically; nothing to re-enter. Plugin versions: Technitium 1.2.0, Docker 1.2.0, TrueNAS 1.2.0, Proxmox 1.3.0, SNMP 1.1.0 (these need Netlens 0.3.109 or newer).
+- ★ **Containers on the map**: Settings → Map has *Show containers and apps under their host* (off by default), and the map's own menu has *Show / Hide containers* for one browser. Running containers and apps that are not a device themselves are drawn as small dashed dots under the host they run on (unhealthy ones outlined in red); click one for its status, image and a link to the host. Virtual machines are devices and stay on the map as before.
+
 ## 0.3.0 — 2026-10-11
 
 ### Added

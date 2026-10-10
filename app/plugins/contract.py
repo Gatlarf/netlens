@@ -15,7 +15,8 @@ KINDS = ("hypervisor", "topology", "dns")
 DNS_CAPABILITIES = ("marker", "delete")   # what a DNS plugin can do besides adding and updating records
 DNS_TYPES = ("A", "AAAA", "PTR", "CNAME")
 MAX_DNS_RECORDS = 50000
-FIELD_TYPES = ("text", "password", "bool", "number", "select")
+FIELD_TYPES = ("text", "password", "bool", "number", "select", "servers")
+MAX_SERVERS = 20
 ID_RE = re.compile(r"^[a-z][a-z0-9_-]{1,30}$")
 KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 MAC_RE = re.compile(r"^[0-9a-fA-F]{2}([:-][0-9a-fA-F]{2}){5}$")
@@ -124,6 +125,126 @@ def _capabilities(value: Any, kind: str) -> list[str]:
     return sorted(set(items))
 
 
+# ----------------------------------------------------------------------------- server lists
+def _server_columns(value: Any, path: str) -> list[dict]:
+    """The columns of a `servers` field: each row is one server. The first column is the address (`host`)."""
+    columns, seen = [], set()
+    for j, raw in enumerate(_list(value, f"{path}.columns")):
+        cpath = f"{path}.columns[{j}]"
+        raw = _dict(raw, cpath)
+        key = _text(raw.get("key"), f"{cpath}.key", required=True, max_len=32)
+        if not KEY_RE.match(key) or key == "id":
+            _fail(f"{cpath}.key", "must be lowercase letters, digits or '_', starting with a letter (and not 'id')")
+        if key in seen:
+            _fail(f"{cpath}.key", f"{key!r} is used twice")
+        seen.add(key)
+        ctype = raw.get("type", "text")
+        if ctype not in ("text", "password"):
+            _fail(f"{cpath}.type", "must be text or password")
+        columns.append({
+            "key": key, "type": ctype, "secret": ctype == "password",
+            "label": _text(raw.get("label"), f"{cpath}.label", max_len=60, default=key),
+            "placeholder": _text(raw.get("placeholder"), f"{cpath}.placeholder", max_len=100),
+            "help": _text(raw.get("help"), f"{cpath}.help", max_len=300),
+            "required": bool(raw.get("required", False)),
+            "optional": bool(raw.get("optional", False)),      # shown under "more" in the row
+        })
+    if not columns:
+        _fail(f"{path}.columns", "a servers field needs at least one column")
+    if columns[0]["key"] != "host":
+        _fail(f"{path}.columns[0].key", "the first column must be 'host' (the address of the server)")
+    return columns
+
+
+def _server_legacy(value: Any, columns: list[dict], path: str) -> dict | None:
+    """How an older version stored the same servers (separate settings), so existing setups carry over."""
+    if value is None:
+        return None
+    value = _dict(value, f"{path}.legacy")
+    mapping = _dict(value.get("map"), f"{path}.legacy.map")
+    keys = {c["key"] for c in columns}
+    for column, old in mapping.items():
+        if column not in keys or not isinstance(old, str) or not KEY_RE.match(old):
+            _fail(f"{path}.legacy.map", "maps column names to the key of an older setting")
+    out = {"map": dict(mapping), "split": value["split"] if isinstance(value.get("split"), str) else ""}
+    pair = value.get("pair")
+    if pair is not None:
+        pair = _dict(pair, f"{path}.legacy.pair")
+        if pair.get("column") not in keys:
+            _fail(f"{path}.legacy.pair.column", "is not a column")
+        out["pair"] = {"sep": _text(pair.get("sep"), f"{path}.legacy.pair.sep", required=True, max_len=3), "column": pair["column"]}
+    return out
+
+
+def migrate_servers(field: dict, saved: dict) -> list[dict]:
+    """Rows built from the settings an older plugin version saved (empty when there is nothing to carry over)."""
+    legacy = field.get("legacy")
+    if not legacy:
+        return []
+    split = legacy.get("split") or ""      # any value: the old text was split on commas and white space
+    columns = {}
+    for column, old in legacy["map"].items():
+        raw = saved.get(old)
+        if not isinstance(raw, str) or not raw.strip():
+            columns[column] = []
+        elif split:
+            columns[column] = [x.strip() for x in re.split(r"[,\s]+", raw.strip()) if x.strip()]
+        else:
+            columns[column] = [raw.strip()]
+    hosts = columns.get("host") or []
+    rows = []
+    for i, host in enumerate(hosts):
+        row = {"id": f"s{i + 1}", "host": host}
+        pair = legacy.get("pair")
+        if pair and pair["sep"] in host:
+            row["host"], row[pair["column"]] = [x.strip() for x in host.split(pair["sep"], 1)]
+        for column, values in columns.items():
+            if column != "host" and values:
+                row[column] = values[i] if i < len(values) else values[0]      # one value for all servers is allowed
+        rows.append(row)
+    return rows
+
+
+def clean_servers(field: dict, rows: Any, current: list | None = None) -> list[dict]:
+    """Normalise the rows of a servers field. A secret left empty in a row keeps the saved one of the row with the same id."""
+    if rows in (None, ""):
+        rows = []
+    if not isinstance(rows, list):
+        raise ContractError(f"{field['label']}: must be a list of servers")
+    if len(rows) > MAX_SERVERS:
+        raise ContractError(f"{field['label']}: at most {MAX_SERVERS} servers")
+    saved = {r.get("id"): r for r in (current or []) if isinstance(r, dict)}
+    out, ids = [], set()
+    for raw in rows:
+        if not isinstance(raw, dict):
+            raise ContractError(f"{field['label']}: every server must be an object")
+        old = saved.get(raw.get("id"), {})
+        row = {}
+        for col in field["columns"]:
+            value = raw.get(col["key"])
+            if value is None:
+                value = ""
+            if not isinstance(value, str):
+                raise ContractError(f"{field['label']}: {col['label']} must be text")
+            value = value.strip()
+            if col["secret"] and not value:
+                value = old.get(col["key"], "") if isinstance(old.get(col["key"]), str) else ""
+            if len(value) > 1000:
+                raise ContractError(f"{field['label']}: {col['label']} is too long")
+            row[col["key"]] = value
+        if not any(row.values()):
+            continue                      # an empty line is not a server
+        rid = str(raw.get("id") or "")[:20]
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,20}", rid) or rid in ids:
+            n = len(out) + 1
+            while f"s{n}" in ids:
+                n += 1
+            rid = f"s{n}"
+        ids.add(rid)
+        out.append({"id": rid, **row})
+    return out
+
+
 # ----------------------------------------------------------------------------- manifest
 def validate_manifest(data: Any) -> dict:
     """Check plugin.json and return it in normalised form."""
@@ -196,6 +317,10 @@ def validate_manifest(data: Any) -> dict:
             field["default"] = _text(default, f"{path}.default", default=options[0]["value"])
             if field["default"] not in [o["value"] for o in options]:
                 _fail(f"{path}.default", "is not one of the options")
+        elif ftype == "servers":
+            field["default"] = []
+            field["columns"] = _server_columns(raw.get("columns"), path)
+            field["legacy"] = _server_legacy(raw.get("legacy"), field["columns"], path)
         else:
             field["default"] = _text(default, f"{path}.default", max_len=500) if ftype == "text" else ""
         fields.append(field)
@@ -220,12 +345,15 @@ def default_config(manifest: dict) -> dict:
     return {f["key"]: f["default"] for f in manifest["config"]}
 
 
-def clean_config(manifest: dict, values: dict) -> dict:
+def clean_config(manifest: dict, values: dict, current: dict | None = None) -> dict:
     """Keep only the manifest's fields, coerced to their types (unknown keys are dropped)."""
     out = {}
     for f in manifest["config"]:
         key = f["key"]
         value = values.get(key, f["default"])
+        if f["type"] == "servers":
+            out[key] = clean_servers(f, value if key in values else [], current.get(key) if current else None)
+            continue
         if f["type"] == "bool":
             value = bool(value)
         elif f["type"] == "number":
@@ -254,7 +382,17 @@ def clean_config(manifest: dict, values: dict) -> dict:
 
 
 def missing_required(manifest: dict, config: dict) -> list[str]:
-    return [f["label"] for f in manifest["config"] if f["required"] and f["type"] != "bool" and config.get(f["key"]) in (None, "")]
+    out = []
+    for f in manifest["config"]:
+        if f["type"] == "servers":
+            rows = config.get(f["key"]) or []
+            if f["required"] and not rows:
+                out.append(f["label"])
+            for i, row in enumerate(rows, 1):
+                out += [f"{f['label']} {i}: {c['label']}" for c in f["columns"] if c["required"] and not row.get(c["key"])]
+        elif f["required"] and f["type"] != "bool" and config.get(f["key"]) in (None, ""):
+            out.append(f["label"])
+    return out
 
 
 # ----------------------------------------------------------------------------- outputs

@@ -194,3 +194,18 @@ dialog.whats-new::backdrop { background: rgba(0, 0, 0, 0.45); }
 dialog.whats-new h2 { margin: 0; }
 .cl-scroll { overflow-y: auto; min-height: 0; display: grid; gap: 16px; padding-right: 4px; }
 .cl-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 8px; }
+
+/* The list of servers in a plugin's settings: one line per server */
+.servers { display: grid; gap: 10px; }
+.server-list { display: grid; gap: 10px; }
+.server-row { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; }
+.server-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 12px; }
+.server-cell { display: grid; gap: 2px; margin: 0; }
+.server-cell span { color: var(--muted); font-size: 0.8rem; }
+.field .server-cell { margin-bottom: 0; }
+.server-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+.server-optional summary { color: var(--muted); font-size: 0.85rem; cursor: pointer; }
+.server-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.server-actions .server-result { flex: 1 1 200px; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.server-result.ok { color: var(--ok, #2e9e5b); }
+.server-add { justify-self: start; }
