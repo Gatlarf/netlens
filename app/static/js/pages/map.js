@@ -134,6 +134,7 @@ let groupFilter = "All"; // "All", "none" (no group) or a group id
 
 // the lines shown for a device; a device without a name always shows its address
 function labelLines(node) {
+  if (node.virtual) return [node.label || ""];      // a container has a name and no address
   const name = node.label && node.label !== node.ip ? shortName(node.label) : null;
   if (labelMode === "ip" || !name) return [node.ip || ""];
   return labelMode === "name" ? [name] : [name, node.ip];
@@ -521,6 +522,7 @@ export async function render(container, params) {
   let currentEdges = [];
   let tree = buildTree([]);
   let fitNext = true;
+  let fitGuests = true;
   let foldedIds = new Set(); // devices hidden because their branch is collapsed (horizontal layout)
   const collapseState = new Map(); // parent id -> true/false once the user folded or opened it
   let selectedEdgeId = null;
@@ -873,6 +875,12 @@ export async function render(container, params) {
 
       applyFilters(nodesDS, edgesDS, currentNodes, currentEdges, searchInput.value, typeSelect.value, statusSelect.value, foldedIds, horizontal);
 
+      if (showGuests && fitGuests && currentNodes.some((n) => n.virtual)) {
+        // the containers were added to the picture: show all of it once (the layouts that arrange themselves would
+        // otherwise leave part of it off the screen)
+        fitGuests = false;
+        setTimeout(() => { if (!destroyed) network.fit({ animation: { duration: 300 } }); }, treeLayout ? 100 : 1500);
+      }
       if (horizontal && fitNext && currentNodes.length > 0) {
         fitNext = false;
         network.fit({ animation: { duration: 300 } });

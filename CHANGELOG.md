@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.113 — 2026-10-11
+
+### Fixed
+- **Containers on the map in the horizontal layout**: the map failed to draw (an error about a missing address) and showed no links; containers have no address and are labelled by name now. When containers are shown, the map also fits the whole picture on the screen once.
+
 ## 0.3.112 — 2026-10-11
 
 ### Changed
