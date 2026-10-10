@@ -228,7 +228,14 @@ def _apply_one(server, change):
             params["ptrName"] = change["value"]
         else:
             params["ipAddress"] = change["value"]
-        server.call("/api/zones/records/delete", **params)
+        try:
+            server.call("/api/zones/records/delete", **params)
+        except AuthRefused:
+            raise
+        except TechnitiumError:
+            # Technitium removes the PTR together with its A record, so a PTR delete that follows can find nothing left: that is success
+            if any(_value(r) == _name(change["value"]) or _value(r) == change["value"] for r in _exists(server, zone, change)):
+                raise
     else:
         raise TechnitiumError(f"unknown action {action!r}")
 
