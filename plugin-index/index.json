@@ -143,6 +143,33 @@
    ]
   },
   {
+   "id": "technitium",
+   "name": "Technitium DNS",
+   "kind": "dns",
+   "description": "Registers your devices in Technitium DNS Server (A and reverse records) and follows address changes, after a preview and your approval. Works with a primary and secondary server and with a Technitium cluster. It only changes records it created itself and never touches records made by anything else, such as Windows machines that register themselves. Tested against a simulated server only.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/technitium",
+   "license": "MIT",
+   "supports": [
+    "Technitium DNS Server with primary and secondary zones (not yet tested on a real server)",
+    "Technitium DNS cluster (not yet tested on a real server)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.0.0/technitium.zip",
+     "sha256": "57738102481d2abbff52d66409d36a9a9ca0fc52a70cb02ad5dfbb0400b4005e",
+     "api_version": 1,
+     "min_netlens": "0.2.96",
+     "released": "2026-10-10",
+     "changelog": "First release. Written from the official API documentation and tested against a simulated Technitium server only: please try it on a scratch zone first and report back (see the README).",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
    "id": "truenas",
    "name": "TrueNAS",
    "kind": "hypervisor",
