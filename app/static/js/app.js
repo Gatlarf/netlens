@@ -2,6 +2,7 @@ import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
 import { initUpdateBadge } from "./update.js";
 import { initTopbar } from "./topbar.js";
+import { maybeShowWhatsNew } from "./changelog.js";
 import { renderSetup } from "./setup.js";
 import { get, post, ApiError } from "./api.js";
 import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
@@ -276,6 +277,8 @@ function setLoginMode(byUser) {
   if (focus) focus.focus();
 }
 
+let whatsNewChecked = false;
+
 async function applySession() {
   const session = await get("/api/session");
   setSessionUser(session.authenticated ? session.user : null);
@@ -294,6 +297,10 @@ async function applySession() {
     } else {
       el("#user-who").textContent = "Not signed in";
     }
+  }
+  if (session.authenticated && !whatsNewChecked) {
+    whatsNewChecked = true;
+    maybeShowWhatsNew();
   }
   return session;
 }

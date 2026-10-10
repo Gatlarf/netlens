@@ -89,7 +89,7 @@ BUILTIN = Principal(username="access token", role="admin", builtin=True)
 # What a viewer may read. Everything else, and every request that changes something, needs an administrator.
 VIEWER_READABLE = re.compile(
     r"^/(metrics"
-    r"|api/(session|update|map|map-settings|hierarchy|relations|events|uptime|scans|scans/current|service-checks|service-checks/\d+/results"
+    r"|api/(session|update|changelog|map|map-settings|hierarchy|relations|events|uptime|scans|scans/current|service-checks|service-checks/\d+/results"
     r"|stats|stats/summary|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
 )
 VIEWER_MAY_POST = ("/api/logout", "/api/me/password")

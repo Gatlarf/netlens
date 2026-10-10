@@ -19,6 +19,7 @@ import { buildGroupsCard } from "../cards/groups.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 import { buildPassiveCard } from "../cards/passive.js";
 import { buildDnsCard } from "../cards/dns.js";
+import { buildChangelogCard } from "../changelog.js";
 
 function kvRow(label, value) {
   const row = h("div", { class: "kv" });
@@ -152,6 +153,11 @@ async function buildAboutCard() {
     wrap.appendChild(await buildUpdateCard());
   } catch (err) {
     // the About card still works without the update card
+  }
+  try {
+    wrap.appendChild(await buildChangelogCard());
+  } catch (err) {
+    // ... nor without the changelog
   }
   return wrap;
 }

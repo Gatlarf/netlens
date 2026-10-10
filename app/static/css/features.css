@@ -176,3 +176,21 @@ td.actions .btn { padding: 2px 8px; font-size: 0.85em; }
 .dns-plan td { vertical-align: top; }
 .dns-change { margin: 2px 0 0; }
 .dns-row.ok td, .dns-row.skip td { color: var(--muted); }
+
+/* Changelog (Settings → About) and the "What's new" window shown after an update */
+.cl-release { border-top: 1px solid var(--border); padding: 8px 0; }
+.cl-release > summary, .cl-release-block h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; cursor: pointer; }
+.cl-release-block h3 { cursor: default; margin: 0 0 4px; font-size: 1.05em; }
+.cl-version { font-weight: 700; font-variant-numeric: tabular-nums; }
+.cl-date, .cl-note { color: var(--muted); font-size: 0.9em; font-weight: 400; }
+.cl-body h4 { margin: 12px 0 4px; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.cl-body ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.cl-item { overflow-wrap: anywhere; }
+.cl-item code { font-size: 0.9em; }
+.cl-star { color: var(--warn); margin-right: 4px; }
+dialog.whats-new { margin: auto; padding: 20px 22px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); width: min(560px, calc(100% - 32px)); max-height: calc(100% - 48px); }
+dialog.whats-new[open] { display: flex; flex-direction: column; gap: 8px; }
+dialog.whats-new::backdrop { background: rgba(0, 0, 0, 0.45); }
+dialog.whats-new h2 { margin: 0; }
+.cl-scroll { overflow-y: auto; min-height: 0; display: grid; gap: 16px; padding-right: 4px; }
+.cl-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 8px; }

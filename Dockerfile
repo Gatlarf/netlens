@@ -40,6 +40,7 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app ./app
+COPY CHANGELOG.md ./CHANGELOG.md
 
 # Set at build time: NETLENS_VERSION=<major.minor>.<commit count> (see README).
 ARG NETLENS_VERSION=dev
