@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.1.0/truenas.zip",
+      "sha256": "192a1669230c27a3a3552b3fc4ca20a6c34c4096b3867954498a656f1a591f7c",
+      "api_version": 1,
+      "min_netlens": "0.2.106",
+      "released": "2026-10-11",
+      "changelog": "Guests now carry details: CPU and memory of VMs and containers, and for apps the version, whether an update is available, the image and the ports they publish (the host's Open ports table names the app). Needs Netlens 0.2.106 or newer."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.0.0/truenas.zip",
       "sha256": "debc4644c1bf3d6eec78911fe39a638d1375685f8caa9126c12843247000e4b7",

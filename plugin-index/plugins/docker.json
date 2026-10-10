@@ -1,0 +1,24 @@
+{
+  "id": "docker",
+  "name": "Docker hosts",
+  "kind": "hypervisor",
+  "description": "Shows your Docker hosts with their containers: state, health, restarts, image (and how old it is), compose project, published ports, and containers with their own address on your network (macvlan / ipvlan) matched to the devices Netlens found. Read-only, through a read-only socket proxy (the README has the recipe). Tested on Docker 29.8.2 with a bridge-network setup; macvlan and ipvlan are tested with simulated data only.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/docker",
+  "license": "MIT",
+  "supports": [
+    "Docker Engine 29.x through tecnativa/docker-socket-proxy (tested)",
+    "Containers on macvlan / ipvlan networks (not yet tested on a real host)"
+  ],
+  "releases": [
+    {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.1.0/docker.zip",
+      "sha256": "bf26f9ffb5c6e1d2d9b2f54b02e87e05d938efeb17b39532f34ca67e47424d02",
+      "api_version": 1,
+      "min_netlens": "0.2.106",
+      "released": "2026-10-11",
+      "changelog": "First release. Docker hosts and their containers as guests of the host: state, health, restarts, image and its age, compose project, published ports, and macvlan / ipvlan containers matched to devices. Needs Netlens 0.2.106 or newer."
+    }
+  ]
+}

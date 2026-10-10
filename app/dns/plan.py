@@ -302,7 +302,15 @@ def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, 
     # ---- containers that share their host's address: a CNAME to the host (only when the host itself is registered)
     if settings.register_containers:
         device_names = {names.fqdn(resolved[d.id], z): d.id for d, z, *_ in eligible}
-        targets = {d.id: names.fqdn(resolved[d.id], z) for d, z, *_ in eligible}
+        # the name to point at: the host's existing address record (made by Netlens or not, e.g. a Windows host's own), else the one being added
+        planned = {i["device_id"]: i for i in items if i["device_id"] is not None}
+        targets = {}
+        for d, z, *_ in eligible:
+            existing = sorted(a_by_value.get(d.ip, []), key=lambda r: (not ours(r), r["name"]))
+            if existing:
+                targets[d.id] = existing[0]["name"]
+            elif planned.get(d.id, {}).get("state") == "add":
+                targets[d.id] = names.fqdn(resolved[d.id], z)
         taken: set[str] = set(device_names)
         for a in sorted(aliases or [], key=lambda x: x.key):
             zone = zone_for(a.host_ip, settings.networks)

@@ -16,6 +16,33 @@
    ]
   },
   {
+   "id": "docker",
+   "name": "Docker hosts",
+   "kind": "hypervisor",
+   "description": "Shows your Docker hosts with their containers: state, health, restarts, image (and how old it is), compose project, published ports, and containers with their own address on your network (macvlan / ipvlan) matched to the devices Netlens found. Read-only, through a read-only socket proxy (the README has the recipe). Tested on Docker 29.8.2 with a bridge-network setup; macvlan and ipvlan are tested with simulated data only.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/docker",
+   "license": "MIT",
+   "supports": [
+    "Docker Engine 29.x through tecnativa/docker-socket-proxy (tested)",
+    "Containers on macvlan / ipvlan networks (not yet tested on a real host)"
+   ],
+   "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.1.0/docker.zip",
+     "sha256": "bf26f9ffb5c6e1d2d9b2f54b02e87e05d938efeb17b39532f34ca67e47424d02",
+     "api_version": 1,
+     "min_netlens": "0.2.106",
+     "released": "2026-10-11",
+     "changelog": "First release. Docker hosts and their containers as guests of the host: state, health, restarts, image and its age, compose project, published ports, and macvlan / ipvlan containers matched to devices. Needs Netlens 0.2.106 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
    "id": "example-router",
    "name": "Example router",
    "kind": "topology",
@@ -156,6 +183,24 @@
    ],
    "releases": [
     {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.1.0/technitium.zip",
+     "sha256": "ec4522dde525b84cacad32adf2352be32c8749d50dc37e06f09dd90adc1383bc",
+     "api_version": 1,
+     "min_netlens": "0.2.106",
+     "released": "2026-10-11",
+     "changelog": "Handles CNAME records, so Netlens can give containers that share their host's address a name (add, replace and remove, checked on a real server). Needs Netlens 0.2.106 or newer.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-11",
+      "tested_on": [
+       "Technitium DNS Server 15.5.1, primary and secondary pair (real servers, scratch zone)"
+      ],
+      "notes": "Adds CNAME add / replace / delete, tested on the real servers in a scratch zone (the record keeps the Netlens comment). Still only touches records carrying the Netlens marker or tracked by Netlens."
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.0.1/technitium.zip",
      "sha256": "2ecd6833a7f807bdc75a9d16c05f7572fb8e91c666af5507f996946d69a1eca4",
@@ -200,6 +245,18 @@
     "TrueNAS 25.04 (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.1.0/truenas.zip",
+     "sha256": "192a1669230c27a3a3552b3fc4ca20a6c34c4096b3867954498a656f1a591f7c",
+     "api_version": 1,
+     "min_netlens": "0.2.106",
+     "released": "2026-10-11",
+     "changelog": "Guests now carry details: CPU and memory of VMs and containers, and for apps the version, whether an update is available, the image and the ports they publish (the host's Open ports table names the app). Needs Netlens 0.2.106 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.0.0/truenas.zip",

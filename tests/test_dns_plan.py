@@ -266,3 +266,10 @@ def test_our_alias_is_ok_updated_when_the_host_is_renamed_and_orphaned_when_gone
     assert item["state"] == "update" and item["changes"][0]["old_value"] == f"oldname.{ZONE}" and item["changes"][0]["value"] == f"dockerhost.{ZONE}"
     gone = alias_plan([ours], aliases=[])
     assert any(i["state"] == "orphan" and i["name"] == f"web.{ZONE}" for i in gone["items"])
+
+
+def test_an_alias_points_at_the_name_the_host_really_has():
+    # the host registered itself under another name: the CNAME follows that name, not the one Netlens would have chosen
+    result = alias_plan([(ZONE, f"dockerhost-old.{ZONE}", "A", "192.168.0.10", False)])
+    item = alias_item(result)
+    assert item["state"] == "add" and item["changes"][0]["value"] == f"dockerhost-old.{ZONE}"

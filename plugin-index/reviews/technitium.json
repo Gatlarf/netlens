@@ -2,6 +2,17 @@
   "id": "technitium",
   "reviews": [
     {
+      "version": "1.1.0",
+      "sha256": "ec4522dde525b84cacad32adf2352be32c8749d50dc37e06f09dd90adc1383bc",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-11",
+      "tested_on": [
+        "Technitium DNS Server 15.5.1, primary and secondary pair (real servers, scratch zone)"
+      ],
+      "notes": "Adds CNAME add / replace / delete, tested on the real servers in a scratch zone (the record keeps the Netlens comment). Still only touches records carrying the Netlens marker or tracked by Netlens."
+    },
+    {
       "version": "1.0.1",
       "sha256": "2ecd6833a7f807bdc75a9d16c05f7572fb8e91c666af5507f996946d69a1eca4",
       "level": "verified",
