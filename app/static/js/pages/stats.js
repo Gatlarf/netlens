@@ -6,7 +6,7 @@ const RANGES = [["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["90d
 const EVENT_LABELS = {
   device_new: "New device", device_offline: "Went offline", device_online: "Came online", ip_changed: "IP changed",
   os_changed: "OS changed", port_opened: "Port opened", wake_sent: "Wake-on-LAN sent", port_closed: "Port closed", port_unexpected: "Unexpected port", port_missing: "Baseline port gone", host_timeout: "Host timeout", device_deleted: "Deleted",
-  service_down: "Service down", service_up: "Service up", wifi_roamed: "Wi-Fi move", ip_reused: "IP reused", backup_failed: "Backup failed", dhcp_rogue: "Rogue DHCP?", gateway_changed: "Gateway changed", dns_registered: "Registered in DNS", dns_updated: "DNS updated", dns_removed: "DNS record removed", dns_failed: "DNS write failed", container_unhealthy: "Container unhealthy", container_restarting: "Container restarting", container_stopped: "Container stopped",
+  service_down: "Service down", service_up: "Service up", wifi_roamed: "Wi-Fi move", ip_reused: "IP reused", backup_failed: "Backup failed", dhcp_rogue: "Rogue DHCP?", gateway_changed: "Gateway changed", dns_registered: "Registered in DNS", dns_updated: "DNS updated", dns_removed: "DNS record removed", dns_failed: "DNS write failed", container_unhealthy: "Container unhealthy", container_restarting: "Container restarting", container_stopped: "Container stopped", guest_stopped: "Guest stopped", guest_started: "Guest started", guest_update_available: "Update available",
 };
 
 const dev = (item) => ({ ...item, href: `#/device/${item.id}` });
@@ -90,17 +90,21 @@ function build(s) {
     card("Passive listening", pa ? table(["", ""], [["State", !pa.enabled ? "off" : pa.running ? "listening" : `not running${pa.error ? `: ${pa.error}` : ""}`], ["Announcements heard", fmtNumber(pa.frames)], ["Devices updated", fmtNumber(pa.applied)], ["Waiting for a scan to find their device", fmtNumber(pa.pending)]]) : emptyNote("Not available here."),
       h("p", { class: "hint" }, "Names and operating systems that devices announce in DHCP, mDNS and UPnP (Settings → Scan performance)."))));
 
-  // ------------------------------------------------------------------ containers (only when a plugin reports some)
-  const ct = s.containers;
-  if (ct && ct.total) {
-    root.appendChild(section("containers", "Containers",
+  // ------------------------------------------------------------------ guests (only when a plugin reports some)
+  const gs = s.guests, ct = s.containers;
+  if (gs && gs.total) {
+    const kinds = [["vm", "virtual machines"], ["lxc", "LXC containers"], ["container", "Docker containers"], ["app", "apps"]].filter(([k]) => gs.by_kind[k]);
+    const attention = [...(ct ? ct.problems : []).map((r) => ({ name: r.name, host: r.host, why: r.problem + (r.restarts ? ` (${r.restarts} restarts)` : ""), device_id: r.device_id })), ...gs.attention];
+    root.appendChild(section("guests", "Virtual machines, containers & apps",
       h("div", { class: "tiles inline" },
-        tile(fmtNumber(ct.running), `running on ${ct.hosts} host${ct.hosts === 1 ? "" : "s"}`), tile(fmtNumber(ct.stopped), "stopped"),
-        tile(fmtNumber(ct.restarting), "restarting", { tone: ct.restarting ? "warn" : "" }), tile(fmtNumber(ct.unhealthy), "unhealthy", { tone: ct.unhealthy ? "warn" : "" }),
-        tile(fmtNumber(ct.exposed), "publish a port on all interfaces")),
-      card("Containers with a problem", ct.problems.length
-        ? table(["Container", "Host", "Problem", "Restarts"], ct.problems.map((r) => [r.device_id ? link({ id: r.device_id }, r.name) : r.name, r.host || "", r.problem, r.restarts === null || r.restarts === undefined ? "" : String(r.restarts)]))
-        : emptyNote("All containers are healthy."))));
+        tile(fmtNumber(gs.running), `running on ${gs.hosts} host${gs.hosts === 1 ? "" : "s"}`), tile(fmtNumber(gs.stopped), "stopped"),
+        ...kinds.map(([k, label]) => tile(fmtNumber(gs.by_kind[k].running), `${label} running (of ${gs.by_kind[k].total})`)),
+        tile(fmtNumber(gs.update_available), "update available", { tone: gs.update_available ? "warn" : "" }),
+        ...(ct && ct.total ? [tile(fmtNumber(ct.restarting), "containers restarting", { tone: ct.restarting ? "warn" : "" }), tile(fmtNumber(ct.unhealthy), "containers unhealthy", { tone: ct.unhealthy ? "warn" : "" }),
+          tile(fmtNumber(ct.old_images ?? gs.old_images), "images older than a year", { tone: gs.old_images ? "warn" : "" }), tile(fmtNumber(ct.exposed), "publish a port on all interfaces")] : [])),
+      card("Needs attention", attention.length
+        ? table(["Guest", "Host", "Why"], attention.map((r) => [r.device_id ? link({ id: r.device_id }, r.name) : r.name, r.host || "", r.why]))
+        : emptyNote("Nothing needs attention."))));
   }
 
   // ------------------------------------------------------------------ availability

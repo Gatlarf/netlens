@@ -350,9 +350,37 @@ function containerAddressNote(g) {
   return "inside the host";
 }
 
+// "2 CPU · 4 GB memory · 32 GB disk"
+function resourceText(d) {
+  const parts = [];
+  if (d.cpus) parts.push(`${d.cpus} CPU`);
+  if (d.memory_mb) parts.push(d.memory_mb >= 1024 ? `${Math.round(d.memory_mb / 102.4) / 10} GB memory` : `${d.memory_mb} MB memory`);
+  if (d.disk_gb) parts.push(`${d.disk_gb} GB disk`);
+  return parts.join(" · ");
+}
+
+const YEAR_MS = 365 * 24 * 3600 * 1000;
+
+function imageAge(created) {
+  const ms = Date.now() - Date.parse(created);
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const days = Math.floor(ms / 86400000);
+  return { days, text: days >= 365 ? `${Math.floor(days / 365)} year${days >= 730 ? "s" : ""} ago` : days >= 60 ? `${Math.floor(days / 30)} months ago` : `${days} days ago`, old: ms > YEAR_MS };
+}
+
 function containerRows(card, g) {
   const d = g.details || {};
-  if (d.image) card.appendChild(kvRow("Image", h("span", {}, d.image)));
+  const resources = resourceText(d);
+  if (resources) card.appendChild(kvRow("Resources", h("span", {}, resources)));
+  if (d.os) card.appendChild(kvRow("System", h("span", {}, d.os)));
+  if (d.version) card.appendChild(kvRow("Version", h("span", {}, d.version, d.update_available ? h("span", { class: "tag unknown-tag", title: "A newer version is available" }, "update available") : null)));
+  else if (d.update_available) card.appendChild(kvRow("Update", h("span", { class: "tag unknown-tag" }, "update available")));
+  if (d.tags) card.appendChild(kvRow("Tags", h("span", {}, d.tags)));
+  if (d.autostart !== undefined) card.appendChild(kvRow("Starts at boot", h("span", {}, d.autostart ? "yes" : "no")));
+  if (d.image) {
+    const age = d.image_created ? imageAge(d.image_created) : null;
+    card.appendChild(kvRow("Image", h("span", {}, d.image, age ? h("span", { class: age.old ? "tag unknown-tag" : "hint", title: "When the image was built" }, ` built ${age.text}`) : null)));
+  }
   if (d.project) card.appendChild(kvRow("Compose", h("span", {}, d.service ? `${d.project} / ${d.service}` : d.project)));
   if (d.network) card.appendChild(kvRow("Network", h("span", {}, d.network_driver && d.network_driver !== d.network ? `${d.network} (${d.network_driver})` : d.network)));
   if (d.health) card.appendChild(kvRow("Health", h("span", {}, d.health)));
@@ -390,7 +418,7 @@ function buildVirtualizationCard(device) {
       : `Hypervisor host with ${info.guests.length} guest${info.guests.length === 1 ? "" : "s"}:`));
     const table = h("table", { class: "data" });
     const headRow = h("tr");
-    (docker ? ["Name", "Status", "Image", "Ports", "Device"] : ["ID", "Name", "Type", "Status", "Device"]).forEach((c) => headRow.appendChild(h("th", {}, c)));
+    (docker ? ["Name", "Status", "Image", "Ports", "Device"] : ["ID", "Name", "Type", "Status", ...(info.guests.some((g) => resourceText(g.details || {})) ? ["Resources"] : []), "Device"]).forEach((c) => headRow.appendChild(h("th", {}, c)));
     table.appendChild(h("thead", {}, headRow));
     const tbody = h("tbody");
     for (const g of info.guests) {
@@ -401,7 +429,9 @@ function buildVirtualizationCard(device) {
       if (docker) {
         tbody.appendChild(h("tr", {}, h("td", {}, g.name), h("td", {}, containerState(g)), h("td", {}, (g.details && g.details.image) || ""), h("td", {}, portText(g.details && g.details.ports)), deviceCell));
       } else {
-        tbody.appendChild(h("tr", {}, h("td", {}, String(g.guest_id)), h("td", {}, g.name), h("td", {}, KIND_LABELS[g.kind] || g.kind), h("td", {}, g.status), deviceCell));
+        const withResources = info.guests.some((x) => resourceText(x.details || {}));
+        tbody.appendChild(h("tr", {}, h("td", {}, String(g.guest_id)), h("td", {}, g.name), h("td", {}, KIND_LABELS[g.kind] || g.kind), h("td", {}, containerState(g)),
+          ...(withResources ? [h("td", {}, resourceText(g.details || {}))] : []), deviceCell));
       }
     }
     table.appendChild(tbody);

@@ -202,7 +202,15 @@ class ProxmoxClient:
                 continue
             running = g.get("status") == "running"
             macs, ips = self._guest_details(g["node"], g["type"], int(g["vmid"]), running)
+            config = self._try(f"/nodes/{g['node']}/{g['type']}/{int(g['vmid'])}/config") or {}
             guests.append({
+                "cpus": g.get("maxcpu"),
+                "memory_mb": int(g["maxmem"] / 1048576) if isinstance(g.get("maxmem"), (int, float)) and g["maxmem"] else None,
+                "disk_gb": int(g["maxdisk"] / 1073741824) if isinstance(g.get("maxdisk"), (int, float)) and g["maxdisk"] else None,
+                "uptime": g.get("uptime") if running else None,
+                "tags": str(g.get("tags") or config.get("tags") or "").replace(";", ", "),
+                "os": str(config.get("ostype") or ""),
+                "autostart": bool(int(config.get("onboot", 0))) if str(config.get("onboot", "")).isdigit() else None,
                 "vmid": int(g["vmid"]),
                 "name": g.get("name") or f"{g['type']}-{g['vmid']}",
                 "kind": g["type"],

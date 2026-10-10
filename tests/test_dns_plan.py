@@ -216,3 +216,53 @@ def test_change_ids_are_unique_and_stable():
     r2 = plan([dev(2, ip="192.168.0.11"), dev(1)])
     ids = [c["id"] for i in r1["items"] for c in i["changes"]]
     assert len(ids) == len(set(ids)) == 4 and ids == [c["id"] for i in r2["items"] for c in i["changes"]]
+
+
+# ----------------------------------------------------------------------------- containers that share their host's address
+from app.dns.plan import DnsAlias
+
+
+def alias_plan(records=(), aliases=None, st=None, devices=None):
+    aliases = aliases if aliases is not None else [DnsAlias(key="1-web", label="web", host_id=1, host_ip="192.168.0.10")]
+    return build_plan(devices or [dev(1, hostname="dockerhost")], snap(records), st or settings(register_containers=True), NOW, aliases=aliases)
+
+
+def alias_item(result, label="web"):
+    return next(i for i in result["items"] if i["id"].startswith("c:") and i["name"] == f"{label}.{ZONE}")
+
+
+def test_a_container_alias_is_a_cname_to_its_registered_host():
+    item = alias_item(alias_plan())
+    assert item["state"] == "add" and item["device_id"] is None
+    assert [(c["type"], c["name"], c["value"]) for c in item["changes"]] == [("CNAME", f"web.{ZONE}", f"dockerhost.{ZONE}")]
+
+
+def test_aliases_are_off_by_default():
+    result = build_plan([dev(1, hostname="dockerhost")], snap(), settings(), NOW, aliases=[DnsAlias(key="1-web", label="web", host_id=1, host_ip="192.168.0.10")])
+    assert not any(i["id"].startswith("c:") for i in result["items"])
+
+
+def test_an_alias_waits_for_its_host_to_be_registered():
+    result = alias_plan(devices=[dev(1, hostname="dockerhost", trusted=False)])
+    assert alias_item(result)["state"] == "skip" and "host is not registered" in alias_item(result)["reason"]
+
+
+def test_an_existing_foreign_name_is_a_conflict_and_never_touched():
+    for existing in ((ZONE, f"web.{ZONE}", "A", "192.168.0.99"), (ZONE, f"web.{ZONE}", "CNAME", "other.example.com")):
+        item = alias_item(alias_plan([existing]))
+        assert item["state"] == "conflict" and item["changes"] == []
+
+
+def test_a_name_used_by_a_device_is_a_conflict():
+    result = alias_plan(aliases=[DnsAlias(key="1-dockerhost", label="dockerhost", host_id=1, host_ip="192.168.0.10")])
+    assert alias_item(result, "dockerhost")["state"] == "conflict"
+
+
+def test_our_alias_is_ok_updated_when_the_host_is_renamed_and_orphaned_when_gone():
+    ours = (ZONE, f"web.{ZONE}", "CNAME", f"dockerhost.{ZONE}", True)
+    assert alias_item(alias_plan([ours]))["state"] == "ok"
+    moved = alias_plan([(ZONE, f"web.{ZONE}", "CNAME", f"oldname.{ZONE}", True)])
+    item = alias_item(moved)
+    assert item["state"] == "update" and item["changes"][0]["old_value"] == f"oldname.{ZONE}" and item["changes"][0]["value"] == f"dockerhost.{ZONE}"
+    gone = alias_plan([ours], aliases=[])
+    assert any(i["state"] == "orphan" and i["name"] == f"web.{ZONE}" for i in gone["items"])

@@ -398,6 +398,19 @@ complete example, and `tests/fake_technitium.py` shows how to test one against a
 
 ### Guest details (hypervisor plugins)
 
-A guest may carry `details`, an object Netlens stores and shows on the device page: `image`, `project`, `service`, `health`,
-`started`, `network`, `network_driver` (text), `restarts`, `exit_code` (numbers), `exposed`, `restarting` (yes/no) and `ports`
-(a list of `{container_port, host_port, proto, bind}`). Unknown keys are dropped. The Docker plugin uses them for containers.
+A guest may carry `details`, an object Netlens stores and shows on the device page, in Statistics and (some of it) in events:
+
+| key | meaning |
+|---|---|
+| `image`, `image_created` | a container's image and when it was built (ISO time; images older than a year are flagged) |
+| `project`, `service` | the compose project / service of a container |
+| `health`, `restarts`, `restarting`, `exit_code`, `started` | health check result, restart count, state details, start time |
+| `network`, `network_driver` | the networks a container is on and the driver (`bridge`, `host`, `macvlan`, `ipvlan`) |
+| `ports` | published ports: a list of `{container_port, host_port, proto, bind}`; the host's *Open ports* table names the guest behind a port |
+| `exposed` | published on all interfaces |
+| `cpus`, `memory_mb`, `disk_gb`, `os`, `tags`, `autostart` | resources and labels of a VM or container |
+| `version`, `update_available` | the version of an app and whether a newer one exists (raises an event) |
+
+Unknown keys are dropped and every value is length-limited. The Proxmox, TrueNAS and Docker plugins all fill what they know. Netlens raises
+events from guest changes between two syncs: containers get `container_unhealthy`, `container_restarting` and `container_stopped`; every
+other guest gets `guest_stopped`, `guest_started` and `guest_update_available`.

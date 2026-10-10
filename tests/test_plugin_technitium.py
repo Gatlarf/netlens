@@ -199,3 +199,17 @@ def test_the_diagnostic_counts_things_and_leaks_nothing(pair):
     assert report["servers"][0]["steps"]["records"]["comments_returned"] is True and report["servers"][0]["steps"]["dynamic_updates"]["policy"] == "Deny"
     assert not re.search(r"\b\d{1,3}(\.\d{1,3}){3}\b", text) and "tok1" not in text and "nas" not in text and "desktop" not in text
     assert plugin.diagnose({"servers": "", "tokens": "x"})["error"].startswith("enter the address")
+
+
+def test_cname_add_replace_and_delete(primary):
+    cfg = {"servers": primary.url, "tokens": "tok1", "zones": [Z], "marker": MARK}
+    change = lambda action, value, old=None: {"id": "c:" + action, "action": action, "zone": Z, "name": f"web.{Z}", "type": "CNAME", "value": value, "old_value": old, "comment": MARK}
+    assert plugin.apply(cfg, [change("add", f"host.{Z}")])[0]["ok"]
+    rows = [r for r in plugin.fetch(cfg)["records"] if r["name"] == f"web.{Z}"]
+    assert [(r["type"], r["value"], r["managed"]) for r in rows] == [("CNAME", f"host.{Z}", True)]
+    assert plugin.apply(cfg, [change("update", f"other.{Z}", f"host.{Z}")])[0]["ok"]
+    assert [r["value"] for r in plugin.fetch(cfg)["records"] if r["name"] == f"web.{Z}"] == [f"other.{Z}"]
+    # a record that changed meanwhile is not replaced
+    assert not plugin.apply(cfg, [change("update", f"x.{Z}", f"host.{Z}")])[0]["ok"]
+    assert plugin.apply(cfg, [change("delete", f"other.{Z}")])[0]["ok"]
+    assert not [r for r in plugin.fetch(cfg)["records"] if r["name"] == f"web.{Z}"]

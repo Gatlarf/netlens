@@ -212,9 +212,18 @@ def _apply_one(server, change):
         params = {"domain": name, "zone": zone, "type": rtype, "comments": comment}
         if rtype == "PTR":
             params["ptrName"] = change["value"]
+        elif rtype == "CNAME":
+            params["cname"] = change["value"]
         else:
             params.update(ipAddress=change["value"], ptr="false")
         server.call("/api/zones/records/add", **params)
+    elif action == "update" and rtype == "CNAME":
+        # a name can have one CNAME: replace it (delete the one that points to the old value, then add the new one)
+        current = [r for r in _exists(server, zone, change) if r.get("type") == "CNAME" and _value(r) == _name(change["old_value"])]
+        if not current:
+            raise TechnitiumError(f"{name} no longer points to {change['old_value']}; nothing was changed")
+        server.call("/api/zones/records/delete", domain=name, zone=zone, type="CNAME")
+        server.call("/api/zones/records/add", domain=name, zone=zone, type="CNAME", cname=change["value"], comments=comment)
     elif action == "update":
         params = {"domain": name, "zone": zone, "type": rtype, "comments": comment}
         if rtype == "PTR":
@@ -226,7 +235,7 @@ def _apply_one(server, change):
         params = {"domain": name, "zone": zone, "type": rtype}
         if rtype == "PTR":
             params["ptrName"] = change["value"]
-        else:
+        elif rtype != "CNAME":
             params["ipAddress"] = change["value"]
         try:
             server.call("/api/zones/records/delete", **params)

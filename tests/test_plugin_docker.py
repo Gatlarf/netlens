@@ -237,3 +237,18 @@ def test_no_container_metrics_without_containers(tmp_path):
     with TestClient(app, headers={"Authorization": "Bearer t"}) as client:
         assert "netlens_containers" not in client.get("/metrics").text
         assert client.get("/api/stats/summary").json()["containers"]["total"] == 0
+
+
+def test_image_age_when_the_proxy_allows_images():
+    old = {"Id": "sha256:c1", "Created": 1_600_000_000}
+    with FakeDocker(containers=[container("c1", "web"), container("c2", "other")], images=[old]) as d:
+        guests = {g["name"]: g for g in plugin.fetch(config(d.url))["guests"]}
+    assert guests["web"]["details"]["image_created"] == "2020-09-13T12:26:40Z" and "image_created" not in guests["other"]["details"]
+    out = validate_output("hypervisor", {"hosts": [], "guests": []})
+    assert out == {"hosts": [], "guests": []}
+
+
+def test_no_image_permission_is_fine():
+    with FakeDocker(containers=[container("c1", "web")], images=None) as d:       # the fake answers 403 for /images
+        guests = plugin.fetch(config(d.url))["guests"]
+    assert guests[0]["name"] == "web" and "image_created" not in guests[0]["details"]

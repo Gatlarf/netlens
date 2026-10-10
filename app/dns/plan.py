@@ -46,6 +46,15 @@ class DnsDevice:
 
 
 @dataclass
+class DnsAlias:
+    """A container that shares its host's address (bridge or host network) and publishes ports: it gets a CNAME to its host."""
+    key: str            # unique, no colon
+    label: str          # the container's name
+    host_id: int        # the host's device
+    host_ip: str
+
+
+@dataclass
 class DnsSettings:
     networks: list = field(default_factory=list)       # [(ip_network, zone)]
     grace_hours: float = 2
@@ -55,6 +64,7 @@ class DnsSettings:
     max_offline_days: int = 7
     remove: bool = False
     marker: str = MARKER
+    register_containers: bool = False
 
 
 def parse_networks(text: str | None) -> list[tuple[Any, str]]:
@@ -117,7 +127,7 @@ def _label_for(d: DnsDevice, template: str) -> tuple[str | None, str, bool]:
     return names.generated_name(template, d.type, d.vendor, d.mac, d.ip), "a generated name", True
 
 
-def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, now: str, tracked: frozenset = frozenset()) -> dict:
+def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, now: str, tracked: frozenset = frozenset(), aliases: list[DnsAlias] | None = None) -> dict:
     """The plan: one item per device (and per leftover record), plus bookkeeping for the caller to store."""
     records = snapshot["records"]
     zones = {z["name"]: z for z in snapshot["zones"]}
@@ -289,10 +299,56 @@ def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, 
         state = "add" if any(c["action"] == "add" and c["type"] == "A" for c in changes) else "update"
         item(state, "; ".join(reasons), changes)
 
+    # ---- containers that share their host's address: a CNAME to the host (only when the host itself is registered)
+    if settings.register_containers:
+        device_names = {names.fqdn(resolved[d.id], z): d.id for d, z, *_ in eligible}
+        targets = {d.id: names.fqdn(resolved[d.id], z) for d, z, *_ in eligible}
+        taken: set[str] = set(device_names)
+        for a in sorted(aliases or [], key=lambda x: x.key):
+            zone = zone_for(a.host_ip, settings.networks)
+            label = names.clean_label(a.label)
+            if zone is None or not label:
+                continue
+            fq = names.fqdn(label, zone)
+            alias_item_id = f"c:{a.key}"
+
+            def alias_item(state: str, reason: str, changes: list[dict] | None = None) -> None:
+                items.append({"id": alias_item_id, "device_id": None, "device": f"container {a.label}", "name": fq, "zone": zone, "ip": None, "state": state, "reason": reason, "changes": changes or []})
+
+            def alias_change(action: str, value: str, old: str | None = None) -> dict:
+                return {"id": f"{alias_item_id}:{action}:CNAME:{fq}", "action": action, "zone": zone, "name": fq, "type": "CNAME", "value": value, "old_value": old, "comment": settings.marker}
+
+            target = targets.get(a.host_id)
+            zone_info = zones.get(zone)
+            if target is None:
+                alias_item("skip", "its host is not registered in DNS by Netlens (a host that registers itself, or is skipped, gets no alias)")
+                continue
+            if zone_info is None or not zone_info["writable"]:
+                alias_item("skip", f"the zone {zone} is missing or read-only for the plugin's account")
+                continue
+            if fq in taken:
+                alias_item("conflict", f"{fq} is already the name of a device or of another container")
+                continue
+            taken.add(fq)
+            cnames, address = by_name.get((fq, "CNAME"), []), by_name.get((fq, "A"), [])
+            mine = [r for r in cnames if ours(r)]
+            if address or [r for r in cnames if not ours(r)]:
+                other = (address or cnames)[0]
+                alias_item("conflict", f"{fq} already exists ({other['type']} {other['value']}) and was not made by Netlens; it is left alone")
+                continue
+            if mine and mine[0]["value"] == target:
+                claimed.add((mine[0]["zone"], mine[0]["name"], "CNAME", mine[0]["value"]))
+                alias_item("ok", "registered by Netlens")
+            elif mine:
+                claimed.add((mine[0]["zone"], mine[0]["name"], "CNAME", mine[0]["value"]))
+                alias_item("update", f"its host is now called {target}", [alias_change("update", target, mine[0]["value"])])
+            else:
+                alias_item("add", f"a container on {target} that publishes ports", [alias_change("add", target)])
+
     # ---- records Netlens made that nobody wants any more
     for r in records:
         key = (r["zone"], r["name"], r["type"], r["value"])
-        if r["type"] in ("A", "PTR") and ours(r) and key not in claimed:
+        if r["type"] in ("A", "PTR", "CNAME") and ours(r) and key not in claimed:
             delete = settings.remove and zones.get(r["zone"], {}).get("writable")
             items.append({
                 "id": f"o:{r['type']}:{r['name']}:{r['value']}", "device_id": None, "name": r["name"], "zone": r["zone"], "ip": r["value"] if r["type"] == "A" else None,

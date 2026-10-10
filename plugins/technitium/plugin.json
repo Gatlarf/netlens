@@ -1,7 +1,7 @@
 {
   "id": "technitium",
   "name": "Technitium DNS",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "dns",
   "author": "Netlens",

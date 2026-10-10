@@ -59,7 +59,7 @@ def _view(service: PluginService, conn) -> dict:
                 out["plan"] = dns.make_plan(conn, active.id, validate_output("dns", data))
                 labels = {r["id"]: r["n"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices")}
                 for item in out["plan"]["items"]:
-                    item["device"] = labels.get(item["device_id"])
+                    item["device"] = labels.get(item["device_id"]) or item.get("device")
             except (ValueError, ContractError) as exc:
                 out["plan_error"] = str(exc)
     return out
@@ -84,6 +84,7 @@ class SettingsBody(BaseModel):
     max_offline_days: int | None = None
     remove: bool | None = None
     auto_apply: bool | None = None
+    register_containers: bool | None = None
     max_changes: int | None = None
 
 

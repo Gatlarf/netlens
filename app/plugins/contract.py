@@ -345,7 +345,7 @@ def validate_dns_results(data: Any, expected_ids: list[str]) -> list[dict]:
 
 
 MAX_DETAIL_PORTS = 100
-DETAIL_TEXT_KEYS = ("image", "project", "service", "health", "started", "network", "network_driver", "exit_code_text")
+DETAIL_TEXT_KEYS = ("image", "image_created", "project", "service", "health", "started", "network", "network_driver", "os", "tags", "version")
 
 
 def _guest_details(value: Any, path: str) -> dict:
@@ -361,7 +361,11 @@ def _guest_details(value: Any, path: str) -> dict:
         number = _optional_number(value.get(key), f"{path}.{key}", 0, 1_000_000, integer=True) if key == "restarts" else _optional_number(value.get(key), f"{path}.{key}", -1000, 1000, integer=True)
         if number is not None:
             out[key] = number
-    for key in ("exposed", "restarting"):
+    for key, high in (("cpus", 4096), ("memory_mb", 100_000_000), ("disk_gb", 100_000_000)):
+        number = _optional_number(value.get(key), f"{path}.{key}", 0, high, integer=True)
+        if number is not None:
+            out[key] = number
+    for key in ("exposed", "restarting", "update_available", "autostart"):
         if key in value:
             out[key] = bool(value[key])
     ports = []

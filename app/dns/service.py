@@ -9,7 +9,7 @@ from typing import Any
 
 from app.db import add_event, get_setting, set_setting, utcnow
 from app.dns import names
-from app.dns.plan import ACTIONABLE, MARKER, DnsDevice, DnsSettings, build_plan, parse_networks
+from app.dns.plan import ACTIONABLE, MARKER, DnsAlias, DnsDevice, DnsSettings, build_plan, parse_networks
 
 SETTINGS_KEY = "dns.settings"
 DEFAULTS: dict[str, Any] = {
@@ -21,6 +21,7 @@ DEFAULTS: dict[str, Any] = {
     "template": names.DEFAULT_TEMPLATE,
     "max_offline_days": 7,
     "remove": False,
+    "register_containers": False,   # containers that share their host's address get a CNAME to the host
     "auto_apply": False,
     "max_changes": 25,         # at most this many changes in one go (a runaway guard)
 }
@@ -53,7 +54,7 @@ def clean_settings(raw: dict) -> dict[str, Any]:
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not low <= value <= high:
                 raise ValueError(f"{key.replace('_', ' ')} must be a number between {low} and {high}")
             out[key] = value
-    for key in ("only_known", "skip_windows", "remove", "auto_apply"):
+    for key in ("only_known", "skip_windows", "remove", "auto_apply", "register_containers"):
         if key in raw:
             if not isinstance(raw[key], bool):
                 raise ValueError(f"{key} must be true or false")
@@ -72,6 +73,7 @@ def engine_settings(values: dict[str, Any]) -> DnsSettings:
     return DnsSettings(
         networks=parse_networks(values["networks"]), grace_hours=float(values["grace_hours"]), only_known=bool(values["only_known"]),
         skip_windows=bool(values["skip_windows"]), template=values["template"], max_offline_days=int(values["max_offline_days"]), remove=bool(values["remove"]),
+        register_containers=bool(values["register_containers"]),
     )
 
 
@@ -114,11 +116,29 @@ def tracked_records(conn: sqlite3.Connection, plugin_id: str) -> frozenset:
     return frozenset((r["zone"], r["name"], r["type"], r["value"]) for r in conn.execute("SELECT zone, name, type, value FROM dns_records WHERE plugin_id = ?", (plugin_id,)))
 
 
+def load_aliases(conn: sqlite3.Connection) -> list[DnsAlias]:
+    """Running containers that share their host's address (bridge or host network) and publish a port, on a host Netlens knows."""
+    out = []
+    for r in conn.execute(
+        """SELECT g.plugin_id, g.name, g.details, h.id AS host_id, h.primary_ip AS host_ip FROM hypervisor_guests g
+           JOIN devices h ON h.id = g.host_device_id WHERE g.kind = 'container' AND g.status = 'running' AND g.device_id IS NULL AND h.primary_ip IS NOT NULL"""
+    ):
+        try:
+            details = json.loads(r["details"] or "{}")
+        except ValueError:
+            continue
+        if details.get("network_driver") in ("macvlan", "ipvlan") or not any(p.get("host_port") for p in details.get("ports") or []) and details.get("network_driver") != "host":
+            continue
+        out.append(DnsAlias(key=f"{r['host_id']}-{r['name']}", label=r["name"], host_id=r["host_id"], host_ip=r["host_ip"]))
+    return out
+
+
 def make_plan(conn: sqlite3.Connection, plugin_id: str, snapshot: dict, now: str | None = None, persist: bool = False) -> dict:
     """Compare the devices with a snapshot. `persist` also stores the bookkeeping (generated names, the grace clock): only the
     scan / refresh path does that, so that merely opening the page does not start any clock."""
     now = now or utcnow()
-    plan = build_plan(load_devices(conn), snapshot, engine_settings(get_settings(conn)), now, tracked_records(conn, plugin_id))
+    values = get_settings(conn)
+    plan = build_plan(load_devices(conn), snapshot, engine_settings(values), now, tracked_records(conn, plugin_id), load_aliases(conn) if values["register_containers"] else [])
     if persist:
         store_bookkeeping(conn, plan, now)
     return plan

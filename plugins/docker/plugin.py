@@ -6,6 +6,7 @@ Talks to the Docker Engine API, read-only (it only sends GET requests):
     GET /networks              which network is a bridge, macvlan, ipvlan ...
     GET /containers/json?all=1 every container with its published ports and addresses
     GET /containers/<id>/json  health, restart count, start time
+    GET /images/json           (optional, needs IMAGES=1 on the proxy) when each image was built
 
 Docker's API controls the whole host, so it should be reached through a read-only socket proxy
 (tecnativa/docker-socket-proxy with CONTAINERS=1, NETWORKS=1, INFO=1 and POST=0), see the README.
@@ -126,7 +127,15 @@ def _ports(container):
     return unique, exposed
 
 
-def to_guest(host, container, inspect, drivers):
+def _iso(epoch):
+    from datetime import datetime, timezone
+    try:
+        return datetime.fromtimestamp(int(epoch), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (TypeError, ValueError, OverflowError, OSError):
+        return ""
+
+
+def to_guest(host, container, inspect, drivers, images=None):
     """One container as a Netlens guest (see the hypervisor contract)."""
     state = str(container.get("State") or "unknown").lower()
     networks = (container.get("NetworkSettings") or {}).get("Networks") or {}
@@ -147,8 +156,10 @@ def to_guest(host, container, inspect, drivers):
     labels = container.get("Labels") or {}
     ports, exposed = _ports(container)
     inspected_state = (inspect or {}).get("State") or {}
+    created = (images or {}).get(container.get("ImageID")) or ""
     details = {
         "image": container.get("Image") or "",
+        "image_created": created,
         "project": labels.get("com.docker.compose.project") or "",
         "service": labels.get("com.docker.compose.service") or "",
         "network": ", ".join(names),
@@ -182,6 +193,12 @@ def read_host(host):
     for net in host.get("/networks") or []:
         drivers[net.get("Id")] = net.get("Driver") or ""
         drivers[net.get("Name")] = net.get("Driver") or ""
+    images = {}
+    try:      # optional (the proxy needs IMAGES=1): when it answers, every container learns how old its image is
+        for image in host.get("/images/json") or []:
+            images[image.get("Id")] = _iso(image.get("Created"))
+    except DockerError:
+        pass
     containers = host.get("/containers/json", all="1") or []
     guests = []
     for c in containers[:MAX_CONTAINERS]:
@@ -189,7 +206,7 @@ def read_host(host):
             inspect = host.get(f"/containers/{c['Id']}/json")
         except DockerError:
             inspect = None      # the list is still useful without health and restart count
-        guests.append(to_guest(host, c, inspect, drivers))
+        guests.append(to_guest(host, c, inspect, drivers, images))
     entry = {"id": host.id, "name": str(info.get("Name") or host.id)[:100], "ip": _host_ip(host), "online": True}
     return entry, guests, info
 

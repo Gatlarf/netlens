@@ -4,7 +4,8 @@ Shows a **TrueNAS** (Community Edition, **25.04 or newer**) as a host in Netlens
 
 - **Containers and virtual machines** of the *Instances / Containers* feature (and classic **VMs**), matched to the devices on your network by IP or MAC address.
   A container with its own IP address on your LAN gets a link to the TrueNAS box on the map and in the hierarchy.
-- **Apps** (the Docker apps of TrueNAS) are listed on the host's device page. They use the TrueNAS address, so they do not become devices of their own.
+- **Apps** (the Docker apps of TrueNAS) are listed on the host's device page with their version, whether an **update is available**, their image and the **ports they publish** (the host's *Open ports* table names the app behind a port). They use the TrueNAS address, so they do not become devices of their own.
+- **Resources** (CPU, memory) and whether it starts at boot are shown for virtual machines and containers. A stopped guest, a started guest and a new app update are events your notification channels can send.
 - The TrueNAS box itself is matched by its IP address, so its device page gets a *Virtualization* box listing everything above.
 
 It only reads. It uses the TrueNAS **JSON-RPC WebSocket API** (`wss://<truenas>/api/current`), the supported API of 25.04 and newer (the old REST API is being retired).

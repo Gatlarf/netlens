@@ -7,6 +7,7 @@ sends `GET` requests (`/info`, `/networks`, `/containers/json`, `/containers/<id
 
 * every container as a guest of its host: state (running, exited, restarting), health check, restart count, image, compose project
   and service, start time, exit code;
+* how old each container's image is (when the proxy allows `IMAGES=1`; Netlens flags images older than a year),
 * the ports each container **publishes**, and a mark when a port is published on all interfaces (reachable from the whole network);
 * on the host's device page the *Open ports* table names the container behind each port;
 * containers on a **macvlan** or **ipvlan** network have their own address on your LAN: Netlens matches them to the device its scans
@@ -28,6 +29,7 @@ services:
       CONTAINERS: 1   # list and inspect containers
       NETWORKS: 1     # which network is macvlan / ipvlan
       INFO: 1         # the host's name
+      IMAGES: 1       # optional: lets Netlens show how old each container's image is
       POST: 0         # nothing that changes anything
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -276,6 +276,58 @@ def _state(value):
     return str(value).lower() if value else "unknown"
 
 
+def _int(value):
+    return int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0 else None
+
+
+def _bytes_to_mb(value):
+    number = _int(value)
+    return number // 1048576 if number else None
+
+
+def _clean(details):
+    return {k: v for k, v in details.items() if v not in (None, "", [])}
+
+
+def _instance_details(item):
+    image = item.get("image") if isinstance(item.get("image"), dict) else {}
+    memory = item.get("memory")
+    return _clean({
+        "cpus": _int(item.get("vcpus")) or (_int(item.get("cpu")) if str(item.get("cpu") or "").isdigit() else None),
+        "memory_mb": _bytes_to_mb(memory) if isinstance(memory, int) and memory > 100000 else _int(memory),
+        "os": str(image.get("os") or image.get("description") or "")[:100],
+        "version": str(image.get("release") or "")[:100],
+        "autostart": bool(item["autostart"]) if "autostart" in item else None,
+    })
+
+
+def _vm_details(item):
+    cpus = (_int(item.get("vcpus")) or 1) * (_int(item.get("cores")) or 1) * (_int(item.get("threads")) or 1) if item.get("vcpus") else None
+    return _clean({"cpus": cpus, "memory_mb": _int(item.get("memory")), "autostart": bool(item["autostart"]) if "autostart" in item else None})
+
+
+def _app_details(item):
+    """Version, update available, the image of its first container and the ports it publishes on the host."""
+    workloads = item.get("active_workloads") if isinstance(item.get("active_workloads"), dict) else {}
+    containers = [c for c in workloads.get("container_details") or [] if isinstance(c, dict)]
+    ports = []
+    for entry in workloads.get("used_ports") or []:
+        if not isinstance(entry, dict):
+            continue
+        for hp in entry.get("host_ports") or []:
+            if isinstance(hp, dict) and _int(hp.get("host_port")):
+                ports.append({"container_port": _int(entry.get("container_port")), "host_port": _int(hp.get("host_port")),
+                              "proto": str(entry.get("protocol") or "tcp").lower(), "bind": str(hp.get("host_ip") or "")})
+    details = {
+        "image": str(containers[0].get("image") or "")[:200] if containers else "",
+        "version": str(item.get("human_version") or item.get("version") or "")[:100],
+        "update_available": bool(item.get("upgrade_available")) if "upgrade_available" in item else None,
+        "ports": ports[:100],
+    }
+    details["exposed"] = any(p["bind"] in ("0.0.0.0", "::", "") for p in ports) if ports else None
+    return _clean(details)
+
+
 def to_hypervisor(snapshot, connect_host=""):
     host = _host(snapshot, connect_host)
     guests = []
@@ -288,6 +340,7 @@ def to_hypervisor(snapshot, connect_host=""):
             "status": _state(item.get("status")),
             "ips": [a["address"] for a in item.get("aliases") or [] if isinstance(a, dict) and a.get("type") == "INET" and a.get("address")],
             "macs": [m for m in (_mac(a.get("hwaddr") or a.get("mac")) for a in item.get("aliases") or [] if isinstance(a, dict)) if m],
+            "details": _instance_details(item),
         })
     for item in snapshot["vms"]:
         if not isinstance(item, dict) or not item.get("name"):
@@ -298,11 +351,11 @@ def to_hypervisor(snapshot, connect_host=""):
             if isinstance(attributes, dict) and str(attributes.get("dtype") or "").upper() == "NIC" and _mac(attributes.get("mac")):
                 macs.append(_mac(attributes["mac"]))
         guests.append({"id": f"vm:{item.get('id', item['name'])}", "name": item["name"], "kind": "qemu", "host_id": host["id"],
-                       "status": _state(item.get("status")), "macs": macs, "ips": []})
+                       "status": _state(item.get("status")), "macs": macs, "ips": [], "details": _vm_details(item)})
     for item in snapshot["apps"]:
         if isinstance(item, dict) and (item.get("name") or item.get("id")):
             name = str(item.get("name") or item["id"])
-            guests.append({"id": f"app:{name}", "name": name, "kind": "app", "host_id": host["id"], "status": _state(item.get("state")), "macs": [], "ips": []})
+            guests.append({"id": f"app:{name}", "name": name, "kind": "app", "host_id": host["id"], "status": _state(item.get("state")), "macs": [], "ips": [], "details": _app_details(item)})
     seen = set()
     unique = []
     for g in guests:

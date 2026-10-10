@@ -1,7 +1,7 @@
 {
   "id": "truenas",
   "name": "TrueNAS",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",

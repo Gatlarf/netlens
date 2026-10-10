@@ -467,6 +467,7 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
         "backups": _backups(conn, now),
         "netchecks": _netchecks(conn),
         "containers": containers.summary(conn),
+        "guests": containers.guest_summary(conn),
         "system": _system(conn, db_path, passive),
     }
 
@@ -504,6 +505,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     services = _services(conn, now)
     backups = _backups(conn, now)
     container_numbers = containers.summary(conn)
+    guest_numbers = containers.guest_summary(conn)
     problems = ((1 if services["down"] else 0) + (1 if container_numbers["problems"] else 0) + (1 if last_info and last_info["status"] == "failed" else 0) + len(failing)
                 + (1 if age is not None and age > stale_after_s else 0) + (1 if backups["last_ok"] is False else 0))
     from app import updates
@@ -532,6 +534,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "netchecks": _netchecks(conn),
         "dns": _dns(conn),
         "containers": {k: container_numbers[k] for k in ("total", "running", "stopped", "restarting", "unhealthy", "exposed", "hosts")},
+        "guests": {k: guest_numbers[k] for k in ("total", "running", "stopped", "hosts", "by_kind", "update_available", "old_images")},
         "passive": None if passive is None else {k: passive.get(k) for k in ("enabled", "running", "frames", "applied")},
         "wifi": {k: wifi[k] for k in ("clients", "weak", "avg_rssi")},
         "uptime": {"24h": _pct(day["u"] or 0, day["n"]), "7d": _pct(week["u"] or 0, week["n"])},

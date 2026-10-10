@@ -98,6 +98,14 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
         out.sample("netlens_containers_exposed", c["exposed"], "Running containers that publish a port on all interfaces")
         out.sample("netlens_container_hosts", c["hosts"], "Container hosts reported by container plugins")
 
+    g = doc["guests"]
+    if g["total"]:
+        for kind, k in sorted(g["by_kind"].items()):
+            out.sample("netlens_guests", k["running"], "Guests reported by hypervisor and container plugins, by kind and state", kind=kind, state="running")
+            out.sample("netlens_guests", k["total"] - k["running"], "Guests reported by hypervisor and container plugins, by kind and state", kind=kind, state="not_running")
+        out.sample("netlens_guests_update_available", g["update_available"], "Guests (apps) with an update available")
+        out.sample("netlens_containers_old_images", g["old_images"], "Running containers whose image was built more than a year ago")
+
     sys_info = stats["system"]
     out.sample("netlens_database_size_bytes", sys_info["db_bytes"], "Size of the Netlens database file")
     out.sample("netlens_vendor_registry_entries", sys_info["vendor_entries"], "Manufacturers in the MAC address registry")

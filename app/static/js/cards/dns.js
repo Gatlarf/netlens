@@ -76,10 +76,11 @@ function render(card, state) {
   form.append(known, windows, field("Name for devices without one", template, "A pattern with {type}, {vendor}, {mac4}, {mac6} and {ip}, for example tv-samsung-a1b2. A generated name stays the same afterwards. You can set a DNS name by hand on the device's page."));
   const offline = h("input", { type: "number", name: "max_offline_days", min: "1", max: "3650", value: String(s.max_offline_days) });
   form.appendChild(field("Ignore devices not seen for (days)", offline));
+  const containers = checkbox("register_containers", s.register_containers, "Give containers that share their host's address a name", "A running Docker container on a bridge or host network that publishes a port gets a CNAME to its host (for example web.home.example.com pointing to the host). Containers with their own address are devices and are registered like any other.");
   const remove = checkbox("remove", s.remove, "Remove records of devices that are gone", "Only records Netlens created, and only with the plugin account allowed to delete. Off by default: leftovers are just listed.");
   const auto = checkbox("auto_apply", s.auto_apply, "Apply automatically after every scan", "Adds missing and changed records without asking (never removes any). Turn it on when you have seen that the preview is what you want.");
   const limit = h("input", { type: "number", name: "max_changes", min: "1", max: "500", value: String(s.max_changes) });
-  form.append(remove, auto, field("Most changes per run", limit, "A safety limit: a bigger plan needs approving in smaller parts."));
+  form.append(containers, remove, auto, field("Most changes per run", limit, "A safety limit: a bigger plan needs approving in smaller parts."));
   const save = h("button", { type: "submit", class: "btn", id: "dns-save" }, "Save settings");
   form.appendChild(save);
   form.addEventListener("submit", async (e) => {
@@ -87,7 +88,7 @@ function render(card, state) {
     const val = (n) => form.elements[n];
     const body = {
       networks: val("networks").value, grace_hours: Number(val("grace_hours").value), only_known: val("only_known").checked, skip_windows: val("skip_windows").checked,
-      template: val("template").value, max_offline_days: Number(val("max_offline_days").value), remove: val("remove").checked, auto_apply: val("auto_apply").checked,
+      template: val("template").value, max_offline_days: Number(val("max_offline_days").value), remove: val("remove").checked, register_containers: val("register_containers").checked, auto_apply: val("auto_apply").checked,
       max_changes: Number(val("max_changes").value),
     };
     if (state.plugins.length > 1) body.plugin = pluginSelect.value;

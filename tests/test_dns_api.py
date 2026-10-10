@@ -1,5 +1,6 @@
 """The DNS feature through Netlens' API, with the real Technitium plugin (its own process) talking to a simulated server."""
 
+import json
 import shutil
 from pathlib import Path
 
@@ -173,3 +174,24 @@ def test_device_fields_for_dns(env):
     assert env.patch(f"/api/devices/{d}", json={"dns_mode": "sometimes"}).status_code == 422
     assert env.patch(f"/api/devices/{d}", json={"dns_name": "!!!"}).status_code == 422
     assert env.patch(f"/api/devices/{d}", json={"dns_name": ""}).json()["dns_name"] is None
+
+
+def test_container_aliases_through_the_api(env):
+    conn = connect(env.path)
+    details = json.dumps({"network_driver": "bridge", "ports": [{"host_port": 8080, "container_port": 80, "proto": "tcp", "bind": "0.0.0.0"}]})
+    for gid, name, status, device in (("h/web", "web", "running", None), ("h/idle", "idle", "running", None), ("h/off", "off", "exited", None), ("h/own", "own", "running", env.ids["printer"])):
+        conn.execute("INSERT INTO hypervisor_guests (plugin_id, guest_id, name, kind, host_name, status, updated, details, device_id, host_device_id) VALUES ('docker', ?, ?, 'container', 'nas', ?, 'now', ?, ?, ?)",
+                     (gid, name, status, details if name != "idle" else json.dumps({"network_driver": "bridge"}), device, env.ids["nas"]))
+    conn.commit()
+    conn.close()
+    setup_dns(env, register_containers=True)
+    view = env.post("/api/dns/refresh").json()
+    aliases = [i for i in view["plan"]["items"] if i["id"].startswith("c:")]
+    assert [(i["name"], i["state"]) for i in aliases] == [(f"web.{Z}", "add")]          # not "idle" (no port), "off" (stopped) or "own" (a device itself)
+    assert aliases[0]["device"] == "container web"
+    r = env.post("/api/dns/apply", json={"ids": [aliases[0]["changes"][0]["id"]]})
+    assert r.status_code == 200 and r.json()["counts"]["added"] == 1, r.text
+    records = [x for x in env.server.zones[Z]["records"] if x["name"] == f"web.{Z}"]
+    assert records and records[0]["type"] == "CNAME" and records[0]["rData"]["cname"] == f"nas.{Z}" and records[0]["comments"] == "managed by Netlens"
+    again = env.post("/api/dns/refresh").json()["plan"]["items"]
+    assert next(i for i in again if i["id"].startswith("c:"))["state"] == "ok"

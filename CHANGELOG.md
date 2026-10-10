@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.2.106 — 2026-10-11
+
+### Added
+- ★ **Proxmox, TrueNAS and Docker report the same things now**: every guest can carry resources (CPU, memory, disk), system, tags, start time, start at boot, and an app's version with *update available*; Docker also reports how old a container's image is (with `IMAGES=1` on the socket proxy; images older than a year are flagged), and TrueNAS apps report the ports they publish, so the host's *Open ports* table names the app behind a port. Proxmox plugin 1.2.0, TrueNAS plugin 1.1.0, Docker plugin 1.1.0. New events for every guest that is not a container: `guest_stopped`, `guest_started` and `guest_update_available` (off by default in notification channels). Statistics has one section, **Virtual machines, containers & apps**, with counts per kind, updates available, old images and a *Needs attention* list; the summary API has `guests`, Prometheus has `netlens_guests{kind,state}`, `netlens_guests_update_available` and `netlens_containers_old_images`, and Home Assistant (0.9.0) has *Guests running* and *Guest updates available*.
+- **DNS names for containers that share their host's address** (Settings → DNS registration, off by default): a running Docker container on a bridge or host network that publishes a port gets a CNAME to its host (`web.home.example.com` pointing to the host), following the host if its name changes. Never over an existing name, never for a host Netlens does not register itself. The Technitium plugin handles CNAME records (1.1.0).
+
 ## 0.2.105 — 2026-10-11
 
 ### Added

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import time
+from datetime import datetime, timezone
 
 from .client import ProxmoxClient
 from .config import ProxmoxConfig, has_credentials
@@ -22,6 +24,16 @@ def _client(config: dict):
     if not has_credentials(cfg):
         raise ValueError("enter either an API token (ID and secret) or a username and password")
     return CLIENT_FACTORY(cfg)
+
+
+def _details(g: dict) -> dict:
+    """Resources, uptime, tags and so on, as the guest details of the plugin contract (empty values left out)."""
+    started = None
+    if isinstance(g.get("uptime"), (int, float)) and g["uptime"] > 0:
+        started = datetime.fromtimestamp(time.time() - g["uptime"], timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    details = {"cpus": g.get("cpus"), "memory_mb": g.get("memory_mb"), "disk_gb": g.get("disk_gb"), "started": started,
+               "tags": g.get("tags"), "os": g.get("os"), "autostart": g.get("autostart")}
+    return {k: v for k, v in details.items() if v not in (None, "")}
 
 
 def test(config: dict) -> dict:
@@ -47,6 +59,7 @@ def fetch(config: dict) -> dict:
                 "status": g["status"],
                 "macs": g["macs"],
                 "ips": g["ips"],
+                "details": _details(g),
             }
             for g in inventory["guests"]
         ],

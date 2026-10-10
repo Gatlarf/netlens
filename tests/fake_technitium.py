@@ -436,6 +436,9 @@ class FakeTechnitium:
                                 if r.get('rData', {}).get('ptrName') == cur_ptr:
                                     del_idx = i
                                     break
+                            elif typ == 'CNAME':
+                                del_idx = i
+                                break
                         if del_idx is None:
                             outer._error(self, "Cannot delete record: the record does not exist")
                             return

@@ -13,8 +13,8 @@ NETWORKS = [
 ]
 
 
-def container(cid, name, state="running", image="img:1", networks=None, ports=None, labels=None, mode="default"):
-    return {"Id": cid, "Names": [f"/{name}"], "Image": image, "State": state, "Status": state,
+def container(cid, name, state="running", image="img:1", networks=None, ports=None, labels=None, mode="default", image_id=None):
+    return {"Id": cid, "ImageID": image_id or f"sha256:{cid}", "Names": [f"/{name}"], "Image": image, "State": state, "Status": state,
             "Ports": ports or [], "Labels": labels or {}, "HostConfig": {"NetworkMode": mode},
             "NetworkSettings": {"Networks": networks or {}}}
 
@@ -22,7 +22,8 @@ def container(cid, name, state="running", image="img:1", networks=None, ports=No
 class FakeDocker:
     """`with FakeDocker(containers=[...], inspect={id: {...}}) as d:` then use `d.url`. `forbid` lists paths answered with 403."""
 
-    def __init__(self, containers=None, inspect=None, name="dockerhost", forbid=()):
+    def __init__(self, containers=None, inspect=None, name="dockerhost", forbid=(), images=None):
+        self.images = images
         self.containers, self.inspect_data, self.name, self.forbid = containers or [], inspect or {}, name, set(forbid)
         self.requests = []
         outer = self
@@ -40,6 +41,10 @@ class FakeDocker:
                     return self._send(200, {"Name": outer.name, "ServerVersion": "29.8.2", "Containers": len(outer.containers), "ContainersRunning": 1})
                 if path == "/networks":
                     return self._send(200, NETWORKS)
+                if path == "/images/json":
+                    if outer.images is None:
+                        return self._send(403, {"message": "forbidden"})
+                    return self._send(200, outer.images)
                 if path == "/containers/json":
                     return self._send(200, outer.containers)
                 if path.startswith("/containers/") and path.endswith("/json"):
