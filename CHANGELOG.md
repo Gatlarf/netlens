@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.0 — 2026-10-11
+
+### Added
+- ★ **Netlens 0.3: Docker, and one view of everything that runs on your hosts.** The new Docker plugin shows your Docker hosts with their containers (state, health, restarts, image and its age, compose project, published ports; macvlan and ipvlan containers are matched to the devices your scans found), Proxmox, TrueNAS and Docker now report the same guest details, and Statistics, the events, Prometheus and Home Assistant follow. Containers can get DNS names, the app is readable on a phone, and this window and the changelog in Settings → About tell you what changed after every update. The details are in the releases below (0.2.100 to 0.2.106).
+
 ## 0.2.106 — 2026-10-11
 
 ### Added
