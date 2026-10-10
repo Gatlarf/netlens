@@ -45,6 +45,10 @@ def _clean_url(text):
 
 class Host:
     def __init__(self, url, verify_tls=True, timeout=15):
+        url, _, lan = url.partition("=")       # "http://127.0.0.1:2375=192.168.0.189": the proxy is local, the host's LAN address is after "="
+        self.lan_ip = _ipv4(lan) if lan else None
+        if lan and not self.lan_ip:
+            raise DockerError(f"{lan!r} after '=' is not an IPv4 address")
         self.url = _clean_url(url)
         self.timeout = float(timeout)
         self.context = None
@@ -87,7 +91,11 @@ def _ipv4(value):
 
 
 def _host_ip(host):
+    if host.lan_ip:
+        return host.lan_ip
     ip = _ipv4(host.address)
+    if ip and ip.startswith("127."):
+        return None          # a proxy on the host itself: Netlens cannot tell which address the host has on the network
     if ip:
         return ip
     try:
@@ -209,6 +217,8 @@ def test(config):
     own = sum(1 for g in guests if g["ips"])
     if own:
         message += f", {own} with their own network address"
+    if any(h["ip"] is None for h in hosts):
+        message += ". A host reached through 127.0.0.1 or localhost needs its network address so Netlens can find its device: write http://127.0.0.1:2375=192.168.0.189"
     if problems:
         message += ". Not reachable: " + "; ".join(problems)
     return {"message": message}

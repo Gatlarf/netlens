@@ -56,7 +56,7 @@ def guests_by_name(output):
 def test_manifest_and_output_follow_the_contract(docker):
     validate_manifest(json.loads((ROOT / "plugin.json").read_text()))
     out = validate_output("hypervisor", plugin.fetch(config(docker.url)))
-    assert len(out["hosts"]) == 1 and out["hosts"][0]["name"] == "dockerhost" and out["hosts"][0]["ip"] == "127.0.0.1"
+    assert len(out["hosts"]) == 1 and out["hosts"][0]["name"] == "dockerhost"
     assert len(out["guests"]) == 7 and all(g["kind"] == "container" for g in out["guests"])
 
 
@@ -85,8 +85,8 @@ def test_host_network_state_restarts_and_exposure(docker):
 
 
 def test_a_macvlan_container_is_matched_to_the_scanned_device(docker):
-    out = validate_output("hypervisor", plugin.fetch(config(docker.url)))
-    devices = [{"id": 1, "mac": "aa:aa:aa:aa:aa:01", "ips": ["127.0.0.1"]}, {"id": 2, "mac": LAN_MAC, "ips": ["192.168.0.50"]},
+    out = validate_output("hypervisor", plugin.fetch(config(docker.url + "=192.168.0.189")))
+    devices = [{"id": 1, "mac": "aa:aa:aa:aa:aa:01", "ips": ["192.168.0.189"]}, {"id": 2, "mac": LAN_MAC, "ips": ["192.168.0.50"]},
                {"id": 3, "mac": "aa:bb:cc:dd:ee:01", "ips": ["192.168.0.51"]}, {"id": 4, "mac": "bb:bb:bb:bb:bb:09", "ips": ["172.17.0.2"]}]
     matched = match_hypervisor(out, devices)
     by_name = {g["name"]: g for g in matched["guests"]}
@@ -94,6 +94,15 @@ def test_a_macvlan_container_is_matched_to_the_scanned_device(docker):
     assert by_name["app"]["device_id"] == 2 and by_name["tv"]["device_id"] == 3      # macvlan by MAC, ipvlan by IP
     assert by_name["web"]["device_id"] is None                                       # a bridge address never matches a LAN device
     assert by_name["web"]["host_device_id"] == 1
+
+
+def test_a_local_proxy_needs_the_lan_address_of_its_host(docker):
+    out = plugin.fetch(config(docker.url + "=192.168.0.189"))
+    assert out["hosts"][0]["ip"] == "192.168.0.189"
+    assert plugin.fetch(config(docker.url))["hosts"][0]["ip"] is None
+    assert ":2375=192.168.0.189" in plugin.test(config(docker.url))["message"]
+    with pytest.raises(plugin.DockerError, match="not an IPv4"):
+        plugin.parse_hosts({"hosts": docker.url + "=nonsense"})
 
 
 def test_only_get_requests_are_sent(docker):
@@ -158,11 +167,11 @@ def test_netlens_stores_container_details_and_shows_them(tmp_path):
         app = create_app(load_settings({"NETLENS_TOKEN": "t", "NETLENS_DATA_DIR": str(data)}), db_path=tmp_path / "t.db")
         with TestClient(app, headers={"Authorization": "Bearer t"}) as client:
             conn = connect(tmp_path / "t.db")
-            host = get_or_create_device(conn, "aa:aa:aa:aa:aa:01", "127.0.0.1")
+            host = get_or_create_device(conn, "aa:aa:aa:aa:aa:01", "192.168.0.189")
             lan = get_or_create_device(conn, LAN_MAC, "192.168.0.50")
             conn.commit()
             conn.close()
-            assert client.put("/api/plugins/docker", json={"enabled": True, "config": {"hosts": d.url, "timeout": 5}}).status_code == 200
+            assert client.put("/api/plugins/docker", json={"enabled": True, "config": {"hosts": d.url + "=192.168.0.189", "timeout": 5}}).status_code == 200
             r = client.post("/api/plugins/docker/sync")
             assert r.status_code == 200 and r.json().get("error") is None, r.text
             info = client.get(f"/api/devices/{host}").json()["virtualization"]
