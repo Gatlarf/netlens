@@ -11,6 +11,23 @@ const SOURCE_LABEL = {
   none: "",
 };
 const COLLAPSED_KEY = "netlens.hierarchy.collapsed";
+const GUESTS_KEY = "netlens.hierarchy.guests";
+
+function loadShowGuests() {
+  try {
+    return localStorage.getItem(GUESTS_KEY) !== "0";       // on unless the user switched it off in this browser
+  } catch (e) {
+    return true;
+  }
+}
+
+function saveShowGuests(on) {
+  try {
+    localStorage.setItem(GUESTS_KEY, on ? "1" : "0");
+  } catch (e) {
+    // storage unavailable: the choice is only kept while the page is open
+  }
+}
 
 function loadCollapsed() {
   try {
@@ -42,6 +59,7 @@ export async function render(container, params) {
   let data = null;
   const collapsed = loadCollapsed();
   let filterText = "";
+  let showGuests = loadShowGuests();
 
   clear(container);
   container.appendChild(h("h1", {}, "Network hierarchy"));
@@ -66,7 +84,8 @@ export async function render(container, params) {
     saveCollapsed(collapsed);
     draw();
   } }, "Collapse all");
-  card.appendChild(h("div", { class: "toolbar" }, filterInput, expandBtn, collapseBtn));
+  const guestBox = h("input", { type: "checkbox", id: "hierarchy-guests", checked: showGuests, onchange: (e) => { showGuests = e.target.checked; saveShowGuests(showGuests); load(); } });
+  card.appendChild(h("div", { class: "toolbar" }, filterInput, expandBtn, collapseBtn, h("label", { class: "check-row" }, guestBox, " Show containers")));
   card.appendChild(summary);
   const treeHolder = h("div", {});
   card.appendChild(treeHolder);
@@ -94,8 +113,11 @@ export async function render(container, params) {
       line.appendChild(h("span", { class: "tree-toggle placeholder" }, ""));
     }
     line.appendChild(statusDot(node.online));
-    line.appendChild(h("a", { href: `#/device/${node.id}`, class: "tree-name", title: node.name }, shortName(node.name)));
+    // a container has no page of its own: its name leads to the host it runs on
+    line.appendChild(h("a", { href: `#/device/${node.virtual ? node.parent_id : node.id}`, class: "tree-name", title: node.virtual ? `${node.name} runs on this host${node.image ? " (" + node.image + ")" : ""}` : node.name }, shortName(node.name)));
     line.appendChild(typeBadge(node.type));
+    if (node.virtual && node.status && node.status !== "running") line.appendChild(h("span", { class: "tag unknown-tag" }, node.status));
+    if (node.virtual && node.health === "unhealthy") line.appendChild(h("span", { class: "tag unknown-tag" }, "unhealthy"));
     if (node.ip && node.ip !== node.name) line.appendChild(h("span", { class: "mono hint" }, node.ip));
     if (node.descendants > 0) {
       line.appendChild(h("span", { class: "tree-count", title: `${node.children} directly below, ${node.descendants} in total` },
@@ -166,14 +188,14 @@ export async function render(container, params) {
     treeHolder.appendChild(fresh);
 
     const s = data.stats;
-    summary.textContent = `${s.devices} devices · ${s.with_parent} with a parent · ${s.manual} set manually · ${s.max_depth + 1} level${s.max_depth === 0 ? "" : "s"} deep`;
+    summary.textContent = `${s.devices} devices${s.guests ? ` · ${s.guests} containers` : ""} · ${s.with_parent} with a parent · ${s.manual} set manually · ${s.max_depth + 1} level${s.max_depth === 0 ? "" : "s"} deep`;
   }
 
   async function load() {
     if (loading || disposed) return;
     loading = true;
     try {
-      const fresh = await get("/api/hierarchy");
+      const fresh = await get(`/api/hierarchy${showGuests ? "?guests=true" : ""}`);
       if (disposed) return;
       failing = false;
       data = fresh;

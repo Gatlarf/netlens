@@ -10,6 +10,6 @@ router = APIRouter(prefix="/api", tags=["hierarchy"])
 
 
 @router.get("/hierarchy")
-def get_hierarchy(conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+def get_hierarchy(guests: bool = False, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     """Which device sits below which: flat nodes with parent_id, how the parent was found, and counts."""
-    return hierarchy_payload(conn)
+    return hierarchy_payload(conn, guests)

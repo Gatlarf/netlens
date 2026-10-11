@@ -101,6 +101,8 @@ export function el(selector, root = document) {
 }
 
 export const TYPE_LABELS = {
+  container: "Container",
+  app: "App",
   router: "Router",
   switch: "Switch",
   ap: "Access point",

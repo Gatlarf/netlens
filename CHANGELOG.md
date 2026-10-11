@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.118 — 2026-10-11
+
+### Added
+- ★ **Containers in the hierarchy**: the Network hierarchy page now lists the containers and apps that plugins report (for example from Docker) below the host they run on, with their state and an *unhealthy* mark. A container that is a device of its own (macvlan) already appears as one. The "N below" counts include them, the name leads to the host's page, and **Show containers** above the tree switches them off (remembered per browser). The API has `GET /api/hierarchy?guests=true`.
+
 ## 0.3.117 — 2026-10-11
 
 ### Changed

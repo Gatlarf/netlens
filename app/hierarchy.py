@@ -189,8 +189,32 @@ def load_hierarchy(conn: sqlite3.Connection) -> tuple[dict[int, dict], dict[int,
     return {d["id"]: d for d in devices}, build_hierarchy(devices, relations)
 
 
-def hierarchy_payload(conn: sqlite3.Connection) -> dict[str, Any]:
-    """Flat node list for the UI (it builds the tree from parent_id)."""
+def _guest_nodes(conn: sqlite3.Connection, devices: dict) -> list[dict[str, Any]]:
+    """Containers and apps a plugin reports that are not a device of their own (a virtual machine is one, or has not been seen)."""
+    import json
+
+    out = []
+    for r in conn.execute(
+        """SELECT plugin_id, guest_id, name, kind, status, host_device_id, details FROM hypervisor_guests
+           WHERE device_id IS NULL AND host_device_id IS NOT NULL AND kind NOT IN ('qemu', 'vm') ORDER BY name COLLATE NOCASE"""
+    ):
+        if r["host_device_id"] not in devices:
+            continue
+        try:
+            details = json.loads(r["details"]) if r["details"] else {}
+        except ValueError:
+            details = {}
+        out.append({
+            "id": f"g:{r['plugin_id']}:{r['guest_id']}", "name": r["name"], "ip": None, "type": "container" if r["kind"] == "container" else r["kind"],
+            "online": r["status"] == "running", "parent_id": r["host_device_id"], "source": "hypervisor", "reason": "runs on this host", "locked": False,
+            "children": 0, "descendants": 0, "depth": 0, "virtual": True, "status": r["status"], "health": details.get("health"), "image": details.get("image"),
+        })
+    return out
+
+
+def hierarchy_payload(conn: sqlite3.Connection, guests: bool = False) -> dict[str, Any]:
+    """Flat node list for the UI (it builds the tree from parent_id). With `guests`, the containers and apps that are not a device
+    themselves are added below their host (they count in the "below" numbers of every device above them)."""
     devs, hierarchy = load_hierarchy(conn)
     kids = children_map(hierarchy)
 
@@ -215,14 +239,28 @@ def hierarchy_payload(conn: sqlite3.Connection) -> dict[str, Any]:
             "depth": depth(dev_id),
         })
     roots = [n["id"] for n in nodes if n["parent_id"] is None]
-    return {
+    device_count = len(nodes)
+    guest_nodes = _guest_nodes(conn, {n["id"]: n for n in nodes}) if guests else []
+    if guest_nodes:
+        by_id = {n["id"]: n for n in nodes}
+        for g in guest_nodes:
+            parent = by_id[g["parent_id"]]
+            g["depth"] = parent["depth"] + 1
+            parent["children"] += 1
+            for above in [g["parent_id"], *ancestors(hierarchy, g["parent_id"])]:
+                by_id[above]["descendants"] += 1
+        nodes.extend(guest_nodes)
+    result = {
         "nodes": nodes,
         "roots": roots,
         "stats": {
-            "devices": len(nodes),
-            "with_parent": len(nodes) - len(roots),
+            "devices": device_count,
+            "with_parent": device_count - len(roots),
             "manual": sum(1 for n in nodes if n["source"] == "manual"),
             "max_depth": max((n["depth"] for n in nodes), default=0),
         },
         "sources": SOURCE_TEXT,
     }
+    if guests:
+        result["stats"]["guests"] = len(guest_nodes)
+    return result

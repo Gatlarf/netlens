@@ -181,3 +181,24 @@ def test_v2_database_gets_the_parent_columns(tmp_path):
     assert (row["parent_mode"], row["parent_device_id"]) == ("auto", None)
     init_db(conn)  # idempotent
     conn.close()
+
+
+def test_containers_can_be_added_below_their_host(client):
+    conn = connect(client.db)
+    for gid, name, kind, status, device, details in (("h/web", "web-1", "container", "running", None, {"health": "unhealthy", "image": "nginx:1"}), ("h/off", "old", "container", "exited", None, {}),
+                                                      ("h/own", "own", "container", "running", 5, {}), ("pve/100", "vm", "qemu", "running", None, {}), ("h/app", "tv-app", "app", "running", None, {})):
+        conn.execute("INSERT INTO hypervisor_guests (plugin_id, guest_id, name, kind, host_name, status, updated, details, device_id, host_device_id) VALUES ('docker', ?, ?, ?, 'h', ?, 'now', ?, ?, 2)",
+                     (gid, name, kind, status, json.dumps(details), device))
+    conn.commit()
+    conn.close()
+    plain = client.get("/api/hierarchy").json()
+    assert not any(n.get("virtual") for n in plain["nodes"]) and "guests" not in plain["stats"]          # off unless asked for
+    body = client.get("/api/hierarchy", params={"guests": "true"}).json()
+    by_id = {n["id"]: n for n in body["nodes"]}
+    virtual = {n["name"]: n for n in body["nodes"] if n.get("virtual")}
+    assert set(virtual) == {"web-1", "old", "tv-app"}                      # not a virtual machine, not a container that is a device itself
+    web = virtual["web-1"]
+    assert (web["parent_id"], web["source"], web["depth"], web["online"], web["health"], web["image"]) == (2, "hypervisor", 2, True, "unhealthy", "nginx:1")
+    assert virtual["old"]["online"] is False and virtual["old"]["status"] == "exited"
+    assert (by_id[2]["children"], by_id[2]["descendants"], by_id[1]["descendants"]) == (5, 5, 7)       # the host and every device above it count them
+    assert body["stats"]["devices"] == 5 and body["stats"]["guests"] == 3 and body["roots"] == [1] and body["stats"]["max_depth"] == 2
