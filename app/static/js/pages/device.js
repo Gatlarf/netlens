@@ -5,6 +5,7 @@ import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
 import { buildParentCard } from "../cards/device_parent.js";
+import { buildDeviceSitesCards } from "../cards/proxy_sites.js";
 import { buildStabilitySection, isStabilityOpen } from "../cards/stability.js";
 
 const WEB_PORTS = new Set([80, 443, 8080, 8443, 8006, 5000, 5001, 9000]);
@@ -697,6 +698,7 @@ export async function render(container, params) {
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
     const virtualizationCard = buildVirtualizationCard(device);
     if (virtualizationCard) right.appendChild(virtualizationCard);
+    for (const siteCard of buildDeviceSitesCards(device)) right.appendChild(siteCard);
     const newEdit = buildEditCard(device, () => load());
     newEdit.card.classList.add("admin-only");
     right.appendChild(newEdit.card);

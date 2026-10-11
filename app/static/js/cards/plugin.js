@@ -1,7 +1,8 @@
 import { get, put, post, del } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
+import { buildPluginSitesCard } from "./proxy_sites.js";
 
-const KIND_LABEL = { hypervisor: "Hypervisor", topology: "Network topology", dns: "DNS" };
+const KIND_LABEL = { hypervisor: "Hypervisor", topology: "Network topology", dns: "DNS", proxy: "Reverse proxy" };
 
 function statusText(plugin) {
   const s = plugin.status;
@@ -11,7 +12,7 @@ function statusText(plugin) {
     return { error: true, text: `Last sync failed (${timeAgo(s.ts)}): ${s.error}${paused}` };
   }
   const parts = [];
-  for (const [key, label] of [["hosts", "hosts"], ["guests", "guests"], ["guests_matched", "matched"], ["nodes", "network nodes"], ["clients", "online clients"], ["links", "links"]]) {
+  for (const [key, label] of [["hosts", "hosts"], ["guests", "guests"], ["guests_matched", "matched"], ["nodes", "network nodes"], ["clients", "online clients"], ["links", "links"], ["sites", "sites"], ["sites_matched", "linked to a device"], ["certificates", "certificates"], ["checks", "checks"]]) {
     if (s[key] !== undefined) parts.push(`${s[key]} ${label}`);
   }
   return { error: false, text: `Last sync ${timeAgo(s.ts)}: ${parts.join(", ")}` };
@@ -255,6 +256,12 @@ function fillPluginCard(card, plugin, onChange) {
 
   const status = statusText(plugin);
   if (status) card.appendChild(h("p", { class: status.error ? "error" : "hint" }, status.text));
+  if (plugin.status && plugin.status.ok) for (const w of plugin.status.warnings || []) card.appendChild(h("p", { class: "plugin-warning" }, w));
+  if (manifest.kind === "proxy" && plugin.enabled) {
+    const slot = h("div", {});
+    card.appendChild(slot);
+    buildPluginSitesCard().then((box) => { if (box) slot.appendChild(box); }).catch(() => {});
+  }
 
   testBtn.addEventListener("click", async () => {
     testBtn.disabled = true;

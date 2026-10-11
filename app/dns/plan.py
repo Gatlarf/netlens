@@ -52,6 +52,8 @@ class DnsAlias:
     label: str          # the container's name
     host_id: int        # the host's device
     host_ip: str
+    fqdn: str = ""      # a site published by a reverse proxy: the full name from its domain list (the zone is found from it)
+    what: str = "container"
 
 
 @dataclass
@@ -65,6 +67,7 @@ class DnsSettings:
     remove: bool = False
     marker: str = MARKER
     register_containers: bool = False
+    register_sites: bool = False
 
 
 def parse_networks(text: str | None) -> list[tuple[Any, str]]:
@@ -300,7 +303,7 @@ def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, 
         item(state, "; ".join(reasons), changes)
 
     # ---- containers that share their host's address: a CNAME to the host (only when the host itself is registered)
-    if settings.register_containers:
+    if settings.register_containers or settings.register_sites:
         device_names = {names.fqdn(resolved[d.id], z): d.id for d, z, *_ in eligible}
         # the name to point at: the host's existing address record (made by Netlens or not, e.g. a Windows host's own), else the one being added
         planned = {i["device_id"]: i for i in items if i["device_id"] is not None}
@@ -313,15 +316,21 @@ def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, 
                 targets[d.id] = names.fqdn(resolved[d.id], z)
         taken: set[str] = set(device_names)
         for a in sorted(aliases or [], key=lambda x: x.key):
-            zone = zone_for(a.host_ip, settings.networks)
-            label = names.clean_label(a.label)
-            if zone is None or not label:
-                continue
-            fq = names.fqdn(label, zone)
-            alias_item_id = f"c:{a.key}"
+            if a.fqdn:        # a site's domain: it belongs to the longest zone the server has for it, else it is not ours to name
+                fq = a.fqdn.lower().rstrip(".")
+                zone = max((z for z, info in zones.items() if info.get("kind") != "reverse" and fq.endswith("." + z)), key=len, default=None)
+                if zone is None:
+                    continue
+            else:
+                zone = zone_for(a.host_ip, settings.networks)
+                label = names.clean_label(a.label)
+                if zone is None or not label:
+                    continue
+                fq = names.fqdn(label, zone)
+            alias_item_id = f"{'s' if a.fqdn else 'c'}:{a.key}"
 
             def alias_item(state: str, reason: str, changes: list[dict] | None = None) -> None:
-                items.append({"id": alias_item_id, "device_id": None, "device": f"container {a.label}", "name": fq, "zone": zone, "ip": None, "state": state, "reason": reason, "changes": changes or []})
+                items.append({"id": alias_item_id, "device_id": None, "device": f"{a.what} {a.label}", "name": fq, "zone": zone, "ip": None, "state": state, "reason": reason, "changes": changes or []})
 
             def alias_change(action: str, value: str, old: str | None = None) -> dict:
                 return {"id": f"{alias_item_id}:{action}:CNAME:{fq}", "action": action, "zone": zone, "name": fq, "type": "CNAME", "value": value, "old_value": old, "comment": settings.marker}
@@ -342,7 +351,10 @@ def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, 
             mine = [r for r in cnames if ours(r)]
             if address or [r for r in cnames if not ours(r)]:
                 other = (address or cnames)[0]
-                alias_item("conflict", f"{fq} already exists ({other['type']} {other['value']}) and was not made by Netlens; it is left alone")
+                if a.fqdn:     # a name that is already in DNS is usually on purpose: say so, do not raise an alarm
+                    alias_item("skip", f"{fq} already exists in DNS ({other['type']} {other['value']}); it is left alone")
+                else:
+                    alias_item("conflict", f"{fq} already exists ({other['type']} {other['value']}) and was not made by Netlens; it is left alone")
                 continue
             if mine and mine[0]["value"] == target:
                 claimed.add((mine[0]["zone"], mine[0]["name"], "CNAME", mine[0]["value"]))
@@ -351,7 +363,7 @@ def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, 
                 claimed.add((mine[0]["zone"], mine[0]["name"], "CNAME", mine[0]["value"]))
                 alias_item("update", f"its host is now called {target}", [alias_change("update", target, mine[0]["value"])])
             else:
-                alias_item("add", f"a container on {target} that publishes ports", [alias_change("add", target)])
+                alias_item("add", f"published through {a.label}" if a.fqdn else f"a container on {target} that publishes ports", [alias_change("add", target)])
 
     # ---- records Netlens made that nobody wants any more
     for r in records:

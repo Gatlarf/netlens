@@ -227,6 +227,9 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
 
     result["baseline"] = baselines.drift(conn, device_id)
     result["virtualization"] = _virtualization_info(conn, device_id)
+    from app import sites
+
+    result["sites"] = sites.device_sites(conn, device_id)
     result["parent"] = _parent_info(conn, device_id)
 
     return result

@@ -37,7 +37,7 @@ def _present(conn, c: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": c["id"], "device_id": c["device_id"], "device_name": dev["n"] if dev else None, "name": c["name"], "kind": c["kind"],
         "host": c["host"], "port": c["port"], "path": c["path"], "expect": c["expect"], "interval_s": c["interval_s"],
-        "timeout_s": c["timeout_s"], "enabled": bool(c["enabled"]), "target": describe(c),
+        "timeout_s": c["timeout_s"], "enabled": bool(c["enabled"]), "target": describe(c), "source": c.get("source"),
         "state": None if c["last_up"] is None else ("up" if c["last_up"] else "down"),
         "last_ts": c["last_ts"], "last_ms": c["last_ms"], "last_detail": c["last_detail"], "since": c["since"],
         "uptime_24h": round(day["u"] / day["n"] * 100, 2) if day["n"] else None,

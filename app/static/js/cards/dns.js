@@ -77,10 +77,11 @@ function render(card, state) {
   const offline = h("input", { type: "number", name: "max_offline_days", min: "1", max: "3650", value: String(s.max_offline_days) });
   form.appendChild(field("Ignore devices not seen for (days)", offline));
   const containers = checkbox("register_containers", s.register_containers, "Give containers that share their host's address a name", "A running Docker container on a bridge or host network that publishes a port gets a CNAME to its host (for example web.home.example.com pointing to the host). Containers with their own address are devices and are registered like any other.");
+  const sites = checkbox("register_sites", s.register_sites, "Give the sites of a reverse proxy a name", "The domains your reverse proxy (Nginx Proxy Manager) publishes that fall inside one of your zones get a CNAME to the proxy's host, so they resolve inside your network. Names that already exist in DNS are left alone.");
   const remove = checkbox("remove", s.remove, "Remove records of devices that are gone", "Only records Netlens created, and only with the plugin account allowed to delete. Off by default: leftovers are just listed.");
   const auto = checkbox("auto_apply", s.auto_apply, "Apply automatically after every scan", "Adds missing and changed records without asking (never removes any). Turn it on when you have seen that the preview is what you want.");
   const limit = h("input", { type: "number", name: "max_changes", min: "1", max: "500", value: String(s.max_changes) });
-  form.append(containers, remove, auto, field("Most changes per run", limit, "A safety limit: a bigger plan needs approving in smaller parts."));
+  form.append(containers, sites, remove, auto, field("Most changes per run", limit, "A safety limit: a bigger plan needs approving in smaller parts."));
   const save = h("button", { type: "submit", class: "btn", id: "dns-save" }, "Save settings");
   form.appendChild(save);
   form.addEventListener("submit", async (e) => {
@@ -88,7 +89,7 @@ function render(card, state) {
     const val = (n) => form.elements[n];
     const body = {
       networks: val("networks").value, grace_hours: Number(val("grace_hours").value), only_known: val("only_known").checked, skip_windows: val("skip_windows").checked,
-      template: val("template").value, max_offline_days: Number(val("max_offline_days").value), remove: val("remove").checked, register_containers: val("register_containers").checked, auto_apply: val("auto_apply").checked,
+      template: val("template").value, max_offline_days: Number(val("max_offline_days").value), remove: val("remove").checked, register_containers: val("register_containers").checked, register_sites: val("register_sites").checked, auto_apply: val("auto_apply").checked,
       max_changes: Number(val("max_changes").value),
     };
     if (state.plugins.length > 1) body.plugin = pluginSelect.value;

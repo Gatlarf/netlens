@@ -219,3 +219,7 @@ dialog.whats-new h2 { margin: 0; }
 .plugin-info { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
 .plugin-info summary { cursor: pointer; font-weight: 600; }
 .plugin-info pre { overflow-x: auto; margin: 8px 0; padding: 10px; border-radius: 6px; background: var(--bg); font-size: 0.85em; }
+
+/* a warning about the account a plugin uses */
+.plugin-warning { margin: 6px 0; padding: 8px 12px; border-radius: 6px; border: 1px solid color-mix(in srgb, #d97706 50%, transparent); background: color-mix(in srgb, #d97706 14%, var(--surface)); }
+.kv-label { overflow-wrap: anywhere; min-width: 0; }   /* a long check name wraps inside its column */

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 
 
 def utcnow() -> str:
@@ -457,6 +457,35 @@ def init_db(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "devices", "dns_name", "TEXT")                           # the user's own DNS name
     # --- schema v18: events held back by a maintenance window carry the window's name ----------------------
     _add_column_if_missing(conn, "events", "maintenance", "TEXT")
+
+    # --- schema v19: sites published by a reverse proxy plugin (Nginx Proxy Manager ...) -----------------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS proxy_sites (
+            plugin_id TEXT NOT NULL,
+            site_id TEXT NOT NULL,
+            proxy_id TEXT NOT NULL,
+            proxy_name TEXT NOT NULL DEFAULT '',
+            proxy_device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
+            type TEXT NOT NULL,
+            domains TEXT NOT NULL DEFAULT '[]',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            scheme TEXT NOT NULL DEFAULT 'http',
+            forward_host TEXT NOT NULL DEFAULT '',
+            forward_port INTEGER,
+            target_device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
+            target_plugin_id TEXT,
+            target_guest_id TEXT,
+            target_name TEXT NOT NULL DEFAULT '',
+            target_how TEXT NOT NULL DEFAULT '',
+            details TEXT NOT NULL DEFAULT '{}',
+            updated TEXT NOT NULL,
+            PRIMARY KEY (plugin_id, site_id)
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_proxy_sites_target ON proxy_sites(target_device_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_proxy_sites_proxy ON proxy_sites(proxy_device_id)")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS dns_state (
@@ -534,6 +563,9 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_service_results ON service_results(check_id, ts)")
+    # --- schema v19: checks made by a plugin, and checks that go through a reverse proxy
+    _add_column_if_missing(conn, "service_checks", "source", "TEXT")      # who made the check (a plugin), NULL = the user
+    _add_column_if_missing(conn, "service_checks", "via", "TEXT")         # connect to this address, but ask for `host` (Host header / SNI)
 
     # --- schema v6: one row per day for the history charts of the Statistics page ---------
     cur.execute(

@@ -11,7 +11,7 @@ import re
 from typing import Any
 
 API_VERSION = 1
-KINDS = ("hypervisor", "topology", "dns")
+KINDS = ("hypervisor", "topology", "dns", "proxy")
 DNS_CAPABILITIES = ("marker", "delete")   # what a DNS plugin can do besides adding and updating records
 DNS_TYPES = ("A", "AAAA", "PTR", "CNAME")
 MAX_DNS_RECORDS = 50000
@@ -427,6 +427,8 @@ def validate_output(kind: str, data: Any) -> dict:
         return _topology(data)
     if kind == "dns":
         return _dns(data)
+    if kind == "proxy":
+        return _proxy(data)
     raise ContractError(f"unknown plugin kind {kind!r}")
 
 
@@ -574,6 +576,95 @@ def _hypervisor(data: Any) -> dict:
             "details": _guest_details(raw.get("details"), f"{path}.details"),
         })
     return {"hosts": hosts, "guests": guests}
+
+
+SITE_TYPES = ("proxy", "redirect", "stream", "dead")
+STAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+HOST_NAME_RE = re.compile(r"^[A-Za-z0-9_]([A-Za-z0-9_.-]{0,251}[A-Za-z0-9_])?$")
+
+
+def _stamp(value: Any, path: str) -> str | None:
+    if value in (None, ""):
+        return None
+    if not isinstance(value, str) or not STAMP_RE.match(value):
+        _fail(path, f"must look like 2026-12-31T23:59:59Z (UTC), got {value!r}")
+    return value
+
+
+def _proxy(data: Any) -> dict:
+    """A reverse proxy plugin: the proxies themselves and the sites they publish (domain -> upstream)."""
+    data = _dict(data, "output")
+    proxies, proxy_ids = [], set()
+    for i, raw in enumerate(_list(data.get("proxies"), "proxies")):
+        path = f"proxies[{i}]"
+        raw = _dict(raw, path)
+        proxy_id = _id(raw.get("id"), f"{path}.id")
+        if proxy_id in proxy_ids:
+            _fail(f"{path}.id", f"{proxy_id!r} is used twice")
+        proxy_ids.add(proxy_id)
+        proxies.append({
+            "id": proxy_id,
+            "name": _text(raw.get("name"), f"{path}.name", default=proxy_id),
+            "ip": _ipv4(raw.get("ip"), f"{path}.ip"),
+            "version": _text(raw.get("version"), f"{path}.version", max_len=40),
+            "online": bool(raw.get("online", True)),
+            "warnings": [_text(w, f"{path}.warnings[{j}]", required=True, max_len=300) for j, w in enumerate(_list(raw.get("warnings"), f"{path}.warnings")[:10])],
+        })
+    certificates = []
+    for i, raw in enumerate(_list(data.get("certificates"), "certificates")):
+        path = f"certificates[{i}]"
+        raw = _dict(raw, path)
+        certificates.append({
+            "id": _id(raw.get("id"), f"{path}.id"),
+            "proxy_id": _id(raw.get("proxy_id"), f"{path}.proxy_id") if raw.get("proxy_id") not in (None, "") else None,
+            "name": _text(raw.get("name"), f"{path}.name", max_len=200),
+            "provider": _text(raw.get("provider"), f"{path}.provider", max_len=40),
+            "domains": [_text(d, f"{path}.domains[{j}]", required=True, max_len=253) for j, d in enumerate(_list(raw.get("domains"), f"{path}.domains")[:100])],
+            "expires": _stamp(raw.get("expires"), f"{path}.expires"),
+            "in_use": bool(raw.get("in_use", False)),
+        })
+    sites, site_ids = [], set()
+    for i, raw in enumerate(_list(data.get("sites"), "sites")):
+        path = f"sites[{i}]"
+        raw = _dict(raw, path)
+        site_id = _id(raw.get("id"), f"{path}.id")
+        if site_id in site_ids:
+            _fail(f"{path}.id", f"{site_id!r} is used twice")
+        site_ids.add(site_id)
+        proxy_id = _id(raw.get("proxy_id"), f"{path}.proxy_id")
+        if proxy_id not in proxy_ids:
+            _fail(f"{path}.proxy_id", f"{proxy_id!r} is not the id of any entry in proxies")
+        kind = raw.get("type", "proxy")
+        if kind not in SITE_TYPES:
+            _fail(f"{path}.type", f"must be one of {', '.join(SITE_TYPES)}, got {kind!r}")
+        scheme = _text(raw.get("scheme"), f"{path}.scheme", max_len=5, default="http").lower()
+        host = _text(raw.get("forward_host"), f"{path}.forward_host", max_len=253)
+        if host and not HOST_NAME_RE.match(host):
+            _fail(f"{path}.forward_host", f"is not a host name or address ({host!r})")
+        sites.append({
+            "id": site_id,
+            "proxy_id": proxy_id,
+            "type": kind,
+            "name": _text(raw.get("name"), f"{path}.name", max_len=200),
+            "domains": [_text(d, f"{path}.domains[{j}]", required=True, max_len=253).lower() for j, d in enumerate(_list(raw.get("domains"), f"{path}.domains")[:100])],
+            "enabled": bool(raw.get("enabled", True)),
+            "scheme": scheme if scheme in ("http", "https") else "http",
+            "forward_host": host,
+            "forward_port": _optional_number(raw.get("forward_port"), f"{path}.forward_port", 1, 65535, integer=True),
+            "forward_ips": [a for a in (_ipv4(x, f"{path}.forward_ips[{j}]") for j, x in enumerate(_list(raw.get("forward_ips"), f"{path}.forward_ips")[:10])) if a],
+            "incoming_port": _optional_number(raw.get("incoming_port"), f"{path}.incoming_port", 1, 65535, integer=True),
+            "ssl": bool(raw.get("ssl", False)),
+            "ssl_forced": bool(raw.get("ssl_forced", False)),
+            "websockets": bool(raw.get("websockets", False)),
+            "certificate_id": _id(raw.get("certificate_id"), f"{path}.certificate_id") if raw.get("certificate_id") not in (None, "") else None,
+            "cert_name": _text(raw.get("cert_name"), f"{path}.cert_name", max_len=200),
+            "cert_provider": _text(raw.get("cert_provider"), f"{path}.cert_provider", max_len=40),
+            "cert_expires": _stamp(raw.get("cert_expires"), f"{path}.cert_expires"),
+            "access_list": _text(raw.get("access_list"), f"{path}.access_list", max_len=200),
+            "redirect_to": _text(raw.get("redirect_to"), f"{path}.redirect_to", max_len=300),
+            "protocols": [p for p in (_text(x, f"{path}.protocols[{j}]", max_len=5).lower() for j, x in enumerate(_list(raw.get("protocols"), f"{path}.protocols")[:4])) if p in ("tcp", "udp")],
+        })
+    return {"proxies": proxies, "certificates": certificates, "sites": sites}
 
 
 def _topology(data: Any) -> dict:

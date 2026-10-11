@@ -1,7 +1,7 @@
 import { get, post, put } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
-const KIND = { hypervisor: "Hypervisor", topology: "Network topology" };
+const KIND = { hypervisor: "Hypervisor", topology: "Network topology", dns: "DNS", proxy: "Reverse proxy" };
 const LEVEL_TEXT = { verified: "Verified", reviewed: "Reviewed", community: "Community" };
 
 function badge(level) {

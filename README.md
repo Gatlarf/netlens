@@ -545,7 +545,7 @@ When a newer Netlens image has been published, an **Update x.y.z available** not
 
 ### Plugins
 
-Netlens learns about your network from other systems through **plugins**. Two kinds exist: **hypervisor** plugins report VMs and containers and the host each runs on, and **topology** plugins report network nodes (router, switch, access point, mesh node) and which node each client is connected to. Netlens matches what a plugin reports to the devices it has scanned (by MAC address, then IP), and shows the result as links on the map and in the hierarchy.
+Netlens learns about your network from other systems through **plugins**. Four kinds exist: **hypervisor** plugins report VMs and containers and the host each runs on, **topology** plugins report network nodes (router, switch, access point, mesh node) and which node each client is connected to, **dns** plugins write names to a DNS server, and **proxy** plugins report the sites a reverse proxy publishes. Netlens matches what a plugin reports to the devices it has scanned (by MAC address, then IP), and shows the result as links on the map and in the hierarchy.
 
 Under **Settings → Integrations** you find:
 
@@ -556,6 +556,18 @@ Under **Settings → Integrations** you find:
 - **Browse plugins**: the **plugin index** lists plugins from the community with a **review level**: *Verified* (a trusted reviewer read the code of that exact version and tested it on real hardware), *Reviewed* (code read, not tested on hardware) or *Community* (only automatic checks; installing it needs an extra confirmation with a warning). *Install* downloads the plugin, checks it against the SHA-256 pinned in the index and applies the same safety checks as an upload; a new plugin starts switched off. Installed plugins show **update available** (nothing updates by itself), updating keeps the settings, and **Go back to the previous version** restores the last one. The index is a file in this repository (`plugin-index/index.json`, read once every six hours); its address can be changed or switched off under *Plugin index settings*. To publish your own plugin see [`plugin-index/README.md`](plugin-index/README.md) (entry format, review process, templates and a local checker).
 
 **Uploaded and downloaded plugins are Python code that runs inside the Netlens container.** Each runs in its own process with a stripped environment, a time limit and no database path, and everything it returns is validated, but this is not a sandbox: it runs as the same user and could read the data volume. Only install plugins you trust and have read. Uploading needs the Netlens login.
+
+#### Nginx Proxy Manager plugin
+
+A **proxy** plugin (`plugins/npm`, install it from *Browse plugins*) that shows what your Nginx Proxy Manager publishes. In Nginx Proxy Manager create a user for Netlens that is not an administrator, has no two-factor login, sees **All Items** and has **View Only** on everything (the plugin's settings show these steps, and warn when the account is wrong); enter the proxy's address (port 81), the e-mail address and the password. Netlens then:
+
+- ties every site (proxy hosts, redirections, streams, 404 hosts) to the device or Docker container its upstream leads to: by a container that publishes the forwarded port on that host, a guest or container with that address, a device with that address or name, or a container name on the proxy's own Docker network. A site it cannot place is listed as *not found*, never guessed;
+- shows a *Published through the proxy* card on the device behind a site, *Sites served* on the proxy's own device, and a list of all sites in the plugin's settings with the ones that need attention first;
+- raises a *certificate expiring* event 14 days (adjustable), 7, 3 and 1 days before a certificate used by a site ends, and when it has expired;
+- keeps one HTTPS check per enabled site under Services (it asks the proxy for the domain, so it does not depend on DNS; a server error such as 502 is *down*; switch it off with *Check every site*);
+- can create DNS names for the domains: *Settings → DNS registration → Give the sites of a reverse proxy a name* (off by default, previewed and approved like every DNS change).
+
+Netlens only reads from Nginx Proxy Manager (it logs in and then does `GET` requests).
 
 #### ASUS router (AiMesh) plugin
 

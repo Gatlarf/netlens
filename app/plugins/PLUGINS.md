@@ -1,13 +1,14 @@
 # Writing Netlens plugins
 
 Netlens can learn about your network from other systems through **plugins**. A plugin talks to one kind of device
-(a router, a hypervisor, ...) and hands Netlens the result in a fixed format. Two kinds exist today:
+(a router, a hypervisor, ...) and hands Netlens the result in a fixed format. Four kinds exist today:
 
 | Kind | Reports | Examples |
 | :--- | :--- | :--- |
 | `hypervisor` | hosts, and the VMs/containers that run on them | Proxmox VE (built in), ESXi, Hyper-V, libvirt |
 | `dns` | a DNS server that Netlens writes device names and addresses to | Technitium DNS (more welcome: BIND with RFC 2136, Pi-hole, AdGuard Home, dnsmasq) |
 | `topology` | network nodes (router, switch, access point, mesh node) and the clients connected to them | ASUS AiMesh (built in), Omada, UniFi, Fritz!Box, MikroTik |
+| `proxy` | a reverse proxy and the sites it publishes (domain → upstream host and port, certificate) | Nginx Proxy Manager (more welcome: Traefik, Caddy, HAProxy) |
 
 Plugin API version: **1**.
 
@@ -54,7 +55,7 @@ my-router/            (the folder is optional)
 | `name` | yes | Shown in the menu and plugin list (max 60). |
 | `version` | yes | Like `1.0.0`. |
 | `api_version` | yes | Must be `1`. |
-| `kind` | yes | `hypervisor` or `topology`. |
+| `kind` | yes | `hypervisor`, `topology`, `dns` or `proxy`. |
 | `description` | no | A sentence or two (max 500). |
 | `author`, `homepage` | no | Shown in the plugin list. |
 | `info` | no | A collapsed box at the top of the plugin's settings page: `{"title": ..., "text": ..., "code": ...}`. `code` is shown in a block with a Copy button, for example the docker-compose lines the plugin needs on the other side. Needs Netlens 0.3.115; older versions ignore it. |
@@ -296,6 +297,58 @@ Return `{"hosts": [...], "guests": [...]}`.
     {"id": "100", "name": "web", "kind": "lxc", "host_id": "pve1", "status": "running",
      "macs": ["bc:24:11:aa:bb:cc"], "ips": ["192.168.0.50"]}
   ]
+}
+```
+
+## Output for kind `proxy`
+
+Return `{"proxies": [...], "sites": [...], "certificates": [...]}` (needs Netlens 0.3.116). Netlens ties every site to the device or Docker
+container its upstream address leads to, shows the sites on both devices, warns before a certificate expires, can keep one HTTPS check per
+site and can give the domains a DNS name. The plugin only reads.
+
+| Proxy field | Required | Meaning |
+| :--- | :--- | :--- |
+| `id` | yes | Text or number, unique. |
+| `name` | no | Default: the id. |
+| `ip` | no | IPv4 address of the machine the proxy runs on: it finds the proxy's device, and site checks are sent to it. |
+| `version` | no | Text. |
+| `warnings` | no | Up to 10 short sentences shown in the plugin's settings (for example "this account can change things"). |
+
+| Site field | Required | Meaning |
+| :--- | :--- | :--- |
+| `id` | yes | Text or number, unique. |
+| `proxy_id` | yes | The `id` of an entry in `proxies`. |
+| `type` | no | `proxy` (default), `redirect`, `stream` or `dead` (a 404 page). Only `proxy` and `stream` lead to an upstream. |
+| `domains` | no | List of domain names (a `*` wildcard is fine). |
+| `enabled` | no | `true` (default) or `false`. Disabled sites get no check and no DNS name. |
+| `scheme` | no | `http` (default) or `https`: how the proxy talks to the upstream. |
+| `forward_host`, `forward_port` | no | The upstream: an IPv4 address, a host name, or the name of a container on the proxy's Docker network. |
+| `forward_ips` | no | The IPv4 addresses the plugin found for a host name. Netlens does no lookups itself. |
+| `incoming_port`, `protocols` | no | For a stream: the port the proxy listens on, and `tcp` / `udp`. |
+| `ssl`, `ssl_forced`, `websockets` | no | Booleans. |
+| `certificate_id`, `cert_name`, `cert_provider`, `cert_expires` | no | The certificate the site uses; `cert_expires` is UTC like `2026-12-31T23:59:59Z`. |
+| `access_list`, `redirect_to`, `name` | no | Text shown with the site. |
+
+| Certificate field | Required | Meaning |
+| :--- | :--- | :--- |
+| `id` | yes | Text or number; `proxy_id` (optional) says which proxy it belongs to. |
+| `name`, `provider`, `domains` | no | Shown in the certificate events. |
+| `expires` | no | UTC like `2026-12-31T23:59:59Z`. A certificate that no enabled site uses is never reported. |
+
+Netlens finds the upstream in this order: a container that **publishes** the forwarded port on the host with that address; a guest (virtual
+machine, macvlan container) that has that address; the device with that address; a container (or compose service) with that name on the
+proxy's own Docker host; `localhost` and `host.docker.internal` mean the proxy's own machine; a name through the addresses you list in
+`forward_ips` or a device with that host name. A site Netlens cannot place is listed as *not found*, never guessed. The plugin settings
+`create_checks`, `check_interval` and `cert_warn_days` are read by Netlens (all optional): `create_checks` (default true) keeps one check
+per enabled `proxy` site, `check_interval` is its interval in seconds (default 300) and `cert_warn_days` (default 14) is the first
+warning step before a certificate expires (the later steps are 7, 3 and 1 days and expired).
+
+```json
+{
+  "proxies": [{"id": "npm", "name": "npm", "ip": "192.168.0.184", "version": "2.15.1", "warnings": []}],
+  "sites": [{"id": "proxy-1", "proxy_id": "npm", "domains": ["media.example.com"], "forward_host": "192.168.0.189", "forward_port": 8096,
+             "ssl": true, "certificate_id": "1", "cert_expires": "2027-01-31T10:20:30Z"}],
+  "certificates": [{"id": "1", "proxy_id": "npm", "name": "wildcard", "provider": "letsencrypt", "domains": ["*.example.com"], "expires": "2027-01-31T10:20:30Z"}]
 }
 ```
 

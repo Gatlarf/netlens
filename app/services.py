@@ -8,6 +8,7 @@ state. A state change needs two identical results in a row (so one lost packet i
 from __future__ import annotations
 
 import asyncio
+import http.client
 import ipaddress
 import json
 import logging
@@ -84,8 +85,8 @@ def validate_check(data: dict[str, Any]) -> dict[str, Any]:
     if kind == "http":
         if path and not path.startswith("/"):
             path = "/" + path
-        if expect and not re.fullmatch(r"\d{3}|text:.{1,150}", expect):
-            raise CheckError("expect is a status code such as 200, or text:<words that must appear in the page>")
+        if expect and not re.fullmatch(r"\d{3}|alive|text:.{1,150}", expect):
+            raise CheckError("expect is a status code such as 200, alive (any answer below 500) or text:<words that must appear in the page>")
     if kind == "tcp":
         path = ""
     interval = data.get("interval_s", 60)
@@ -103,7 +104,8 @@ def validate_check(data: dict[str, Any]) -> dict[str, Any]:
 def describe(check: dict[str, Any]) -> str:
     """Short text for the target of a check."""
     if check["kind"] == "http":
-        return f"http://{check['host']}:{check['port']}{check['path'] or '/'}"
+        scheme = "https" if check["port"] in (443, 8443) else "http"
+        return f"{scheme}://{check['host']}:{check['port']}{check['path'] or '/'}" + (f" via {check['via']}" if check.get("via") else "")
     if check["kind"] == "dns":
         return f"{check['path']} @ {check['host']}:{check['port']}"
     return f"{check['host']}:{check['port']}"
@@ -145,15 +147,40 @@ def _http_get(url: str, timeout: float) -> tuple[int, str]:
         return exc.code, exc.read(65536).decode("utf-8", errors="replace")
 
 
+def _http_get_via(host: str, via: str, port: int, path: str, scheme: str, timeout: float) -> tuple[int, str]:
+    """GET http(s)://host/path but connect to `via`: how a site behind a reverse proxy is asked for without depending on DNS."""
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    if scheme == "https":
+        class Connection(http.client.HTTPSConnection):
+            def connect(self):  # the name goes into the TLS handshake (SNI), the address is the proxy's
+                self.sock = context.wrap_socket(socket.create_connection((via, port), timeout), server_hostname=host)
+
+        conn = Connection(via, port, timeout=timeout, context=context)
+    else:
+        conn = http.client.HTTPConnection(via, port, timeout=timeout)
+    try:
+        conn.request("GET", path, headers={"Host": host, "User-Agent": "Netlens-service-check"})
+        resp = conn.getresponse()
+        return resp.status, resp.read(65536).decode("utf-8", errors="replace")
+    finally:
+        conn.close()
+
+
 async def check_http(check: dict[str, Any], timeout: float) -> Result:
     scheme = "https" if check["port"] in (443, 8443) else "http"
     url = f"{scheme}://{check['host']}:{check['port']}{check['path'] or '/'}"
     start = time.monotonic()
     try:
-        status, body = await asyncio.wait_for(asyncio.to_thread(_http_get, url, timeout), timeout + 1)
+        if check.get("via"):
+            fetch = asyncio.to_thread(_http_get_via, check["host"], check["via"], check["port"], check["path"] or "/", scheme, timeout)
+        else:
+            fetch = asyncio.to_thread(_http_get, url, timeout)
+        status, body = await asyncio.wait_for(fetch, timeout + 1)
     except asyncio.TimeoutError:
         return Result(False, None, f"no answer within {timeout:g} s")
-    except (urllib.error.URLError, OSError, ValueError) as exc:
+    except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException) as exc:
         reason = getattr(exc, "reason", exc)
         return Result(False, None, str(reason)[:200])
     ms = round((time.monotonic() - start) * 1000, 1)
@@ -161,6 +188,8 @@ async def check_http(check: dict[str, Any], timeout: float) -> Result:
     if expect.startswith("text:"):
         ok = 200 <= status < 400 and expect[5:] in body
         return Result(ok, ms, f"HTTP {status}" + ("" if ok else f", text not found" if 200 <= status < 400 else ""))
+    if expect == "alive":     # the site answered; only the proxy's own errors (502, 504 ...) count as down
+        return Result(status < 500, ms, f"HTTP {status}")
     if expect:
         return Result(str(status) == expect, ms, f"HTTP {status}" + ("" if str(status) == expect else f" (expected {expect})"))
     return Result(200 <= status < 400, ms, f"HTTP {status}")

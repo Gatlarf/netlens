@@ -85,6 +85,7 @@ class SettingsBody(BaseModel):
     remove: bool | None = None
     auto_apply: bool | None = None
     register_containers: bool | None = None
+    register_sites: bool | None = None
     max_changes: int | None = None
 
 

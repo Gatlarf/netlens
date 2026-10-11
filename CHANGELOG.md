@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.116 — 2026-10-11
+
+### Added
+- ★ **Reverse proxy plugins, with Nginx Proxy Manager as the first**: a new kind of plugin (`proxy`) reports the sites a reverse proxy publishes. The **Nginx Proxy Manager** plugin (needs Netlens 0.3.116 or newer; install it from Settings → Integrations → Browse plugins) reads the proxy hosts, redirections, streams and 404 hosts with their certificates through a view-only user. Netlens ties every site to the device or Docker container behind it, using the upstream address and port (a container that publishes that port, a container with that name on the proxy's Docker network, a macvlan container's own address, or a device with that address or name): the device page gets a *Published through the proxy* card, the proxy's page lists *Sites served*, and sites Netlens cannot place are flagged *not found*. The plugin also warns about an account that sees only its own items or can change things.
+- ★ **Certificate expiry events**: a certificate that a site uses gives a *certificate expiring* event 14 days before it ends (you can change the number of days), again at 7, 3 and 1 days and when it has expired. It goes to your notification channels like other events.
+- **A check for every site**: the plugin can keep one HTTPS (or HTTP) check per enabled site under Services. The check asks the proxy for the site's domain (it does not depend on DNS), counts any answer below 500 as up and reports a server error such as 502 as *service down*. Checks come and go with the proxy's list; you can still change their interval or turn one off. A service check now understands `alive` (any answer below 500) as its expected result.
+- **DNS names for the sites**: *Give the sites of a reverse proxy a name* in Settings → DNS registration makes a CNAME to the proxy's host for every domain that falls inside one of your zones. It is off by default, goes through the same preview and approval as other DNS changes, and never touches a name that already exists.
+
 ## 0.3.115 — 2026-10-11
 
 ### Added
