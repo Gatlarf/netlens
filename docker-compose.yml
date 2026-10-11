@@ -47,6 +47,11 @@ services:
       # Enable terminal UI (on/off).
       NETLENS_TERMINAL: ${NETLENS_TERMINAL:-on}
       NETLENS_TERMINAL_REMOTE: ${NETLENS_TERMINAL_REMOTE:-off}
+      # Reverse proxies whose X-Forwarded-For is believed (addresses or networks, comma separated). Set this when Netlens is reached
+      # through a proxy, so the login throttle counts the real visitor instead of the proxy. Empty = nobody is trusted.
+      NETLENS_TRUSTED_PROXIES: ${NETLENS_TRUSTED_PROXIES:-}
+      # Serve the API documentation pages (/docs, /redoc, /openapi.json). Off by default.
+      NETLENS_API_DOCS: ${NETLENS_API_DOCS:-off}
       # Optional SNMP community string; empty means disabled.
       NETLENS_SNMP_COMMUNITY: ${NETLENS_SNMP_COMMUNITY:-}
       # Bind address for the web server (default 0.0.0.0:8080).

@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app import users
-from app.auth import COOKIE_NAME, BUILTIN, identify, session_value, LoginLimiter
+from app.auth import COOKIE_NAME, BUILTIN, LoginLimiter, client_ip, identify, session_value
 from app.db import connect
 
 
@@ -50,11 +50,13 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
 
     settings = request.app.state.settings
     limiter: LoginLimiter = request.app.state.login_limiter
-    host = request.client.host if request.client else "unknown"
-    # a wrong guess counts against the address and, for user logins, against the user name as well
-    keys = [host] + ([f"user:{body.username.strip().lower()}"] if body.username else [])
+    host = client_ip(request)
+    user_limiter: LoginLimiter = request.app.state.user_limiter
+    # a wrong guess counts against the address (5 a minute) and, for user logins, against the user name as well (20 in a quarter of an hour,
+    # more generous because anybody can type the owner's name: a stricter limit would let a stranger lock the owner out)
+    user_key = f"user:{body.username.strip().lower()}" if body.username else None
 
-    if not all(limiter.allowed(k) for k in keys):
+    if not limiter.allowed(host) or (user_key and not user_limiter.allowed(user_key)):
         raise HTTPException(status_code=429, detail="too many attempts")
 
     if body.username is not None:
@@ -64,11 +66,11 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
         finally:
             db.close()
         if cookie is None:
-            for k in keys:
-                limiter.record_failure(k)
+            limiter.record_failure(host)
+            user_limiter.record_failure(user_key)
             raise HTTPException(status_code=401, detail="wrong user name or password")
-        for k in keys:
-            limiter.reset(k)
+        limiter.reset(host)
+        user_limiter.reset(user_key)
         response = JSONResponse({"ok": True})
         _session_cookie(response, request, cookie)
         return response

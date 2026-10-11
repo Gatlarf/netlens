@@ -1,4 +1,5 @@
 import hmac
+import ipaddress
 import hashlib
 import re
 import time
@@ -42,12 +43,51 @@ def is_authorized(token: str, cookie: Optional[str], authorization: Optional[str
     return False
 
 
+def client_ip(conn: HTTPConnection) -> str:
+    """The address of whoever is really asking. Behind a reverse proxy every request arrives from the proxy's own address, so
+    when that address is in NETLENS_TRUSTED_PROXIES the real client is the last X-Forwarded-For entry that is not a trusted proxy
+    (entries further left can be made up by the client). Without that setting only the connection's address is used."""
+    peer = conn.client.host if conn.client else "unknown"
+    nets = []
+    for item in getattr(conn.app.state.settings, "trusted_proxies", ()) or ():
+        try:
+            nets.append(ipaddress.ip_network(item, strict=False))
+        except ValueError:
+            continue
+
+    def trusted(text: str) -> bool:
+        try:
+            ip = ipaddress.ip_address(text.strip())
+        except ValueError:
+            return False
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            ip = ip.ipv4_mapped
+        return any(ip.version == n.version and ip in n for n in nets)
+
+    if not nets or not trusted(peer):
+        return peer
+    for entry in reversed([e.strip() for e in conn.headers.get("x-forwarded-for", "").split(",") if e.strip()]):
+        if not trusted(entry):
+            try:
+                return str(ipaddress.ip_address(entry))
+            except ValueError:
+                return peer       # not an address: do not let a made-up value become a key
+    return peer
+
+
 class LoginLimiter:
     def __init__(self, max_failures: int = 5, window: float = 60.0, clock=time.monotonic):
         self.max_failures = max_failures
         self.window = window
         self.clock = clock
         self._failures: dict[str, list[float]] = defaultdict(list)
+
+    MAX_KEYS = 5000     # an attacker who invents user names must not grow this without limit
+
+    def _prune(self, cutoff: float) -> None:
+        if len(self._failures) > self.MAX_KEYS:
+            for k in [k for k, v in self._failures.items() if not v or v[-1] <= cutoff]:
+                del self._failures[k]
 
     def allowed(self, key: str) -> bool:
         now = self.clock()
@@ -63,6 +103,7 @@ class LoginLimiter:
         failures = self._failures[key]
         # Remove expired entries
         self._failures[key] = [t for t in failures if t > cutoff]
+        self._prune(cutoff)
         # Bound memory by max_failures entries
         if len(self._failures[key]) >= self.max_failures:
             self._failures[key] = self._failures[key][-self.max_failures:]

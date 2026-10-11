@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 from app import shares
-from app.auth import LoginLimiter
+from app.auth import LoginLimiter, client_ip
 from app.db import connect
 
 router = APIRouter(tags=["share"])
@@ -17,7 +17,7 @@ HEADERS = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Re
 def _guard(request: Request) -> None:
     """Guessing tokens is hopeless, but keep a scanner from hammering the endpoint."""
     limiter: LoginLimiter = request.app.state.share_limiter
-    host = request.client.host if request.client else "unknown"
+    host = client_ip(request)
     if not limiter.allowed(host):
         raise HTTPException(status_code=429, detail="too many attempts")
 
@@ -31,7 +31,7 @@ def share_page(request: Request, token: str) -> FileResponse:
     finally:
         conn.close()
     if not live:
-        request.app.state.share_limiter.record_failure(request.client.host if request.client else "unknown")
+        request.app.state.share_limiter.record_failure(client_ip(request))
         raise HTTPException(status_code=404, detail="this link does not exist or has expired")
     return FileResponse(PAGE, headers=HEADERS)
 
@@ -43,7 +43,7 @@ def share_data(request: Request, token: str) -> JSONResponse:
     try:
         link = shares.find(conn, token)
         if link is None:
-            request.app.state.share_limiter.record_failure(request.client.host if request.client else "unknown")
+            request.app.state.share_limiter.record_failure(client_ip(request))
             raise HTTPException(status_code=404, detail="this link does not exist or has expired")
         return JSONResponse(shares.public_data(conn, link), headers=HEADERS)
     finally:

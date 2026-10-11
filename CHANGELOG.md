@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.120 — 2026-10-11
+
+### Changed
+- ★ **Safer when Netlens is reachable from the internet**: found by a security review of the public address. (1) Behind a reverse proxy every visitor looked like the proxy, so the login throttle was shared: a stranger's wrong guesses blocked you too. Set `NETLENS_TRUSTED_PROXIES` to the proxy's address and the throttle (5 wrong attempts a minute) counts each real visitor; the limit per user name is now 20 in 15 minutes so a stranger typing your name cannot lock you out. (2) The API documentation pages (`/docs`, `/redoc`, `/openapi.json`) are off unless `NETLENS_API_DOCS=on`. (3) The version number is only shown to logged-in visitors. (4) Over HTTPS Netlens now sends `Strict-Transport-Security`.
+
 ## 0.3.119 — 2026-10-11
 
 ### Added

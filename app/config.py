@@ -23,6 +23,8 @@ class Settings:
     bind_port: int
     data_dir: Path
     terminal_remote: str = "off"   # where the terminal may be used from, see app/terminal/access.py
+    trusted_proxies: tuple[str, ...] = ()   # reverse proxies whose X-Forwarded-For is believed (NETLENS_TRUSTED_PROXIES)
+    api_docs: bool = False                  # serve /docs, /redoc and /openapi.json (NETLENS_API_DOCS=on)
 
 
 def is_scannable_range(cidr: str) -> bool:
@@ -126,6 +128,19 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     if terminal_remote not in ("off", "lan", "any"):
         raise ConfigError("NETLENS_TERMINAL_REMOTE must be 'off', 'lan' or 'any'")
 
+    trusted = []
+    for item in env.get("NETLENS_TRUSTED_PROXIES", "").replace(";", ",").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            trusted.append(str(ipaddress.ip_network(item, strict=False)))
+        except ValueError:
+            raise ConfigError(f"NETLENS_TRUSTED_PROXIES: {item!r} is not an address or network")
+    docs_str = env.get("NETLENS_API_DOCS", "off").strip().lower() or "off"
+    if docs_str not in ("on", "off"):
+        raise ConfigError("NETLENS_API_DOCS must be 'on' or 'off'")
+
     snmp_community = env.get("NETLENS_SNMP_COMMUNITY", "")
     snmp_community = snmp_community if snmp_community else None
 
@@ -153,4 +168,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         bind_port=port,
         data_dir=data_dir,
         terminal_remote=terminal_remote,
+        trusted_proxies=tuple(trusted),
+        api_docs=docs_str == "on",
     )

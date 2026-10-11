@@ -7,14 +7,14 @@ from pathlib import Path
 from typing import Any
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
 from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, stats as stats_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
-from app.auth import LoginLimiter, require_auth
+from app.auth import LoginLimiter, identify, require_auth
 from app.config import load_settings
 from app.db import connect, init_db
 from app.scanner.orchestrator import ScanManager
@@ -93,7 +93,9 @@ def create_app(
     scheduler: bool = False,
     scan_manager: ScanManager | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Netlens", lifespan=lifespan)
+    docs = bool(getattr(settings, "api_docs", False))      # the API map is for the owner, not for the internet: off unless NETLENS_API_DOCS=on
+    app = FastAPI(title="Netlens", lifespan=lifespan, docs_url="/docs" if docs else None, redoc_url="/redoc" if docs else None,
+                  openapi_url="/openapi.json" if docs else None)
 
     app.add_middleware(SecurityHeadersMiddleware)
 
@@ -104,6 +106,7 @@ def create_app(
     app.state.scheduler = scheduler
     app.state.scan_manager = scan_manager or ScanManager(app.state.db_path, settings)
     app.state.login_limiter = LoginLimiter()
+    app.state.user_limiter = LoginLimiter(max_failures=20, window=900.0)
     app.state.share_limiter = LoginLimiter(max_failures=30, window=60.0)
     app.state.terminal_backends = {"ssh": SSHBackend, "telnet": TelnetBackend}
     app.state.terminal_sessions = 0
@@ -150,7 +153,9 @@ def create_app(
     app.include_router(terminal_router, dependencies=[Depends(require_terminal_enabled)])
 
     @app.get("/api/health")
-    async def health() -> dict[str, str]:
+    async def health(request: Request) -> dict[str, str]:
+        if identify(request) is None:       # the version tells a stranger which known flaws to try
+            return {"status": "ok"}
         return {"status": "ok", "version": VERSION}
 
     static_dir = Path(__file__).parent / "static"

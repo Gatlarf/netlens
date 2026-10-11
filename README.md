@@ -377,6 +377,8 @@ Restoring the backup matters because a newer version may have changed the databa
 | `NETLENS_DEEP_INTERVAL` | `86400` | Deep scan interval in seconds |
 | `NETLENS_TERMINAL` | `on` | Enable/disable web terminal |
 | `NETLENS_TERMINAL_REMOTE` | `off` | Where the terminal may be used from: `off` = direct local connections only (not through a reverse proxy / HTTPS address), `lan` = also through a proxy for local clients, `any` = anywhere |
+| `NETLENS_TRUSTED_PROXIES` | *(empty)* | Reverse proxies whose `X-Forwarded-For` header is believed, as addresses or networks (`192.168.0.184` or `192.168.0.0/24`, comma separated). **Set this when you reach Netlens through a reverse proxy**: without it every visitor looks like the proxy, so the login throttle (5 wrong attempts a minute) is shared by everybody and a stranger can lock you out |
+| `NETLENS_API_DOCS` | `off` | `on` serves the API documentation pages `/docs`, `/redoc` and `/openapi.json`; they are off so a stranger cannot read a map of the API |
 | `NETLENS_SNMP_COMMUNITY` | *(reserved/unused)* | SNMP community string |
 | `NETLENS_BIND` | `0.0.0.0:8080` | Bind address and port |
 | `NETLENS_DATA_DIR` | `/data` | Data directory |
@@ -711,7 +713,8 @@ A device that was online and is not seen by a scan is asked for once more on its
 ## Security notes
 
 - Access token required (cookie HttpOnly, SameSite=Strict, Secure behind HTTPS)
-- Login rate limit: 5 failures/minute per client address
+- Login rate limit: 5 wrong attempts a minute per client address and 20 per quarter hour per user name. Behind a reverse proxy set `NETLENS_TRUSTED_PROXIES`, otherwise all visitors share the proxy's address
+- The API documentation pages and the version number are hidden from visitors who are not logged in; HSTS is sent over HTTPS
 - No TLS built in — put behind a reverse proxy with HTTPS
   - `X-Forwarded-Proto` must be set
   - WebSocket upgrade must be forwarded
@@ -720,7 +723,7 @@ A device that was online and is not seen by a scan is asked for once more on its
 - Host networking
 - Read-only root filesystem
 - Security headers and CSP
-- Never expose to the internet
+- If you do open it to the internet: HTTPS through the proxy, a long random access token and passwords, `NETLENS_TRUSTED_PROXIES` set, the terminal left on its default (direct local connections only), and ideally an extra layer in front (an access list or VPN in the proxy, or an authenticating proxy)
 - Scanning only private ranges
 - Treat the token like a root password because the terminal can reach devices
 

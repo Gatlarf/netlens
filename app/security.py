@@ -19,6 +19,8 @@ class SecurityHeadersMiddleware:
 
         path = scope.get("path", "")
         is_api = path.startswith("/api/")
+        forwarded = dict(scope.get("headers") or []).get(b"x-forwarded-proto", b"").decode("latin-1").split(",")[0].strip().lower()
+        https = scope.get("scheme") == "https" or forwarded == "https"      # browsers only honour HSTS received over https anyway
 
         async def send_with_headers(message: dict[str, Any]) -> None:
             if message["type"] == "http.response.start":
@@ -31,6 +33,8 @@ class SecurityHeadersMiddleware:
                     if name.lower() not in existing_keys:
                         headers.append((name.encode("latin-1"), value.encode("latin-1")))
 
+                if https:
+                    add_header("Strict-Transport-Security", "max-age=31536000")
                 add_header("X-Content-Type-Options", "nosniff")
                 add_header("X-Frame-Options", "DENY")
                 add_header("Referrer-Policy", "no-referrer")
