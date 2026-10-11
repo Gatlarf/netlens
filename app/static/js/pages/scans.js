@@ -20,7 +20,9 @@ const KIND_LABELS = {
   service_up: "Service up",
   backup_failed: "Backup failed",
   dhcp_rogue: "Rogue DHCP?",
-  gateway_changed: "Gateway changed"
+  gateway_changed: "Gateway changed",
+  login_failed: "Failed logins",
+  cert_expiring: "Certificate expiring"
 };
 
 const KIND_ORDER = [
@@ -42,7 +44,9 @@ const KIND_ORDER = [
   "service_up",
   "backup_failed",
   "dhcp_rogue",
-  "gateway_changed"
+  "gateway_changed",
+  "login_failed",
+  "cert_expiring"
 ];
 
 function statusClass(status) {

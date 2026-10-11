@@ -80,3 +80,42 @@ def test_trusted_proxy_setting_is_checked():
     assert load_settings({"NETLENS_TOKEN": "x", "NETLENS_TRUSTED_PROXIES": "10.0.0.1, 192.168.0.0/24"}).trusted_proxies == ("10.0.0.1/32", "192.168.0.0/24")
     with pytest.raises(ConfigError):
         load_settings({"NETLENS_TOKEN": "x", "NETLENS_TRUSTED_PROXIES": "banana"})
+
+
+def events(tmp_path, kind="login_failed"):
+    from app.db import connect
+    conn = connect(tmp_path / "t.db")
+    try:
+        return [r["detail"] for r in conn.execute("SELECT detail FROM events WHERE kind = ?", (kind,))]
+    finally:
+        conn.close()
+
+
+def test_a_burst_of_wrong_logins_raises_one_alarm_per_block(tmp_path):
+    with TestClient(make(tmp_path, NETLENS_TRUSTED_PROXIES=PROXY), client=(PROXY, 5000)) as c:
+        def attempt(body, ip="203.0.113.9"):
+            return c.post("/api/login", json=body, headers={"X-Forwarded-For": ip}).status_code
+
+        assert [attempt({"username": "bert\x00\n", "password": "x"}) for _ in range(4)] == [401] * 4
+        assert events(tmp_path) == []                                           # a few typos are no alarm
+        assert attempt({"username": "bert", "password": "x"}) == 401
+        [text] = events(tmp_path)
+        assert "5 wrong sign-in attempts from 203.0.113.9" in text and "\x00" not in text
+        assert [attempt({"token": "nope"}) for _ in range(3)] == [429] * 3        # blocked: no further alarms for the same burst
+        assert len(events(tmp_path)) == 1
+        assert [attempt({"token": "nope"}, ip="203.0.113.50") for _ in range(5)] == [401] * 5
+        assert any("wrong access tokens from 203.0.113.50" in t for t in events(tmp_path))
+
+
+def test_a_slow_attack_on_one_user_name_is_noticed_too(tmp_path):
+    with TestClient(make(tmp_path, NETLENS_TRUSTED_PROXIES=PROXY), client=(PROXY, 5000)) as c:
+        for i in range(20):
+            c.post("/api/login", json={"username": "bert", "password": "x"}, headers={"X-Forwarded-For": f"198.51.100.{i}"})
+        assert any("20 wrong passwords for the user 'bert'" in t for t in events(tmp_path))
+
+
+def test_the_alarm_can_be_sent_to_a_channel():
+    from app.notify import channels
+    assert "login_failed" in channels.EVENT_LABELS and "login_failed" in channels.DEFAULT_EVENTS
+    line = channels._line({"kind": "login_failed", "detail": "5 wrong sign-in attempts", "name": "", "ip": "", "ts": "2026-10-11T12:00:00Z"})
+    assert "Login attack? 5 wrong sign-in attempts" in line

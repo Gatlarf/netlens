@@ -109,6 +109,10 @@ class LoginLimiter:
             self._failures[key] = self._failures[key][-self.max_failures:]
         self._failures[key].append(now)
 
+    def reached(self, key: str) -> bool:
+        """True right after the failure that used up the budget (the moment to raise an alarm, once per window)."""
+        return len(self._failures.get(key, ())) == self.max_failures
+
     def reset(self, key: str) -> None:
         self._failures[key] = []
 
