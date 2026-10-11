@@ -1,0 +1,24 @@
+{
+  "id": "hyperv",
+  "name": "Microsoft Hyper-V",
+  "kind": "hypervisor",
+  "description": "Shows your Hyper-V hosts with their virtual machines (state, processors, memory, start time, network switch) and ties each VM to the device Netlens found by MAC address, then IP. Reads through Windows Remote Management over HTTPS by running one fixed, read-only Get-VM script; the settings page has the PowerShell lines that create the user and the HTTPS listener. Tested with simulated answers and Microsoft's published NTLM test values; not yet on a real Hyper-V host.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/hyperv",
+  "license": "MIT",
+  "supports": [
+    "Hyper-V on Windows Server and Windows 10/11 Pro through WinRM over HTTPS (not yet tested on a real host)",
+    "NTLM or Basic login; Kerberos is not supported"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.0.0/hyperv.zip",
+      "sha256": "2c2e22fd577193f9d59e114c8044578773268b8e881ae95810f825087e776f4c",
+      "api_version": 1,
+      "min_netlens": "0.3.115",
+      "released": "2026-10-11",
+      "changelog": "First release. Virtual machines of a Hyper-V host through WinRM over HTTPS, matched to devices by MAC address then IP. Needs Netlens 0.3.115 or newer."
+    }
+  ]
+}
