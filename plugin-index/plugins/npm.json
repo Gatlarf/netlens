@@ -1,0 +1,24 @@
+{
+  "id": "npm",
+  "name": "Nginx Proxy Manager",
+  "kind": "proxy",
+  "description": "Shows the sites your Nginx Proxy Manager publishes (proxy hosts, redirections, streams, 404 hosts) and ties each to the device or Docker container behind it: a card on that device, the sites a proxy serves, certificate expiry events, optional HTTPS checks per site and optional DNS names for the domains. Read-only, through a user that can only view. Tested on Nginx Proxy Manager 2.15.1 (login and permission checks on a real instance; site data with simulated answers).",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/npm",
+  "license": "MIT",
+  "supports": [
+    "Nginx Proxy Manager 2.15.x (login tested on a real instance)",
+    "Sites, certificates and access lists read with simulated data matching the 2.x API"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.0.0/npm.zip",
+      "sha256": "c26d3ac6a8d4278a7558e60c270887b2a52d6397b1b64deb0c86333fb3fccd82",
+      "api_version": 1,
+      "min_netlens": "0.3.116",
+      "released": "2026-10-11",
+      "changelog": "First release. Proxy hosts, redirections, streams and 404 hosts with their certificates, tied to the device or container behind each site; certificate expiry events; optional HTTPS check per site; optional DNS names. Needs Netlens 0.3.116 or newer."
+    }
+  ]
+}
