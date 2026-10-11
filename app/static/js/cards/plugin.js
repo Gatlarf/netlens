@@ -138,6 +138,7 @@ function fillPluginCard(card, plugin, onChange) {
   if (manifest.author) meta.push(`by ${manifest.author}`);
   card.appendChild(h("p", { class: "hint" }, meta.join(" · ")));
   if (manifest.description) card.appendChild(h("p", { class: "hint" }, manifest.description));
+  if (manifest.info) card.appendChild(infoBox(manifest.info));
   if (plugin.problem) card.appendChild(h("p", { class: "error" }, plugin.problem));
 
   // A clear on/off banner: an installed plugin does nothing until it is turned on
@@ -333,6 +334,31 @@ function removeButton(plugin, onChange) {
     }
   });
   return btn;
+}
+
+// A collapsed box with a short text and a block of code to copy (what the plugin needs set up on the other side).
+function infoBox(info) {
+  const box = h("details", { class: "plugin-info" }, h("summary", {}, info.title));
+  if (info.text) box.appendChild(h("p", { class: "hint" }, info.text));
+  if (info.code) {
+    const copy = h("button", { type: "button", class: "btn" }, "Copy");
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(info.code);
+        toast("Copied", "success");
+      } catch {
+        const range = document.createRange();
+        range.selectNodeContents(box.querySelector("code"));
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        toast("Press Ctrl+C to copy the selected text", "info");
+      }
+    });
+    box.appendChild(h("pre", {}, h("code", {}, info.code)));
+    box.appendChild(copy);
+  }
+  return box;
 }
 
 export async function buildPluginCard(pluginId) {

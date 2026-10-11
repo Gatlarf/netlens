@@ -84,3 +84,20 @@ def test_a_saved_setting_with_the_same_key_as_the_new_list_is_carried_over(tmp_p
     assert [(r["host"], r["token"]) for r in rows] == [("http://a:1", "t1"), ("http://b:2", "t2")]
     shown = public_state(conn, plugin)
     assert [r["host"] for r in shown["config"]["servers"]] == ["http://a:1", "http://b:2"] and "t1" not in json.dumps(shown)
+
+
+def test_info_box_is_validated_and_the_docker_plugin_has_one():
+    import json
+    from pathlib import Path
+
+    from app.plugins.contract import ContractError, validate_manifest
+
+    base = {"id": "demo", "name": "Demo", "version": "1.0.0", "api_version": 1, "kind": "hypervisor", "config": []}
+    assert validate_manifest(base)["info"] is None
+    ok = validate_manifest({**base, "info": {"title": "Setup", "text": "t", "code": "a: 1"}})
+    assert ok["info"] == {"title": "Setup", "text": "t", "code": "a: 1"}
+    for bad in ({"text": "no title"}, "text", {"title": "x" * 200}):
+        with pytest.raises(ContractError):
+            validate_manifest({**base, "info": bad})
+    docker = validate_manifest(json.loads((Path(__file__).resolve().parents[1] / "plugins" / "docker" / "plugin.json").read_text()))
+    assert "docker-socket-proxy" in docker["info"]["code"] and "POST: 0" in docker["info"]["code"]

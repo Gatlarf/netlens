@@ -1,11 +1,16 @@
 {
   "id": "docker",
   "name": "Docker hosts",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
   "description": "Shows your Docker hosts with their containers: state, health, restarts, image, compose project, the ports each container publishes, and containers that have their own address on your network (macvlan / ipvlan) matched to the devices Netlens found. Read-only: it only lists containers and networks. Docker's API gives full control of a host, so talk to it through a read-only socket proxy (see the README), never through an open Docker port.",
+  "info": {
+    "title": "What to add to this Docker host (docker compose)",
+    "text": "Docker's API gives full control of a host, so never open port 2375 itself. Add this small read-only proxy to the compose file on every Docker host, change the address on the ports line to that host's own LAN address, start it, and enter http://<that address>:2375 below. It only allows GET requests for containers, networks and info; everything else is refused.",
+    "code": "services:\n  docker-socket-proxy:\n    image: tecnativa/docker-socket-proxy\n    restart: unless-stopped\n    environment:\n      CONTAINERS: 1   # list and inspect containers\n      NETWORKS: 1     # which network is macvlan / ipvlan\n      INFO: 1         # the host's name\n      IMAGES: 1       # optional: how old each container's image is\n      POST: 0         # nothing that changes anything\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n    ports:\n      - 192.168.0.189:2375:2375   # this host's LAN address"
+  },
   "timeout": 60,
   "diagnose": true,
   "config": [

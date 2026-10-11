@@ -214,3 +214,8 @@ dialog.whats-new h2 { margin: 0; }
 .badge.maint { background: color-mix(in srgb, #d97706 18%, var(--surface)); color: color-mix(in srgb, #d97706 55%, var(--text)); margin-left: 6px; }
 .days { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .maintenance-form select[multiple] { min-height: 8em; }
+
+/* a plugin's collapsed setup box */
+.plugin-info { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+.plugin-info summary { cursor: pointer; font-weight: 600; }
+.plugin-info pre { overflow-x: auto; margin: 8px 0; padding: 10px; border-radius: 6px; background: var(--bg); font-size: 0.85em; }

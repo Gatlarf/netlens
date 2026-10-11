@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.115 — 2026-10-11
+
+### Added
+- **Setup help in a plugin's settings**: a plugin can show a collapsed box with the text and the code to copy that it needs set up elsewhere. The Docker plugin (1.3.0, needs Netlens 0.3.115 or newer) uses it to show the docker-compose lines for the read-only socket proxy that every Docker host needs.
+
 ## 0.3.114 — 2026-10-11
 
 ### Added

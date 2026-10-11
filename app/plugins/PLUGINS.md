@@ -57,6 +57,7 @@ my-router/            (the folder is optional)
 | `kind` | yes | `hypervisor` or `topology`. |
 | `description` | no | A sentence or two (max 500). |
 | `author`, `homepage` | no | Shown in the plugin list. |
+| `info` | no | A collapsed box at the top of the plugin's settings page: `{"title": ..., "text": ..., "code": ...}`. `code` is shown in a block with a Copy button, for example the docker-compose lines the plugin needs on the other side. Needs Netlens 0.3.115; older versions ignore it. |
 | `timeout` | no | Seconds, 5-600, default 60. Netlens stops the plugin after this long. |
 | `diagnose` | no, but recommended | `true` when `plugin.py` has `diagnose(config)`: the plugin's page then shows a **Run diagnostic** button (see below). |
 | `config` | no | The settings form: a list of fields (below). |

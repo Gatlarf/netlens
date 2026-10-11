@@ -337,8 +337,21 @@ def validate_manifest(data: Any) -> dict:
         "timeout": timeout,
         "diagnose": bool(data.get("diagnose", False)),  # the plugin has diagnose(config): a report for its author
         "capabilities": _capabilities(data.get("capabilities"), kind),
+        "info": _info(data.get("info")),
         "config": fields,
     }
+
+
+def _info(raw: Any) -> dict | None:
+    """An optional collapsed box on the plugin's settings page: a title, a short text and a code block to copy (for example the
+    docker-compose lines the plugin needs on the other side)."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        _fail("info", "must be an object")
+    return {"title": _text(raw.get("title"), "info.title", required=True, max_len=80),
+            "text": _text(raw.get("text"), "info.text", max_len=800),
+            "code": _text(raw.get("code"), "info.code", max_len=4000)}
 
 
 def default_config(manifest: dict) -> dict:
