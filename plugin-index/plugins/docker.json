@@ -2,7 +2,7 @@
   "id": "docker",
   "name": "Docker hosts",
   "kind": "hypervisor",
-  "description": "Shows your Docker hosts with their containers: state, health, restarts, image (and how old it is), compose project, published ports, and containers with their own address on your network (macvlan / ipvlan) matched to the devices Netlens found. Read-only, through a read-only socket proxy (the README has the recipe). Tested on Docker 29.8.2 with a bridge-network setup; macvlan and ipvlan are tested with simulated data only.",
+  "description": "Shows your Docker hosts with their containers: state, health, restarts, image (and how old it is), compose project, published ports, and containers with their own address on your network (macvlan / ipvlan) matched to the devices Netlens found. Optionally flags containers that have a newer image in their registry. Read-only, through a read-only socket proxy (the README has the recipe). Tested on Docker 29.8.2 with a bridge-network setup; macvlan and ipvlan are tested with simulated data only.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/docker",
   "license": "MIT",
@@ -11,6 +11,15 @@
     "Containers on macvlan / ipvlan networks (not yet tested on a real host)"
   ],
   "releases": [
+    {
+      "version": "1.4.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.4.0/docker.zip",
+      "sha256": "17f7ced22a28dcd45fea02e98dfcccf6164711d7876080458926c78267888b79",
+      "api_version": 1,
+      "min_netlens": "0.3.119",
+      "released": "2026-10-11",
+      "changelog": "New setting Check for newer images (off by default): Netlens asks the registry each image comes from whether its tag now points to a newer image and flags those containers, with an event. Only image names are sent. Needs IMAGES: 1 on the socket proxy and Netlens 0.3.119 or newer."
+    },
     {
       "version": "1.3.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.3.0/docker.zip",
