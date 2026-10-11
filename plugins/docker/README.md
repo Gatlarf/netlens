@@ -40,6 +40,8 @@ services:
 Everything else (images, volumes, exec, secrets, ...) is refused with HTTP 403. Bind the port to the host's LAN address only, and
 let your firewall allow it from the Netlens machine only if you can.
 
+The plugin's settings page shows the same lines in a collapsed box (**What to add to this Docker host**) with a Copy button.
+
 Then add a line for every Docker host in the plugin's settings (`http://<host address>:2375`; **+ Add server** adds a line, **Test** on a line tests that host) and turn it on.
 If Netlens runs on the Docker host itself and reaches the proxy as `127.0.0.1`, fill in *Host's own address* under *More* (for example `192.168.0.189`) so Netlens can find the host's device.
 
