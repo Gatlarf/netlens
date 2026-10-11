@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 
 
 def utcnow() -> str:
@@ -455,6 +455,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     # --- schema v16: DNS registration (see app/dns) -------------------------------------------
     _add_column_if_missing(conn, "devices", "dns_mode", "TEXT NOT NULL DEFAULT 'auto'")   # auto | always | never
     _add_column_if_missing(conn, "devices", "dns_name", "TEXT")                           # the user's own DNS name
+    # --- schema v18: events held back by a maintenance window carry the window's name ----------------------
+    _add_column_if_missing(conn, "events", "maintenance", "TEXT")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS dns_state (
@@ -666,13 +668,19 @@ def add_event(
     if now is None:
         now = utcnow()
 
+    from app.maintenance import tag_for
+
+    try:
+        window = tag_for(conn, kind, device_id, now)
+    except Exception:  # noqa: BLE001 - a broken window list must never lose an event
+        window = None
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO events (ts, device_id, kind, detail)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO events (ts, device_id, kind, detail, maintenance)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (now, device_id, kind, detail),
+        (now, device_id, kind, detail, window),
     )
     conn.commit()
     return cur.lastrowid

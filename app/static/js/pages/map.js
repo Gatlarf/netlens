@@ -167,7 +167,7 @@ function buildNodeData(node, mode = "free", extra = {}) {
     },
     borderWidth: dark ? 2 : 1,
     borderWidthSelected: 4,
-    shapeProperties: { borderDashes: node.online ? false : [4, 3] },
+    shapeProperties: { borderDashes: node.online ? false : node.maintenance ? [1, 4] : [4, 3] },
     opacity: node.online ? 1 : dark ? 0.6 : 0.4,
     hidden: false,
   };
@@ -552,6 +552,7 @@ export async function render(container, params) {
 
     const statusEl = statusDot(node.online);
     panel.appendChild(statusEl);
+    if (node.maintenance) panel.appendChild(h("span", { class: "badge maint", title: "Alarms about this device are held back right now" }, `In maintenance: ${node.maintenance}`));
 
     panel.appendChild(h("p", {}, `IP: ${node.ip}`));
     const macEl = h("p", { class: "mono" }, `MAC: ${node.mac}`);

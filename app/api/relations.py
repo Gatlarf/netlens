@@ -90,7 +90,10 @@ def get_map(guests: bool = False, conn: sqlite3.Connection = Depends(get_conn)) 
         """
     ).fetchall()
 
+    from app.maintenance import covered
+
     known_groups = groups_mod.lookup(conn)
+    held = covered(conn)
     for row in rows:
         group = known_groups.get(row["group_id"])
         tags_raw = row["tags"]
@@ -113,6 +116,7 @@ def get_map(guests: bool = False, conn: sqlite3.Connection = Depends(get_conn)) 
             "group_id": row["group_id"],
             "group": group["name"] if group else None,
             "group_color": group["color"] if group else None,
+            "maintenance": held.get(row["id"]),
         })
 
     # The chosen parent of every device as an edge parent -> child (the "hierarchy" view of the map)

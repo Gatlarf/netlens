@@ -209,3 +209,8 @@ dialog.whats-new h2 { margin: 0; }
 .server-actions .server-result { flex: 1 1 200px; min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .server-result.ok { color: var(--ok, #2e9e5b); }
 .server-add { justify-self: start; }
+
+/* maintenance windows */
+.badge.maint { background: color-mix(in srgb, #d97706 18%, var(--surface)); color: color-mix(in srgb, #d97706 55%, var(--text)); margin-left: 6px; }
+.days { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.maintenance-form select[multiple] { min-height: 8em; }

@@ -1,3 +1,4 @@
+import { buildMaintenanceCard } from "../cards/maintenance.js";
 import { get, post, put } from "../api.js";
 import { h, clear, toast, isAdmin, fmtTime } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
@@ -204,6 +205,7 @@ const STATIC_GROUPS = [
     items: [
       { key: "notifications", label: "E-mail notifications", build: buildNotificationsCard },
       { key: "channels", label: "Channels & quiet hours", build: buildChannelsCard },
+      { key: "maintenance", label: "Maintenance windows", build: buildMaintenanceCard },
     ],
   },
   "integrations",

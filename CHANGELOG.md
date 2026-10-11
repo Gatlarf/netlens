@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.114 — 2026-10-11
+
+### Added
+- ★ **Maintenance windows** (Settings → Notifications → Maintenance windows): tell Netlens when devices are expected to be unreachable, for example a mesh node that reboots on Monday, Wednesday and in the weekend at 3 a.m. A window covers everything, groups or chosen devices (and optionally the devices behind them) and runs weekly on the days you choose (also past midnight) or once; it follows your time zone, and the times can be changed at any time. While a device is covered, its offline, online and service down/up events are still recorded but marked *maintenance* and are not sent to e-mail or notification channels; if the device is still offline when the window ends, the normal offline message follows then. Devices show an *In maintenance* badge on their page and the map, and every device page has a **Maintenance…** menu to start a window of 30 minutes to 24 hours right now. The events list and the API show which window held an event back (`maintenance`).
+
 ## 0.3.113 — 2026-10-11
 
 ### Fixed

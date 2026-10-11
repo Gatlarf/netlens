@@ -16,6 +16,7 @@ class EventDict(BaseModel):
     device_id: int | None
     kind: str
     detail: str | None
+    maintenance: str | None = None      # the maintenance window that held this event back
 
 
 @router.get("/events", response_model=list[EventDict])
@@ -41,7 +42,7 @@ def list_events(
         conditions.append("id > ?")
         params.append(since_id)
 
-    query = "SELECT id, ts, device_id, kind, detail FROM events"
+    query = "SELECT id, ts, device_id, kind, detail, maintenance FROM events"
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     query += " ORDER BY id DESC LIMIT ?"

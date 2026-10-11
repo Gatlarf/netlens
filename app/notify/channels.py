@@ -309,7 +309,7 @@ def send_channel(channel: dict, title: str, body: str, events: list[dict], *, po
 def _pending_events(conn: sqlite3.Connection, after_id: int) -> list[dict]:
     rows = conn.execute(
         """
-        SELECT e.id, e.ts, e.kind, e.device_id, e.detail,
+        SELECT e.id, e.ts, e.kind, e.device_id, e.detail, e.maintenance,
                COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.mac, d.vendor, d.trusted, d.notify_offline
         FROM events e LEFT JOIN devices d ON d.id = e.device_id
         WHERE e.id > ? ORDER BY e.id LIMIT 500
@@ -349,7 +349,7 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
                 if not pending:
                     continue
                 top = pending[-1]["id"]
-                wanted = [e for e in pending if e["kind"] in ch["events"] and not (e["kind"] == "device_offline" and e["device_id"] is not None and e["notify_offline"] == 0)]
+                wanted = [e for e in pending if e["kind"] in ch["events"] and not e["maintenance"] and not (e["kind"] == "device_offline" and e["device_id"] is not None and e["notify_offline"] == 0)]
                 if not wanted:
                     ch["last_event_id"] = top
                     changed = True

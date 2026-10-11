@@ -548,12 +548,33 @@ function buildEventsCard(device) {
     const li = h("li", { class: "event" });
     li.appendChild(h("span", { class: "event-time" }, timeAgo(ev.ts)));
     li.appendChild(h("span", { class: "event-kind" }, ev.kind));
+    if (ev.maintenance) li.appendChild(h("span", { class: "badge maint", title: "Held back by a maintenance window" }, `maintenance: ${ev.maintenance}`));
     li.appendChild(h("span", { class: "event-detail" }, ev.detail || ""));
     list.appendChild(li);
   }
   card.appendChild(list);
 
   return card;
+}
+
+// "Maintenance": hold back the alarms about this device (and the devices behind it) for a while, e.g. before a planned reboot.
+function maintenanceButton(device, reload) {
+  const select = h("select", { class: "admin-only", "aria-label": "Start maintenance for", title: "Hold back offline alarms for this device and the devices behind it" },
+    h("option", { value: "" }, "Maintenance…"), h("option", { value: "30" }, "30 minutes"), h("option", { value: "60" }, "1 hour"),
+    h("option", { value: "240" }, "4 hours"), h("option", { value: "1440" }, "24 hours"));
+  select.addEventListener("change", async () => {
+    const minutes = Number(select.value);
+    select.value = "";
+    if (!minutes) return;
+    try {
+      await post("/api/maintenance/now", { device_ids: [device.id], minutes, behind: true });
+      toast(`Maintenance started for ${minutes >= 60 ? `${minutes / 60} h` : `${minutes} min`}. End it under Settings → Maintenance windows.`, "success");
+      reload();
+    } catch (err) {
+      toast(err.message || "Could not start maintenance", "error");
+    }
+  });
+  return select;
 }
 
 // A heading button that runs one action and shows its answer in a toast.
@@ -607,6 +628,7 @@ export async function render(container, params) {
     heading.appendChild(statusDot(device.online));
     heading.appendChild(h("h1", { title: device.name || null }, shortName(device.name) || device.primary_ip || "Unknown"));
     heading.appendChild(typeBadge(device.type));
+    if (device.maintenance) heading.appendChild(h("span", { class: "badge maint", title: "Alarms about this device are held back right now" }, `In maintenance: ${device.maintenance}`));
     heading.appendChild(h("a", { href: "#/devices" }, "← Devices"));
     if (device.primary_ip) {
       const scanBtn = h("button", {
@@ -636,6 +658,7 @@ export async function render(container, params) {
         return r.hops.length ? `Route: ${r.hops.join(" → ")} → ${device.primary_ip}` : `${device.primary_ip} is on the same network (no hops)`;
       }, "trace"));
     }
+    heading.appendChild(maintenanceButton(device, () => load()));
     if (device.mac) {
       heading.appendChild(actionButton("Wake", "Send a Wake-on-LAN packet to this device's MAC address", async () => {
         await post(`/api/devices/${device.id}/wake`);

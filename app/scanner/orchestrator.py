@@ -273,6 +273,12 @@ class ScanManager:
                 targets,
                 now=utcnow(),
             )
+            try:
+                from app.maintenance import announce_still_down
+
+                announce_still_down(conn)
+            except Exception:
+                logging.getLogger(__name__).exception("maintenance follow-up failed")
 
             # A full scan looks at ONE host: it adds no uptime heartbeat (those mark the regular scan
             # cadence) and must not re-infer the network's relations from a single host's traceroute.

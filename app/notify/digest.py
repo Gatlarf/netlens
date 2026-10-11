@@ -12,7 +12,7 @@ def collect_events(
 ) -> tuple[list[dict], int]:
     rows = conn.execute(
         """
-        SELECT e.id, e.ts, e.kind, e.device_id, e.detail,
+        SELECT e.id, e.ts, e.kind, e.device_id, e.detail, e.maintenance,
                d.custom_name, d.hostname, d.primary_ip, d.mac, d.vendor, d.notify_offline
         FROM events e
         LEFT JOIN devices d ON d.id = e.device_id
@@ -27,6 +27,8 @@ def collect_events(
 
     for row in rows:
         max_seen = row["id"]
+        if row["maintenance"]:
+            continue                    # held back by a maintenance window
 
         if row["kind"] == "device_new" and cfg.notify_new:
             detail = row["detail"] or ""

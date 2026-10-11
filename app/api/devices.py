@@ -84,9 +84,13 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
 
 
 def _add_group(conn: sqlite3.Connection, devices: list[dict[str, Any]]) -> None:
-    """Add the group's name and colour next to `group_id`."""
+    """Add the group's name and colour next to `group_id`, and the maintenance window the device is in right now (if any)."""
+    from app.maintenance import covered
+
     known = groups_mod.lookup(conn)
+    held = covered(conn)            # devices inside an active maintenance window
     for d in devices:
+        d["maintenance"] = held.get(d["id"])
         g = known.get(d.get("group_id"))
         d["group"] = g["name"] if g else None
         d["group_color"] = g["color"] if g else None

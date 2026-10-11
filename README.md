@@ -32,6 +32,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Installing Netlens as an app](#installing-netlens-as-an-app)
   - [Wi-Fi details](#wi-fi-details)
   - [Service checks](#service-checks)
+  - [Maintenance windows](#maintenance-windows)
   - [Notification channels and quiet hours](#notification-channels-and-quiet-hours)
   - [Prometheus and Grafana](#prometheus-and-grafana)
   - [Statistics](#statistics)
@@ -478,6 +479,10 @@ When a topology plugin reports the signal of Wi-Fi clients (the ASUS plugin does
 ### Service checks
 
 **Services** (top bar) watches things a ping cannot: an **HTTP(S) page** (any status 200-399, a chosen status, or text that must appear), a **TCP port**, or a **DNS lookup** against a chosen server (optionally with the address it must return). Pick the interval (15 seconds to a day) and the time-out, optionally attach it to a device, and see a heartbeat bar, 24 hour uptime and response time per check. A state change needs two identical results in a row (one lost packet is not an outage) and logs a **Service down / up** event, which goes to e-mail and the notification channels. A check can be run on demand, paused and edited; HTTPS certificates are not verified (devices on a LAN usually have self-signed ones). Results are kept for 30 days.
+
+### Maintenance windows
+
+**Settings → Maintenance windows** tells Netlens when devices are expected to be unreachable (a mesh node that reboots every night, a planned update). A window covers everything, some groups or chosen devices (optionally the devices behind them, which go down with them) and runs weekly on chosen days between two times (an end before the start runs past midnight) or once, in your time zone. While it is active, the *offline*, *online* and *service down/up* events of covered devices are still recorded, but marked with the window's name and left out of e-mail and notification channels. A device that is still offline when its window ends is reported then. Devices show an *In maintenance* badge, and the **Maintenance…** menu on a device page starts a window for 30 minutes to 24 hours. The events API has a `maintenance` field on held-back events.
 
 ### Notification channels and quiet hours
 

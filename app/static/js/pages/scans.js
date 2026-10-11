@@ -176,6 +176,7 @@ export async function render(container, params) {
 
         const label = h("span", { class: `event-kind ${ev.kind}` }, KIND_LABELS[ev.kind] || ev.kind);
         li.appendChild(label);
+        if (ev.maintenance) li.appendChild(h("span", { class: "badge maint", title: "Held back by a maintenance window: not sent to e-mail or channels" }, `maintenance: ${ev.maintenance}`));
 
         const detail = h("span", { class: "event-detail" }, ev.detail || "");
         li.appendChild(detail);
