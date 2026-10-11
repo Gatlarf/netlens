@@ -37,7 +37,13 @@
      "released": "2026-10-11",
      "changelog": "The settings page has a collapsed box with the docker-compose lines for the read-only socket proxy that every Docker host needs, with a Copy button. Needs Netlens 0.3.115 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-11",
+      "tested_on": [
+       "Docker Engine 29.8.2 through tecnativa/docker-socket-proxy, three real hosts (bridge networks)"
+      ],
+      "notes": "Read-only: only GET requests through the socket proxy. Tested on three real Docker hosts. Macvlan and ipvlan matching is tested with simulated data only."
      }
     },
     {
@@ -362,7 +368,13 @@
      "released": "2026-10-11",
      "changelog": "Several TrueNAS systems can be read: one line per system with its own address and API key, a Test button per line, and Test all. Existing settings carry over. Needs Netlens 0.3.109 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-11",
+      "tested_on": [
+       "TrueNAS Community Edition 25.10 (real system)"
+      ],
+      "notes": "Read-only: only reads through the API with a read-only key (https only). Version 25.04 is not tested."
      }
     },
     {

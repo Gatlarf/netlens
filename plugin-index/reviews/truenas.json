@@ -1,0 +1,16 @@
+{
+  "id": "truenas",
+  "reviews": [
+    {
+      "version": "1.2.0",
+      "sha256": "084f106d5fafe6700436e89c6b26a056b2de3ae4ad7de1d4879f26e4a95565d4",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-11",
+      "tested_on": [
+        "TrueNAS Community Edition 25.10 (real system)"
+      ],
+      "notes": "Read-only: only reads through the API with a read-only key (https only). Version 25.04 is not tested."
+    }
+  ]
+}
