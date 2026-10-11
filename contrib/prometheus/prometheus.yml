@@ -39,3 +39,12 @@ scrape_configs:
 #       - alert: ContainerUnhealthy
 #         expr: netlens_containers_unhealthy > 0 or netlens_containers{state="restarting"} > 0
 #         for: 10m
+#       - alert: CertificateExpiringSoon
+#         expr: netlens_certificate_days_left < 14
+#         for: 1h
+#       - alert: SiteDown
+#         expr: netlens_sites_down > 0
+#         for: 10m
+#       - alert: ContainerImageOutdated
+#         expr: netlens_containers_image_updates > 0
+#         for: 7d

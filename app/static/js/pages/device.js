@@ -375,12 +375,13 @@ function containerRows(card, g) {
   if (resources) card.appendChild(kvRow("Resources", h("span", {}, resources)));
   if (d.os) card.appendChild(kvRow("System", h("span", {}, d.os)));
   if (d.version) card.appendChild(kvRow("Version", h("span", {}, d.version, d.update_available ? h("span", { class: "tag unknown-tag", title: "A newer version is available" }, "update available") : null)));
-  else if (d.update_available) card.appendChild(kvRow("Update", h("span", { class: "tag unknown-tag" }, "update available")));
+  else if (d.update_available && !d.image_checked) card.appendChild(kvRow("Update", h("span", { class: "tag unknown-tag" }, "update available")));
   if (d.tags) card.appendChild(kvRow("Tags", h("span", {}, d.tags)));
   if (d.autostart !== undefined) card.appendChild(kvRow("Starts at boot", h("span", {}, d.autostart ? "yes" : "no")));
   if (d.image) {
     const age = d.image_created ? imageAge(d.image_created) : null;
-    card.appendChild(kvRow("Image", h("span", {}, d.image, age ? h("span", { class: age.old ? "tag unknown-tag" : "hint", title: "When the image was built" }, ` built ${age.text}`) : null)));
+    card.appendChild(kvRow("Image", h("span", {}, d.image, age ? h("span", { class: age.old ? "tag unknown-tag" : "hint", title: "When the image was built" }, ` built ${age.text}`) : null,
+      d.image_checked ? (d.update_available ? h("span", { class: "tag unknown-tag", title: "The registry now serves a different image for this tag" }, "newer image available") : h("span", { class: "hint", title: "Same as what the registry serves for this tag" }, " · up to date")) : null)));
   }
   if (d.project) card.appendChild(kvRow("Compose", h("span", {}, d.service ? `${d.project} / ${d.service}` : d.project)));
   if (d.network) card.appendChild(kvRow("Network", h("span", {}, d.network_driver && d.network_driver !== d.network ? `${d.network} (${d.network_driver})` : d.network)));

@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { h, clear, toast, timeAgo, TYPE_LABELS } from "../util.js";
+import { h, clear, toast, timeAgo, fmtTime, TYPE_LABELS } from "../util.js";
 import { barList, columnChart, donut, emptyNote, fmtBytes, fmtDuration, fmtNumber, fmtPct, lineChart, tile } from "../charts.js";
 
 const RANGES = [["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["90d", "90 days"]];
@@ -105,6 +105,19 @@ function build(s) {
       card("Needs attention", attention.length
         ? table(["Guest", "Host", "Why"], attention.map((r) => [r.device_id ? link({ id: r.device_id }, r.name) : r.name, r.host || "", r.why]))
         : emptyNote("Nothing needs attention."))));
+  }
+
+  // ------------------------------------------------------------------ reverse proxy sites (only when a proxy plugin reports some)
+  const px = s.sites;
+  if (px && px.total) {
+    root.appendChild(section("sites", "Reverse proxy sites",
+      h("div", { class: "tiles inline" },
+        tile(fmtNumber(px.enabled), `sites published (of ${px.total})`), tile(fmtNumber(px.unmatched), "not tied to a device", { tone: px.unmatched ? "warn" : "" }),
+        tile(fmtNumber(px.down), "failing their check", { tone: px.down ? "warn" : "" }),
+        tile(px.next_expiry_days === null ? "–" : fmtNumber(px.next_expiry_days), "days to the next certificate", { tone: px.next_expiry_days !== null && px.next_expiry_days <= 14 ? "warn" : "" })),
+      card("Certificates", px.certificate_list.length
+        ? table(["Certificate", "Proxy", "Used by", "Ends", "Days left"], px.certificate_list.map((c) => [c.name, c.proxy || "", c.domains.slice(0, 3).join(", ") + (c.domains.length > 3 ? ` +${c.domains.length - 3}` : ""), fmtTime(c.expires), c.days < 0 ? "expired" : String(c.days)]))
+        : emptyNote("No site uses a certificate."))));
   }
 
   // ------------------------------------------------------------------ availability

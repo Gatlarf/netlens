@@ -143,7 +143,28 @@ def _iso(epoch):
         return ""
 
 
-def to_guest(host, container, inspect, drivers, images=None):
+def _repo_of(ref):
+    """'ghcr.io/x/y:1' -> 'ghcr.io/x/y'; 'nginx:1' -> 'nginx' (the repository part of an image reference)."""
+    ref = str(ref or "").split("@")[0]
+    head, _, tail = ref.rpartition("/")
+    return (head + "/" if head else "") + tail.split(":")[0]
+
+
+def _digest_for(ref, repo_digests):
+    """The sha256 the image was pulled as, from its RepoDigests ('repo@sha256:...'): the one for the repository the container's
+    image reference names, else the only one there is."""
+    found = [str(d) for d in repo_digests or [] if "@sha256:" in str(d)]
+    if not found:
+        return ""
+    wanted = _repo_of(ref)
+    plain = lambda r: re.sub(r"^(docker\.io|index\.docker\.io|registry-1\.docker\.io)/", "", r).removeprefix("library/")
+    for d in found:
+        if plain(d.split("@")[0]) == plain(wanted):
+            return d.split("@")[1]
+    return found[0].split("@")[1] if len(found) == 1 else ""
+
+
+def to_guest(host, container, inspect, drivers, images=None, digests=None):
     """One container as a Netlens guest (see the hypervisor contract)."""
     state = str(container.get("State") or "unknown").lower()
     networks = (container.get("NetworkSettings") or {}).get("Networks") or {}
@@ -168,6 +189,7 @@ def to_guest(host, container, inspect, drivers, images=None):
     details = {
         "image": container.get("Image") or "",
         "image_created": created,
+        "image_digest": _digest_for(container.get("Image"), (digests or {}).get(container.get("ImageID"))),
         "project": labels.get("com.docker.compose.project") or "",
         "service": labels.get("com.docker.compose.service") or "",
         "network": ", ".join(names),
@@ -201,10 +223,11 @@ def read_host(host):
     for net in host.get("/networks") or []:
         drivers[net.get("Id")] = net.get("Driver") or ""
         drivers[net.get("Name")] = net.get("Driver") or ""
-    images = {}
-    try:      # optional (the proxy needs IMAGES=1): when it answers, every container learns how old its image is
+    images, digests = {}, {}
+    try:      # optional (the proxy needs IMAGES=1): when it answers, every container learns how old its image is and what it was pulled as
         for image in host.get("/images/json") or []:
             images[image.get("Id")] = _iso(image.get("Created"))
+            digests[image.get("Id")] = image.get("RepoDigests")
     except DockerError:
         pass
     containers = host.get("/containers/json", all="1") or []
@@ -214,7 +237,7 @@ def read_host(host):
             inspect = host.get(f"/containers/{c['Id']}/json")
         except DockerError:
             inspect = None      # the list is still useful without health and restart count
-        guests.append(to_guest(host, c, inspect, drivers, images))
+        guests.append(to_guest(host, c, inspect, drivers, images, digests))
     entry = {"id": host.id, "name": str(info.get("Name") or host.id)[:100], "ip": _host_ip(host), "online": True}
     return entry, guests, info
 

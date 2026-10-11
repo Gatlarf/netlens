@@ -278,7 +278,7 @@ def test_the_api_lists_sites_and_the_device_detail_carries_them(tmp_path):
         sites.apply_proxy(conn, "npm", output(site("1", ["nas.example.com"], "192.168.0.50", 80, ssl=True, certificate_id="1", cert_expires=soon)), {}, NOW)
         conn.close()
         body = c.get("/api/sites").json()
-        assert body["summary"] == {"total": 1, "enabled": 1, "unmatched": 0, "expiring": 1, "down": 0}
+        assert {k: body["summary"][k] for k in ("total", "enabled", "unmatched", "expiring", "down", "certificates", "next_expiry_days")} == {"total": 1, "enabled": 1, "unmatched": 0, "expiring": 1, "down": 0, "certificates": 1, "next_expiry_days": 4}
         s = body["sites"][0]
         assert s["domains"] == ["nas.example.com"] and s["target_device_id"] == nas and s["proxy_device_id"] == proxy and s["check_id"] and s["check_state"] is None
         assert c.get("/api/sites", params={"device_id": nas}).json()["sites"][0]["id"] == "1"
@@ -351,3 +351,38 @@ async def test_a_proxy_plugin_syncs_through_the_service_and_is_cleaned_up_with_i
     assert sites.list_sites(conn) == [] and conn.execute("SELECT COUNT(*) FROM service_checks").fetchone()[0] == 0
     conn.close()
     assert discover(tmp_path)["npm"].manifest["kind"] == "proxy"
+
+
+def stamp(days):
+    return (datetime.now(timezone.utc) + timedelta(days=days, hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_certificates_are_counted_once_and_reach_the_summary_and_the_metrics(db):
+    from app.metrics import render_metrics
+    from app.stats import summary
+
+    conn, _ = db
+    data = output(site("1", ["a.example.com"], "192.168.0.189", 8096, ssl=True, certificate_id="1", cert_name="wildcard", cert_expires=stamp(5)),
+                  site("2", ["b.example.com"], "192.168.0.50", 80, ssl=True, certificate_id="1", cert_name="wildcard", cert_expires=stamp(5)),
+                  site("3", ["c.example.com"], "192.168.0.50", 80, ssl=True, certificate_id="2", cert_name="old", cert_expires=stamp(-3)),
+                  site("4", ["d.example.com"], "192.168.0.50", 80, ssl=True, certificate_id="3", cert_name="fine", cert_expires=stamp(90)),
+                  site("5", ["off.example.com"], "192.168.0.50", 80, enabled=False, ssl=True, certificate_id="4", cert_name="unused", cert_expires=stamp(1)))
+    sites.apply_proxy(conn, "npm", data, {"create_checks": False}, NOW)
+    certs = sites.certificates(conn)
+    assert [(c["name"], c["days"]) for c in certs] == [("old", -3), ("wildcard", 5), ("fine", 90)]
+    assert certs[1]["domains"] == ["a.example.com", "b.example.com"]
+    block = summary(conn)["sites"]
+    assert (block["certificates"], block["certificates_expiring"], block["certificates_expired"], block["next_expiry_days"]) == (3, 1, 1, -3)
+    text = render_metrics(conn)
+    assert 'netlens_certificate_days_left{certificate="wildcard",proxy="npm"} 5' in text
+    assert 'netlens_certificate_expires_timestamp_seconds{certificate="fine",proxy="npm"}' in text and "unused" not in text
+    assert 'netlens_sites{state="enabled"} 4' in text and 'netlens_sites{state="disabled"} 1' in text and "netlens_sites_unmatched" in text
+
+
+def test_a_network_without_proxy_sites_has_empty_numbers_and_no_metrics(db):
+    from app.metrics import render_metrics
+    from app.stats import summary
+
+    conn, _ = db
+    assert summary(conn)["sites"] == {"total": 0, "enabled": 0, "unmatched": 0, "expiring": 0, "down": 0, "certificates": 0, "certificates_expiring": 0, "certificates_expired": 0, "next_expiry_days": None}
+    assert "netlens_sites" not in render_metrics(conn) and "netlens_certificate" not in render_metrics(conn)

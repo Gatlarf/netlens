@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.119 — 2026-10-11
+
+### Added
+- ★ **Newer-image check for Docker containers**: switch on *Check for newer images* in the Docker plugin (the socket proxy needs `IMAGES: 1`) and Netlens asks the registry of each image (Docker Hub, ghcr.io, your own) every few hours which image the tag points to now. Containers that run an older one are marked *newer image available* on the host's page and under *Needs attention* in Statistics, and you get an *An update becomes available* event (the first result after switching it on is not reported). Only image names are sent; images pulled by digest, built locally or from a registry that needs a login are skipped. Off by default.
+- ★ **Reverse proxy sites and certificates in the summary and Prometheus**: `GET /api/stats/summary` has a `sites` block (sites, not tied to a device, down, certificates, expiring, expired, days to the next expiry) and `/metrics` has `netlens_sites`, `netlens_sites_unmatched`, `netlens_sites_down`, `netlens_certificate_days_left`, `netlens_certificate_expires_timestamp_seconds` and `netlens_containers_image_updates`. The Grafana dashboard has panels for certificates and sites, and `contrib/prometheus` has alert rule examples.
+- The summary's `guests` block has `image_updates` (containers with a newer image).
+
 ## 0.3.118 — 2026-10-11
 
 ### Added

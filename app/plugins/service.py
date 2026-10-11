@@ -9,7 +9,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Callable
 
-from app import containers
+from app import containers, imageupdates
 from app.db import add_event, connect, delete_setting, get_setting, set_setting, utcnow
 from app.plugins.contract import ContractError, clean_config, default_config, migrate_servers, missing_required, validate_output
 from app.plugins import enrich
@@ -197,6 +197,8 @@ def apply_plugin(conn: sqlite3.Connection, plugin: Plugin) -> dict:
     summary: dict[str, int]
     if kind == "hypervisor":
         matched = match_hypervisor(data, _devices_for_matching(conn))
+        if get_state(conn, plugin)["config"].get("check_image_updates"):
+            imageupdates.annotate(conn, matched["guests"])      # from what the last sync asked the registries
         now = utcnow()
         hosts_by_id = {h["id"]: h for h in data["hosts"]}
         pairs = []
@@ -314,6 +316,8 @@ class PluginService:
                 set_status(conn, plugin.id, ok=False, error=message, auth_failed=False)
                 return {"error": message, "auth_failed": False}
             set_setting(conn, _key(plugin.id, "data"), json.dumps(data))
+            if plugin.manifest["kind"] == "hypervisor" and state["config"].get("check_image_updates"):
+                await asyncio.to_thread(self._ask_registries, data)
             summary = apply_plugin(conn, plugin)
             if plugin.manifest["kind"] == "dns":
                 try:  # the grace clock and the generated names are kept per scan, not when somebody looks at the page
@@ -334,6 +338,16 @@ class PluginService:
                     log.exception("could not store the router's names and Wi-Fi samples")
             set_status(conn, plugin.id, ok=True, **summary)
             return summary
+        finally:
+            conn.close()
+
+    def _ask_registries(self, data: dict) -> None:
+        """Look up the images of the containers just fetched (answers are cached, so most syncs ask nobody). Never fails a sync."""
+        conn = connect(self.db_path)
+        try:
+            imageupdates.refresh(conn, imageupdates.images_of(data["guests"]))
+        except (sqlite3.Error, OSError, ValueError):
+            log.exception("could not check the images for updates")
         finally:
             conn.close()
 

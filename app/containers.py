@@ -32,7 +32,7 @@ def previous_state(conn: sqlite3.Connection, plugin_id: str) -> dict[str, dict]:
     out = {}
     for r in conn.execute("SELECT guest_id, status, details FROM hypervisor_guests WHERE plugin_id = ?", (plugin_id,)):
         d = _details(r["details"])
-        out[r["guest_id"]] = {"status": r["status"], "health": d.get("health"), "restarts": d.get("restarts"), "update": bool(d.get("update_available"))}
+        out[r["guest_id"]] = {"status": r["status"], "health": d.get("health"), "restarts": d.get("restarts"), "update": bool(d.get("update_available")), "checked": bool(d.get("image_checked"))}
     return out
 
 
@@ -56,6 +56,8 @@ def changes(previous: dict[str, dict], guests: list[dict], host_names: dict[str,
             if d.get("update_available") and not before.get("update"):
                 out.append(("guest_update_available", f"An update is available for the {noun} {where}" + (f" ({d['version']})" if d.get("version") else ""), device))
             continue
+        if d.get("update_available") and not before.get("update") and before.get("checked"):    # the first verdict after switching the check on is not news
+            out.append(("guest_update_available", f"A newer image is available for {where}", device))
         if d.get("health") == "unhealthy" and before.get("health") != "unhealthy":
             out.append(("container_unhealthy", f"{where}: the health check is failing", device))
         jumped = (d.get("restarts") or 0) - (before.get("restarts") or 0) >= RESTART_JUMP
@@ -111,7 +113,7 @@ def _age_days(iso: str | None, now: float | None = None) -> int | None:
 def guest_summary(conn: sqlite3.Connection) -> dict[str, Any]:
     """Every guest over every plugin: counts by kind, updates available, old container images, and what needs attention."""
     by_kind: dict[str, dict[str, int]] = {}
-    total = running = stopped = updates = old = 0
+    total = running = stopped = updates = old = image_updates = 0
     hosts: set[tuple[str, str]] = set()
     attention = []
     for r in conn.execute("SELECT plugin_id, name, kind, status, host_name, details, device_id, host_device_id FROM hypervisor_guests ORDER BY name"):
@@ -129,10 +131,14 @@ def guest_summary(conn: sqlite3.Connection) -> dict[str, Any]:
         link = r["device_id"] or r["host_device_id"]
         if d.get("update_available"):
             updates += 1
-            attention.append({"name": r["name"], "host": r["host_name"], "why": "update available" + (f" ({d['version']})" if d.get("version") else ""), "device_id": link})
+            if kind == "container":
+                image_updates += 1
+                attention.append({"name": r["name"], "host": r["host_name"], "why": "newer image available", "device_id": link})
+            else:
+                attention.append({"name": r["name"], "host": r["host_name"], "why": "update available" + (f" ({d['version']})" if d.get("version") else ""), "device_id": link})
         days = _age_days(d.get("image_created"))
         if days is not None and days > OLD_IMAGE_DAYS and r["status"] == "running":
             old += 1
             attention.append({"name": r["name"], "host": r["host_name"], "why": f"image built {days // 365} year(s) ago", "device_id": link})
     return {"total": total, "running": running, "stopped": stopped, "hosts": len(hosts), "by_kind": by_kind,
-            "update_available": updates, "old_images": old, "attention": attention[:30]}
+            "update_available": updates, "image_updates": image_updates, "old_images": old, "attention": attention[:30]}

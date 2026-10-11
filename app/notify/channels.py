@@ -79,7 +79,7 @@ EVENT_LABELS = {
     "container_stopped": "A container crashes (stops with an error code)",
     "guest_stopped": "A virtual machine, container or app stops",
     "guest_started": "A virtual machine, container or app starts",
-    "guest_update_available": "An update becomes available for an app",
+    "guest_update_available": "An update becomes available for an app or a container image",
     "cert_expiring": "A certificate used by a published site is about to expire",
 }
 DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring"]

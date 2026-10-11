@@ -8,6 +8,7 @@ sends `GET` requests (`/info`, `/networks`, `/containers/json`, `/containers/<id
 * every container as a guest of its host: state (running, exited, restarting), health check, restart count, image, compose project
   and service, start time, exit code;
 * how old each container's image is (when the proxy allows `IMAGES=1`; Netlens flags images older than a year),
+* **newer images** (switch on *Check for newer images*, needs `IMAGES: 1`): every few hours Netlens asks the registry an image comes from (Docker Hub, ghcr.io, a private registry on your network) which image its tag points to now, and flags the containers that run an older one, with an event (*An update becomes available*) and a Prometheus metric. It sends image names only, and skips images pulled by digest, built locally or from a registry that needs a login;
 * the ports each container **publishes**, and a mark when a port is published on all interfaces (reachable from the whole network);
 * on the host's device page the *Open ports* table names the container behind each port;
 * containers on a **macvlan** or **ipvlan** network have their own address on your LAN: Netlens matches them to the device its scans

@@ -262,3 +262,13 @@ def test_the_server_list_rows_are_the_hosts(docker):
         plugin.parse_hosts({"servers": [{"id": "a", "host": ""}]})
     with pytest.raises(plugin.DockerError, match="not an IPv4"):
         plugin.parse_hosts({"servers": [{"host": docker.url, "lan": "nonsense"}]})
+
+
+def test_the_digest_an_image_was_pulled_as_is_reported_for_the_matching_repository(docker):
+    d = plugin._digest_for
+    sha = "sha256:" + "d" * 64
+    assert d("nginx:1.27", [f"nginx@{sha}"]) == sha
+    assert d("docker.io/library/nginx:1", [f"nginx@{sha}"]) == sha
+    assert d("ghcr.io/x/y:2", ["other/thing@sha256:" + "e" * 64, f"ghcr.io/x/y@{sha}"]) == sha
+    assert d("a:1", ["b@sha256:" + "e" * 64, "c@sha256:" + "f" * 64]) == ""         # cannot tell which one
+    assert d("local:1", []) == "" and d("local:1", None) == ""

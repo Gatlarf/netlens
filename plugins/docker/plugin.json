@@ -1,7 +1,7 @@
 {
   "id": "docker",
   "name": "Docker hosts",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
@@ -52,6 +52,13 @@
       "label": "Verify TLS certificate",
       "default": true,
       "help": "Only matters for https:// addresses."
+    },
+    {
+      "key": "check_image_updates",
+      "type": "bool",
+      "label": "Check for newer images",
+      "default": false,
+      "help": "Once every few hours Netlens asks the registry each image comes from (Docker Hub, ghcr.io ...) whether its tag now points to a newer image, and flags those containers. Only image names are sent, nothing about your network. Needs IMAGES: 1 on the socket proxy. Images pulled by digest, built locally or from a registry that needs a login are skipped."
     },
     {
       "key": "timeout",

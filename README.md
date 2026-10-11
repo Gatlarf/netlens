@@ -490,7 +490,7 @@ Besides e-mail, **Settings → Channels & quiet hours** sends alerts to **ntfy**
 
 ### Prometheus and Grafana
 
-`GET /metrics` (an API token from Settings → Users & tokens, as a Bearer token; a viewer's token is enough) exposes Prometheus metrics: device presence and last seen, devices by state, uptime ratio, open ports, scan duration/hosts/last success per kind, events by kind, plugin health, service check state and response time, Wi-Fi signal per client, devices by type and group, how many devices are still unknown or hidden behind a private address, flapping devices, backup result and age, DHCP servers (trusted or not), passive listening activity, database size and a `netlens_problem` flag. `contrib/prometheus/prometheus.yml` has a scrape job and alert rule examples; `contrib/grafana/netlens-dashboard.json` is a dashboard you can import in Grafana.
+`GET /metrics` (an API token from Settings → Users & tokens, as a Bearer token; a viewer's token is enough) exposes Prometheus metrics: device presence and last seen, devices by state, uptime ratio, open ports, scan duration/hosts/last success per kind, events by kind, plugin health, service check state and response time, Wi-Fi signal per client, devices by type and group, how many devices are still unknown or hidden behind a private address, flapping devices, backup result and age, DHCP servers (trusted or not), passive listening activity, reverse proxy sites and the days left on each certificate they use (`netlens_certificate_days_left`), containers with a newer image available, database size and a `netlens_problem` flag. `contrib/prometheus/prometheus.yml` has a scrape job and alert rule examples; `contrib/grafana/netlens-dashboard.json` is a dashboard you can import in Grafana.
 
 ### Statistics
 

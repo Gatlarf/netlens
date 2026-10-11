@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
+from app import sites
 from app.db import utcnow
 from app.stats import _ago, compute_stats, summary
 from app.version import VERSION
@@ -105,6 +106,17 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
             out.sample("netlens_guests", k["total"] - k["running"], "Guests reported by hypervisor and container plugins, by kind and state", kind=kind, state="not_running")
         out.sample("netlens_guests_update_available", g["update_available"], "Guests (apps) with an update available")
         out.sample("netlens_containers_old_images", g["old_images"], "Running containers whose image was built more than a year ago")
+        out.sample("netlens_containers_image_updates", g["image_updates"], "Containers whose image tag now points to a newer image in the registry")
+
+    st = doc["sites"]
+    if st["total"]:
+        out.sample("netlens_sites", st["enabled"], "Sites published by reverse proxies, by state", state="enabled")
+        out.sample("netlens_sites", st["total"] - st["enabled"], "Sites published by reverse proxies, by state", state="disabled")
+        out.sample("netlens_sites_unmatched", st["unmatched"], "Enabled proxy sites that Netlens could not tie to a device or container")
+        out.sample("netlens_sites_down", st["down"], "Sites whose check fails (a server error or no answer)")
+        for cert in sites.certificates(conn):
+            out.sample("netlens_certificate_expires_timestamp_seconds", _ts(cert["expires"]), "When a certificate used by a reverse proxy site ends", certificate=cert["name"], proxy=cert["proxy"] or "")
+            out.sample("netlens_certificate_days_left", cert["days"], "Days until a certificate used by a reverse proxy site ends (negative: expired)", certificate=cert["name"], proxy=cert["proxy"] or "")
 
     sys_info = stats["system"]
     out.sample("netlens_database_size_bytes", sys_info["db_bytes"], "Size of the Netlens database file")

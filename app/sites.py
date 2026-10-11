@@ -269,9 +269,24 @@ def device_sites(conn: sqlite3.Connection, device_id: int) -> dict[str, list[dic
     return {"published": published, "serves": serves}
 
 
+def certificates(conn: sqlite3.Connection, sites: list[dict] | None = None) -> list[dict]:
+    """The certificates the enabled sites use, once each, soonest to end first: name, proxy, domains, expiry and days left."""
+    found: dict[tuple, dict] = {}
+    for s in sites if sites is not None else list_sites(conn):
+        if not s["enabled"] or s["cert_days"] is None or s["type"] == "dead":
+            continue
+        key = (s["plugin_id"], s["proxy"], s["cert_name"] or "", s["cert_expires"])
+        item = found.setdefault(key, {"name": s["cert_name"] or (s["domains"][0] if s["domains"] else "certificate"), "proxy": s["proxy"], "expires": s["cert_expires"], "days": s["cert_days"], "domains": []})
+        item["domains"].extend(d for d in s["domains"] if d not in item["domains"])
+    return sorted(found.values(), key=lambda c: c["days"])
+
+
 def summary(conn: sqlite3.Connection) -> dict[str, Any]:
     sites = list_sites(conn)
+    certs = certificates(conn, sites)
     return {"total": len(sites), "enabled": sum(1 for s in sites if s["enabled"]),
             "unmatched": sum(1 for s in sites if s["type"] == "proxy" and s["enabled"] and s["target_device_id"] is None),
             "expiring": sum(1 for s in sites if s["cert_days"] is not None and s["cert_days"] <= 14),
-            "down": sum(1 for s in sites if s["check_state"] == "down")}
+            "down": sum(1 for s in sites if s["check_state"] == "down"),
+            "certificates": len(certs), "certificates_expiring": sum(1 for c in certs if 0 <= c["days"] <= 14),
+            "certificates_expired": sum(1 for c in certs if c["days"] < 0), "next_expiry_days": certs[0]["days"] if certs else None}
