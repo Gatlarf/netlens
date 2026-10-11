@@ -1,0 +1,76 @@
+{
+  "id": "hyperv",
+  "name": "Microsoft Hyper-V",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows your Hyper-V hosts with their virtual machines: state, processors, memory, start time, network switch, and each VM matched to the device Netlens found by its MAC address (then IP), so a VM is one device linked to its host. Reads through Windows Remote Management (WinRM over HTTPS) by running one fixed, read-only Get-VM script. Needs a user on the Hyper-V machine that may use remote management and Hyper-V; the settings page has the PowerShell lines to set that up.",
+  "info": {
+    "title": "What to run on the Hyper-V machine (PowerShell as administrator)",
+    "text": "Run this once on the Hyper-V host, in a PowerShell window opened as administrator. It makes a user for Netlens that can use remote management and Hyper-V (and nothing else), switches on WinRM over HTTPS with a self-signed certificate and opens port 5986 only to the machine Netlens runs on. Change the first line to the address of that machine. Then enter https://<this host's address>:5986, the user name (netlens) and its password below, and keep 'Verify TLS certificate' off while the certificate is self-signed. The 'Hyper-V Administrators' group can also manage the virtual machines, so use a long password, and keep the firewall rule.",
+    "code": "$netlens = '192.168.0.189'   # the address of the machine Netlens runs on\n$pw = Read-Host -AsSecureString 'Password for the netlens user'\nNew-LocalUser -Name netlens -Password $pw -PasswordNeverExpires -UserMayNotChangePassword -Description 'Netlens (read Hyper-V)'\nAdd-LocalGroupMember -Group 'Hyper-V Administrators' -Member netlens\nAdd-LocalGroupMember -Group 'Remote Management Users' -Member netlens\nEnable-PSRemoting -Force -SkipNetworkProfileCheck\n$cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(10)\nNew-Item -Path WSMan:\\localhost\\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force\nGet-ChildItem WSMan:\\localhost\\Listener | Where-Object Keys -contains 'Transport=HTTP' | Remove-Item -Recurse -Force\nGet-NetFirewallRule -Name 'WINRM-HTTP-In-TCP*' | Disable-NetFirewallRule\nNew-NetFirewallRule -DisplayName 'Netlens WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -RemoteAddress $netlens -Action Allow"
+  },
+  "timeout": 120,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Hyper-V hosts",
+      "required": true,
+      "help": "One line per Hyper-V host: its address (https://host:5986, port 5986 is the default), and the user name and password of the Netlens user on that Windows machine (a local user is just the name, a domain user is DOMAIN\\name). Fill in the host's own address under More when the first field is a name, so Netlens can find its device.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.0.115:5986",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "lan",
+          "label": "Host's own address",
+          "placeholder": "192.168.0.115",
+          "help": "Only needed when the address above is a name",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "auth",
+      "type": "select",
+      "label": "Login method",
+      "default": "ntlm",
+      "options": [
+        {"value": "ntlm", "label": "NTLM (default, works with local and domain users)"},
+        {"value": "basic", "label": "Basic (only when you turned Basic on in WinRM)"}
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Leave this off while the host uses a self-signed certificate (what the setup lines create)."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/hyperv"
+}

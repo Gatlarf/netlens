@@ -569,6 +569,10 @@ A **proxy** plugin (`plugins/npm`, install it from *Browse plugins*) that shows 
 
 Netlens only reads from Nginx Proxy Manager (it logs in and then does `GET` requests).
 
+#### Microsoft Hyper-V plugin
+
+A **hypervisor** plugin (`plugins/hyperv`, install it from *Browse plugins*, needs Netlens 0.3.115 or newer) that lists the virtual machines of a Hyper-V host with their state, processors, memory, start time and network switch, and ties each VM to the device Netlens found by MAC address (then IP). It reads through Windows Remote Management over **HTTPS** by running one fixed `Get-VM` script. Plugins can only use the Python standard library, so it contains its own small WinRM client with NTLMv2 (or Basic) login. The plugin's settings page shows the PowerShell lines to run once on the host: they create a `netlens` user (member of *Remote Management Users* and *Hyper-V Administrators*, not an administrator), switch on an HTTPS listener with a self-signed certificate, drop the plain-HTTP listener and open port 5986 only to the Netlens machine. Windows has no read-only Hyper-V role, so keep that firewall rule and use a long password. Tested against simulated answers and Microsoft's published NTLM test values; not yet on a real host.
+
 #### ASUS router (AiMesh) plugin
 
 Reads your ASUS router's client list and AiMesh node list and links every online device to the mesh node it is connected to (wired or Wi-Fi), and every mesh node to the router. These links appear in the hierarchy and on the map and rank above traceroute and gateway guesses. It is read-only and uses the router's HTTPS web interface (one login, two reads, a logout per sync; no SSH, so no sessions are left open on the router). Tested on an RT-AX92U with stock firmware.
