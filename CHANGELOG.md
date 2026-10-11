@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.117 — 2026-10-11
+
+### Changed
+- **A calmer Browse plugins page**: every plugin is one short line (name, type, review badge, version) with its first sentence and the Install button; the full description, what it works with, who reviewed it, what's new and the not-reviewed warning are under **Details**, and the explanation of the badges is a collapsed note at the top.
+
 ## 0.3.116 — 2026-10-11
 
 ### Added

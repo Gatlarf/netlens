@@ -223,3 +223,13 @@ dialog.whats-new h2 { margin: 0; }
 /* a warning about the account a plugin uses */
 .plugin-warning { margin: 6px 0; padding: 8px 12px; border-radius: 6px; border: 1px solid color-mix(in srgb, #d97706 50%, transparent); background: color-mix(in srgb, #d97706 14%, var(--surface)); }
 .kv-label { overflow-wrap: anywhere; min-width: 0; }   /* a long check name wraps inside its column */
+
+/* the plugin index: a compact line per plugin, the rest under Details */
+.browse-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; }
+.browse-short { margin: 2px 0 6px; color: var(--muted, inherit); }
+.browse-more { margin-top: 6px; }
+.browse-more summary { cursor: pointer; font-size: 0.85em; color: var(--muted, inherit); }
+.browse-more ul { margin: 2px 0 0 18px; padding: 0; }
+.browse-intro { margin: 2px 0 10px; }
+.browse-list, .toolbar input[type="search"] { min-width: 0; }
+.toolbar input[type="search"] { flex: 1 1 14em; }

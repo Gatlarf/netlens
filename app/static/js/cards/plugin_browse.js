@@ -19,29 +19,45 @@ function confirmText(p, release) {
   return `WARNING: ${p.name} ${release.version} has NOT been reviewed.\n\nA plugin is Python code that runs inside Netlens with its rights and can read its data, including saved credentials. It passed only automatic checks.\n\nInstall it only if you trust its author (${p.author || "unknown"}).\n\nInstall anyway?`;
 }
 
+// the first sentence, kept short: the rest of the description goes under "Details"
+function shortText(text) {
+  const first = (text || "").split(/(?<=\.)\s/)[0];
+  if (first.length <= 150) return first;
+  return first.slice(0, 150).replace(/\s+\S*$/, "") + "…";
+}
+
 function entryCard(p, reload) {
   const card = h("div", { class: "browse-item" });
   const latest = p.latest;
   const level = p.builtin ? "verified" : latest ? latest.review.level : "community";
-  const title = h("div", { class: "browse-title" }, h("strong", {}, p.name), " ", h("span", { class: "tag" }, KIND[p.kind] || p.kind), " ", p.builtin ? h("span", { class: "tag" }, "built in") : badge(level));
-  card.appendChild(title);
-  if (p.description) card.appendChild(h("p", {}, p.description));
+  const version = p.builtin ? null
+    : p.update_available ? h("span", { class: "tag unknown-tag" }, `update ${latest.version} available`)
+    : p.installed ? h("span", { class: "hint" }, `installed ${p.installed_version}`)
+    : latest ? h("span", { class: "hint" }, `version ${latest.version}`) : null;
+  card.appendChild(h("div", { class: "browse-head" },
+    h("div", { class: "browse-title" }, h("strong", {}, p.name), " ", h("span", { class: "tag" }, KIND[p.kind] || p.kind), " ", p.builtin ? h("span", { class: "tag" }, "built in") : badge(level)),
+    version));
+  if (p.description) card.appendChild(h("p", { class: "browse-short" }, shortText(p.description)));
+  if (p.incompatible) card.appendChild(h("p", { class: "error" }, `Cannot be installed here: ${p.incompatible}`));
+
+  // everything else, one click away
+  const more = h("details", { class: "browse-more" }, h("summary", {}, "Details"));
+  if (p.description && p.description !== shortText(p.description)) more.appendChild(h("p", {}, p.description));
   const meta = [];
   if (p.author) meta.push(`by ${p.author}`);
   if (p.license) meta.push(p.license);
   if (latest && !p.builtin) meta.push(`latest ${latest.version}`);
   if (p.installed && !p.builtin) meta.push(`installed ${p.installed_version}`);
-  card.appendChild(h("p", { class: "hint" }, meta.join(" · "), p.homepage ? [" · ", h("a", { href: p.homepage, target: "_blank", rel: "noopener noreferrer" }, "homepage")] : null));
-  if (p.supports.length) card.appendChild(h("p", { class: "hint" }, "Works with: " + p.supports.join(", ")));
+  more.appendChild(h("p", { class: "hint" }, meta.join(" · "), p.homepage ? [" · ", h("a", { href: p.homepage, target: "_blank", rel: "noopener noreferrer" }, "homepage")] : null));
+  if (p.supports.length) more.appendChild(h("div", { class: "hint" }, "Works with:", h("ul", {}, ...p.supports.map((t) => h("li", {}, t)))));
   if (latest && !p.builtin && latest.review.level !== "community") {
     const r = latest.review;
-    card.appendChild(h("p", { class: "hint" }, `Reviewed by ${r.reviewer}${r.date ? ` on ${r.date}` : ""}${r.tested_on.length ? `; tested on ${r.tested_on.join(", ")}` : "; not tested on real hardware"}${r.notes ? `. ${r.notes}` : ""}`));
+    more.appendChild(h("p", { class: "hint" }, `Reviewed by ${r.reviewer}${r.date ? ` on ${r.date}` : ""}${r.tested_on.length ? `; tested on ${r.tested_on.join(", ")}` : "; not tested on real hardware"}${r.notes ? `. ${r.notes}` : ""}`));
   }
-  if (latest && latest.changelog && !p.builtin) card.appendChild(h("p", { class: "hint" }, `What's new: ${latest.changelog}`));
+  if (latest && latest.changelog && !p.builtin) more.appendChild(h("p", { class: "hint" }, `What's new: ${latest.changelog}`));
   if (!p.builtin && latest && latest.review.level === "community") {
-    card.appendChild(h("p", { class: "warn-note" }, "Not reviewed: only automatic checks were done. It is code that runs inside Netlens."));
+    more.appendChild(h("p", { class: "warn-note" }, "Not reviewed: only automatic checks were done. It is code that runs inside Netlens."));
   }
-  if (p.incompatible) card.appendChild(h("p", { class: "error" }, `Cannot be installed here: ${p.incompatible}`));
 
   const actions = h("div", { class: "browse-actions" });
   if (p.builtin) {
@@ -83,6 +99,7 @@ function entryCard(p, reload) {
     }
   }
   card.appendChild(actions);
+  card.appendChild(more);
   return card;
 }
 
@@ -95,9 +112,10 @@ export async function buildBrowseCard() {
     document.dispatchEvent(new CustomEvent("netlens:plugins-changed")); // the menu shows how many updates there are
     clear(wrap);
     const card = h("div", { class: "card" }, h("h2", {}, "Browse plugins"));
-    card.appendChild(h("p", { class: "hint" },
-      "The plugin index lists plugins written by the community. Netlens checks every download against the checksum in the index. " +
-      "Verified and Reviewed plugins were read by trusted reviewers; Community plugins only passed automatic checks."));
+    card.appendChild(h("p", { class: "hint" }, "Plugins from the community. Every download is checked against the checksum in the index."));
+    card.appendChild(h("details", { class: "browse-more browse-intro" }, h("summary", {}, "What the badges mean"),
+      h("p", { class: "hint" }, "Verified: a trusted reviewer read the code and tested it on real hardware. Reviewed: a trusted reviewer read the code. " +
+        "Community: only automatic checks were done, so install it only if you trust its author. A plugin is code that runs inside Netlens.")));
     const idx = data.index;
     if (!idx.enabled) {
       card.appendChild(h("p", { class: "warn-note" }, "The plugin index is switched off (see the settings below)."));
