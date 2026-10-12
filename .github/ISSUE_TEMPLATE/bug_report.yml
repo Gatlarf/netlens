@@ -1,0 +1,65 @@
+name: Bug report
+description: Something does not work the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please check the **Troubleshooting** part of the README first, and leave passwords, tokens and other people's data out of everything you paste.
+  - type: input
+    id: version
+    attributes:
+      label: Netlens version
+      description: Settings → About, or the top bar. For example `0.3.141`.
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options:
+        - Docker Compose (published image)
+        - Portainer stack
+        - Synology Container Manager
+        - docker run
+        - Built from source
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you saw, and the exact error text if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Press ...
+        3. See ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or diagnostic output
+      description: "`docker compose logs --tail 100 netlens`, or the output of a plugin's **Run diagnostic** button. Remove secrets first."
+      render: text
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin and its version (if a plugin is involved)
+      placeholder: "Docker 1.4.0"
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Browser, device type, screenshots (blur addresses and names you do not want to share).

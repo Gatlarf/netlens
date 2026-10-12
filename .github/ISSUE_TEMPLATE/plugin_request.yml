@@ -1,0 +1,43 @@
+name: Plugin problem or support for a new device
+description: A plugin does not work with your hardware, or you want one for a product that has none
+labels: ["plugin"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a plugin that misbehaves, press **Run diagnostic** on its settings page first and paste the result below: it contains counts and steps, no names or addresses.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is this about?
+      options:
+        - An existing plugin does not work with my device
+        - I would like a plugin for a product that has none
+        - I tested a plugin on hardware (a test report)
+    validations:
+      required: true
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin and version
+      description: Leave empty for a new plugin.
+      placeholder: "Hyper-V 1.0.2"
+  - type: input
+    id: device
+    attributes:
+      label: Product, model and firmware or software version
+      placeholder: "TP-Link TL-SG108E, firmware 1.0.0"
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: What happens, or what should it show?
+      description: For a new plugin, what the product can tell Netlens (its API, SNMP, a documented interface).
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostic
+    attributes:
+      label: Diagnostic output or error message
+      render: text

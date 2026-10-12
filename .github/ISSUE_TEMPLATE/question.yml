@@ -1,0 +1,16 @@
+name: Question or help
+description: You are stuck, or something in the manual is unclear
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to do, and where are you stuck?
+      description: Say what you already tried. If the manual was unclear, tell us which part so we can improve it.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Netlens version and how you run it
+      placeholder: "0.3.141, Docker Compose"

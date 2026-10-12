@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest an idea or an improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem do you want to solve?
+      description: Describe the situation first, not the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Netlens to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do today, or what else did you consider?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where would it live?
+      options:
+        - Map or hierarchy
+        - Devices and scanning
+        - Notifications
+        - Statistics, Prometheus or Home Assistant
+        - Settings or users
+        - A plugin (new or existing)
+        - Installation and updates
+        - Other
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Would you help?
+      options:
+        - label: I can test a first version on my own network or hardware
+        - label: I would like to work on it myself (see CONTRIBUTING.md)

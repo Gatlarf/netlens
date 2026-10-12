@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability (private)
+    url: https://github.com/Gatlarf/netlens/security/advisories/new
+    about: Please do not open a public issue for a security problem. Use the private reporting form.
+  - name: Submit or update a plugin in the index
+    url: https://github.com/Gatlarf/netlens/blob/main/plugin-index/README.md
+    about: Plugins are added to the index with a pull request; the steps are described here.
+  - name: Read the manual
+    url: https://github.com/Gatlarf/netlens#readme
+    about: The README covers installation, updating, settings and troubleshooting.

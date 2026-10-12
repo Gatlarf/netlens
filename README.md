@@ -683,6 +683,8 @@ A device that was online and is not seen by a scan is asked for once more on its
 
 ## Development
 
+Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md) (setup, how to send a change, plugins), the [Code of Conduct](CODE_OF_CONDUCT.md) and the [security policy](SECURITY.md) for private vulnerability reports.
+
 ```bash
 python3 -m venv .venv
 pip install -r requirements-dev.txt
