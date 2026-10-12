@@ -10,6 +10,7 @@ The version is `<major.minor from VERSION>.<commit count>`. Each heading below i
 - ★ **Backups include the plugins**: a backup now contains the installed plugins (their code) next to their settings, so restoring into a fresh container brings everything back as it was, with the plugins switched on as before. Older backups restore as they did; for plugins with saved settings but no files, the Plugins page lists them with an *Install again from the index* button, and installing keeps their settings (a plugin whose code differs from the saved one starts off).
 
 ### Added
+- **Buy me a coffee**: a small link in the account menu and in Settings → About, for anyone who wants to support the project. Nothing is hidden or limited without it.
 - ★ **Vertical map layout**: next to the horizontal layout the map can now be arranged top to bottom, with the router at the top, one row per level and a card per device. Folding clients, *Fit* and the right-angle links work as in the horizontal layout. Pick it in the map's layout menu, or as the default under Settings → Map.
 - ★ **Service check from an open port**: the Open ports table on a device page has a Check column. **Add check** creates a service check for that port in one click (a web check for ports 80, 443, 8080 and 8443, a plain port check for the rest), pre-filled with the device and its address. Once a check exists the column shows its status dot and a **Remove check** button.
 

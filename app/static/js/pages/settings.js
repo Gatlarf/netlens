@@ -143,6 +143,8 @@ async function buildAboutCard() {
   card.appendChild(h("h2", {}, "About"));
   card.appendChild(kvRow("Version", cfg.version ?? ""));
   card.appendChild(kvRow("Listening on", cfg.bind ?? ""));
+  card.appendChild(h("p", { class: "hint" }, "Netlens is free for noncommercial use and made in spare time. If it helps you, a coffee keeps the updates coming."));
+  card.appendChild(h("a", { class: "btn", href: "https://buymeacoffee.com/Gatlarf", target: "_blank", rel: "noopener noreferrer" }, "\u2615 Buy me a coffee"));
   const wrap = h("div", {}, card);
   try {
     wrap.appendChild(await buildUpdateCard());

@@ -68,6 +68,8 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
 - [Development](#development)
   - [Project layout](#project-layout)
 - [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Support](#support)
 - [Third-party](#third-party)
 
 ## Overview
@@ -758,6 +760,11 @@ Versions **0.3.142 and earlier** were published under the MIT License and stay a
 ([text](licenses/LICENSE-MIT-until-0.3.142.txt), and the git tag `mit-final`); the new license applies from 0.3.143. The
 plugins in the plugin index are separate works with their own licenses (the index shows each one). Third-party components keep
 their own licenses, see below.
+
+## Support
+
+Netlens is free for noncommercial use and is made in spare time. If it saved you some work, you can
+[buy me a coffee](https://buymeacoffee.com/Gatlarf). It is a thank-you, not a license: commercial use still needs the license above.
 
 ## Third-party
 
