@@ -21,7 +21,7 @@ function updateButton() {
   const btn = document.getElementById("theme-toggle");
   if (!btn) return;
   const dark = isDark();
-  btn.textContent = dark ? `${ICON.dark} Light mode` : `${ICON.light} Dark mode`;
+  btn.textContent = dark ? ICON.dark : ICON.light;
   const label = dark ? "Switch to light mode" : "Switch to dark mode";
   btn.setAttribute("aria-label", label);
   btn.title = label;
