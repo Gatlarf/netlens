@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from app import dashboard
 from app.api.stats import _cached, _passive
+from app.api.devices import get_conn
 from app.db import connect
 from app.scanner.scans import running_scan
 from app.stats import summary
@@ -23,3 +25,27 @@ def get_dashboard(request: Request) -> dict:
             conn.close()
 
     return _cached(request, ("dashboard", db_path), build)
+
+
+class LayoutBody(BaseModel):
+    order: list[str]
+
+
+@router.get("/dashboard/layout")
+def get_layout(request: Request, conn=Depends(get_conn)) -> dict:
+    """The cards this user chose, in order (null while the user still has the default)."""
+    return {"order": dashboard.get_layout(conn, request.state.user)}
+
+
+@router.put("/dashboard/layout")
+def put_layout(body: LayoutBody, request: Request, conn=Depends(get_conn)) -> dict:
+    try:
+        return {"order": dashboard.set_layout(conn, request.state.user, body.order)}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.delete("/dashboard/layout")
+def delete_layout(request: Request, conn=Depends(get_conn)) -> dict:
+    dashboard.reset_layout(conn, request.state.user)
+    return {"order": None}

@@ -92,3 +92,32 @@ def test_top_bar_group_class_does_not_clash_with_the_settings_menu():
     assert 'class="menu-wrap nav-group"' not in index
     for name in ("app.js", "topbar.js"):
         assert 'querySelectorAll(".nav-group")' not in (STATIC / "js" / name).read_text(encoding="utf-8")
+
+
+# ---- the layout is kept per user on the server ----
+def test_every_user_keeps_their_own_layout_and_a_viewer_may_arrange_theirs(tmp_path):
+    from tests.test_users import ADMIN, make, sign_in
+
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    with TestClient(app) as c:
+        make(c, "alice", "admin")
+        make(c, "vera", "viewer")
+        alice, vera = sign_in(app, "alice"), sign_in(app, "vera")
+        assert alice.get("/api/dashboard/layout").json() == {"order": None} and vera.get("/api/dashboard/layout").json() == {"order": None}
+        assert alice.put("/api/dashboard/layout", json={"order": ["uptime", "devices", "uptime"]}).json() == {"order": ["uptime", "devices"]}    # no duplicates
+        assert vera.put("/api/dashboard/layout", json={"order": ["events"]}).status_code == 200                                                  # a viewer arranges their own
+        # another browser or device of the same user sees the same layout; other users see theirs
+        assert sign_in(app, "alice").get("/api/dashboard/layout").json() == {"order": ["uptime", "devices"]}
+        assert vera.get("/api/dashboard/layout").json() == {"order": ["events"]}
+        assert c.get("/api/dashboard/layout", headers=ADMIN).json() == {"order": None}                                                           # the access token has its own
+        assert vera.delete("/api/dashboard/layout").json() == {"order": None} and vera.get("/api/dashboard/layout").json() == {"order": None}
+        assert alice.get("/api/dashboard/layout").json()["order"] == ["uptime", "devices"]
+        # a viewer still cannot change anything else
+        assert vera.put("/api/map-settings", json={"domain_suffix": "x"}).status_code == 403
+
+
+@pytest.mark.parametrize("order", [["Bad Id"], [""], ["x" * 41], [1], [f"c{i}" for i in range(101)]])
+def test_layout_validation(tmp_path, order):
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    with TestClient(app, headers={"Authorization": "Bearer secret"}) as c:
+        assert c.put("/api/dashboard/layout", json={"order": order}).status_code == 422

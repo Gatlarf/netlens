@@ -1,4 +1,6 @@
 """Everything the dashboard page needs on top of the summary: the problems worth a look, the latest events and a few small series."""
+import json
+import re
 import sqlite3
 
 from app.maintenance import covered
@@ -88,3 +90,51 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "maintenance": len(covered(conn)),
         "speed": speedtest.latest(conn, "internet"),
     }
+
+
+# ---------- the cards a user chose (per user, so every browser and device shows the same dashboard) ----------
+
+CARD_ID = re.compile(r"^[a-z0-9_-]{1,40}$")
+MAX_CARDS = 100
+
+
+def _layout_key(principal) -> str:
+    uid = getattr(principal, "user_id", None)
+    return f"dashboard.layout.user{uid}" if uid is not None else "dashboard.layout.builtin"      # the access token has no account
+
+
+def get_layout(conn: sqlite3.Connection, principal) -> list[str] | None:
+    """The chosen card order, or None while the user has never changed the default."""
+    from app.db import get_setting
+
+    try:
+        value = json.loads(get_setting(conn, _layout_key(principal)) or "null")
+    except ValueError:
+        return None
+    return value.get("order") if isinstance(value, dict) and isinstance(value.get("order"), list) else None
+
+
+def clean_order(order) -> list[str]:
+    if not isinstance(order, list) or len(order) > MAX_CARDS:
+        raise ValueError(f"a layout has at most {MAX_CARDS} cards")
+    out: list[str] = []
+    for card in order:
+        if not isinstance(card, str) or not CARD_ID.match(card):
+            raise ValueError("a card id is 1 to 40 lowercase letters, digits, - or _")
+        if card not in out:
+            out.append(card)
+    return out
+
+
+def set_layout(conn: sqlite3.Connection, principal, order) -> list[str]:
+    from app.db import set_setting
+
+    order = clean_order(order)
+    set_setting(conn, _layout_key(principal), json.dumps({"order": order}))
+    conn.commit()
+    return order
+
+
+def reset_layout(conn: sqlite3.Connection, principal) -> None:
+    conn.execute("DELETE FROM settings WHERE key = ?", (_layout_key(principal),))
+    conn.commit()

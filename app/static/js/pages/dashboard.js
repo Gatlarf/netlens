@@ -1,5 +1,5 @@
 // The start page: a grid of cards. Which cards, and in what order, is a per-user choice kept in this browser.
-import { get } from "../api.js";
+import { get, put, del } from "../api.js";
 import { h, clear, timeAgo, shortName, isAdmin, sessionInfo } from "../util.js";
 import { barList, columnChart, emptyNote, fmtPct, lineChart } from "../charts.js";
 import { cssVar } from "../theme.js";
@@ -153,26 +153,56 @@ const CARDS = [
 const BY_ID = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 const DEFAULT_ORDER = CARDS.filter((c) => c.def).map((c) => c.id);
 
-// ---------- the chosen layout (per user, in this browser) ----------
+// ---------- the chosen layout (per user, kept on the server so every browser and device shows the same dashboard) ----------
+// The browser's own storage is only the fallback (and where an older version kept the layout): it is moved to the server once.
 
 const storageKey = () => `netlens.dashboard.${sessionInfo()?.username || "default"}`;
+const tidy = (list) => list.filter((id, i) => BY_ID[id] && list.indexOf(id) === i);
 
-function loadOrder() {
+function localOrder() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey()) || "null");
-    if (Array.isArray(saved)) return saved.filter((id, i) => BY_ID[id] && saved.indexOf(id) === i);
+    if (Array.isArray(saved)) return saved;
   } catch (e) {
-    // no storage or damaged: the default layout
+    // no storage or damaged
+  }
+  return null;
+}
+
+function setLocal(order) {
+  try {
+    if (order) localStorage.setItem(storageKey(), JSON.stringify(order));
+    else localStorage.removeItem(storageKey());
+  } catch (e) {
+    // the choice then lasts until the page is closed
+  }
+}
+
+async function loadOrder() {
+  let server = null, reachable = true;
+  try {
+    server = (await get("/api/dashboard/layout")).order;
+  } catch (e) {
+    reachable = false;
+  }
+  if (Array.isArray(server)) return tidy(server);
+  const local = localOrder();
+  if (local) {
+    if (reachable) {  // a layout from before it was kept on the server: move it there
+      try { await put("/api/dashboard/layout", { order: local }); setLocal(null); } catch (e) { /* stays in the browser */ }
+    }
+    return tidy(local);
   }
   return [...DEFAULT_ORDER];
 }
 
-function saveOrder(order, isDefault) {
+async function saveOrder(order, isDefault) {
   try {
-    if (isDefault) localStorage.removeItem(storageKey());
-    else localStorage.setItem(storageKey(), JSON.stringify(order));
+    if (isDefault) await del("/api/dashboard/layout");
+    else await put("/api/dashboard/layout", { order });
+    setLocal(null);
   } catch (e) {
-    // the choice then lasts until the page is closed
+    setLocal(isDefault ? null : order);  // for example the demo, where nothing may be saved on the server
   }
 }
 
@@ -223,7 +253,7 @@ function miniMap() {
 // ---------- the page ----------
 
 export async function render(container) {
-  let data = null, order = loadOrder(), editing = false, disposed = false, timer = null;
+  let data = null, order = await loadOrder(), editing = false, disposed = false, timer = null;
   const map = miniMap();
   let mapStarted = false;
   const header = h("div", { class: "dash-head" });

@@ -135,7 +135,7 @@ BUILTIN = Principal(username="access token", role="admin", builtin=True)
 VIEWER_READABLE = re.compile(
     r"^/(metrics"
     r"|api/(session|update|changelog|map|map-settings|hierarchy|relations|events|uptime|scans|scans/current|service-checks|service-checks/\d+/results"
-    r"|stats|stats/summary|dashboard|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
+    r"|stats|stats/summary|dashboard|dashboard/layout|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
 )
 VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/speedtest/up", "/api/speedtest/browser")  # a viewer may test the line from their own device
 
@@ -168,7 +168,8 @@ def require_auth(request: HTTPConnection) -> None:
     if principal.role != "admin":
         method = request.scope.get("method", "GET")
         path = request.url.path
-        allowed = (method in ("GET", "HEAD") and VIEWER_READABLE.match(path)) or (method == "POST" and path in VIEWER_MAY_POST)
+        allowed = ((method in ("GET", "HEAD") and VIEWER_READABLE.match(path)) or (method == "POST" and path in VIEWER_MAY_POST)
+                   or (method in ("PUT", "DELETE") and path == "/api/dashboard/layout"))     # everybody arranges their own dashboard
         if not allowed:
             raise HTTPException(status_code=403, detail="this needs an administrator")
 

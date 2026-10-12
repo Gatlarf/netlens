@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.156 — 2026-10-12
+
+### Changed
+- ★ **Your dashboard follows you**: the cards you choose and their order are now saved per user on the server instead of in the browser, so the same dashboard shows on every browser and device you sign in on. The layout you already made in this browser is moved to your account the first time you open the dashboard. Every user, viewers included, arranges their own; *Reset to default* clears yours. (In the demo, where nothing can be saved on the server, the layout stays in the browser.)
+
 ## 0.3.155 — 2026-10-12
 
 ### Added
