@@ -2,26 +2,50 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
-## 0.3.129 — 2026-10-12
+## 0.3.152 — 2026-10-12
+
+### Added
+- ★ **Dashboard start page**: Netlens now opens on a dashboard of cards: devices online, uptime, unstable devices, services, containers and guests, sites and certificates, plugins, backup and scans, DNS and network checks, security, a *Needs attention* list, the recent events and a small map of the network (click it to open the full map). Press **Customize** to reorder the cards (drag them, or use the arrows), remove them, or add more: least reliable devices, 14-day trend, events per day, device types, groups, Wi-Fi, new devices, certificates, available updates and quick scan buttons. The layout is remembered per user in the browser. Everything refreshes every 30 seconds. Viewers see it too.
+
+### Changed
+- ★ **A tidier top bar**: the page links are grouped into **Dashboard**, **Network** (Map, Devices, Hierarchy), **Monitoring** (Uptime, Services, Statistics, Scans & events) and **Settings**, so the bar no longer overflows on a small screen such as an older iPad. The *Buy me a coffee* button shows in the bar only on wide screens (it is always in the account menu), and the light/dark switch moved into the account menu. On a narrow screen the menu lists the groups under headings.
 
 ### Fixed
 - **Settings menu works again from the dashboard**: after opening a Settings page (for example from a dashboard card), the Settings menu and the page links stopped reacting. The new grouped top bar shared a name with the Settings menu.
+
+
+## 0.3.149 — 2026-10-12
+
+### Added
+- ★ **Demo mode**: start the same image with `NETLENS_DEMO=on` to get a made-up network of 46 devices with a month of history (outages, flaky devices, a power cut), fictional DNS registration, plugins, reverse-proxy sites and service checks, kept moving by a small simulator. Visitors can look at every page but change nothing, and the data starts over hourly or daily (`NETLENS_DEMO_RESET`). Nothing real is scanned or sent. See `docker-compose.demo.yml` and the README.
+
+
+## 0.3.147 — 2026-10-12
+
+### Fixed
 - ★ **Share links work again after a scheduled backup**: once a scheduled backup had run, the share page said "The page could not be loaded" and the statistics summary and `/metrics` failed, because the backup time was stored in a format those pages could not read. The time is now stored in the standard format and older values are read as well.
+
+
+## 0.3.143 — 2026-10-12
+
+### Changed
+- ★ **New license: PolyForm Noncommercial 1.0.0**: from version 0.3.143 Netlens is free for noncommercial use (home, hobby, study, research, charity) and needs a commercial license for anything commercial. Versions 0.3.142 and earlier stay available under the MIT License. See the *License* section of the README for how to ask for a commercial license.
+
+
+## 0.3.129 — 2026-10-12
+
+### Fixed
 - **"Latest published" is fresh after an update**: Settings → About → Updates could show an older latest version than the one you run (the answer was cached for a day). Netlens now looks for the newest version right after it starts, and asks again when the cached answer was made by a different version than the one running or is older than it.
 - ★ **Hyper-V plugin works for a normal user (1.0.2)**: tested on a real Windows 11 host. Windows refuses `Get-VM` for an account that is not an administrator, so the plugin now reads the VMs through Hyper-V's management data (CIM), which a member of *Hyper-V Administrators* may read. The setup lines also let *Remote Management Users* open a remote shell (WinRM only admits administrators by default), give the groups by their fixed ids (so they work on Windows in any language) and print the members to check. Update it under Settings → Plugins → Browse.
 - ★ **Backups include the plugins**: a backup now contains the installed plugins (their code) next to their settings, so restoring into a fresh container brings everything back as it was, with the plugins switched on as before. Older backups restore as they did; for plugins with saved settings but no files, the Plugins page lists them with an *Install again from the index* button, and installing keeps their settings (a plugin whose code differs from the saved one starts off).
 
 ### Added
-- ★ **Dashboard start page**: Netlens now opens on a dashboard of cards: devices online, uptime, unstable devices, services, containers and guests, sites and certificates, plugins, backup and scans, DNS and network checks, security, a *Needs attention* list, the recent events and a small map of the network (click it to open the full map). Press **Customize** to reorder the cards (drag them, or use the arrows), remove them, or add more: least reliable devices, 14-day trend, events per day, device types, groups, Wi-Fi, new devices, certificates, available updates and quick scan buttons. The layout is remembered per user in the browser. Everything refreshes every 30 seconds. Viewers see it too.
-- ★ **Demo mode**: start the same image with `NETLENS_DEMO=on` to get a made-up network of 46 devices with a month of history (outages, flaky devices, a power cut), fictional DNS registration, plugins, reverse-proxy sites and service checks, kept moving by a small simulator. Visitors can look at every page but change nothing, and the data starts over hourly or daily (`NETLENS_DEMO_RESET`). Nothing real is scanned or sent. See `docker-compose.demo.yml` and the README.
 - **Buy me a coffee**: a yellow coffee button at the top of every page (just the cup on narrow screens), plus links in the account menu and Settings → About, for anyone who wants to support the project. Nothing is hidden or limited without it.
 - ★ **Vertical map layout**: next to the horizontal layout the map can now be arranged top to bottom, with the router at the top, one row per level and a card per device. Folding clients, *Fit* and the right-angle links work as in the horizontal layout. Pick it in the map's layout menu, or as the default under Settings → Map.
 - ★ **Service check from an open port**: the Open ports table on a device page has a Check column. **Add check** creates a service check for that port in one click (a web check for ports 80, 443, 8080 and 8443, a plain port check for the rest), pre-filled with the device and its address. Once a check exists the column shows its status dot and a **Remove check** button.
 
 ### Changed
-- ★ **A tidier top bar**: the page links are grouped into **Dashboard**, **Network** (Map, Devices, Hierarchy), **Monitoring** (Uptime, Services, Statistics, Scans & events) and **Settings**, so the bar no longer overflows on a small screen such as an older iPad. The *Buy me a coffee* button shows in the bar only on wide screens (it is always in the account menu), and the light/dark switch moved into the account menu. On a narrow screen the menu lists the groups under headings.
 - **Settings menu tidied**: *Plugins* and *Browse plugins* now sit together, and the Plugins page has a *Browse plugins* button next to *Upload plugin*. *DNS registration*, *Ignored devices*, *Users & tokens* and *Web terminal* moved to General. The plugin guide is no longer in the menu; it is linked from the Plugins page.
-- ★ **New license: PolyForm Noncommercial 1.0.0**: from version 0.3.143 Netlens is free for noncommercial use (home, hobby, study, research, charity) and needs a commercial license for anything commercial. Versions 0.3.142 and earlier stay available under the MIT License. See the *License* section of the README for how to ask for a commercial license.
 - **The unused SNMP line is gone from About**: Settings → About showed "SNMP disabled" and `NETLENS_SNMP_COMMUNITY` existed from before there were plugins, but nothing ever used it. SNMP switches (MAC table and LLDP) are handled by the SNMP plugin under Settings → Plugins. An old `NETLENS_SNMP_COMMUNITY` in a compose file is simply ignored.
 - **Update instructions in About, and the manufacturer database moved**: Settings → About → Updates now explains how to update (Netlens cannot update itself from the inside; you pull the newest image and recreate the container, your data stays) with the commands for compose, Portainer, Synology and docker run. The *Update now* button of the manufacturer (vendor) database was just above the Updates section and looked like a Netlens update button; it now has its own card under Settings → Scan performance.
 - ★ **Simpler install and update**: `docker-compose.yml` now pulls the published image instead of compiling the source, keeps its data in a Docker volume and no longer needs `DOCKERDIR` or a `.env` file; `docker-compose.image.yml` is gone (use `docker-compose.simple.yml` or paste the service into your own compose file or Portainer stack, see the README). Update with `docker compose pull && docker compose up -d`; pin a version with `NETLENS_IMAGE_TAG`; keep a host folder with `NETLENS_DATA`. If you used the old `DOCKERDIR` files, set `NETLENS_DATA=<DOCKERDIR>/appdata/netlens` to keep your data. Developers build from source with the new `docker-compose.build.yml` override.
