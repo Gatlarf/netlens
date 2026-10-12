@@ -58,6 +58,20 @@ export async function buildUpdateCard() {
     card.appendChild(h("div", { class: "field" }, h("label", {}, toggle, " Check for new versions once a day")));
     card.appendChild(h("p", { class: "hint" }, "Only asks the container registry for the list of published version numbers. Nothing is installed automatically."));
     card.appendChild(check);
+
+    card.appendChild(h("h3", {}, "How to update"));
+    card.appendChild(h("p", { class: "hint" },
+      "Netlens runs from a read-only container, so it cannot update itself from the inside. You update it by pulling the newest image and recreating the container. " +
+      "Your data, settings and plugins live in the data volume and stay as they are; the database upgrades itself when the new version starts."));
+    const how = h("ul", { class: "hint" });
+    for (const [where, what] of [
+      ["Your own docker-compose.yml", "docker compose pull netlens && docker compose up -d netlens"],
+      ["Portainer", "open the stack and press Update the stack with Re-pull image switched on"],
+      ["Synology", "Container Manager → Project → netlens → Action → Build"],
+      ["docker run", "docker pull ghcr.io/gatlarf/netlens:latest, then remove and start the container again with the same options"],
+    ]) how.appendChild(h("li", {}, `${where}: `, what.startsWith("docker ") ? h("code", {}, what) : what));
+    card.appendChild(how);
+    card.appendChild(h("p", { class: "hint" }, "Plugins are the exception: update those under Settings → Plugins → Browse plugins, no new image needed. Take a backup first under Settings → Backup & restore if you like."));
   }
   await fill(await get("/api/update"));
   return card;

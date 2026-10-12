@@ -110,12 +110,12 @@ async function buildRangesCard() {
   return card;
 }
 
-// "Vendor database": which copy of the IEEE registry names the manufacturers, with an update button
+// "Manufacturer database": which copy of the IEEE registry names the manufacturers, with an update button
 async function buildVendorDbRow() {
   const info = await get("/api/vendor-db");
   const row = h("div", { id: "vendor-db-row" });
   const text = () => `${info.entries.toLocaleString()} manufacturers (${info.source}${info.refreshed ? `, updated ${fmtTime(info.refreshed)}` : ""}). It updates itself every month.`;
-  const line = kvRow("Vendor database", text());
+  const line = kvRow("Registry", text());
   const btn = h("button", { type: "button", class: "btn admin-only", id: "vendor-db-update" }, "Update now");
   btn.addEventListener("click", async () => {
     btn.disabled = true;
@@ -125,7 +125,7 @@ async function buildVendorDbRow() {
       Object.assign(info, res);
       toast(`Vendor database updated (${res.result.vendors_filled} vendor(s) filled in, ${res.result.types_changed} type(s) changed)`, "success");
       clear(row);
-      row.append(kvRow("Vendor database", text()), btn);
+      row.append(kvRow("Registry", text()), btn);
     } catch (err) {
       toast(err.message || "Update failed", "error");
     }
@@ -146,11 +146,6 @@ async function buildAboutCard() {
   card.appendChild(kvRow("Listening on", cfg.bind ?? ""));
   const wrap = h("div", {}, card);
   try {
-    card.appendChild(await buildVendorDbRow());
-  } catch (err) {
-    // the About card still works without it
-  }
-  try {
     wrap.appendChild(await buildUpdateCard());
   } catch (err) {
     // the About card still works without the update card
@@ -163,11 +158,25 @@ async function buildAboutCard() {
   return wrap;
 }
 
+// The manufacturer registry belongs with the identification settings, not with the version information
+async function buildVendorDbCard() {
+  const card = h("div", { class: "card" });
+  card.appendChild(h("h2", {}, "Manufacturer database"));
+  card.appendChild(h("p", { class: "hint" }, "Netlens names the manufacturer of a device from its MAC address with the IEEE registry. A copy ships with Netlens and is refreshed from the IEEE website every month."));
+  card.appendChild(await buildVendorDbRow());
+  return card;
+}
+
 // "Scan performance" also holds what widens the identification beyond scans
 async function buildScanPage() {
   const wrap = h("div", {});
   wrap.appendChild(await buildScanOptionsCard());
   if (isAdmin()) {
+    try {
+      wrap.appendChild(await buildVendorDbCard());
+    } catch (err) {
+      // the scan settings still work without it
+    }
     try {
       wrap.appendChild(await buildPassiveCard());
     } catch (err) {
