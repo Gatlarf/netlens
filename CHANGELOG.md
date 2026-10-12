@@ -5,7 +5,7 @@ The version is `<major.minor from VERSION>.<commit count>`. Each heading below i
 ## 0.3.129 — 2026-10-12
 
 ### Fixed
-- **Hyper-V plugin 1.0.1**: the setup lines add the user to *Remote Management Users* and *Hyper-V Administrators* by their fixed ids, so they also work on Windows in another language (where the English names do not exist), and print the members of both groups so you can check. The "access is denied" message says what to check. Update it under Settings → Plugins → Browse.
+- ★ **Hyper-V plugin works for a normal user (1.0.2)**: tested on a real Windows 11 host. Windows refuses `Get-VM` for an account that is not an administrator, so the plugin now reads the VMs through Hyper-V's management data (CIM), which a member of *Hyper-V Administrators* may read. The setup lines also let *Remote Management Users* open a remote shell (WinRM only admits administrators by default), give the groups by their fixed ids (so they work on Windows in any language) and print the members to check. Update it under Settings → Plugins → Browse.
 - ★ **Backups include the plugins**: a backup now contains the installed plugins (their code) next to their settings, so restoring into a fresh container brings everything back as it was, with the plugins switched on as before. Older backups restore as they did; for plugins with saved settings but no files, the Plugins page lists them with an *Install again from the index* button, and installing keeps their settings (a plugin whose code differs from the saved one starts off).
 
 ### Added

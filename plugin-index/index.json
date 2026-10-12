@@ -118,15 +118,27 @@
    "id": "hyperv",
    "name": "Microsoft Hyper-V",
    "kind": "hypervisor",
-   "description": "Shows your Hyper-V hosts with their virtual machines (state, processors, memory, start time, network switch) and ties each VM to the device Netlens found by MAC address, then IP. Reads through Windows Remote Management over HTTPS by running one fixed, read-only Get-VM script; the settings page has the PowerShell lines that create the user and the HTTPS listener. Tested with simulated answers and Microsoft's published NTLM test values; not yet on a real Hyper-V host.",
+   "description": "Shows your Hyper-V hosts with their virtual machines (state, processors, memory, start time, network switch) and ties each VM to the device Netlens found by MAC address, then IP. Reads through Windows Remote Management over HTTPS by running one fixed, read-only Get-VM script; the settings page has the PowerShell lines that create the user and the HTTPS listener. Tested on a real Windows 11 Hyper-V host (user without administrator rights) and with simulated answers.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/hyperv",
    "license": "MIT",
    "supports": [
-    "Hyper-V on Windows Server and Windows 10/11 Pro through WinRM over HTTPS (not yet tested on a real host)",
+    "Hyper-V on Windows Server and Windows 10/11 Pro through WinRM over HTTPS (tested on Windows 11 24H2)",
     "NTLM or Basic login; Kerberos is not supported"
    ],
    "releases": [
+    {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.0.2/hyperv.zip",
+     "sha256": "647f78ffe8b189d868ec78ee4c3824849abd9383a1e544c5ecdf4997a36c00ae",
+     "api_version": 1,
+     "min_netlens": "0.3.115",
+     "released": "2026-10-12",
+     "changelog": "Reads the virtual machines through Hyper-V's management data (CIM) instead of Get-VM, which Windows refuses for a user without administrator rights. The setup lines also let 'Remote Management Users' open a remote shell (WinRM permission). Tested on a real Windows 11 host.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.0.1/hyperv.zip",
