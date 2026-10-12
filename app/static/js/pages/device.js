@@ -4,6 +4,7 @@ import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
+import { stateDot } from "./services.js";
 import { buildParentCard } from "../cards/device_parent.js";
 import { buildDeviceSitesCards } from "../cards/proxy_sites.js";
 import { buildStabilitySection, isStabilityOpen } from "../cards/stability.js";
@@ -114,6 +115,20 @@ function containerPortOwners(device) {
   return owners;
 }
 
+// The service check that watches this port of this device, if there is one.
+function checkForPort(checks, port) {
+  return checks.find((c) => (c.kind === "tcp" || c.kind === "http") && c.port === port.port && (port.proto || "tcp") === "tcp") || null;
+}
+
+// What "Add" creates for an open port: a web check on the usual web ports (80, 443, 8080, 8443; the scheme follows the port), a plain port check on the rest.
+function checkFor(device, p) {
+  const web = [80, 443, 8080, 8443].includes(p.port) && /http|www/i.test(p.service || "http");
+  const label = p.service && p.service !== "unknown" ? p.service : `port ${p.port}`;
+  const name = `${device.custom_name || device.hostname || device.primary_ip} ${label}`.slice(0, 100);
+  return web ? { device_id: device.id, name, kind: "http", host: device.primary_ip, port: p.port, path: "/", expect: "alive" }
+    : { device_id: device.id, name, kind: "tcp", host: device.primary_ip, port: p.port };
+}
+
 function buildPortsCard(device, onChanged) {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Open ports"));
@@ -123,17 +138,18 @@ function buildPortsCard(device, onChanged) {
   const headRow = h("tr");
   const owners = containerPortOwners(device);
   const withOwner = owners.size > 0;
-  ["Port", "Proto", "Service", "Product", "Version", "State", ...(withOwner ? ["Container"] : [])].forEach((col) => {
+  ["Port", "Proto", "Service", "Product", "Version", "State", ...(withOwner ? ["Container"] : []), "Check"].forEach((col) => {
     headRow.appendChild(h("th", {}, col));
   });
   thead.appendChild(headRow);
   table.appendChild(thead);
 
   const tbody = h("tbody");
+  const checkCells = [];
   const ports = device.ports || [];
   if (ports.length === 0) {
     const emptyRow = h("tr");
-    const emptyCell = h("td", { colspan: withOwner ? "7" : "6" }, "No open ports");
+    const emptyCell = h("td", { colspan: withOwner ? "8" : "7" }, "No open ports");
     emptyRow.appendChild(emptyCell);
     tbody.appendChild(emptyRow);
   } else {
@@ -161,10 +177,36 @@ function buildPortsCard(device, onChanged) {
         const who = owners.get(`${p.proto}/${p.port}`) || [];
         row.appendChild(h("td", {}, ...who.map((g, i) => [i ? ", " : "", h("span", { class: "tag", title: g.details.image || "" }, g.name)]).flat()));
       }
+      const checkCell = h("td", { class: "port-check" });
+      row.appendChild(checkCell);
+      checkCells.push([p, checkCell]);
       tbody.appendChild(row);
     }
   }
   table.appendChild(tbody);
+  if (checkCells.length && device.primary_ip) {
+    get(`/api/service-checks?device_id=${device.id}`).then((checks) => {
+      for (const [p, cell] of checkCells) {
+        if ((p.proto || "tcp") !== "tcp") continue;     // service checks connect over TCP
+        const existing = checkForPort(checks, p);
+        if (existing) {
+          const remove = h("button", { type: "button", class: "btn admin-only", title: `Stop watching ${existing.target}` }, "Remove check");
+          remove.addEventListener("click", async () => {
+            remove.disabled = true;
+            try { await del(`/api/service-checks/${existing.id}`); toast("Check removed", "success"); onChanged(); } catch (err) { toast(err.message || "Failed", "error"); remove.disabled = false; }
+          });
+          cell.append(stateDot(existing), " ", remove);
+        } else {
+          const add = h("button", { type: "button", class: "btn admin-only", title: "Watch this port with a service check" }, "Add check");
+          add.addEventListener("click", async () => {
+            add.disabled = true;
+            try { await post("/api/service-checks", checkFor(device, p)); toast("Check added", "success"); onChanged(); } catch (err) { toast(err.message || "Failed", "error"); add.disabled = false; }
+          });
+          cell.appendChild(add);
+        }
+      }
+    }).catch(() => {});
+  }
   card.appendChild(table);
 
   const base = device.baseline;

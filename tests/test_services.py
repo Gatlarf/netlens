@@ -289,3 +289,12 @@ def test_api_validation_and_auth(client):
     bad = {"Authorization": "Bearer no"}
     for method, url in (("get", "/api/service-checks"), ("post", "/api/service-checks"), ("delete", f"/api/service-checks/{ok['id']}")):
         assert getattr(client, method)(url, headers=bad).status_code == 401
+
+
+def test_the_payloads_of_the_open_ports_button_are_accepted(client):
+    """The device page's "Add check" button sends exactly these (see checkFor in pages/device.js)."""
+    web = client.post("/api/service-checks", json={"device_id": 1, "name": "nas http", "kind": "http", "host": "10.0.0.5", "port": 443, "path": "/", "expect": "alive"})
+    plain = client.post("/api/service-checks", json={"device_id": 1, "name": "nas port 8006", "kind": "tcp", "host": "10.0.0.5", "port": 8006})
+    assert web.status_code == plain.status_code == 201
+    assert web.json()["target"] == "https://10.0.0.5:443/" and plain.json()["target"] == "10.0.0.5:8006"
+    assert {(c["kind"], c["port"]) for c in client.get("/api/service-checks", params={"device_id": 1}).json()} == {("http", 443), ("tcp", 8006)}

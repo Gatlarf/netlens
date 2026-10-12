@@ -4,6 +4,9 @@ The version is `<major.minor from VERSION>.<commit count>`. Each heading below i
 
 ## 0.3.129 — 2026-10-12
 
+### Added
+- ★ **Service check from an open port**: the Open ports table on a device page has a Check column. **Add check** creates a service check for that port in one click (a web check for ports 80, 443, 8080 and 8443, a plain port check for the rest), pre-filled with the device and its address. Once a check exists the column shows its status dot and a **Remove check** button.
+
 ### Changed
 - ★ **Simpler install and update**: `docker-compose.yml` now pulls the published image instead of compiling the source, keeps its data in a Docker volume and no longer needs `DOCKERDIR` or a `.env` file; `docker-compose.image.yml` is gone (use `docker-compose.simple.yml` or paste the service into your own compose file or Portainer stack, see the README). Update with `docker compose pull && docker compose up -d`; pin a version with `NETLENS_IMAGE_TAG`; keep a host folder with `NETLENS_DATA`. If you used the old `DOCKERDIR` files, set `NETLENS_DATA=<DOCKERDIR>/appdata/netlens` to keep your data. Developers build from source with the new `docker-compose.build.yml` override.
 
