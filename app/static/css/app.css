@@ -660,7 +660,7 @@ body.setup-mode #nav, body.setup-mode .topbar-actions { display: none; }
 :root[data-theme="dark"] .demo-banner { background: #422006; color: #fde68a; border-color: #b45309; }
 
 /* ---------- grouped page links (Network, Monitoring) ---------- */
-.nav-group { display: inline-block; }
+.topnav-group { display: inline-block; }
 .nav-group-btn { border: 0; background: none; font: inherit; font-weight: 500; cursor: pointer; color: var(--text); }
 .nav-group-btn:hover { background: var(--bg); }
 .nav-group-btn.active { background: var(--accent); color: var(--accent-text); }
@@ -668,7 +668,7 @@ body.setup-mode #nav, body.setup-mode .topbar-actions { display: none; }
 .nav-popmenu { left: 0; right: auto; min-width: 170px; }
 .nav-popmenu .nav-link { display: block; }
 @media (max-width: 1040px) {
-  .topbar .nav .nav-group { display: block; }
+  .topbar .nav .topnav-group { display: block; }
   .topbar .nav .nav-group-btn { display: block; width: 100%; text-align: left; pointer-events: none; background: none; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 12px 12px 2px; }
   .topbar .nav .nav-group-btn .caret { display: none; }
   .topbar .nav .nav-popmenu[hidden] { display: block; }

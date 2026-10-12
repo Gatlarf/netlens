@@ -80,6 +80,15 @@ def test_start_page_and_menu_groups_are_wired():
     assert '"#/": "dashboard"' in app_js
     for route in ("dashboard", "map", "devices", "hierarchy", "uptime", "services", "stats", "scans", "settings"):
         assert f'data-route="{route}"' in index, route
-    assert index.count('class="menu-wrap nav-group"') == 2
+    assert index.count('class="menu-wrap topnav-group"') == 2
     # the coffee link stays reachable on a small screen: it is in the account menu
     assert index.count("buymeacoffee.com") == 2
+
+
+def test_top_bar_group_class_does_not_clash_with_the_settings_menu():
+    """The Settings side menu has its own `.nav-group` headings; the top bar's groups use another class, or
+    the nav highlight code throws on every Settings route change and the menu stops working."""
+    index = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert 'class="menu-wrap nav-group"' not in index
+    for name in ("app.js", "topbar.js"):
+        assert 'querySelectorAll(".nav-group")' not in (STATIC / "js" / name).read_text(encoding="utf-8")

@@ -48,7 +48,7 @@ function updateNav(name) {
     link.classList.toggle("active", link.dataset.route === name);
   });
   // a group button lights up while one of its pages is open
-  document.querySelectorAll(".nav-group").forEach((group) => {
+  document.querySelectorAll(".topnav-group").forEach((group) => {
     group.querySelector(".nav-group-btn").classList.toggle("active", !!group.querySelector(".nav-link.active"));
   });
 }

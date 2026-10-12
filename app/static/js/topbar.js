@@ -14,7 +14,7 @@ export function initTopbar() {
     { btn: document.getElementById("scan-menu-btn"), panel: document.getElementById("scan-menu") },
     { btn: document.getElementById("user-menu-btn"), panel: userMenu },
     // the page groups (Network, Monitoring): pop-up menus on a wide screen, plain headings above their links on a narrow one
-    ...[...document.querySelectorAll(".nav-group")].map((g) => ({ btn: g.querySelector(".nav-group-btn"), panel: g.querySelector(".nav-popmenu"), group: true })),
+    ...[...document.querySelectorAll(".topnav-group")].map((g) => ({ btn: g.querySelector(".nav-group-btn"), panel: g.querySelector(".nav-popmenu"), group: true })),
   ];
   const inPageMenu = (m) => compact.matches && (m.panel === userMenu || m.group);
 
