@@ -61,7 +61,7 @@ def test_admin_user_can_do_everything_viewer_is_read_only(env):
     assert alice.get("/api/session").json()["user"] == {"username": "alice", "role": "admin", "builtin": False}
     assert alice.get("/api/users").status_code == 200
     # viewer: may read devices, the map, stats...
-    for path in ("/api/devices", "/api/devices/1", "/api/map", "/api/stats/summary", "/api/stats?range=7d", "/api/events", "/api/hierarchy", "/api/scans/current", "/api/service-checks", "/api/update", "/api/map-settings"):
+    for path in ("/api/devices", "/api/devices/1", "/api/map", "/api/stats/summary", "/api/stats?range=7d", "/api/events", "/api/hierarchy", "/api/scans/current", "/api/service-checks", "/api/update", "/api/map-settings", "/api/dashboard"):
         assert vera.get(path).status_code == 200, path
     # ...but not secrets, settings, exports, backups or admin pages
     for path in ("/api/users", "/api/backup", "/api/backups", "/api/notifications", "/api/plugins", "/api/export/devices.json", "/api/notify-channels", "/api/config", "/api/ignored", "/api/plugin-index"):

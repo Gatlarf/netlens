@@ -105,8 +105,9 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Statistics page: devices by type/vendor/OS, uptime and reliability, flapping devices, ports and services, scan performance, event history, hierarchy and plugin health, with 24 h to 90 day periods; a compact `/api/stats/summary` for integrations such as Home Assistant
 - Network hierarchy: which device depends on which (gateway, then Proxmox host, then its guests), as a tree page, a tree layout on the map, and a parent you can set per device
 - Live scan progress in the header
-- Light and dark mode, switchable with the moon / sun button in the top bar
-- A slim one-row top bar (a **Scan** menu with quick scan, deep scan and scan settings, a moon / sun button, and an account menu with the version, update notice and log out); on iPad and phone the pages fold into one menu, and on a phone the bar slides away while you scroll down. The Settings pages fold into one button on a phone
+- Light and dark mode, switchable in the account menu
+- A **dashboard** as the start page: cards for devices online, uptime, unstable devices, services, containers and guests, sites and certificates, plugins, backup and scans, DNS, security, what needs attention, recent events and a small map. **Customize** lets you drag, remove and add cards (also least reliable devices, 14-day trend, device types, Wi-Fi, certificates, available updates, quick scan buttons); the layout is remembered per user in the browser
+- A slim one-row top bar with the pages grouped (**Dashboard**, **Network**, **Monitoring**, **Settings**), a **Scan** menu with quick scan, deep scan and scan settings, and an account menu with the version, update notice, light / dark switch, a coffee link and log out; on iPad and phone the pages fold into one menu, and on a phone the bar slides away while you scroll down. The Settings pages fold into one button on a phone
 - Delete a device (optionally ignoring it in future scans), and a full scan of a single host from its page
 - Backup and restore of everything from the Settings page, with scheduled backups and retention
 - Port baselines (alert when a port opens that is not normal for the device), Wake-on-LAN, ping and traceroute from the device page
@@ -571,7 +572,7 @@ The same data is available as `GET /api/hierarchy`, and `PATCH /api/devices/<id>
 
 ### Dark mode
 
-The **moon / sun button** in the top bar, next to the account menu, switches between light and dark mode. Without a choice Netlens follows your operating system's setting; once you click the button your choice is remembered in that browser (it is not shared between browsers or users). Charts and the map follow the theme too (the map draws brighter device colours and links with outlined dots and haloed labels in dark mode, and offline devices get a dashed outline).
+The **Dark mode / Light mode** item in the account menu (top right) switches between light and dark mode. Without a choice Netlens follows your operating system's setting; once you click the button your choice is remembered in that browser (it is not shared between browsers or users). Charts and the map follow the theme too (the map draws brighter device colours and links with outlined dots and haloed labels in dark mode, and offline devices get a dashed outline).
 
 ### Deleting a device and ignoring devices
 

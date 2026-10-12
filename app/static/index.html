@@ -23,13 +23,24 @@
   <header class="topbar" id="topbar">
     <a class="brand" href="#/"><img class="brand-icon" src="img/favicon.svg" alt="" width="24" height="24">Netlens</a>
     <nav id="nav" class="nav" aria-label="Pages">
-      <a class="nav-link" href="#/map" data-route="map">Map</a>
-      <a class="nav-link" href="#/devices" data-route="devices">Devices</a>
-      <a class="nav-link" href="#/hierarchy" data-route="hierarchy">Hierarchy</a>
-      <a class="nav-link" href="#/uptime" data-route="uptime">Uptime</a>
-      <a class="nav-link" href="#/services" data-route="services">Services</a>
-      <a class="nav-link" href="#/stats" data-route="stats">Statistics</a>
-      <a class="nav-link" href="#/scans" data-route="scans">Scans &amp; events</a>
+      <a class="nav-link" href="#/dashboard" data-route="dashboard">Dashboard</a>
+      <div class="menu-wrap nav-group">
+        <button class="nav-link nav-group-btn" type="button" aria-haspopup="true" aria-expanded="false">Network <span class="caret" aria-hidden="true">&#9662;</span></button>
+        <div class="popmenu nav-popmenu" hidden>
+          <a class="nav-link" href="#/map" data-route="map">Map</a>
+          <a class="nav-link" href="#/devices" data-route="devices">Devices</a>
+          <a class="nav-link" href="#/hierarchy" data-route="hierarchy">Hierarchy</a>
+        </div>
+      </div>
+      <div class="menu-wrap nav-group">
+        <button class="nav-link nav-group-btn" type="button" aria-haspopup="true" aria-expanded="false">Monitoring <span class="caret" aria-hidden="true">&#9662;</span></button>
+        <div class="popmenu nav-popmenu" hidden>
+          <a class="nav-link" href="#/uptime" data-route="uptime">Uptime</a>
+          <a class="nav-link" href="#/services" data-route="services">Services</a>
+          <a class="nav-link" href="#/stats" data-route="stats">Statistics</a>
+          <a class="nav-link" href="#/scans" data-route="scans">Scans &amp; events</a>
+        </div>
+      </div>
       <a class="nav-link" href="#/settings" data-route="settings">Settings</a>
     </nav>
     <div class="topbar-actions">
@@ -43,7 +54,6 @@
           <a id="scan-settings" class="menu-item" href="#/settings/nmap" title="Change which ports and checks nmap uses">&#9881; Scan settings</a>
         </div>
       </div>
-      <button id="theme-toggle" class="btn ghost theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">&#9790;</button>
       <div class="menu-wrap" id="user-menu-wrap">
         <button id="user-menu-btn" class="btn user-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu"><span id="user-name">Account</span> &#9662;</button>
         <div id="user-menu" class="popmenu" hidden>
@@ -52,6 +62,7 @@
           <a class="menu-row version-link" href="#/settings/about" title="About this version and what changed"><span>Version</span><span id="app-version" class="app-version"></span></a>
           <a id="update-badge" class="menu-row update-badge" href="#/settings/about" hidden></a>
           <a class="menu-row" href="https://buymeacoffee.com/Gatlarf" target="_blank" rel="noopener noreferrer" title="Netlens is free; a coffee helps keep it going">&#9749; Buy me a coffee</a>
+          <button id="theme-toggle" class="menu-item theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">&#9790; Dark mode</button>
           <hr>
           <button id="logout" class="menu-item" type="button">Log out</button>
         </div>

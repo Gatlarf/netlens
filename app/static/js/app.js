@@ -8,8 +8,9 @@ import { get, post, ApiError } from "./api.js";
 import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
 
 const ROUTES = {
-  "": "map",
-  "#/": "map",
+  "": "dashboard",
+  "#/": "dashboard",
+  "#/dashboard": "dashboard",
   "#/map": "map",
   "#/devices": "devices",
   "#/hierarchy": "hierarchy",
@@ -28,7 +29,7 @@ let renderGen = 0;
 
 function parseRoute() {
   const hash = location.hash;
-  if (!hash || hash === "#/") return { name: "map", params: {} };
+  if (!hash || hash === "#/") return { name: "dashboard", params: {} };
   if (hash.startsWith("#/device/")) {
     const id = Number(hash.slice(9));
     if (Number.isInteger(id) && id > 0) {
@@ -45,6 +46,10 @@ function parseRoute() {
 function updateNav(name) {
   document.querySelectorAll(".nav-link").forEach((link) => {
     link.classList.toggle("active", link.dataset.route === name);
+  });
+  // a group button lights up while one of its pages is open
+  document.querySelectorAll(".nav-group").forEach((group) => {
+    group.querySelector(".nav-group-btn").classList.toggle("active", !!group.querySelector(".nav-link.active"));
   });
 }
 
@@ -381,7 +386,7 @@ function startSetup() {
     document.body.classList.remove("setup-mode");
     await applySession();
     displayLoaded = false;
-    location.hash = "#/map";
+    location.hash = "#/dashboard";
     startPoll();
     renderPage();
   });

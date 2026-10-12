@@ -13,13 +13,16 @@ export function initTopbar() {
   const menus = [
     { btn: document.getElementById("scan-menu-btn"), panel: document.getElementById("scan-menu") },
     { btn: document.getElementById("user-menu-btn"), panel: userMenu },
+    // the page groups (Network, Monitoring): pop-up menus on a wide screen, plain headings above their links on a narrow one
+    ...[...document.querySelectorAll(".nav-group")].map((g) => ({ btn: g.querySelector(".nav-group-btn"), panel: g.querySelector(".nav-popmenu"), group: true })),
   ];
+  const inPageMenu = (m) => compact.matches && (m.panel === userMenu || m.group);
 
   const compact = window.matchMedia(COMPACT);
   const closeMenus = (except) => {
     for (const m of menus) {
       if (!m.btn || m === except) continue;
-      if (m.panel === userMenu && compact.matches) continue;  // on a narrow screen it is part of the page menu
+      if (inPageMenu(m)) continue;  // on a narrow screen these are part of the page menu
       m.panel.hidden = true;
       m.btn.setAttribute("aria-expanded", "false");
     }
@@ -28,13 +31,14 @@ export function initTopbar() {
     bar.classList.remove("nav-open");
     navToggle.setAttribute("aria-expanded", "false");
   };
-  const anythingOpen = () => bar.classList.contains("nav-open") || menus.some((m) => m.panel && !m.panel.hidden && !(m.panel === userMenu && compact.matches));
+  const anythingOpen = () => bar.classList.contains("nav-open") || menus.some((m) => m.panel && !m.panel.hidden && !inPageMenu(m));
   const closeAll = () => { closeMenus(); closeNav(); };
 
   for (const m of menus) {
     if (!m.btn) continue;
     m.btn.addEventListener("click", (event) => {
       event.stopPropagation();
+      if (inPageMenu(m)) return;
       const open = m.panel.hidden;
       closeMenus(m);
       closeNav();
@@ -78,6 +82,7 @@ export function initTopbar() {
       userWrap.appendChild(userMenu);
       userMenu.hidden = true;
       menus[1].btn.setAttribute("aria-expanded", "false");
+      for (const m of menus) if (m.group) { m.panel.hidden = true; m.btn.setAttribute("aria-expanded", "false"); }
       closeNav();
     }
   };
