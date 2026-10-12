@@ -735,3 +735,22 @@ body.setup-mode #nav, body.setup-mode .topbar-actions { display: none; }
 @media (max-width: 460px) { .dash-grid { grid-template-columns: 1fr; } .d-value { font-size: 1.6rem; } }
 
 .topbar .theme-toggle { font-size: 1.1rem; line-height: 1; padding: 6px 10px; min-width: 38px; color: var(--text); }
+
+/* ---------- speed tests ---------- */
+.speed-title { margin: 0; font-size: 1.4rem; }
+.speed-page .card { margin-bottom: 14px; }
+.speed-page h3 { margin: 18px 0 6px; font-size: 1rem; }
+.speed-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 10px 0; }
+.speed-tiles .tile { padding: 10px 12px; }
+.speed-actions, .speed-form, .speed-schedule { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
+.speed-live { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.speed-label, .speed-host { flex: 1 1 220px; min-width: 0; }
+.speed-port { width: 5.5em; }
+.speed-cmds { display: grid; gap: 6px; margin: 8px 0; }
+.speed-cmd { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.speed-cmd code { padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; word-break: break-all; }
+.speed-failed td { color: var(--muted); }
+.speed-page .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 700px) { .speed-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.speed-schedule select, .speed-schedule .btn, .speed-actions select, .speed-form select { width: auto; }
+.speed-page .chart { max-width: 760px; }

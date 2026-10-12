@@ -143,6 +143,8 @@ const CARDS = [
       ["Container images", s.guests.image_updates || 0, s.guests.image_updates ? "warn" : ""], ["Hosts with updates", s.guests.update_available || 0],
       ["Netlens", s.update.available ? s.update.latest : "up to date", s.update.available ? "warn" : ""], ["Plugins", s.update.plugin_updates, s.update.plugin_updates ? "warn" : ""],
     ]) },
+  { id: "speed", title: "Internet speed", href: "#/speedtest", size: "s", about: "The latest internet speed test: download, upload and delay.", show: (d) => !!d.speed,
+    build: ({ speed: s }) => big(s.down_mbps >= 1000 ? `${(s.down_mbps / 1000).toFixed(2)} Gbps` : `${Math.round(s.down_mbps)} Mbps`, `down · up ${Math.round(s.up_mbps)} Mbps · ping ${Math.round(s.latency_ms)} ms`, { extra: h("div", { class: "d-mini" }, timeAgo(s.ts)) }) },
   { id: "actions", title: "Quick actions", size: "s", admin: true, about: "Start a scan with one tap.",
     build: () => h("div", { class: "d-actions" },
       h("button", { class: "btn primary", type: "button", onclick: () => document.getElementById("scan-quick")?.click() }, "Quick scan"),

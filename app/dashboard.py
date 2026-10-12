@@ -3,7 +3,7 @@ import sqlite3
 
 from app.maintenance import covered
 from app.stats import _ago, _pct, utcnow
-from app import sites as sites_mod
+from app import sites as sites_mod, speedtest
 
 
 def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str]) -> list[dict]:
@@ -86,4 +86,5 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "new_devices": new_devices,
         "certificates": [{"name": c["name"], "proxy": c["proxy"], "days": c["days"], "expires": c["expires"]} for c in certs[:5]],
         "maintenance": len(covered(conn)),
+        "speed": speedtest.latest(conn, "internet"),
     }

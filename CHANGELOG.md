@@ -2,6 +2,16 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.154 — 2026-10-12
+
+### Added
+- ★ **Speed tests** (Network → Speed tests): three kinds of test on one page, with a history of every result.
+  - **Internet speed**: delay, jitter, download and upload against Cloudflare's nearest test server (about 20 seconds, no account or extra program). Run it by hand or let Netlens test every 1, 3, 6, 12 or 24 hours (off by default); the history chart shows the trend, and a *Internet speed* card can be added to the dashboard.
+  - **iperf3 server inside Netlens**: switch it on (port 5201 by default) and the page shows the exact `iperf3 -c <address>` line to run on any other computer; every test that connects is added to the results. It stays on after a restart and is off until you switch it on.
+  - **iperf3 client**: pick a device or type an address and Netlens tests against an iperf3 server there, in one or both directions.
+  - **Test from this device**: any browser (a phone, tablet or PC, no installation) measures download, upload and delay between itself and Netlens, and can be saved with a label such as "Wi-Fi in the kitchen". Viewers can do this too.
+  The Docker image now includes iperf3. See the README.
+
 ## 0.3.152 — 2026-10-12
 
 ### Added

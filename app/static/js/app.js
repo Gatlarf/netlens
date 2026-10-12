@@ -14,6 +14,7 @@ const ROUTES = {
   "#/map": "map",
   "#/devices": "devices",
   "#/hierarchy": "hierarchy",
+  "#/speedtest": "speedtest",
   "#/uptime": "uptime",
   "#/stats": "stats",
   "#/services": "services",

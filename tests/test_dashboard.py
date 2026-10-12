@@ -50,7 +50,7 @@ def demo(tmp_path):
 
 def test_dashboard_endpoint_has_everything_the_cards_use(demo):
     data = demo.get("/api/dashboard").json()
-    assert {"summary", "attention", "events", "worst", "trend", "new_devices", "certificates", "services_down", "login_failed_24h", "maintenance"} <= data.keys()
+    assert {"summary", "attention", "events", "worst", "trend", "new_devices", "certificates", "services_down", "login_failed_24h", "maintenance", "speed"} <= data.keys()
     assert data["summary"]["devices"]["total"] == 46
     assert data["events"] and data["trend"] and data["certificates"]
     assert all({"level", "text", "href"} <= a.keys() for a in data["attention"])

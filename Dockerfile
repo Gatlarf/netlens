@@ -16,6 +16,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         nmap \
+        iperf3 \
         iproute2 \
         libcap2-bin \
         ca-certificates && \

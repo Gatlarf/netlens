@@ -65,6 +65,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Edge kinds](#edge-kinds)
   - [Map features](#map-features)
 - [Web terminal](#web-terminal)
+- [Speed tests](#speed-tests)
 - [Demo mode](#demo-mode)
 - [Security notes](#security-notes)
 - [Not implemented / limitations](#not-implemented--limitations)
@@ -657,6 +658,17 @@ A device that was online and is not seen by a scan is asked for once more on its
 - **Only on the local network by default.** A request that came through a reverse proxy (it carries `X-Forwarded-*` headers) is treated as coming from outside, so the terminal does not work on your HTTPS address; open `http://<netlens>:8080` on the local network instead. `NETLENS_TERMINAL_REMOTE` widens this: `off` (default), `lan` (also through a proxy when the client address the proxy reports is a local one; the proxy must set `X-Forwarded-For`, which the recipes above do or do by default) or `any`. It is an environment variable on purpose: nobody who reaches the web interface from outside can change it, and the on/off switch for the terminal (Settings) can only be changed from the local network either. The device page's console is in the left column (with a *Wide view* button) and the top bar has an **SSH** button that jumps to it.
 - For a guarantee that does not depend on Netlens, also block it in the reverse proxy, for example nginx `location /api/terminal { return 404; }` or Caddy `respond /api/terminal/* 404`. Nginx Proxy Manager: *Custom Locations* with `/api/terminal` and an advanced `return 404;`.
 - HTTP/HTTPS admin UIs opened via plain links ("Open" next to ports 80/443/...)
+
+## Speed tests
+
+**Network → Speed tests** has four parts, and keeps every result (a year, at most 5000 results).
+
+- **Internet speed** measures delay, jitter, download and upload against Cloudflare's nearest test server (`speed.cloudflare.com`, the same one its public speed test uses; no account, nothing is installed). A test takes about 20 seconds and on a fast line downloads a few hundred megabytes, so the automatic test is **off by default**; switch it on under the chart and pick every 1, 3, 6, 12 or 24 hours. A failed test (no internet) is recorded as a failure. Netlens contacts Cloudflare only when a test runs.
+- **iperf3 server**: the image contains `iperf3`. Press **Start server** (default port 5201, changeable) and Netlens listens on all of its addresses (it runs on the host network). The page then shows the line to type on any other computer, for example `iperf3 -c 192.168.0.10`; add `-R` to test the other direction and `-P 4` for four parallel streams. Every test that connects is stored with the client's address. The server stays on after a restart and has no password (iperf3 has none), so switch it off when you are done. If another iperf3 already uses the port, Netlens reports that and stays off; pick another port.
+- **iperf3 client**: type an address or choose an online device, and Netlens runs `iperf3 -c` against it (that host must run `iperf3 -s`): both directions, or one, 3 to 60 seconds, 1 to 16 streams.
+- **Test from this device** runs in the browser, on any device, with nothing to install. The page downloads and uploads data from and to Netlens over four and three parallel connections for 8 seconds each and measures delay, so it shows the speed between that device and Netlens (a Wi-Fi spot, a cable, a powerline adapter). Open Netlens by its local address to measure only your local network; through a reverse proxy or the internet it measures that whole path. It is a browser test, not iperf: a browser cannot speak the iperf protocol, and a single browser rarely reaches more than a few Gbit/s. Add a label to remember where you tested.
+
+Only one internet or iperf3-client test runs at a time (a test needs the whole line). Administrators run the internet and iperf3 tests; viewers can run the browser test. In demo mode the history is made up and only the browser test works.
 
 ## Demo mode
 

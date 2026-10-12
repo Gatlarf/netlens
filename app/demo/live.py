@@ -110,6 +110,12 @@ def tick(conn, sim: Sim, now: datetime) -> None:
         if s.medium == "wifi" and s.link == "asus" and state[s.key] and ids.get(s.name):
             conn.execute("INSERT INTO wifi_samples (device_id, ts, node, band, rssi, tx_mbps, rx_mbps) VALUES (?, ?, ?, ?, ?, ?, ?)",
                          (ids[s.name], stamp, BY_KEY[s.parent].name.replace("mesh-", "").title(), s.band, rng.randint(-78, -45), round(rng.uniform(30, 280), 1), round(rng.uniform(1, 60), 1)))
+    # the scheduled internet speed test, every six hours
+    last = conn.execute("SELECT ts FROM speedtests WHERE kind = 'internet' ORDER BY id DESC LIMIT 1").fetchone()
+    if last is None or (now - datetime.strptime(last["ts"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)) >= timedelta(hours=6):
+        conn.execute("INSERT INTO speedtests (ts, kind, target, down_mbps, up_mbps, latency_ms, jitter_ms, ok, detail) VALUES (?, 'internet', 'Cloudflare', ?, ?, ?, ?, 1, ?)",
+                     (stamp, round(rng.gauss(485, 25), 1), round(rng.gauss(48, 2.5), 1), round(rng.gauss(10, 1.5), 1), round(abs(rng.gauss(1.8, 0.7)), 2),
+                      json.dumps({"server": "Brussels", "server_code": "BRU", "isp": "Example Telecom", "country": "BE"})))
     # what the plugins "reported" a moment ago
     for plugin in ("proxmox", "asus", "docker", "truenas", "hyperv", "npm", "snmp", "technitium"):
         raw = get_setting(conn, f"plugin.{plugin}.status")

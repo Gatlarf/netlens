@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi
+from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, metrics as metrics_api, notifications, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, identify, require_auth
@@ -79,12 +79,23 @@ async def lifespan(app: FastAPI):
         app.state.passive = Control(app.state.db_path)
         if app.state.passive.enabled():
             app.state.passive.start()
+        import logging
+
+        from app import speedtest as speedtest_mod
+
+        wanted = speedtest_mod.get_iperf_settings(conn)
+        if wanted["enabled"]:  # the iperf3 server the owner switched on stays on after a restart
+            try:
+                app.state.iperf.start(wanted["port"])
+            except RuntimeError as exc:
+                logging.getLogger(__name__).warning("iperf3 server not started: %s", exc)
 
     try:
         yield
     finally:
         if getattr(app.state, "passive", None) is not None:
             app.state.passive.stop()
+        app.state.iperf.stop()
         for task in tasks:
             task.cancel()
             try:
@@ -117,6 +128,9 @@ def create_app(
     app.state.db_path = str(db_path) if db_path is not None else str(settings.data_dir / "netlens.db")
     app.state.scheduler = scheduler
     app.state.scan_manager = scan_manager or ScanManager(app.state.db_path, settings)
+    from app import iperf
+
+    app.state.iperf = iperf.Server(app.state.db_path)
     app.state.login_limiter = LoginLimiter()
     app.state.user_limiter = LoginLimiter(max_failures=20, window=900.0)
     app.state.share_limiter = LoginLimiter(max_failures=30, window=60.0)
@@ -151,6 +165,7 @@ def create_app(
     app.include_router(plugins.router, dependencies=auth_deps)
     app.include_router(stats_api.router, dependencies=auth_deps)
     app.include_router(dashboard_api.router, dependencies=auth_deps)
+    app.include_router(speedtest_api.router, dependencies=auth_deps)
     app.include_router(wifi.router, dependencies=auth_deps)
     app.include_router(services_api.router, dependencies=auth_deps)
     app.include_router(channels_api.router, dependencies=auth_deps)

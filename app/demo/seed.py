@@ -441,6 +441,31 @@ def _wifi(conn, ids, times, up, rng) -> None:
             conn.executemany("INSERT INTO wifi_samples (device_id, ts, node, band, rssi, tx_mbps, rx_mbps) VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
 
 
+def _speedtests(conn, now: datetime, rng: random.Random) -> None:
+    """A month of scheduled internet tests (a slow patch on day 12), a few iperf3 runs and browser tests."""
+    rows = []
+    for i in range(HISTORY_DAYS * 4):
+        when = now - timedelta(hours=6 * i)
+        slow = 11.5 <= (now - when).total_seconds() / 86400 <= 12.5
+        evening = when.hour in (18, 20)
+        down = rng.gauss(180 if slow else 455 if evening else 495, 22)
+        up = rng.gauss(46 if slow else 48, 2.5)
+        latency = rng.gauss(14 if slow else 10, 1.5)
+        jitter = abs(rng.gauss(1.8, 0.7))
+        ok = i != 41                                              # one test that could not reach the server
+        rows.append((fmt(when), "internet", "Cloudflare", round(down, 1) if ok else None, round(up, 1) if ok else None, round(latency, 1) if ok else None, round(jitter, 2) if ok else None,
+                     1 if ok else 0, None if ok else "Could not reach the test server. Is the internet connection up?", json.dumps({"server": "Brussels", "server_code": "BRU", "isp": "Example Telecom", "country": "BE"}) if ok else "{}"))
+    runs = [("pc_anna", "iperf-in", 931, 936), ("pve", "iperf-in", 941, 940), ("nas", "iperf-in", 938, 939), ("pc_anna", "iperf-in", 929, 935), ("pve", "iperf-in", 940, 941)]
+    for n, (key, kind, up, down) in enumerate(runs):
+        when = now - timedelta(days=1 + n * 5, hours=n)
+        rows.append((fmt(when), kind, ip(BY_KEY[key]), round(down + rng.uniform(-6, 4), 1), round(up + rng.uniform(-6, 4), 1), None, None, 1, None, json.dumps({"streams": 4, "seconds": 10, "retransmits": rng.randint(0, 12)})))
+    for n, (target, up, down) in enumerate((("192.168.42.31:5201", 912, 931), ("192.168.42.30:5201", 927, 934))):
+        rows.append((fmt(now - timedelta(days=3 + n * 9)), "iperf-out", target, down, up, None, None, 1, None, json.dumps({"streams": 4, "seconds": 10, "direction": "both"})))
+    for n, (label, down, up, lat) in enumerate((("Wi-Fi, kitchen tablet", 312.4, 188.9, 6.2), ("Wi-Fi, Anna's phone", 402.7, 251.3, 5.1), ("Wired, desk-anna", 934.5, 921.0, 1.1))):
+        rows.append((fmt(now - timedelta(days=2 + n * 4, hours=3)), "browser", f"{net.SUBNET}.{120 + n}", down, up, lat, round(rng.uniform(0.3, 1.8), 2), 1, None, json.dumps({"label": label})))
+    conn.executemany("INSERT INTO speedtests (ts, kind, target, down_mbps, up_mbps, latency_ms, jitter_ms, ok, error, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", sorted(rows))
+
+
 def seed(conn, data_dir: Path, now: datetime | None = None) -> dict:
     now = (now or datetime.now(timezone.utc)).replace(microsecond=0)
     rng = random.Random(20261012)
@@ -461,12 +486,15 @@ def seed(conn, data_dir: Path, now: datetime | None = None) -> dict:
     _proxy(conn, ids, now)
     _dns(conn, ids, now)
     _wifi(conn, ids, times, up, rng)
+    _speedtests(conn, now, rng)
     settings = {
         "ranges": json.dumps([f"{net.SUBNET}.0/24"]), "map_default_layout": "horizontal", "map_show_guests": "1",
         "netchecks.gateway": json.dumps({"ip": f"{net.SUBNET}.1", "mac": mac(BY_KEY["gw"]), "since": fmt(now - timedelta(days=HISTORY_DAYS))}),
         "backup.schedule": json.dumps({"enabled": True, "every_hours": 6, "keep": 28}),
         "update_check.settings": json.dumps({"enabled": False}),
         "backup.last": json.dumps({"at": fmt(now - timedelta(hours=3)), "ok": True, "name": "netlens-demo.db", "error": None}),
+        "speedtest.schedule": json.dumps({"enabled": True, "every_hours": 6}),
+        "speedtest.iperf": json.dumps({"enabled": True, "port": 5201}),
         "demo.seeded": fmt(now),
     }
     for key, value in settings.items():

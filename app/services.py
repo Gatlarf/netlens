@@ -8,6 +8,7 @@ state. A state change needs two identical results in a row (so one lost packet i
 from __future__ import annotations
 
 import asyncio
+import threading
 import http.client
 import ipaddress
 import json
@@ -421,6 +422,10 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                             await process_channels(db_path)
                             await process_notifications(db_path)
                     await asyncio.to_thread(_housekeeping_checks, conn)
+                    from app import speedtest
+
+                    if speedtest.due(conn) and speedtest.PROGRESS.start("internet", "Cloudflare"):  # about 20 seconds: in its own thread, the checks go on
+                        threading.Thread(target=speedtest.run_and_record, args=(db_path, speedtest.PROGRESS), daemon=True).start()
                 finally:
                     conn.close()
         except asyncio.CancelledError:

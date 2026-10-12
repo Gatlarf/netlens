@@ -6,7 +6,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-ALLOWED_WRITES = ("/api/login", "/api/logout")
+ALLOWED_WRITES = ("/api/login", "/api/logout", "/api/speedtest/up", "/api/speedtest/browser")   # the browser speed test only measures
 MESSAGE = "This is a demo with made-up data: changes are switched off here. Install Netlens yourself to try them."
 
 

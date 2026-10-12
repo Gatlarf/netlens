@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 
 def utcnow() -> str:
@@ -486,6 +486,26 @@ def init_db(conn: sqlite3.Connection) -> None:
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_proxy_sites_target ON proxy_sites(target_device_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_proxy_sites_proxy ON proxy_sites(proxy_device_id)")
+
+    # --- schema v20: speed tests (internet, iperf3, browser) ----------------------------------------------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS speedtests (
+            id INTEGER PRIMARY KEY,
+            ts TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            target TEXT NOT NULL DEFAULT '',
+            down_mbps REAL,
+            up_mbps REAL,
+            latency_ms REAL,
+            jitter_ms REAL,
+            ok INTEGER NOT NULL DEFAULT 1,
+            error TEXT,
+            detail TEXT NOT NULL DEFAULT '{}'
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_speedtests_kind_ts ON speedtests(kind, ts)")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS dns_state (
