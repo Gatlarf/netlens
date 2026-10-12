@@ -316,3 +316,56 @@ def due(conn, now: str | None = None) -> bool:
 
 
 PROGRESS = Progress()  # one test at a time (a speed test needs the whole line); the scheduler and the pages share this
+
+
+def _age(ts: str | None, now: str) -> int | None:
+    if not ts:
+        return None
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    return int((datetime.strptime(now, fmt) - datetime.strptime(ts, fmt)).total_seconds())
+
+
+def _slim(row: dict | None, now: str) -> dict | None:
+    if row is None:
+        return None
+    return {"ts": row["ts"], "age_s": _age(row["ts"], now), "down_mbps": row["down_mbps"], "up_mbps": row["up_mbps"], "latency_ms": row["latency_ms"], "jitter_ms": row["jitter_ms"],
+            "server": row["detail"].get("server"), "isp": row["detail"].get("isp"), "target": row["target"]}
+
+
+def summary(conn, now: str | None = None) -> dict:
+    """The speed block of the statistics summary (Home Assistant) and the metrics. `total` is the number of internet tests kept."""
+    now = now or utcnow()
+    week = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ") - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    day = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ") - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    avg = conn.execute("SELECT AVG(down_mbps) AS d, AVG(up_mbps) AS u, COUNT(*) AS n FROM speedtests WHERE kind = 'internet' AND ok = 1 AND ts >= ?", (week,)).fetchone()
+    newest = conn.execute("SELECT ok FROM speedtests WHERE kind = 'internet' ORDER BY id DESC LIMIT 1").fetchone()
+    return {
+        "total": conn.execute("SELECT COUNT(*) FROM speedtests WHERE kind = 'internet'").fetchone()[0],
+        "internet": _slim(latest(conn, "internet"), now),
+        "last_ok": None if newest is None else bool(newest["ok"]),
+        "failed_24h": conn.execute("SELECT COUNT(*) FROM speedtests WHERE kind = 'internet' AND ok = 0 AND ts >= ?", (day,)).fetchone()[0],
+        "avg_down_7d": _round(avg["d"]),
+        "avg_up_7d": _round(avg["u"]),
+        "tests_7d": avg["n"],
+        "iperf": _slim(latest(conn, "iperf-in") or latest(conn, "iperf-out"), now),
+    }
+
+
+def stats(conn, now: str, days: int) -> dict:
+    """For the Statistics page: the internet tests of the chosen window with their spread, plus the latest iperf3 and browser tests."""
+    since = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ") - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rows = [r for r in reversed(history(conn, "internet", 2000)) if r["ts"] >= since]
+    good = [r for r in rows if r["ok"]]
+
+    def spread(key):
+        values = [r[key] for r in good if r[key] is not None]
+        return {"avg": _round(statistics.mean(values)) if values else None, "min": _round(min(values)) if values else None, "max": _round(max(values)) if values else None}
+
+    return {
+        "tests": len(rows), "failed": len(rows) - len(good),
+        "down": spread("down_mbps"), "up": spread("up_mbps"), "latency": spread("latency_ms"),
+        "series": [{"ts": r["ts"], "down": r["down_mbps"], "up": r["up_mbps"], "latency": r["latency_ms"]} for r in good],
+        "last": _slim(latest(conn, "internet"), now),
+        "iperf": [_slim(r, now) for r in history(conn, "iperf-in", 5) + history(conn, "iperf-out", 5) if r["ok"]][:8],
+        "browser": [{**_slim(r, now), "label": r["detail"].get("label")} for r in history(conn, "browser", 5) if r["ok"]],
+    }

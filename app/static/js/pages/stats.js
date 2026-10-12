@@ -120,6 +120,24 @@ function build(s) {
         : emptyNote("No site uses a certificate."))));
   }
 
+  // ------------------------------------------------------------------ speed tests (only when there are results)
+  const sp = s.speed;
+  if (sp && (sp.tests || sp.iperf.length || sp.browser.length)) {
+    const rate = (v) => (v === null || v === undefined ? "–" : v >= 1000 ? `${(v / 1000).toFixed(2)} Gbps` : `${Math.round(v)} Mbps`);
+    const msText = (v) => (v === null || v === undefined ? "–" : `${v.toFixed(v < 10 ? 1 : 0)} ms`);
+    const kindName = (r) => (r.label ? `Browser: ${r.label}` : r.target);
+    root.appendChild(section("speed", "Speed tests",
+      h("div", { class: "tiles inline" },
+        tile(rate(sp.down.avg), "download, average"), tile(rate(sp.up.avg), "upload, average"), tile(msText(sp.latency.avg), "ping, average"),
+        tile(fmtNumber(sp.tests), "internet tests", { tone: sp.failed ? "warn" : "" }), tile(fmtNumber(sp.failed), "failed", { tone: sp.failed ? "warn" : "" })),
+      card("Internet speed over time", sp.series.length > 1
+        ? lineChart(sp.series.map((r) => ({ x: r.ts.slice(5, s.range === "24h" ? 16 : 10).replace("T", " "), down: r.down, up: r.up })), [{ key: "down", label: "Download (Mbps)" }, { key: "up", label: "Upload (Mbps)" }], { height: 150 })
+        : emptyNote("Needs two tests in this period.")),
+      card("Spread in this period", table(["", "Lowest", "Average", "Highest"], [["Download", rate(sp.down.min), rate(sp.down.avg), rate(sp.down.max)], ["Upload", rate(sp.up.min), rate(sp.up.avg), rate(sp.up.max)], ["Ping", msText(sp.latency.min), msText(sp.latency.avg), msText(sp.latency.max)]])),
+      card("Latest iperf3 tests", sp.iperf.length ? table(["When", "With", "Download", "Upload"], sp.iperf.map((r) => [timeAgo(r.ts), r.target, rate(r.down_mbps), rate(r.up_mbps)])) : emptyNote("No iperf3 tests yet.")),
+      card("Latest browser tests", sp.browser.length ? table(["When", "From", "Download", "Upload", "Ping"], sp.browser.map((r) => [timeAgo(r.ts), kindName(r), rate(r.down_mbps), rate(r.up_mbps), msText(r.latency_ms)])) : emptyNote("No browser tests yet."))));
+  }
+
   // ------------------------------------------------------------------ availability
   const rel = (list) => table(["Device", "Uptime (7 d)", "Outages"], list.map((r) => [link(r), fmtPct(r.uptime), String(r.outages)]));
   root.appendChild(section("availability", "Availability",

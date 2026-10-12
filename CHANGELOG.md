@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.155 — 2026-10-12
+
+### Added
+- ★ **Internet speed on the dashboard, in Statistics, Home Assistant and Prometheus**: the dashboard has an *Internet speed* card (download, upload, ping and when it was measured; on by default for new layouts, and under *Customize → Add a card* for an existing one). Statistics has a *Speed tests* section with the internet speed over the chosen period, the lowest, average and highest values, and the latest iperf3 and browser tests. The statistics summary (`/api/stats/summary`) has a new `speed` block, which the Home Assistant integration 0.11.0 turns into *Internet download speed*, *upload speed* and *ping* sensors (plus jitter and last test time, disabled by default). `/metrics` has `netlens_speedtest_download_bits_per_second`, `_upload_bits_per_second`, `_latency_seconds`, `_jitter_seconds`, `_timestamp_seconds`, `_last_ok`, `_failures_24h` and `netlens_iperf_last_bits_per_second`, and the Grafana dashboard has two new panels. These show the latest scheduled or manual internet test, so switch on the automatic test under Network → Speed tests to keep them current.
+
 ## 0.3.154 — 2026-10-12
 
 ### Added

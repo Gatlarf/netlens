@@ -55,6 +55,8 @@ const CARDS = [
   { id: "uptime", title: "Uptime", href: "#/uptime", size: "s", def: true, about: "Share of device checks that succeeded, last 24 hours and 7 days.",
     tone: (d) => toneUp(d.summary.uptime["24h"]),
     build: ({ summary: s, trend }) => big(fmtPct(s.uptime["24h"]), `24 hours · 7 days: ${fmtPct(s.uptime["7d"])}`, { spark: sparkline(trend.map((t) => (t.devices ? (t.online / t.devices) * 100 : null))) }) },
+  { id: "speed", title: "Internet speed", href: "#/speedtest", size: "s", def: true, about: "The latest internet speed test: download, upload and delay.", show: (d) => !!d.speed,
+    build: ({ speed: s }) => big(s.down_mbps >= 1000 ? `${(s.down_mbps / 1000).toFixed(2)} Gbps` : `${Math.round(s.down_mbps)} Mbps`, `down · up ${Math.round(s.up_mbps)} Mbps · ping ${Math.round(s.latency_ms)} ms`, { extra: h("div", { class: "d-mini" }, timeAgo(s.ts)) }) },
   { id: "flapping", title: "Unstable devices", href: "#/uptime", size: "s", def: true, about: "Devices that keep going up and down, and the least reliable ones.",
     tone: (d) => (d.summary.devices.flapping ? "warn" : "ok"),
     build: ({ summary: s, worst }) => big(s.devices.flapping, s.devices.flapping === 1 ? "device flaps (24 hours)" : "devices flap (24 hours)", {
@@ -143,8 +145,6 @@ const CARDS = [
       ["Container images", s.guests.image_updates || 0, s.guests.image_updates ? "warn" : ""], ["Hosts with updates", s.guests.update_available || 0],
       ["Netlens", s.update.available ? s.update.latest : "up to date", s.update.available ? "warn" : ""], ["Plugins", s.update.plugin_updates, s.update.plugin_updates ? "warn" : ""],
     ]) },
-  { id: "speed", title: "Internet speed", href: "#/speedtest", size: "s", about: "The latest internet speed test: download, upload and delay.", show: (d) => !!d.speed,
-    build: ({ speed: s }) => big(s.down_mbps >= 1000 ? `${(s.down_mbps / 1000).toFixed(2)} Gbps` : `${Math.round(s.down_mbps)} Mbps`, `down · up ${Math.round(s.up_mbps)} Mbps · ping ${Math.round(s.latency_ms)} ms`, { extra: h("div", { class: "d-mini" }, timeAgo(s.ts)) }) },
   { id: "actions", title: "Quick actions", size: "s", admin: true, about: "Start a scan with one tap.",
     build: () => h("div", { class: "d-actions" },
       h("button", { class: "btn primary", type: "button", onclick: () => document.getElementById("scan-quick")?.click() }, "Quick scan"),

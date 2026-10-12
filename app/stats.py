@@ -15,7 +15,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app import containers, sites
+from app import containers, sites, speedtest
 from app.db import get_setting, utcnow
 from app.hierarchy import children_map, load_hierarchy
 from app.version import VERSION
@@ -473,6 +473,7 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
         "containers": containers.summary(conn),
         "guests": containers.guest_summary(conn),
         "sites": {**sites.summary(conn), "certificate_list": sites.certificates(conn)[:30]},
+        "speed": speedtest.stats(conn, now, days),
         "system": _system(conn, db_path, passive),
     }
 
@@ -541,6 +542,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "containers": {k: container_numbers[k] for k in ("total", "running", "stopped", "restarting", "unhealthy", "exposed", "hosts")},
         "guests": {k: guest_numbers[k] for k in ("total", "running", "stopped", "hosts", "by_kind", "update_available", "image_updates", "old_images")},
         "sites": sites.summary(conn),
+        "speed": speedtest.summary(conn, now),
         "passive": None if passive is None else {k: passive.get(k) for k in ("enabled", "running", "frames", "applied")},
         "wifi": {k: wifi[k] for k in ("clients", "weak", "avg_rssi")},
         "uptime": {"24h": _pct(day["u"] or 0, day["n"]), "7d": _pct(week["u"] or 0, week["n"])},

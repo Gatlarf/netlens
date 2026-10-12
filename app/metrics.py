@@ -117,6 +117,19 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
             out.sample("netlens_certificate_expires_timestamp_seconds", _ts(cert["expires"]), "When a certificate used by a reverse proxy site ends", certificate=cert["name"], proxy=cert["proxy"] or "")
             out.sample("netlens_certificate_days_left", cert["days"], "Days until a certificate used by a reverse proxy site ends (negative: expired)", certificate=cert["name"], proxy=cert["proxy"] or "")
 
+    sp = doc["speed"]
+    if sp["internet"]:
+        net = sp["internet"]
+        out.sample("netlens_speedtest_download_bits_per_second", net["down_mbps"] * 1e6, "Download speed of the last successful internet speed test")
+        out.sample("netlens_speedtest_upload_bits_per_second", net["up_mbps"] * 1e6, "Upload speed of the last successful internet speed test")
+        out.sample("netlens_speedtest_latency_seconds", net["latency_ms"] / 1000, "Delay measured by the last successful internet speed test")
+        out.sample("netlens_speedtest_jitter_seconds", net["jitter_ms"] / 1000, "Jitter measured by the last successful internet speed test")
+        out.sample("netlens_speedtest_timestamp_seconds", _ts(net["ts"]), "When the last successful internet speed test ran")
+        out.sample("netlens_speedtest_last_ok", 1 if sp["last_ok"] else 0, "1 when the latest internet speed test succeeded")
+        out.sample("netlens_speedtest_failures_24h", sp["failed_24h"], "Internet speed tests that failed in the last 24 hours")
+    if sp["iperf"]:
+        out.sample("netlens_iperf_last_bits_per_second", max(sp["iperf"]["down_mbps"] or 0, sp["iperf"]["up_mbps"] or 0) * 1e6, "Speed of the latest iperf3 test", peer=sp["iperf"]["target"])
+
     sys_info = stats["system"]
     out.sample("netlens_database_size_bytes", sys_info["db_bytes"], "Size of the Netlens database file")
     out.sample("netlens_vendor_registry_entries", sys_info["vendor_entries"], "Manufacturers in the MAC address registry")

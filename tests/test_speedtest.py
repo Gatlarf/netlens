@@ -184,3 +184,48 @@ def test_demo_has_speed_history_and_blocks_server_side_tests(tmp_path):
         assert {"internet", "iperf-in"} <= kinds and data["internet"]["last"]["down_mbps"] > 100 and data["iperf"]["running"] is True
         assert c.post("/api/speedtest/internet").status_code == 403
         assert c.post("/api/speedtest/up", content=b"x" * 1000).status_code == 200          # the browser test only measures
+
+
+# ---- statistics, summary, metrics ----
+NOW = "2026-10-12T12:00:00Z"
+
+
+@pytest.fixture
+def filled(tmp_path):
+    conn = connect(tmp_path / "x.db")
+    init_db(conn)
+    speedtest.record(conn, "internet", "Cloudflare", down=400, up=40, latency=10, jitter=1, detail={"server": "Brussels", "isp": "ISP"}, now="2026-10-10T12:00:00Z")
+    speedtest.record(conn, "internet", "Cloudflare", ok=False, error="down", now="2026-10-11T12:00:00Z")
+    speedtest.record(conn, "internet", "Cloudflare", down=500, up=50, latency=12, jitter=2, detail={"server": "Brussels", "isp": "ISP"}, now="2026-10-12T06:00:00Z")
+    speedtest.record(conn, "iperf-in", "192.168.0.5", up=930, now="2026-10-12T07:00:00Z")
+    speedtest.record(conn, "browser", "192.168.0.9", down=300, up=100, latency=4, detail={"label": "kitchen"}, now="2026-10-12T08:00:00Z")
+    return conn
+
+
+def test_summary_block(filled):
+    s = speedtest.summary(filled, NOW)
+    assert s["total"] == 3 and s["last_ok"] is True and s["failed_24h"] == 1
+    assert s["internet"]["down_mbps"] == 500 and s["internet"]["age_s"] == 6 * 3600 and s["internet"]["isp"] == "ISP"
+    assert s["avg_down_7d"] == 450 and s["tests_7d"] == 2 and s["iperf"]["up_mbps"] == 930
+    empty = connect(":memory:")
+    init_db(empty)
+    assert speedtest.summary(empty, NOW)["internet"] is None and speedtest.summary(empty, NOW)["total"] == 0
+
+
+def test_stats_block(filled):
+    s = speedtest.stats(filled, NOW, 7)
+    assert s["tests"] == 3 and s["failed"] == 1 and s["down"] == {"avg": 450.0, "min": 400.0, "max": 500.0}
+    assert [p["down"] for p in s["series"]] == [400, 500] and s["browser"][0]["label"] == "kitchen" and s["iperf"][0]["target"] == "192.168.0.5"
+    assert speedtest.stats(filled, NOW, 1)["tests"] == 2          # a 24 hour window: yesterday noon's failure and this morning's test
+
+
+def test_metrics_and_summary_endpoints_carry_the_speed(env):
+    from app.metrics import render_metrics
+
+    c, _, db = env
+    conn = connect(db)
+    speedtest.record(conn, "internet", "Cloudflare", down=450, up=45, latency=11, jitter=1.5)
+    text = render_metrics(conn)
+    assert "netlens_speedtest_download_bits_per_second 4.5e+08" in text and "netlens_speedtest_latency_seconds 0.011" in text and "netlens_speedtest_last_ok 1" in text
+    assert c.get("/api/stats/summary").json()["speed"]["internet"]["down_mbps"] == 450
+    assert c.get("/api/stats?range=7d").json()["speed"]["tests"] == 1
