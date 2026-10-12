@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
 
 from app import sites
 from app.db import utcnow
-from app.stats import _ago, compute_stats, summary
+from app.stats import _ago, _parse, compute_stats, summary
 from app.version import VERSION
 
 
@@ -18,7 +17,7 @@ def _esc(value: object) -> str:
 def _ts(value: str | None) -> float | None:
     if not value:
         return None
-    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+    return _parse(value).timestamp()
 
 
 class _Out:

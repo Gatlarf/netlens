@@ -93,7 +93,7 @@ def run_backup(conn, db_path, now: datetime | None = None, data_dir=None) -> dic
     folder = backup_dir(db_path)
     name = "netlens-" + now.strftime("%Y%m%d-%H%M%S") + ".db"
     target = folder / name
-    result = {"at": now.isoformat(), "ok": True, "name": name, "error": None}
+    result = {"at": now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "ok": True, "name": name, "error": None}
     try:
         folder.mkdir(mode=0o700, exist_ok=True)
         os.chmod(folder, 0o700)

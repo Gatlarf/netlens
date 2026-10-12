@@ -98,3 +98,18 @@ def test_api_roundtrip_download_restore_delete(client):
 def test_requires_auth(client):
     assert client.get("/api/backups", headers={"Authorization": "Bearer no"}).status_code == 401
     assert client.post("/api/backups/run", headers={"Authorization": "Bearer no"}).status_code == 401
+
+
+def test_summary_works_with_a_backup_stamp_in_the_old_format(db):
+    """Old stamps (microseconds, +00:00) must not break the summary that the share page and the statistics use."""
+    import json
+
+    from app import stats
+    from app.db import set_setting, utcnow
+
+    conn, path = db
+    bs.run_backup(conn, path, datetime.now(timezone.utc))
+    assert stats._backups(conn, utcnow())["age_s"] is not None
+    set_setting(conn, bs.LAST_KEY, json.dumps({**bs.get_last(conn), "at": "2026-10-12T15:52:39.013306+00:00"}))
+    assert stats._backups(conn, utcnow())["age_s"] is not None
+    assert stats.summary(conn)

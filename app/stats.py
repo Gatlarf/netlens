@@ -32,7 +32,11 @@ TYPE = "COALESCE(NULLIF(d.type_override, ''), NULLIF(d.device_type, ''), 'unknow
 
 # ----------------------------------------------------------------------------- time helpers
 def _parse(ts: str) -> datetime:
-    return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    try:
+        return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        # stamps written by older versions (the backup schedule) carry microseconds and "+00:00"
+        return datetime.fromisoformat(ts).astimezone(timezone.utc)
 
 
 def _fmt(dt: datetime) -> str:
