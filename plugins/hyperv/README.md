@@ -2,7 +2,7 @@
 
 Shows your Hyper-V hosts with their virtual machines in Netlens (kind `hypervisor`, like Proxmox, TrueNAS and Docker). Needs Netlens
 0.3.115 or newer. It is read-only in what it does: it logs in to Windows Remote Management (WinRM) and runs **one fixed PowerShell
-script**, which only calls `Get-VM` (the script is `SCRIPT` at the top of `plugin.py`; nothing else is ever sent).
+script**, which only reads Hyper-V's management data with `Get-CimInstance` (the script is `SCRIPT` at the top of `plugin.py`; nothing else is ever sent).
 
 ## What you get
 
@@ -32,6 +32,10 @@ New-Item -Path WSMan:\localhost\Listener -Transport HTTPS -Address * -Certificat
 Get-ChildItem WSMan:\localhost\Listener | Where-Object Keys -contains 'Transport=HTTP' | Remove-Item -Recurse -Force
 Get-NetFirewallRule -Name 'WINRM-HTTP-In-TCP*' | Disable-NetFirewallRule
 New-NetFirewallRule -DisplayName 'Netlens WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -RemoteAddress $netlens -Action Allow
+# lets 'Remote Management Users' open a remote shell (WinRM's default permissions only let administrators in)
+$sddl = (Get-Item WSMan:\localhost\Service\RootSDDL).Value
+if ($sddl -notmatch ';;;RM\)') { $dacl, $sacl = $sddl -split 'S:', 2; Set-Item WSMan:\localhost\Service\RootSDDL -Value ($dacl + '(A;;GXGR;;;RM)S:' + $sacl) -Force }
+Restart-Service WinRM -Force
 foreach ($sid in 'S-1-5-32-580','S-1-5-32-578') { $g = Get-LocalGroup -SID $sid; "$($g.Name): " + ((Get-LocalGroupMember -SID $sid).Name -join ', ') }   # netlens must be listed twice
 ```
 
@@ -62,10 +66,10 @@ sealing every message, which this client does not implement, so it refuses (and 
 | :--- | :--- |
 | `cannot reach …: Connection refused` / timeout | The HTTPS listener (`winrm enumerate winrm/config/listener` on the host should show Transport = HTTPS), the firewall rule and the address. |
 | `cannot make a secure connection` | The listener has no usable certificate; run the `New-SelfSignedCertificate` and `New-Item … Listener` lines again. |
-| `says access is denied` | The login worked but the user may not open a remote shell. Run the last line of the setup (it lists the members of both groups): `netlens` must be in *Remote Management Users* **and** *Hyper-V Administrators*. If it is not, run the two `Add-LocalGroupMember` lines (with the ids, they work in any language), then press **Test** again. If the user already existed, the `New-LocalUser` line fails; that is fine, skip it. |
+| `says access is denied` | The login worked but Windows refuses the remote shell. WinRM only lets administrators in until the `RootSDDL` lines of the setup have run (they add read and execute for *Remote Management Users*; the last of them restarts WinRM). Check with the last setup line that `netlens` is in *Remote Management Users* **and** *Hyper-V Administrators*. If the user already existed, the `New-LocalUser` line fails; that is fine, skip it. |
 | `refused the login` | User name or password wrong; the user must be in *Remote Management Users*. A local user is just `netlens`, a domain user `DOMAIN\name`. |
-| `may not manage Hyper-V` | Add the user to the local group *Hyper-V Administrators* and try again (a new login is needed). |
-| `Hyper-V is not installed` | `Get-VM` does not exist: the Hyper-V role and its PowerShell module must be installed on that machine. |
+| `may not manage Hyper-V` | Add the user to the local group *Hyper-V Administrators* (by id, see the setup) and try again; if it was added just now, restart the *Hyper-V Virtual Machine Management* service or the host once. |
+| `Hyper-V is not installed` | Hyper-V's management interface (WMI namespace `root\virtualization\v2`) does not exist: the Hyper-V role must be installed on that machine. |
 | `does not offer NTLM login` | WinRM's *Negotiate* authentication is off: `Set-Item WSMan:\localhost\Service\Auth\Negotiate $true`. |
 
 The **Run diagnostic** button reports how far the connection gets, as yes/no and counts (no names, addresses or accounts).

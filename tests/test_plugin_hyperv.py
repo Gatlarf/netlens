@@ -60,7 +60,7 @@ def test_fetch_logs_in_with_ntlm_runs_one_read_only_script_and_reads_the_vms(tmp
         assert server.logins == 1 and server.actions == ["Create", "Command", "Receive", "Delete"] and server.shells_open == 0
         assert len(server.scripts) == 1 and server.scripts[0] == plugin.SCRIPT
     script = plugin.SCRIPT
-    assert "Get-VM" in script and not any(w in script for w in ("Start-VM", "Stop-VM", "Set-", "Remove-", "New-", "Invoke-", "Restart"))
+    assert "Get-CimInstance" in script and "Get-VM" not in script and not any(w in script for w in ("Start-VM", "Stop-VM", "Set-", "Remove-", "New-", "Invoke-", "Restart", "Invoke-CimMethod", "Set-CimInstance"))
     checked = validate_output("hypervisor", out)
     host = checked["hosts"][0]
     assert host["name"] == "ILLUSION-265K" and host["ip"] == "192.168.0.115"
@@ -123,7 +123,7 @@ def test_missing_permission_and_missing_role_are_explained(tmp_path):
     with FakeWinRM(tmp_path, output="", stderr=clixml, exit_code=1) as server:
         with pytest.raises(plugin.AuthRefused, match="Hyper-V Administrators"):
             plugin.fetch(config(server))
-    clixml = '<Objs><S S="Error">Get-VM : The term \'Get-VM\' is not recognized as the name of a cmdlet_x000D__x000A_</S></Objs>'
+    clixml = '<Objs><S S="Error">Get-CimInstance : Invalid namespace _x000D__x000A_</S></Objs>'
     with FakeWinRM(tmp_path, output="", stderr=clixml, exit_code=1) as server:
         with pytest.raises(plugin.HyperVError, match="not installed"):
             plugin.fetch(config(server))

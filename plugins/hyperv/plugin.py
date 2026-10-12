@@ -1,7 +1,7 @@
 """Netlens plugin for Microsoft Hyper-V (kind "hypervisor").
 
 Talks to Windows Remote Management (WinRM, the protocol behind PowerShell remoting) and runs ONE fixed, read-only PowerShell script
-(`Get-VM`, nothing else) that prints the virtual machines as JSON. Only the Python standard library is available to plugins, so this
+(it only reads the Hyper-V management data with `Get-CimInstance`, nothing else) that prints the virtual machines as JSON. Only the Python standard library is available to plugins, so this
 file contains a small WinRM client: the SOAP messages of a remote command shell, and the NTLM login (NTLMv2, with its own MD4) or
 Basic login. It only works over HTTPS (port 5986), where the connection itself is encrypted; Windows refuses NTLM over plain HTTP
 unless the traffic is sealed, which this client does not do.
@@ -26,10 +26,22 @@ import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 
-SCRIPT = r"""$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
-$vms=@(Get-VM|ForEach-Object{$v=$_
-[pscustomobject]@{Id=$v.Id.ToString();Name=$v.Name;State=$v.State.ToString();Cpu=[int]$v.ProcessorCount;Mem=[int64]($v.MemoryAssigned/1MB);MemStartup=[int64]($v.MemoryStartup/1MB);Gen=[int]$v.Generation;Up=[int64]$v.Uptime.TotalSeconds;Auto=$v.AutomaticStartAction.ToString()
-Nics=@($v.NetworkAdapters|ForEach-Object{[pscustomobject]@{Mac=$_.MacAddress;Ips=@($_.IPAddresses);Switch=$_.SwitchName}})}})
+SCRIPT = r"""$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$ns='root\virtualization\v2'
+$st=@{2='Running';3='Off';6='Saved';9='Paused';32768='Paused';32769='Saved';32770='Starting';32773='Saving';32774='Stopping';32776='Pausing';32777='Resuming'}
+$au=@{2='Nothing';3='StartIfRunning';4='Start'}
+$sw=@{};Get-CimInstance -Namespace $ns -ClassName Msvm_VirtualEthernetSwitch|ForEach-Object{$sw[$_.Name]=$_.ElementName}
+function Rel($o,$c){@(Get-CimAssociatedInstance -InputObject $o -ResultClassName $c)}
+$vms=@(Get-CimInstance -Namespace $ns -ClassName Msvm_ComputerSystem -Filter "Caption='Virtual Machine'"|ForEach-Object{$v=$_
+$s=@(Get-CimAssociatedInstance -InputObject $v -Association Msvm_SettingsDefineState -ResultClassName Msvm_VirtualSystemSettingData)|Select-Object -First 1
+if(-not $s){return}
+$al=@(Rel $s 'Msvm_EthernetPortAllocationSettingData')
+$ports=@(@(Rel $s 'Msvm_SyntheticEthernetPortSettingData')+@(Rel $s 'Msvm_EmulatedEthernetPortSettingData'))
+[pscustomobject]@{Id=[string]$v.Name;Name=[string]$v.ElementName;State=[string]$st[[int]$v.EnabledState];Cpu=[int](Rel $s 'Msvm_ProcessorSettingData'|Select-Object -First 1).VirtualQuantity
+Mem=[int64](Rel $s 'Msvm_MemorySettingData'|Select-Object -First 1).VirtualQuantity;Gen=[int]($s.VirtualSystemSubType -replace '.*:','');Up=[int64]($v.OnTimeInMilliseconds/1000);Auto=[string]$au[[int]$s.AutomaticStartupAction]
+Nics=@($ports|ForEach-Object{$p=$_;$a=$al|Where-Object{$_.Parent -and ([string]$_.Parent).Replace('\\','\').Contains([string]$p.InstanceID)}|Select-Object -First 1
+$sn='';if($a -and $a.HostResource){$m=[regex]::Match([string]$a.HostResource[0],',Name="([^"]+)"');if($m.Success){$sn=[string]$sw[$m.Groups[1].Value]}}
+$ips=@();if($p.CimClass.CimClassName -eq 'Msvm_SyntheticEthernetPortSettingData'){$g=Rel $p 'Msvm_GuestNetworkAdapterConfiguration'|Select-Object -First 1;if($g){$ips=@($g.IPAddresses)}}
+[pscustomobject]@{Mac=[string]$p.Address;Ips=$ips;Switch=$sn}})}})
 [pscustomobject]@{Host=$env:COMPUTERNAME;Vms=$vms}|ConvertTo-Json -Depth 5 -Compress"""
 
 SOAP_ACTIONS = {
@@ -438,8 +450,8 @@ def read_host(session):
         session.close()
     if code != 0 or not out.strip():
         message = powershell_error(err)
-        if "not recognized" in message and "Get-VM" in message:
-            raise HyperVError(f"{session.id}: Hyper-V is not installed on that machine (Get-VM does not exist)")
+        if "invalid namespace" in message.lower() or "not recognized" in message:
+            raise HyperVError(f"{session.id}: Hyper-V is not installed on that machine (its management interface does not exist)")
         if "required permission" in message or "access" in message.lower() and "denied" in message.lower():
             raise AuthRefused(f"{session.id}: the user may not manage Hyper-V. Add it to the local group 'Hyper-V Administrators'")
         raise HyperVError(f"{session.id}: the script failed" + (f": {message}" if message else f" (exit code {code})"))
