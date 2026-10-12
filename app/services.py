@@ -367,9 +367,20 @@ def _housekeeping_checks(conn) -> None:
         log.debug("update check failed", exc_info=True)
 
 
+def _startup_checks(db_path: str) -> None:
+    """Right after a start: look for a newer Netlens and newer plugins, so the About page is not showing a day-old answer."""
+    conn = connect(db_path)
+    try:
+        _housekeeping_checks(conn)
+    finally:
+        conn.close()
+
+
 async def service_loop(db_path: str, interval: float = 10.0) -> None:
     """Background task: run due checks every few seconds, prune old results hourly."""
     last_prune = 0.0
+    startup = asyncio.ensure_future(asyncio.to_thread(_startup_checks, db_path))      # does not hold the loop up when the internet is slow
+    startup.add_done_callback(lambda f: f.exception())                                  # never an unhandled error
     while True:
         try:
             if await run_due_checks(db_path):

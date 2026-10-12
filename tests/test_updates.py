@@ -111,3 +111,24 @@ def test_api(tmp_path):
         assert client.get("/api/update").json()["enabled"] is False
         assert client.get("/api/update", headers={"Authorization": "Bearer no"}).status_code == 401
         assert client.put("/api/update", json={}, headers={"Authorization": "Bearer no"}).status_code == 401
+
+
+def test_an_answer_from_before_an_update_is_asked_again(conn):
+    reg = Registry(["0.2.44", "0.2.46"])
+    updates.check(conn, getter=reg, now="2026-03-10T12:00:00Z", current="0.2.44")
+    n = len(reg.calls)
+    # the same day, but Netlens now runs a different version than when the answer was cached: ask again
+    updates.check(conn, getter=reg, now="2026-03-10T13:00:00Z", current="0.2.46")
+    assert len(reg.calls) > n
+    n = len(reg.calls)
+    updates.check(conn, getter=reg, now="2026-03-10T14:00:00Z", current="0.2.46")       # same version, same day: cached
+    assert len(reg.calls) == n
+
+
+def test_running_ahead_of_the_cached_answer_asks_again(conn):
+    reg = Registry(["0.2.44"])
+    updates.check(conn, getter=reg, now="2026-03-10T12:00:00Z", current="0.2.44")
+    n = len(reg.calls)
+    reg.tags.append("0.2.50")
+    r = updates.check(conn, getter=reg, now="2026-03-10T12:30:00Z", current="0.2.50")   # running 0.2.50 while the cache says 0.2.44
+    assert len(reg.calls) > n and r["latest"] == "0.2.50"

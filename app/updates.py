@@ -77,6 +77,9 @@ def check(conn, *, force: bool = False, getter=http_get, now: str | None = None,
         return result
     now = now or utcnow()
     cache = _cache(conn)
+    # a cached answer from before this version started (you just updated) or older than the running version says nothing useful: ask again
+    if cache and cache.get("current") not in (None, current) or cache and is_newer(current, cache["latest"]):
+        force = True
     if cache and not force and cache.get("checked"):
         age = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ") - datetime.strptime(cache["checked"], "%Y-%m-%dT%H:%M:%SZ")).total_seconds()
         if 0 <= age < TTL_SECONDS:
@@ -85,5 +88,5 @@ def check(conn, *, force: bool = False, getter=http_get, now: str | None = None,
         latest = fetch_latest(getter)
     except PluginIndexError as exc:
         return {**result, "error": str(exc)}
-    set_setting(conn, CACHE_KEY, json.dumps({"latest": latest, "checked": now}))
+    set_setting(conn, CACHE_KEY, json.dumps({"latest": latest, "checked": now, "current": current}))
     return status(conn, current)
