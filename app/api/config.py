@@ -117,7 +117,6 @@ async def _config_payload(request: Request) -> dict:
         "terminal_allowed_here": allowed_here,
         "terminal_available": settings.terminal_enabled and allowed_here,   # for THIS request
         "terminal_here": why_here,
-        "snmp_enabled": settings.snmp_community is not None,
         "bind": f"{settings.bind_host}:{settings.bind_port}",
     }
 

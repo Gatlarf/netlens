@@ -20,7 +20,6 @@ def test_load_settings_defaults():
     assert settings.quick_interval == 900
     assert settings.deep_interval == 86400
     assert settings.terminal_enabled is True
-    assert settings.snmp_community is None
     assert settings.bind_host == "0.0.0.0"
     assert settings.bind_port == 8080
     assert settings.data_dir == Path("/data")
@@ -150,16 +149,6 @@ def test_load_settings_terminal_enabled_invalid():
     assert "NETLENS_TERMINAL" in str(exc.value)
 
 
-def test_load_settings_snmp_community_default():
-    settings = load_settings(_base_env())
-    assert settings.snmp_community is None
-
-
-def test_load_settings_snmp_community_custom():
-    settings = load_settings(_base_env(NETLENS_SNMP_COMMUNITY="public"))
-    assert settings.snmp_community == "public"
-
-
 def test_load_settings_bind_default():
     settings = load_settings(_base_env())
     assert settings.bind_host == "0.0.0.0"
@@ -224,3 +213,6 @@ def test_config_error_is_exception():
 )
 def test_is_scannable_range(cidr, expected):
     assert is_scannable_range(cidr) is expected
+
+def test_the_old_snmp_community_variable_is_ignored():
+    load_settings(_base_env(NETLENS_SNMP_COMMUNITY="public"))      # still set in older compose files: harmless

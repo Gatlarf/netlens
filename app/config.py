@@ -18,7 +18,6 @@ class Settings:
     quick_interval: int
     deep_interval: int
     terminal_enabled: bool
-    snmp_community: str | None
     bind_host: str
     bind_port: int
     data_dir: Path
@@ -141,9 +140,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     if docs_str not in ("on", "off"):
         raise ConfigError("NETLENS_API_DOCS must be 'on' or 'off'")
 
-    snmp_community = env.get("NETLENS_SNMP_COMMUNITY", "")
-    snmp_community = snmp_community if snmp_community else None
-
     bind_str = env.get("NETLENS_BIND", "0.0.0.0:8080")
     if ":" not in bind_str:
         raise ConfigError("NETLENS_BIND must be in format host:port")
@@ -163,7 +159,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         quick_interval=quick_interval,
         deep_interval=deep_interval,
         terminal_enabled=terminal_enabled,
-        snmp_community=snmp_community,
         bind_host=host,
         bind_port=port,
         data_dir=data_dir,

@@ -53,8 +53,6 @@ services:
       NETLENS_TRUSTED_PROXIES: ${NETLENS_TRUSTED_PROXIES:-}
       # Serve the API documentation pages (/docs, /redoc, /openapi.json). Off by default.
       NETLENS_API_DOCS: ${NETLENS_API_DOCS:-off}
-      # Optional SNMP community string; empty means disabled.
-      NETLENS_SNMP_COMMUNITY: ${NETLENS_SNMP_COMMUNITY:-}
       # Bind address for the web server (default 0.0.0.0:8080).
       NETLENS_BIND: ${NETLENS_BIND:-0.0.0.0:8080}
 

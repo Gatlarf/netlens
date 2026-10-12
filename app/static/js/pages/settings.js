@@ -142,7 +142,6 @@ async function buildAboutCard() {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "About"));
   card.appendChild(kvRow("Version", cfg.version ?? ""));
-  card.appendChild(kvRow("SNMP", cfg.snmp_enabled ? "enabled" : "disabled"));
   card.appendChild(kvRow("Listening on", cfg.bind ?? ""));
   const wrap = h("div", {}, card);
   try {

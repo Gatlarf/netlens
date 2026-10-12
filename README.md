@@ -322,7 +322,6 @@ Restoring the backup matters because a newer version may have changed the databa
 | `NETLENS_TERMINAL_REMOTE` | `off` | Where the terminal may be used from: `off` = direct local connections only (not through a reverse proxy / HTTPS address), `lan` = also through a proxy for local clients, `any` = anywhere |
 | `NETLENS_TRUSTED_PROXIES` | *(empty)* | Reverse proxies whose `X-Forwarded-For` header is believed, as addresses or networks (`192.168.0.184` or `192.168.0.0/24`, comma separated). **Set this when you reach Netlens through a reverse proxy**: without it every visitor looks like the proxy, so the login throttle (5 wrong attempts a minute) is shared by everybody and a stranger can lock you out |
 | `NETLENS_API_DOCS` | `off` | `on` serves the API documentation pages `/docs`, `/redoc` and `/openapi.json`; they are off so a stranger cannot read a map of the API |
-| `NETLENS_SNMP_COMMUNITY` | *(reserved/unused)* | SNMP community string |
 | `NETLENS_BIND` | `0.0.0.0:8080` | Bind address and port |
 | `NETLENS_DATA_DIR` | `/data` | Data directory |
 
@@ -672,7 +671,7 @@ A device that was online and is not seen by a scan is asked for once more on its
 
 ## Not implemented / limitations
 
-- SNMP and LLDP/CDP neighbour discovery (planned)
+- CDP neighbour discovery (planned); SNMP switches and LLDP are covered by the SNMP plugin
 - Switch-to-device links come only from traceroute/heuristics/manual
 - IPv6 hosts are ignored
 - No multi-user accounts

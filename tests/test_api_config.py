@@ -86,7 +86,7 @@ def test_config_with_auth(tmp_path: Path) -> None:
         assert data["quick_interval"] == 900
         assert data["deep_interval"] == 86400
         assert data["terminal_enabled"] is True
-        assert data["snmp_enabled"] is True
+        assert "snmp_enabled" not in data
         assert data["bind"] == "0.0.0.0:8080"
         assert "version" in data
         body = resp.text
