@@ -19,6 +19,8 @@ from app.plugins.service import (
     clear_plugin_data,
     forget_plugin,
     get_state,
+    install_state,
+    missing_plugins,
     merge_config,
     public_state,
     save_state,
@@ -64,10 +66,12 @@ def list_plugins(request: Request) -> dict:
     service = _service(request)
     conn = connect(request.app.state.db_path)
     try:
-        items = [_summary(conn, p) for p in service.plugins().values()]
+        plugins = service.plugins()
+        items = [_summary(conn, p) for p in plugins.values()]
+        missing = missing_plugins(conn, plugins)
     finally:
         conn.close()
-    return {"plugins": items, "api_version": API_VERSION, "kinds": list(KINDS)}
+    return {"plugins": items, "missing": missing, "api_version": API_VERSION, "kinds": list(KINDS)}
 
 
 @router.get("/plugins/guide")
@@ -219,7 +223,7 @@ async def upload_plugin(request: Request, replace: bool = False) -> dict:
     conn = connect(request.app.state.db_path)
     try:
         if not result["replaced"]:
-            save_state(conn, manifest["id"], False, clean_config(manifest, {}))
+            install_state(conn, manifest, result["sha256"])
         inst.remember_zip(request.app.state.settings.data_dir, manifest["id"], manifest["version"], bytes(data))
         set_setting(conn, f"plugin.{manifest['id']}.install", json.dumps({"source": "upload", "version": manifest["version"], "sha256": result["sha256"], "level": None, "installed": utcnow()}))
     finally:

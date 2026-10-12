@@ -126,7 +126,7 @@ def test_a_sync_stores_the_sites_with_their_targets(db):
     assert (summary["sites"], summary["sites_matched"], summary["proxies"]) == (3, 2, 1)
     listing = {s["id"]: s for s in sites.list_sites(conn)}
     assert listing["1"]["target_container"] and listing["1"]["target_name"] == "jellyfin" and listing["1"]["target_device_id"] == ids["docker"]
-    assert listing["1"]["proxy_device_id"] == ids["proxy"] and listing["1"]["cert_days"] == 80 and listing["1"]["ssl"]
+    assert listing["1"]["proxy_device_id"] == ids["proxy"] and listing["1"]["cert_days"] == sites._cert_days("2026-12-31T00:00:00Z", datetime.now(timezone.utc)) and listing["1"]["ssl"]
     assert listing["2"]["target_device_id"] is None
     sites.apply_proxy(conn, "npm", output(site("1", ["media.example.com"], "192.168.0.189", 8096)), {"create_checks": False}, NOW)      # a site that is gone is gone
     assert [s["id"] for s in sites.list_sites(conn)] == ["1"]

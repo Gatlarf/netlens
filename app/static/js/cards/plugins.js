@@ -1,4 +1,4 @@
-import { get, put, upload } from "../api.js";
+import { get, post, put, upload } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
 const KIND_LABEL = { hypervisor: "Hypervisor", topology: "Network topology", dns: "DNS", proxy: "Reverse proxy" };
@@ -16,6 +16,41 @@ function fillPluginsCard(card, data, notice = null) {
   card.appendChild(h("p", { class: "hint" },
     "Plugins connect Netlens to routers and hypervisors. Each one reports what is connected to what, and Netlens shows it on the map and in the hierarchy. " +
     "Turn a plugin on or off here; its own settings are on its page in the menu."));
+
+  if ((data.missing || []).length) {
+    // settings that came back with a restore, for plugins whose files are not here (a new data folder): installing keeps them
+    const box = h("div", { class: "baseline-box" });
+    box.appendChild(h("p", { class: "error" }, "Not installed here, but their settings are saved (for example after a restore). Install them again and the settings come back."));
+    for (const m of data.missing) {
+      const row = h("p", {}, h("strong", {}, m.id), m.version ? ` ${m.version} ` : " ");
+      if (m.source === "index") {
+        const btn = h("button", { type: "button", class: "btn admin-only" }, "Install again from the index");
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          try {
+            let result;
+            try {
+              result = await post(`/api/plugin-index/${m.id}/install`, {});
+            } catch (err) {
+              if (err.status !== 409 || !window.confirm(`${err.message}\n\nInstall it anyway?`)) throw err;
+              result = await post(`/api/plugin-index/${m.id}/install`, { accept_risk: true });
+            }
+            toast(`${m.id} ${result.version} installed with its saved settings`, "success");
+            document.dispatchEvent(new CustomEvent("netlens:plugins-changed"));
+            fillPluginsCard(card, await get("/api/plugins"));
+          } catch (err) {
+            toast(err.message || "Could not install it", "error");
+            btn.disabled = false;
+          }
+        });
+        row.appendChild(btn);
+      } else {
+        row.appendChild(h("span", { class: "hint" }, "was uploaded as a file: upload the .zip again below"));
+      }
+      box.appendChild(row);
+    }
+    card.appendChild(box);
+  }
 
   const table = h("table", { class: "data" });
   const head = h("tr");

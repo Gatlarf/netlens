@@ -413,3 +413,41 @@ def test_api_cache_only(client):
     assert s.calls == []
     client.get("/api/plugin-index")
     assert len(client.get("/api/plugin-index", params={"cache_only": "true"}).json()["plugins"]) == 1
+
+
+def test_settings_survive_a_restore_that_left_the_plugin_files_behind(world, tmp_path_factory):
+    """Restore = the database comes back, the plugin folder does not (a fresh container/volume). Installing again must not wipe the settings."""
+    conn, tmp, server = world
+    r1 = publish(server, "1.0.0")
+    e1 = entry_of(r1)
+    inst.install_release(conn, tmp, e1, e1["releases"][0], getter=server)
+    save_state(conn, "omada", True, {"host": "10.0.0.1"})
+
+    fresh = tmp_path_factory.mktemp("fresh-data")                    # the new data folder: no plugins in it
+    from app.plugins.service import missing_plugins
+    assert missing_plugins(conn, discover(fresh)) == [{"id": "omada", "version": "1.0.0", "source": "index"}]
+    inst.install_release(conn, fresh, e1, e1["releases"][0], getter=server)
+    p = discover(fresh)["omada"]
+    assert get_state(conn, p) == {"enabled": True, "config": {"host": "10.0.0.1"}}     # same code: settings and the on switch are back
+    assert missing_plugins(conn, discover(fresh)) == []
+
+    other = tmp_path_factory.mktemp("other-data")                    # other code than the one that was configured: settings kept, but off
+    r2 = publish(server, "1.1.0")
+    e2 = entry_of(r2)
+    inst.install_release(conn, other, e2, e2["releases"][0], getter=server)
+    assert get_state(conn, discover(other)["omada"]) == {"enabled": False, "config": {"host": "10.0.0.1"}}
+
+
+def test_a_new_plugin_without_saved_settings_still_starts_off(world):
+    conn, tmp, server = world
+    e = entry_of(publish(server, "1.0.0"))
+    inst.install_release(conn, tmp, e, e["releases"][0], getter=server)
+    assert get_state(conn, discover(tmp)["omada"])["enabled"] is False
+
+
+def test_a_removed_plugin_is_not_listed_as_missing(client):
+    assert client.get("/api/plugins").json()["missing"] == []
+    z = make_zip("manual", "1.0.0")
+    client.post("/api/plugins", content=z, headers={"Content-Type": "application/zip"})
+    client.delete("/api/plugins/manual")                      # forgotten on purpose: nothing to restore
+    assert client.get("/api/plugins").json()["missing"] == []

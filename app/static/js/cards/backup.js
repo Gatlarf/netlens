@@ -87,7 +87,7 @@ export function buildBackupCard() {
   card.appendChild(h("h2", {}, "Backup and restore"));
 
   card.appendChild(h("p", { class: "hint" },
-    "The backup contains all devices, history and settings, including saved e-mail and plugin credentials. Store it somewhere safe."));
+    "The backup contains all devices, history and settings, including saved e-mail and plugin credentials. Store it somewhere safe. Plugin files are not in it: after a restore on a fresh install, the Plugins page lists the plugins to install again, and their settings come back with them."));
 
   card.appendChild(h("a", { class: "btn", href: "/api/backup", download: "" }, "Download backup"));
 

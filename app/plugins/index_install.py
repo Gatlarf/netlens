@@ -13,7 +13,7 @@ from app.db import get_setting, set_setting, utcnow
 from app.plugins import registry
 from app.plugins.contract import clean_config
 from app.plugins.index import download_release
-from app.plugins.service import save_state
+from app.plugins.service import install_state
 from app.plugins.registry import Plugin
 
 KEEP_BACKUPS = 3
@@ -90,7 +90,7 @@ def install_release(conn, data_dir: Path | str, entry: dict, release: dict, *, g
     result = registry.install(data_dir, data, replace=existing)
     remember_zip(data_dir, entry["id"], release["version"], data)
     if not existing:
-        save_state(conn, entry["id"], False, clean_config(manifest, {}))
+        install_state(conn, manifest, release["sha256"])
     set_setting(conn, _key(entry["id"]), json.dumps({
         "source": "index", "index_url": index_url, "version": release["version"], "sha256": release["sha256"],
         "level": release["review"]["level"], "reviewer": release["review"]["reviewer"], "installed": utcnow(),

@@ -60,6 +60,40 @@ def save_state(conn: sqlite3.Connection, plugin_id: str, enabled: bool, config: 
     set_setting(conn, _key(plugin_id), json.dumps({"enabled": enabled, "config": config}))
 
 
+def install_state(conn: sqlite3.Connection, manifest: dict, sha256: str) -> None:
+    """State of a plugin that was just installed and had no files here before.
+
+    Normally that is a new plugin: switched off, defaults. But the database may already hold settings for this id (after a
+    restore from a backup, or a container with a fresh plugin folder); then they are kept, so nobody types them again.
+    It only stays on when the code is byte for byte the code that was installed when the settings were saved; other code
+    starts off and has to be turned on, because it would otherwise run at once with the credentials saved for the old one."""
+    saved = _load_json(conn, _key(manifest["id"]))
+    if not isinstance(saved, dict) or not isinstance(saved.get("config"), dict):
+        save_state(conn, manifest["id"], False, clean_config(manifest, {}))
+        return
+    config = default_config(manifest)
+    config.update({k: v for k, v in saved["config"].items() if k in config})
+    before = _load_json(conn, _key(manifest["id"], "install"))
+    same_code = isinstance(before, dict) and bool(before.get("sha256")) and before.get("sha256") == sha256
+    save_state(conn, manifest["id"], bool(saved.get("enabled")) and same_code, config)
+
+
+def missing_plugins(conn: sqlite3.Connection, plugins: dict) -> list[dict]:
+    """Plugins that have settings in the database but are not installed (typically after a restore on a fresh data folder)."""
+    out = []
+    for key, value in conn.execute("SELECT key, value FROM settings WHERE key LIKE 'plugin.%.install'").fetchall():
+        plugin_id = key[len("plugin."):-len(".install")]
+        if plugin_id in plugins or "." in plugin_id:
+            continue
+        try:
+            info = json.loads(value)
+        except ValueError:
+            info = {}
+        info = info if isinstance(info, dict) else {}
+        out.append({"id": plugin_id, "version": info.get("version"), "source": info.get("source", "upload")})
+    return sorted(out, key=lambda m: m["id"])
+
+
 def get_status(conn: sqlite3.Connection, plugin_id: str) -> dict | None:
     status = _load_json(conn, _key(plugin_id, "status"))
     return status if isinstance(status, dict) else None
