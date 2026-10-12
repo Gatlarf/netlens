@@ -95,7 +95,7 @@ function fillPluginsCard(card, data, notice = null) {
   const uploadBtn = h("button", { type: "button", class: "btn" }, "Upload plugin");
   const resultEl = h("p", { class: "hint" }, "");
   card.appendChild(h("div", { class: "field" }, fileInput));
-  card.appendChild(uploadBtn);
+  card.appendChild(h("div", { class: "button-row" }, uploadBtn, h("a", { class: "btn", href: "#/settings/plugin-browse" }, "Browse plugins")));
   card.appendChild(resultEl);
 
   uploadBtn.addEventListener("click", async () => {

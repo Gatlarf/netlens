@@ -340,7 +340,7 @@ Order of precedence: the web setting, then `NETLENS_RANGES`, then auto-detection
 
 ## Settings in the web interface
 
-Settings has a menu on the left, grouped into General, Notifications, Integrations, Data and System. **Every entry is its own page** with its own address (so you can bookmark it or use Back): `#/settings/ranges`, `nmap`, `schedule`, `map`, `notifications`, `plugins`, `plugin-<id>` (for example `plugin-proxmox`, `plugin-asus`), `plugin-guide`, `ignored`, `backup`, `export`, `about` and `session`, for example `http://<docker-host>:8080/#/settings/plugin-proxmox`. On a narrow screen the menu becomes a row of buttons on top. The older addresses `#/settings/proxmox` and `#/settings/asus` still work.
+Settings has a menu on the left, grouped into General, Notifications, Integrations, Data and System. **Every entry is its own page** with its own address (so you can bookmark it or use Back): `#/settings/ranges`, `nmap`, `schedule`, `map`, `notifications`, `dns`, `ignored`, `users`, `terminal`, `plugins`, `plugin-browse`, `plugin-<id>` (for example `plugin-proxmox`, `plugin-asus`), `plugin-guide` (linked from the Plugins page), `backup`, `export`, `about` and `session`, for example `http://<docker-host>:8080/#/settings/plugin-proxmox`. On a narrow screen the menu becomes a row of buttons on top. The older addresses `#/settings/proxmox` and `#/settings/asus` still work.
 
 Everything below is saved in the data directory, so it survives updates and rebuilds. Values set in the browser take precedence over the matching environment variables; "Reset" returns to the environment value.
 

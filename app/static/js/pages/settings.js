@@ -208,6 +208,10 @@ const STATIC_GROUPS = [
       { key: "map", label: "Map", build: buildMapCard },
       { key: "groups", label: "Groups", build: buildGroupsCard },
       { key: "netchecks", label: "Network checks", build: buildNetchecksCard },
+      { key: "dns", label: "DNS registration", build: buildDnsCard },
+      { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
+      { key: "users", label: "Users & tokens", build: buildUsersCard },
+      { key: "terminal", label: "Web terminal", build: buildTerminalCard },
     ],
   },
   {
@@ -222,7 +226,6 @@ const STATIC_GROUPS = [
   {
     title: "Data",
     items: [
-      { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
       { key: "backup", label: "Backup & restore", build: buildBackupCard },
       { key: "export", label: "Export", build: buildExportCard },
       { key: "shares", label: "Share links", build: buildSharesCard },
@@ -232,8 +235,6 @@ const STATIC_GROUPS = [
     title: "System",
     items: [
       { key: "about", label: "About", build: buildAboutCard },
-      { key: "terminal", label: "Web terminal", build: buildTerminalCard },
-      { key: "users", label: "Users & tokens", build: buildUsersCard },
       { key: "session", label: "Account", build: buildAccountCard },
     ],
   },
@@ -247,10 +248,9 @@ const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus" };
 function integrationsGroup(plugins, updates = 0) {
   const items = [
     { key: "plugins", label: "Plugins", build: buildPluginsCard },
-    { key: "dns", label: "DNS registration", build: buildDnsCard },
     { key: "plugin-browse", label: updates ? `Browse plugins (${updates} update${updates === 1 ? "" : "s"})` : "Browse plugins", build: buildBrowseCard },
     ...plugins.map((p) => ({ key: `plugin-${p.id}`, label: p.name, build: () => buildPluginCard(p.id) })),
-    { key: "plugin-guide", label: "Plugin guide", build: buildPluginGuideCard },
+    { key: "plugin-guide", label: "Plugin guide", hidden: true, build: buildPluginGuideCard },
   ];
   return { title: "Integrations", items };
 }
@@ -278,6 +278,7 @@ function fillNav(nav, groups, activeKey) {
   for (const group of groups) {
     nav.appendChild(h("div", { class: "nav-group" }, group.title));
     for (const entry of group.items) {
+      if (entry.hidden) continue; // reachable by address (linked from the Plugins page), not listed in the menu
       const link = h("a", { href: `#/settings/${entry.key}`, "data-section": entry.key }, entry.label);
       if (entry.key === activeKey) {
         link.classList.add("active");

@@ -651,3 +651,5 @@ body.setup-mode #nav, body.setup-mode .topbar-actions { display: none; }
 .topbar .coffee-btn:hover { background: #ffe94d; }
 .topbar .coffee-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 900px) { .topbar .coffee-text { display: none; } }
+
+.button-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
