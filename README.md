@@ -65,6 +65,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Edge kinds](#edge-kinds)
   - [Map features](#map-features)
 - [Web terminal](#web-terminal)
+- [Demo mode](#demo-mode)
 - [Security notes](#security-notes)
 - [Not implemented / limitations](#not-implemented--limitations)
 - [Development](#development)
@@ -655,6 +656,29 @@ A device that was online and is not seen by a scan is asked for once more on its
 - **Only on the local network by default.** A request that came through a reverse proxy (it carries `X-Forwarded-*` headers) is treated as coming from outside, so the terminal does not work on your HTTPS address; open `http://<netlens>:8080` on the local network instead. `NETLENS_TERMINAL_REMOTE` widens this: `off` (default), `lan` (also through a proxy when the client address the proxy reports is a local one; the proxy must set `X-Forwarded-For`, which the recipes above do or do by default) or `any`. It is an environment variable on purpose: nobody who reaches the web interface from outside can change it, and the on/off switch for the terminal (Settings) can only be changed from the local network either. The device page's console is in the left column (with a *Wide view* button) and the top bar has an **SSH** button that jumps to it.
 - For a guarantee that does not depend on Netlens, also block it in the reverse proxy, for example nginx `location /api/terminal { return 404; }` or Caddy `respond /api/terminal/* 404`. Nginx Proxy Manager: *Custom Locations* with `/api/terminal` and an advanced `return 404;`.
 - HTTP/HTTPS admin UIs opened via plain links ("Open" next to ports 80/443/...)
+
+## Demo mode
+
+Want to show Netlens to someone, or try it without a network? Start the same image with `NETLENS_DEMO=on`, as its own container next to
+the real one (use a different name and port, and no volume). It builds a made-up home network of 46 devices with a month of history:
+outages, a flaky smart plug, a switch that takes its cameras down, a power cut, DNS registration, Proxmox / Docker / Hyper-V / TrueNAS
+guests, reverse-proxy sites with certificates, service checks and Wi-Fi roaming. A small simulator keeps it moving (devices go offline
+and come back), and the map, hierarchy, uptime, statistics and settings pages all work.
+
+```bash
+docker compose -f docker-compose.demo.yml up -d      # then open http://<this-machine>:8081, sign in as demo / netlens-demo
+```
+
+Or add it to your own compose file: the real image, `NETLENS_DEMO: "on"`, a port and `tmpfs: ["/data:uid=10001,gid=10001"]`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `NETLENS_DEMO` | `off` | `on` switches demo mode on |
+| `NETLENS_DEMO_RESET` | `daily` | `off`, `hourly` or `daily`: how often the data starts over |
+
+The demo is read-only for visitors: the demo account sees every page, but every change (scans, settings, plugins, users) is refused
+with a message. Nothing is scanned or sent, the web terminal is off, and the sign-in page shows the demo account. The addresses
+and names are fictional (`192.168.42.0/24`, `home.example.net`).
 
 ## Security notes
 

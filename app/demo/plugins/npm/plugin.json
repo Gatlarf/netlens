@@ -1,0 +1,97 @@
+{
+  "id": "npm",
+  "name": "Nginx Proxy Manager",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "proxy",
+  "author": "Netlens",
+  "description": "Shows the sites your Nginx Proxy Manager publishes (proxy hosts, redirections, streams, 404 hosts) and ties each one to the device or Docker container behind it: a 'Published through Nginx Proxy Manager' card on that device, the sites a proxy serves, certificate expiry with warnings, optional HTTPS checks per site and optional DNS names for the domains. Read-only: it only reads from the Nginx Proxy Manager API, so give it a user that can only view.",
+  "info": {
+    "title": "How to create the Nginx Proxy Manager user for Netlens",
+    "text": "In Nginx Proxy Manager open Users and add a user for Netlens. Give it a normal e-mail address and a password, do NOT make it an administrator and do not turn on two-factor authentication for it (the API login cannot answer a code). Then open that user's Permissions and set Item Visibility to 'All Items' (otherwise it sees only what it created itself) and every permission to 'View Only'. Enter that e-mail address and password below. Netlens only ever reads.",
+    "code": "Users > Add User\n  Email:       netlens@example.com\n  Roles:       (none, not Administrator)\n\nUsers > Netlens > Permissions\n  Item Visibility:    All Items\n  Proxy Hosts:        View Only\n  Redirection Hosts:  View Only\n  404 Hosts:          View Only\n  Streams:            View Only\n  Access Lists:       View Only\n  Certificates:       View Only"
+  },
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Nginx Proxy Manager",
+      "required": true,
+      "help": "The address of the admin interface (port 81 by default) and the e-mail address and password of the read-only user. When Netlens reaches the proxy under a name or as 127.0.0.1, fill in the proxy's own network address as well, so its sites can be linked to the right device.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "http://192.168.0.184:81",
+          "required": true
+        },
+        {
+          "key": "email",
+          "label": "E-mail address of the user",
+          "placeholder": "netlens@example.com",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "lan",
+          "label": "Proxy's own address",
+          "placeholder": "192.168.0.184",
+          "help": "Only needed when the address above is a name or 127.0.0.1",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only matters for https:// addresses."
+    },
+    {
+      "key": "resolve_names",
+      "type": "bool",
+      "label": "Look up the names sites forward to",
+      "default": true,
+      "help": "A site that forwards to a host name (nas.home.example.com) is tied to the device with that address."
+    },
+    {
+      "key": "create_checks",
+      "type": "bool",
+      "label": "Check every site",
+      "default": true,
+      "help": "Netlens asks the proxy for each enabled site over HTTPS (or HTTP) every few minutes and reports it under Services, with a 'service down' event when the proxy answers with a server error. These checks follow the proxy's list: they come and go with the sites."
+    },
+    {
+      "key": "check_interval",
+      "type": "number",
+      "label": "Check every (seconds)",
+      "default": 300,
+      "min": 60,
+      "max": 3600
+    },
+    {
+      "key": "cert_warn_days",
+      "type": "number",
+      "label": "Warn about certificates this many days before they expire",
+      "default": 14,
+      "min": 1,
+      "max": 60,
+      "help": "You get a 'certificate expiring' event at this many days, and again at 7, 3 and 1 days and when it has expired."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/npm"
+}

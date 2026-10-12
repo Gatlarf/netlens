@@ -1,0 +1,82 @@
+{
+  "id": "hyperv",
+  "name": "Microsoft Hyper-V",
+  "version": "1.0.2",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows your Hyper-V hosts with their virtual machines: state, processors, memory, start time, network switch, each VM matched to the device Netlens found by MAC address (then IP). Reads through Windows Remote Management (WinRM over HTTPS) with one fixed, read-only query of Hyper-V's management data. Needs a user on the Hyper-V machine; the settings page has the PowerShell lines that set it up.",
+  "info": {
+    "title": "What to run on the Hyper-V machine (PowerShell as administrator)",
+    "text": "Run this once on the Hyper-V host in an administrator PowerShell. It makes a user for Netlens that can use remote management and read Hyper-V (and nothing else), switches on WinRM over HTTPS with a self-signed certificate, lets that group open a remote shell, and opens port 5986 only to the machine Netlens runs on. Change the first line to that machine's address. The groups are given by id, so it works on Windows in any language; the last line lists their members: netlens must be in both. If the user already exists, skip the New-LocalUser line. Then enter https://<this host's address>:5986, the user name (netlens) and its password below; leave 'Verify TLS certificate' off while the certificate is self-signed. Use a long password.",
+    "code": "$netlens = '192.168.0.189'   # the address of the machine Netlens runs on\n$pw = Read-Host -AsSecureString 'Password for the netlens user'\nNew-LocalUser -Name netlens -Password $pw -PasswordNeverExpires -UserMayNotChangePassword -Description 'Netlens (read Hyper-V)'\nAdd-LocalGroupMember -Group (Get-LocalGroup -SID 'S-1-5-32-578') -Member netlens   # Hyper-V Administrators (by id: the name is translated on non-English Windows)\nAdd-LocalGroupMember -Group (Get-LocalGroup -SID 'S-1-5-32-580') -Member netlens   # Remote Management Users\nEnable-PSRemoting -Force -SkipNetworkProfileCheck\n$cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(10)\nNew-Item -Path WSMan:\\localhost\\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force\nGet-ChildItem WSMan:\\localhost\\Listener | Where-Object Keys -contains 'Transport=HTTP' | Remove-Item -Recurse -Force\nGet-NetFirewallRule -Name 'WINRM-HTTP-In-TCP*' | Disable-NetFirewallRule\nNew-NetFirewallRule -DisplayName 'Netlens WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -RemoteAddress $netlens -Action Allow\n# lets 'Remote Management Users' open a remote shell (WinRM's default permissions only let administrators in)\n$sddl = (Get-Item WSMan:\\localhost\\Service\\RootSDDL).Value\nif ($sddl -notmatch ';;;RM\\)') { $dacl, $sacl = $sddl -split 'S:', 2; Set-Item WSMan:\\localhost\\Service\\RootSDDL -Value ($dacl + '(A;;GXGR;;;RM)S:' + $sacl) -Force }\nRestart-Service WinRM -Force\nforeach ($sid in 'S-1-5-32-580','S-1-5-32-578') { $g = Get-LocalGroup -SID $sid; \"$($g.Name): \" + ((Get-LocalGroupMember -SID $sid).Name -join ', ') }   # netlens must be listed twice"
+  },
+  "timeout": 120,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Hyper-V hosts",
+      "required": true,
+      "help": "One line per Hyper-V host: its address (https://host:5986, port 5986 is the default), and the user name and password of the Netlens user on that Windows machine (a local user is just the name, a domain user is DOMAIN\\name). Fill in the host's own address under More when the first field is a name, so Netlens can find its device.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.0.115:5986",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "lan",
+          "label": "Host's own address",
+          "placeholder": "192.168.0.115",
+          "help": "Only needed when the address above is a name",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "auth",
+      "type": "select",
+      "label": "Login method",
+      "default": "ntlm",
+      "options": [
+        {
+          "value": "ntlm",
+          "label": "NTLM (default, works with local and domain users)"
+        },
+        {
+          "value": "basic",
+          "label": "Basic (only when you turned Basic on in WinRM)"
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Leave this off while the host uses a self-signed certificate (what the setup lines create)."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/hyperv"
+}

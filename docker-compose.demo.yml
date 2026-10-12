@@ -1,0 +1,28 @@
+# A demo of Netlens with made-up data, for showing it to people. Nothing real is scanned, checked or changed, and nothing is kept:
+# the data lives in memory and starts over (hourly or daily, see NETLENS_DEMO_RESET).
+#
+#   docker compose -f docker-compose.demo.yml up -d      then open http://<this-machine>:8081
+#
+# It is the same image as the real Netlens; NETLENS_DEMO=on is the only difference. Run it on its own, next to the real one.
+
+services:
+  netlens-demo:
+    image: ghcr.io/gatlarf/netlens:${NETLENS_IMAGE_TAG:-latest}
+    container_name: netlens-demo
+    restart: unless-stopped
+    ports:
+      - "${NETLENS_DEMO_PORT:-8081}:8080"          # a normal network is enough: the demo scans nothing
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - "/tmp"
+      - "/data:uid=10001,gid=10001,mode=0750"       # disposable: the demo data is rebuilt at every start
+    environment:
+      TZ: ${TZ:-UTC}
+      NETLENS_DEMO: "on"
+      NETLENS_DEMO_RESET: ${NETLENS_DEMO_RESET:-daily}   # off, hourly or daily
+      # Behind a reverse proxy: the proxy's address, so the sign-in throttle counts the real visitor.
+      NETLENS_TRUSTED_PROXIES: ${NETLENS_TRUSTED_PROXIES:-}

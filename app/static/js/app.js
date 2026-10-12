@@ -279,6 +279,28 @@ function setLoginMode(byUser) {
 
 let whatsNewChecked = false;
 
+// Demo mode: a banner on every page, and the demo account filled in on the sign-in page
+function showDemo(demo) {
+  const banner = el("#demo-banner");
+  if (!demo || !banner) return;
+  const again = demo.reset === "off" ? "" : ` The data starts over ${demo.reset === "hourly" ? "every hour" : "every day"}.`;
+  banner.textContent = `Demo: everything here is made up, and changes are switched off.${again} `;
+  const link = document.createElement("a");
+  link.href = "https://github.com/Gatlarf/netlens";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "Get Netlens";
+  banner.append(link);
+  banner.hidden = false;
+  const hint = el("#login-demo");
+  if (hint) {
+    hint.textContent = `Demo account: user name ${demo.username}, password ${demo.password}`;
+    hint.hidden = false;
+  }
+  if (el("#login-user") && !el("#login-user").value) el("#login-user").value = demo.username;
+  if (el("#login-password") && !el("#login-password").value) el("#login-password").value = demo.password;
+}
+
 async function applySession() {
   const session = await get("/api/session");
   setSessionUser(session.authenticated ? session.user : null);
@@ -298,7 +320,8 @@ async function applySession() {
       el("#user-who").textContent = "Not signed in";
     }
   }
-  if (session.authenticated && !whatsNewChecked) {
+  showDemo(session.demo);
+  if (session.authenticated && !whatsNewChecked && !session.demo) {
     whatsNewChecked = true;
     maybeShowWhatsNew();
   }

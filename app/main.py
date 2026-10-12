@@ -57,7 +57,15 @@ async def lifespan(app: FastAPI):
         logging.getLogger(__name__).exception("could not refresh the device identification")
 
     tasks = []
-    if getattr(app.state, "scheduler", False):
+    settings = app.state.settings
+    if getattr(settings, "demo", False):
+        # demo mode: a made-up network that keeps moving; nothing real is scanned, checked or run
+        from app.demo.live import demo_loop
+        from app.demo.seed import seed
+
+        seed(conn, settings.data_dir)
+        tasks.append(asyncio.create_task(demo_loop(app.state.db_path, settings.data_dir, settings.demo_reset)))
+    elif getattr(app.state, "scheduler", False):
         tasks.append(asyncio.create_task(
             scheduler_loop(
                 app.state.scan_manager,
@@ -98,6 +106,10 @@ def create_app(
                   openapi_url="/openapi.json" if docs else None)
 
     app.add_middleware(SecurityHeadersMiddleware)
+    if getattr(settings, "demo", False):
+        from app.demo import guard
+
+        guard.install(app)
 
     app.state.settings = settings
     app.state.env_settings = settings

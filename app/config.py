@@ -24,6 +24,8 @@ class Settings:
     terminal_remote: str = "off"   # where the terminal may be used from, see app/terminal/access.py
     trusted_proxies: tuple[str, ...] = ()   # reverse proxies whose X-Forwarded-For is believed (NETLENS_TRUSTED_PROXIES)
     api_docs: bool = False                  # serve /docs, /redoc and /openapi.json (NETLENS_API_DOCS=on)
+    demo: bool = False                      # NETLENS_DEMO=on: a made-up network, nothing real is scanned or changed (see app/demo)
+    demo_reset: str = "daily"               # NETLENS_DEMO_RESET: how often the demo data starts over: off, hourly or daily
 
 
 def is_scannable_range(cidr: str) -> bool:
@@ -140,6 +142,15 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     if docs_str not in ("on", "off"):
         raise ConfigError("NETLENS_API_DOCS must be 'on' or 'off'")
 
+    demo_str = env.get("NETLENS_DEMO", "off").strip().lower() or "off"
+    if demo_str not in ("on", "off"):
+        raise ConfigError("NETLENS_DEMO must be 'on' or 'off'")
+    demo_reset = env.get("NETLENS_DEMO_RESET", "daily").strip().lower() or "daily"
+    if demo_reset not in ("off", "hourly", "daily"):
+        raise ConfigError("NETLENS_DEMO_RESET must be 'off', 'hourly' or 'daily'")
+    if demo_str == "on":
+        terminal_enabled = False        # nobody gets a shell in a public demo
+
     bind_str = env.get("NETLENS_BIND", "0.0.0.0:8080")
     if ":" not in bind_str:
         raise ConfigError("NETLENS_BIND must be in format host:port")
@@ -165,4 +176,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         terminal_remote=terminal_remote,
         trusted_proxies=tuple(trusted),
         api_docs=docs_str == "on",
+        demo=demo_str == "on",
+        demo_reset=demo_reset,
     )

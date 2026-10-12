@@ -126,6 +126,16 @@ async def logout(request: Request) -> JSONResponse:
     return response
 
 
+def _demo_info(request: Request) -> dict:
+    """In demo mode the sign-in page shows the demo account, and every page a banner."""
+    settings = request.app.state.settings
+    if not getattr(settings, "demo", False):
+        return {}
+    from app.demo.seed import DEMO_PASSWORD, DEMO_USER
+
+    return {"demo": {"username": DEMO_USER, "password": DEMO_PASSWORD, "reset": settings.demo_reset}}
+
+
 @router.get("/session")
 async def session(request: Request) -> JSONResponse:
     principal = identify(request)
@@ -141,10 +151,12 @@ async def session(request: Request) -> JSONResponse:
             "authenticated": False,
             "setup_required": needs_setup,
             "token_login": bool(request.app.state.settings.token),  # False: only user name and password sign in
+            **_demo_info(request),
         })
     return JSONResponse({
         "authenticated": True,
         "user": {"username": principal.username, "role": principal.role, "builtin": principal.builtin},
+        **_demo_info(request),
     })
 
 

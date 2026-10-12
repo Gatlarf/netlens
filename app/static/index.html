@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="css/phone.css">
 </head>
 <body>
+  <div id="demo-banner" class="demo-banner" role="note" hidden></div>
   <header class="topbar" id="topbar">
     <a class="brand" href="#/"><img class="brand-icon" src="img/favicon.svg" alt="" width="24" height="24">Netlens</a>
     <nav id="nav" class="nav" aria-label="Pages">
@@ -83,6 +84,7 @@
         <label for="login-password">Password</label>
         <input id="login-password" type="password" autocomplete="current-password">
       </div>
+      <p id="login-demo" class="hint" hidden></p>
       <p id="login-error" class="error" hidden></p>
       <button class="btn primary" type="submit">Sign in</button>
       <button id="login-switch" class="btn ghost" type="button">Sign in with a user name instead</button>
