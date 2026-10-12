@@ -5,6 +5,7 @@ The version is `<major.minor from VERSION>.<commit count>`. Each heading below i
 ## 0.3.129 — 2026-10-12
 
 ### Fixed
+- **Hyper-V plugin 1.0.1**: the setup lines add the user to *Remote Management Users* and *Hyper-V Administrators* by their fixed ids, so they also work on Windows in another language (where the English names do not exist), and print the members of both groups so you can check. The "access is denied" message says what to check. Update it under Settings → Plugins → Browse.
 - ★ **Backups include the plugins**: a backup now contains the installed plugins (their code) next to their settings, so restoring into a fresh container brings everything back as it was, with the plugins switched on as before. Older backups restore as they did; for plugins with saved settings but no files, the Plugins page lists them with an *Install again from the index* button, and installing keeps their settings (a plugin whose code differs from the saved one starts off).
 
 ### Added

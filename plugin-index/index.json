@@ -128,6 +128,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.0.1/hyperv.zip",
+     "sha256": "23e2e1979f293841e2d5e96d67b163ae826a32c5a442d6e661658569f9a5cd2f",
+     "api_version": 1,
+     "min_netlens": "0.3.115",
+     "released": "2026-10-12",
+     "changelog": "Setup lines give the groups by id (Remote Management Users, Hyper-V Administrators), so they work on Windows in any language, and print the members to check. A clearer message for 'access is denied'.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.0.0/hyperv.zip",
      "sha256": "2c2e22fd577193f9d59e114c8044578773268b8e881ae95810f825087e776f4c",
