@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.157 — 2026-10-13
+
+### Added
+- ★ **Make your own dashboard cards**: under *Customize* press **Create a card**. Pick **a value from your data** (search any number Netlens knows, such as uptime, internet speed or unhealthy containers, show it as a big number, a gauge bar or a status light, and set the warning and problem limits that colour it), **a device** (up or down, since when, address, uptime), **a group** of devices (how many are online and which are not), **a service check**, or **notes and links** (text plus shortcuts to Grafana, Portainer, your router and so on). A live preview shows the card while you make it. Your cards are saved with your dashboard, so they follow you to every browser, and every user has their own.
+- ★ **Cards from plugins**: every enabled plugin now offers a status card (working or failing, last sync, guests or sites it reported) under *Customize*, and a plugin can declare more cards in its `plugin.json` (`dashboard`, see the plugin guide); a plugin runs no code for a card. The built-in Proxmox plugin (now 1.4.0) offers a *Proxmox guests* card with running, stopped, virtual machines and containers.
+
 ## 0.3.156 — 2026-10-12
 
 ### Changed

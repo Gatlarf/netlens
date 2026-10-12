@@ -62,6 +62,7 @@ my-router/            (the folder is optional)
 | `timeout` | no | Seconds, 5-600, default 60. Netlens stops the plugin after this long. |
 | `diagnose` | no, but recommended | `true` when `plugin.py` has `diagnose(config)`: the plugin's page then shows a **Run diagnostic** button (see below). |
 | `config` | no | The settings form: a list of fields (below). |
+| `dashboard` | no | Cards the plugin offers for the dashboard (below). Needs Netlens 0.3.157; older versions ignore it. |
 
 ### Settings fields (`config`)
 
@@ -96,6 +97,26 @@ For a plugin that talks to one or more servers, a `servers` field shows one line
 - `legacy` (optional) says how an older version of your plugin saved the same servers (separate settings, optionally separated by commas or spaces, `pair` splits `a=b`), so existing setups become lines by themselves.
 - Give every guest or host id a prefix when two servers can hand out the same id (two Proxmox clusters both have VM 100).
 - A plugin with a `servers` field needs Netlens 0.3.109 or newer (`min_netlens` in the plugin index).
+
+### Dashboard cards (`dashboard`)
+
+Every enabled plugin gets a plain *status* card on the dashboard (is it working, when it last synced and, for hypervisor and proxy plugins, how many guests or sites it reported). With `dashboard` a plugin can offer more cards. A card is only a description: the plugin runs no code for it, and Netlens fills in the numbers.
+
+```json
+"dashboard": [
+  {"id": "guests", "title": "Proxmox guests", "about": "Running and stopped guests.", "href": "#/hierarchy",
+   "rows": [
+     {"label": "Running", "count": "guests", "where": {"status": "running"}},
+     {"label": "Stopped", "count": "guests", "where": {"status": ["stopped"]}, "tone_if_positive": "warn"},
+     {"label": "Last sync", "value": "status.ts"}]}
+]
+```
+
+- At most 4 cards of 1 to 8 rows. `id` is 1-20 lowercase letters, digits, `-` or `_` (`status` is taken), `title` and `about` are texts, `href` (optional) is a page of Netlens such as `#/devices`; the default is the plugin's settings page.
+- A row has a `label` and **either** `count` **or** `value`:
+  - `count`: `guests` (what the plugin reported through `fetch`, kind `hypervisor`) or `sites` (kind `proxy`), optionally narrowed with `where`. `where` maps a column to a value or a list of values; the columns are `kind`, `status`, `host_name` for guests and `type`, `enabled`, `scheme`, `proxy_name` for sites. `tone_if_positive` (`warn` or `bad`) colours the row when the count is not zero.
+  - `value`: `status.ok` (shown as Working or Failing), `status.ts` (when it last synced) or `status.error`.
+- Users add the cards under *Customize* on the dashboard; they appear while the plugin is enabled.
 
 ### Example
 

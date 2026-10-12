@@ -338,8 +338,15 @@ def validate_manifest(data: Any) -> dict:
         "diagnose": bool(data.get("diagnose", False)),  # the plugin has diagnose(config): a report for its author
         "capabilities": _capabilities(data.get("capabilities"), kind),
         "info": _info(data.get("info")),
+        "dashboard": _dashboard(data.get("dashboard")),
         "config": fields,
     }
+
+
+def _dashboard(raw: Any) -> list[dict]:
+    from app.plugin_cards import validate_cards       # the cards a plugin offers for the dashboard
+
+    return validate_cards(raw)
 
 
 def _info(raw: Any) -> dict | None:

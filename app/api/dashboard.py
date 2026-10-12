@@ -11,6 +11,18 @@ from app.stats import summary
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
 
+def _plugin_cards(request: Request, conn) -> list[dict]:
+    from app import plugin_cards
+    from app.plugins.service import PluginService, get_state, get_status
+
+    service = PluginService(request.app.state.db_path, request.app.state.settings.data_dir, getattr(request.app.state, "plugin_runner", None))
+    out: list[dict] = []
+    for plugin in service.plugins().values():
+        if plugin.manifest and get_state(conn, plugin)["enabled"]:
+            out += plugin_cards.resolve(conn, plugin.manifest, get_status(conn, plugin.id))
+    return out
+
+
 @router.get("/dashboard")
 def get_dashboard(request: Request) -> dict:
     """The start page: the summary plus what needs attention, the latest events and a few small series."""
@@ -20,7 +32,9 @@ def get_dashboard(request: Request) -> dict:
         conn = connect(db_path)
         try:
             s = summary(conn, scan_running=running_scan(conn) is not None, data_dir=request.app.state.settings.data_dir, passive=_passive(request))
-            return dashboard.build(conn, s)
+            doc = dashboard.build(conn, s)
+            doc["plugin_cards"] = _plugin_cards(request, conn)
+            return doc
         finally:
             conn.close()
 
@@ -29,18 +43,19 @@ def get_dashboard(request: Request) -> dict:
 
 class LayoutBody(BaseModel):
     order: list[str]
+    custom: list[dict] = []
 
 
 @router.get("/dashboard/layout")
 def get_layout(request: Request, conn=Depends(get_conn)) -> dict:
     """The cards this user chose, in order (null while the user still has the default)."""
-    return {"order": dashboard.get_layout(conn, request.state.user)}
+    return dashboard.get_layout(conn, request.state.user) or {"order": None, "custom": []}
 
 
 @router.put("/dashboard/layout")
 def put_layout(body: LayoutBody, request: Request, conn=Depends(get_conn)) -> dict:
     try:
-        return {"order": dashboard.set_layout(conn, request.state.user, body.order)}
+        return dashboard.set_layout(conn, request.state.user, body.order, body.custom)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -48,4 +63,4 @@ def put_layout(body: LayoutBody, request: Request, conn=Depends(get_conn)) -> di
 @router.delete("/dashboard/layout")
 def delete_layout(request: Request, conn=Depends(get_conn)) -> dict:
     dashboard.reset_layout(conn, request.state.user)
-    return {"order": None}
+    return {"order": None, "custom": []}

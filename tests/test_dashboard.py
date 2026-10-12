@@ -95,6 +95,7 @@ def test_top_bar_group_class_does_not_clash_with_the_settings_menu():
 
 
 # ---- the layout is kept per user on the server ----
+NONE = {"order": None, "custom": []}
 def test_every_user_keeps_their_own_layout_and_a_viewer_may_arrange_theirs(tmp_path):
     from tests.test_users import ADMIN, make, sign_in
 
@@ -103,21 +104,101 @@ def test_every_user_keeps_their_own_layout_and_a_viewer_may_arrange_theirs(tmp_p
         make(c, "alice", "admin")
         make(c, "vera", "viewer")
         alice, vera = sign_in(app, "alice"), sign_in(app, "vera")
-        assert alice.get("/api/dashboard/layout").json() == {"order": None} and vera.get("/api/dashboard/layout").json() == {"order": None}
-        assert alice.put("/api/dashboard/layout", json={"order": ["uptime", "devices", "uptime"]}).json() == {"order": ["uptime", "devices"]}    # no duplicates
+        assert alice.get("/api/dashboard/layout").json() == NONE and vera.get("/api/dashboard/layout").json() == NONE
+        assert alice.put("/api/dashboard/layout", json={"order": ["uptime", "devices", "uptime"]}).json() == {"order": ["uptime", "devices"], "custom": []}    # no duplicates
         assert vera.put("/api/dashboard/layout", json={"order": ["events"]}).status_code == 200                                                  # a viewer arranges their own
         # another browser or device of the same user sees the same layout; other users see theirs
-        assert sign_in(app, "alice").get("/api/dashboard/layout").json() == {"order": ["uptime", "devices"]}
-        assert vera.get("/api/dashboard/layout").json() == {"order": ["events"]}
-        assert c.get("/api/dashboard/layout", headers=ADMIN).json() == {"order": None}                                                           # the access token has its own
-        assert vera.delete("/api/dashboard/layout").json() == {"order": None} and vera.get("/api/dashboard/layout").json() == {"order": None}
+        assert sign_in(app, "alice").get("/api/dashboard/layout").json() == {"order": ["uptime", "devices"], "custom": []}
+        assert vera.get("/api/dashboard/layout").json() == {"order": ["events"], "custom": []}
+        assert c.get("/api/dashboard/layout", headers=ADMIN).json() == NONE                                                           # the access token has its own
+        assert vera.delete("/api/dashboard/layout").json() == NONE and vera.get("/api/dashboard/layout").json() == NONE
         assert alice.get("/api/dashboard/layout").json()["order"] == ["uptime", "devices"]
         # a viewer still cannot change anything else
         assert vera.put("/api/map-settings", json={"domain_suffix": "x"}).status_code == 403
 
 
-@pytest.mark.parametrize("order", [["Bad Id"], [""], ["x" * 41], [1], [f"c{i}" for i in range(101)]])
+@pytest.mark.parametrize("order", [["Bad Id"], [""], ["x" * 81], [1], [f"c{i}" for i in range(101)]])
 def test_layout_validation(tmp_path, order):
     app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
     with TestClient(app, headers={"Authorization": "Bearer secret"}) as c:
         assert c.put("/api/dashboard/layout", json={"order": order}).status_code == 422
+
+
+# ---- cards of your own ----
+def _put(c, order, custom):
+    return c.put("/api/dashboard/layout", json={"order": order, "custom": custom})
+
+
+VALUE = {"id": "c-abc123", "type": "value", "title": "Line speed", "source": "speed.down_mbps", "format": "mbps", "display": "gauge", "unit": "", "decimals": 0,
+         "direction": "below", "warn": 300, "bad": 150, "min": 0, "max": 1000, "href": "#/speedtest"}
+
+
+@pytest.fixture
+def admin(tmp_path):
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    with TestClient(app, headers={"Authorization": "Bearer secret"}) as c:
+        yield c
+
+
+def test_cards_of_your_own_are_saved_with_the_layout(admin):
+    cards = [VALUE, {"id": "c-dev001", "type": "device", "title": "", "device_id": 3}, {"id": "c-grp001", "type": "group", "group": "Cameras"},
+             {"id": "c-svc001", "type": "service", "check_id": 2},
+             {"id": "c-note01", "type": "notes", "title": "Links", "text": "Hello\nworld", "links": [{"label": "Grafana", "url": "https://grafana.example.net"}, {"label": "Map", "url": "#/map"}]}]
+    saved = _put(admin, ["uptime", "c-abc123", "c-note01", "c-ghost1"], cards).json()
+    assert saved["order"] == ["uptime", "c-abc123", "c-note01"]                    # a card of your own that does not exist is dropped
+    assert [c["id"] for c in saved["custom"]] == [c["id"] for c in cards] and saved["custom"][0]["warn"] == 300
+    assert admin.get("/api/dashboard/layout").json() == saved
+    assert admin.delete("/api/dashboard/layout").json() == {"order": None, "custom": []}
+
+
+@pytest.mark.parametrize("card", [
+    {**VALUE, "source": "a b"}, {**VALUE, "source": "x" * 130}, {**VALUE, "source": "../../etc"}, {**VALUE, "format": "html"}, {**VALUE, "display": "iframe"}, {**VALUE, "warn": "red"},
+    {**VALUE, "href": "https://evil.example"}, {**VALUE, "href": "javascript:alert(1)"}, {**VALUE, "decimals": 9}, {**VALUE, "id": "abc"},
+    {"id": "c-dev001", "type": "device", "device_id": 0}, {"id": "c-dev001", "type": "device", "device_id": True}, {"id": "c-grp001", "type": "group", "group": ""},
+    {"id": "c-note01", "type": "notes", "text": ""}, {"id": "c-note01", "type": "notes", "text": "x" * 2001},
+    {"id": "c-note01", "type": "notes", "text": "x", "links": [{"label": "bad", "url": "javascript:alert(1)"}]},
+    {"id": "c-note01", "type": "notes", "text": "x", "links": [{"label": "bad", "url": "data:text/html,<script>"}]},
+    {"id": "c-note01", "type": "notes", "text": "x", "links": [{"label": "l", "url": "https://a.example"}] * 9},
+    {"id": "c-x0000", "type": "script", "code": "alert(1)"},
+])
+def test_cards_of_your_own_are_checked(admin, card):
+    assert _put(admin, [], [card]).status_code == 422
+
+
+def test_unknown_fields_of_a_card_are_dropped(admin):
+    saved = _put(admin, ["c-abc123"], [{**VALUE, "html": "<script>alert(1)</script>", "onclick": "x"}]).json()
+    assert "html" not in saved["custom"][0] and "onclick" not in saved["custom"][0]
+
+
+def test_at_most_forty_cards_of_your_own(admin):
+    many = [{"id": f"c-n{i:04d}", "type": "notes", "text": "x"} for i in range(41)]
+    assert _put(admin, [], many).status_code == 422 and _put(admin, [], many[:40]).status_code == 200
+
+
+# ---- cards from plugins ----
+def test_dashboard_has_the_extra_data_custom_cards_read(demo):
+    data = demo.get("/api/dashboard").json()
+    assert data["service_checks"] and {"id", "name", "state"} <= data["service_checks"][0].keys()
+    first = data["summary"]["device_list"][0]["id"]
+    assert str(first) in data["devices_uptime"] or first in data["devices_uptime"]
+    cards = {(c["plugin"], c["id"]): c for c in data["plugin_cards"]}
+    assert ("proxmox", "status") in cards and ("proxmox", "guests") in cards and ("docker", "status") in cards
+    guests = {r["label"]: r for r in cards[("proxmox", "guests")]["rows"]}
+    assert guests["Running"]["value"] > 0 and guests["Virtual machines"]["value"] > 0
+
+
+def test_plugin_cards_are_validated():
+    from app.plugin_cards import validate_cards
+    from app.plugins.contract import ContractError
+
+    ok = [{"id": "g", "title": "Guests", "rows": [{"label": "Running", "count": "guests", "where": {"status": ["running"]}}, {"label": "Last sync", "value": "status.ts"}]}]
+    assert validate_cards(ok)[0]["rows"][0]["where"] == {"status": ["running"]} and validate_cards(None) == []
+    for bad in ([{"id": "status", "title": "x", "rows": [{"label": "a", "value": "status.ok"}]}],                       # reserved
+                [{"id": "g", "title": "x", "rows": [{"label": "a", "count": "devices"}]}],                           # unknown source
+                [{"id": "g", "title": "x", "rows": [{"label": "a", "count": "guests", "where": {"name; DROP TABLE x": "1"}}]}],    # a column that is not allowed
+                [{"id": "g", "title": "x", "rows": [{"label": "a", "count": "guests", "value": "status.ok"}]}],       # both
+                [{"id": "g", "title": "x", "rows": [{"label": "a", "value": "settings.password"}]}],
+                [{"id": "g", "title": "x", "href": "https://evil.example", "rows": [{"label": "a", "value": "status.ok"}]}],
+                [{"id": "g", "title": "x", "rows": []}]):
+        with pytest.raises(ContractError):
+            validate_cards(bad)

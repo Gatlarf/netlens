@@ -1,7 +1,7 @@
 {
   "id": "proxmox",
   "name": "Proxmox VE",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "api_version": 1,
   "diagnose": true,
   "kind": "hypervisor",
@@ -61,6 +61,47 @@
       "label": "Verify TLS certificate",
       "default": true,
       "help": "Turn off for the self-signed certificate Proxmox uses by default."
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "guests",
+      "title": "Proxmox guests",
+      "about": "Virtual machines and containers on your Proxmox hosts: running, stopped and how many of each.",
+      "href": "#/hierarchy",
+      "rows": [
+        {
+          "label": "Running",
+          "count": "guests",
+          "where": {
+            "status": "running"
+          }
+        },
+        {
+          "label": "Stopped",
+          "count": "guests",
+          "where": {
+            "status": [
+              "stopped"
+            ]
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Virtual machines",
+          "count": "guests",
+          "where": {
+            "kind": "qemu"
+          }
+        },
+        {
+          "label": "Containers",
+          "count": "guests",
+          "where": {
+            "kind": "lxc"
+          }
+        }
+      ]
     }
   ]
 }

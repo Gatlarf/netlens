@@ -1,8 +1,10 @@
-// The start page: a grid of cards. Which cards, and in what order, is a per-user choice kept in this browser.
+// The start page: a grid of cards. Which cards, in what order and the cards a user made are a per-user choice kept on the server.
 import { get, put, del } from "../api.js";
-import { h, clear, timeAgo, shortName, isAdmin, sessionInfo } from "../util.js";
+import { h, clear, timeAgo, shortName, isAdmin, sessionInfo, toast } from "../util.js";
 import { barList, columnChart, emptyNote, fmtPct, lineChart } from "../charts.js";
 import { cssVar } from "../theme.js";
+import { big, customCard, linkList, pluginCard, plural, rows, sparkline, toneUp } from "../dashboard_cards.js";
+import { openEditor } from "../dashboard_editor.js";
 
 const REFRESH_MS = 30000;
 const KINDS = {
@@ -10,41 +12,6 @@ const KINDS = {
   port_closed: "Port closed", wifi_roamed: "Roamed", login_failed: "Failed sign-ins", cert_expiring: "Certificate", service_down: "Service down", service_up: "Service up",
 };
 const kindText = (k) => KINDS[k] || k.replace(/_/g, " ");
-const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-
-// ---------- small building blocks ----------
-
-function sparkline(values, { height = 28 } = {}) {
-  const v = values.filter((x) => x !== null && x !== undefined);
-  if (v.length < 2) return null;
-  const min = Math.min(...v), max = Math.max(...v), span = max - min || 1, w = 100;
-  const pts = v.map((x, i) => `${((i / (v.length - 1)) * w).toFixed(1)},${(height - 3 - ((x - min) / span) * (height - 6)).toFixed(1)}`).join(" ");
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("viewBox", `0 0 ${w} ${height}`);
-  svg.setAttribute("preserveAspectRatio", "none");
-  svg.setAttribute("class", "spark");
-  svg.setAttribute("aria-hidden", "true");
-  const line = document.createElementNS(ns, "polyline");
-  line.setAttribute("points", pts);
-  line.setAttribute("fill", "none");
-  line.setAttribute("stroke", "currentColor");
-  line.setAttribute("stroke-width", "2");
-  line.setAttribute("vector-effect", "non-scaling-stroke");
-  svg.appendChild(line);
-  return svg;
-}
-
-// a big number with a caption and, optionally, a small line chart and extra lines
-const big = (value, sub, { spark = null, extra = null } = {}) => h("div", { class: "d-body" }, h("div", { class: "d-value" }, value), h("div", { class: "d-sub" }, sub), spark, extra);
-
-// label / value lines: rows = [[label, value, tone?]]
-const rows = (list) => h("dl", { class: "d-rows" }, list.map(([k, v, tone]) => h("div", { class: tone ? `d-${tone}` : "" }, h("dt", {}, k), h("dd", {}, v))));
-
-const linkList = (items) => h("ul", { class: "d-list" }, items.map((i) => h("li", { class: i.tone ? `d-${i.tone}` : "" }, i.href ? h("a", { href: i.href }, i.text) : h("span", {}, i.text), i.note ? h("span", { class: "d-note" }, i.note) : null)));
-
-const toneUp = (pct) => (pct === null || pct === undefined ? "" : pct >= 99 ? "ok" : pct >= 95 ? "warn" : "bad");
-
 // ---------- the cards ----------
 // size: s = one column, w = two, f = the whole row. show(d): has this installation anything for the card? `def` = on the default dashboard.
 
@@ -150,59 +117,61 @@ const CARDS = [
       h("button", { class: "btn primary", type: "button", onclick: () => document.getElementById("scan-quick")?.click() }, "Quick scan"),
       h("button", { class: "btn", type: "button", onclick: () => document.getElementById("scan-deep")?.click() }, "Deep scan")) },
 ];
-const BY_ID = Object.fromEntries(CARDS.map((c) => [c.id, c]));
+const TYPE_ABOUT = { value: "A value from your data", device: "A device", group: "A group of devices", service: "A service check", notes: "Notes and links" };
 const DEFAULT_ORDER = CARDS.filter((c) => c.def).map((c) => c.id);
 
 // ---------- the chosen layout (per user, kept on the server so every browser and device shows the same dashboard) ----------
 // The browser's own storage is only the fallback (and where an older version kept the layout): it is moved to the server once.
 
 const storageKey = () => `netlens.dashboard.${sessionInfo()?.username || "default"}`;
-const tidy = (list) => list.filter((id, i) => BY_ID[id] && list.indexOf(id) === i);
+const EMPTY = { order: null, custom: [] };
 
-function localOrder() {
+function localLayout() {
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey()) || "null");
-    if (Array.isArray(saved)) return saved;
+    if (Array.isArray(saved)) return { order: saved, custom: [] };           // how an older version stored it
+    if (saved && Array.isArray(saved.order)) return { order: saved.order, custom: Array.isArray(saved.custom) ? saved.custom : [] };
   } catch (e) {
     // no storage or damaged
   }
   return null;
 }
 
-function setLocal(order) {
+function setLocal(layout) {
   try {
-    if (order) localStorage.setItem(storageKey(), JSON.stringify(order));
+    if (layout) localStorage.setItem(storageKey(), JSON.stringify(layout));
     else localStorage.removeItem(storageKey());
   } catch (e) {
     // the choice then lasts until the page is closed
   }
 }
 
-async function loadOrder() {
-  let server = null, reachable = true;
+async function loadLayout() {
+  let server = EMPTY, reachable = true;
   try {
-    server = (await get("/api/dashboard/layout")).order;
+    server = await get("/api/dashboard/layout");
   } catch (e) {
     reachable = false;
   }
-  if (Array.isArray(server)) return tidy(server);
-  const local = localOrder();
+  if (Array.isArray(server.order)) return { order: server.order, custom: server.custom || [] };
+  const local = localLayout();
   if (local) {
     if (reachable) {  // a layout from before it was kept on the server: move it there
-      try { await put("/api/dashboard/layout", { order: local }); setLocal(null); } catch (e) { /* stays in the browser */ }
+      try { await put("/api/dashboard/layout", local); setLocal(null); } catch (e) { /* stays in the browser */ }
     }
-    return tidy(local);
+    return local;
   }
-  return [...DEFAULT_ORDER];
+  return { order: [...DEFAULT_ORDER], custom: [] };
 }
 
-async function saveOrder(order, isDefault) {
+async function saveLayout(layout, isDefault) {
   try {
     if (isDefault) await del("/api/dashboard/layout");
-    else await put("/api/dashboard/layout", { order });
+    else await put("/api/dashboard/layout", layout);
     setLocal(null);
   } catch (e) {
-    setLocal(isDefault ? null : order);  // for example the demo, where nothing may be saved on the server
+    if (e && e.status === 422) throw e;   // the server refused the layout itself: nothing is kept, the window shows why
+    setLocal(isDefault ? null : layout);  // for example the demo, where nothing may be saved on the server
   }
 }
 
@@ -253,7 +222,8 @@ function miniMap() {
 // ---------- the page ----------
 
 export async function render(container) {
-  let data = null, order = await loadOrder(), editing = false, disposed = false, timer = null;
+  const layout = await loadLayout();
+  let data = null, order = layout.order, custom = layout.custom, editing = false, disposed = false, timer = null;
   const map = miniMap();
   let mapStarted = false;
   const header = h("div", { class: "dash-head" });
@@ -263,12 +233,44 @@ export async function render(container) {
 
   const visible = (card) => !card.admin || isAdmin();
   const hasData = (card) => !card.show || card.show(data);
+  // every card there can be right now: the built-in ones, those of the enabled plugins and the ones this user made
+  const registry = () => {
+    const all = new Map(CARDS.map((c) => [c.id, c]));
+    for (const pc of data ? data.plugin_cards || [] : []) { const c = pluginCard(pc); all.set(c.id, c); }
+    for (const def of custom) { const c = customCard(def, data); all.set(c.id, c); }
+    return all;
+  };
+  const byId = (id) => registry().get(id);
 
-  function persist() { saveOrder(order, order.length === DEFAULT_ORDER.length && order.every((id, i) => id === DEFAULT_ORDER[i])); }
+  async function persist() {
+    const known = registry();
+    order = order.filter((id) => known.has(id) || !data);                      // a card of a plugin that is switched off is dropped
+    custom = custom.filter((c) => true);
+    try {
+      await saveLayout({ order, custom }, !custom.length && order.length === DEFAULT_ORDER.length && order.every((id, i) => id === DEFAULT_ORDER[i]));
+    } catch (e) {
+      toast(e.message || "Could not save the dashboard", "error");
+    }
+  }
   function move(id, delta) {
     const i = order.indexOf(id), j = i + delta;
     if (i < 0 || j < 0 || j >= order.length) return;
     [order[i], order[j]] = [order[j], order[i]];
+    persist();
+    draw();
+  }
+  function edit(def) {
+    openEditor({ def, data, onSave: async (saved) => {
+      const next = custom.some((c) => c.id === saved.id) ? custom.map((c) => (c.id === saved.id ? saved : c)) : [...custom, saved];
+      const placed = order.includes(saved.id) ? order : [...order, saved.id];
+      await saveLayout({ order: placed, custom: next }, false);   // the server checks the card; a mistake shows in the window
+      custom = next; order = placed;
+      draw();
+    } });
+  }
+  function deleteCard(id) {
+    custom = custom.filter((c) => c.id !== id);
+    order = order.filter((x) => x !== id);
     persist();
     draw();
   }
@@ -281,6 +283,7 @@ export async function render(container) {
     if (editing) {
       const i = order.indexOf(card.id);
       head.append(h("span", { class: "d-tools" },
+        card.custom ? h("button", { class: "btn d-tool", type: "button", "aria-label": `Change ${card.title}`, title: "Change", onclick: () => edit(card.custom) }, "✎") : null,
         h("button", { class: "btn d-tool", type: "button", disabled: i === 0, "aria-label": `Move ${card.title} earlier`, title: "Earlier", onclick: () => move(card.id, -1) }, "◀"),
         h("button", { class: "btn d-tool", type: "button", disabled: i === order.length - 1, "aria-label": `Move ${card.title} later`, title: "Later", onclick: () => move(card.id, 1) }, "▶"),
         h("button", { class: "btn d-tool", type: "button", "aria-label": `Remove ${card.title}`, title: "Remove", onclick: () => { order = order.filter((x) => x !== card.id); persist(); draw(); } }, "✕")));
@@ -294,7 +297,7 @@ export async function render(container) {
       node.addEventListener("drop", (e) => {
         e.preventDefault();
         const from = e.dataTransfer.getData("text/plain");
-        if (!BY_ID[from] || from === card.id) return;
+        if (!byId(from) || from === card.id) return;
         order = order.filter((x) => x !== from);
         order.splice(order.indexOf(card.id), 0, from);
         persist();
@@ -315,14 +318,24 @@ export async function render(container) {
         h("button", { class: `btn ${editing ? "primary" : ""}`, type: "button", "aria-pressed": String(editing), onclick: () => { editing = !editing; draw(); } }, editing ? "Done" : "Customize")));
   }
 
+  function poolItem(c, extra) {
+    return h("div", { class: "pool-item" }, h("div", {}, h("strong", {}, c.title), h("p", { class: "hint" }, c.about)),
+      h("div", { class: "pool-buttons" }, extra, h("button", { class: "btn", type: "button", onclick: () => { order.push(c.id); persist(); draw(); } }, "Add")));
+  }
+
   function drawPool() {
     clear(pool);
     if (!editing) return;
-    const free = CARDS.filter((c) => !order.includes(c.id) && visible(c));
-    pool.append(h("h2", {}, "Add a card"), free.length
-      ? h("div", { class: "pool-list" }, free.map((c) => h("div", { class: "pool-item" }, h("div", {}, h("strong", {}, c.title), h("p", { class: "hint" }, c.about)),
-        h("button", { class: "btn", type: "button", onclick: () => { order.push(c.id); persist(); draw(); } }, "Add"))))
-      : h("p", { class: "hint" }, "All cards are on your dashboard."));
+    const all = [...registry().values()];
+    const free = all.filter((c) => !order.includes(c.id) && visible(c) && !c.custom && !c.plugin);
+    const mine = all.filter((c) => c.custom && !order.includes(c.id));
+    const plugins = all.filter((c) => c.plugin && !order.includes(c.id));
+    pool.append(h("div", { class: "toolbar" }, h("h2", {}, "Your own cards"), h("button", { class: "btn primary", type: "button", onclick: () => edit(null) }, "Create a card")),
+      mine.length ? h("div", { class: "pool-list" }, mine.map((c) => poolItem({ ...c, about: TYPE_ABOUT[c.custom.type] || c.about }, [
+        h("button", { class: "btn", type: "button", onclick: () => edit(c.custom) }, "Change"), h("button", { class: "btn danger", type: "button", onclick: () => deleteCard(c.id) }, "Delete")])))
+        : h("p", { class: "hint" }, "Make a card that shows any value, a device, a group, a service check, or notes and links."));
+    if (plugins.length) pool.append(h("h2", {}, "Cards from your plugins"), h("div", { class: "pool-list" }, plugins.map((c) => poolItem(c))));
+    pool.append(h("h2", {}, "Add a card"), free.length ? h("div", { class: "pool-list" }, free.map((c) => poolItem(c))) : h("p", { class: "hint" }, "All cards are on your dashboard."));
   }
 
   function draw() {
@@ -330,8 +343,9 @@ export async function render(container) {
     drawHeader();
     clear(grid);
     grid.classList.toggle("editing", editing);
+    const known = registry();
     for (const id of order) {
-      const card = BY_ID[id];
+      const card = known.get(id);
       if (!card || !visible(card) || (!editing && !hasData(card))) continue;
       grid.append(cardEl(card));
     }
