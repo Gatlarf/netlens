@@ -10,7 +10,7 @@ KEY = "map_default_layout"
 SUFFIX_KEY = "domain_suffix"
 GUESTS_KEY = "map_show_guests"
 _SUFFIX_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$")
-LAYOUTS = ("free", "tree", "horizontal")
+LAYOUTS = ("free", "tree", "horizontal", "vertical")
 DEFAULT_LAYOUT = "free"
 
 router = APIRouter(prefix="/api", tags=["map"])
@@ -35,7 +35,7 @@ def _view(conn) -> dict:
 
 
 class MapSettingsBody(BaseModel):
-    default_layout: Literal["free", "tree", "horizontal"] | None = None
+    default_layout: Literal["free", "tree", "horizontal", "vertical"] | None = None
     domain_suffix: str | None = None
     show_guests: bool | None = None
 

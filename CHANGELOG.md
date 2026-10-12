@@ -5,6 +5,7 @@ The version is `<major.minor from VERSION>.<commit count>`. Each heading below i
 ## 0.3.129 — 2026-10-12
 
 ### Added
+- ★ **Vertical map layout**: next to the horizontal layout the map can now be arranged top to bottom, with the router at the top, one row per level and a card per device. Folding clients, *Fit* and the right-angle links work as in the horizontal layout. Pick it in the map's layout menu, or as the default under Settings → Map.
 - ★ **Service check from an open port**: the Open ports table on a device page has a Check column. **Add check** creates a service check for that port in one click (a web check for ports 80, 443, 8080 and 8443, a plain port check for the rest), pre-filled with the device and its address. Once a check exists the column shows its status dot and a **Remove check** button.
 
 ### Changed

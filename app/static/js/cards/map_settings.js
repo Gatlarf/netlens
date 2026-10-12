@@ -3,8 +3,9 @@ import { h, clear, toast, setDomainSuffix } from "../util.js";
 
 const LAYOUT_LABELS = {
   free: "Free layout (drag devices where you like)",
-  tree: "Tree layout (top to bottom)",
+  tree: "Tree layout (simple top-down)",
   horizontal: "Horizontal layout (left to right, like Omada)",
+  vertical: "Vertical layout (top to bottom)",
 };
 
 function browserChoice() {

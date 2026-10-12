@@ -1,9 +1,10 @@
 import { cssVar, isDark } from "../theme.js";
 import { get, post, patch, del, ApiError } from "../api.js";
 import { h, clear, toast, foldToolbarOnPhone, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
-import { buildTree, defaultCollapsed, layoutHorizontal, leafIds } from "../layout_horizontal.js";
+import { buildTree, defaultCollapsed, layoutHorizontal, layoutVertical, leafIds } from "../layout_horizontal.js";
 
-const LAYOUTS = ["free", "tree", "horizontal"];
+const LAYOUTS = ["free", "tree", "horizontal", "vertical"];
+const cardMode = (mode) => mode === "horizontal" || mode === "vertical";   // the layouts that draw a card per device
 
 
 // Colours of the devices and links, one set per theme. The dark set is brighter so everything keeps
@@ -144,7 +145,7 @@ function shorten(text, max) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-// mode: "free" | "tree" | "horizontal"; extra.folded = number of hidden client devices below this one
+// mode: "free" | "tree" | "horizontal" | "vertical"; extra.folded = number of hidden client devices below this one
 function buildNodeData(node, mode = "free", extra = {}) {
   const treeLayout = mode !== "free";
   const color = colorMode === "group" ? node.group_color || NO_GROUP_COLOR : nodeColor(node.type);
@@ -184,7 +185,7 @@ function buildNodeData(node, mode = "free", extra = {}) {
     data.x = node.pos_x;
     data.y = node.pos_y;
   }
-  if (mode === "horizontal") {
+  if (cardMode(mode)) {
     // a card per device (name and address inside it) so labels never run into each other
     const surface = cssVar("--surface", dark ? "#1b2230" : "#ffffff");
     const lines = labelLines(node).map((line) => shorten(line, 24));
@@ -237,9 +238,9 @@ function buildEdgeData(edge, mode = "free") {
     color: { color: edgeColor(edge.kind), highlight: isDark() ? "#ffffff" : "#0f172a", hover: isDark() ? "#ffffff" : "#0f172a" },
     width: style.width,
     dashes: style.dashes,
-    arrows: mode === "horizontal" ? "" : "to",
-    smooth: mode === "horizontal"
-      ? { type: "cubicBezier", forceDirection: "horizontal", roundness: 0.5 }
+    arrows: cardMode(mode) ? "" : "to",
+    smooth: cardMode(mode)
+      ? { type: "cubicBezier", forceDirection: mode === "vertical" ? "vertical" : "horizontal", roundness: 0.5 }
       : treeLayout ? { type: "cubicBezier", forceDirection: "vertical", roundness: 0.5 } : { type: "continuous" },
     title: edge.kind === "parent" ? edge.reason : edgeTitle(edge),
     hidden: false,
@@ -305,7 +306,8 @@ export async function render(container, params) {
   // a layout chosen in this browser wins over the default set under Settings -> Map
   const layoutMode = readPref("netlens.map.layout", LAYOUTS, serverLayout);
   const treeLayout = layoutMode !== "free"; // the layout arranges itself
-  const horizontal = layoutMode === "horizontal";
+  const vertical = layoutMode === "vertical";
+  const horizontal = cardMode(layoutMode);   // both card layouts: folding, fitting and the drawn elbows
   // the tree layout needs the parent -> child links, so it always shows the hierarchy
   const linksMode = treeLayout ? "hierarchy" : readPref("netlens.map.links", ["hierarchy", "all"], "hierarchy");
   // containers and apps under their host: the default is set under Settings -> Map, a choice made here is kept per browser
@@ -336,6 +338,7 @@ export async function render(container, params) {
   layoutSelect.appendChild(h("option", { value: "free" }, "Free layout"));
   layoutSelect.appendChild(h("option", { value: "tree" }, "Tree layout"));
   layoutSelect.appendChild(h("option", { value: "horizontal" }, "Horizontal layout"));
+  layoutSelect.appendChild(h("option", { value: "vertical" }, "Vertical layout"));
   layoutSelect.value = layoutMode;
   layoutSelect.addEventListener("change", () => {
     savePref("netlens.map.layout", layoutSelect.value);
@@ -668,7 +671,7 @@ export async function render(container, params) {
     if (leafIds(tree, params.nodes[0]).length > 0) toggleBranch(params.nodes[0]);
   });
 
-  // Horizontal layout: parent -> child links as right-angle elbows (vis-network only draws curves and straight lines)
+  // Card layouts: parent -> child links as right-angle elbows (vis-network only draws curves and straight lines)
   network.on("beforeDrawing", (ctx) => {
     if (destroyed || !horizontal) return;
     const edges = palette().edges;
@@ -688,28 +691,33 @@ export async function render(container, params) {
         continue;
       }
       if (!a || !b) continue;
-      const x0 = a.right;
-      const y0 = (a.top + a.bottom) / 2;
-      const x1 = b.left;
-      const y1 = (b.top + b.bottom) / 2;
-      const trunk = Math.min(x0 + trunkGap, x1 - 4);
       const style = edge.source === "hypervisor" ? edges["host-of"] : edges.parent;
       ctx.save();
       ctx.beginPath();
       ctx.strokeStyle = style.color;
       ctx.lineWidth = edge.source === "hypervisor" ? 2 : style.width;
       ctx.setLineDash(edge.source === "hypervisor" ? [6, 4] : []);
-      ctx.moveTo(x0, y0);
-      if (Math.abs(y1 - y0) < 1) {
-        ctx.lineTo(x1, y1);
+      // along the layout's direction: from the parent's right side to the child's left side, or from its bottom to the child's top
+      const u0 = vertical ? (a.bottom) : a.right;
+      const v0 = vertical ? (a.left + a.right) / 2 : (a.top + a.bottom) / 2;
+      const u1 = vertical ? b.top : b.left;
+      const v1 = vertical ? (b.left + b.right) / 2 : (b.top + b.bottom) / 2;
+      const trunk = Math.min(u0 + trunkGap, u1 - 4);
+      const pt = (u, v) => (vertical ? [v, u] : [u, v]);
+      const move = (u, v) => ctx.moveTo(...pt(u, v));
+      const line = (u, v) => ctx.lineTo(...pt(u, v));
+      const arc = (u1c, v1c, u2c, v2c, rad) => ctx.arcTo(...pt(u1c, v1c), ...pt(u2c, v2c), rad);
+      move(u0, v0);
+      if (Math.abs(v1 - v0) < 1) {
+        line(u1, v1);
       } else {
-        const dir = y1 > y0 ? 1 : -1;
-        const r = Math.min(radius, Math.abs(y1 - y0) / 2, Math.max(trunk - x0, 1));
-        ctx.lineTo(trunk - r, y0);
-        ctx.arcTo(trunk, y0, trunk, y0 + dir * r, r);
-        ctx.lineTo(trunk, y1 - dir * r);
-        ctx.arcTo(trunk, y1, trunk + r, y1, r);
-        ctx.lineTo(x1, y1);
+        const dir = v1 > v0 ? 1 : -1;
+        const r = Math.min(radius, Math.abs(v1 - v0) / 2, Math.max(trunk - u0, 1));
+        line(trunk - r, v0);
+        arc(trunk, v0, trunk, v0 + dir * r, r);
+        line(trunk, v1 - dir * r);
+        arc(trunk, v1, trunk + r, v1, r);
+        line(u1, v1);
       }
       ctx.stroke();
       ctx.restore();
@@ -846,7 +854,7 @@ export async function render(container, params) {
       tree = buildTree(newNodes);
       if (horizontal) {
         const collapsed = new Set([...tree.children.keys()].filter(isCollapsed));
-        arranged = layoutHorizontal(newNodes, collapsed);
+        arranged = (vertical ? layoutVertical : layoutHorizontal)(newNodes, collapsed);
         foldedIds = arranged.hidden;
       }
 

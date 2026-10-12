@@ -98,3 +98,75 @@ export function layoutHorizontal(nodes, collapsed = new Set()) {
   for (const n of nodes) if (!positions.has(n.id) && !hidden.has(n.id)) positions.set(n.id, { x: 0, y: (top += GRID.rowH) }); // safety net
   return { positions, hidden, folded };
 }
+
+// Top-to-bottom variant of the same layout: the top-level device is at the top, every level is a row below it, and the
+// children of a device sit side by side under it. Client devices are folded into a block under their switch or access point.
+export const GRID_V = {
+  rowH: 130, // distance between levels
+  colW: 210, // width of a card slot (cards are at most 190 wide)
+  leafRowH: 74, // distance between the rows of a leaf block
+  leafCols: 6, // a leaf block gets another row after this many devices
+  groupGap: 40, // extra space between top-level trees
+};
+
+// Same arguments and result as layoutHorizontal.
+export function layoutVertical(nodes, collapsed = new Set()) {
+  const tree = buildTree(nodes);
+  const positions = new Map();
+  const hidden = new Set();
+  const folded = new Map();
+  const seen = new Set();
+
+  // places the subtree of `id` starting at horizontal position `left`; returns the x right of the subtree
+  function place(id, depth, left) {
+    seen.add(id);
+    const kids = tree.children.get(id).filter((c) => !seen.has(c));
+    const leaves = kids.filter((c) => tree.children.get(c).length === 0);
+    const inner = kids.filter((c) => tree.children.get(c).length > 0);
+    const y = depth * GRID_V.rowH;
+    if (kids.length === 0) {
+      positions.set(id, { x: left + GRID_V.colW / 2, y });
+      return left + GRID_V.colW;
+    }
+    const xs = [];
+    let x = left;
+    for (const child of inner) {
+      const right = place(child, depth + 1, x);
+      xs.push(positions.get(child).x);
+      x = right;
+    }
+    if (collapsed.has(id) && leaves.length > 0) {
+      for (const leaf of leaves) {
+        seen.add(leaf);
+        hidden.add(leaf);
+      }
+      folded.set(id, leaves.length);
+    } else if (leaves.length > 0) {
+      const rows = Math.ceil(leaves.length / GRID_V.leafCols);
+      const cols = Math.ceil(leaves.length / rows);
+      leaves.forEach((leaf, i) => {
+        seen.add(leaf);
+        positions.set(leaf, { x: x + (i % cols) * GRID_V.colW + GRID_V.colW / 2, y: (depth + 1) * GRID_V.rowH + Math.floor(i / cols) * GRID_V.leafRowH });
+      });
+      xs.push(x + GRID_V.colW / 2, x + (cols - 1) * GRID_V.colW + GRID_V.colW / 2);
+      x += cols * GRID_V.colW;
+    }
+    if (xs.length === 0) {
+      positions.set(id, { x: left + GRID_V.colW / 2, y });
+      return left + GRID_V.colW;
+    }
+    positions.set(id, { x: (Math.min(...xs) + Math.max(...xs)) / 2, y });
+    return Math.max(x, left + GRID_V.colW);
+  }
+
+  // big trees first, single devices last
+  const size = (id) => 1 + tree.children.get(id).reduce((sum, c) => sum + size(c), 0);
+  const roots = [...tree.roots].sort((a, b) => size(b) - size(a) || tree.roots.indexOf(a) - tree.roots.indexOf(b));
+  let left = 0;
+  for (const root of roots) {
+    if (seen.has(root)) continue;
+    left = place(root, 0, left) + GRID_V.groupGap;
+  }
+  for (const n of nodes) if (!positions.has(n.id) && !hidden.has(n.id)) positions.set(n.id, { x: (left += GRID_V.colW), y: 0 }); // safety net
+  return { positions, hidden, folded };
+}
