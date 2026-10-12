@@ -24,18 +24,20 @@ repeated here). Change `$netlens` to the address of the machine Netlens runs on.
 $netlens = '192.168.0.189'   # the address of the machine Netlens runs on
 $pw = Read-Host -AsSecureString 'Password for the netlens user'
 New-LocalUser -Name netlens -Password $pw -PasswordNeverExpires -UserMayNotChangePassword -Description 'Netlens (read Hyper-V)'
-Add-LocalGroupMember -Group 'Hyper-V Administrators' -Member netlens
-Add-LocalGroupMember -Group 'Remote Management Users' -Member netlens
+Add-LocalGroupMember -Group (Get-LocalGroup -SID 'S-1-5-32-578') -Member netlens   # Hyper-V Administrators (by id: the name is translated on non-English Windows)
+Add-LocalGroupMember -Group (Get-LocalGroup -SID 'S-1-5-32-580') -Member netlens   # Remote Management Users
 Enable-PSRemoting -Force -SkipNetworkProfileCheck
 $cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\LocalMachine\My -NotAfter (Get-Date).AddYears(10)
 New-Item -Path WSMan:\localhost\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force
 Get-ChildItem WSMan:\localhost\Listener | Where-Object Keys -contains 'Transport=HTTP' | Remove-Item -Recurse -Force
 Get-NetFirewallRule -Name 'WINRM-HTTP-In-TCP*' | Disable-NetFirewallRule
 New-NetFirewallRule -DisplayName 'Netlens WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -RemoteAddress $netlens -Action Allow
+foreach ($sid in 'S-1-5-32-580','S-1-5-32-578') { $g = Get-LocalGroup -SID $sid; "$($g.Name): " + ((Get-LocalGroupMember -SID $sid).Name -join ', ') }   # netlens must be listed twice
 ```
 
 What this does: creates a user `netlens` that is **not** an administrator, may log in remotely (Remote Management Users) and may use
-Hyper-V (Hyper-V Administrators); switches on WinRM with an **HTTPS** listener (self-signed certificate, valid ten years); removes the
+Hyper-V (Hyper-V Administrators). The two groups are looked up by their fixed ids (`S-1-5-32-580` and `S-1-5-32-578`), because their names are
+translated on Windows in another language (a command with the English name fails there). The last line prints the members of both groups: `netlens` must be in both; switches on WinRM with an **HTTPS** listener (self-signed certificate, valid ten years); removes the
 plain-HTTP listener and its firewall rule; opens port 5986 only to the Netlens machine.
 
 Then in Netlens: *Settings → Plugins → Microsoft Hyper-V*: address `https://<host address>:5986`, user `netlens`, the password, and
@@ -60,6 +62,7 @@ sealing every message, which this client does not implement, so it refuses (and 
 | :--- | :--- |
 | `cannot reach …: Connection refused` / timeout | The HTTPS listener (`winrm enumerate winrm/config/listener` on the host should show Transport = HTTPS), the firewall rule and the address. |
 | `cannot make a secure connection` | The listener has no usable certificate; run the `New-SelfSignedCertificate` and `New-Item … Listener` lines again. |
+| `says access is denied` | The login worked but the user may not open a remote shell. Run the last line of the setup (it lists the members of both groups): `netlens` must be in *Remote Management Users* **and** *Hyper-V Administrators*. If it is not, run the two `Add-LocalGroupMember` lines (with the ids, they work in any language), then press **Test** again. If the user already existed, the `New-LocalUser` line fails; that is fine, skip it. |
 | `refused the login` | User name or password wrong; the user must be in *Remote Management Users*. A local user is just `netlens`, a domain user `DOMAIN\name`. |
 | `may not manage Hyper-V` | Add the user to the local group *Hyper-V Administrators* and try again (a new login is needed). |
 | `Hyper-V is not installed` | `Get-VM` does not exist: the Hyper-V role and its PowerShell module must be installed on that machine. |

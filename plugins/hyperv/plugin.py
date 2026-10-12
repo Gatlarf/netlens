@@ -237,7 +237,7 @@ class Session:
                 fault = _fault_text(root)
                 if fault:
                     if "(code 5)" in fault or "access is denied" in fault.lower():
-                        raise AuthRefused(f"{self.id} says access is denied: the account must be a member of 'Remote Management Users' and 'Hyper-V Administrators'")
+                        raise AuthRefused(f"{self.id} says access is denied: the account must be a member of the local groups 'Remote Management Users' and 'Hyper-V Administrators' (on Windows in another language they have another name). Run the last line of the setup box on the host to see who is in them, then try again")
                     raise HyperVError(f"{self.id} reported: {fault[:300]}")
                 return root
             raise HyperVError(f"{self.id} answered HTTP {status}" + (" (the WinRM service is probably not listening on this port or protocol)" if status in (404, 405) else ""))

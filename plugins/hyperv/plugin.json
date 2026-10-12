@@ -1,15 +1,15 @@
 {
   "id": "hyperv",
   "name": "Microsoft Hyper-V",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
   "description": "Shows your Hyper-V hosts with their virtual machines: state, processors, memory, start time, network switch, and each VM matched to the device Netlens found by its MAC address (then IP), so a VM is one device linked to its host. Reads through Windows Remote Management (WinRM over HTTPS) by running one fixed, read-only Get-VM script. Needs a user on the Hyper-V machine that may use remote management and Hyper-V; the settings page has the PowerShell lines to set that up.",
   "info": {
     "title": "What to run on the Hyper-V machine (PowerShell as administrator)",
-    "text": "Run this once on the Hyper-V host, in a PowerShell window opened as administrator. It makes a user for Netlens that can use remote management and Hyper-V (and nothing else), switches on WinRM over HTTPS with a self-signed certificate and opens port 5986 only to the machine Netlens runs on. Change the first line to the address of that machine. Then enter https://<this host's address>:5986, the user name (netlens) and its password below, and keep 'Verify TLS certificate' off while the certificate is self-signed. The 'Hyper-V Administrators' group can also manage the virtual machines, so use a long password, and keep the firewall rule.",
-    "code": "$netlens = '192.168.0.189'   # the address of the machine Netlens runs on\n$pw = Read-Host -AsSecureString 'Password for the netlens user'\nNew-LocalUser -Name netlens -Password $pw -PasswordNeverExpires -UserMayNotChangePassword -Description 'Netlens (read Hyper-V)'\nAdd-LocalGroupMember -Group 'Hyper-V Administrators' -Member netlens\nAdd-LocalGroupMember -Group 'Remote Management Users' -Member netlens\nEnable-PSRemoting -Force -SkipNetworkProfileCheck\n$cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(10)\nNew-Item -Path WSMan:\\localhost\\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force\nGet-ChildItem WSMan:\\localhost\\Listener | Where-Object Keys -contains 'Transport=HTTP' | Remove-Item -Recurse -Force\nGet-NetFirewallRule -Name 'WINRM-HTTP-In-TCP*' | Disable-NetFirewallRule\nNew-NetFirewallRule -DisplayName 'Netlens WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -RemoteAddress $netlens -Action Allow"
+    "text": "Run this once on the Hyper-V host in an administrator PowerShell. It makes a user for Netlens that can use remote management and Hyper-V (and nothing else), switches on WinRM over HTTPS with a self-signed certificate and opens port 5986 only to the machine Netlens runs on. Change the first line to that machine's address. The groups are given by id, so it works on Windows in any language; the last line lists their members: netlens must be in both. If the user already exists, run only the two Add-LocalGroupMember lines and the last line. Then enter https://<this host's address>:5986, the user name (netlens) and its password below; leave 'Verify TLS certificate' off while the certificate is self-signed. Hyper-V Administrators can manage VMs: use a long password.",
+    "code": "$netlens = '192.168.0.189'   # the address of the machine Netlens runs on\n$pw = Read-Host -AsSecureString 'Password for the netlens user'\nNew-LocalUser -Name netlens -Password $pw -PasswordNeverExpires -UserMayNotChangePassword -Description 'Netlens (read Hyper-V)'\nAdd-LocalGroupMember -Group (Get-LocalGroup -SID 'S-1-5-32-578') -Member netlens   # Hyper-V Administrators (by id: the name is translated on non-English Windows)\nAdd-LocalGroupMember -Group (Get-LocalGroup -SID 'S-1-5-32-580') -Member netlens   # Remote Management Users\nEnable-PSRemoting -Force -SkipNetworkProfileCheck\n$cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(10)\nNew-Item -Path WSMan:\\localhost\\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force\nGet-ChildItem WSMan:\\localhost\\Listener | Where-Object Keys -contains 'Transport=HTTP' | Remove-Item -Recurse -Force\nGet-NetFirewallRule -Name 'WINRM-HTTP-In-TCP*' | Disable-NetFirewallRule\nNew-NetFirewallRule -DisplayName 'Netlens WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -RemoteAddress $netlens -Action Allow\nforeach ($sid in 'S-1-5-32-580','S-1-5-32-578') { $g = Get-LocalGroup -SID $sid; \"$($g.Name): \" + ((Get-LocalGroupMember -SID $sid).Name -join ', ') }   # netlens must be listed twice"
   },
   "timeout": 120,
   "diagnose": true,
@@ -54,8 +54,14 @@
       "label": "Login method",
       "default": "ntlm",
       "options": [
-        {"value": "ntlm", "label": "NTLM (default, works with local and domain users)"},
-        {"value": "basic", "label": "Basic (only when you turned Basic on in WinRM)"}
+        {
+          "value": "ntlm",
+          "label": "NTLM (default, works with local and domain users)"
+        },
+        {
+          "value": "basic",
+          "label": "Basic (only when you turned Basic on in WinRM)"
+        }
       ]
     },
     {
