@@ -28,13 +28,16 @@ services:
     tmpfs:
       - "/tmp"
 
-    # Persistent storage for scan results and state.
+    # Persistent storage: a Docker volume called "netlens-data" (nothing to create, no permissions to set).
+    # To keep the data in a folder of your own instead, set NETLENS_DATA in .env, for example NETLENS_DATA=/srv/netlens
+    # (create it first and run: sudo chown 10001:10001 /srv/netlens).
     volumes:
-      - "${DOCKERDIR:?Set DOCKERDIR in .env}/appdata/netlens:/data"
+      - "${NETLENS_DATA:-netlens-data}:/data"
 
-    # Environment variables sourced from .env with sensible defaults.
+    # Everything below is optional and can be set in a .env file next to this one. Without a .env it just works.
     environment:
       # Optional access token (signs in as administrator). Leave it empty to create your own account in the first-start wizard.
+      TZ: ${TZ:-UTC}
       NETLENS_TOKEN: ${NETLENS_TOKEN:-}
       # Optional scan ranges; empty string means auto-detect.
       NETLENS_RANGES: ${NETLENS_RANGES:-}
@@ -54,3 +57,6 @@ services:
       NETLENS_SNMP_COMMUNITY: ${NETLENS_SNMP_COMMUNITY:-}
       # Bind address for the web server (default 0.0.0.0:8080).
       NETLENS_BIND: ${NETLENS_BIND:-0.0.0.0:8080}
+
+volumes:
+  netlens-data:

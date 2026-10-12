@@ -115,7 +115,49 @@ network you want to scan** (a NAS, a mini PC, a Raspberry Pi, a server), not on 
 folders to create and no token**. The image is published for 64-bit Intel/AMD (amd64) and 64-bit ARM (arm64, for example a Raspberry Pi 3/4/5
 running a 64-bit OS) at `ghcr.io/gatlarf/netlens`; no account is needed to pull it.
 
-### Docker Compose (any Linux device with Docker)
+### Add it to your existing docker-compose.yml (easiest if you already run other containers)
+
+If you already keep your containers in one `docker-compose.yml`, paste this service under `services:` and add `netlens-data:` under the `volumes:` list at the bottom
+of the same file (create a `volumes:` list if there is none). Nothing else is needed: no extra variables, no folders.
+
+```yaml
+  netlens:
+    image: ghcr.io/gatlarf/netlens:latest
+    container_name: netlens
+    restart: unless-stopped
+    network_mode: host          # required to see the devices on your network (ARP, mDNS, SSDP)
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - netlens-data:/data
+    environment:
+      - TZ=Europe/Brussels      # your time zone
+```
+
+```yaml
+volumes:
+  netlens-data:
+```
+
+Then run `docker compose up -d netlens` and open `http://<this-device>:8080`. To update later: `docker compose pull netlens && docker compose up -d netlens`.
+Your own data folder instead of a Docker volume: replace `netlens-data:/data` with `/path/to/netlens:/data` and run `sudo chown 10001:10001 /path/to/netlens` once.
+
+### Portainer (for example on DietPi or any other device)
+
+1. **Stacks → Add stack**, give it a name (`netlens`), choose **Web editor**.
+2. Paste the contents of [`docker-compose.simple.yml`](docker-compose.simple.yml), optionally set `TZ` under *Environment variables*, and press **Deploy the stack**.
+3. Open `http://<this-device>:8080`.
+
+To update later: open the stack and press **Update the stack** with **Re-pull image** switched on.
+(Already have a stack for your other containers? Paste only the `netlens:` service from above into that stack's editor, add the `netlens-data:` volume, and update the stack.)
+
+### Docker Compose with a separate file (any Linux device with Docker)
 
 ```bash
 mkdir netlens && cd netlens
@@ -133,14 +175,6 @@ docker run -d --name netlens --restart unless-stopped --network host \
   --cap-drop ALL --cap-add NET_RAW --cap-add NET_ADMIN --read-only --tmpfs /tmp \
   -e TZ=Europe/Brussels -v netlens-data:/data ghcr.io/gatlarf/netlens:latest
 ```
-
-### Portainer (for example on DietPi or any other device)
-
-1. **Stacks → Add stack**, give it a name (`netlens`), choose **Web editor**.
-2. Paste the contents of [`docker-compose.simple.yml`](docker-compose.simple.yml), optionally set `TZ` under *Environment variables*, and press **Deploy the stack**.
-3. Open `http://<this-device>:8080`.
-
-To update later: open the stack and press **Update the stack** with **Re-pull image** switched on.
 
 ### Synology NAS (DSM 7.2 or newer, Container Manager)
 
@@ -216,70 +250,15 @@ location / {
 Things to know: behind a proxy every request comes from the proxy's address, so the login rate limit then counts per user name instead of per address; Home Assistant and Prometheus use
 the same HTTPS address (Home Assistant: *Reconfigure*; tick *Verify the TLS certificate* when the certificate is a normal one).
 
-### Advanced: a host folder, building from source, an existing compose stack
+### Advanced: a host folder, a pinned version, building from source
 
-These are for people who want the data in a folder they choose (for backups with their own tools) or want to build the image themselves. They use the
-`DOCKERDIR` variable from a `.env` file. Existing installations that were set up this way keep working unchanged.
+None of this is needed for a normal install. The repository's own [`docker-compose.yml`](docker-compose.yml) (clone the repository and run `docker compose up -d`)
+uses the same published image and the same Docker volume as the simple file. Optional settings go in a `.env` file next to it; [`.env.example`](.env.example) lists them.
 
-#### Pre-built image with a host folder
-
-```bash
-mkdir netlens && cd netlens
-curl -O https://raw.githubusercontent.com/Gatlarf/netlens/main/docker-compose.image.yml
-printf 'DOCKERDIR=/home/you/docker\n' > .env
-mkdir -p /home/you/docker/appdata/netlens
-sudo chown 10001:10001 /home/you/docker/appdata/netlens   # the container runs as uid 10001
-docker compose -f docker-compose.image.yml up -d
-```
-
-To pin a specific version instead of following `latest`, change the image line, for example `ghcr.io/gatlarf/netlens:1.2.3`.
-
-#### Build from source
-
-```bash
-git clone https://github.com/Gatlarf/netlens.git
-cd netlens
-cp .env.example .env            # set DOCKERDIR (and optionally NETLENS_TOKEN)
-mkdir -p "$DOCKERDIR/appdata/netlens"
-sudo chown 10001:10001 "$DOCKERDIR/appdata/netlens"
-docker compose up -d            # pulls the published image; nothing is compiled
-```
-
-To compile your own changes instead, add the override file: `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
-
-#### Add Netlens to an existing compose stack
-
-If you already keep all your services in one `docker-compose.yml` with a shared `.env` (defining `DOCKERDIR`), clone this repository to `$DOCKERDIR/build/netlens`
-(`git clone https://github.com/Gatlarf/netlens.git $DOCKERDIR/build/netlens`) and append this service:
-
-```yaml
-  netlens:
-    build:
-      context: ${DOCKERDIR}/build/netlens
-      args:
-        NETLENS_VERSION: ${NETLENS_VERSION:-dev}
-    image: netlens:latest
-    container_name: netlens
-    restart: unless-stopped
-    network_mode: host
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_RAW
-      - NET_ADMIN
-    read_only: true
-    tmpfs:
-      - /tmp
-    volumes:
-      - $DOCKERDIR/appdata/netlens:/data
-    environment:
-      - TZ=${TZ}
-      - NETLENS_BIND=0.0.0.0:8080
-```
-
-Create and chown the data directory as above, then run `docker compose up -d --build netlens` from the directory that holds your compose file.
-`NETLENS_TOKEN` is optional: set it to keep a shared administrator token (see *Access token* below); leave it out to create your account in the first-start wizard.
-The other `NETLENS_*` variables in the table below can be added to `environment:` as needed.
+- **Data in a folder you choose** (for backups with your own tools): set `NETLENS_DATA=/srv/netlens` in `.env`, create the folder and run `sudo chown 10001:10001 /srv/netlens`.
+- **A specific version** instead of the newest: set `NETLENS_IMAGE_TAG=0.3.128` in `.env`, or change the image line to `ghcr.io/gatlarf/netlens:0.3.128`.
+- **Build from source** (developers): `export NETLENS_VERSION="$(tr -d '[:space:]' < VERSION).$(git rev-list --count HEAD)"`, then
+  `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`. Without `NETLENS_VERSION` the app works but reports the version as `dev`.
 
 #### Existing installations
 
@@ -293,80 +272,40 @@ then remove `NETLENS_TOKEN` from your compose file.
 docker compose ps                  # status and health
 docker compose logs -f netlens     # logs (scan errors also appear in the UI under "Scans & events")
 docker compose pull && docker compose up -d   # update to the newest published image
-docker compose down                # stop and remove the container (data in appdata is kept)
+docker compose down                # stop and remove the container (the data volume is kept)
 ```
 
 Do not use `--no-new-privileges` or remove the `NET_RAW`/`NET_ADMIN` capabilities: nmap runs as a non-root user and relies on file capabilities for raw sockets.
 
 ## Updating to a new version
 
-**Simple install** (`docker-compose.simple.yml`, Portainer, Synology): pull the newest image and recreate the container; the data volume is untouched.
+Pull the newest image and recreate the container; the data volume is untouched. Take a backup first if you like (**Settings → Backup & restore → Download backup**).
 
-```bash
-docker compose -f docker-compose.simple.yml pull
-docker compose -f docker-compose.simple.yml up -d
-```
+- **Added to your own docker-compose.yml:** `docker compose pull netlens && docker compose up -d netlens`
+- **Separate file:** `docker compose -f docker-compose.simple.yml pull && docker compose -f docker-compose.simple.yml up -d`
+- **Clone of this repository (`docker-compose.yml`):** `docker compose pull && docker compose up -d`
+- **Portainer:** open the stack, press **Update the stack** with **Re-pull image** on.
+- **Synology:** **Project → netlens → Action → Build** (it pulls the newest image), then start it again.
 
-In Portainer press **Update the stack** with **Re-pull image** on; on a Synology use **Project → netlens → Action → Build**. Download a backup first if you like
-(**Settings → Backup & restore**). Netlens shows an **Update available** badge when a newer image exists.
+Netlens shows an **Update available** badge when a newer image exists. To check: `docker compose ps` should show *healthy*, and `curl http://<docker-host>:8080/api/health` answers `{"status":"ok"}`.
+Old images can be removed afterwards with `docker image prune -f`.
 
-**Advanced install from a clone** (`docker-compose.yml`): it also uses the published image now, so updating is the same two commands: `docker compose pull && docker compose up -d`. Pin a version with `NETLENS_IMAGE_TAG=0.3.128` in `.env`.
+**If you build from source** (the build override): pull the new code with `git pull` (a specific release: `git fetch --tags && git checkout <tag>`), set
+`NETLENS_VERSION` as shown under *Advanced* and run `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
 
-**Installs built from source** (the build override, or the compose snippet that has a `build:` section): Netlens is built from source, so updating means pulling the new code and rebuilding the image. Your data lives in `$DOCKERDIR/appdata/netlens` and is not touched by a rebuild. Releases and changes are listed at https://github.com/Gatlarf/netlens/commits/main; while the project is in development, check for changes to the data format or configuration before updating.
-
-1. **Back up the data** (recommended before every update). The easiest way is **Settings → Backup and restore → Download backup**. From the command line:
-
-   ```bash
-   docker compose stop netlens
-   sudo cp -a "$DOCKERDIR/appdata/netlens" "$DOCKERDIR/appdata/netlens.bak-$(date +%F)"
-   ```
-
-2. **Pull the new code.** Option A: run this in your clone. Option B: run it in `$DOCKERDIR/build/netlens`.
-
-   ```bash
-   git pull
-   ```
-
-   To run a specific release instead of the latest `main`, use `git fetch --tags && git checkout <tag>`.
-
-3. **Rebuild and restart** (only if you build from source; with the published image just run `docker compose pull && docker compose up -d`) from the directory that holds your compose file (for option B, `$DOCKERDIR`):
-
-   ```bash
-   # The version number rises with every commit: <VERSION file>.<commit count>
-   export NETLENS_VERSION="$(tr -d '[:space:]' < build/netlens/VERSION).$(git -C build/netlens rev-list --count HEAD)"   # option B
-   docker compose up -d --build netlens      # option A: run in the clone, and use NETLENS_VERSION="$(tr -d '[:space:]' < VERSION).$(git rev-list --count HEAD)"
-   ```
-
-   If you skip the `NETLENS_VERSION` line the app still works, it just reports the version as `dev`.
-
-   Compose rebuilds the image, recreates the container, and starts it again with the same settings and the same data directory.
-
-4. **Verify:**
-
-   ```bash
-   docker compose ps                         # STATUS should show "healthy"
-   curl http://<docker-host>:8080/api/health # {"status":"ok","version":"..."}
-   docker compose logs --tail 50 netlens
-   ```
-
-   **If you use the pre-built image (option C),** there is nothing to pull or build from source: run `docker compose -f docker-compose.image.yml pull && docker compose -f docker-compose.image.yml up -d` (in Portainer, recreate the stack with **Pull latest image** enabled). Do the backup and verify steps as above.
-
-5. **Clean up** old images once you are happy with the new version:
-
-   ```bash
-   docker image prune -f
-   ```
+**If you moved from the old `DOCKERDIR` files:** the compose files no longer use `DOCKERDIR`. To keep using your existing data folder, add
+`NETLENS_DATA=<your DOCKERDIR>/appdata/netlens` to your `.env` (or use that path as the volume in your own compose file) before the next `docker compose up`;
+otherwise Netlens starts empty in a new Docker volume (your old folder is not touched).
 
 ### Rolling back
 
-If the new version misbehaves, stop the container, go back to the previous code, restore the data backup, and rebuild:
+If the new version misbehaves, run the previous version by its tag (for example `NETLENS_IMAGE_TAG=0.3.120`, or `ghcr.io/gatlarf/netlens:0.3.120` in your
+compose file) and, if the data was changed, restore the backup you downloaded under **Settings → Backup & restore**:
 
 ```bash
 docker compose stop netlens
-git checkout <previous-tag-or-commit>
-sudo rm -rf "$DOCKERDIR/appdata/netlens"
-sudo cp -a "$DOCKERDIR/appdata/netlens.bak-<date>" "$DOCKERDIR/appdata/netlens"
-docker compose up -d --build netlens
+# set the older image tag, then:
+docker compose up -d netlens
 ```
 
 Restoring the backup matters because a newer version may have changed the database in a way an older version cannot read. If the update made no data changes you can skip the restore, but you should not count on that.
@@ -788,13 +727,13 @@ tests
 
   | Log message | Fix |
   |---|---|
-  | `PermissionError: [Errno 13] Permission denied: '/data...'` | The data directory is not writable by the container user. Run `sudo chown 10001:10001 $DOCKERDIR/appdata/netlens` |
+  | `PermissionError: [Errno 13] Permission denied: '/data...'` | The data directory is not writable by the container user. Only happens with your own data folder: run `sudo chown 10001:10001 <that folder>` |
   | `Is a directory` / the page asks for a token you never set | Old files: the token is optional now. Use `docker-compose.simple.yml`, or leave `NETLENS_TOKEN` empty to get the first-start wizard |
   | `NETLENS_RANGES contains non-scannable range` | Use private ranges only, no larger than /20 |
   | `NETLENS_BIND must be in format host:port` | Fix the value, e.g. `0.0.0.0:8080` |
   | `address already in use` | Another service on the host already uses port 8080 (the container uses host networking). Change `NETLENS_BIND` |
 
-  If `docker compose up` itself refuses to start, the message names the missing variable (for example `DOCKERDIR`, which only the advanced compose files need). Run `docker compose config` to see the final configuration with all variables filled in.
+  If `docker compose up` itself refuses to start, the message names the missing variable (none of the shipped compose files require one). Run `docker compose config` to see the final configuration with all variables filled in.
 - **Proxmox sync fails:** the message on the plugin's settings page says why. `the TLS certificate could not be verified`: untick *Verify TLS certificate* (Proxmox's default certificate is self-signed). `authentication failed`: check the token ID (`user@realm!tokenname`), the secret, or the password. `permission denied (... PVEAuditor)`: give the token or user the PVEAuditor role on `/`. `cannot connect`: wrong URL/port or a firewall.
 - **No notification mails:** use **Send test email** first. Check that *Send e-mail notifications* is ticked, that the device has not opted out, and the status line under the card for the last problem. Gmail and most providers need an app password, not your normal password.
 - **A guest does not show under its Proxmox host:** the connector matches by MAC address, so Netlens must have scanned that guest at least once on the same network. Run a scan and press *Sync now*.

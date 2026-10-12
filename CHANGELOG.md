@@ -5,7 +5,7 @@ The version is `<major.minor from VERSION>.<commit count>`. Each heading below i
 ## 0.3.129 — 2026-10-12
 
 ### Changed
-- ★ **Simpler install and update from a clone**: `docker-compose.yml` now pulls the published image instead of compiling the source, so `docker compose up -d` installs and `docker compose pull && docker compose up -d` updates. Pin a version with `NETLENS_IMAGE_TAG`. Developers who want to build their own changes use the new `docker-compose.build.yml` override.
+- ★ **Simpler install and update**: `docker-compose.yml` now pulls the published image instead of compiling the source, keeps its data in a Docker volume and no longer needs `DOCKERDIR` or a `.env` file; `docker-compose.image.yml` is gone (use `docker-compose.simple.yml` or paste the service into your own compose file or Portainer stack, see the README). Update with `docker compose pull && docker compose up -d`; pin a version with `NETLENS_IMAGE_TAG`; keep a host folder with `NETLENS_DATA`. If you used the old `DOCKERDIR` files, set `NETLENS_DATA=<DOCKERDIR>/appdata/netlens` to keep your data. Developers build from source with the new `docker-compose.build.yml` override.
 
 ## 0.3.121 — 2026-10-11
 
