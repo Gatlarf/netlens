@@ -8,7 +8,7 @@
    "builtin": true,
    "description": "Built into Netlens: which device is connected to which AiMesh node, with Wi-Fi signal and roaming (stock ASUSWRT, read-only, no SSH).",
    "author": "Netlens",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "homepage": "https://github.com/Gatlarf/netlens",
    "supports": [
     "ASUS RT-AX92U (tested)",
@@ -22,7 +22,7 @@
    "description": "Shows your Docker hosts with their containers: state, health, restarts, image (and how old it is), compose project, published ports, and containers with their own address on your network (macvlan / ipvlan) matched to the devices Netlens found. Optionally flags containers that have a newer image in their registry. Read-only, through a read-only socket proxy (the README has the recipe). Tested on Docker 29.8.2 with a bridge-network setup; macvlan and ipvlan are tested with simulated data only.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/docker",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
     "Docker Engine 29.x through tecnativa/docker-socket-proxy (tested)",
     "Containers on macvlan / ipvlan networks (not yet tested on a real host)"
@@ -91,7 +91,7 @@
    "description": "A template plugin that reports a made-up router, access point and two clients. Install it to see how plugins work, then copy it as a starting point for your own.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugin-index/template",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
     "no real device (made-up data)"
    ],
@@ -121,7 +121,7 @@
    "description": "Shows your Hyper-V hosts with their virtual machines (state, processors, memory, start time, network switch) and ties each VM to the device Netlens found by MAC address, then IP. Reads through Windows Remote Management over HTTPS by running one fixed, read-only Get-VM script; the settings page has the PowerShell lines that create the user and the HTTPS listener. Tested on a real Windows 11 Hyper-V host (user without administrator rights) and with simulated answers.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/hyperv",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
     "Hyper-V on Windows Server and Windows 10/11 Pro through WinRM over HTTPS (tested on Windows 11 24H2)",
     "NTLM or Basic login; Kerberos is not supported"
@@ -172,7 +172,7 @@
    "description": "Shows the sites your Nginx Proxy Manager publishes (proxy hosts, redirections, streams, 404 hosts) and ties each to the device or Docker container behind it: a card on that device, the sites a proxy serves, certificate expiry events, optional HTTPS checks per site and optional DNS names for the domains. Read-only, through a user that can only view. Tested on Nginx Proxy Manager 2.15.1 (login and permission checks on a real instance; site data with simulated answers).",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/npm",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
     "Nginx Proxy Manager 2.15.x (login tested on a real instance)",
     "Sites, certificates and access lists read with simulated data matching the 2.x API"
@@ -199,7 +199,7 @@
    "description": "Reads an Omada controller (5.1 or newer): gateway, switches and access points, which device hangs below which, and which switch or access point each client is connected to, with Wi-Fi signal, band and link rate. Read-only. Not yet tested on real hardware.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/omada",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
     "Omada software controller 5.1 or newer",
     "OC200 / OC300 hardware controllers (not yet tested)"
@@ -256,7 +256,7 @@
    "builtin": true,
    "description": "Built into Netlens: shows which VMs and containers run on which Proxmox host (read-only, API token or password).",
    "author": "Netlens",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "homepage": "https://github.com/Gatlarf/netlens",
    "supports": [
     "Proxmox VE 8 and 9"
@@ -269,7 +269,7 @@
    "description": "Asks managed switches over SNMP v1 / v2c (read-only) which device is plugged into which port: the MAC address table and LLDP. Netlens shows each device's switch and port and places the switches in the hierarchy. Works with switches that have the standard bridge MIB (TP-Link, Netgear, HP / Aruba, Cisco, Zyxel, MikroTik, Ubiquiti and others). Tested against simulated switches only.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/snmp",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
     "Managed switches with SNMP v1/v2c and the BRIDGE-MIB or Q-BRIDGE-MIB (not yet tested on hardware)",
     "LLDP-MIB for links between switches (optional)"
@@ -308,7 +308,7 @@
    "description": "Registers your devices in Technitium DNS Server (A and reverse records) and follows address changes, after a preview and your approval. Works with a primary and secondary server and with a Technitium cluster. It only changes records it created itself and never touches records made by anything else, such as Windows machines that register themselves. Tested on real Technitium 15.5.1 servers (primary and secondary).",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/technitium",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
     "Technitium DNS Server 15.5.1 with primary and secondary zones (tested on real servers)",
     "Technitium DNS cluster (not yet tested on a real server)"
@@ -389,7 +389,7 @@
    "description": "Shows a TrueNAS (Community Edition 25.04 or newer) as a host with its containers, virtual machines and apps as guests, matched to your network devices by IP or MAC. Read-only, with an API key over TLS. Tested on TrueNAS 25.10.6 (VMs with simulated data).",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/truenas",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
     "TrueNAS Community Edition 25.10 (tested)",
     "TrueNAS 25.04 (not tested)"
@@ -458,7 +458,7 @@
    "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine and Cloud Key Gen2+, or a classic self-hosted controller): gateway, switches and access points, which device hangs below which, and which switch or access point each client is connected to, with Wi-Fi signal, band and link rate. Read-only. Not yet tested on real hardware.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unifi",
-   "license": "MIT",
+   "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
     "UniFi OS consoles (Dream Machine, Cloud Gateway, Cloud Key Gen2+) (not yet tested)",
     "Classic self-hosted controller, port 8443 (not yet tested)"

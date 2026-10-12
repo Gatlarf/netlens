@@ -5,7 +5,7 @@
   "description": "Shows your Docker hosts with their containers: state, health, restarts, image (and how old it is), compose project, published ports, and containers with their own address on your network (macvlan / ipvlan) matched to the devices Netlens found. Optionally flags containers that have a newer image in their registry. Read-only, through a read-only socket proxy (the README has the recipe). Tested on Docker 29.8.2 with a bridge-network setup; macvlan and ipvlan are tested with simulated data only.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/docker",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "supports": [
     "Docker Engine 29.x through tecnativa/docker-socket-proxy (tested)",
     "Containers on macvlan / ipvlan networks (not yet tested on a real host)"

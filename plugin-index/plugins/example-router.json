@@ -5,7 +5,7 @@
   "description": "A template plugin that reports a made-up router, access point and two clients. Install it to see how plugins work, then copy it as a starting point for your own.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugin-index/template",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "supports": [
     "no real device (made-up data)"
   ],

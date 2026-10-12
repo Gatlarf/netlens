@@ -5,7 +5,7 @@
   "description": "Shows a TrueNAS (Community Edition 25.04 or newer) as a host with its containers, virtual machines and apps as guests, matched to your network devices by IP or MAC. Read-only, with an API key over TLS. Tested on TrueNAS 25.10.6 (VMs with simulated data).",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/truenas",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "supports": [
     "TrueNAS Community Edition 25.10 (tested)",
     "TrueNAS 25.04 (not tested)"

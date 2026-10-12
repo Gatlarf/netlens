@@ -5,7 +5,7 @@
   "description": "Shows your Hyper-V hosts with their virtual machines (state, processors, memory, start time, network switch) and ties each VM to the device Netlens found by MAC address, then IP. Reads through Windows Remote Management over HTTPS by running one fixed, read-only Get-VM script; the settings page has the PowerShell lines that create the user and the HTTPS listener. Tested on a real Windows 11 Hyper-V host (user without administrator rights) and with simulated answers.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/hyperv",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "supports": [
     "Hyper-V on Windows Server and Windows 10/11 Pro through WinRM over HTTPS (tested on Windows 11 24H2)",
     "NTLM or Basic login; Kerberos is not supported"

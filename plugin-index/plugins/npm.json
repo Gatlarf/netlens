@@ -5,7 +5,7 @@
   "description": "Shows the sites your Nginx Proxy Manager publishes (proxy hosts, redirections, streams, 404 hosts) and ties each to the device or Docker container behind it: a card on that device, the sites a proxy serves, certificate expiry events, optional HTTPS checks per site and optional DNS names for the domains. Read-only, through a user that can only view. Tested on Nginx Proxy Manager 2.15.1 (login and permission checks on a real instance; site data with simulated answers).",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/npm",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "supports": [
     "Nginx Proxy Manager 2.15.x (login tested on a real instance)",
     "Sites, certificates and access lists read with simulated data matching the 2.x API"

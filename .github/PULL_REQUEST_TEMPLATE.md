@@ -20,6 +20,7 @@
 - [ ] I added or updated tests for the change
 - [ ] I added a line to `CHANGELOG.md` (for anything a user can see)
 - [ ] I updated the README or the plugin's own README where behaviour, settings or setup changed
+- [ ] I agree that my contribution is licensed as described in CONTRIBUTING.md (noncommercial, and the maintainer may also license it commercially)
 - [ ] There are no secrets, tokens or real network details in the code, tests, logs or screenshots
 - [ ] The browser code stays free of build steps and extra dependencies; plugins use the Python standard library only
 

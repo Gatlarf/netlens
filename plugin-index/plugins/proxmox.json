@@ -5,7 +5,7 @@
   "builtin": true,
   "description": "Built into Netlens: shows which VMs and containers run on which Proxmox host (read-only, API token or password).",
   "author": "Netlens",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "homepage": "https://github.com/Gatlarf/netlens",
   "supports": [
     "Proxmox VE 8 and 9"

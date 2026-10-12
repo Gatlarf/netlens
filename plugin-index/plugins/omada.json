@@ -5,7 +5,7 @@
   "description": "Reads an Omada controller (5.1 or newer): gateway, switches and access points, which device hangs below which, and which switch or access point each client is connected to, with Wi-Fi signal, band and link rate. Read-only. Not yet tested on real hardware.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/omada",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "supports": [
     "Omada software controller 5.1 or newer",
     "OC200 / OC300 hardware controllers (not yet tested)"

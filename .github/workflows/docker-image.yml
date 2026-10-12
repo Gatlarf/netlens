@@ -60,6 +60,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          labels: |
+            org.opencontainers.image.licenses=PolyForm-Noncommercial-1.0.0
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ steps.ver.outputs.version }}

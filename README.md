@@ -742,6 +742,23 @@ tests
 - **OS detection empty:** Needs deep scan and root-capable nmap.
 - **Terminal button missing:** Port 22/23 not seen open yet, `NETLENS_TERMINAL=off`, or you opened Netlens through a reverse proxy (see *Web terminal*).
 
+## License
+
+Netlens is free for **noncommercial use** under the [PolyForm Noncommercial License 1.0.0](LICENSE): you may run it at home, for
+a hobby, for study or research, in a school or charity, change it and share it, as long as it is not for commercial purposes.
+It is source-available, not "open source" in the OSI sense.
+
+**Commercial use needs a commercial license.** That includes using it in a business, selling it, bundling it in a product, and
+offering it as a paid or hosted service. To get one, send a private message through the maintainers' form (only they can see it):
+**Security → Report a vulnerability** at <https://github.com/Gatlarf/netlens/security/advisories/new>, start with "Commercial
+license" in the first line, and say who you are and what you want to use Netlens for. Exceptions are possible, for example for the
+workplace of someone who helps with the project.
+
+Versions **0.3.142 and earlier** were published under the MIT License and stay available under it
+([text](licenses/LICENSE-MIT-until-0.3.142.txt), and the git tag `mit-final`); the new license applies from 0.3.143. The
+plugins in the plugin index are separate works with their own licenses (the index shows each one). Third-party components keep
+their own licenses, see below.
+
 ## Third-party
 
 - **vis-network** 9.1.9 (MIT) — vendored under `app/static/vendor`

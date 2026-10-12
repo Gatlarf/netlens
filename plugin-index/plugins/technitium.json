@@ -5,7 +5,7 @@
   "description": "Registers your devices in Technitium DNS Server (A and reverse records) and follows address changes, after a preview and your approval. Works with a primary and secondary server and with a Technitium cluster. It only changes records it created itself and never touches records made by anything else, such as Windows machines that register themselves. Tested on real Technitium 15.5.1 servers (primary and secondary).",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/technitium",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "supports": [
     "Technitium DNS Server 15.5.1 with primary and secondary zones (tested on real servers)",
     "Technitium DNS cluster (not yet tested on a real server)"

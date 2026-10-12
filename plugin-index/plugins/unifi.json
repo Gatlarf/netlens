@@ -5,7 +5,7 @@
   "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine and Cloud Key Gen2+, or a classic self-hosted controller): gateway, switches and access points, which device hangs below which, and which switch or access point each client is connected to, with Wi-Fi signal, band and link rate. Read-only. Not yet tested on real hardware.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unifi",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "supports": [
     "UniFi OS consoles (Dream Machine, Cloud Gateway, Cloud Key Gen2+) (not yet tested)",
     "Classic self-hosted controller, port 8443 (not yet tested)"

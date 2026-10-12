@@ -1,7 +1,9 @@
 # Contributing to Netlens
 
 Thank you for wanting to help. Bug reports, ideas, documentation fixes, plugins and code are all welcome. By taking part you agree to
-follow the [Code of Conduct](CODE_OF_CONDUCT.md). Contributions are released under the project's [MIT license](LICENSE).
+follow the [Code of Conduct](CODE_OF_CONDUCT.md). Contributions are licensed under the project's [PolyForm Noncommercial license](LICENSE). By sending a contribution you also allow the
+maintainer to license it under other terms, including commercial ones (this is how Netlens offers commercial licenses), and you confirm that you
+wrote it or may share it.
 
 ## Ways to help
 
