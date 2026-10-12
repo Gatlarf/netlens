@@ -5,7 +5,7 @@ The version is `<major.minor from VERSION>.<commit count>`. Each heading below i
 ## 0.3.129 — 2026-10-12
 
 ### Fixed
-- ★ **Plugin settings survive a restore**: restoring a backup into a fresh container brings back the plugin settings, but installing a plugin used to reset them. Now the settings are kept when a plugin is installed again, and it switches back on by itself when the code is the same as before (other code starts off). The Plugins page lists plugins that have saved settings but are not installed, with an *Install again from the index* button.
+- ★ **Backups include the plugins**: a backup now contains the installed plugins (their code) next to their settings, so restoring into a fresh container brings everything back as it was, with the plugins switched on as before. Older backups restore as they did; for plugins with saved settings but no files, the Plugins page lists them with an *Install again from the index* button, and installing keeps their settings (a plugin whose code differs from the saved one starts off).
 
 ### Added
 - ★ **Vertical map layout**: next to the horizontal layout the map can now be arranged top to bottom, with the router at the top, one row per level and a card per device. Folding clients, *Fit* and the right-angle links work as in the horizontal layout. Pick it in the map's layout menu, or as the default under Settings → Map.

@@ -87,7 +87,7 @@ def prune(db_path, keep: int) -> None:
             log.warning("could not remove old backup %s", item["name"])
 
 
-def run_backup(conn, db_path, now: datetime | None = None) -> dict:
+def run_backup(conn, db_path, now: datetime | None = None, data_dir=None) -> dict:
     """Make a backup now, remember the outcome and raise a `backup_failed` event on failure."""
     now = now or datetime.now(timezone.utc)
     folder = backup_dir(db_path)
@@ -97,7 +97,7 @@ def run_backup(conn, db_path, now: datetime | None = None) -> dict:
     try:
         folder.mkdir(mode=0o700, exist_ok=True)
         os.chmod(folder, 0o700)
-        create_backup(db_path, target)
+        create_backup(db_path, target, data_dir)
         os.chmod(target, 0o600)
         validate_backup(target)
         prune(db_path, get_schedule(conn)["keep"])

@@ -22,7 +22,7 @@ async def download_backup(request: Request) -> FileResponse:
     fd, tmp = tempfile.mkstemp(prefix="netlens-backup-", suffix=".db")
     os.close(fd)
     try:
-        await asyncio.to_thread(create_backup, request.app.state.db_path, tmp)
+        await asyncio.to_thread(create_backup, request.app.state.db_path, tmp, request.app.state.settings.data_dir)
     except BackupError as exc:
         os.unlink(tmp)
         raise HTTPException(status_code=500, detail=str(exc))
@@ -58,7 +58,7 @@ async def upload_restore(request: Request) -> dict:
             f.write(data)
         try:
             version = await asyncio.to_thread(validate_backup, tmp)
-            await asyncio.to_thread(restore_backup, db_path, tmp)
+            restored = await asyncio.to_thread(restore_backup, db_path, tmp, app.state.settings.data_dir)
         except BackupError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
     finally:
@@ -73,4 +73,4 @@ async def upload_restore(request: Request) -> dict:
         devices = conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
     finally:
         conn.close()
-    return {"ok": True, "backup_schema_version": version, "devices": devices}
+    return {"ok": True, "backup_schema_version": version, "devices": devices, **restored}

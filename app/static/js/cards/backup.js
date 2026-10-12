@@ -62,7 +62,8 @@ function fillSchedule(box, data) {
         restore.disabled = true;
         try {
           const res = await api(`/api/backups/${b.name}/restore`, { method: "POST" });
-          toast(`Restored ${res.devices} devices. Reloading...`, "success");
+          toast(`Restored ${res.devices} devices${(res.plugins || []).length ? ` and ${res.plugins.length} plugin(s)` : ""}. Reloading...`, "success");
+          if ((res.plugins_failed || []).length) toast(`Could not restore: ${res.plugins_failed.join(", ")}`, "error");
           setTimeout(() => location.reload(), 1200);
         } catch (err) {
           toast(err.message || "Restore failed", "error");
@@ -87,7 +88,7 @@ export function buildBackupCard() {
   card.appendChild(h("h2", {}, "Backup and restore"));
 
   card.appendChild(h("p", { class: "hint" },
-    "The backup contains all devices, history and settings, including saved e-mail and plugin credentials. Store it somewhere safe. Plugin files are not in it: after a restore on a fresh install, the Plugins page lists the plugins to install again, and their settings come back with them."));
+    "The backup contains all devices, history and settings, including saved e-mail and plugin credentials. The installed plugins are in it too (their code and settings), so a restore brings everything back as it was. Store it somewhere safe."));
 
   card.appendChild(h("a", { class: "btn", href: "/api/backup", download: "" }, "Download backup"));
 
@@ -162,7 +163,8 @@ export function buildBackupCard() {
       }
 
       const devices = data && data.devices != null ? data.devices : 0;
-      toast(`Restored ${devices} devices. Reloading...`, "success");
+      toast(`Restored ${devices} devices${data && (data.plugins || []).length ? ` and ${data.plugins.length} plugin(s)` : ""}. Reloading...`, "success");
+      if (data && (data.plugins_failed || []).length) toast(`Could not restore: ${data.plugins_failed.join(", ")}`, "error");
       setTimeout(() => location.reload(), 1200);
     } catch (err) {
       const msg = err.message || "Restore failed";

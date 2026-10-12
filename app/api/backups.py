@@ -59,7 +59,7 @@ async def run_now(request: Request) -> dict:
     def work() -> dict:
         conn = connect(db_path)
         try:
-            result = bs.run_backup(conn, db_path)
+            result = bs.run_backup(conn, db_path, data_dir=request.app.state.settings.data_dir)
             return {**_view(request, conn), "result": result}
         finally:
             conn.close()
@@ -102,7 +102,7 @@ async def restore(request: Request, name: str) -> dict:
     db_path = str(app.state.db_path)
     try:
         version = await asyncio.to_thread(validate_backup, path)
-        await asyncio.to_thread(restore_backup, db_path, path)
+        restored = await asyncio.to_thread(restore_backup, db_path, path, app.state.settings.data_dir)
     except BackupError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     config_api.apply_overrides(app)
@@ -111,4 +111,4 @@ async def restore(request: Request, name: str) -> dict:
         devices = conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
     finally:
         conn.close()
-    return {"ok": True, "backup_schema_version": version, "devices": devices}
+    return {"ok": True, "backup_schema_version": version, "devices": devices, **restored}
