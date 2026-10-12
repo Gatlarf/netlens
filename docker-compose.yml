@@ -5,11 +5,9 @@
 
 services:
   netlens:
-    build:
-      context: .
-      args:
-        NETLENS_VERSION: ${NETLENS_VERSION:-dev}
-    image: netlens:latest
+    # The published image: `docker compose pull && docker compose up -d` updates it. To build from this source tree instead
+    # (developers), add the override file: docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+    image: ghcr.io/gatlarf/netlens:${NETLENS_IMAGE_TAG:-latest}
     container_name: netlens
     restart: unless-stopped
 

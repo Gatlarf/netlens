@@ -242,8 +242,10 @@ cd netlens
 cp .env.example .env            # set DOCKERDIR (and optionally NETLENS_TOKEN)
 mkdir -p "$DOCKERDIR/appdata/netlens"
 sudo chown 10001:10001 "$DOCKERDIR/appdata/netlens"
-docker compose up -d --build
+docker compose up -d            # pulls the published image; nothing is compiled
 ```
+
+To compile your own changes instead, add the override file: `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`.
 
 #### Add Netlens to an existing compose stack
 
@@ -290,7 +292,7 @@ then remove `NETLENS_TOKEN` from your compose file.
 ```bash
 docker compose ps                  # status and health
 docker compose logs -f netlens     # logs (scan errors also appear in the UI under "Scans & events")
-docker compose up -d --build       # rebuild and restart after pulling new code
+docker compose pull && docker compose up -d   # update to the newest published image
 docker compose down                # stop and remove the container (data in appdata is kept)
 ```
 
@@ -308,7 +310,9 @@ docker compose -f docker-compose.simple.yml up -d
 In Portainer press **Update the stack** with **Re-pull image** on; on a Synology use **Project → netlens → Action → Build**. Download a backup first if you like
 (**Settings → Backup & restore**). Netlens shows an **Update available** badge when a newer image exists.
 
-**Installs built from source** (the *Advanced* routes above): Netlens is built from source, so updating means pulling the new code and rebuilding the image. Your data lives in `$DOCKERDIR/appdata/netlens` and is not touched by a rebuild. Releases and changes are listed at https://github.com/Gatlarf/netlens/commits/main; while the project is in development, check for changes to the data format or configuration before updating.
+**Advanced install from a clone** (`docker-compose.yml`): it also uses the published image now, so updating is the same two commands: `docker compose pull && docker compose up -d`. Pin a version with `NETLENS_IMAGE_TAG=0.3.128` in `.env`.
+
+**Installs built from source** (the build override, or the compose snippet that has a `build:` section): Netlens is built from source, so updating means pulling the new code and rebuilding the image. Your data lives in `$DOCKERDIR/appdata/netlens` and is not touched by a rebuild. Releases and changes are listed at https://github.com/Gatlarf/netlens/commits/main; while the project is in development, check for changes to the data format or configuration before updating.
 
 1. **Back up the data** (recommended before every update). The easiest way is **Settings → Backup and restore → Download backup**. From the command line:
 
@@ -325,7 +329,7 @@ In Portainer press **Update the stack** with **Re-pull image** on; on a Synology
 
    To run a specific release instead of the latest `main`, use `git fetch --tags && git checkout <tag>`.
 
-3. **Rebuild and restart** from the directory that holds your compose file (for option B, `$DOCKERDIR`):
+3. **Rebuild and restart** (only if you build from source; with the published image just run `docker compose pull && docker compose up -d`) from the directory that holds your compose file (for option B, `$DOCKERDIR`):
 
    ```bash
    # The version number rises with every commit: <VERSION file>.<commit count>

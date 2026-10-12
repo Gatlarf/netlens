@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.129 — 2026-10-12
+
+### Changed
+- ★ **Simpler install and update from a clone**: `docker-compose.yml` now pulls the published image instead of compiling the source, so `docker compose up -d` installs and `docker compose pull && docker compose up -d` updates. Pin a version with `NETLENS_IMAGE_TAG`. Developers who want to build their own changes use the new `docker-compose.build.yml` override.
+
 ## 0.3.121 — 2026-10-11
 
 ### Added
