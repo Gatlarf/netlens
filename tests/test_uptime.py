@@ -149,3 +149,54 @@ def test_uptime_overview(conn):
     assert result[2]["bars"] == []
     assert result[2]["last_ts"] is None
     assert isinstance(result[0]["online"], bool)
+
+def _history(conn, device, hours, step_minutes=60, down_at=()):
+    from app.uptime import _format_ts, _parse_ts
+    end = _parse_ts(NOW)
+    n = int(hours * 60 / step_minutes)
+    for i in range(n + 1):
+        ts = _format_ts(end - __import__("datetime").timedelta(minutes=i * step_minutes))
+        up = 0 if i in down_at else 1
+        conn.execute("INSERT INTO checks (device_id, ts, up, rtt_ms) VALUES (?, ?, ?, ?)", (device, ts, up, None if not up else 10.0 + i))
+    conn.commit()
+
+
+def test_overview_with_a_range_gives_slices_with_time_and_response(conn):
+    a = get_or_create_device(conn, "aa:bb:cc:dd:ee:01", "192.168.1.10")
+    _history(conn, a, 24, 60, down_at={5})
+    row = uptime_overview(conn, bars=24, now=NOW, days=1)[0]
+    bars = row["bars"]
+    assert len(bars) == 24 and all("ts" in b for b in bars)             # the newest check lands in the last slice, not in a 25th
+    assert sum(1 for b in bars if not b["up"]) == 1
+    assert [b for b in bars if b["up"]][0]["rtt_ms"] is not None
+    assert row["up_30d"] is not None and row["up_24h"] is not None
+
+
+def test_a_slice_with_several_checks_says_how_many_and_how_many_failed(conn):
+    a = get_or_create_device(conn, "aa:bb:cc:dd:ee:01", "192.168.1.10")
+    _history(conn, a, 24, 30, down_at={3})
+    bars = uptime_overview(conn, bars=6, now=NOW, days=1)[0]["bars"]
+    assert len(bars) == 6
+    bad = [b for b in bars if not b["up"]]
+    assert len(bad) == 1 and bad[0]["down"] == 1 and bad[0]["n"] == 9 and bad[0]["end"] > bad[0]["ts"]
+    assert all(b["n"] == 8 for b in bars[1:5])      # the check made exactly now belongs to the newest slice
+
+
+def test_device_uptime_over_30_days(conn):
+    a = get_or_create_device(conn, "aa:bb:cc:dd:ee:01", "192.168.1.10")
+    _history(conn, a, 24 * 30, 360)
+    result = device_uptime(conn, a, now=NOW, limit=30, days=30)
+    assert len(result["checks"]) == 30 and result["up_30d"] == 100.0 and result["avg_rtt_ms"] is not None
+    assert device_uptime(conn, a, now=NOW, limit=5)["checks"][0]["up"] in (True, False)      # the original form is unchanged
+
+
+def test_uptime_endpoint_ranges(tmp_path):
+    from fastapi.testclient import TestClient
+    from app.config import load_settings
+    from app.main import create_app
+
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    with TestClient(app, headers={"Authorization": "Bearer secret"}) as c:
+        assert c.get("/api/uptime?range=7d&bars=30").status_code == 200
+        assert c.get("/api/uptime?range=1y").status_code == 422
+        assert c.get("/api/uptime").status_code == 200

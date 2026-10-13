@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.161 — 2026-10-13
+
+### Changed
+- ★ **A new Uptime page**: choose **24 hours, 7 days or 30 days** (your choice is remembered), see at a glance how many devices are online, the average availability, how many devices missed a check and the average response time, and read each device on its own row with the Uptime-Kuma style availability bar **and a response-time line** next to it, plus its 24 h, 7 day and 30 day uptime. You can filter, sort by least reliable or slowest, and show only devices with a problem.
+- ★ **Point at a bar or the line to see the details**: every uptime graph (Uptime page, a device's Uptime card and the service-check history) now shows an infobox with the time of the measurement, up or down, and the response time. When one bar covers several checks (a longer period) it says how many there were, how many failed and the average and highest response time.
+- ★ **The Uptime card of a device** has the same 24 hours / 7 days / 30 days choice and a response-time line with its highest and average value; its 24 h, 7 day and 30 day figures show at once. The Uptime card on the dashboard now shows 24 hours, 7 days and 30 days together.
+
 ## 0.3.160 — 2026-10-13
 
 ### Changed

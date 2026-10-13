@@ -117,17 +117,19 @@ def device_uptime(
     device_id: int,
     now: str | None = None,
     limit: int = 60,
+    days: int | None = None,
 ) -> dict:
+    """days=N: `checks` are `limit` slices of time over the last N days (with their response time) instead of the last `limit` checks."""
     if now is None:
         now = utcnow()
 
     up_24h = uptime_percent(conn, device_id, 1, now)
     up_7d = uptime_percent(conn, device_id, 7, now)
     up_30d = uptime_percent(conn, device_id, 30, now)
-    checks = recent_checks(conn, device_id, limit)
+    checks = _bucket_rows(conn, now, days, limit, device_id).get(device_id, []) if days else recent_checks(conn, device_id, limit)
 
-    # avg_rtt_ms over last 24h
-    cutoff_24h = _cutoff(now, 1)
+    # avg_rtt_ms over the chosen period (24 h by default)
+    cutoff_24h = _cutoff(now, days or 1)
     row = conn.execute(
         "SELECT AVG(rtt_ms) AS avg_rtt FROM checks WHERE device_id = ? AND ts >= ? AND rtt_ms IS NOT NULL",
         (device_id, cutoff_24h),
@@ -179,7 +181,9 @@ def uptime_overview(
     conn: sqlite3.Connection,
     bars: int = 60,
     now: str | None = None,
+    days: int | None = None,
 ) -> list[dict]:
+    """days=None: the last `bars` checks as 1/0 (the original form); days=N: `bars` slices of time with their time and response time."""
     if now is None:
         now = utcnow()
 
@@ -201,9 +205,17 @@ def uptime_overview(
     ).fetchall():
         agg_7d[row["device_id"]] = round(row["total_up"] / row["total"] * 100, 2) if row["total"] else None
 
-    # Window function query for bars
-    bars_map: dict[int, list[int]] = {}
+    agg_30d = {}
     for row in conn.execute(
+        "SELECT device_id, SUM(up) AS total_up, COUNT(*) AS total, AVG(rtt_ms) AS rtt FROM checks WHERE ts >= ? GROUP BY device_id",
+        (_cutoff(now, 30),),
+    ).fetchall():
+        agg_30d[row["device_id"]] = round(row["total_up"] / row["total"] * 100, 2) if row["total"] else None
+
+    # Window function query for bars
+    bars_map: dict[int, list] = {}
+    sliced = _bucket_rows(conn, now, days, bars) if days else None
+    for row in [] if days else conn.execute(
         "SELECT device_id, up FROM ("
         "SELECT device_id, up, ts, ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY ts DESC, id DESC) AS rn "
         "FROM checks"
@@ -245,8 +257,42 @@ def uptime_overview(
             "online": bool(row["online"]),
             "up_24h": agg_24h.get(device_id),
             "up_7d": agg_7d.get(device_id),
-            "bars": bars_map.get(device_id, []),
+            "up_30d": agg_30d.get(device_id),
+            "bars": sliced.get(device_id, []) if sliced is not None else bars_map.get(device_id, []),
             "last_ts": last_ts_map.get(device_id),
         })
 
     return result
+
+
+# ---------- the bars and response-time line for a chosen period (24 h, 7 days, 30 days) ----------
+
+RANGES = {"24h": 1, "7d": 7, "30d": 30}
+
+
+def _bucket_rows(conn: sqlite3.Connection, now: str, days: int, bars: int, device_id: int | None = None) -> dict[int, list[dict]]:
+    """Checks of the last `days` days grouped into `bars` equal slices of time, per device (oldest first). A slice that holds one check
+    is exactly that measurement; a slice with several says how many there were and how many failed. A slice is down when any check in it failed."""
+    end = _parse_ts(now)
+    start = end - timedelta(days=days)
+    size = days * 86400 / bars
+    t0 = int(start.timestamp())
+    sql = ("SELECT device_id, MIN(?, CAST((CAST(strftime('%s', ts) AS INTEGER) - ?) / ? AS INTEGER)) AS b, COUNT(*) AS n, SUM(up) AS ups, "
+           "AVG(rtt_ms) AS rtt, MAX(rtt_ms) AS rtt_max, MIN(ts) AS first, MAX(ts) AS last FROM checks WHERE ts >= ? AND ts <= ?")
+    args: list = [bars - 1, t0, size, _format_ts(start), now]
+    if device_id is not None:
+        sql += " AND device_id = ?"
+        args.append(device_id)
+    sql += " GROUP BY device_id, b ORDER BY device_id, b"
+    out: dict[int, list[dict]] = {}
+    for r in conn.execute(sql, args):
+        down = r["n"] - (r["ups"] or 0)
+        item = {"ts": r["first"], "up": down == 0, "rtt_ms": round(r["rtt"], 1) if r["rtt"] is not None else None}
+        if r["n"] > 1:
+            item.update(n=r["n"], down=down, end=r["last"], rtt_max=round(r["rtt_max"], 1) if r["rtt_max"] is not None else None)
+        out.setdefault(r["device_id"], []).append(item)
+    return out
+
+
+def range_days(name: str | None) -> int | None:
+    return RANGES.get(name) if name else None

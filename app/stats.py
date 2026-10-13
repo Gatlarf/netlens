@@ -497,6 +497,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     ]
     day = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ?", (_ago(now, hours=24),)).fetchone()
     week = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ?", (_ago(now, days=7),)).fetchone()
+    month = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ?", (_ago(now, days=30),)).fetchone()
     last = conn.execute("SELECT kind, status, started, finished, hosts_found FROM scans WHERE status != 'running' ORDER BY id DESC LIMIT 1").fetchone()
     last_done = conn.execute("SELECT kind, started, finished, hosts_found FROM scans WHERE status = 'done' AND finished IS NOT NULL ORDER BY id DESC LIMIT 1").fetchone()
     last_info = None
@@ -545,7 +546,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "speed": speedtest.summary(conn, now),
         "passive": None if passive is None else {k: passive.get(k) for k in ("enabled", "running", "frames", "applied")},
         "wifi": {k: wifi[k] for k in ("clients", "weak", "avg_rssi")},
-        "uptime": {"24h": _pct(day["u"] or 0, day["n"]), "7d": _pct(week["u"] or 0, week["n"])},
+        "uptime": {"24h": _pct(day["u"] or 0, day["n"]), "7d": _pct(week["u"] or 0, week["n"]), "30d": _pct(month["u"] or 0, month["n"])},
         "ports": {"open": conn.execute("SELECT COUNT(*) FROM ports WHERE state = 'open'").fetchone()[0]},
         "events": {"24h": conn.execute("SELECT COUNT(*) FROM events WHERE ts >= ?", (_ago(now, hours=24),)).fetchone()[0],
                    "last_id": conn.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()[0]},
