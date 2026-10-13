@@ -16,7 +16,7 @@ from pathlib import Path
 
 from app.db import get_setting, set_setting
 from app.demo import network as net
-from app.demo.network import BY_KEY, DEVICES, DOMAIN, GROUPS, REVERSE_ZONE, chain, ip, mac
+from app.demo.network import ALWAYS_ON, BY_KEY, DEVICES, DOMAIN, GROUPS, REVERSE_ZONE, chain, ip, mac
 
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
 HISTORY_DAYS = 30
@@ -132,7 +132,7 @@ def _devices(conn, now: datetime, up_now: dict[str, bool], rng: random.Random) -
             (mac(s), ip(s), s.name, s.vendor, s.os, rng.choice((92, 95, 98, 100)), s.type, s.custom or None, s.notes or None, 1 if up_now[s.key] else 0,
              first_seen, last_seen, 0 if s.profile in ("evening", "off") else 1, 1 if s.known else 0,
              "general purpose" if s.type in ("server", "pc", "nas") else "specialized", group_ids.get(s.group),
-             1 if s.type in ("router", "switch", "ap", "server", "nas", "camera", "vm") and s.profile in ("solid", "normal", "flaky") else 0),
+             1 if s.key in ALWAYS_ON else 0),
         )
         ids[s.key] = cur.lastrowid
         conn.execute("INSERT INTO device_ips (device_id, ip, first_seen, last_seen) VALUES (?, ?, ?, ?)", (cur.lastrowid, ip(s), first_seen, last_seen))

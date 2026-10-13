@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.163 — 2026-10-13
+
+### Changed
+- The demo now has always-on devices: 20 of its devices (network gear, servers and cameras) are marked, so the Always-on view, the dashboard Uptime card and Statistics show the difference to the phones and tablets, and the chooser suggests a few more.
+
 ## 0.3.162 — 2026-10-13
 
 ### Added

@@ -124,3 +124,10 @@ def chain(key: str) -> list[str]:
         out.append(key)
         key = BY_KEY[key].parent
     return out
+
+
+# The devices the demo owner marked "always on" (they should be online all the time): the network gear, the servers and guests that run the house, and the
+# outdoor cameras. mesh-garage and sw-garden are flaky on purpose, so the always-on view has something to show. Nothing else is marked: a few
+# well-behaved devices are left for the "suggested" list of the chooser.
+ALWAYS_ON = frozenset({"gw", "n_base", "n_attic", "n_guest", "n_garage", "sw_rack", "sw_office", "sw_garden", "pve", "nas", "rpi_docker", "rpi_dns", "hv", "ha",
+                       "docker1", "web1", "proxy", "dns1", "cam_front", "cam_drive"})

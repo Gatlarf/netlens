@@ -125,3 +125,21 @@ def test_demo_plugin_stand_ins_match_the_real_manifests():
         pytest.skip("plugin sources are not part of this checkout")
     for folder in sorted((Path(seed_module.__file__).parent / "plugins").iterdir()):
         assert json.loads((folder / "plugin.json").read_text()) == json.loads((real / folder.name / "plugin.json").read_text()), folder.name
+
+
+def test_demo_has_always_on_devices_and_suggestions(tmp_path):
+    import tempfile
+    from pathlib import Path
+
+    from app.db import connect, init_db, utcnow
+    from app.demo import seed as demo_seed
+    from app.stats import core_numbers
+    from app.uptime import core_choices
+
+    data = Path(tempfile.mkdtemp())
+    conn = connect(data / "t.db")
+    init_db(conn)
+    demo_seed.seed(conn, data)
+    core = core_numbers(conn, utcnow())
+    assert 10 <= core["devices"] < 30 and core["uptime"]["30d"] > 97              # the always-on view looks healthy next to ~80% for everything
+    assert any(c["suggested"] for c in core_choices(conn))                           # and the chooser has something to suggest
