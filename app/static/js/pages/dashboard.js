@@ -146,32 +146,44 @@ function setLocal(layout) {
   }
 }
 
-async function loadLayout() {
+// The administrator's dashboard for everybody (null while there is none). Whoever has not arranged their own sees this one.
+async function loadDefault() {
+  try {
+    const d = await get("/api/dashboard/default");
+    if (Array.isArray(d.order)) return { order: d.order, custom: d.custom || [] };
+  } catch (e) {
+    // an older server: the built-in cards
+  }
+  return null;
+}
+
+async function loadLayout(shared) {
   let server = EMPTY, reachable = true;
   try {
     server = await get("/api/dashboard/layout");
   } catch (e) {
     reachable = false;
   }
-  if (Array.isArray(server.order)) return { order: server.order, custom: server.custom || [] };
+  if (Array.isArray(server.order)) return { order: server.order, custom: server.custom || [], own: true };
   const local = localLayout();
   if (local) {
     if (reachable) {  // a layout from before it was kept on the server: move it there
       try { await put("/api/dashboard/layout", local); setLocal(null); } catch (e) { /* stays in the browser */ }
     }
-    return local;
+    return { ...local, own: true };
   }
-  return { order: [...DEFAULT_ORDER], custom: [] };
+  return shared ? { order: [...shared.order], custom: [...shared.custom], own: false } : { order: [...DEFAULT_ORDER], custom: [], own: false };
 }
 
-async function saveLayout(layout, isDefault) {
+// reset: go back to what the administrator set (or the built-in cards); the layout of this user is then removed
+async function saveLayout(layout, reset) {
   try {
-    if (isDefault) await del("/api/dashboard/layout");
+    if (reset) await del("/api/dashboard/layout");
     else await put("/api/dashboard/layout", layout);
     setLocal(null);
   } catch (e) {
     if (e && e.status === 422) throw e;   // the server refused the layout itself: nothing is kept, the window shows why
-    setLocal(isDefault ? null : layout);  // for example the demo, where nothing may be saved on the server
+    setLocal(reset ? null : layout);      // for example the demo, where nothing may be saved on the server
   }
 }
 
@@ -222,8 +234,10 @@ function miniMap() {
 // ---------- the page ----------
 
 export async function render(container) {
-  const layout = await loadLayout();
-  let data = null, order = layout.order, custom = layout.custom, editing = false, disposed = false, timer = null;
+  const shared = await loadDefault();
+  const layout = await loadLayout(shared);
+  const base = () => (shared ? { order: shared.order, custom: shared.custom } : { order: DEFAULT_ORDER, custom: [] });
+  let data = null, order = layout.order, custom = layout.custom, own = layout.own, editing = false, disposed = false, timer = null;
   const map = miniMap();
   let mapStarted = false;
   const header = h("div", { class: "dash-head" });
@@ -245,9 +259,10 @@ export async function render(container) {
   async function persist() {
     const known = registry();
     order = order.filter((id) => known.has(id) || !data);                      // a card of a plugin that is switched off is dropped
-    custom = custom.filter((c) => true);
     try {
-      await saveLayout({ order, custom }, !custom.length && order.length === DEFAULT_ORDER.length && order.every((id, i) => id === DEFAULT_ORDER[i]));
+      const b = base();
+      own = !(!custom.length && !b.custom.length && order.length === b.order.length && order.every((id, i) => id === b.order[i]));
+      await saveLayout({ order, custom }, !own);
     } catch (e) {
       toast(e.message || "Could not save the dashboard", "error");
     }
@@ -264,7 +279,7 @@ export async function render(container) {
       const next = custom.some((c) => c.id === saved.id) ? custom.map((c) => (c.id === saved.id ? saved : c)) : [...custom, saved];
       const placed = order.includes(saved.id) ? order : [...order, saved.id];
       await saveLayout({ order: placed, custom: next }, false);   // the server checks the card; a mistake shows in the window
-      custom = next; order = placed;
+      custom = next; order = placed; own = true;
       draw();
     } });
   }
@@ -312,10 +327,38 @@ export async function render(container) {
     const status = bad ? `${plural(bad, "thing")} need${bad === 1 ? "s" : ""} attention` : "Everything looks fine";
     clear(header);
     header.append(
-      h("div", {}, h("h1", {}, "Dashboard"), h("p", { class: `dash-status ${bad ? "d-warn" : "d-ok"}` }, status, h("span", { class: "hint" }, ` · updated ${timeAgo(data.summary.generated)}`))),
+      h("div", {}, h("h1", {}, "Dashboard"), h("p", { class: `dash-status ${bad ? "d-warn" : "d-ok"}` }, status, h("span", { class: "hint" }, ` · updated ${timeAgo(data.summary.generated)}`)),
+        shared && !own ? h("p", { class: "hint" }, "This is the starting dashboard set by your administrator. Press Customize to make it your own.") : null),
       h("div", { class: "dash-tools" },
-        editing ? h("button", { class: "btn", type: "button", onclick: () => { order = [...DEFAULT_ORDER]; persist(); draw(); } }, "Reset to default") : null,
+        editing && isAdmin() ? h("button", { class: "btn", type: "button", title: "Everybody who has not arranged their own dashboard will see this one", onclick: setForEveryone }, "Use as default for everyone") : null,
+        editing && isAdmin() && shared ? h("button", { class: "btn", type: "button", title: "Back to the built-in default for everybody who has not arranged their own", onclick: clearForEveryone }, "Remove the default") : null,
+        editing ? h("button", { class: "btn", type: "button", onclick: resetMine }, shared ? "Back to the default" : "Reset to default") : null,
         h("button", { class: `btn ${editing ? "primary" : ""}`, type: "button", "aria-pressed": String(editing), onclick: () => { editing = !editing; draw(); } }, editing ? "Done" : "Customize")));
+  }
+
+  async function setForEveryone() {
+    try {
+      await put("/api/dashboard/default", { order, custom });
+      toast("Saved. Everybody who has not arranged their own dashboard now sees this one.");
+      location.reload();
+    } catch (e) {
+      toast(e.message || "Could not save the default dashboard", "error");
+    }
+  }
+  async function clearForEveryone() {
+    try {
+      await del("/api/dashboard/default");
+      toast("The built-in default is used again.");
+      location.reload();
+    } catch (e) {
+      toast(e.message || "Could not remove the default dashboard", "error");
+    }
+  }
+  async function resetMine() {
+    const b = base();
+    order = [...b.order]; custom = b.custom.map((c) => ({ ...c })); own = false;
+    try { await saveLayout(null, true); } catch (e) { toast(e.message || "Could not reset the dashboard", "error"); }
+    draw();
   }
 
   function poolItem(c, extra) {

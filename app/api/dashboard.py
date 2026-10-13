@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app import dashboard
+from app.auth import require_admin
 from app.api.stats import _cached, _passive
 from app.api.devices import get_conn
 from app.db import connect
@@ -63,4 +64,26 @@ def put_layout(body: LayoutBody, request: Request, conn=Depends(get_conn)) -> di
 @router.delete("/dashboard/layout")
 def delete_layout(request: Request, conn=Depends(get_conn)) -> dict:
     dashboard.reset_layout(conn, request.state.user)
+    return {"order": None, "custom": []}
+
+
+@router.get("/dashboard/default")
+def get_default(conn=Depends(get_conn)) -> dict:
+    """The dashboard an administrator set for everybody (null while there is none)."""
+    return dashboard.get_default(conn) or {"order": None, "custom": []}
+
+
+@router.put("/dashboard/default")
+def put_default(body: LayoutBody, request: Request, conn=Depends(get_conn)) -> dict:
+    require_admin(request)
+    try:
+        return dashboard.set_default(conn, body.order, body.custom)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.delete("/dashboard/default")
+def delete_default(request: Request, conn=Depends(get_conn)) -> dict:
+    require_admin(request)
+    dashboard.reset_default(conn)
     return {"order": None, "custom": []}

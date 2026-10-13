@@ -135,7 +135,7 @@ BUILTIN = Principal(username="access token", role="admin", builtin=True)
 VIEWER_READABLE = re.compile(
     r"^/(metrics"
     r"|api/(session|update|changelog|map|map-settings|hierarchy|relations|events|uptime|scans|scans/current|service-checks|service-checks/\d+/results"
-    r"|stats|stats/summary|dashboard|dashboard/layout|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
+    r"|stats|stats/summary|dashboard|dashboard/layout|dashboard/default|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
 )
 VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/speedtest/up", "/api/speedtest/browser")  # a viewer may test the line from their own device
 

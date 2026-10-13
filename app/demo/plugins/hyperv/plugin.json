@@ -1,7 +1,7 @@
 {
   "id": "hyperv",
   "name": "Microsoft Hyper-V",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
@@ -78,5 +78,45 @@
       "default": 30
     }
   ],
-  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/hyperv"
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/hyperv",
+  "dashboard": [
+    {
+      "id": "vms",
+      "title": "Hyper-V machines",
+      "about": "Virtual machines on your Hyper-V hosts: running, stopped and paused.",
+      "href": "#/hierarchy",
+      "rows": [
+        {
+          "label": "Running",
+          "count": "guests",
+          "where": {
+            "status": "running"
+          }
+        },
+        {
+          "label": "Stopped",
+          "count": "guests",
+          "where": {
+            "status": "stopped"
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Paused or saved",
+          "count": "guests",
+          "where": {
+            "status": [
+              "paused",
+              "saved"
+            ]
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Virtual machines",
+          "count": "guests"
+        }
+      ]
+    }
+  ]
 }

@@ -117,12 +117,24 @@ def _layout_key(principal) -> str:
     return f"dashboard.layout.user{uid}" if uid is not None else "dashboard.layout.builtin"      # the access token has no account
 
 
+DEFAULT_KEY = "dashboard.layout.default"       # set by an administrator: what everybody sees until they arrange their own
+
+
 def get_layout(conn: sqlite3.Connection, principal) -> dict | None:
     """{"order": [...], "custom": [...]}, or None while the user has never changed the default."""
+    return _read(conn, _layout_key(principal))
+
+
+def get_default(conn: sqlite3.Connection) -> dict | None:
+    """The dashboard an administrator set for everybody, or None (then the built-in cards are used)."""
+    return _read(conn, DEFAULT_KEY)
+
+
+def _read(conn: sqlite3.Connection, key: str) -> dict | None:
     from app.db import get_setting
 
     try:
-        value = json.loads(get_setting(conn, _layout_key(principal)) or "null")
+        value = json.loads(get_setting(conn, key) or "null")
     except ValueError:
         return None
     if not isinstance(value, dict) or not isinstance(value.get("order"), list):
@@ -237,16 +249,29 @@ def clean_custom(custom) -> list[dict]:
 
 
 def set_layout(conn: sqlite3.Connection, principal, order, custom=None) -> dict:
+    return _write(conn, _layout_key(principal), order, custom)
+
+
+def set_default(conn: sqlite3.Connection, order, custom=None) -> dict:
+    return _write(conn, DEFAULT_KEY, order, custom)
+
+
+def _write(conn: sqlite3.Connection, key: str, order, custom=None) -> dict:
     from app.db import set_setting
 
     custom = clean_custom(custom or [])
     known = {c["id"] for c in custom}
     order = [c for c in clean_order(order) if not c.startswith("c-") or c in known]      # a card of your own that no longer exists is dropped
-    set_setting(conn, _layout_key(principal), json.dumps({"order": order, "custom": custom}))
+    set_setting(conn, key, json.dumps({"order": order, "custom": custom}))
     conn.commit()
     return {"order": order, "custom": custom}
 
 
 def reset_layout(conn: sqlite3.Connection, principal) -> None:
     conn.execute("DELETE FROM settings WHERE key = ?", (_layout_key(principal),))
+    conn.commit()
+
+
+def reset_default(conn: sqlite3.Connection) -> None:
+    conn.execute("DELETE FROM settings WHERE key = ?", (DEFAULT_KEY,))
     conn.commit()

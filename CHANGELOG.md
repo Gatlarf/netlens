@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.158 — 2026-10-13
+
+### Added
+- ★ **A starting dashboard for everyone**: an administrator arranges the dashboard (cards, order, even cards of their own) and presses **Use as default for everyone** under *Customize*. Everybody who has not arranged their own dashboard then starts with it, and a notice says so; pressing *Customize* makes it their own, and **Back to the default** returns to it. **Remove the default** goes back to the built-in cards. Viewers can see it but not change it.
+- ★ **Dashboard cards for more plugins**: Docker (1.5.0: running, stopped, restarting and paused containers), Nginx Proxy Manager (1.1.0: sites, switched off, proxy hosts, redirections, streams, 404 hosts), TrueNAS (1.3.0: running and stopped apps, containers and VMs) and Hyper-V (1.1.0: running, stopped and paused machines) now offer their own card under *Customize*, next to the status card every plugin has.
+
 ## 0.3.157 — 2026-10-13
 
 ### Added

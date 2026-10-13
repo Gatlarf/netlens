@@ -1,7 +1,7 @@
 {
   "id": "docker",
   "name": "Docker hosts",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
@@ -67,5 +67,50 @@
       "default": 15
     }
   ],
-  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/docker"
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/docker",
+  "dashboard": [
+    {
+      "id": "containers",
+      "title": "Docker containers",
+      "about": "Containers on your Docker hosts: running, stopped, restarting.",
+      "href": "#/hierarchy",
+      "rows": [
+        {
+          "label": "Running",
+          "count": "guests",
+          "where": {
+            "status": "running"
+          }
+        },
+        {
+          "label": "Stopped",
+          "count": "guests",
+          "where": {
+            "status": [
+              "exited",
+              "dead",
+              "created"
+            ]
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Restarting",
+          "count": "guests",
+          "where": {
+            "status": "restarting"
+          },
+          "tone_if_positive": "bad"
+        },
+        {
+          "label": "Paused",
+          "count": "guests",
+          "where": {
+            "status": "paused"
+          },
+          "tone_if_positive": "warn"
+        }
+      ]
+    }
+  ]
 }

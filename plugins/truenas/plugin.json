@@ -1,7 +1,7 @@
 {
   "id": "truenas",
   "name": "TrueNAS",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
@@ -44,5 +44,57 @@
       "help": "TrueNAS uses a self-signed certificate until you install your own. Leave this off in that case."
     }
   ],
-  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/truenas"
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/truenas",
+  "dashboard": [
+    {
+      "id": "guests",
+      "title": "TrueNAS workloads",
+      "about": "Apps, containers and virtual machines on your TrueNAS: running and stopped.",
+      "href": "#/hierarchy",
+      "rows": [
+        {
+          "label": "Running",
+          "count": "guests",
+          "where": {
+            "status": [
+              "running",
+              "deploying"
+            ]
+          }
+        },
+        {
+          "label": "Stopped",
+          "count": "guests",
+          "where": {
+            "status": [
+              "stopped",
+              "crashed"
+            ]
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Apps",
+          "count": "guests",
+          "where": {
+            "kind": "app"
+          }
+        },
+        {
+          "label": "Containers",
+          "count": "guests",
+          "where": {
+            "kind": "lxc"
+          }
+        },
+        {
+          "label": "Virtual machines",
+          "count": "guests",
+          "where": {
+            "kind": "qemu"
+          }
+        }
+      ]
+    }
+  ]
 }

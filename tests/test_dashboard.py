@@ -202,3 +202,42 @@ def test_plugin_cards_are_validated():
                 [{"id": "g", "title": "x", "rows": []}]):
         with pytest.raises(ContractError):
             validate_cards(bad)
+
+
+# ---- the dashboard an administrator sets for everybody ----
+def test_administrator_default_dashboard(tmp_path):
+    from tests.test_users import make, sign_in
+
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    with TestClient(app) as c:
+        make(c, "alice", "admin")
+        make(c, "vera", "viewer")
+        alice, vera = sign_in(app, "alice"), sign_in(app, "vera")
+        assert vera.get("/api/dashboard/default").json() == NONE
+        note = {"id": "c-abc123", "type": "notes", "title": "Links", "text": "Hello", "links": []}
+        assert alice.put("/api/dashboard/default", json={"order": ["uptime", "c-abc123", "c-gone99"], "custom": [note]}).json() == {"order": ["uptime", "c-abc123"], "custom": [note]}
+        # everybody can read it, only an administrator can change or remove it
+        assert vera.get("/api/dashboard/default").json()["order"] == ["uptime", "c-abc123"]
+        assert vera.put("/api/dashboard/default", json={"order": ["events"]}).status_code == 403
+        assert vera.delete("/api/dashboard/default").status_code == 403
+        assert alice.put("/api/dashboard/default", json={"order": ["Bad Id"]}).status_code == 422
+        # a user's own layout is separate and untouched
+        assert vera.get("/api/dashboard/layout").json() == NONE
+        assert alice.delete("/api/dashboard/default").json() == NONE and vera.get("/api/dashboard/default").json() == NONE
+
+
+def test_default_dashboard_is_in_the_page_and_in_the_demo_guard(demo):
+    text = (STATIC / "js" / "pages" / "dashboard.js").read_text(encoding="utf-8")
+    assert "/api/dashboard/default" in text and "Use as default for everyone" in text
+    assert demo.put("/api/dashboard/default", json={"order": ["uptime"]}).status_code in (403, 405)       # nobody changes the demo
+
+
+@pytest.mark.parametrize("plugin", ["docker", "npm", "truenas", "hyperv"])
+def test_every_plugin_in_the_repository_declares_valid_dashboard_cards(plugin):
+    import json
+
+    from app import plugin_cards
+
+    manifest = json.loads((Path(__file__).resolve().parent.parent / "plugins" / plugin / "plugin.json").read_text())
+    cards = plugin_cards.validate_cards(manifest["dashboard"])
+    assert cards and all(card["rows"] for card in cards)

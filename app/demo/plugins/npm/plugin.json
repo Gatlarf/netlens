@@ -1,7 +1,7 @@
 {
   "id": "npm",
   "name": "Nginx Proxy Manager",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "proxy",
   "author": "Netlens",
@@ -93,5 +93,55 @@
       "default": 15
     }
   ],
-  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/npm"
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/npm",
+  "dashboard": [
+    {
+      "id": "sites",
+      "title": "Proxy sites",
+      "about": "Sites published by Nginx Proxy Manager: proxied, redirected, streams and switched off.",
+      "href": "#/stats",
+      "rows": [
+        {
+          "label": "Sites",
+          "count": "sites"
+        },
+        {
+          "label": "Switched off",
+          "count": "sites",
+          "where": {
+            "enabled": false
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Proxy hosts",
+          "count": "sites",
+          "where": {
+            "type": "proxy"
+          }
+        },
+        {
+          "label": "Redirections",
+          "count": "sites",
+          "where": {
+            "type": "redirect"
+          }
+        },
+        {
+          "label": "Streams",
+          "count": "sites",
+          "where": {
+            "type": "stream"
+          }
+        },
+        {
+          "label": "404 hosts",
+          "count": "sites",
+          "where": {
+            "type": "dead"
+          }
+        }
+      ]
+    }
+  ]
 }
