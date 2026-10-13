@@ -34,6 +34,7 @@ class DevicePatch(BaseModel):
     tags: list[str] | None = None
     type_override: str | None = None
     notify_offline: bool | None = None
+    always_on: bool | None = None           # a core device: it should always be online (counts for the core availability)
     trusted: bool | None = None             # True = a device the user knows
     gentle: bool | None = None              # True = scans only check its ports, they never probe its services
     dns_mode: str | None = None             # 'auto' | 'always' | 'never' (DNS registration)
@@ -74,6 +75,7 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
         "type": row["type_override"] or row["device_type"] or "unknown",
         "open_ports": row["open_ports"],
         "notify_offline": bool(row["notify_offline"]),
+        "always_on": bool(row["always_on"]),
         "trusted": bool(row["trusted"]),
         "gentle": bool(row["gentle"]),
         "dns_mode": row["dns_mode"] or "auto",
@@ -263,6 +265,7 @@ def list_devices(
             pos_x,
             pos_y,
             notify_offline,
+            always_on,
             trusted,
             gentle,
             dns_mode,
@@ -377,6 +380,7 @@ def get_device(
             pos_x,
             pos_y,
             notify_offline,
+            always_on,
             trusted,
             gentle,
             dns_mode,
@@ -399,6 +403,7 @@ def get_device(
 def patch_device(
     device_id: int,
     body: DevicePatch,
+    request: Request,
     conn: sqlite3.Connection = Depends(get_conn),
 ) -> dict[str, Any]:
     row = conn.execute(
@@ -422,6 +427,7 @@ def patch_device(
             pos_x,
             pos_y,
             notify_offline,
+            always_on,
             trusted,
             gentle,
             dns_mode,
@@ -497,6 +503,10 @@ def patch_device(
     if "notify_offline" in fields_set:
         updates["notify_offline"] = 0 if body.notify_offline is False else 1
 
+    if "always_on" in fields_set:
+        updates["always_on"] = 1 if body.always_on else 0
+        request.app.state.__dict__.get("stats_cache", {}).clear()      # the uptime pages show the new choice at once
+
     if "trusted" in fields_set and body.trusted is not None:
         updates["trusted"] = 1 if body.trusted else 0
 
@@ -561,6 +571,7 @@ def patch_device(
             pos_x,
             pos_y,
             notify_offline,
+            always_on,
             trusted,
             gentle,
             dns_mode,

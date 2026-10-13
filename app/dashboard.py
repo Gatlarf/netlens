@@ -8,7 +8,7 @@ from app.stats import _ago, _pct, utcnow
 from app import sites as sites_mod, speedtest
 
 
-def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str]) -> list[dict]:
+def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], core_down: list[dict] | None = None) -> list[dict]:
     items: list[dict] = []
 
     def add(level: str, text: str, href: str) -> None:
@@ -38,8 +38,16 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str]) -
         add("warn", f"Certificate {soon[0]['name']} ends in {soon[0]['days']} day{'s' if soon[0]['days'] != 1 else ''}", "#/stats")
     if s["sites"]["down"]:
         add("bad", f"{s['sites']['down']} proxy site{'s' if s['sites']['down'] != 1 else ''} not answering", "#/stats")
-    if s["devices"]["flapping"]:
-        add("warn", f"{s['devices']['flapping']} device{'s' if s['devices']['flapping'] != 1 else ''} keep going up and down", "#/uptime")
+    for dev in (core_down or [])[:3]:
+        add("bad", f"{dev['name']} should always be online but is not answering", f"#/device/{dev['id']}")
+    if len(core_down or []) > 3:
+        add("bad", f"{len(core_down) - 3} more always-on devices are not answering", "#/uptime")
+    core_flap = (s.get("core") or {}).get("flapping", 0)
+    other_flap = s["devices"]["flapping"] - core_flap
+    if core_flap:     # the always-on devices are the ones that matter; a phone or tablet flapping is only worth a note
+        add("warn", f"{core_flap} always-on device{'s' if core_flap != 1 else ''} keep going up and down", "#/uptime")
+    if other_flap > 0:
+        add("warn" if not core_flap and not (s.get("core") or {}).get("devices") else "info", f"{other_flap} other device{'s' if other_flap != 1 else ''} keep going up and down", "#/uptime")
     if s["devices"]["unknown"]:
         add("info", f"{s['devices']['unknown']} device{'s' if s['devices']['unknown'] != 1 else ''} not marked as known yet", "#/devices")
     if s["dns"]["conflicts"]:
@@ -72,6 +80,7 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         for r in conn.execute("SELECT device_id, SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ? GROUP BY device_id HAVING SUM(up) < COUNT(*) ORDER BY CAST(SUM(up) AS REAL) / COUNT(*) LIMIT 5", (_ago(now, days=7),))
         if r["device_id"] in names
     ]
+    core_down = [{"id": r["id"], "name": names.get(r["id"])} for r in conn.execute("SELECT id FROM devices WHERE always_on = 1 AND online = 0 ORDER BY id")]
     since = _ago(now, days=14)[:10]
     trend = [{"day": r["day"], "devices": r["devices"], "online": r["online"], "events": r["events"]}
              for r in conn.execute("SELECT day, devices, online, events FROM stats_daily WHERE day >= ? ORDER BY day", (since,))]
@@ -86,7 +95,7 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "summary": s,
         "devices_uptime": uptime,
         "service_checks": _services(conn, now)["checks"],
-        "attention": _attention(s, certs, login_failed, down),
+        "attention": _attention(s, certs, login_failed, down, core_down),
         "events": events,
         "services_down": down,
         "login_failed_24h": login_failed,

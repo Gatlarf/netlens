@@ -205,6 +205,7 @@ def _availability(conn, now: str) -> dict:
     ]
     return {
         "uptime_24h": network(1), "uptime_7d": network(7), "uptime_30d": network(30),
+        "core": core_numbers(conn, now),
         "least_reliable": least, "most_reliable": most, "flapping": flapping, "flapping_total": len(flapping_all),
         "longest_outages": outages_now[:5], "avg_rtt_ms": round(rtt, 1) if rtt is not None else None, "slowest": slow,
     }
@@ -269,13 +270,30 @@ def _dns(conn) -> dict:
     }
 
 
-def flapping_devices(conn, now: str) -> int:
-    """Devices with FLAP_TRANSITIONS or more up/down changes in the last 24 hours."""
+def flapping_devices(conn, now: str, core: bool | None = None) -> int:
+    """Devices with FLAP_TRANSITIONS or more up/down changes in the last 24 hours. core=True: only the always-on devices, False: only the others."""
     since = _ago(now, hours=24)
     per_device: dict[int, list[int]] = defaultdict(list)
-    for r in conn.execute("SELECT device_id, up FROM checks WHERE ts >= ? ORDER BY device_id, ts, id", (since,)):
+    sql = "SELECT c.device_id, c.up FROM checks c"
+    args: list = [since]
+    if core is not None:
+        sql += " JOIN devices d ON d.id = c.device_id AND d.always_on = ?"
+        args.insert(0, 1 if core else 0)
+    for r in conn.execute(sql + " WHERE c.ts >= ? ORDER BY c.device_id, c.ts, c.id", args):
         per_device[r["device_id"]].append(r["up"])
     return sum(1 for ups in per_device.values() if sum(1 for a, b in zip(ups, ups[1:]) if a != b) >= FLAP_TRANSITIONS)
+
+
+def core_numbers(conn, now: str) -> dict:
+    """The always-on ("core") devices: how many there are, how many are online, their availability and how many of them flap.
+    The availability is None while no device is marked."""
+    row = conn.execute("SELECT COUNT(*) AS n, COALESCE(SUM(online), 0) AS o FROM devices WHERE always_on = 1").fetchone()
+
+    def pct(days: float) -> float | None:
+        r = conn.execute("SELECT SUM(c.up) AS u, COUNT(*) AS n FROM checks c JOIN devices d ON d.id = c.device_id AND d.always_on = 1 WHERE c.ts >= ?", (_ago(now, days=days),)).fetchone()
+        return _pct(r["u"] or 0, r["n"])
+
+    return {"devices": row["n"], "online": row["o"], "uptime": {"24h": pct(1), "7d": pct(7), "30d": pct(30)}, "flapping": flapping_devices(conn, now, True) if row["n"] else 0}
 
 
 def _history(conn, now: str, days: int) -> dict:
@@ -535,7 +553,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "update": {"current": upd["current"], "latest": upd["latest"], "available": upd["available"], "plugin_updates": plugin_updates},
         "version": VERSION,
         "generated": now,
-        "devices": {**{k: overview[k] for k in ("total", "online", "offline", "new_24h", "new_7d", "stale_30d", "unknown")}, "flapping": flapping_devices(conn, now)},
+        "devices": {**{k: overview[k] for k in ("total", "online", "offline", "new_24h", "new_7d", "stale_30d", "unknown")}, "flapping": flapping_devices(conn, now), "always_on": conn.execute("SELECT COUNT(*) FROM devices WHERE always_on = 1").fetchone()[0]},
         "identification": _identification(conn),
         "backup": {k: backups[k] for k in ("enabled", "last_at", "last_ok", "last_error", "age_s")},
         "netchecks": _netchecks(conn),
@@ -547,6 +565,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "passive": None if passive is None else {k: passive.get(k) for k in ("enabled", "running", "frames", "applied")},
         "wifi": {k: wifi[k] for k in ("clients", "weak", "avg_rssi")},
         "uptime": {"24h": _pct(day["u"] or 0, day["n"]), "7d": _pct(week["u"] or 0, week["n"]), "30d": _pct(month["u"] or 0, month["n"])},
+        "core": core_numbers(conn, now),
         "ports": {"open": conn.execute("SELECT COUNT(*) FROM ports WHERE state = 'open'").fetchone()[0]},
         "events": {"24h": conn.execute("SELECT COUNT(*) FROM events WHERE ts >= ?", (_ago(now, hours=24),)).fetchone()[0],
                    "last_id": conn.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()[0]},

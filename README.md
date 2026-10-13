@@ -99,7 +99,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - CSV and JSON export of devices
 - PNG export of the network map
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
-- Uptime history like Uptime Kuma: heartbeat bars, 24 h / 7 d / 30 d uptime and response times per device
+- Uptime history like Uptime Kuma: heartbeat bars with a response-time line, 24 h / 7 d / 30 d, hover details, and **always-on (core) devices** whose availability is shown apart from phones and tablets
 - E-mail notifications for new and offline devices, with an on/off switch per device
 - Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: Proxmox VE and ASUS AiMesh come built in (which VM runs on which host, which device is connected to which mesh node); TP-Link Omada and Ubiquiti UniFi are available from the plugin index (community, not yet tested on hardware)
 - Known and unknown devices, better device identification (router names, mDNS and UPnP details, name hints), Wi-Fi signal history and roaming, service checks (HTTP, TCP, DNS), more notification channels (ntfy, Telegram, Discord, Pushover, webhook) with quiet hours, and Prometheus metrics with a Grafana dashboard
@@ -414,6 +414,8 @@ Three presets set these for you: **Default** (the original behavior), **Fast** (
 The header shows the running version. It is `<major.minor from the VERSION file>.<number of commits>`, so it rises with every commit and every published image, for example `0.2.57`. The pre-built image is tagged with it (`ghcr.io/gatlarf/netlens:0.2.57`) as well as `latest`. Builds from source report `dev` unless you pass `NETLENS_VERSION` as shown under "Updating".
 
 ### Uptime history
+
+**Always-on devices.** Phones, tablets and laptops that come and go pull the network's availability down. Mark the devices that should be online all the time (router, switches, servers, NAS, cameras) as **always-on**: tick *Always-on device* when you edit a device, or on the Uptime page press **Choose always-on devices** (Netlens suggests the ones that have been up 99% of the last 30 days and are the kind of device that runs all day). The Uptime page then has an **All devices / Always-on** switch, the dashboard Uptime card shows the always-on figure with the all-devices figure beneath it, the Unstable devices card and the attention list count the always-on ones apart from the others, and an always-on device that is not answering is listed as needing attention. Statistics, `/api/stats/summary` (`core`), Prometheus (`netlens_core_*`) and Home Assistant carry the core figures next to the existing ones, which keep meaning all devices.
 
 After every scan Netlens records, for each device inside the scanned ranges, whether it answered (and its response time when nmap reports one). The **Uptime** page shows a heartbeat bar per device (green = up, red = down, newest on the right) with 24 hour and 7 day uptime, like Uptime Kuma. Each device page has a larger bar, 24 h / 7 d / 30 d uptime, average response time, how long the current state has lasted, and a response-time graph. History is kept for 90 days. The resolution is your scan interval (15 minutes by default); shorten it under Settings for finer detail.
 

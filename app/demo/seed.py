@@ -127,11 +127,12 @@ def _devices(conn, now: datetime, up_now: dict[str, bool], rng: random.Random) -
         last_seen = fmt(now) if up_now[s.key] else fmt(now - timedelta(minutes=rng.randint(40, 600)))
         cur = conn.execute(
             """INSERT INTO devices (mac, primary_ip, hostname, vendor, os_name, os_confidence, device_type, custom_name, notes, online, first_seen, last_seen,
-                                    notify_offline, parent_mode, trusted, hints, os_type, group_id, dns_mode)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', ?, '[]', ?, ?, 'auto')""",
+                                    notify_offline, parent_mode, trusted, hints, os_type, group_id, dns_mode, always_on)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', ?, '[]', ?, ?, 'auto', ?)""",
             (mac(s), ip(s), s.name, s.vendor, s.os, rng.choice((92, 95, 98, 100)), s.type, s.custom or None, s.notes or None, 1 if up_now[s.key] else 0,
              first_seen, last_seen, 0 if s.profile in ("evening", "off") else 1, 1 if s.known else 0,
-             "general purpose" if s.type in ("server", "pc", "nas") else "specialized", group_ids.get(s.group), ),
+             "general purpose" if s.type in ("server", "pc", "nas") else "specialized", group_ids.get(s.group),
+             1 if s.type in ("router", "switch", "ap", "server", "nas", "camera", "vm") and s.profile in ("solid", "normal", "flaky") else 0),
         )
         ids[s.key] = cur.lastrowid
         conn.execute("INSERT INTO device_ips (device_id, ip, first_seen, last_seen) VALUES (?, ?, ?, ?)", (cur.lastrowid, ip(s), first_seen, last_seen))

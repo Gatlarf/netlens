@@ -20,16 +20,30 @@ const CARDS = [
   { id: "devices", title: "Devices online", href: "#/devices", size: "s", def: true, about: "How many devices answer right now, with the 14-day trend.",
     tone: (d) => (d.summary.devices.offline === 0 ? "ok" : ""),
     build: ({ summary: s, trend }) => big(`${s.devices.online} / ${s.devices.total}`, `${s.devices.offline} offline · ${s.devices.new_24h} new today`, { spark: sparkline(trend.map((t) => t.online)) }) },
-  { id: "uptime", title: "Uptime", href: "#/uptime", size: "s", def: true, about: "Share of device checks that succeeded: last 24 hours, 7 days and 30 days at once.",
-    tone: (d) => toneUp(d.summary.uptime["24h"]),
-    build: ({ summary: s, trend }) => big(fmtPct(s.uptime["24h"]), "last 24 hours", { spark: sparkline(trend.map((t) => (t.devices ? (t.online / t.devices) * 100 : null))),
-      extra: h("div", { class: "d-three" }, [["7 days", s.uptime["7d"]], ["30 days", s.uptime["30d"]]].map(([label, v]) => h("div", {}, h("small", {}, label), h("strong", { class: `d-${toneUp(v) || "ok"}` }, fmtPct(v))))) }) },
+  { id: "uptime", title: "Uptime", href: "#/uptime", size: "s", def: true, about: "Share of device checks that succeeded: the always-on (core) devices and all devices, over 24 hours, 7 days and 30 days.",
+    tone: (d) => toneUp(d.summary.core && d.summary.core.devices ? d.summary.core.uptime["24h"] : d.summary.uptime["24h"]),
+    build: ({ summary: s, trend }) => {
+      const core = s.core && s.core.devices ? s.core : null, all = s.uptime;
+      const pair = (u) => h("div", { class: "d-three" }, [["7 days", u["7d"]], ["30 days", u["30d"]]].map(([label, v]) => h("div", {}, h("small", {}, label), h("strong", { class: `d-${toneUp(v) || "ok"}` }, fmtPct(v)))));
+      if (!core) {   // nothing marked yet: all devices, with a nudge
+        return big(fmtPct(all["24h"]), "all devices, last 24 hours", { spark: sparkline(trend.map((t) => (t.devices ? (t.online / t.devices) * 100 : null))), extra: [pair(all),
+          h("div", { class: "d-mini" }, h("a", { href: "#/uptime" }, "Mark your always-on devices"), " to see them apart from phones and tablets.")] });
+      }
+      return big(fmtPct(core.uptime["24h"]), `${plural(core.devices, "always-on device")} · last 24 hours`, { extra: [
+        pair(core.uptime),
+        h("div", { class: "d-mini" }, `All devices: ${fmtPct(all["24h"])} · ${fmtPct(all["7d"])} · ${fmtPct(all["30d"])}`)] });
+    } },
   { id: "speed", title: "Internet speed", href: "#/speedtest", size: "s", def: true, about: "The latest internet speed test: download, upload and delay.", show: (d) => !!d.speed,
     build: ({ speed: s }) => big(s.down_mbps >= 1000 ? `${(s.down_mbps / 1000).toFixed(2)} Gbps` : `${Math.round(s.down_mbps)} Mbps`, `down · up ${Math.round(s.up_mbps)} Mbps · ping ${Math.round(s.latency_ms)} ms`, { extra: h("div", { class: "d-mini" }, timeAgo(s.ts)) }) },
-  { id: "flapping", title: "Unstable devices", href: "#/uptime", size: "s", def: true, about: "Devices that keep going up and down, and the least reliable ones.",
-    tone: (d) => (d.summary.devices.flapping ? "warn" : "ok"),
-    build: ({ summary: s, worst }) => big(s.devices.flapping, s.devices.flapping === 1 ? "device flaps (24 hours)" : "devices flap (24 hours)", {
-      extra: worst.length ? h("div", { class: "d-mini" }, "Lowest 7 days: ", worst.slice(0, 2).map((w, i) => [i ? ", " : "", h("a", { href: `#/device/${w.id}` }, shortName(w.name)), ` ${fmtPct(w.pct)}`])) : null }) },
+  { id: "flapping", title: "Unstable devices", href: "#/uptime", size: "s", def: true, about: "Devices that keep going up and down: the always-on ones and the others apart, and the least reliable ones.",
+    tone: (d) => ((d.summary.core && d.summary.core.devices ? d.summary.core.flapping : d.summary.devices.flapping) ? "warn" : "ok"),
+    build: ({ summary: s, worst }) => {
+      const core = s.core && s.core.devices ? s.core : null, others = s.devices.flapping - (core ? core.flapping : 0);
+      const lowest = worst.length ? h("div", { class: "d-mini" }, "Lowest 7 days: ", worst.slice(0, 2).map((w, i) => [i ? ", " : "", h("a", { href: `#/device/${w.id}` }, shortName(w.name)), ` ${fmtPct(w.pct)}`])) : null;
+      if (!core) return big(s.devices.flapping, s.devices.flapping === 1 ? "device flaps (24 hours)" : "devices flap (24 hours)", { extra: lowest });
+      return big(core.flapping, core.flapping === 1 ? "always-on device flaps (24 hours)" : "always-on devices flap (24 hours)", { extra: [
+        h("div", { class: "d-mini" }, `${others} other ${others === 1 ? "device flaps" : "devices flap"}`), lowest] });
+    } },
   { id: "services", title: "Services", href: "#/services", size: "s", def: true, about: "Your HTTP, port and DNS checks.",
     show: (d) => d.summary.services.total > 0, tone: (d) => (d.summary.services.down ? "bad" : "ok"),
     build: ({ summary: s, services_down: down }) => big(`${s.services.up} / ${s.services.up + s.services.down}`, s.services.down ? `down: ${down.slice(0, 2).join(", ")}${down.length > 2 ? "…" : ""}` : "all up") },

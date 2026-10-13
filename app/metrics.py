@@ -55,6 +55,13 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
         out.sample("netlens_identification_devices", count, "Devices by how well Netlens knows them (unknown_type, private_mac, no_vendor, manual_type, gentle, nameless, no_os)", kind=kind)
     out.sample("netlens_uptime_ratio", None if doc["uptime"]["24h"] is None else doc["uptime"]["24h"] / 100, "Share of successful presence checks", window="24h")
     out.sample("netlens_uptime_ratio", None if doc["uptime"]["7d"] is None else doc["uptime"]["7d"] / 100, "Share of successful presence checks", window="7d")
+    core = doc.get("core") or {}
+    if core.get("devices"):
+        out.sample("netlens_core_devices", core["devices"], "Devices marked as always on")
+        out.sample("netlens_core_devices_online", core["online"], "Always-on devices that are online now")
+        out.sample("netlens_core_uptime_ratio", None if core["uptime"]["24h"] is None else core["uptime"]["24h"] / 100, "Share of successful presence checks of the always-on devices", window="24h")
+        out.sample("netlens_core_uptime_ratio", None if core["uptime"]["7d"] is None else core["uptime"]["7d"] / 100, "Share of successful presence checks of the always-on devices", window="7d")
+        out.sample("netlens_core_uptime_ratio", None if core["uptime"]["30d"] is None else core["uptime"]["30d"] / 100, "Share of successful presence checks of the always-on devices", window="30d")
     out.sample("netlens_open_ports", doc["ports"]["open"], "Open ports found on all devices")
     out.sample("netlens_events_24h", doc["events"]["24h"], "Events logged in the last 24 hours")
     out.sample("netlens_update_available", 1 if doc["update"]["available"] else 0, "1 when a newer Netlens version has been published")

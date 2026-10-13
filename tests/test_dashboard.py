@@ -241,3 +241,14 @@ def test_every_plugin_in_the_repository_declares_valid_dashboard_cards(plugin):
     manifest = json.loads((Path(__file__).resolve().parent.parent / "plugins" / plugin / "plugin.json").read_text())
     cards = plugin_cards.validate_cards(manifest["dashboard"])
     assert cards and all(card["rows"] for card in cards)
+
+
+def test_attention_separates_core_and_other_devices():
+    s = _summary_stub(devices={"flapping": 3, "unknown": 0}, core={"devices": 4, "flapping": 1})
+    texts = [(i["level"], i["text"]) for i in dashboard._attention(s, [], 0, [], [{"id": 7, "name": "nas"}])]
+    assert ("bad", "nas should always be online but is not answering") in texts
+    assert ("warn", "1 always-on device keep going up and down") in texts
+    assert ("info", "2 other devices keep going up and down") in texts
+    # nothing marked: all flapping devices stay a warning, as before
+    plain = dashboard._attention(_summary_stub(devices={"flapping": 2, "unknown": 0}), [], 0, [])
+    assert plain == [{"level": "warn", "text": "2 other devices keep going up and down", "href": "#/uptime"}]

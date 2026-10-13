@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.162 — 2026-10-13
+
+### Added
+- ★ **Always-on devices**: mark the devices that should be online all the time (router, switches, servers, NAS, cameras) with *Always-on device* on a device's Edit panel, or in bulk with **Choose always-on devices** on the Uptime page, where Netlens also suggests the ones that have been up 99% of the last 30 days. The availability of phones and tablets that come and go no longer drags your uptime down: the Uptime page has an **All devices / Always-on** switch, the dashboard Uptime card shows the always-on figure and the all-devices figure together, and Statistics, Prometheus (`netlens_core_*`) and Home Assistant (integration 0.12.0) get the always-on figures next to the existing ones.
+- ★ **Unstable devices split**: the dashboard card and the attention list now count always-on devices that keep going up and down apart from the others (a phone flapping is only a note), and an always-on device that is not answering is listed as needing attention.
+
 ## 0.3.161 — 2026-10-13
 
 ### Changed

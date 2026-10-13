@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 20
+SCHEMA_VERSION = 21
 
 
 def utcnow() -> str:
@@ -486,6 +486,9 @@ def init_db(conn: sqlite3.Connection) -> None:
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_proxy_sites_target ON proxy_sites(target_device_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_proxy_sites_proxy ON proxy_sites(proxy_device_id)")
+
+    # --- schema v21: "always on" devices (the core devices the availability can be limited to) ----------------
+    _add_column_if_missing(conn, "devices", "always_on", "INTEGER NOT NULL DEFAULT 0")
 
     # --- schema v20: speed tests (internet, iperf3, browser) ----------------------------------------------------
     cur.execute(

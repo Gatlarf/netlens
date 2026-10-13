@@ -320,3 +320,15 @@ dialog.whats-new h2 { margin: 0; }
   .up-tiles .d-value { font-size: 1.5rem; }
   .up-tiles .dcard { padding: 10px 12px; }
 }
+
+/* choosing the always-on devices */
+.up-pickers { display: flex; gap: 10px; flex-wrap: wrap; }
+.up-choose { margin-bottom: 14px; }
+.up-choose-list { max-height: 340px; overflow: auto; display: grid; gap: 2px; margin: 8px 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 4px; }
+.up-choose-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto 64px; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.up-choose-row:hover { background: var(--bg); }
+.up-choose-row input { width: auto; margin: 0; }
+.up-choose-name { min-width: 0; overflow-wrap: anywhere; }
+.up-choose-pct { text-align: right; font-variant-numeric: tabular-nums; }
+.up-suggest { background: var(--accent); color: #fff; }
+@media (max-width: 500px) { .up-choose-row { grid-template-columns: auto minmax(0, 1fr) auto; } .up-choose-row > .hint, .up-choose-row .up-suggest { display: none; } }

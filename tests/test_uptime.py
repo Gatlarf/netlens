@@ -200,3 +200,58 @@ def test_uptime_endpoint_ranges(tmp_path):
         assert c.get("/api/uptime?range=7d&bars=30").status_code == 200
         assert c.get("/api/uptime?range=1y").status_code == 422
         assert c.get("/api/uptime").status_code == 200
+
+
+# ---- always-on (core) devices ----
+def test_core_numbers_and_suggestions(conn):
+    from app.stats import core_numbers
+    from app.uptime import core_choices, set_core
+
+    router = get_or_create_device(conn, "aa:bb:cc:dd:ee:01", "192.168.1.1")
+    phone = get_or_create_device(conn, "aa:bb:cc:dd:ee:02", "192.168.1.2")
+    conn.execute("UPDATE devices SET device_type = 'router' WHERE id = ?", (router,))
+    conn.execute("UPDATE devices SET device_type = 'phone' WHERE id = ?", (phone,))
+    _history(conn, router, 24 * 3, 60)
+    _history(conn, phone, 24 * 3, 60, down_at=set(range(0, 40)))
+    assert core_numbers(conn, NOW)["devices"] == 0 and core_numbers(conn, NOW)["uptime"]["24h"] is None
+    choices = {c["id"]: c for c in core_choices(conn, NOW)}
+    assert choices[router]["suggested"] is True and choices[phone]["suggested"] is False         # up all the time and a router
+    assert set_core(conn, [router]) == 1
+    core = core_numbers(conn, NOW)
+    assert core["devices"] == 1 and core["uptime"]["24h"] == 100.0 and core["uptime"]["30d"] == 100.0     # the phone's gaps do not count
+    assert uptime_overview(conn, now=NOW)[0]["always_on"] is True
+    assert set_core(conn, []) == 0
+
+
+def test_flapping_can_be_split_into_core_and_others(conn):
+    from app.stats import flapping_devices
+
+    a = get_or_create_device(conn, "aa:bb:cc:dd:ee:01", "192.168.1.1")
+    b = get_or_create_device(conn, "aa:bb:cc:dd:ee:02", "192.168.1.2")
+    for dev in (a, b):
+        _history(conn, dev, 12, 30, down_at={1, 3, 5, 7, 9, 11, 13})
+    conn.execute("UPDATE devices SET always_on = 1 WHERE id = ?", (a,))
+    assert flapping_devices(conn, NOW) == 2 and flapping_devices(conn, NOW, True) == 1 and flapping_devices(conn, NOW, False) == 1
+
+
+def test_core_api_and_viewer_rights(tmp_path):
+    from fastapi.testclient import TestClient
+    from app.config import load_settings
+    from app.main import create_app
+    from tests.test_users import make, sign_in
+
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    with TestClient(app, headers={"Authorization": "Bearer secret"}) as c:
+        conn = connect(tmp_path / "t.db")
+        dev = get_or_create_device(conn, "aa:bb:cc:dd:ee:01", "192.168.1.1")
+        conn.commit()
+        make(c, "vera", "viewer")
+        vera = sign_in(app, "vera")
+        assert vera.get("/api/uptime/core").status_code == 200
+        assert vera.put("/api/uptime/core", json={"device_ids": [dev]}).status_code == 403
+        assert c.put("/api/uptime/core", json={"device_ids": [dev]}).json() == {"count": 1}
+        assert c.get("/api/uptime?range=24h").json()[0]["always_on"] is True
+        assert c.get("/api/stats/summary").json()["core"]["devices"] == 1
+        assert c.patch(f"/api/devices/{dev}", json={"always_on": False}).json()["always_on"] is False
+        assert c.get("/api/uptime?range=24h").json()[0]["always_on"] is False
+        assert c.patch(f"/api/devices/{dev}", json={"always_on": True}).json()["always_on"] is True

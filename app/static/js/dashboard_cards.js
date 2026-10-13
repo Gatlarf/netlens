@@ -82,7 +82,9 @@ const SKIP = new Set(["device_list", "devices_uptime", "service_checks", "plugin
 const FRIENDLY = {
   "summary.devices.online": "Devices online", "summary.devices.offline": "Devices offline", "summary.devices.total": "Devices known", "summary.devices.flapping": "Unstable devices",
   "summary.devices.unknown": "Devices not marked known", "summary.devices.new_24h": "New devices today", "summary.devices.new_7d": "New devices this week",
-  "summary.uptime.24h": "Network uptime, 24 hours", "summary.uptime.7d": "Network uptime, 7 days", "summary.services.up": "Services up", "summary.services.down": "Services down",
+  "summary.uptime.24h": "Network uptime, 24 hours", "summary.uptime.7d": "Network uptime, 7 days", "summary.uptime.30d": "Network uptime, 30 days",
+  "summary.core.uptime.24h": "Core devices uptime, 24 hours", "summary.core.uptime.7d": "Core devices uptime, 7 days", "summary.core.uptime.30d": "Core devices uptime, 30 days",
+  "summary.core.devices": "Always-on devices", "summary.core.online": "Always-on devices online", "summary.core.flapping": "Always-on devices that flap", "summary.services.up": "Services up", "summary.services.down": "Services down",
   "summary.containers.running": "Containers running", "summary.containers.unhealthy": "Unhealthy containers", "summary.containers.restarting": "Restarting containers",
   "summary.guests.running": "Guests running", "summary.guests.total": "Guests in total", "summary.sites.total": "Proxy sites", "summary.sites.next_expiry_days": "Days until the next certificate ends",
   "summary.wifi.clients": "Wi-Fi clients", "summary.wifi.avg_rssi": "Average Wi-Fi signal (dBm)", "summary.wifi.weak": "Wi-Fi clients with a weak signal",

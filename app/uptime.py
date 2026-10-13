@@ -233,7 +233,7 @@ def uptime_overview(
 
     # Fetch devices
     devices = conn.execute(
-        "SELECT id, primary_ip, online, custom_name, hostname FROM devices"
+        "SELECT id, primary_ip, online, custom_name, hostname, always_on FROM devices"
     ).fetchall()
 
     def display_name(row) -> str:
@@ -255,6 +255,7 @@ def uptime_overview(
             "name": display_name(row),
             "ip": row["primary_ip"],
             "online": bool(row["online"]),
+            "always_on": bool(row["always_on"]),
             "up_24h": agg_24h.get(device_id),
             "up_7d": agg_7d.get(device_id),
             "up_30d": agg_30d.get(device_id),
@@ -296,3 +297,38 @@ def _bucket_rows(conn: sqlite3.Connection, now: str, days: int, bars: int, devic
 
 def range_days(name: str | None) -> int | None:
     return RANGES.get(name) if name else None
+
+
+# ---------- the always-on ("core") devices ----------
+
+SUGGEST_TYPES = ("router", "switch", "ap", "server", "nas", "camera", "vm", "printer", "appliance")
+SUGGEST_MIN_UPTIME = 99.0   # percent over 30 days
+SUGGEST_MIN_CHECKS = 30
+
+
+def core_choices(conn: sqlite3.Connection, now: str | None = None) -> list[dict]:
+    """Every device with whether it is marked always-on, its 30-day uptime and whether Netlens suggests marking it: it has been up
+    nearly all the time (so it is probably meant to be) and is the kind of device that runs all day."""
+    now = now or utcnow()
+    stats = {r["device_id"]: (r["u"], r["n"]) for r in conn.execute("SELECT device_id, SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ? GROUP BY device_id", (_cutoff(now, 30),))}
+    out = []
+    for r in conn.execute("SELECT id, primary_ip, custom_name, hostname, always_on, COALESCE(type_override, device_type, 'unknown') AS type FROM devices"):
+        u, n = stats.get(r["id"], (0, 0))
+        pct = round(u / n * 100, 2) if n else None
+        out.append({
+            "id": r["id"], "name": r["custom_name"] or r["hostname"] or r["primary_ip"] or f"device {r['id']}", "ip": r["primary_ip"], "type": r["type"],
+            "always_on": bool(r["always_on"]), "up_30d": pct,
+            "suggested": (not r["always_on"]) and r["type"] in SUGGEST_TYPES and n >= SUGGEST_MIN_CHECKS and pct is not None and pct >= SUGGEST_MIN_UPTIME,
+        })
+    out.sort(key=lambda d: d["name"].lower())
+    return out
+
+
+def set_core(conn: sqlite3.Connection, device_ids: list[int]) -> int:
+    """Exactly these devices are always-on afterwards. Returns how many."""
+    ids = sorted({int(i) for i in device_ids})
+    conn.execute("UPDATE devices SET always_on = 0 WHERE always_on = 1")
+    if ids:
+        conn.execute(f"UPDATE devices SET always_on = 1 WHERE id IN ({','.join('?' * len(ids))})", ids)
+    conn.commit()
+    return conn.execute("SELECT COUNT(*) FROM devices WHERE always_on = 1").fetchone()[0]

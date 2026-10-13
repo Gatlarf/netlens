@@ -166,7 +166,7 @@ def test_summary_document(db):
     conn, _ = db
     doc = summary(conn, NOW, scan_running=True)
     assert doc["api"] == 1 and doc["generated"] == NOW and doc["scans"]["running"] is True
-    assert doc["devices"] == {"total": 5, "online": 3, "offline": 2, "new_24h": 1, "new_7d": 1, "stale_30d": 1, "unknown": 5, "flapping": 1}
+    assert doc["devices"] == {"total": 5, "online": 3, "offline": 2, "new_24h": 1, "new_7d": 1, "stale_30d": 1, "unknown": 5, "flapping": 1, "always_on": 0}
     assert doc["wifi"] == {"clients": 0, "weak": 0, "avg_rssi": None}
     assert doc["ports"] == {"open": 5} and doc["events"]["24h"] == 1 and doc["events"]["last_id"] == 5
     assert doc["uptime"]["24h"] is not None and doc["scans"]["last"]["kind"] == "quick" and doc["scans"]["last_ok_age_s"] == 3600 - 10

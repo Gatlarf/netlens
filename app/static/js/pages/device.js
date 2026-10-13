@@ -304,6 +304,11 @@ function buildEditCard(device, onSaved) {
   notifyField.appendChild(h("label", { title: "Needs e-mail notifications to be set up under Settings." }, notifyInput, " E-mail me when it goes offline"));
   form.appendChild(notifyField);
 
+  const alwaysField = h("div", { class: "field" });
+  const alwaysInput = h("input", { type: "checkbox", name: "always_on", checked: device.always_on === true });
+  alwaysField.appendChild(h("label", { title: "Tick it for devices that should be on all the time (router, switch, server, NAS, camera). The Uptime page and the dashboard can then show the availability of these core devices separately from phones, tablets and laptops that come and go." }, alwaysInput, " Always-on device (should always be online)"));
+  form.appendChild(alwaysField);
+
   const gentleField = h("div", { class: "field" });
   const gentleInput = h("input", { type: "checkbox", name: "gentle", checked: device.gentle === true });
   gentleField.appendChild(h("label", { title: "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself." }, gentleInput, " Gentle scanning (don't probe its services)"));
@@ -329,7 +334,7 @@ function buildEditCard(device, onSaved) {
   let dirty = false;
   let focused = false;
 
-  const fields = [nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, trustInput, dnsMode, dnsName];
+  const fields = [nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, alwaysInput, trustInput, dnsMode, dnsName];
   for (const f of fields) {
     f.addEventListener("input", () => { dirty = true; });
     f.addEventListener("change", () => { dirty = true; });
@@ -346,6 +351,7 @@ function buildEditCard(device, onSaved) {
       tags: tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean),
       notes: notesTextarea.value,
       notify_offline: notifyInput.checked,
+      always_on: alwaysInput.checked,
       trusted: trustInput.checked,
       gentle: gentleInput.checked,
       dns_mode: dnsMode.value,

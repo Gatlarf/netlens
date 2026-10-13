@@ -1,11 +1,12 @@
 from typing import Literal
 
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.api.devices import get_conn
 from app.api.stats import _cached
 from app.db import connect
-from app.uptime import RANGES, device_uptime, uptime_overview
+from app.uptime import RANGES, core_choices, device_uptime, set_core, uptime_overview
 
 router = APIRouter(prefix="/api", tags=["uptime"])
 
@@ -34,3 +35,21 @@ def get_device_uptime(
     if conn.execute("SELECT 1 FROM devices WHERE id = ?", (device_id,)).fetchone() is None:
         raise HTTPException(status_code=404, detail="device not found")
     return device_uptime(conn, device_id, limit=limit, days=RANGES[range] if range else None)
+
+
+@router.get("/uptime/core")
+def get_core(conn=Depends(get_conn)) -> dict:
+    """Every device with whether it is marked always-on, plus Netlens's suggestions."""
+    return {"devices": core_choices(conn)}
+
+
+class CoreBody(BaseModel):
+    device_ids: list[int] = Field(max_length=5000)
+
+
+@router.put("/uptime/core")
+def put_core(body: CoreBody, request: Request, conn=Depends(get_conn)) -> dict:
+    """Mark exactly these devices as always-on (an administrator; viewers are refused by the role filter)."""
+    count = set_core(conn, body.device_ids)
+    request.app.state.__dict__.get("stats_cache", {}).clear()      # the pages show the new choice at once
+    return {"count": count}

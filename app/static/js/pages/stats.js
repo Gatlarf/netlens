@@ -141,7 +141,8 @@ function build(s) {
   // ------------------------------------------------------------------ availability
   const rel = (list) => table(["Device", "Uptime (7 d)", "Outages"], list.map((r) => [link(r), fmtPct(r.uptime), String(r.outages)]));
   root.appendChild(section("availability", "Availability",
-    h("div", { class: "tiles inline" }, tile(fmtPct(a.uptime_24h), "network uptime, 24 h"), tile(fmtPct(a.uptime_7d), "7 days"), tile(fmtPct(a.uptime_30d), "30 days"), tile(a.avg_rtt_ms === null ? "–" : `${a.avg_rtt_ms} ms`, "average response")),
+    h("div", { class: "tiles inline" }, tile(fmtPct(a.uptime_24h), "all devices, 24 h"), tile(fmtPct(a.uptime_7d), "7 days"), tile(fmtPct(a.uptime_30d), "30 days"), tile(a.avg_rtt_ms === null ? "–" : `${a.avg_rtt_ms} ms`, "average response")),
+    a.core && a.core.devices ? h("div", { class: "tiles inline" }, tile(fmtPct(a.core.uptime["24h"]), `${a.core.devices} always-on devices, 24 h`), tile(fmtPct(a.core.uptime["7d"]), "7 days"), tile(fmtPct(a.core.uptime["30d"]), "30 days"), tile(`${a.core.online} / ${a.core.devices}`, "online now")) : null,
     card("Least reliable (7 days)", rel(a.least_reliable)), card("Most reliable (7 days)", rel(a.most_reliable)),
     card(`Flapping (many changes in 24 h)${a.flapping_total ? `: ${a.flapping_total}` : ""}`, table(["Device", "Changes"], a.flapping.map((r) => [link(r), String(r.flaps_24h)]))),
     card("Offline the longest", table(["Device", "Offline for"], a.longest_outages.map((r) => [link(r), fmtDuration(r.seconds)]))),
