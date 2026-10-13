@@ -79,7 +79,7 @@ const CARDS = [
     tone: (d) => (d.summary.dns.conflicts || d.summary.netchecks.untrusted ? "warn" : "ok"),
     build: ({ summary: s }) => rows([
       ["Registered", s.dns.registered], ["Waiting to register", s.dns.pending, s.dns.pending ? "warn" : ""], ["Conflicts", s.dns.conflicts, s.dns.conflicts ? "warn" : ""],
-      ["DHCP servers", s.netchecks.enabled ? `${s.netchecks.dhcp_servers}${s.netchecks.untrusted ? ` (${s.netchecks.untrusted} untrusted)` : ""}` : "not checked", s.netchecks.untrusted ? "bad" : ""],
+      ["DHCP servers", !s.netchecks.enabled ? "check is off" : !s.netchecks.last_run ? "not checked yet" : `${s.netchecks.dhcp_servers}${s.netchecks.untrusted ? ` (${s.netchecks.untrusted} untrusted)` : ""}`, s.netchecks.untrusted ? "bad" : ""],
     ]) },
   { id: "security", title: "Security", href: "#/scans", size: "s", def: true, about: "Failed sign-ins, devices you have not approved and new versions.",
     tone: (d) => (d.login_failed_24h ? "warn" : "ok"),

@@ -310,3 +310,13 @@ def test_summary_has_the_dns_block(db):
     conn.execute("INSERT INTO dns_state (device_id, state) SELECT id, 'conflict' FROM devices WHERE id NOT IN (SELECT device_id FROM dns_state) LIMIT 1")
     conn.commit()
     assert summary(conn, NOW)["dns"]["registered"] == 2 and summary(conn, NOW)["dns"]["conflicts"] == 1
+
+
+def test_netchecks_enabled_follows_the_dhcp_setting(db):
+    conn, _ = db
+    from app import netchecks
+    from app.stats import _netchecks
+
+    assert _netchecks(conn)["enabled"] is True          # the DHCP check is on by default
+    netchecks.set_settings(conn, enabled=False)
+    assert _netchecks(conn)["enabled"] is False

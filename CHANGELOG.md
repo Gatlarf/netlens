@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.164 — 2026-10-13
+
+### Fixed
+- The dashboard card *DNS & network checks* always said "DHCP servers: not checked", even though the rogue DHCP check is on by default. It now shows the number of DHCP servers found (and how many you do not trust), "not checked yet" until the first check has run, or "check is off" when you switched it off under Settings → Network checks. Statistics and Home Assistant read the same flag, so their "Last DHCP check" line is right too.
+
 ## 0.3.163 — 2026-10-13
 
 ### Changed

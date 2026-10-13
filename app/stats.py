@@ -255,7 +255,7 @@ def _netchecks(conn) -> dict:
     servers = netchecks.list_servers(conn)
     last = netchecks.get_last(conn)
     return {
-        "enabled": bool(netchecks.get_settings(conn).get("enabled")),
+        "enabled": bool(netchecks.get_settings(conn)["dhcp_enabled"]),
         "dhcp_servers": len(servers), "untrusted": sum(1 for s in servers if not s["trusted"]),
         "last_run": (last or {}).get("at"), "last_ok": None if not last else bool(last.get("ok")),
     }
