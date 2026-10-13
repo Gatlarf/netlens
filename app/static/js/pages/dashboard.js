@@ -266,7 +266,22 @@ export async function render(container) {
   const header = h("div", { class: "dash-head" });
   const grid = h("div", { class: "dash-grid" });
   const pool = h("div", { class: "dash-pool" });
-  container.append(header, grid, pool);
+  const nudge = h("div", {});
+  container.append(nudge, header, grid, pool);
+  // administrators who have not been through the getting-started guide (or closed it halfway) get a one-line invitation
+  if (isAdmin()) {
+    get("/api/wizard").then((w) => {
+      if (disposed || !w || w.status === "done" || w.status === "dismissed") return;
+      nudge.append(h("div", { class: "card wiz-banner", id: "wizard-nudge" },
+        h("p", {}, h("strong", {}, "Finish setting up Netlens. "), "A short guide walks through the settings that matter: networks, alerts, always-on devices and checks."),
+        h("span", { class: "wiz-nav-end" },
+          h("a", { class: "btn primary", href: "#/wizard" }, w.status === "pending" ? "Continue the guide" : "Open the guide"),
+          h("button", { class: "btn", type: "button", onclick: async () => {
+            try { await put("/api/wizard", { status: "dismissed" }); } catch (err) { /* hidden anyway */ }
+            clear(nudge);
+          } }, "Not now"))));
+    }).catch(() => {});
+  }
 
   const visible = (card) => !card.admin || isAdmin();
   const hasData = (card) => !card.show || card.show(data);

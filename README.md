@@ -99,6 +99,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - CSV and JSON export of devices
 - PNG export of the network map
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
+- A **setup guide** that walks a new install through the settings that matter (networks, names, always-on devices, alerts, checks, plugins, backups); reopen it any time under Settings → System → Setup guide
 - Uptime history like Uptime Kuma: heartbeat bars with a response-time line, 24 h / 7 d / 30 d, hover details, and **always-on (core) devices** whose availability is shown apart from phones and tablets
 - E-mail notifications for new and offline devices, with an on/off switch per device
 - Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: Proxmox VE and ASUS AiMesh come built in (which VM runs on which host, which device is connected to which mesh node); TP-Link Omada and Ubiquiti UniFi are available from the plugin index (community, not yet tested on hardware)

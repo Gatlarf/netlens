@@ -20,6 +20,7 @@ const ROUTES = {
   "#/services": "services",
   "#/scans": "scans",
   "#/settings": "settings",
+  "#/wizard": "wizard",
 };
 
 let currentCleanup = null;
@@ -387,7 +388,7 @@ function startSetup() {
     document.body.classList.remove("setup-mode");
     await applySession();
     displayLoaded = false;
-    location.hash = "#/dashboard";
+    location.hash = "#/wizard"; // a fresh install goes straight into the getting-started guide
     startPoll();
     renderPage();
   });

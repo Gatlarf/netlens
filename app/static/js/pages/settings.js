@@ -104,7 +104,7 @@ function fillRangesCard(card, cfg) {
   card.appendChild(form);
 }
 
-async function buildRangesCard() {
+export async function buildRangesCard() {
   const card = h("div", { class: "card" });
   fillRangesCard(card, await get("/api/config"));
   return card;
@@ -145,6 +145,7 @@ async function buildAboutCard() {
   card.appendChild(kvRow("Listening on", cfg.bind ?? ""));
   card.appendChild(h("p", { class: "hint" }, "Netlens is free for noncommercial use and made in spare time. If it helps you, a coffee keeps the updates coming."));
   card.appendChild(h("a", { class: "btn", href: "https://buymeacoffee.com/Gatlarf", target: "_blank", rel: "noopener noreferrer" }, "\u2615 Buy me a coffee"));
+  card.appendChild(h("a", { class: "btn", href: "#/wizard" }, "Open the setup guide"));
   const wrap = h("div", {}, card);
   try {
     wrap.appendChild(await buildUpdateCard());
@@ -157,6 +158,17 @@ async function buildAboutCard() {
     // ... nor without the changelog
   }
   return wrap;
+}
+
+// A way back into the getting-started guide
+async function buildWizardCard() {
+  let state = null;
+  try { state = await get("/api/wizard"); } catch (err) { /* the button still works */ }
+  const card = h("div", { class: "card" }, h("h2", {}, "Setup guide"));
+  card.appendChild(h("p", { class: "hint" }, "A short guided tour of the settings that matter most: networks, names, always-on devices, alerts, checks and plugins. Nothing is changed unless you change it, and every step can be skipped."));
+  if (state && state.status === "done") card.appendChild(h("p", { class: "hint" }, "You have been through it before; it opens with your current settings."));
+  card.appendChild(h("a", { class: "btn primary", href: "#/wizard", id: "open-wizard" }, state && state.status === "done" ? "Open the setup guide again" : "Open the setup guide"));
+  return card;
 }
 
 // The manufacturer registry belongs with the identification settings, not with the version information
@@ -234,6 +246,7 @@ const STATIC_GROUPS = [
   {
     title: "System",
     items: [
+      { key: "wizard", label: "Setup guide", build: buildWizardCard },
       { key: "about", label: "About", build: buildAboutCard },
       { key: "session", label: "Account", build: buildAccountCard },
     ],

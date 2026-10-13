@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.165 — 2026-10-14
+
+### Added
+- ★ **Setup guide**: a step-by-step guide through the settings that matter most on a new install: networks and schedule, better names (passive discovery, DNS), always-on devices, alerts (add a channel right there), network checks, plugins, and users and backups. Every step can be skipped and changes are saved straight away. A fresh install opens it right after the first account is made. Existing installs get a short "Finish setting up" bar on the dashboard (with "Not now"), and everybody can open it again under Settings → System → Setup guide.
+
 ## 0.3.164 — 2026-10-13
 
 ### Fixed

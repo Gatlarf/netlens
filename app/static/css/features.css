@@ -332,3 +332,16 @@ dialog.whats-new h2 { margin: 0; }
 .up-choose-pct { text-align: right; font-variant-numeric: tabular-nums; }
 .up-suggest { background: var(--accent); color: #fff; }
 @media (max-width: 500px) { .up-choose-row { grid-template-columns: auto minmax(0, 1fr) auto; } .up-choose-row > .hint, .up-choose-row .up-suggest { display: none; } }
+
+/* getting-started wizard */
+.wiz { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.wiz-head h1 { margin: 0 0 4px; }
+.wiz-dots { display: flex; gap: 6px; list-style: none; padding: 0; margin: 12px 0 0; flex-wrap: wrap; }
+.wiz-dots button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border, #8884); background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
+.wiz-dots .past button { background: var(--accent, #3b82f6); color: #fff; border-color: transparent; opacity: .7; }
+.wiz-dots .now button { background: var(--accent, #3b82f6); color: #fff; border-color: transparent; font-weight: 700; }
+.wiz-body { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.wiz-nav { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.wiz-nav-end { display: flex; gap: 8px; flex-wrap: wrap; }
+.wiz-banner { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; }
+.wiz-banner p { margin: 0; }
