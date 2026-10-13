@@ -157,12 +157,42 @@ Your own data folder instead of a Docker volume: replace `netlens-data:/data` wi
 
 ### Portainer (for example on DietPi or any other device)
 
+Netlens needs two things that Portainer does not set by default: the **host network** and two extra **capabilities**, `NET_RAW` and `NET_ADMIN`
+(they let it scan the network and listen for devices announcing themselves). Without them the container starts, but scanning does not work.
+There are two ways to set this up. A stack is easier because the settings are already in the file.
+
+**Option 1: a stack (recommended)**
+
 1. **Stacks → Add stack**, give it a name (`netlens`), choose **Web editor**.
 2. Paste the contents of [`docker-compose.simple.yml`](docker-compose.simple.yml), optionally set `TZ` under *Environment variables*, and press **Deploy the stack**.
 3. Open `http://<this-device>:8080`.
 
+The file already contains `network_mode: host` and `cap_add: [NET_RAW, NET_ADMIN]`. (Already have a stack for your other containers? Paste only the
+`netlens:` service from above into that stack's editor, add the `netlens-data:` volume, and update the stack.)
+
 To update later: open the stack and press **Update the stack** with **Re-pull image** switched on.
-(Already have a stack for your other containers? Paste only the `netlens:` service from above into that stack's editor, add the `netlens-data:` volume, and update the stack.)
+
+**Option 2: one container by hand (Containers → Add container)**
+
+| Where in Portainer | What to set |
+|---|---|
+| **Name** | `netlens` |
+| **Image** | `ghcr.io/gatlarf/netlens:latest` (no registry login needed) |
+| **Advanced container settings → Network → Network** | **host** |
+| **Advanced container settings → Runtime & Resources → Capabilities** | switch **NET_RAW** and **NET_ADMIN** to **On**; leave all others as they are |
+| **Advanced container settings → Volumes → map additional volume** | container `/data`, a new volume (for example `netlens-data`) |
+| **Advanced container settings → Restart policy** | **Unless stopped** |
+| **Env** (optional) | `TZ` = your time zone, for example `Europe/Brussels` |
+
+Then press **Deploy the container** and open `http://<this-device>:8080`. Leave **Privileged mode** off. Do not add `no-new-privileges`
+under *Security*, because it stops the scanner from using the two capabilities.
+
+**Already running without the capabilities?** Capabilities cannot be changed on a running container. Open the container in Portainer, press
+**Duplicate/Edit**, set the network and the two capabilities as in the table (the same volume at `/data` keeps all your data), and **Deploy the container**
+again after removing the old one (Portainer asks to replace it).
+
+**How do I know it worked?** Press *Scan* in Netlens: it finds your devices. If it finds nothing, or the passive listening card in *Settings → Scan performance* says "Not running" and mentions `NET_RAW`,
+the container is missing the host network or one of the two capabilities.
 
 ### Docker Compose with a separate file (any Linux device with Docker)
 

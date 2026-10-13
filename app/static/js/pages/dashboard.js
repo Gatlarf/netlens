@@ -5,6 +5,7 @@ import { barList, columnChart, emptyNote, fmtPct, lineChart } from "../charts.js
 import { cssVar } from "../theme.js";
 import { big, customCard, linkList, pluginCard, plural, rows, sparkline, toneUp } from "../dashboard_cards.js";
 import { openEditor } from "../dashboard_editor.js";
+import { layoutHorizontal } from "../layout_horizontal.js";
 
 const REFRESH_MS = 30000;
 const KINDS = {
@@ -199,6 +200,9 @@ function loadVis() {
   });
 }
 
+// the Map page spaces its cards far apart; the small map packs the same layout tighter so it fills the card
+const squeeze = (p) => (p ? { x: p.x * 1.3, y: p.y * 0.34 } : {});
+
 function miniMap() {
   const box = h("div", { class: "d-map", "aria-label": "Map of the network" });
   let network = null, nodes = null;
@@ -208,19 +212,23 @@ function miniMap() {
   async function load() {
     try {
       const [data] = await Promise.all([get("/api/map"), loadVis()]);
-      const list = data.nodes.map((n) => ({ id: n.id, title: `${shortName(n.label)}${n.online ? "" : " (offline)"}`, shape: "dot", size: n.online ? 9 : 7, ...paint(n) }));
-      const edges = data.edges.filter((e) => e.kind === "parent").map((e) => ({ from: e.from, to: e.to, color: { color: colors().edge } }));
+      // the same left-to-right layout as the Map page: the top device on the left, every level a column to its right
+      const parents = data.edges.filter((e) => e.kind === "parent");
+      const parentOf = new Map(parents.map((e) => [e.to, e.from]));
+      const ids = new Set(data.nodes.map((n) => n.id));
+      const where = layoutHorizontal(data.nodes.map((n) => ({ id: n.id, parent_id: ids.has(parentOf.get(n.id)) ? parentOf.get(n.id) : null }))).positions;
+      const list = data.nodes.map((n) => ({ id: n.id, title: `${shortName(n.label)}${n.online ? "" : " (offline)"}`, shape: "dot", size: n.online ? 9 : 7, ...paint(n), ...squeeze(where.get(n.id)) }));
+      const edges = parents.map((e) => ({ from: e.from, to: e.to, color: { color: colors().edge } }));
       if (!network) {
         nodes = new window.vis.DataSet(list);
         network = new window.vis.Network(box, { nodes, edges: new window.vis.DataSet(edges) }, {
-          layout: { hierarchical: { enabled: true, direction: "UD", sortMethod: "directed", levelSeparation: 55, nodeSpacing: 22, treeSpacing: 30 } },
           physics: false, interaction: { dragNodes: false, dragView: false, zoomView: false, hover: true },
-          edges: { smooth: false, width: 1 }, nodes: { borderWidth: 0 },
+          edges: { smooth: { type: "cubicBezier", forceDirection: "horizontal", roundness: 0.5 }, width: 1 }, nodes: { borderWidth: 0 },
         });
         network.on("click", (p) => { location.hash = p.nodes.length && Number.isInteger(p.nodes[0]) ? `#/device/${p.nodes[0]}` : "#/map"; });
         network.once("afterDrawing", () => network.fit({ animation: false }));
       } else {
-        nodes.update(list.map((n) => ({ id: n.id, size: n.size, color: n.color, title: n.title })));
+        nodes.update(list.map((n) => ({ id: n.id, size: n.size, color: n.color, title: n.title, x: n.x, y: n.y })));
         network.redraw();
         network.fit({ animation: false });
       }

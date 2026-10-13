@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.160 — 2026-10-13
+
+### Changed
+- ★ **The dashboard map uses the horizontal layout**: the small map now draws the network left to right like the *Horizontal layout* on the Map page (the top device on the left, every level a column to its right), packed to fill its card.
+
+### Fixed
+- The README now explains the Portainer setup step by step, including where to switch on the `NET_RAW` and `NET_ADMIN` capabilities and the host network when you create the container by hand.
+
 ## 0.3.158 — 2026-10-13
 
 ### Added
