@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.1.0/hyperv.zip",
+      "sha256": "e8fbf97d0f7d28772fd0d3924d7d57a831b00e4834e1ae075b7fcdba0775c27c",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-13",
+      "changelog": "Adds a dashboard card with running, stopped and paused virtual machines. Needs Netlens 0.3.157 or newer."
+    },
+    {
       "version": "1.0.2",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.0.2/hyperv.zip",
       "sha256": "647f78ffe8b189d868ec78ee4c3824849abd9383a1e544c5ecdf4997a36c00ae",

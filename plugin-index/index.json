@@ -29,6 +29,18 @@
    ],
    "releases": [
     {
+     "version": "1.5.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.5.0/docker.zip",
+     "sha256": "7cad851d0cf8fa3b58f6b35d42ea5cba294a0693c0b9b22332ecff61cc35a102",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-13",
+     "changelog": "Adds a dashboard card with running, stopped, restarting and paused containers (Customize on the dashboard). Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.4.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.4.0/docker.zip",
      "sha256": "17f7ced22a28dcd45fea02e98dfcccf6164711d7876080458926c78267888b79",
@@ -128,6 +140,18 @@
    ],
    "releases": [
     {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.1.0/hyperv.zip",
+     "sha256": "e8fbf97d0f7d28772fd0d3924d7d57a831b00e4834e1ae075b7fcdba0775c27c",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-13",
+     "changelog": "Adds a dashboard card with running, stopped and paused virtual machines. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.2",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.0.2/hyperv.zip",
      "sha256": "647f78ffe8b189d868ec78ee4c3824849abd9383a1e544c5ecdf4997a36c00ae",
@@ -178,6 +202,18 @@
     "Sites, certificates and access lists read with simulated data matching the 2.x API"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.1.0/npm.zip",
+     "sha256": "17cdce9c4dd343e6713e264b0f53e1f8f3c94ecca09edc79c95f3a7909cdb325",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-13",
+     "changelog": "Adds a dashboard card with the number of sites, switched-off sites, proxy hosts, redirections, streams and 404 hosts. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.0.0/npm.zip",
@@ -395,6 +431,18 @@
     "TrueNAS 25.04 (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.3.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.3.0/truenas.zip",
+     "sha256": "d0b0591cf3419d8f77a28d373e3099b1276e89dfb0cb1b186895f5be00e5de1e",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-13",
+     "changelog": "Adds a dashboard card with running and stopped apps, containers and virtual machines. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.2.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.2.0/truenas.zip",

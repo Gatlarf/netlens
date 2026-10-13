@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.5.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.5.0/docker.zip",
+      "sha256": "7cad851d0cf8fa3b58f6b35d42ea5cba294a0693c0b9b22332ecff61cc35a102",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-13",
+      "changelog": "Adds a dashboard card with running, stopped, restarting and paused containers (Customize on the dashboard). Needs Netlens 0.3.157 or newer."
+    },
+    {
       "version": "1.4.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.4.0/docker.zip",
       "sha256": "17f7ced22a28dcd45fea02e98dfcccf6164711d7876080458926c78267888b79",

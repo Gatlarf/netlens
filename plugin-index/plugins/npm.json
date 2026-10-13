@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.1.0/npm.zip",
+      "sha256": "17cdce9c4dd343e6713e264b0f53e1f8f3c94ecca09edc79c95f3a7909cdb325",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-13",
+      "changelog": "Adds a dashboard card with the number of sites, switched-off sites, proxy hosts, redirections, streams and 404 hosts. Needs Netlens 0.3.157 or newer."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.0.0/npm.zip",
       "sha256": "c26d3ac6a8d4278a7558e60c270887b2a52d6397b1b64deb0c86333fb3fccd82",
