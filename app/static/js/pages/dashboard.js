@@ -393,6 +393,7 @@ export async function render(container) {
       const i = order.indexOf(card.id);
       head.append(h("span", { class: "d-tools" },
         card.custom && (!card.shared || isAdmin()) ? h("button", { class: "btn d-tool", type: "button", "aria-label": `Change ${card.title}`, title: "Change", onclick: () => edit(card.custom) }, "✎") : null,
+        card.custom && !card.shared && isAdmin() ? h("button", { class: "btn d-tool", type: "button", "aria-label": `Share ${card.title} with everyone`, title: "Share with everyone", onclick: () => shareCard(card.custom) }, "⇪") : null,
         h("button", { class: "btn d-tool", type: "button", disabled: i === 0, "aria-label": `Move ${card.title} earlier`, title: "Earlier", onclick: () => move(card.id, -1) }, "◀"),
         h("button", { class: "btn d-tool", type: "button", disabled: i === order.length - 1, "aria-label": `Move ${card.title} later`, title: "Later", onclick: () => move(card.id, 1) }, "▶"),
         h("button", { class: "btn d-tool", type: "button", "aria-label": `Remove ${card.title}`, title: "Remove", onclick: () => { order = order.filter((x) => x !== card.id); persist(); draw(); } }, "✕")));
@@ -456,8 +457,9 @@ export async function render(container) {
   }
 
   function poolItem(c, extra) {
-    return h("div", { class: "pool-item" }, h("div", {}, h("strong", {}, c.title), h("p", { class: "hint" }, c.about)),
-      h("div", { class: "pool-buttons" }, extra, h("button", { class: "btn", type: "button", onclick: () => { order.push(c.id); persist(); draw(); } }, "Add")));
+    const placed = order.includes(c.id);
+    return h("div", { class: "pool-item" }, h("div", {}, h("strong", {}, c.title), h("p", { class: "hint" }, placed ? `${c.about} On your dashboard.` : c.about)),
+      h("div", { class: "pool-buttons" }, extra, placed ? null : h("button", { class: "btn", type: "button", onclick: () => { order.push(c.id); persist(); draw(); } }, "Add")));
   }
 
   function drawPool() {
@@ -465,8 +467,8 @@ export async function render(container) {
     if (!editing) return;
     const all = [...registry().values()];
     const free = all.filter((c) => !order.includes(c.id) && visible(c) && !c.custom && !c.plugin);
-    const mine = all.filter((c) => c.custom && !c.shared && !order.includes(c.id));
-    const sharedFree = all.filter((c) => c.shared && !order.includes(c.id));
+    const mine = all.filter((c) => c.custom && !c.shared);                          // also the ones already on the dashboard
+    const sharedFree = all.filter((c) => c.shared && (isAdmin() || !order.includes(c.id)));    // an administrator also sees the ones already on the dashboard, to change or unshare them
     const plugins = all.filter((c) => c.plugin && !order.includes(c.id));
     pool.append(h("div", { class: "toolbar" }, h("h2", {}, "Your own cards"), h("button", { class: "btn primary", type: "button", onclick: () => edit(null) }, "Create a card")),
       mine.length ? h("div", { class: "pool-list" }, mine.map((c) => poolItem({ ...c, about: TYPE_ABOUT[c.custom.type] || c.about }, [
