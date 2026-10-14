@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.175 — 2026-10-14
+
+### Changed
+- ★ **Stored passwords are encrypted**: plugin credentials (Proxmox, ASUS, TrueNAS, Technitium, NPM, Hyper-V ...) and notification channel secrets (SMTP password, ntfy, Telegram, Discord, Pushover and webhook tokens) were stored in the database as plain text and are now encrypted with AES-256-GCM. The key is created as `secret.key` in the data folder, or taken from `NETLENS_SECRET_KEY`. Existing values are encrypted on the first start (a copy of the database is kept as `netlens.db.pre-encryption`). Backups hold the encrypted values only; Settings → Backup & restore shows the key so you can keep a copy and put it back after a restore, and the dashboard warns when stored passwords cannot be read.
+- A **recovery passphrase** (Settings → Backup & restore) puts the key into every backup wrapped with that passphrase, so a restore on a new machine can unlock the passwords by entering it. The leftover plain-text copy of the old e-mail setup is removed.
+
 ## 0.3.174 — 2026-10-14
 
 ### Changed

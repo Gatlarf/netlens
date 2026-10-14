@@ -1,4 +1,5 @@
 fastapi>=0.115
 uvicorn[standard]>=0.30
 asyncssh>=2.14
+cryptography>=41
 zeroconf>=0.130

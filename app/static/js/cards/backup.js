@@ -83,12 +83,91 @@ function fillSchedule(box, data) {
   }
 }
 
+// The key that encrypts the stored passwords: whether everything can be read, a copy of it, and putting one back after a restore
+function keyBox() {
+  const box = h("div", { class: "key-box" });
+  async function draw() {
+    clear(box);
+    box.appendChild(h("h3", {}, "Encryption key"));
+    let state;
+    try {
+      state = await api("/api/vault");
+    } catch (err) {
+      box.appendChild(h("p", { class: "error" }, err.message || "Could not read the key status"));
+      return;
+    }
+    const where = state.source === "env" ? "It is set with the NETLENS_SECRET_KEY environment variable." : "It is the file secret.key in the data folder, next to the database.";
+    box.appendChild(h("p", { class: "hint" }, `Saved passwords and tokens (plugins, notification channels) are stored encrypted. ${where} Keep a copy of the key: without it a restored backup cannot be read, and the passwords have to be entered again.`));
+    if (state.unreadable) {
+      box.appendChild(h("p", { class: "error", id: "vault-bad" }, `${state.unreadable} saved password setting(s) cannot be read with this key. This happens after restoring a backup on another machine.`));
+      const field = (label, name, type) => { const i = h("input", { type, name, autocomplete: "off", "aria-label": label, placeholder: label }); return [i, h("div", { class: "field" }, h("label", {}, label), i)]; };
+      const unlock = async (btn, body) => {
+        btn.disabled = true;
+        try {
+          await api("/api/vault/key", { method: "PUT", body });
+          toast("The passwords can be read again", "success");
+          draw();
+        } catch (err) {
+          toast(err.message || "That did not work", "error");
+          btn.disabled = false;
+        }
+      };
+      if (state.recovery) {
+        const [pass, passRow] = field("Recovery passphrase", "passphrase", "password");
+        const go = h("button", { type: "button", class: "btn" }, "Unlock with the passphrase");
+        go.addEventListener("click", () => unlock(go, { passphrase: pass.value }));
+        box.append(passRow, go);
+      }
+      const [key, keyRow] = field("Or paste the encryption key of the original installation", "key", "text");
+      const use = h("button", { type: "button", class: "btn" }, "Use this key");
+      use.addEventListener("click", () => unlock(use, { key: key.value }));
+      box.append(keyRow, use);
+      return;
+    }
+    box.appendChild(h("p", { class: "hint" }, `${state.encrypted} saved setting(s) are encrypted and readable.`));
+    if (state.source === "file") {
+      if (!state.recovery) {
+        box.appendChild(h("p", { class: "hint", id: "vault-norecovery" },
+          "Backups cannot give back the saved passwords on a new machine yet. Set a recovery passphrase: the key is then kept inside every backup, wrapped with it. Remember the passphrase; Netlens does not store it."));
+      } else {
+        box.appendChild(h("p", { class: "hint" }, "A recovery passphrase is set: backups carry the key, wrapped with it. Set it again to change it."));
+      }
+      const pass = h("input", { type: "password", name: "recovery", autocomplete: "new-password", placeholder: "Recovery passphrase (8 characters or more)", "aria-label": "Recovery passphrase" });
+      const setBtn = h("button", { type: "button", class: "btn" }, state.recovery ? "Change the passphrase" : "Set the passphrase");
+      setBtn.addEventListener("click", async () => {
+        setBtn.disabled = true;
+        try {
+          await api("/api/vault/recovery", { method: "PUT", body: { passphrase: pass.value } });
+          toast("The recovery passphrase is set", "success");
+          draw();
+        } catch (err) {
+          toast(err.message || "That did not work", "error");
+          setBtn.disabled = false;
+        }
+      });
+      box.append(h("div", { class: "field" }, pass), setBtn);
+      const show = h("button", { type: "button", class: "btn" }, "Show the key to keep a copy");
+      const out = h("p", { class: "mono", id: "vault-key" });
+      show.addEventListener("click", async () => {
+        try {
+          out.textContent = (await api("/api/vault/key")).key;
+        } catch (err) {
+          toast(err.message || "The key cannot be shown here", "error");
+        }
+      });
+      box.append(show, out);
+    }
+  }
+  draw();
+  return box;
+}
+
 export function buildBackupCard() {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Backup and restore"));
 
   card.appendChild(h("p", { class: "hint" },
-    "The backup contains all devices, history and settings, including saved e-mail and plugin credentials. The installed plugins are in it too (their code and settings), so a restore brings everything back as it was. Store it somewhere safe."));
+    "The backup contains all devices, history and settings. Saved passwords and tokens are in it encrypted; they can only be read with the encryption key below, which is not in the backup. The installed plugins are in it too (their code and settings), so a restore brings everything back as it was. Store it somewhere safe."));
 
   card.appendChild(h("a", { class: "btn", href: "/api/backup", download: "" }, "Download backup"));
 
@@ -98,6 +177,8 @@ export function buildBackupCard() {
     clear(scheduleBox);
     scheduleBox.appendChild(h("p", { class: "error" }, err.message || "Failed to load the schedule"));
   });
+
+  card.appendChild(keyBox());
 
   const form = h("form", { class: "edit-form" });
 

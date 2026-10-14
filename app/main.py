@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, wizard as wizard_api
+from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, wizard as wizard_api, vault as vault_api
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, identify, require_auth
@@ -41,6 +41,9 @@ async def require_terminal_enabled(conn: HTTPConnection) -> None:
 async def lifespan(app: FastAPI):
     conn = connect(app.state.db_path)
     init_db(conn)
+    from app import vault
+
+    vault.migrate(conn)                      # passwords and tokens that are still plain text get encrypted (once)
     config.apply_overrides(app)
     app.state.scan_manager.recover()
     # identification: use the vendor registry copy in the data directory, and apply the current rules to what is already known
@@ -165,6 +168,7 @@ def create_app(
     app.include_router(stats_api.router, dependencies=auth_deps)
     app.include_router(dashboard_api.router, dependencies=auth_deps)
     app.include_router(wizard_api.router, dependencies=auth_deps)
+    app.include_router(vault_api.router, dependencies=auth_deps)
     app.include_router(speedtest_api.router, dependencies=auth_deps)
     app.include_router(wifi.router, dependencies=auth_deps)
     app.include_router(services_api.router, dependencies=auth_deps)

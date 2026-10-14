@@ -39,6 +39,7 @@ def test_a_restore_into_a_fresh_data_folder_brings_back_plugins_and_settings(tmp
     with old:
         assert old.post("/api/plugins", content=plugin_zip(), headers={"Content-Type": "application/zip"}).status_code == 200
         assert old.put("/api/plugins/omada", json={"enabled": True, "config": {"host": "10.0.0.1"}}).status_code == 200
+        assert old.put("/api/vault/recovery", json={"passphrase": "correct horse"}).status_code == 200      # the key travels in the backup, wrapped
         backup = old.get("/api/backup").content
 
     new = instance(tmp_path / "new")                                   # a recreated container: empty data folder
@@ -46,6 +47,10 @@ def test_a_restore_into_a_fresh_data_folder_brings_back_plugins_and_settings(tmp
         assert new.get("/api/plugins").json()["plugins"] == [] or all(p["builtin"] for p in new.get("/api/plugins").json()["plugins"])
         res = new.post("/api/restore", content=backup, headers={"Content-Type": "application/octet-stream"})
         assert res.status_code == 200 and res.json()["plugins"] == ["omada"] and res.json()["plugins_failed"] == []
+        # the saved configuration is encrypted with the old installation's key: unreadable until the recovery passphrase unlocks it
+        assert new.get("/api/vault").json()["unreadable"] >= 1
+        assert new.put("/api/vault/key", json={"passphrase": "wrong passphrase"}).status_code == 403
+        assert new.put("/api/vault/key", json={"passphrase": "correct horse"}).json()["unreadable"] == 0
         omada = new.get("/api/plugins/omada").json()
         assert omada["enabled"] is True and omada["config"]["host"] == "10.0.0.1"
         assert new.get("/api/plugins").json()["missing"] == []
@@ -82,3 +87,17 @@ def test_a_backup_is_still_a_valid_netlens_database_and_old_backups_restore(tmp_
     conn = connect(root / "netlens.db")
     conn.execute("DROP TABLE IF EXISTS backup_plugins")
     conn.close()
+
+
+def test_a_restore_without_recovery_passphrase_keeps_working_with_empty_passwords(tmp_path):
+    old = instance(tmp_path / "old")
+    with old:
+        assert old.post("/api/plugins", content=plugin_zip(), headers={"Content-Type": "application/zip"}).status_code == 200
+        assert old.put("/api/plugins/omada", json={"enabled": True, "config": {"host": "10.0.0.1"}}).status_code == 200
+        backup = old.get("/api/backup").content
+    new = instance(tmp_path / "new")
+    with new:
+        assert new.post("/api/restore", content=backup, headers={"Content-Type": "application/octet-stream"}).status_code == 200
+        assert new.get("/api/vault").json()["unreadable"] >= 1
+        assert new.get("/api/plugins").status_code == 200 and new.get("/api/dashboard").status_code == 200
+        assert any("cannot be read" in i["text"] for i in new.get("/api/dashboard").json()["attention"])

@@ -756,10 +756,30 @@ def list_devices(conn: sqlite3.Connection) -> list[dict[str, Any]]:
 
 def get_setting(conn: sqlite3.Connection, key: str) -> str | None:
     row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
-    return row["value"] if row else None
+    if not row:
+        return None
+    value = row["value"]
+    if isinstance(value, str) and value.startswith("enc:v1:"):        # a secret setting (see app/vault.py)
+        from app import vault
+
+        try:
+            return vault.decrypt(conn, value)
+        except vault.VaultError:
+            vault.note_unreadable(conn, key)
+            return None
+    return value
 
 
 def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    from app import vault
+
+    if value and vault.is_secret_key(key):                              # passwords and tokens are stored encrypted
+        try:
+            value = vault.encrypt(conn, value)
+        except (OSError, ValueError):                                   # no usable key file: better stored plain than lost
+            import logging
+
+            logging.getLogger(__name__).warning("could not encrypt %s: the key file cannot be read or created", key)
     conn.execute(
         "INSERT INTO settings (key, value) VALUES (?, ?) "
         "ON CONFLICT(key) DO UPDATE SET value = excluded.value",

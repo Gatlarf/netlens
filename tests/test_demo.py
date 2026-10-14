@@ -1,4 +1,6 @@
 import json
+
+from app.db import get_setting
 import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -62,7 +64,7 @@ def test_seed_builds_a_complete_network(seeded):
     assert conn.execute("SELECT COUNT(*) FROM dns_state WHERE state = 'ok'").fetchone()[0] >= 30
     # the plugins are switched on with a configuration, and nothing in them is real
     for plugin in ("proxmox", "asus", "docker", "truenas", "hyperv", "npm", "snmp", "technitium"):
-        assert json.loads(conn.execute("SELECT value FROM settings WHERE key = ?", (f"plugin.{plugin}",)).fetchone()[0])["enabled"] is True
+        assert json.loads(get_setting(conn, f"plugin.{plugin}"))["enabled"] is True
     assert not any(s.lower().startswith(("http://192.168.0.", "https://192.168.0.")) for (s,) in conn.execute("SELECT value FROM settings"))
 
 

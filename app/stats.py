@@ -420,11 +420,11 @@ def _services(conn, now: str) -> dict:
 
 def _plugin_status(conn) -> list[dict]:
     out = []
-    for r in conn.execute("SELECT key, value FROM settings WHERE key LIKE 'plugin.%' AND key NOT LIKE 'plugin.%.%'"):
+    for r in conn.execute("SELECT key FROM settings WHERE key LIKE 'plugin.%' AND key NOT LIKE 'plugin.%.%'").fetchall():
         plugin_id = r["key"][len("plugin."):]
         try:
-            enabled = bool(json.loads(r["value"]).get("enabled"))
-        except ValueError:
+            enabled = bool(json.loads(get_setting(conn, r["key"]) or "null").get("enabled"))       # the saved configuration is encrypted
+        except (ValueError, AttributeError):
             continue
         try:
             status = json.loads(get_setting(conn, f"plugin.{plugin_id}.status") or "null")

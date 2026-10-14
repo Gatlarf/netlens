@@ -35,6 +35,12 @@ def get_dashboard(request: Request) -> dict:
             s = summary(conn, scan_running=running_scan(conn) is not None, data_dir=request.app.state.settings.data_dir, passive=_passive(request))
             doc = dashboard.build(conn, s)
             doc["plugin_cards"] = _plugin_cards(request, conn)
+            from app import vault
+
+            unreadable = vault.status(conn)["unreadable"]
+            if unreadable:       # a restore on another machine without the key: the passwords have to be entered again, or the key put back
+                doc["attention"].insert(0, {"level": "bad", "text": f"{unreadable} stored password setting(s) cannot be read: the encryption key is missing or different",
+                                            "href": "#/settings/backup"})
             return doc
         finally:
             conn.close()

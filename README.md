@@ -435,7 +435,16 @@ You can switch the offline alerts off **per device** with the checkbox "Alert me
 
 An installation that used the former separate **E-mail notifications** page has it converted to an e-mail channel automatically (same server, recipients and events); the old page address redirects to the channels page.
 
-The SMTP password is stored in the database in plain text (like all settings) and is included in backups, so protect the data directory and the backup files.
+The SMTP password is stored encrypted (see *Stored passwords* below).
+
+### Stored passwords
+
+Passwords and tokens that Netlens has to remember (plugin credentials, the SMTP password, ntfy/Telegram/Discord/Pushover/webhook secrets) are stored **encrypted** (AES-256-GCM). User passwords are stored only as scrypt hashes, and sign-in sessions and API tokens only as SHA-256 hashes.
+
+- The key is created on first start as `secret.key` in the data folder (readable only by the Netlens user). To keep it outside the data volume, set `NETLENS_SECRET_KEY` (64 hex characters, or 43 base64 characters, or any passphrase) and Netlens uses that instead.
+- **Backups contain the encrypted values but not the key**, so a backup file that leaks does not leak your passwords. To restore a backup on another machine (or into a new, empty data folder) you need the key: **Settings → Backup & restore → Encryption key** lets an administrator on a direct local connection show it, and set a **recovery passphrase**. With a passphrase set, every backup carries the key wrapped with it (the passphrase itself is not stored; there is no way to get it back), and after a restore you enter the passphrase to unlock the passwords. Without the key or the passphrase Netlens keeps working and the affected passwords are simply empty and must be entered again; the dashboard says so.
+- The first start after the update encrypts passwords that were stored in plain text and keeps one copy of the database as `netlens.db.pre-encryption` in the data folder (it still holds the old plain-text values; delete it once you have checked that everything works).
+- What this protects against is a copy of the database or a backup falling into the wrong hands. It does not protect against someone who can read both the data folder and the key, or who is signed in as an administrator.
 
 ### Known and unknown devices
 

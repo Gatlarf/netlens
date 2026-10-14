@@ -109,6 +109,10 @@ class ChannelError(Exception):
 def _migrate_old_mail(conn: sqlite3.Connection) -> None:
     """E-mail used to be set up on its own page. Turn that setup into an e-mail channel once (also after restoring an old backup)."""
     if get_setting(conn, MIGRATED_KEY):
+        if get_setting(conn, "notifications"):          # the old plain-text copy (with the SMTP password) is not needed any more
+            from app.db import delete_setting
+
+            delete_setting(conn, "notifications")
         return
     set_setting(conn, MIGRATED_KEY, "1")
     old = load_old_mail_config(conn)
@@ -124,6 +128,9 @@ def _migrate_old_mail(conn: sqlite3.Connection) -> None:
                             "password": old.password, "from_addr": old.from_addr, "to_addrs": ", ".join(old.to_addrs)},
                "last_event_id": old.last_event_id}
     set_setting(conn, CHANNELS_KEY, json.dumps([channel, *(existing if isinstance(existing, list) else [])]))
+    from app.db import delete_setting
+
+    delete_setting(conn, "notifications")               # the secrets now live in the (encrypted) channel only
 
 
 def load_channels(conn: sqlite3.Connection) -> list[dict]:
