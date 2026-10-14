@@ -345,3 +345,15 @@ dialog.whats-new h2 { margin: 0; }
 .wiz-nav-end { display: flex; gap: 8px; flex-wrap: wrap; }
 .wiz-banner { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; }
 .wiz-banner p { margin: 0; }
+.wiz-card p { margin: 0 0 12px; }
+.wiz-card .field { margin-bottom: 12px; }
+.wiz-more { margin: 0; }
+.wiz-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.wiz-tile { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--border, #8884); border-radius: 10px; cursor: pointer; }
+.wiz-tile:has(input:checked) { border-color: var(--accent, #3b82f6); box-shadow: 0 0 0 1px var(--accent, #3b82f6); }
+.wiz-tile input { position: absolute; opacity: 0; pointer-events: none; }
+.wiz-radio { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: baseline; margin: 6px 0; cursor: pointer; }
+.wiz-radio input { width: auto; margin: 0; }
+.wiz-radio .hint { grid-column: 2; }
+.wiz-summary { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.wiz-summary .no { color: var(--muted, #888); }

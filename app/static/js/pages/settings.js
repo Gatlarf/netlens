@@ -325,6 +325,14 @@ export async function render(container, params) {
     toggle.querySelector(".caret").textContent = open ? "▴" : "▾";
   });
   container.appendChild(h("div", { class: "settings-layout" }, side, content));
+  // in the middle of the setup guide: a way back
+  if (isAdmin()) {
+    get("/api/wizard").then((w) => {
+      if (destroyed || !w || w.status !== "pending") return;
+      container.prepend(h("div", { class: "card wiz-banner", id: "wizard-back" },
+        h("p", {}, "You are in the middle of the setup guide."), h("a", { class: "btn primary", href: "#/wizard" }, "Back to the setup guide")));
+    }).catch(() => {});
+  }
 
   // installing or removing a plugin changes the menu
   let destroyed = false;

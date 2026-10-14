@@ -50,3 +50,17 @@ def test_front_end_is_wired_up():
     assert re.search(r'key: "wizard"', (JS / "pages" / "settings.js").read_text())
     assert "wizard-nudge" in (JS / "pages" / "dashboard.js").read_text()
     assert (JS / "pages" / "wizard.js").exists()
+    steps = (JS / "wizard_steps.js").read_text()
+    assert "export const STEPS" in steps and steps.count("build:") >= 9      # every step has a builder
+    for settings_card_import in ("buildChannelsCard", "buildDnsCard", "buildNetchecksCard"):
+        assert settings_card_import not in steps                              # the guide uses small forms, not the settings cards
+
+
+def test_important_preset_only_names_known_events():
+    import re
+
+    from app.notify.channels import EVENT_LABELS
+
+    block = re.search(r"export const IMPORTANT = \[(.*?)\]", (JS / "wizard_steps.js").read_text()).group(1)
+    names = re.findall(r'"([a-z_]+)"', block)
+    assert names and all(n in EVENT_LABELS for n in names)

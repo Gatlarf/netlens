@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.167 — 2026-10-14
+
+### Changed
+- ★ **A simpler setup guide**: the guide no longer shows the full settings pages. Each step is now a short, plain question with the recommended answer filled in: your network, device names, always-on devices, how to reach you (e-mail, phone notification, Telegram or Discord, with a test message and a choice between "only important things" and "everything"), and the safety checks. Moving on saves the step, and each step links to the full settings page for more options. The last step shows what is set up. While the guide is unfinished, Settings shows a "Back to the setup guide" button.
+
 ## 0.3.166 — 2026-10-14
 
 ### Changed
