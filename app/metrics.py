@@ -189,6 +189,17 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
                         labels["name"] = series["label"]
                     out.sample(spec[0], series["last"] / spec[2], spec[1], **labels)
 
+    # remote sites that report to this Netlens
+    from app import probes as probes_mod
+
+    for row in conn.execute("SELECT * FROM probes ORDER BY name COLLATE NOCASE"):
+        site = probes_mod.present(conn, row)
+        out.sample("netlens_remote_site_up", 1 if site["state"] == "connected" else 0, "1 while a remote site is reporting", site=site["name"])
+        out.sample("netlens_remote_site_devices", site["devices"]["online"], "Devices of a remote site, by state", site=site["name"], state="online")
+        out.sample("netlens_remote_site_devices", site["devices"]["total"] - site["devices"]["online"], "Devices of a remote site, by state", site=site["name"], state="offline")
+        out.sample("netlens_remote_site_services_down", site["services"]["down"], "Service checks of a remote site that are down", site=site["name"])
+        out.sample("netlens_remote_site_health_problems", site["problems"]["count"], "Health readings of a remote site past a limit", site=site["name"])
+
     w = stats["wifi"]
     out.sample("netlens_wifi_clients", w["clients"], "Wi-Fi clients seen in the last two hours")
     out.sample("netlens_wifi_weak_clients", w["weak"], "Wi-Fi clients with a signal below -75 dBm")

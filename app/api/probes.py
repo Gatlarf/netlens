@@ -1,0 +1,137 @@
+"""Remote sites: the list and details for the web interface, and the endpoint a probe pushes its report to."""
+
+from __future__ import annotations
+
+import json
+import zlib
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
+
+from app import probes as probes_mod
+from app.api.devices import get_conn
+from app.auth import LoginLimiter, client_ip
+from app.db import connect
+
+router = APIRouter(prefix="/api", tags=["remote-sites"])
+push_router = APIRouter(tags=["remote-sites"])
+MAX_BODY = 12 * 1024 * 1024
+
+
+class NameBody(BaseModel):
+    name: str | None = None
+    enabled: bool | None = None
+
+
+def _row(conn, probe_id: int):
+    row = conn.execute("SELECT * FROM probes WHERE id = ?", (probe_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="remote site not found")
+    return row
+
+
+@router.get("/probes")
+def list_probes(conn=Depends(get_conn)) -> list[dict]:
+    return [probes_mod.present(conn, r) for r in conn.execute("SELECT * FROM probes ORDER BY name COLLATE NOCASE")]
+
+
+@router.post("/probes", status_code=201)
+def create_probe(body: NameBody, conn=Depends(get_conn)) -> dict:
+    try:
+        probe, token = probes_mod.create(conn, body.name or "")
+    except probes_mod.ProbeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"probe": probe, "token": token}
+
+
+@router.get("/probes/{probe_id}")
+def probe_detail(probe_id: int, conn=Depends(get_conn)) -> dict[str, Any]:
+    row = _row(conn, probe_id)
+    summary = json.loads(row["summary"] or "{}")
+    devices = [{"id": r["id"], "key": r["key"], "name": r["name"], "ip": r["ip"], "mac": r["mac"], "vendor": r["vendor"], "type": r["type"], "os": r["os"],
+                "online": bool(r["online"]), "always_on": bool(r["always_on"]), "ports": json.loads(r["ports"] or "[]"), "first_seen": r["first_seen"], "last_seen": r["last_seen"]}
+               for r in conn.execute("SELECT * FROM remote_devices WHERE probe_id = ? ORDER BY online ASC, name COLLATE NOCASE", (probe_id,))]
+    services = [{"id": r["id"], "key": r["key"], "name": r["name"], "kind": r["kind"], "target": r["target"], "state": r["state"], "ms": r["ms"],
+                 "detail": r["detail"], "since": r["since"], "checked": r["checked"]}
+                for r in conn.execute("SELECT * FROM remote_services WHERE probe_id = ? ORDER BY name COLLATE NOCASE", (probe_id,))]
+    return {"probe": probes_mod.present(conn, row), "devices": devices, "services": services, "problems": summary.get("problems") or [],
+            "monitors": summary.get("monitors") or [], "scan": summary.get("scan")}
+
+
+@router.patch("/probes/{probe_id}")
+def update_probe(probe_id: int, body: NameBody, conn=Depends(get_conn)) -> dict:
+    row = _row(conn, probe_id)
+    if body.name is not None:
+        try:
+            name = probes_mod.clean_name(body.name)
+        except probes_mod.ProbeError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        if conn.execute("SELECT 1 FROM probes WHERE name = ? COLLATE NOCASE AND id != ?", (name, probe_id)).fetchone():
+            raise HTTPException(status_code=422, detail="there is already a remote site with that name")
+        conn.execute("UPDATE probes SET name = ? WHERE id = ?", (name, probe_id))
+    if body.enabled is not None:
+        conn.execute("UPDATE probes SET enabled = ? WHERE id = ?", (int(body.enabled), probe_id))
+    conn.commit()
+    return probes_mod.present(conn, _row(conn, row["id"]))
+
+
+@router.post("/probes/{probe_id}/token")
+def new_token(probe_id: int, conn=Depends(get_conn)) -> dict:
+    """A new token; the old one stops working at once."""
+    _row(conn, probe_id)
+    return {"token": probes_mod.rotate_token(conn, probe_id)}
+
+
+@router.delete("/probes/{probe_id}")
+def delete_probe(probe_id: int, conn=Depends(get_conn)) -> dict:
+    _row(conn, probe_id)
+    probes_mod.delete(conn, probe_id)
+    return {"removed": probe_id}
+
+
+# ----------------------------------------------------------------------------- the report of a probe
+@push_router.post("/api/probe/push")
+async def push(request: Request) -> dict:
+    limiter: LoginLimiter = request.app.state.share_limiter
+    host = client_ip(request)
+    if not limiter.allowed(host):
+        raise HTTPException(status_code=429, detail="too many attempts")
+    header = request.headers.get("authorization", "")
+    token = header[7:].strip() if header.lower().startswith("bearer ") else ""
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_BODY:
+        raise HTTPException(status_code=413, detail="the report is too large")
+    body = await request.body()            # read it before answering, so a refusal does not cut the connection off in the sender's face
+    conn = connect(request.app.state.db_path)
+    try:
+        probe = probes_mod.find_by_token(conn, token) if token else None
+        if probe is None or not probe["enabled"]:
+            limiter.record_failure(host)
+            raise HTTPException(status_code=401, detail="this token is not valid (the remote site may have been removed or its token replaced)")
+        if len(body) > MAX_BODY:
+            raise HTTPException(status_code=413, detail="the report is too large")
+        if request.headers.get("content-encoding", "").lower() == "gzip":
+            try:
+                inflater = zlib.decompressobj(16 + zlib.MAX_WBITS)
+                body = inflater.decompress(body, MAX_BODY * 4)
+                if inflater.unconsumed_tail:             # more than the limit: a decompression bomb, not a report
+                    raise HTTPException(status_code=413, detail="the report is too large")
+            except zlib.error:
+                raise HTTPException(status_code=400, detail="the report is not valid gzip")
+        try:
+            payload = json.loads(body)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="the report is not valid JSON")
+        try:
+            result = probes_mod.ingest(conn, probe, payload, remote_ip=host)
+        except probes_mod.ProbeError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+    finally:
+        conn.close()
+    # the events this report raised should reach the channels now, not at the next scan
+    if result.get("events") or result.get("ok"):
+        from app.notify.channels import process_channels
+
+        await process_channels(request.app.state.db_path)
+    return result

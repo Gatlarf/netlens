@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.179 — 2026-10-14
+
+### Added
+- ★ **Remote sites**: one Netlens can now watch several locations. Install Netlens at the other location (a branch office, a second home, a customer), then on the main one open **Monitoring → Remote sites → Add a remote site** to get a token, and on the remote one enter the address and token under **Settings → Report to a central Netlens**. The remote Netlens keeps scanning and checking its own network as before and sends a report every minute; the connection always goes out from the remote site, so nothing there has to be reachable from the internet, and the token is stored hashed on the main side and encrypted on the remote side. The main Netlens shows each site with its devices, service checks and health problems, graphs of their history, and raises alerts: a device or service going down, a health problem, a new device, and **a site that stops reporting** (its devices are then shown as not watched instead of all going offline). New events for the notification channels, the dashboard "Needs attention" list and Prometheus (`netlens_remote_site_*`) include the sites.
+
 ## 0.3.178 — 2026-10-14
 
 ### Added

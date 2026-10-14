@@ -438,3 +438,15 @@ dialog.whats-new h2 { margin: 0; }
 .hl-row.hl-paused { opacity: 0.6; }
 .monitor-values { margin-top: 6px; }
 .monitor-result { margin-top: 10px; }
+
+/* remote sites (js/pages/remote_sites.js) */
+.rs-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.rs-card { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border: 1px solid var(--border); border-left: 5px solid var(--ok); border-radius: var(--radius); background: var(--surface); color: var(--text); text-decoration: none; min-width: 0; }
+.rs-card:hover { border-color: var(--accent); }
+.rs-card.tone-warn { border-left-color: var(--warn); }
+.rs-card.tone-bad { border-left-color: var(--bad); }
+.rs-card.tone-off { border-left-color: var(--muted); opacity: 0.7; }
+.rs-name { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rs-stats { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+.rs-setup ol { padding-left: 20px; }
+.rs-setup li { margin: 6px 0; }

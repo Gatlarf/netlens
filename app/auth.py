@@ -134,7 +134,7 @@ BUILTIN = Principal(username="access token", role="admin", builtin=True)
 # What a viewer may read. Everything else, and every request that changes something, needs an administrator.
 VIEWER_READABLE = re.compile(
     r"^/(metrics"
-    r"|api/(session|update|changelog|map|map-settings|hierarchy|relations|events|uptime|uptime/core|scans|scans/current|service-checks|service-checks/\d+/results|monitors|monitoring/limits|timeseries/(device|service|probe)/\d+|timeseries/(device|service|probe)/\d+/[A-Za-z0-9_.-]+"
+    r"|api/(session|update|changelog|map|map-settings|hierarchy|relations|events|uptime|uptime/core|scans|scans/current|service-checks|service-checks/\d+/results|monitors|monitoring/limits|probes|probes/\d+|timeseries/(device|service|probe)/\d+|timeseries/(device|service|probe)/\d+/[A-Za-z0-9_.-]+"
     r"|stats|stats/summary|dashboard|dashboard/layout|dashboard/default|dashboard/shared|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
 )
 VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/speedtest/up", "/api/speedtest/browser")  # a viewer may test the line from their own device

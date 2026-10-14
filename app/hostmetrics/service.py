@@ -243,7 +243,7 @@ def record(conn, device_id: int, points: list[tuple], now: float | None = None) 
     store.record([("device", device_id, metric, value, label, unit) for metric, label, value, unit in points], ts=int(now if now is not None else time.time()))
 
 
-PROCESS_RE = __import__("re").compile(r"^[A-Za-z0-9_.@:+-]{1,64}$")
+PROCESS_RE = __import__("re").compile(r"^[A-Za-z0-9_.@:+][A-Za-z0-9_.@:+-]{0,63}$")      # never starts with "-": it would be taken for an option
 
 
 async def check_process(db_path: str, device_id: int | None, name: str, timeout: float = 10.0) -> tuple[bool, str, float | None]:

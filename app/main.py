@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api
+from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api, probes as probes_api, central as central_api
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, identify, require_auth
@@ -97,6 +97,9 @@ async def lifespan(app: FastAPI):
         from app.hostmetrics import service as host_monitors
 
         tasks.append(asyncio.create_task(host_monitors.loop(app.state.db_path)))
+        from app import central
+
+        tasks.append(asyncio.create_task(central.loop(app.state.db_path)))
         from app.scanner.passive import Control
 
         app.state.passive = Control(app.state.db_path)
@@ -192,6 +195,9 @@ def create_app(
     app.include_router(remote_api.router)         # its routes check the sign-in and the terminal rules themselves (the WebSocket cannot use the dependency)
     app.include_router(timeseries_api.router, dependencies=auth_deps)
     app.include_router(monitors_api.router, dependencies=auth_deps)
+    app.include_router(probes_api.router, dependencies=auth_deps)
+    app.include_router(central_api.router, dependencies=auth_deps)
+    app.include_router(probes_api.push_router)       # a probe signs in with its own token (checked there), not with a user session
     app.include_router(speedtest_api.router, dependencies=auth_deps)
     app.include_router(wifi.router, dependencies=auth_deps)
     app.include_router(services_api.router, dependencies=auth_deps)

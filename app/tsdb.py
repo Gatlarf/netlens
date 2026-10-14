@@ -35,7 +35,7 @@ H1_SECONDS = 730 * 86400
 STEP_5M, STEP_1H = 300, 3600
 RANGES = {"1h": 3600, "6h": 6 * 3600, "24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400, "90d": 90 * 86400, "1y": 365 * 86400}
 MAX_POINTS = 600
-ENTITIES = ("device", "service", "probe")
+ENTITIES = ("device", "service", "probe", "remote", "remote_service")
 
 _stores: dict[str, "Store"] = {}
 _lock = threading.Lock()
@@ -191,6 +191,21 @@ class Store:
             self._ids = {k: v for k, v in self._ids.items() if not (k[0] == entity and k[1] == entity_id)}
         except sqlite3.Error:
             log.exception("could not forget metrics")
+
+    def export_since(self, since: int, entities: tuple[str, ...] = ("device", "service"), limit: int = 20000) -> list[tuple]:
+        """Raw samples newer than `since`: (ts, entity, entity_id, metric, label, value, unit), oldest first."""
+        marks = ",".join("?" for _ in entities)
+        try:
+            conn = self._connect()
+        except sqlite3.Error:
+            return []
+        try:
+            rows = conn.execute(
+                f"SELECT r.ts, s.entity, s.entity_id, s.metric, s.label, r.v, s.unit FROM raw r JOIN series s ON s.id = r.series "
+                f"WHERE r.ts > ? AND s.entity IN ({marks}) ORDER BY r.ts LIMIT ?", (int(since), *entities, int(limit))).fetchall()
+            return [tuple(r) for r in rows]
+        finally:
+            conn.close()
 
     # ------------------------------------------------------------------ history from the main database
     def reset(self) -> None:

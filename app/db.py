@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 23
 
 
 def utcnow() -> str:
@@ -650,6 +650,65 @@ def init_db(conn: sqlite3.Connection) -> None:
             pending TEXT,
             pending_n INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (monitor_id, metric, label)
+        )
+        """
+    )
+
+    # --- schema v23: remote sites (other Netlens instances that report to this one) --------------------------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS probes (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            created TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            last_seen TEXT,
+            last_ip TEXT,
+            version TEXT,
+            interval_s INTEGER NOT NULL DEFAULT 60,
+            snapshot_ts TEXT,
+            offline_notified INTEGER NOT NULL DEFAULT 0,
+            summary TEXT NOT NULL DEFAULT '{}'
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS remote_devices (
+            id INTEGER PRIMARY KEY,
+            probe_id INTEGER NOT NULL REFERENCES probes(id) ON DELETE CASCADE,
+            key TEXT NOT NULL,
+            mac TEXT,
+            ip TEXT,
+            name TEXT NOT NULL,
+            vendor TEXT,
+            type TEXT,
+            os TEXT,
+            online INTEGER NOT NULL DEFAULT 1,
+            always_on INTEGER NOT NULL DEFAULT 0,
+            ports TEXT NOT NULL DEFAULT '[]',
+            first_seen TEXT,
+            last_seen TEXT,
+            UNIQUE (probe_id, key)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS remote_services (
+            id INTEGER PRIMARY KEY,
+            probe_id INTEGER NOT NULL REFERENCES probes(id) ON DELETE CASCADE,
+            key TEXT NOT NULL,
+            name TEXT NOT NULL,
+            kind TEXT,
+            target TEXT,
+            state TEXT,
+            ms REAL,
+            detail TEXT,
+            since TEXT,
+            checked TEXT,
+            UNIQUE (probe_id, key)
         )
         """
     )

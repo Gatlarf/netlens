@@ -163,3 +163,87 @@ def tick(conn, ids: dict[str, int], now: datetime) -> None:
     stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     conn.execute("UPDATE host_monitors SET last_ts = ?, last_ok = 1", (stamp,))
     conn.commit()
+
+
+# ----------------------------------------------------------------------------- a remote site
+SITE_NAME = "Branch office"
+SITE_DEVICES = [
+    # key, name, ip, vendor, type, always_on, ports, online
+    ("c8:3a:35:00:00:01", "gateway-branch", "10.20.0.1", "MikroTik", "router", True, [80, 443, 8291], True),
+    ("c8:3a:35:00:00:02", "switch-branch", "10.20.0.2", "TP-Link", "switch", True, [80], True),
+    ("00:11:32:00:00:03", "nas-branch", "10.20.0.10", "Synology", "nas", True, [445, 5000, 5001], True),
+    ("18:db:f2:00:00:04", "reception-pc", "10.20.0.21", "Dell", "pc", False, [135, 445], True),
+    ("18:db:f2:00:00:05", "accounting-pc", "10.20.0.22", "Dell", "pc", False, [135, 445], True),
+    ("98:fa:9b:00:00:06", "manager-laptop", "10.20.0.23", "Lenovo", "pc", False, [], False),
+    ("00:1b:a9:00:00:07", "printer-branch", "10.20.0.30", "Brother Industries", "printer", False, [80, 631, 9100], True),
+    ("ec:71:db:00:00:08", "cam-entrance", "10.20.0.40", "Reolink", "camera", True, [80, 554], True),
+    ("b0:95:75:00:00:09", "plug-coffee", "10.20.0.50", "TP-Link Tapo", "iot", False, [80], True),
+]
+SITE_SERVICES = [("svc:1", "Branch router web", "http", "http://10.20.0.1/", "up", 9.0), ("svc:2", "File server SMB", "tcp", "10.20.0.10:445", "up", 3.2),
+                 ("svc:3", "Printer queue", "tcp", "10.20.0.30:9100", "up", 6.5), ("svc:4", "Certificate of the VPN", "cert", "certificate of vpn.branch.example:443", "up", 40.0)]
+
+
+def seed_remote(conn, now: datetime, days: int = 7) -> None:
+    from app.db import add_event
+
+    token = vault.encrypt(conn, "demo")[-24:]
+    stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    summary = {
+        "problems": [{"device_key": "00:11:32:00:00:03", "device": "nas-branch", "metric": "disk_pct", "label": "/volume1", "level": "warning", "value": 87.0, "title": "Disk full", "unit": "%",
+                      "since": (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")}],
+        "monitors": [{"device_key": "00:11:32:00:00:03", "device": "nas-branch", "method": "snmp", "ok": True, "error": None, "level": "warning",
+                      "latest": {"cpu": 12.0, "mem": 58.0, "disk": 87.0, "temp": 44.0}, "disk_label": "/volume1"}],
+        "scan": {"finished": stamp, "running": False, "hosts": 8}, "counts": {"devices": len(SITE_DEVICES), "services": len(SITE_SERVICES), "samples": 0},
+    }
+    cur = conn.execute("INSERT INTO probes (name, token_hash, created, last_seen, last_ip, version, interval_s, snapshot_ts, summary) VALUES (?,?,?,?,?,?,?,?,?)",
+                       (SITE_NAME, "demo-" + token, (now - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ"), stamp, "203.0.113.45", "0.4.0", 60, stamp, json.dumps(summary)))
+    probe_id = cur.lastrowid
+    dev_ids = {}
+    for key, name, ip_, vendor, kind, always_on, ports, online in SITE_DEVICES:
+        c = conn.execute("INSERT INTO remote_devices (probe_id, key, mac, ip, name, vendor, type, online, always_on, ports, first_seen, last_seen) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                         (probe_id, key, key, ip_, name, vendor, kind, int(online), int(always_on), json.dumps(ports), (now - timedelta(days=25)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                          stamp if online else (now - timedelta(hours=5)).strftime("%Y-%m-%dT%H:%M:%SZ")))
+        dev_ids[key] = c.lastrowid
+    svc_ids = {}
+    for key, name, kind, target, state, ms in SITE_SERVICES:
+        c = conn.execute("INSERT INTO remote_services (probe_id, key, name, kind, target, state, ms, detail, since, checked) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                         (probe_id, key, name, kind, target, state, ms, "valid for 40 more days" if kind == "cert" else "answered", (now - timedelta(days=9)).strftime("%Y-%m-%dT%H:%M:%SZ"), stamp))
+        svc_ids[key] = c.lastrowid
+    for when, kind, text in ((now - timedelta(hours=5), "remote_offline", f"{SITE_NAME}: manager-laptop (10.20.0.23) went offline"),
+                             (now - timedelta(days=2), "remote_metric_warning", f"{SITE_NAME}: nas-branch: disk full on /volume1 is 87% (limit 85%)"),
+                             (now - timedelta(days=4, hours=3), "remote_service_down", f"{SITE_NAME}: Printer queue (10.20.0.30:9100) is down: timed out"),
+                             (now - timedelta(days=4, hours=2), "remote_service_up", f"{SITE_NAME}: Printer queue (10.20.0.30:9100) is up")):
+        conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES (?, NULL, ?, ?)", (when.strftime("%Y-%m-%dT%H:%M:%SZ"), kind, text))
+    store = tsdb.for_conn(conn)
+    if store is not None:
+        rows = []
+        end = now.timestamp()
+        t = end - days * 86400
+        while t <= end:
+            day = _day(t)
+            for key, ident in dev_ids.items():
+                spec = next(d for d in SITE_DEVICES if d[0] == key)
+                online = spec[7] or t < end - 5 * 3600
+                rows.append((int(t), "remote", ident, "up", 1.0 if online else 0.0, "", "state"))
+                if online:
+                    rows.append((int(t), "remote", ident, "rtt_ms", 1.5 + _noise(t, ident) * 0.6 + (day * 2 if spec[4] == "iot" else 0), "", "ms"))
+            nas = dev_ids["00:11:32:00:00:03"]
+            rows.append((int(t), "remote", nas, "cpu_pct", 9 + day * 8 + _noise(t, 3) * 2, "", "%"))
+            rows.append((int(t), "remote", nas, "mem_pct", 55 + day * 4, "", "%"))
+            rows.append((int(t), "remote", nas, "disk_pct", 80 + (t - (end - days * 86400)) / (days * 86400) * 7, "/volume1", "%"))
+            for key, ident in svc_ids.items():
+                rows.append((int(t), "remote_service", ident, "up", 1.0, "", "state"))
+                rows.append((int(t), "remote_service", ident, "response_ms", 5 + _noise(t, ident) * 2 + day * 3, "", "ms"))
+            t += 600
+        store.record_bulk(rows)
+        store.rollup(int(end) + 1)
+    conn.commit()
+
+
+def tick_remote(conn, now: datetime) -> None:
+    """The remote site keeps reporting in the demo."""
+    stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    conn.execute("UPDATE probes SET last_seen = ?, snapshot_ts = ? WHERE name = ?", (stamp, stamp, SITE_NAME))
+    conn.execute("UPDATE remote_devices SET last_seen = ? WHERE online = 1 AND probe_id IN (SELECT id FROM probes WHERE name = ?)", (stamp, SITE_NAME))
+    conn.execute("UPDATE remote_services SET checked = ? WHERE probe_id IN (SELECT id FROM probes WHERE name = ?)", (stamp, SITE_NAME))
+    conn.commit()

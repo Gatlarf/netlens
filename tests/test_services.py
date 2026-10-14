@@ -309,7 +309,7 @@ def test_cert_and_process_validation():
         validate_check({"kind": "cert", "name": "site", "host": "example.org", "expect": "soon"})
     p = validate_check({"kind": "process", "name": "web", "host": "10.0.0.5", "path": "nginx"})
     assert p["port"] is None and p["path"] == "nginx"
-    for bad in ("", "a b", "x;rm -rf /", "$(id)", "a" * 70):
+    for bad in ("", "a b", "x;rm -rf /", "$(id)", "a" * 70, "-f", "--help"):
         with pytest.raises(CheckError):
             validate_check({"kind": "process", "name": "web", "host": "10.0.0.5", "path": bad})
 

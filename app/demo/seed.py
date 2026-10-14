@@ -514,4 +514,5 @@ def seed(conn, data_dir: Path, now: datetime | None = None) -> dict:
         series.reset()
         series.backfill(conn, force=True)
     health.seed(conn, ids, now)
+    health.seed_remote(conn, now)
     return ids

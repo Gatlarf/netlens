@@ -35,6 +35,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Wi-Fi details](#wi-fi-details)
   - [Service checks](#service-checks)
   - [Performance graphs and health monitoring](#performance-graphs-and-health-monitoring)
+  - [Remote sites](#remote-sites)
   - [Maintenance windows](#maintenance-windows)
   - [Notification channels and quiet hours](#notification-channels-and-quiet-hours)
   - [Prometheus and Grafana](#prometheus-and-grafana)
@@ -103,6 +104,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
 - A **setup guide** that walks a new install through the settings that matter (networks, names, always-on devices, alerts, checks, plugins, backups); reopen it any time under Settings → System → Setup guide
 - **Performance graphs** (response time and availability for up to a year) and **health monitoring** of switches, NAS boxes, printers, UPS units, Windows (SNMP) and Linux (SSH): processor, memory, disks, traffic, temperature, supplies and battery, with limits that raise warnings
+- **Remote sites**: several locations in one overview; a Netlens at each location reports to a central one (outgoing connection only), with devices, checks, health, graphs and alerts per site
 - Uptime history like Uptime Kuma: heartbeat bars with a response-time line, 24 h / 7 d / 30 d, hover details, and **always-on (core) devices** whose availability is shown apart from phones and tablets
 - Alerts by e-mail, ntfy, Telegram, Discord, Pushover or webhook, each channel with its own events and an on/off switch per device
 - Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: Proxmox VE and ASUS AiMesh come built in (which VM runs on which host, which device is connected to which mesh node); TP-Link Omada and Ubiquiti UniFi are available from the plugin index (community, not yet tested on hardware)
@@ -496,6 +498,17 @@ Netlens keeps a time series of what it measures in its own small database file, 
 Nothing is installed on the device and only read requests are sent: SNMP `GET` / `GETNEXT` / `GETBULK`, or one short shell command over SSH that reads `/proc`, `/sys` and `df`. An ordinary (non-root) SSH account is enough. The SSH host key is remembered the first time and shared with the web terminal. The login is stored encrypted (see *Stored passwords*). *Test* shows what the device answers before you save. Windows can be read through the SNMP service; there is no WinRM or agent.
 
 **Warnings**: a reading has to stay past its limit for a few rounds in a row (processor 5, others 2-3) before anything is said, so a short peak is not an alarm. Defaults: processor 90 / 98 %, memory 90 / 97 %, disk 85 / 95 % full, temperature 80 / 90 °C, printer supplies and UPS battery below 15 / 5 % and 50 / 25 %, and a UPS running on battery. Change them on **Monitoring → Health**. The events *Health warning*, *Health critical* and *Health normal* go through the notification channels, respect maintenance windows, and show on the dashboard. `/metrics` carries the readings as `netlens_host_*`.
+
+### Remote sites
+
+Netlens can watch more than one network. Run a Netlens at each location (a branch office, a holiday house, a customer) and let them report to one **central** Netlens:
+
+1. On the central Netlens open **Monitoring → Remote sites → Add a remote site**, give the location a name and copy the token (it is shown once; only a hash of it is kept).
+2. On the Netlens at that location open **Settings → Report to a central Netlens**, enter the address of the central Netlens and the token, switch it on and press *Send a report now*.
+
+The remote Netlens keeps working on its own (scans, checks, health monitoring, its own alerts) and sends a report every minute: its devices, service checks, health problems and the measurements made since the last report. **The connection always goes out from the remote site**, so nothing there has to be reachable from outside; across the internet the central Netlens should be reachable over `https://` (a plain `http://` address is accepted for a server on your own network, for example through a VPN). The token is the only credential: a new one can be made at any time, which locks the old one out.
+
+The central Netlens keeps the remote devices apart from its own (two sites may use the same address range). Each site shows its devices, service checks and health problems with graphs of their history, and raises alerts through the notification channels: a device offline or new, a service down, a health problem, and **a site that stops reporting** (until it reports again its devices are shown as not watched rather than all offline). Alerts also appear on the dashboard and in Prometheus (`netlens_remote_site_*`). What a remote site shows is limited to what it chose to report: names, addresses, MAC addresses, vendors, ports and measurements, never passwords.
 
 ### Maintenance windows
 

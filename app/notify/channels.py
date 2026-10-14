@@ -28,7 +28,7 @@ CHANNELS_KEY = "notify.channels"
 QUIET_KEY = "notify.quiet"
 MAX_CHANNELS = 20
 MAX_EVENTS_PER_MESSAGE = 40
-CRITICAL = {"service_down", "dhcp_rogue", "gateway_changed", "metric_critical"}  # these break through quiet hours
+CRITICAL = {"service_down", "dhcp_rogue", "gateway_changed", "metric_critical", "remote_service_down", "remote_metric_critical", "probe_offline"}  # these break through quiet hours
 _lock = asyncio.Lock()
 
 MIGRATED_KEY = "notify.email_migrated"
@@ -77,6 +77,16 @@ EVENT_LABELS = {
     "metric_warning": "A device's health reading goes past its warning limit (processor, memory, disk, temperature, UPS ...)",
     "metric_critical": "A device's health reading goes past its critical limit",
     "metric_ok": "A health reading is back to normal",
+    "remote_new": "A new device appears at a remote site",
+    "remote_offline": "A device at a remote site goes offline",
+    "remote_online": "A device at a remote site comes back online",
+    "remote_service_down": "A service check at a remote site goes down",
+    "remote_service_up": "A service check at a remote site recovers",
+    "remote_metric_warning": "A health reading at a remote site goes past its warning limit",
+    "remote_metric_critical": "A health reading at a remote site goes past its critical limit",
+    "remote_metric_ok": "A health reading at a remote site is back to normal",
+    "probe_offline": "A remote site stops reporting",
+    "probe_online": "A remote site reports again",
     "port_opened": "A new port opens on a device",
     "port_closed": "A port closes on a device",
     "port_unexpected": "A port outside the device's baseline opens",
@@ -101,7 +111,7 @@ EVENT_LABELS = {
     "cert_expiring": "A certificate used by a published site is about to expire",
     "login_failed": "Someone keeps entering a wrong password or token (a possible attack)",
 }
-DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "metric_critical", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "login_failed"]
+DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "metric_critical", "remote_offline", "remote_service_down", "remote_metric_critical", "probe_offline", "probe_online", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "login_failed"]
 
 
 class ChannelError(Exception):
@@ -298,6 +308,9 @@ def _line(e: dict) -> str:
         "dns_registered": f"Registered in DNS: {detail}",
         "dns_updated": f"DNS record updated: {detail}",
         "dns_failed": f"DNS write FAILED: {detail}",
+        "remote_new": detail, "remote_offline": f"OFFLINE: {detail}", "remote_online": detail, "remote_service_down": f"SERVICE DOWN: {detail}", "remote_service_up": detail,
+        "remote_metric_warning": f"Warning: {detail}", "remote_metric_critical": f"CRITICAL: {detail}", "remote_metric_ok": f"Normal again: {detail}",
+        "probe_offline": f"REMOTE SITE SILENT: {detail}", "probe_online": detail,
         "metric_warning": f"Warning: {detail}",
         "metric_critical": f"CRITICAL: {detail}",
         "metric_ok": f"Normal again: {detail}",
@@ -317,6 +330,9 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
         "service_up": "service up", "port_opened": "port opened", "port_closed": "port closed", "port_unexpected": "unexpected port", "port_missing": "port missing", "ip_changed": "IP changed", "ip_reused": "IP reused",
         "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "backup_failed": "backup failed", "dhcp_rogue": "rogue DHCP", "gateway_changed": "gateway changed",
         "dns_registered": "registered in DNS", "dns_updated": "DNS updated", "dns_failed": "DNS write failed",
+        "remote_new": "remote device new", "remote_offline": "remote offline", "remote_online": "remote online", "remote_service_down": "remote service down",
+        "remote_service_up": "remote service up", "remote_metric_warning": "remote health warning", "remote_metric_critical": "remote health critical",
+        "remote_metric_ok": "remote health normal", "probe_offline": "site silent", "probe_online": "site reporting",
         "metric_warning": "health warning", "metric_critical": "health critical", "metric_ok": "health normal", "unreachable": "behind an offline device",
         "container_unhealthy": "container unhealthy", "container_restarting": "container restarting", "container_stopped": "container stopped",
         "guest_stopped": "guest stopped", "guest_started": "guest started", "guest_update_available": "update available", "cert_expiring": "certificate expiring", "login_failed": "failed logins",

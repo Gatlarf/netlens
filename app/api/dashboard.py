@@ -48,6 +48,22 @@ def get_dashboard(request: Request) -> dict:
                 value = f"{p['value']:.0f}{p['unit']}" if p["unit"] else f"{p['value']:g}"
                 doc["attention"].append({"level": "bad" if p["level"] == "critical" else "warn",
                                          "text": f"{p['device']}: {p['title'].lower()}{where} is {value}", "href": f"#/device/{p['device_id']}"})
+            from app import probes as probes_mod
+
+            for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
+                site = probes_mod.present(conn, row)
+                href = f"#/remote-sites?id={site['id']}"
+                if site["state"] == "silent":
+                    doc["attention"].append({"level": "bad", "text": f"{site['name']} has stopped reporting", "href": href})
+                    continue
+                down = site["devices"]["core_down"]
+                if down:
+                    doc["attention"].append({"level": "bad", "text": f"{site['name']}: {down} always-on device{'s' if down != 1 else ''} offline", "href": href})
+                if site["services"]["down"]:
+                    doc["attention"].append({"level": "bad", "text": f"{site['name']}: {site['services']['down']} service check{'s' if site['services']['down'] != 1 else ''} down", "href": href})
+                if site["problems"]["count"]:
+                    doc["attention"].append({"level": "bad" if site["problems"]["critical"] else "warn",
+                                             "text": f"{site['name']}: {site['problems']['count']} health problem{'s' if site['problems']['count'] != 1 else ''}", "href": href})
             doc["attention"].sort(key=lambda i: {"bad": 0, "warn": 1}.get(i["level"], 2))
             return doc
         finally:

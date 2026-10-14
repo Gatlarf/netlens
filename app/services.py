@@ -466,6 +466,19 @@ def _maintain_metrics(db_path: str, prune: bool) -> None:
         log.exception("metrics maintenance failed")
 
 
+def _check_probes(db_path: str) -> bool:
+    from app import probes
+
+    conn = connect(db_path)
+    try:
+        return bool(probes.check_silent(conn))
+    except Exception:  # noqa: BLE001
+        log.exception("remote site check failed")
+        return False
+    finally:
+        conn.close()
+
+
 async def service_loop(db_path: str, interval: float = 10.0) -> None:
     """Background task: run due checks every few seconds, prune old results hourly."""
     last_prune = 0.0
@@ -481,6 +494,10 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
             if time.monotonic() - last_rollup > 60:       # fold the new samples of the graphs into the coarser tiers
                 last_rollup = time.monotonic()
                 await asyncio.to_thread(_maintain_metrics, db_path, time.monotonic() - last_prune > 3600)
+                if await asyncio.to_thread(_check_probes, db_path):       # a remote site stopped reporting
+                    from app.notify.channels import process_channels
+
+                    await process_channels(db_path)
             if time.monotonic() - last_prune > 3600:
                 last_prune = time.monotonic()
                 conn = connect(db_path)

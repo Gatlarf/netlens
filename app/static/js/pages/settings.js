@@ -8,6 +8,7 @@ import { buildPluginsCard } from "../cards/plugins.js";
 import { buildPluginGuideCard } from "../cards/plugin_guide.js";
 import { buildMapCard } from "../cards/map_settings.js";
 import { buildChannelsCard } from "../cards/channels.js";
+import { buildCentralCard } from "../cards/central.js";
 import { buildUpdateCard } from "../update.js";
 import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
@@ -221,6 +222,7 @@ const STATIC_GROUPS = [
       { key: "netchecks", label: "Network checks", build: buildNetchecksCard },
       { key: "dns", label: "DNS registration", build: buildDnsCard },
       { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
+      { key: "central", label: "Report to a central Netlens", build: buildCentralCard },
       { key: "users", label: "Users & tokens", build: buildUsersCard },
       { key: "terminal", label: "Web terminal", build: buildTerminalCard },
     ],

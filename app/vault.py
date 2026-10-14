@@ -31,7 +31,7 @@ KEY_FILE = "secret.key"
 ENV_KEY = "NETLENS_SECRET_KEY"
 _AAD = b"netlens-secret-v1"
 _PLUGIN_CONFIG = re.compile(r"^plugin\.[A-Za-z0-9_-]+$")          # a plugin's saved configuration (not its .status, .data ...)
-SECRET_KEYS = frozenset({"notify.channels", "remote.credentials"})
+SECRET_KEYS = frozenset({"notify.channels", "remote.credentials", "central.link"})
 
 _lock = threading.Lock()
 _keys: dict[str, bytes] = {}
