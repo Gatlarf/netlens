@@ -86,6 +86,8 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
 
 Netlens is a self-hosted LAN scanner and network map for home labs and small networks. It periodically scans your private network ranges with nmap, discovers devices, works out what they are (router, server, printer, VM, ...), tracks when they appear, disappear or change, and draws the result as an interactive map. From any discovered device you can open an SSH or Telnet session straight in the browser.
 
+Beyond discovery it keeps watch: **performance graphs** of response time and availability up to a year back, **health monitoring** of switches, NAS boxes, printers, UPS units and servers (processor, memory, disks, traffic, temperature, supplies, battery) over SNMP or SSH, certificate and process checks, alerts that name the one cause behind many ("the garden switch is offline, 4 devices behind it cannot be reached"), and **remote sites**: other Netlens installations that report to this one, so a few locations show up in one overview.
+
 It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaScript UI) with no external services and no cloud component. Everything stays on your network.
 
 ## Features
@@ -300,7 +302,7 @@ uses the same published image and the same Docker volume as the simple file. Opt
 
 - **Data in a folder you choose** (for backups with your own tools): set `NETLENS_DATA=/srv/netlens` in `.env`, create the folder and run `sudo chown 10001:10001 /srv/netlens`.
 - **A specific version** instead of the newest: set `NETLENS_IMAGE_TAG=0.3.128` in `.env`, or change the image line to `ghcr.io/gatlarf/netlens:0.3.128`.
-- **Build from source** (developers): `export NETLENS_VERSION="$(tr -d '[:space:]' < VERSION).$(git rev-list --count HEAD)"`, then
+- **Build from source** (developers): `export NETLENS_VERSION="$(sh tools/version.sh)"`, then
   `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`. Without `NETLENS_VERSION` the app works but reports the version as `dev`.
 
 #### Existing installations
@@ -418,7 +420,7 @@ Three presets set these for you: **Default** (the original behavior), **Fast** (
 
 ### Version
 
-The header shows the running version. It is `<major.minor from the VERSION file>.<number of commits>`, so it rises with every commit and every published image, for example `0.2.57`. The pre-built image is tagged with it (`ghcr.io/gatlarf/netlens:0.2.57`) as well as `latest`. Builds from source report `dev` unless you pass `NETLENS_VERSION` as shown under "Updating".
+The header shows the running version. It is `<major.minor from the VERSION file>.<commits since that file last changed>`, so it rises with every commit and every published image, for example `0.4.12`. The pre-built image is tagged with it (`ghcr.io/gatlarf/netlens:0.4.12`) as well as `latest`. Builds from source report `dev` unless you pass `NETLENS_VERSION` as shown under "Updating".
 
 ### Uptime history
 
@@ -854,6 +856,10 @@ app/plugins      plugin system: manifest and output contract, runner, registry, 
 app/terminal     SSH/Telnet backends
 app/api          REST API routers
 app/uptime.py    uptime history, app/backup.py  backup and restore
+app/tsdb.py      metrics store (metrics.db): raw, 5-minute and hourly tiers behind the performance graphs
+app/hostmetrics  health readings: SNMP client, SSH collector, monitors, limits and alerts
+app/probes.py    remote sites (central side), app/central.py  reporting to a central Netlens (remote side)
+app/rootcause.py groups alerts by the offline device that causes them
 app/static       web UI (js/pages, js/cards)
 tests
 ```
@@ -881,6 +887,8 @@ tests
 - **Proxmox sync fails:** the message on the plugin's settings page says why. `the TLS certificate could not be verified`: untick *Verify TLS certificate* (Proxmox's default certificate is self-signed). `authentication failed`: check the token ID (`user@realm!tokenname`), the secret, or the password. `permission denied (... PVEAuditor)`: give the token or user the PVEAuditor role on `/`. `cannot connect`: wrong URL/port or a firewall.
 - **No notification mails:** use **Send test** on the e-mail channel first. Check that the channel is switched on and has the events you expect, that the device has not opted out, and the status line next to the channel for the last problem. Gmail and most providers need an app password, not your normal password.
 - **A guest does not show under its Proxmox host:** the connector matches by MAC address, so Netlens must have scanned that guest at least once on the same network. Run a scan and press *Sync now*.
+- **Health monitoring says "cannot be read":** the message on the device's Health monitoring card says why. SNMP: the device does not answer, so check that SNMP is switched on, the community string (many devices use `public`), that the device's access list allows this host, and the port (161). SSH: `the login was refused` means a wrong user name, password or key; `cannot connect` means the port is closed or a firewall is in the way. *Test* in the form shows what the device answers before you save. Windows needs the SNMP feature installed and a community set on it.
+- **A remote site shows "Not heard from":** the remote Netlens has stopped reporting. Open its Settings → Report to a central Netlens: the status line says what went wrong (`cannot reach the central Netlens` is a network or address problem, `refused the token` means the token was replaced or the site removed). The remote Netlens only needs to be able to open an outgoing connection to the central one.
 - **No devices found:** Check ranges, host networking, and that nmap has capabilities. Check `docker logs netlens`; scan errors appear under "Scans & events".
 - **OS detection empty:** Needs deep scan and root-capable nmap.
 - **Terminal button missing:** Port 22/23 not seen open yet, `NETLENS_TERMINAL=off`, or you opened Netlens through a reverse proxy (see *Web terminal*).

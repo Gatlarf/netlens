@@ -1,6 +1,6 @@
 """Application version.
 
-The image is built with NETLENS_VERSION=<major.minor>.<commit count>, so the
+The image is built with NETLENS_VERSION=<major.minor>.<commits since VERSION changed> (tools/version.sh), so the
 patch number rises with every commit. Running from source falls back to a dev tag.
 """
 

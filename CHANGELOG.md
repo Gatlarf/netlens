@@ -1,6 +1,14 @@
 # Changelog
 
-The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
+The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`tools/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
+
+## 0.4.0 — 2026-10-14
+
+### Added
+- ★ **Netlens 0.4: performance, health and remote sites**. This release gathers the monitoring work of 0.3.177 to 0.3.179: **performance graphs** of response time and availability for up to a year, **health monitoring** of switches, NAS boxes, printers, UPS units and servers over SNMP or SSH (processor, memory, disks, traffic, temperature, supplies, battery) with warnings that need a few readings in a row, **certificate and process checks**, alerts **grouped by cause** ("the garden switch is offline, 4 devices behind it cannot be reached"), and **remote sites**: a Netlens at another location reports to this one, which shows its devices, checks, health and history and tells you when the site stops reporting. New pages are Monitoring → Health and Monitoring → Remote sites; Settings has "Report to a central Netlens".
+
+### Changed
+- The version number is now `<major.minor>.<commits since VERSION last changed>` (`tools/version.sh`), so this release is 0.4.0 and the number after it counts from here.
 
 ## 0.3.179 — 2026-10-14
 
