@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.172 — 2026-10-14
+
+### Added
+- ★ **Investigate checks the address**: the Stability section of a device now also looks at its address history. A device that answers on two addresses at the same time with the same MAC (for example a fixed address plus a DHCP lease from the router, as with a container or VM that is configured twice) is flagged with the addresses involved and what to look for, and so is a device whose address keeps changing. Before, this only showed up as hundreds of "IP changed" events and was invisible in the uptime analysis.
+
 ## 0.3.171 — 2026-10-14
 
 ### Added

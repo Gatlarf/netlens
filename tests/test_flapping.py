@@ -205,3 +205,45 @@ def test_api(client):
     r = client.post("/api/devices/7/flapping/probe")
     assert r.status_code == 200 and r.json()["methods"][0]["answered"] == 8
     assert client.post("/api/devices/999/flapping/probe").status_code == 404
+
+
+# ------------------------------------------------------------------ address changes
+def _ip_swap(conn, device_id, ts_minutes_ago, a, b):
+    for old, new in ((a, b), (b, a)):
+        conn.execute("INSERT INTO events (ts, kind, device_id, detail) VALUES (?, 'ip_changed', ?, ?)", (stamp(ts_minutes_ago), device_id, f"{old} -> {new}"))
+
+
+def test_two_addresses_at_once_are_named_as_the_cause(conn):
+    conn.execute("UPDATE devices SET mac = '10:66:6a:37:09:9d', vendor = 'Zabbly' WHERE id = 3")
+    conn.execute("INSERT INTO device_names (device_id, name, source, first_seen, last_seen) VALUES (3, 'proxmox-pbs', 'router', 'x', 'x')")
+    for ip in ("192.168.0.135", "192.168.0.201"):
+        conn.execute("INSERT INTO device_ips (device_id, ip, first_seen, last_seen) VALUES (3, ?, ?, ?)", (ip, stamp(5000), stamp(5)))
+    for i in range(6):
+        _ip_swap(conn, 3, 15 * (i + 1), "192.168.0.135", "192.168.0.201")
+    conn.commit()
+    history(conn, 3, "U" * 20)
+    report = flapping.analyze(conn, 3, days=1, now=stamp(0))
+    top = report["findings"][0]
+    assert top["level"] == "warn" and "2 addresses at the same time" in top["title"]
+    for part in ("192.168.0.135", "192.168.0.201", "same MAC", "proxmox-pbs", "Incus", "DHCP"):
+        assert part in top["detail"], part
+    assert report["address"]["at_once"] is True and report["address"]["changes"] == 12
+
+
+def test_an_address_that_moves_over_time_is_a_dhcp_hint(conn):
+    for i, (a, b) in enumerate((("10.0.0.20", "10.0.0.21"), ("10.0.0.21", "10.0.0.22"), ("10.0.0.22", "10.0.0.23"))):
+        conn.execute("INSERT INTO events (ts, kind, device_id, detail) VALUES (?, 'ip_changed', 4, ?)", (stamp(600 - i * 120), f"{a} -> {b}"))
+    conn.execute("INSERT INTO device_ips (device_id, ip, first_seen, last_seen) VALUES (4, '10.0.0.23', ?, ?)", (stamp(900), stamp(2)))
+    conn.execute("INSERT INTO device_ips (device_id, ip, first_seen, last_seen) VALUES (4, '10.0.0.20', ?, ?)", (stamp(900), stamp(400)))
+    conn.commit()
+    report = flapping.analyze(conn, 4, days=1, now=stamp(0))
+    assert report["findings"][0]["title"] == "Its address keeps changing"
+    assert report["address"]["at_once"] is False
+
+
+def test_one_address_change_is_only_a_note_and_none_adds_nothing(conn):
+    assert flapping.analyze(conn, 5, days=7, now=stamp(0))["findings"][0]["title"] == "Not enough history yet"
+    conn.execute("INSERT INTO events (ts, kind, device_id, detail) VALUES (?, 'ip_changed', 5, '10.0.0.5 -> 10.0.0.50')", (stamp(100),))
+    conn.commit()
+    first = flapping.analyze(conn, 5, days=7, now=stamp(0))["findings"][0]
+    assert first["level"] == "info" and first["title"] == "Its address changed"

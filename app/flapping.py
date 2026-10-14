@@ -68,6 +68,67 @@ def outages(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
     return found
 
 
+MIN_ADDRESS_CHANGES = 3   # fewer address changes than this in the period is just a note
+SEEN_TOGETHER = timedelta(hours=1)
+ZABBLY_PREFIX = "10:66:6a"   # the default MAC prefix of Incus containers and VMs (Incus is made by Zabbly)
+
+
+def address_findings(conn: sqlite3.Connection, device_id: int, since: str) -> tuple[list[dict[str, str]], dict[str, Any]]:
+    """Does the device keep changing its address, or answer on two addresses at once?
+
+    Netlens keeps one entry per MAC address. A device with two addresses on one network card (a fixed one and a DHCP lease, a
+    container that copies its host's MAC, ...) answers on both in every scan, so its entry's address "changes" back and forth
+    and the history fills up with address changes. That is not an outage, but it explains odd uptime, names and DNS records.
+    """
+    device = conn.execute("SELECT mac, vendor, primary_ip FROM devices WHERE id = ?", (device_id,)).fetchone()
+    changes = conn.execute("SELECT ts, detail FROM events WHERE device_id = ? AND kind = 'ip_changed' AND ts >= ? ORDER BY ts", (device_id, since)).fetchall()
+    seen = conn.execute("SELECT ip, last_seen FROM device_ips WHERE device_id = ? AND last_seen >= ? ORDER BY last_seen DESC, ip", (device_id, since)).fetchall()
+    info: dict[str, Any] = {"changes": len(changes), "addresses": [{"ip": r["ip"], "last_seen": r["last_seen"]} for r in seen], "at_once": False}
+    if not changes:
+        return [], info
+
+    # one scan that reports "A -> B" and "B -> A" at the same moment saw both addresses answer
+    directions: dict[str, set[str]] = {}
+    for r in changes:
+        directions.setdefault(r["ts"], set()).add(r["detail"] or "")
+    swaps = 0
+    for ts, details in directions.items():
+        for d in details:
+            a, _, b = d.partition(" -> ")
+            if b and f"{b} -> {a}" in details:
+                swaps += 1
+                break
+    newest = _ts(seen[0]["last_seen"]) if seen else None
+    together = [r["ip"] for r in seen if newest and newest - _ts(r["last_seen"]) <= SEEN_TOGETHER]
+    at_once = swaps >= 2 or len(together) >= 2 and len(changes) >= MIN_ADDRESS_CHANGES
+    info.update({"at_once": at_once, "swapped_scans": swaps})
+
+    addresses = [r["ip"] for r in seen] or [device["primary_ip"]]
+    names = ", ".join(sorted(addresses))
+    router_name = conn.execute("SELECT name FROM device_names WHERE device_id = ? AND source = 'router' ORDER BY last_seen DESC LIMIT 1", (device_id,)).fetchone()
+    mac = device["mac"] or "?"
+    incus = (device["mac"] or "").lower().startswith(ZABBLY_PREFIX) or (device["vendor"] or "").lower() == "zabbly"
+    if at_once and len(changes) >= MIN_ADDRESS_CHANGES:
+        extra = []
+        if router_name:
+            extra.append(f"The router knows it as \u201c{router_name['name']}\u201d, so one of the addresses is probably a DHCP lease from the router.")
+        if incus:
+            extra.append("The MAC address starts with 10:66:6a, the prefix Incus gives its containers and virtual machines, so look at the network settings inside that container or VM (an image configured for DHCP plus a fixed address you added).")
+        return [_finding(
+            "warn", f"It answers on {len(together) if len(together) >= 2 else 2} addresses at the same time",
+            f"{names} all answer with the same MAC address ({mac}), so this is one network card (or one container or VM) with more than one address. Netlens keeps one entry per MAC, so "
+            f"in {swaps or 'many'} scan(s) the entry's address \u201cchanged\u201d back and forth ({len(changes)} address changes in this period). It is not an outage, but it fills the history with changes and can "
+            "confuse names and DNS records. Usual causes: a fixed address configured on the device while it also still asks the router for one (DHCP), or two interfaces sharing one MAC. "
+            "On the device, `ip -4 addr` lists its addresses; remove the one you do not want (turn off DHCP on that interface), or delete its lease/reservation in the router. "
+            + " ".join(extra))], info
+    if len(changes) >= MIN_ADDRESS_CHANGES:
+        return [_finding(
+            "warn", "Its address keeps changing",
+            f"Netlens saw the address of this device change {len(changes)} times in this period ({names}). A device with a fixed address does not do that: it usually gets its address from "
+            "DHCP and the lease is handed out again. Give it a reservation in the router (or set a fixed address on the device) so that it keeps one.")], info
+    return [_finding("info", "Its address changed", f"The address of this device changed {len(changes)} time(s) in this period ({names}).")], info
+
+
 def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | None = None, tz_minutes: int = 0) -> dict[str, Any]:
     device = conn.execute("SELECT id, primary_ip, device_type, type_override, vendor FROM devices WHERE id = ?", (device_id,)).fetchone()
     if device is None:
@@ -78,6 +139,9 @@ def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | 
     rows = conn.execute("SELECT ts, up, rtt_ms FROM checks WHERE device_id = ? AND ts >= ? ORDER BY ts", (device_id, since)).fetchall()
     result: dict[str, Any] = {"device_id": device_id, "days": days, "checks": len(rows), "findings": []}
     findings = result["findings"]
+    address, address_info = address_findings(conn, device_id, since)       # independent of the uptime history: checked first
+    result["address"] = address_info
+    findings.extend(address)
     if len(rows) < 10:
         findings.append(_finding("info", "Not enough history yet", f"Only {len(rows)} scan result(s) in the last {days} day(s); a few more scans are needed."))
         return result
