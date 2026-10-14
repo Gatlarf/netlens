@@ -41,6 +41,14 @@ def get_dashboard(request: Request) -> dict:
             if unreadable:       # a restore on another machine without the key: the passwords have to be entered again, or the key put back
                 doc["attention"].insert(0, {"level": "bad", "text": f"{unreadable} stored password setting(s) cannot be read: the encryption key is missing or different",
                                             "href": "#/settings/backup"})
+            from app.hostmetrics import service as host_monitors
+
+            for p in host_monitors.problems(conn)[:5]:      # a disk filling up, a hot server, a UPS on battery
+                where = f" on {p['label']}" if p["label"] else ""
+                value = f"{p['value']:.0f}{p['unit']}" if p["unit"] else f"{p['value']:g}"
+                doc["attention"].append({"level": "bad" if p["level"] == "critical" else "warn",
+                                         "text": f"{p['device']}: {p['title'].lower()}{where} is {value}", "href": f"#/device/{p['device_id']}"})
+            doc["attention"].sort(key=lambda i: {"bad": 0, "warn": 1}.get(i["level"], 2))
             return doc
         finally:
             conn.close()

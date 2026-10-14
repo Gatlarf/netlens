@@ -23,7 +23,7 @@ async function heartbeats(check) {
 export async function render(container) {
   let destroyed = false;
   const openGraphs = new Set();      // checks whose graph is open (kept when the table is redrawn)
-  const top = h("div", { class: "toolbar" }, h("strong", {}, "Service checks"), h("span", { class: "hint" }, "HTTP pages, TCP ports and DNS lookups, checked at the interval you choose."));
+  const top = h("div", { class: "toolbar" }, h("strong", {}, "Service checks"), h("span", { class: "hint" }, "HTTP pages, TCP ports, DNS lookups, certificates and processes, checked at the interval you choose."));
   const addBtn = h("button", { class: "btn admin-only", type: "button" }, "Add check");
   top.appendChild(addBtn);
   const formSlot = h("div", {});

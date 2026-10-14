@@ -51,7 +51,9 @@ def list_checks(device_id: int | None = None, conn=Depends(get_conn)) -> list[di
     return [_present(conn, dict(r)) for r in rows]
 
 
-def _check_device(conn, device_id: int | None) -> None:
+def _check_device(conn, device_id: int | None, kind: str | None = None) -> None:
+    if kind == "process" and device_id is None:
+        raise HTTPException(status_code=422, detail="a process check belongs to a device that has health monitoring: choose the device")
     if device_id is not None and conn.execute("SELECT 1 FROM devices WHERE id = ?", (device_id,)).fetchone() is None:
         raise HTTPException(status_code=422, detail="that device does not exist")
 
@@ -62,7 +64,7 @@ def create_check(body: CheckBody, conn=Depends(get_conn)) -> dict:
         data = validate_check(body.model_dump(exclude_none=True))
     except CheckError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    _check_device(conn, body.device_id)
+    _check_device(conn, body.device_id, data["kind"])
     count = conn.execute("SELECT COUNT(*) FROM service_checks").fetchone()[0]
     if count >= 200:
         raise HTTPException(status_code=422, detail="at most 200 checks")
@@ -84,7 +86,7 @@ def update_check(check_id: int, body: CheckBody, conn=Depends(get_conn)) -> dict
     except CheckError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     device_id = body.device_id if "device_id" in body.model_fields_set else current["device_id"]
-    _check_device(conn, device_id)
+    _check_device(conn, device_id, data["kind"])
     # a changed target starts a new history: the old state says nothing about the new one
     changed_target = any(data[k] != current[k] for k in ("kind", "host", "port", "path", "expect"))
     conn.execute(
@@ -114,7 +116,7 @@ def delete_check(check_id: int, conn=Depends(get_conn)) -> dict:
 async def run_now(check_id: int, conn=Depends(get_conn)) -> dict:
     """Run a check now and record the result (the answer shows what happened)."""
     check = _row(conn, check_id)
-    result = await run_check(check)
+    result = await run_check(check, tsdb.db_file(conn) or None)
     record_result(conn, _row(conn, check_id), result)
     return {"up": result.up, "ms": result.ms, "detail": result.detail, "check": _present(conn, _row(conn, check_id))}
 

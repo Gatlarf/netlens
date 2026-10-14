@@ -1,0 +1,210 @@
+"""Host monitors: ask a device for its health (SNMP or SSH), and the limits that raise alerts."""
+
+from __future__ import annotations
+
+import json
+import time
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
+from app import tsdb
+from app.api.devices import get_conn
+from app.hostmetrics import service as hm
+from app.hostmetrics.snmp import GROUP_TITLES
+
+router = APIRouter(prefix="/api", tags=["monitors"])
+
+
+class MonitorBody(BaseModel):
+    method: str | None = None
+    address: str | None = None
+    port: int | None = None
+    interval_s: int | None = None
+    community: str | None = None
+    version: str | None = None
+    username: str | None = None
+    password: str | None = None
+    private_key: str | None = None
+    passphrase: str | None = None
+    clear_password: bool | None = None
+    alerts: bool | None = None
+    enabled: bool | None = None
+
+
+def _device(conn, device_id: int):
+    row = conn.execute("SELECT id, primary_ip, hostname, custom_name FROM devices WHERE id = ?", (device_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    return row
+
+
+def _data(body: MonitorBody) -> dict[str, Any]:
+    return body.model_dump(exclude_unset=True)
+
+
+@router.get("/devices/{device_id}/monitor")
+def get_monitor(device_id: int, conn=Depends(get_conn)) -> dict:
+    device = _device(conn, device_id)
+    row = hm.get_monitor(conn, device_id)
+    return {"monitor": hm.public(conn, row) if row else None, "default_address": device["primary_ip"], "groups": GROUP_TITLES,
+            "state": _state(conn, row["id"]) if row else []}
+
+
+def _state(conn, monitor_id: int) -> list[dict]:
+    return [{"metric": r["metric"], "label": r["label"], "level": r["level"], "since": r["since"], "value": r["value"]}
+            for r in conn.execute("SELECT * FROM metric_state WHERE monitor_id = ? ORDER BY metric, label", (monitor_id,))]
+
+
+@router.post("/devices/{device_id}/monitor/test")
+async def test_monitor(device_id: int, body: MonitorBody, conn=Depends(get_conn)) -> dict:
+    """Try the readings with what is in the form (or what is stored, for the secrets left empty). Nothing is saved."""
+    device = _device(conn, device_id)
+    row = hm.get_monitor(conn, device_id)
+    data = _data(body)
+    data.setdefault("address", (row["address"] if row else None) or device["primary_ip"])
+    current = None
+    if row is not None and data.get("method") in (None, row["method"]):
+        current = {"method": row["method"], "address": row["address"], "port": row["port"], "interval_s": row["interval_s"],
+                   "alerts": bool(row["alerts"]), "enabled": bool(row["enabled"]), "secret": hm.load_secret(conn, row)}
+    try:
+        d = hm.validate(data, current)
+    except hm.MonitorError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    known = None
+    if d["method"] == "ssh":
+        from app.terminal.hostkeys import get_fingerprint
+
+        known = get_fingerprint(conn, device_id)
+    state: dict = {}
+    try:
+        points, found, fingerprint = await hm.read(d["method"], d["address"], d["port"], d["secret"], None, state, known)
+        if d["method"] in ("snmp",) or (d["method"] == "ssh" and "network" in found):
+            # traffic and processor need two rounds: take a second reading a moment later so the test shows real numbers
+            import asyncio
+
+            await asyncio.sleep(2)
+            points, found, fingerprint = await hm.read(d["method"], d["address"], d["port"], d["secret"], None, state, known)
+    except hm.MonitorError as exc:
+        return {"ok": False, "error": str(exc), "found": [], "values": []}
+    values = [{"metric": m, "label": label, "value": v, "unit": u} for m, label, v, u in points]
+    return {"ok": True, "error": None, "found": found, "found_titles": [GROUP_TITLES.get(g, g) for g in found], "values": values[:60],
+            "fingerprint": fingerprint, "new_host_key": bool(fingerprint) and known is None and d["method"] == "ssh"}
+
+
+@router.put("/devices/{device_id}/monitor")
+async def put_monitor(device_id: int, body: MonitorBody, conn=Depends(get_conn)) -> dict:
+    device = _device(conn, device_id)
+    data = _data(body)
+    data.setdefault("address", device["primary_ip"])
+    try:
+        saved = hm.save_monitor(conn, device_id, data)
+    except hm.MonitorError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"monitor": saved}
+
+
+@router.post("/devices/{device_id}/monitor/run")
+async def run_now(device_id: int, request_conn=Depends(get_conn)) -> dict:
+    """Read now (the answer says what happened) instead of waiting for the next round."""
+    conn = request_conn
+    _device(conn, device_id)
+    row = hm.get_monitor(conn, device_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="this device has no monitor")
+    db_path = tsdb.db_file(conn)
+    result = await hm.run_monitor(db_path, row["id"])
+    # the traffic counters need a second reading to turn into a rate
+    return {**result, "monitor": hm.public(conn, hm.get_monitor(conn, device_id))}
+
+
+@router.delete("/devices/{device_id}/monitor")
+def delete_monitor(device_id: int, conn=Depends(get_conn)) -> dict:
+    _device(conn, device_id)
+    row = hm.get_monitor(conn, device_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="this device has no monitor")
+    conn.execute("DELETE FROM metric_state WHERE monitor_id = ?", (row["id"],))
+    conn.execute("DELETE FROM host_monitors WHERE id = ?", (row["id"],))
+    conn.commit()
+    hm._STATES.pop(row["id"], None)
+    return {"removed": device_id}
+
+
+# ----------------------------------------------------------------------------- overview and limits
+def _latest(store, device_id: int) -> dict[str, Any]:
+    out: dict[str, Any] = {"cpu": None, "mem": None, "disk": None, "disk_label": None, "temp": None, "battery": None, "uptime": None, "rx": None, "tx": None,
+                           "supply": None, "supply_label": None}
+    if store is None:
+        return out
+    now = time.time()
+    worst = None
+    rx = tx = 0.0
+    seen_net = False
+    for s in store.metrics_of("device", device_id):
+        if s["last"] is None or s["last_ts"] is None or now - s["last_ts"] > 3600:
+            continue
+        m = s["metric"]
+        if m == "cpu_pct":
+            out["cpu"] = s["last"]
+        elif m == "mem_pct":
+            out["mem"] = s["last"]
+        elif m == "disk_pct" and (worst is None or s["last"] > worst[0]):
+            worst = (s["last"], s["label"])
+        elif m == "supply_pct" and (out["supply"] is None or s["last"] < out["supply"]):
+            out["supply"], out["supply_label"] = s["last"], s["label"]
+        elif m == "temp_c" and (out["temp"] is None or s["last"] > out["temp"]):
+            out["temp"] = s["last"]
+        elif m == "battery_pct":
+            out["battery"] = s["last"]
+        elif m == "uptime_s":
+            out["uptime"] = s["last"]
+        elif m == "net_rx_bps":
+            rx += s["last"]
+            seen_net = True
+        elif m == "net_tx_bps":
+            tx += s["last"]
+    if worst:
+        out["disk"], out["disk_label"] = worst
+    if seen_net:
+        out["rx"], out["tx"] = rx, tx
+    return out
+
+
+@router.get("/monitors")
+def overview(conn=Depends(get_conn)) -> dict:
+    """Every monitored device with its newest readings and the readings that are past a limit."""
+    store = tsdb.for_conn(conn)
+    levels: dict[int, str] = {}
+    for p in hm.problems(conn):
+        cur = levels.get(p["device_id"], "ok")
+        levels[p["device_id"]] = "critical" if "critical" in (cur, p["level"]) else "warning"
+    out = []
+    for row in conn.execute(
+        "SELECT m.*, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.online AS online, COALESCE(d.type_override, d.device_type) AS type "
+        "FROM host_monitors m JOIN devices d ON d.id = m.device_id ORDER BY name COLLATE NOCASE"):
+        out.append({
+            "device_id": row["device_id"], "name": row["name"], "ip": row["ip"], "type": row["type"], "online": bool(row["online"]),
+            "method": row["method"], "enabled": bool(row["enabled"]), "alerts": bool(row["alerts"]), "last_ts": row["last_ts"],
+            "last_ok": None if row["last_ok"] is None else bool(row["last_ok"]), "last_error": row["last_error"],
+            "level": levels.get(row["device_id"], "ok"), "latest": _latest(store, row["device_id"]),
+        })
+    return {"monitors": out, "problems": hm.problems(conn)}
+
+
+@router.get("/monitoring/limits")
+def get_limits(conn=Depends(get_conn)) -> dict:
+    return {"rules": hm.rules(conn)}
+
+
+class LimitsBody(BaseModel):
+    rules: dict[str, dict[str, Any]]
+
+
+@router.put("/monitoring/limits")
+def put_limits(body: LimitsBody, conn=Depends(get_conn)) -> dict:
+    try:
+        return {"rules": hm.save_rules(conn, body.rules)}
+    except hm.MonitorError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))

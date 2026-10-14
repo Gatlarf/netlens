@@ -30,7 +30,7 @@ from app.db import add_event, connect, utcnow
 
 log = logging.getLogger(__name__)
 
-KINDS = ("http", "tcp", "dns")
+KINDS = ("http", "tcp", "dns", "cert", "process")
 MIN_INTERVAL, MAX_INTERVAL = 15, 86400
 MAX_TIMEOUT = 30
 RESULT_RETENTION_DAYS = 30
@@ -48,6 +48,7 @@ class Result:
     up: bool
     ms: float | None
     detail: str
+    metrics: dict[str, float] | None = None       # more numbers worth a graph (days left of a certificate)
 
 
 # ----------------------------------------------------------------------------- validation
@@ -73,7 +74,21 @@ def validate_check(data: dict[str, Any]) -> dict[str, Any]:
     expect = str(data.get("expect") or "").strip()
     if len(expect) > 200 or len(path) > 300:
         raise CheckError("path or expected text is too long")
-    if kind in ("http", "tcp"):
+    if kind == "cert":
+        port = 443 if port in (None, "") else port
+        if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+            raise CheckError("port must be a number from 1 to 65535")
+        if expect and not re.fullmatch(r"\d{1,3}", expect):
+            raise CheckError("expect is the number of days: the check goes down when fewer are left (default 14)")
+        path = ""
+    elif kind == "process":
+        from app.hostmetrics.service import PROCESS_RE
+
+        port = None
+        if not PROCESS_RE.match(path):
+            raise CheckError("put the name of the process or service in the path field (for example nginx, sshd or postgresql)")
+        expect = ""
+    elif kind in ("http", "tcp"):
         default = 80 if kind == "http" else None
         port = default if port in (None, "") else port
         if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
@@ -110,6 +125,10 @@ def describe(check: dict[str, Any]) -> str:
         return f"{scheme}://{check['host']}:{check['port']}{check['path'] or '/'}" + (f" via {check['via']}" if check.get("via") else "")
     if check["kind"] == "dns":
         return f"{check['path']} @ {check['host']}:{check['port']}"
+    if check["kind"] == "cert":
+        return f"certificate of {check['host']}:{check['port']}"
+    if check["kind"] == "process":
+        return f"process {check['path']} on {check['host']}"
     return f"{check['host']}:{check['port']}"
 
 
@@ -268,9 +287,60 @@ async def check_dns(check: dict[str, Any], timeout: float) -> Result:
     return Result(True, ms, ", ".join(addresses))
 
 
-async def run_check(check: dict[str, Any]) -> Result:
+def _read_certificate(host: str, port: int, timeout: float) -> bytes:
+    context = ssl.create_default_context()
+    context.check_hostname = False      # what is measured is how long the certificate lasts, not who vouches for it
+    context.verify_mode = ssl.CERT_NONE
+    try:
+        ipaddress.ip_address(host)
+        name = None                     # no SNI for a bare address
+    except ValueError:
+        name = host
+    with socket.create_connection((host, port), timeout) as raw:
+        with context.wrap_socket(raw, server_hostname=name) as tls:
+            der = tls.getpeercert(binary_form=True)
+    if not der:
+        raise ValueError("the server sent no certificate")
+    return der
+
+
+async def check_cert(check: dict[str, Any], timeout: float) -> Result:
+    """Days left of the certificate a TLS service presents (a web site, a mail server, an RDP host ...)."""
+    from cryptography import x509
+
+    warn_days = int(check["expect"]) if check["expect"] else 14
+    start = time.monotonic()
+    try:
+        der = await asyncio.wait_for(asyncio.to_thread(_read_certificate, check["host"], check["port"], timeout), timeout + 1)
+        cert = x509.load_der_x509_certificate(der)
+    except asyncio.TimeoutError:
+        return Result(False, None, f"no answer within {timeout:g} s")
+    except (OSError, ssl.SSLError, ValueError) as exc:
+        return Result(False, None, (getattr(exc, "strerror", None) or str(exc))[:200])
+    ms = round((time.monotonic() - start) * 1000, 1)
+    ends = cert.not_valid_after_utc
+    days = (ends - datetime.now(timezone.utc)).total_seconds() / 86400
+    when = ends.strftime("%Y-%m-%d")
+    metrics = {"cert_days": round(days, 1)}
+    if days < 0:
+        return Result(False, ms, f"expired {int(-days)} day{'s' if int(-days) != 1 else ''} ago ({when})", metrics)
+    if days < warn_days:
+        return Result(False, ms, f"ends in {int(days)} day{'s' if int(days) != 1 else ''} ({when}), limit {warn_days}", metrics)
+    return Result(True, ms, f"valid for {int(days)} more days (until {when})", metrics)
+
+
+async def run_check(check: dict[str, Any], db_path: str | None = None) -> Result:
     timeout = float(check["timeout_s"])
     try:
+        if check["kind"] == "cert":
+            return await check_cert(check, timeout)
+        if check["kind"] == "process":
+            if db_path is None:
+                return Result(False, None, "a process check needs the database")
+            from app.hostmetrics.service import check_process
+
+            running, detail, ms = await check_process(db_path, check.get("device_id"), check["path"], timeout)
+            return Result(running, ms, detail)
         if check["kind"] == "tcp":
             return await check_tcp(check["host"], check["port"], timeout)
         if check["kind"] == "http":
@@ -309,6 +379,8 @@ def record_result(conn, check: dict[str, Any], result: Result, now: str | None =
         points = [("service", check["id"], "up", new_state, "", "state")]
         if result.ms is not None:
             points.append(("service", check["id"], "response_ms", result.ms, "", "ms"))
+        for metric, value in (result.metrics or {}).items():
+            points.append(("service", check["id"], metric, value, "", "days" if metric == "cert_days" else ""))
         store.record(points, ts=int(_parse(now).timestamp()))
     if flipped:
         text = f"{check['name']} ({describe(check)}) is {flipped}" + (f": {result.detail}" if flipped == "down" else "")
@@ -344,7 +416,7 @@ async def run_due_checks(db_path: str, now: str | None = None) -> int:
 
     async def one(check: dict[str, Any]) -> None:
         async with gate:
-            result = await run_check(check)
+            result = await run_check(check, db_path)
         c = connect(db_path)
         try:
             fresh = c.execute("SELECT * FROM service_checks WHERE id = ?", (check["id"],)).fetchone()

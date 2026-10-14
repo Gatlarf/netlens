@@ -131,6 +131,7 @@ class QuietBody(BaseModel):
     tz: str = "UTC"
     offset_min: int = 0
     bypass_critical: bool = True
+    group_by_cause: bool = True
 
 
 @router.put("/notify-quiet")

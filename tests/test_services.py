@@ -298,3 +298,127 @@ def test_the_payloads_of_the_open_ports_button_are_accepted(client):
     assert web.status_code == plain.status_code == 201
     assert web.json()["target"] == "https://10.0.0.5:443/" and plain.json()["target"] == "10.0.0.5:8006"
     assert {(c["kind"], c["port"]) for c in client.get("/api/service-checks", params={"device_id": 1}).json()} == {("http", 443), ("tcp", 8006)}
+
+
+# ------------------------------------------------------------------ certificate and process checks
+def test_cert_and_process_validation():
+    ok = validate_check({"kind": "cert", "name": "site", "host": "example.org"})
+    assert ok["port"] == 443 and ok["expect"] == "" and ok["path"] == ""
+    assert validate_check({"kind": "cert", "name": "site", "host": "example.org", "port": 993, "expect": "30"})["expect"] == "30"
+    with pytest.raises(CheckError):
+        validate_check({"kind": "cert", "name": "site", "host": "example.org", "expect": "soon"})
+    p = validate_check({"kind": "process", "name": "web", "host": "10.0.0.5", "path": "nginx"})
+    assert p["port"] is None and p["path"] == "nginx"
+    for bad in ("", "a b", "x;rm -rf /", "$(id)", "a" * 70):
+        with pytest.raises(CheckError):
+            validate_check({"kind": "process", "name": "web", "host": "10.0.0.5", "path": bad})
+
+
+@pytest.fixture
+def tls_server(tmp_path):
+    """A TLS listener with a self-signed certificate that ends in `days` days."""
+    import datetime
+    import ssl
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    servers = []
+
+    def start(days):
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test.local")])
+        now = datetime.datetime.now(datetime.timezone.utc)
+        cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(1)
+                .not_valid_before(now - datetime.timedelta(days=30)).not_valid_after(now + datetime.timedelta(days=days))
+                .sign(key, hashes.SHA256()))
+        crt, pem = tmp_path / f"c{days}.pem", tmp_path / f"k{days}.pem"
+        crt.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+        pem.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(crt, pem)
+        sock = socket.socket()
+        sock.bind(("127.0.0.1", 0))
+        sock.listen(5)
+        stop = threading.Event()
+
+        def serve():
+            sock.settimeout(0.2)
+            while not stop.is_set():
+                try:
+                    c, _ = sock.accept()
+                except (socket.timeout, OSError):
+                    continue
+                try:
+                    with ctx.wrap_socket(c, server_side=True):
+                        pass
+                except (ssl.SSLError, OSError):
+                    pass
+
+        threading.Thread(target=serve, daemon=True).start()
+        servers.append((sock, stop))
+        return sock.getsockname()[1]
+
+    yield start
+    for sock, stop in servers:
+        stop.set()
+        sock.close()
+
+
+async def test_certificate_days_left(tls_server):
+    from app.services import check_cert
+
+    port = tls_server(40)
+    ok = await check_cert({"host": "127.0.0.1", "port": port, "expect": ""}, 3)
+    assert ok.up and "valid for 39 more days" in ok.detail or "valid for 40 more days" in ok.detail
+    assert 39 < ok.metrics["cert_days"] <= 40
+    soon = await check_cert({"host": "127.0.0.1", "port": port, "expect": "60"}, 3)
+    assert not soon.up and "limit 60" in soon.detail
+    ended = await check_cert({"host": "127.0.0.1", "port": tls_server(-3), "expect": ""}, 3)
+    assert not ended.up and "expired" in ended.detail and ended.metrics["cert_days"] < 0
+
+
+async def test_certificate_of_a_closed_port():
+    from app.services import check_cert
+
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    res = await check_cert({"host": "127.0.0.1", "port": port, "expect": ""}, 2)
+    assert not res.up and res.ms is None
+
+
+async def test_process_check_needs_a_monitored_device(tmp_path):
+    from app.hostmetrics.service import check_process
+
+    c = connect(tmp_path / "t.db")
+    init_db(c)
+    c.execute("INSERT INTO devices (id, mac, primary_ip, online, first_seen, last_seen) VALUES (1, 'aa:00:00:00:00:01', '10.0.0.5', 1, ?, ?)", (NOW, NOW))
+    c.commit()
+    running, detail, _ms = await check_process(str(tmp_path / "t.db"), 1, "nginx")
+    assert not running and "no health monitoring" in detail
+    running, detail, _ms = await check_process(str(tmp_path / "t.db"), None, "nginx")
+    assert not running and "choose the device" in detail
+
+
+async def test_process_check_over_snmp(tmp_path, monkeypatch):
+    from app.hostmetrics import service as hm, snmp
+    from tests.test_hostmetrics import answering, oid
+    from tests import test_plugin_snmp as sim
+
+    c = connect(tmp_path / "t.db")
+    init_db(c)
+    c.execute("INSERT INTO devices (id, mac, primary_ip, online, first_seen, last_seen) VALUES (1, 'aa:00:00:00:00:01', '10.0.0.5', 1, ?, ?)", (NOW, NOW))
+    c.commit()
+    hm.save_monitor(c, 1, {"method": "snmp", "address": "10.0.0.5", "community": "public"})
+    mib = sim.Mib("public")
+    mib.set(oid(snmp.HR_SW_RUN_NAME, 100), b"sqlservr.exe")
+    mib.set(oid(snmp.HR_SW_RUN_NAME, 200), b"svchost.exe")
+    monkeypatch.setattr(snmp, "SEND", answering(mib))
+    db = str(tmp_path / "t.db")
+    assert (await hm.check_process(db, 1, "sqlservr"))[:2] == (True, "running")
+    assert (await hm.check_process(db, 1, "SQLSERVR.EXE"))[0] is True
+    assert (await hm.check_process(db, 1, "nginx"))[0] is False

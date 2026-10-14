@@ -3,6 +3,7 @@ import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, s
 import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildPerformanceCard } from "../cards/performance.js";
+import { buildDeviceMonitorCard } from "../cards/device_monitor.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
 import { stateDot } from "./services.js";
@@ -744,6 +745,11 @@ export async function render(container, params) {
     right.appendChild(performanceSlot);
     buildPerformanceCard("device", device.id, { unlessOnly: ["up", "rtt_ms"], skip: ["up"] })
       .then((c) => { if (c && !disposed) performanceSlot.appendChild(c); }).catch(() => {});
+    if (isAdmin()) {
+      const monitorSlot = h("div", {});
+      right.appendChild(monitorSlot);
+      buildDeviceMonitorCard(device).then((c) => { if (c && !disposed) monitorSlot.appendChild(c); }).catch(() => {});
+    }
     const servicesSlot = h("div", {});
     right.appendChild(servicesSlot);
     buildDeviceServicesCard(device).then((c) => { if (!disposed) servicesSlot.appendChild(c); }).catch(() => {});

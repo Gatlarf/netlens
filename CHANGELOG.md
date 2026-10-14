@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.178 — 2026-10-14
+
+### Added
+- ★ **Health monitoring**: Netlens can now read the health of a device over **SNMP** (switches, routers, NAS boxes, printers, UPS units, Windows with the SNMP service) or **SSH** (Linux): processor, memory, swap, disks (used and free), network traffic per interface, temperatures, uptime, printer supplies and UPS battery. Nothing is installed on the device and only read requests are sent. Set it up on a device's page (Health monitoring card: Test shows what was found, then Save); the login is stored encrypted. The readings are graphed in the device's Performance card and listed on the new **Monitoring → Health** page, which shows what is past a limit.
+- **Warnings that mean something**: a reading has to stay past its limit for a few rounds in a row (so a short peak is not an alarm). Defaults: processor 90 / 98 %, memory 90 / 97 %, disk 85 / 95 % full, temperature 80 / 90 °C, supplies below 15 / 5 %, UPS battery below 50 / 25 % and a UPS running on battery. The limits can be changed on the Health page. New events Health warning, Health critical and Health normal go through the notification channels (critical breaks through quiet hours), respect maintenance windows, and appear on the dashboard under "Needs attention".
+- Prometheus (`/metrics`) now carries the readings of monitored devices (`netlens_host_cpu_ratio`, `netlens_host_disk_used_ratio` ...).
+- ★ **Certificate and process checks**: two new kinds of service check. *Certificate* reads what a TLS service presents (a web site, a mail server, an RDP host) and goes down when fewer than the chosen number of days are left (default 14) or the certificate has ended; the days left are graphed. *Process* asks a device that has health monitoring whether a program or service runs (SNMP: the list of running programs, Windows services included; SSH: `pgrep` or `systemctl`), for example `nginx`, `sshd` or `sqlservr`.
+- ★ **Alerts grouped by cause**: when a switch or a host goes offline, the notification says "sw-garden is offline, so 4 devices behind it cannot be reached: ..." instead of listing five offline devices. This uses the network hierarchy (which device depends on which). Only the messages are grouped: every event is still recorded and Home Assistant and Prometheus see the individual devices. It can be switched off next to the quiet hours (Group alerts by cause).
+
 ## 0.3.177 — 2026-10-14
 
 ### Added

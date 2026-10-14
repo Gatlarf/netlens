@@ -88,18 +88,21 @@ function quietCard(overview, reload) {
   const start = h("input", { type: "time", name: "start", value: q.start });
   const end = h("input", { type: "time", name: "end", value: q.end });
   const bypass = h("input", { type: "checkbox", name: "bypass_critical", checked: q.bypass_critical });
+  const cause = h("input", { type: "checkbox", name: "group_by_cause", checked: q.group_by_cause !== false });
   form.append(
     h("div", { class: "field" }, h("label", {}, enabled, " Use quiet hours")),
     h("div", { class: "field" }, h("label", {}, "From"), start), h("div", { class: "field" }, h("label", {}, "Until"), end),
     h("div", { class: "field" }, h("label", {}, bypass, " Still send when a service goes down")),
-    h("p", { class: "hint" }, `Times are in your time zone (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`));
+    h("p", { class: "hint" }, `Times are in your time zone (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`),
+    h("div", { class: "field" }, h("label", {}, cause, " Group alerts by cause"),
+      h("p", { class: "hint" }, "When a switch or a host goes offline, send one message (\u201cX is offline, 4 devices behind it cannot be reached\u201d) instead of one for each device behind it.")));
   const save = h("button", { type: "submit", class: "btn" }, "Save");
   form.appendChild(save);
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
       await put("/api/notify-quiet", {
-        enabled: enabled.checked, start: start.value, end: end.value, bypass_critical: bypass.checked,
+        enabled: enabled.checked, start: start.value, end: end.value, bypass_critical: bypass.checked, group_by_cause: cause.checked,
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone, offset_min: -new Date().getTimezoneOffset(),
       });
       toast("Quiet hours saved", "success");

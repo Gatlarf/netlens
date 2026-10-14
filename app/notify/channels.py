@@ -28,7 +28,7 @@ CHANNELS_KEY = "notify.channels"
 QUIET_KEY = "notify.quiet"
 MAX_CHANNELS = 20
 MAX_EVENTS_PER_MESSAGE = 40
-CRITICAL = {"service_down", "dhcp_rogue", "gateway_changed"}  # these break through quiet hours
+CRITICAL = {"service_down", "dhcp_rogue", "gateway_changed", "metric_critical"}  # these break through quiet hours
 _lock = asyncio.Lock()
 
 MIGRATED_KEY = "notify.email_migrated"
@@ -74,6 +74,9 @@ EVENT_LABELS = {
     "device_online": "A device comes back online",
     "service_down": "A service check goes down",
     "service_up": "A service check recovers",
+    "metric_warning": "A device's health reading goes past its warning limit (processor, memory, disk, temperature, UPS ...)",
+    "metric_critical": "A device's health reading goes past its critical limit",
+    "metric_ok": "A health reading is back to normal",
     "port_opened": "A new port opens on a device",
     "port_closed": "A port closes on a device",
     "port_unexpected": "A port outside the device's baseline opens",
@@ -98,7 +101,7 @@ EVENT_LABELS = {
     "cert_expiring": "A certificate used by a published site is about to expire",
     "login_failed": "Someone keeps entering a wrong password or token (a possible attack)",
 }
-DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "login_failed"]
+DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "metric_critical", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "login_failed"]
 
 
 class ChannelError(Exception):
@@ -223,7 +226,7 @@ def new_channel_id() -> str:
 
 # ----------------------------------------------------------------------------- quiet hours
 def load_quiet(conn: sqlite3.Connection) -> dict:
-    default = {"enabled": False, "start": "23:00", "end": "07:00", "tz": "UTC", "offset_min": 0, "bypass_critical": True}
+    default = {"enabled": False, "start": "23:00", "end": "07:00", "tz": "UTC", "offset_min": 0, "bypass_critical": True, "group_by_cause": True}
     try:
         data = json.loads(get_setting(conn, QUIET_KEY) or "{}")
     except ValueError:
@@ -232,7 +235,7 @@ def load_quiet(conn: sqlite3.Connection) -> dict:
 
 
 def clean_quiet(data: dict) -> dict:
-    out = {"enabled": bool(data.get("enabled")), "bypass_critical": bool(data.get("bypass_critical", True))}
+    out = {"enabled": bool(data.get("enabled")), "bypass_critical": bool(data.get("bypass_critical", True)), "group_by_cause": bool(data.get("group_by_cause", True))}
     for key in ("start", "end"):
         value = str(data.get(key) or "")
         if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", value):
@@ -272,6 +275,8 @@ def _line(e: dict) -> str:
     name, ip, kind = e["name"], e["ip"] or "", e["kind"]
     where = f"{name} ({ip})" if ip and ip != name else name
     detail = e["detail"] or ""
+    if kind == "unreachable":
+        return e.get("text") or f"Devices behind {where} cannot be reached"
     if kind == "device_new":
         flag = "" if e.get("trusted") else " [unknown device]"
         extra = f", {e['vendor']}" if e.get("vendor") else ""
@@ -293,6 +298,9 @@ def _line(e: dict) -> str:
         "dns_registered": f"Registered in DNS: {detail}",
         "dns_updated": f"DNS record updated: {detail}",
         "dns_failed": f"DNS write FAILED: {detail}",
+        "metric_warning": f"Warning: {detail}",
+        "metric_critical": f"CRITICAL: {detail}",
+        "metric_ok": f"Normal again: {detail}",
         "container_unhealthy": f"Container unhealthy: {detail}",
         "container_restarting": f"Container restarting: {detail}",
         "container_stopped": f"Container stopped: {detail}",
@@ -309,6 +317,7 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
         "service_up": "service up", "port_opened": "port opened", "port_closed": "port closed", "port_unexpected": "unexpected port", "port_missing": "port missing", "ip_changed": "IP changed", "ip_reused": "IP reused",
         "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "backup_failed": "backup failed", "dhcp_rogue": "rogue DHCP", "gateway_changed": "gateway changed",
         "dns_registered": "registered in DNS", "dns_updated": "DNS updated", "dns_failed": "DNS write failed",
+        "metric_warning": "health warning", "metric_critical": "health critical", "metric_ok": "health normal", "unreachable": "behind an offline device",
         "container_unhealthy": "container unhealthy", "container_restarting": "container restarting", "container_stopped": "container stopped",
         "guest_stopped": "guest stopped", "guest_started": "guest started", "guest_update_available": "update available", "cert_expiring": "certificate expiring", "login_failed": "failed logins",
     }
@@ -429,6 +438,10 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
                     continue
                 if quiet_now and not (quiet["bypass_critical"] and any(e["kind"] in CRITICAL for e in wanted)):
                     continue  # held back until the quiet hours end
+                if quiet.get("group_by_cause", True):
+                    from app import rootcause
+
+                    wanted = rootcause.collapse(conn, wanted)
                 title, body = build_digest(wanted)
                 try:
                     await asyncio.to_thread(send_channel, ch, title, body, wanted, poster=poster, mailer=mailer)

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 21
+SCHEMA_VERSION = 22
 
 
 def utcnow() -> str:
@@ -612,6 +612,44 @@ def init_db(conn: sqlite3.Connection) -> None:
             device_id INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
             fingerprint TEXT NOT NULL,
             first_seen TEXT NOT NULL
+        )
+        """
+    )
+
+    # --- schema v22: host monitors (health readings over SNMP or SSH) and the level each reading is at ---------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS host_monitors (
+            id INTEGER PRIMARY KEY,
+            device_id INTEGER NOT NULL UNIQUE REFERENCES devices(id) ON DELETE CASCADE,
+            method TEXT NOT NULL,
+            address TEXT NOT NULL,
+            port INTEGER NOT NULL,
+            credential TEXT NOT NULL DEFAULT '',
+            interval_s INTEGER NOT NULL DEFAULT 60,
+            groups TEXT NOT NULL DEFAULT '[]',
+            alerts INTEGER NOT NULL DEFAULT 1,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            last_ts TEXT,
+            last_ok INTEGER,
+            last_error TEXT,
+            since TEXT,
+            created TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS metric_state (
+            monitor_id INTEGER NOT NULL REFERENCES host_monitors(id) ON DELETE CASCADE,
+            metric TEXT NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            level TEXT NOT NULL DEFAULT 'ok',
+            since TEXT,
+            value REAL,
+            pending TEXT,
+            pending_n INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (monitor_id, metric, label)
         )
         """
     )

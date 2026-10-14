@@ -10,12 +10,18 @@ const KNOWN = {
   cpu_pct: { title: "Processor", unit: "%", fixedMax: 100, warn: 85, crit: 95, order: 2 },
   load1: { title: "Load (1 minute)", unit: "", order: 3 },
   mem_pct: { title: "Memory in use", unit: "%", fixedMax: 100, warn: 85, crit: 95, order: 4 },
-  swap_pct: { title: "Swap in use", unit: "%", fixedMax: 100, warn: 50, crit: 80, order: 5 },
-  disk_pct: { title: "Disk", unit: "%", fixedMax: 100, warn: 85, crit: 95, order: 6 },
+  swap_pct: { title: "Swap in use", unit: "%", fixedMax: 100, order: 5 },
+  disk_pct: { title: "Disk used", unit: "%", fixedMax: 100, warn: 85, crit: 95, order: 6 },
+  disk_free_b: { title: "Disk free", unit: "B", order: 6.5 },
+  supply_pct: { title: "Supply left", unit: "%", fixedMax: 100, order: 11 },
+  battery_pct: { title: "UPS battery", unit: "%", fixedMax: 100, order: 12 },
+  battery_minutes: { title: "UPS runtime", unit: "min", order: 12.5 },
+  on_battery: { title: "UPS on battery", unit: "state", order: 13 },
   net_rx_bps: { title: "Received", unit: "bps", order: 7 },
   net_tx_bps: { title: "Sent", unit: "bps", order: 8 },
   temp_c: { title: "Temperature", unit: "°C", order: 9 },
   uptime_s: { title: "Time since start", unit: "s", order: 10 },
+  cert_days: { title: "Certificate days left", unit: "days", order: 14 },
 };
 
 export function describeSeries(s) {
@@ -36,11 +42,20 @@ export async function buildPerformanceCard(entity, id, { title = "Performance", 
     .sort((a, b) => describeSeries(a).order - describeSeries(b).order || a.label.localeCompare(b.label));
   if (series.length < minimum) return null;
   if (unlessOnly.length && series.every((s) => unlessOnly.includes(s.metric))) return null;     // nothing beyond what the Uptime card shows
+  let limits = {};
+  try {
+    limits = (await get("/api/monitoring/limits")).rules || {};
+  } catch (err) {
+    limits = {};
+  }
   let range = savedGraphRange();
   const graphs = h("div", { class: "tg-grid-list" });
   const make = () => series.map((s) => {
     const d = describeSeries(s);
-    return metricGraph({ entity, id, metric: s.metric, label: s.label, title: d.title, unit: d.unit, warn: d.warn ?? null, crit: d.crit ?? null, fixedMax: d.fixedMax ?? null, range });
+    const rule = limits[s.metric];            // the limits the user set decide where the dashed lines are
+    const warn = rule ? (rule.enabled ? rule.warn : null) : d.warn ?? null;
+    const crit = rule ? (rule.enabled ? rule.crit : null) : d.crit ?? null;
+    return metricGraph({ entity, id, metric: s.metric, label: s.label, title: d.title, unit: d.unit, warn, crit, fixedMax: d.fixedMax ?? null, range });
   });
   graphs.append(...make());
   const card = h("div", { class: "card tg-card" },

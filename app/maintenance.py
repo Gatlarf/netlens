@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from app.db import add_event, get_setting, set_setting
 
 KEY = "maintenance_windows"
-SILENCED = {"device_offline", "device_online", "service_down", "service_up"}     # events a window holds back
+SILENCED = {"device_offline", "device_online", "service_down", "service_up", "metric_warning", "metric_critical", "metric_ok"}     # events a window holds back
 DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 STAMP = "%Y-%m-%dT%H:%M:%SZ"

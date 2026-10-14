@@ -101,6 +101,9 @@ def tick(conn, sim: Sim, now: datetime) -> None:
                 add_event(conn, "device_online", None, device_id=device_id, now=stamp)
             else:
                 add_event(conn, "device_offline", ip(s), device_id=device_id, now=stamp)
+    from app.demo import health
+
+    health.tick(conn, {s.key: ids[s.name] for s in DEVICES if s.name in ids}, now)
     online = sum(state.values())
     conn.execute("INSERT INTO scans (kind, status, started, finished, hosts_found) VALUES ('quick', 'done', ?, ?, ?)", (stamp, fmt(now + timedelta(seconds=rng.randint(14, 24))), online))
     # service checks follow their device

@@ -34,6 +34,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Installing Netlens as an app](#installing-netlens-as-an-app)
   - [Wi-Fi details](#wi-fi-details)
   - [Service checks](#service-checks)
+  - [Performance graphs and health monitoring](#performance-graphs-and-health-monitoring)
   - [Maintenance windows](#maintenance-windows)
   - [Notification channels and quiet hours](#notification-channels-and-quiet-hours)
   - [Prometheus and Grafana](#prometheus-and-grafana)
@@ -101,6 +102,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - PNG export of the network map
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
 - A **setup guide** that walks a new install through the settings that matter (networks, names, always-on devices, alerts, checks, plugins, backups); reopen it any time under Settings → System → Setup guide
+- **Performance graphs** (response time and availability for up to a year) and **health monitoring** of switches, NAS boxes, printers, UPS units, Windows (SNMP) and Linux (SSH): processor, memory, disks, traffic, temperature, supplies and battery, with limits that raise warnings
 - Uptime history like Uptime Kuma: heartbeat bars with a response-time line, 24 h / 7 d / 30 d, hover details, and **always-on (core) devices** whose availability is shown apart from phones and tablets
 - Alerts by e-mail, ntfy, Telegram, Discord, Pushover or webhook, each channel with its own events and an on/off switch per device
 - Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: Proxmox VE and ASUS AiMesh come built in (which VM runs on which host, which device is connected to which mesh node); TP-Link Omada and Ubiquiti UniFi are available from the plugin index (community, not yet tested on hardware)
@@ -478,7 +480,22 @@ When a topology plugin reports the signal of Wi-Fi clients (the ASUS plugin does
 
 ### Service checks
 
-**Services** (top bar) watches things a ping cannot: an **HTTP(S) page** (any status 200-399, a chosen status, or text that must appear), a **TCP port**, or a **DNS lookup** against a chosen server (optionally with the address it must return). Pick the interval (15 seconds to a day) and the time-out, optionally attach it to a device, and see a heartbeat bar, 24 hour uptime and response time per check. A state change needs two identical results in a row (one lost packet is not an outage) and logs a **Service down / up** event, which goes to e-mail and the notification channels. A check can be run on demand, paused and edited; HTTPS certificates are not verified (devices on a LAN usually have self-signed ones). Results are kept for 30 days.
+**Services** (top bar) watches things a ping cannot: an **HTTP(S) page** (any status 200-399, a chosen status, or text that must appear), a **TCP port**, or a **DNS lookup** against a chosen server (optionally with the address it must return). Pick the interval (15 seconds to a day) and the time-out, optionally attach it to a device, and see a heartbeat bar, 24 hour uptime and response time per check. A **certificate** check reads what a TLS service presents and goes down when fewer than the chosen number of days are left; a **process** check asks a device with health monitoring (below) whether a program or service runs. A state change needs two identical results in a row (one lost packet is not an outage) and logs a **Service down / up** event, which goes to e-mail and the notification channels. A check can be run on demand, paused and edited; HTTPS certificates are not verified (devices on a LAN usually have self-signed ones). Results are kept for 30 days.
+
+### Performance graphs and health monitoring
+
+Netlens keeps a time series of what it measures in its own small database file, `metrics.db`, next to `netlens.db`: the response time and availability of every device (from the scans) and of every service check. Full detail is kept for 7 days, 5-minute values for 90 days and hourly values (lowest, average, highest) for 2 years, so a graph can show anything from 6 hours to a year. The file is derived data and is not part of a backup; the first start after an update fills it from the uptime history that already exists.
+
+**Health monitoring** adds what a ping cannot tell you. On a device's page choose *Set up health monitoring* and pick how to ask it:
+
+| Method | For | Reads |
+| --- | --- | --- |
+| **SNMP** v1 / v2c | switches, routers, NAS boxes, printers, UPS units, Windows with the SNMP service, Linux with `snmpd` | processor, memory, swap, disks (used and free), traffic per interface, temperatures (net-snmp), uptime, printer supplies, UPS battery and runtime |
+| **SSH** | Linux and other systems with `/proc` | processor, load, memory, swap, disks, traffic per interface, temperatures, uptime |
+
+Nothing is installed on the device and only read requests are sent: SNMP `GET` / `GETNEXT` / `GETBULK`, or one short shell command over SSH that reads `/proc`, `/sys` and `df`. An ordinary (non-root) SSH account is enough. The SSH host key is remembered the first time and shared with the web terminal. The login is stored encrypted (see *Stored passwords*). *Test* shows what the device answers before you save. Windows can be read through the SNMP service; there is no WinRM or agent.
+
+**Warnings**: a reading has to stay past its limit for a few rounds in a row (processor 5, others 2-3) before anything is said, so a short peak is not an alarm. Defaults: processor 90 / 98 %, memory 90 / 97 %, disk 85 / 95 % full, temperature 80 / 90 °C, printer supplies and UPS battery below 15 / 5 % and 50 / 25 %, and a UPS running on battery. Change them on **Monitoring → Health**. The events *Health warning*, *Health critical* and *Health normal* go through the notification channels, respect maintenance windows, and show on the dashboard. `/metrics` carries the readings as `netlens_host_*`.
 
 ### Maintenance windows
 

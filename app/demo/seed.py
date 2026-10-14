@@ -507,9 +507,11 @@ def seed(conn, data_dir: Path, now: datetime | None = None) -> dict:
     conn.execute("INSERT INTO share_links (token, name, mode, show_ips, show_macs, created, views) VALUES (?, 'Status page', 'status', 0, 0, ?, 12)", ("demo-status-page-token-0123456789abcdef", fmt(now - timedelta(days=5))))
     conn.commit()
     from app import tsdb
+    from app.demo import health
 
     series = tsdb.for_conn(conn)
     if series is not None:      # the graphs start with the same weeks of history as the uptime page
         series.reset()
         series.backfill(conn, force=True)
+    health.seed(conn, ids, now)
     return ids

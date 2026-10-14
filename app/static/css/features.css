@@ -421,3 +421,20 @@ dialog.whats-new h2 { margin: 0; }
 .tg-tip-time { font-weight: 600; }
 .tg-tip-note { opacity: 0.8; }
 .tg-empty { margin: 14px 0; }
+
+/* health page (js/pages/health.js) and the monitor card */
+.hl-meter { display: inline-flex; align-items: center; gap: 8px; min-width: 120px; }
+.hl-track { flex: 1; height: 8px; min-width: 60px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.hl-fill { display: block; height: 100%; background: var(--ok); border-radius: 4px; }
+.hl-fill.warn { background: var(--warn); }
+.hl-fill.bad { background: var(--bad); }
+.hl-num { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+.hl-num.warn, .warn { color: var(--warn); }
+.hl-num.bad { color: var(--bad); }
+.hl-badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; color: #fff; background: var(--muted); }
+.hl-badge.warn { background: var(--warn); }
+.hl-badge.bad { background: var(--bad); }
+.hl-table td { vertical-align: middle; }
+.hl-row.hl-paused { opacity: 0.6; }
+.monitor-values { margin-top: 6px; }
+.monitor-result { margin-top: 10px; }

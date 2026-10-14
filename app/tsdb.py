@@ -155,6 +155,26 @@ class Store:
             self._ids.clear()
         return rows
 
+    def record_bulk(self, rows: Iterable[tuple]) -> int:
+        """Many samples with their own times in one go: (ts, entity, entity_id, metric, value, label, unit)."""
+        n = 0
+        try:
+            conn = self._connect()
+            try:
+                for ts, entity, entity_id, metric, value, label, unit in rows:
+                    if value is None or entity not in ENTITIES:
+                        continue
+                    sid = self._series_id(conn, entity, int(entity_id), str(metric), str(label or ""), str(unit or ""))
+                    conn.execute("INSERT OR REPLACE INTO raw (series, ts, v) VALUES (?,?,?)", (sid, int(ts), float(value)))
+                    n += 1
+                conn.commit()
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            log.exception("could not record metrics")
+            self._ids.clear()
+        return n
+
     def forget(self, entity: str, entity_id: int) -> None:
         """Remove every series of an entity (the device or check was deleted)."""
         try:

@@ -5,6 +5,8 @@ const KIND_HELP = {
   http: { target: "Path", placeholder: "/", expect: "Expect", expectHint: "empty = any status from 200 to 399; a status code such as 401; or text:words that must appear in the page", port: "80" },
   tcp: { target: null, placeholder: "", expect: null, expectHint: "", port: "22" },
   dns: { target: "Name to look up", placeholder: "example.com", expect: "Expected address", expectHint: "optional: the IP address the answer must contain", port: "53" },
+  cert: { target: null, placeholder: "", expect: "Warn when fewer days are left", expectHint: "a number of days; empty = 14. The check goes down when the certificate ends sooner than that (or has ended).", port: "443" },
+  process: { target: "Process or service name", placeholder: "nginx", expect: null, expectHint: "", port: null },
 };
 
 function field(label, input, hint) {
@@ -27,7 +29,7 @@ export async function buildServiceForm({ check = null, defaults = {}, onDone }) 
   const form = h("form", { class: "edit-form service-form" });
   const name = h("input", { type: "text", name: "name", value: c.name || "", placeholder: "Web interface", required: true });
   const kind = h("select", { name: "kind" });
-  for (const [value, label] of [["http", "HTTP(S) page"], ["tcp", "TCP port"], ["dns", "DNS lookup"]]) kind.appendChild(h("option", { value }, label));
+  for (const [value, label] of [["http", "HTTP(S) page"], ["tcp", "TCP port"], ["dns", "DNS lookup"], ["cert", "Certificate (days left)"], ["process", "Process or service on a monitored device"]]) kind.appendChild(h("option", { value }, label));
   kind.value = c.kind;
   const host = h("input", { type: "text", name: "host", value: c.host || "", placeholder: "192.168.0.10 or name", required: true });
   const port = h("input", { type: "number", name: "port", min: "1", max: "65535", value: c.port ? String(c.port) : "" });
@@ -42,9 +44,15 @@ export async function buildServiceForm({ check = null, defaults = {}, onDone }) 
 
   const pathField = h("div", { class: "field" });
   const expectField = h("div", { class: "field" });
+  const portField = field("Port", port);
+  const deviceNote = h("p", { class: "hint" }, "");
   function refreshKind() {
     const help = KIND_HELP[kind.value];
-    port.placeholder = help.port;
+    port.placeholder = help.port || "";
+    portField.style.display = help.port === null ? "none" : "";
+    deviceNote.textContent = kind.value === "process"
+      ? "Pick the device below. It needs health monitoring (SNMP or SSH, set up on its page): the check asks it whether the process runs."
+      : "";
     pathField.style.display = help.target ? "" : "none";
     expectField.style.display = help.expect ? "" : "none";
     pathField.replaceChildren(h("label", {}, help.target || ""), path);
@@ -54,7 +62,7 @@ export async function buildServiceForm({ check = null, defaults = {}, onDone }) 
   kind.addEventListener("change", refreshKind);
   refreshKind();
 
-  form.append(field("Name", name), field("Type", kind), field("Host", host), field("Port", port), pathField, expectField,
+  form.append(field("Name", name), field("Type", kind), field("Host", host), portField, pathField, expectField, deviceNote,
     field("Check every (seconds)", interval), field("Give up after (seconds)", timeout), field("Belongs to device", device));
   const error = h("p", { class: "error" }, "");
   const save = h("button", { type: "submit", class: "btn" }, check ? "Save" : "Add check");

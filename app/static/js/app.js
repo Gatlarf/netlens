@@ -18,6 +18,7 @@ const ROUTES = {
   "#/uptime": "uptime",
   "#/stats": "stats",
   "#/services": "services",
+  "#/health": "health",
   "#/scans": "scans",
   "#/settings": "settings",
   "#/wizard": "wizard",

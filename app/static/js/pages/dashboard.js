@@ -11,6 +11,7 @@ const REFRESH_MS = 30000;
 const KINDS = {
   device_new: "New device", device_online: "Came online", device_offline: "Went offline", device_changed: "Changed", port_opened: "Port opened",
   port_closed: "Port closed", wifi_roamed: "Roamed", login_failed: "Failed sign-ins", cert_expiring: "Certificate", service_down: "Service down", service_up: "Service up",
+  metric_warning: "Health warning", metric_critical: "Health critical", metric_ok: "Health normal",
 };
 const kindText = (k) => KINDS[k] || k.replace(/_/g, " ");
 // ---------- the cards ----------

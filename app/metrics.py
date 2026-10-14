@@ -14,6 +14,10 @@ def _esc(value: object) -> str:
     return str(value).replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
 
 
+def _parse_now(now: str) -> float:
+    return _parse(now).timestamp()
+
+
 def _ts(value: str | None) -> float | None:
     if not value:
         return None
@@ -160,6 +164,30 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
         if c["enabled"] and c["state"] is not None:
             out.sample("netlens_service_up", 1 if c["state"] == "up" else 0, "1 when the service check is up", name=c["name"], kind=c["kind"])
             out.sample("netlens_service_response_seconds", None if c["ms"] is None else c["ms"] / 1000, "Response time of the last service check", name=c["name"])
+
+    # health readings of the devices that have a monitor (SNMP / SSH)
+    from app import tsdb
+
+    store = tsdb.for_conn(conn)
+    if store is not None:
+        names = {"cpu_pct": ("netlens_host_cpu_ratio", "Processor busy share of a monitored device (0-1)", 100.0),
+                 "mem_pct": ("netlens_host_memory_used_ratio", "Memory in use on a monitored device (0-1)", 100.0),
+                 "disk_pct": ("netlens_host_disk_used_ratio", "Used share of a disk on a monitored device (0-1)", 100.0),
+                 "disk_free_b": ("netlens_host_disk_free_bytes", "Free space of a disk on a monitored device", 1.0),
+                 "temp_c": ("netlens_host_temperature_celsius", "Temperature sensor of a monitored device", 1.0),
+                 "uptime_s": ("netlens_host_uptime_seconds", "Time since a monitored device started", 1.0),
+                 "net_rx_bps": ("netlens_host_receive_bits_per_second", "Received traffic of a monitored device", 1.0),
+                 "net_tx_bps": ("netlens_host_transmit_bits_per_second", "Sent traffic of a monitored device", 1.0),
+                 "battery_pct": ("netlens_host_battery_ratio", "UPS battery charge (0-1)", 100.0),
+                 "supply_pct": ("netlens_host_supply_ratio", "Printer supply left (0-1)", 100.0)}
+        for m in conn.execute("SELECT m.device_id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS n FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1"):
+            for series in store.metrics_of("device", m["device_id"]):
+                spec = names.get(series["metric"])
+                if spec and series["last"] is not None and series["last_ts"] is not None and _parse_now(now) - series["last_ts"] < 3600:
+                    labels = {"device": m["n"]}
+                    if series["label"]:
+                        labels["name"] = series["label"]
+                    out.sample(spec[0], series["last"] / spec[2], spec[1], **labels)
 
     w = stats["wifi"]
     out.sample("netlens_wifi_clients", w["clients"], "Wi-Fi clients seen in the last two hours")
