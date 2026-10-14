@@ -473,7 +473,7 @@ export async function render(container) {
     pool.append(h("div", { class: "toolbar" }, h("h2", {}, "Your own cards"), h("button", { class: "btn primary", type: "button", onclick: () => edit(null) }, "Create a card")),
       mine.length ? h("div", { class: "pool-list" }, mine.map((c) => poolItem({ ...c, about: TYPE_ABOUT[c.custom.type] || c.about }, [
         h("button", { class: "btn", type: "button", onclick: () => edit(c.custom) }, "Change"),
-        isAdmin() ? h("button", { class: "btn", type: "button", title: "Let every user add this card to their dashboard", onclick: () => shareCard(c.custom) }, "Share with everyone") : null,
+        isAdmin() ? h("button", { class: "btn", type: "button", title: "Let every user add this card to their dashboard", onclick: () => shareCard(c.custom) }, "Share") : null,
         h("button", { class: "btn danger", type: "button", onclick: () => deleteCard(c.id) }, "Delete")])))
         : h("p", { class: "hint" }, "Make a card that shows any value, a device, a group, a service check, or notes and links."));
     if (sharedFree.length) {

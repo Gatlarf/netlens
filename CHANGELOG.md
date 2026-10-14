@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.170 — 2026-10-14
+
+### Changed
+- The dashboard card button *Share with everyone* is now simply *Share*.
+
 ## 0.3.169 — 2026-10-14
 
 ### Fixed
