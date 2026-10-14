@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.171 — 2026-10-14
+
+### Added
+- ★ **Compact map layout**: the dashboard's mini-map view is now available on the Map page as *Compact layout*: small dots in columns from left to right with curved links, nothing folded, a one-line name under each dot. Pick it in the map's own layout menu, or make it the default under Settings → Map.
+
 ## 0.3.170 — 2026-10-14
 
 ### Changed

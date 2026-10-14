@@ -3,7 +3,9 @@ import { get, post, patch, del, ApiError } from "../api.js";
 import { h, clear, toast, foldToolbarOnPhone, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { buildTree, defaultCollapsed, layoutHorizontal, layoutVertical, leafIds } from "../layout_horizontal.js";
 
-const LAYOUTS = ["free", "tree", "horizontal", "vertical"];
+const LAYOUTS = ["free", "tree", "horizontal", "vertical", "compact"];
+// the compact layout is the dashboard's mini-map at full size: small dots in columns, flattened, with curved links
+const compactPos = (p) => (p ? { x: p.x * 1.1, y: p.y * 0.6 } : undefined);
 const cardMode = (mode) => mode === "horizontal" || mode === "vertical";   // the layouts that draw a card per device
 
 
@@ -145,7 +147,7 @@ function shorten(text, max) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-// mode: "free" | "tree" | "horizontal" | "vertical"; extra.folded = number of hidden client devices below this one
+// mode: "free" | "tree" | "horizontal" | "vertical" | "compact"; extra.folded = number of hidden client devices below this one
 function buildNodeData(node, mode = "free", extra = {}) {
   const treeLayout = mode !== "free";
   const color = colorMode === "group" ? node.group_color || NO_GROUP_COLOR : nodeColor(node.type);
@@ -184,6 +186,15 @@ function buildNodeData(node, mode = "free", extra = {}) {
   if (!treeLayout && node.pos_x != null && node.pos_y != null) {
     data.x = node.pos_x;
     data.y = node.pos_y;
+  }
+  if (mode === "compact") {
+    data.size = node.virtual ? 7 : 11;
+    data.label = labelLines(node)[0] || "";
+    if (node.virtual) data.label = shorten(node.label || "", 22);
+    data.font = { size: 11, color: cssVar("--text", "#1c1f24"), strokeWidth: 3, strokeColor: cssVar("--surface", "#ffffff") };
+    data.fixed = { x: true, y: true };
+    const pos = compactPos(extra.pos);
+    if (pos) { data.x = pos.x; data.y = pos.y; }
   }
   if (cardMode(mode)) {
     // a card per device (name and address inside it) so labels never run into each other
@@ -238,8 +249,8 @@ function buildEdgeData(edge, mode = "free") {
     color: { color: edgeColor(edge.kind), highlight: isDark() ? "#ffffff" : "#0f172a", hover: isDark() ? "#ffffff" : "#0f172a" },
     width: style.width,
     dashes: style.dashes,
-    arrows: cardMode(mode) ? "" : "to",
-    smooth: cardMode(mode)
+    arrows: cardMode(mode) || mode === "compact" ? "" : "to",
+    smooth: cardMode(mode) || mode === "compact"
       ? { type: "cubicBezier", forceDirection: mode === "vertical" ? "vertical" : "horizontal", roundness: 0.5 }
       : treeLayout ? { type: "cubicBezier", forceDirection: "vertical", roundness: 0.5 } : { type: "continuous" },
     title: edge.kind === "parent" ? edge.reason : edgeTitle(edge),
@@ -308,6 +319,7 @@ export async function render(container, params) {
   const treeLayout = layoutMode !== "free"; // the layout arranges itself
   const vertical = layoutMode === "vertical";
   const horizontal = cardMode(layoutMode);   // both card layouts: folding, fitting and the drawn elbows
+  const compact = layoutMode === "compact";    // dots in columns, nothing folded; fitted like the card layouts
   // the tree layout needs the parent -> child links, so it always shows the hierarchy
   const linksMode = treeLayout ? "hierarchy" : readPref("netlens.map.links", ["hierarchy", "all"], "hierarchy");
   // containers and apps under their host: the default is set under Settings -> Map, a choice made here is kept per browser
@@ -339,6 +351,7 @@ export async function render(container, params) {
   layoutSelect.appendChild(h("option", { value: "tree" }, "Tree layout"));
   layoutSelect.appendChild(h("option", { value: "horizontal" }, "Horizontal layout"));
   layoutSelect.appendChild(h("option", { value: "vertical" }, "Vertical layout"));
+  layoutSelect.appendChild(h("option", { value: "compact" }, "Compact layout"));
   layoutSelect.value = layoutMode;
   layoutSelect.addEventListener("change", () => {
     savePref("netlens.map.layout", layoutSelect.value);
@@ -436,8 +449,8 @@ export async function render(container, params) {
   if (horizontal) {
     toolbar.appendChild(collapseAllBtn);
     toolbar.appendChild(expandAllBtn);
-    toolbar.appendChild(fitBtn);
   }
+  if (horizontal || compact) toolbar.appendChild(fitBtn);
   toolbar.appendChild(exportBtn);
   toolbar.appendChild(legend);
   toolbar.appendChild(groupLegend);
@@ -856,6 +869,9 @@ export async function render(container, params) {
         const collapsed = new Set([...tree.children.keys()].filter(isCollapsed));
         arranged = (vertical ? layoutVertical : layoutHorizontal)(newNodes, collapsed);
         foldedIds = arranged.hidden;
+      } else if (compact) {
+        arranged = layoutHorizontal(newNodes, new Set());        // everything shown, like the mini-map
+        foldedIds = new Set();
       }
 
       for (const node of newNodes) {
@@ -890,7 +906,7 @@ export async function render(container, params) {
         fitGuests = false;
         setTimeout(() => { if (!destroyed) network.fit({ animation: { duration: 300 } }); }, treeLayout ? 100 : 1500);
       }
-      if (horizontal && fitNext && currentNodes.length > 0) {
+      if ((horizontal || compact) && fitNext && currentNodes.length > 0) {
         fitNext = false;
         network.fit({ animation: { duration: 300 } });
       }

@@ -6,6 +6,7 @@ const LAYOUT_LABELS = {
   tree: "Tree layout (simple top-down)",
   horizontal: "Horizontal layout (left to right, like Omada)",
   vertical: "Vertical layout (top to bottom)",
+  compact: "Compact layout (small dots, left to right, like the dashboard map)",
 };
 
 function browserChoice() {

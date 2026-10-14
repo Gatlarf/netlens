@@ -15,7 +15,7 @@ def client(tmp_path):
 
 
 def test_default_is_free_and_choice_is_saved(client):
-    assert client.get("/api/map-settings").json() == {"default_layout": "free", "layouts": ["free", "tree", "horizontal", "vertical"], "domain_suffix": "", "show_guests": False}
+    assert client.get("/api/map-settings").json() == {"default_layout": "free", "layouts": ["free", "tree", "horizontal", "vertical", "compact"], "domain_suffix": "", "show_guests": False}
     r = client.put("/api/map-settings", json={"default_layout": "horizontal"})
     assert r.status_code == 200 and r.json()["default_layout"] == "horizontal"
     assert client.get("/api/map-settings").json()["default_layout"] == "horizontal"
