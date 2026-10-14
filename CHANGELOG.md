@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.176 — 2026-10-14
+
+### Added
+- ★ **Remote access**: a new page under Network lists the devices that have SSH, Telnet, RDP or VNC open, with the sessions on the right in tabs. SSH and Telnet use the existing web terminal. **RDP (Windows) and VNC** are drawn in the browser through an optional helper container (guacd from Apache Guacamole); the page explains how to add it, with lines to copy, and checks that it is reachable. Clipboard works both ways, the screen follows the window size, and a login can be remembered (stored encrypted). Same rules as the terminal: administrators on a direct local connection only, and only devices with that port seen open. Device pages get RDP and VNC buttons.
+
 ## 0.3.175 — 2026-10-14
 
 ### Changed

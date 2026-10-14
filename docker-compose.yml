@@ -56,5 +56,16 @@ services:
       # Bind address for the web server (default 0.0.0.0:8080).
       NETLENS_BIND: ${NETLENS_BIND:-0.0.0.0:8080}
 
+  # Optional: the helper that lets Netlens open RDP (Windows) and VNC sessions in the browser (Network -> Remote access).
+  # SSH and Telnet need nothing extra. Remove the leading "#" of the next lines to switch it on, then `docker compose up -d`.
+  # It only listens on this machine (127.0.0.1), where Netlens (host network) finds it by default. NETLENS_GUACD changes the address.
+  #
+  # guacd:
+  #   image: guacamole/guacd:1.5.5
+  #   container_name: netlens-guacd
+  #   restart: unless-stopped
+  #   ports:
+  #     - "127.0.0.1:4822:4822"
+
 volumes:
   netlens-data:

@@ -65,6 +65,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Edge kinds](#edge-kinds)
   - [Map features](#map-features)
 - [Web terminal](#web-terminal)
+- [Remote access](#remote-access)
 - [Speed tests](#speed-tests)
 - [Demo mode](#demo-mode)
 - [Security notes](#security-notes)
@@ -94,7 +95,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - MAC vendor lookup from nmap's OUI table
 - Device type classification by rules (vendor, OS, ports, hostnames)
 - Network map with gateway, route, host-of, and manual edges
-- Web terminal (SSH and Telnet) via xterm.js
+- Web terminal (SSH and Telnet) via xterm.js, and remote desktop (RDP and VNC) in the browser through an optional helper container (Network → Remote access)
 - Scan ranges editable in the web UI (Settings), no restart needed
 - CSV and JSON export of devices
 - PNG export of the network map
@@ -357,6 +358,7 @@ Restoring the backup matters because a newer version may have changed the databa
 | `NETLENS_QUICK_INTERVAL` | `900` | Quick scan interval in seconds |
 | `NETLENS_DEEP_INTERVAL` | `86400` | Deep scan interval in seconds |
 | `NETLENS_TERMINAL` | `on` | Enable/disable web terminal |
+| `NETLENS_GUACD` | `127.0.0.1:4822` | Address of the optional guacd helper container for RDP and VNC (`off` disables it) |
 | `NETLENS_TERMINAL_REMOTE` | `off` | Where the terminal may be used from: `off` = direct local connections only (not through a reverse proxy / HTTPS address), `lan` = also through a proxy for local clients, `any` = anywhere |
 | `NETLENS_TRUSTED_PROXIES` | *(empty)* | Reverse proxies whose `X-Forwarded-For` header is believed, as addresses or networks (`192.168.0.184` or `192.168.0.0/24`, comma separated). **Set this when you reach Netlens through a reverse proxy**: without it every visitor looks like the proxy, so the login throttle (5 wrong attempts a minute) is shared by everybody and a stranger can lock you out |
 | `NETLENS_API_DOCS` | `off` | `on` serves the API documentation pages `/docs`, `/redoc` and `/openapi.json`; they are off so a stranger cannot read a map of the API |
@@ -706,6 +708,27 @@ A device that was online and is not seen by a scan is asked for once more on its
 - For a guarantee that does not depend on Netlens, also block it in the reverse proxy, for example nginx `location /api/terminal { return 404; }` or Caddy `respond /api/terminal/* 404`. Nginx Proxy Manager: *Custom Locations* with `/api/terminal` and an advanced `return 404;`.
 - HTTP/HTTPS admin UIs opened via plain links ("Open" next to ports 80/443/...)
 
+## Remote access
+
+**Network → Remote access** lists the devices that have SSH (22), Telnet (23), RDP (3389) or VNC (5900–5909) open, and opens sessions on the right, in tabs. A device page has an RDP or VNC button when those ports are open.
+
+- **SSH and Telnet** are the web terminal described above, nothing extra is needed.
+- **RDP and VNC** need a small helper container, **guacd** from the Apache Guacamole project, which translates the remote desktop protocols for the browser. The page itself shows the three steps (add the service, let Netlens find it, check) with the lines to copy. In short, add this service to the compose file you run Netlens from and run `docker compose up -d`:
+
+  ```yaml
+    guacd:
+      image: guacamole/guacd:1.5.5
+      container_name: netlens-guacd
+      restart: unless-stopped
+      ports:
+        - "127.0.0.1:4822:4822"
+  ```
+
+  Netlens runs on the host network in the supplied compose files, so it reaches the helper at `127.0.0.1:4822`, which is the default. Set `NETLENS_GUACD=host:port` if it lives elsewhere (for a Netlens container that is on a normal Docker network, give the helper no published port and use `NETLENS_GUACD=guacd:4822`), or `NETLENS_GUACD=off` to switch it off. Without the helper the page still lists SSH and Telnet and explains what is missing; the same lines are in `docker-compose.yml` as an optional block.
+- **Who and where:** administrators only, from a direct connection on the local network, the same rule as the terminal (`NETLENS_TERMINAL`, `NETLENS_TERMINAL_REMOTE`; switched off in the demo). Only inventoried devices with a private address and that port seen open can be reached, and at most 5 sessions (terminal and remote desktop together) run at once; an idle session ends after 15 minutes.
+- **Passwords** are typed for each session and sent once. With *Remember this login* they are stored encrypted with the Netlens key (see *Stored passwords*) and can be forgotten again on the same form; the browser never gets a saved password back.
+- **Good to know:** the helper has no login of its own, so never publish its port to your network or the internet. RDP certificates are accepted without checking (Windows machines use self-signed ones); network level authentication works. Clipboard text goes both ways; drives, printers and sound are not redirected. The remote screen follows the size of the browser window (RDP) and *Fit* scales it.
+
 ## Speed tests
 
 **Network → Speed tests** has four parts, and keeps every result (a year, at most 5000 results).
@@ -858,5 +881,6 @@ Netlens is free for noncommercial use and is made in spare time. If it saved you
 
 - **vis-network** 9.1.9 (MIT) — vendored under `app/static/vendor`
 - **xterm.js** 5.5.0 with addon-fit 0.10.0 (MIT) — vendored under `app/static/vendor`
+- **guacamole-common-js** 1.5.0 (Apache License 2.0, the browser client of Apache Guacamole) — vendored under `app/static/vendor`, licence text in `licenses/`; the optional **guacd** helper is a separate container image from the Apache Guacamole project (Apache License 2.0), not part of Netlens
 - **Python deps:** FastAPI, uvicorn, asyncssh, zeroconf
 - **nmap** is required and installed in the image

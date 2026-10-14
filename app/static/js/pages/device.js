@@ -769,6 +769,12 @@ export async function render(container, params) {
     container.appendChild(page);
 
     if (!isAdmin()) return; // the terminal is for administrators
+    // RDP and VNC open on the Remote access page
+    for (const [proto, label] of [["rdp", "RDP"], ["vnc", "VNC"]]) {
+      const open = (device.ports || []).some((p) => p.proto === "tcp" && String(p.state || "").startsWith("open")
+        && (proto === "rdp" ? p.port === 3389 || ["ms-wbt-server", "rdp"].includes(p.service) : (p.port >= 5900 && p.port <= 5909) || String(p.service || "").includes("vnc")));
+      if (open) heading.appendChild(h("a", { class: "btn admin-only", href: `#/remote?device=${device.id}&proto=${proto}`, id: `jump-${proto}`, title: `Open ${label} on the Remote access page` }, label));
+    }
     try {
       // "Wide view" lifts the console above both columns, "Narrow view" puts it back under the details
       const placeWide = (wide) => {

@@ -21,6 +21,7 @@ const ROUTES = {
   "#/scans": "scans",
   "#/settings": "settings",
   "#/wizard": "wizard",
+  "#/remote": "remote",
 };
 
 let currentCleanup = null;
@@ -41,7 +42,7 @@ function parseRoute() {
   }
   const settingsSection = /^#\/settings\/([a-z0-9_-]+)$/.exec(hash);
   if (settingsSection) return { name: "settings", params: { section: settingsSection[1] } };
-  const name = ROUTES[hash];
+  const name = ROUTES[hash.split("?")[0]];
   return name ? { name, params: {} } : { name: "devices", params: {} };
 }
 
