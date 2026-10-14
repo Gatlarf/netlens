@@ -404,17 +404,7 @@ dialog.whats-new h2 { margin: 0; }
 .tg-now { font-variant-numeric: tabular-nums; font-weight: 600; }
 .tg-foot { margin-top: 2px; font-variant-numeric: tabular-nums; }
 .tg { position: relative; }
-.tg-svg { display: block; max-width: 100%; height: auto; touch-action: pan-y; }
-.tg-grid { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.tg-axis { fill: var(--muted); font-size: 10px; font-family: var(--font); }
-.tg-line { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.tg-band { fill: var(--accent); opacity: 0.16; stroke: none; }
-.tg-dot { fill: var(--accent); }
-.tg-limit { stroke-width: 1; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
-.tg-warn { stroke: var(--warn); }
-.tg-crit { stroke: var(--bad); }
-.tg-cursor { stroke: var(--muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.tg-marker { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+.tg-svg { display: block; max-width: 100%; height: auto; touch-action: pan-y; color: var(--text); }
 .tg-tip { position: absolute; top: 4px; z-index: 5; pointer-events: none; padding: 5px 9px; border-radius: 7px; font-size: 0.8rem; line-height: 1.35;
   background: var(--text); color: var(--surface); box-shadow: 0 2px 8px #0003; font-variant-numeric: tabular-nums; }
 .tg-tip[hidden] { display: none; }

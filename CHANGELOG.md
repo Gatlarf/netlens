@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.1 — 2026-10-14
+
+### Changed
+- **Graphs in colour**: performance graphs are now coloured by what the value means. A line is green while it is within its limits, amber past the warning limit and red past the critical limit, with the warning and critical parts of the scale tinted and the newest value shown in the colour of its level. Availability is a strip that is green while up and red where it was down. Batteries and printer supplies, where low is bad, are coloured the other way round. Graphs without limits (response time, traffic) are blue.
+
 ## 0.4.0 — 2026-10-14
 
 ### Added
