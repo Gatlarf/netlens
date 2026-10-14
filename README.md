@@ -302,7 +302,7 @@ uses the same published image and the same Docker volume as the simple file. Opt
 
 - **Data in a folder you choose** (for backups with your own tools): set `NETLENS_DATA=/srv/netlens` in `.env`, create the folder and run `sudo chown 10001:10001 /srv/netlens`.
 - **A specific version** instead of the newest: set `NETLENS_IMAGE_TAG=0.3.128` in `.env`, or change the image line to `ghcr.io/gatlarf/netlens:0.3.128`.
-- **Build from source** (developers): `export NETLENS_VERSION="$(sh tools/version.sh)"`, then
+- **Build from source** (developers): `export NETLENS_VERSION="$(sh contrib/version.sh)"`, then
   `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`. Without `NETLENS_VERSION` the app works but reports the version as `dev`.
 
 #### Existing installations

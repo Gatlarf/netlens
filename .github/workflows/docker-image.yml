@@ -2,7 +2,7 @@ name: Test, build and publish Docker image
 
 # Runs the test suite on every push and pull request. On pushes to main (and v* tags) the
 # image is published to ghcr.io/<owner>/netlens, but only if the tests pass.
-# Version = <major.minor from VERSION file>.<commits since VERSION last changed> (tools/version.sh), so it rises with every build.
+# Version = <major.minor from VERSION file>.<commits since VERSION last changed> (contrib/version.sh), so it rises with every build.
 on:
   push:
     branches: [main]
@@ -44,7 +44,7 @@ jobs:
           fetch-depth: 0  # full history so the commit count is correct
 
       - id: ver
-        run: echo "version=$(sh tools/version.sh)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(sh contrib/version.sh)" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-qemu-action@v3
 

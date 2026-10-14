@@ -61,7 +61,7 @@ To run the image you built from your changes, use the build override:
    (`192.0.2.0/24`, `198.51.100.0/24`) or the private ranges used in the existing tests.
 7. Open the pull request and fill in the template. Every push runs the tests on GitHub; they must pass.
 
-The version number is generated (`<major.minor from VERSION>.<commits since VERSION last changed>`, see `tools/version.sh`), so do not edit `VERSION` in a normal change.
+The version number is generated (`<major.minor from VERSION>.<commits since VERSION last changed>`, see `contrib/version.sh`), so do not edit `VERSION` in a normal change.
 
 ## Commit messages
 

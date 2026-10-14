@@ -43,7 +43,7 @@ RUN pip install -r requirements.txt
 COPY app ./app
 COPY CHANGELOG.md ./CHANGELOG.md
 
-# Set at build time: NETLENS_VERSION=<major.minor>.<commits since VERSION changed> (tools/version.sh, see README).
+# Set at build time: NETLENS_VERSION=<major.minor>.<commits since VERSION changed> (contrib/version.sh, see README).
 ARG NETLENS_VERSION=dev
 ENV NETLENS_VERSION=$NETLENS_VERSION
 
