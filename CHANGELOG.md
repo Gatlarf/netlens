@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.177 — 2026-10-14
+
+### Added
+- ★ **Performance graphs**: Netlens now keeps a time series of what it measures (response time and availability of every device, response time and state of every service check) in its own small database file, `metrics.db`, next to the main one, with full detail for 7 days, 5-minute values for 90 days and hourly values for 2 years. Graphs show the lowest, average and highest value, read-outs under the pointer and ranges from 6 hours to 1 year. The Services page has a Graph button per check; a device page gets a Performance card as soon as it has measurements beyond what the Uptime card shows. The first start after the update fills the graphs from the uptime history Netlens already holds. This is the foundation for the host and probe monitoring of the 0.4 series.
+
 ## 0.3.176 — 2026-10-14
 
 ### Added

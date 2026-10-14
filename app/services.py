@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from app import tsdb
 from app.db import add_event, connect, utcnow
 
 log = logging.getLogger(__name__)
@@ -303,6 +304,12 @@ def record_result(conn, check: dict[str, Any], result: Result, now: str | None =
         "UPDATE service_checks SET last_ts = ?, last_up = ?, last_ms = ?, last_detail = ?, since = ? WHERE id = ?",
         (now, confirmed_next, result.ms, result.detail[:300], since, check["id"]),
     )
+    store = tsdb.for_conn(conn)
+    if store is not None:
+        points = [("service", check["id"], "up", new_state, "", "state")]
+        if result.ms is not None:
+            points.append(("service", check["id"], "response_ms", result.ms, "", "ms"))
+        store.record(points, ts=int(_parse(now).timestamp()))
     if flipped:
         text = f"{check['name']} ({describe(check)}) is {flipped}" + (f": {result.detail}" if flipped == "down" else "")
         add_event(conn, f"service_{flipped}", text, device_id=check.get("device_id"), now=now)
@@ -377,9 +384,20 @@ def _startup_checks(db_path: str) -> None:
         conn.close()
 
 
+def _maintain_metrics(db_path: str, prune: bool) -> None:
+    try:
+        store = tsdb.for_path(db_path)
+        store.rollup()
+        if prune:
+            store.prune()
+    except Exception:  # noqa: BLE001 - the graphs are a convenience, never a reason to stop the checks
+        log.exception("metrics maintenance failed")
+
+
 async def service_loop(db_path: str, interval: float = 10.0) -> None:
     """Background task: run due checks every few seconds, prune old results hourly."""
     last_prune = 0.0
+    last_rollup = 0.0
     startup = asyncio.ensure_future(asyncio.to_thread(_startup_checks, db_path))      # does not hold the loop up when the internet is slow
     startup.add_done_callback(lambda f: f.exception())                                  # never an unhandled error
     while True:
@@ -388,6 +406,9 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                 from app.notify.channels import process_channels  # a service going down should not wait for the next scan
 
                 await process_channels(db_path)
+            if time.monotonic() - last_rollup > 60:       # fold the new samples of the graphs into the coarser tiers
+                last_rollup = time.monotonic()
+                await asyncio.to_thread(_maintain_metrics, db_path, time.monotonic() - last_prune > 3600)
             if time.monotonic() - last_prune > 3600:
                 last_prune = time.monotonic()
                 conn = connect(db_path)

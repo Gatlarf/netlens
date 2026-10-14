@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from app import actions, baselines, flapping, groups as groups_mod
+from app import actions, baselines, flapping, groups as groups_mod, tsdb
 from app.db import add_event, connect, utcnow
 from app.scanner import store, vendor as vendor_db
 from app.scanner.classify import DEVICE_TYPES as CLASSIFY_TYPES
@@ -617,6 +617,9 @@ def delete_device(device_id: int, ignore: bool = False, conn: sqlite3.Connection
             raise HTTPException(status_code=422, detail="this device has no MAC or IP address to ignore")
     conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
     conn.commit()
+    series = tsdb.for_conn(conn)
+    if series is not None:
+        series.forget("device", device_id)
     ip = f" ({row['primary_ip']})" if row["primary_ip"] and row["primary_ip"] != label else ""
     add_event(conn, "device_deleted", f"{label}{ip} deleted" + (" and ignored" if ignore else ""))
 

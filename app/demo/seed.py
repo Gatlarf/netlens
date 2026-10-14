@@ -506,4 +506,10 @@ def seed(conn, data_dir: Path, now: datetime | None = None) -> dict:
     dns_service.make_plan(conn, "technitium", validate_output("dns", json.loads(get_setting(conn, "plugin.technitium.data"))), fmt(now), persist=True)
     conn.execute("INSERT INTO share_links (token, name, mode, show_ips, show_macs, created, views) VALUES (?, 'Status page', 'status', 0, 0, ?, 12)", ("demo-status-page-token-0123456789abcdef", fmt(now - timedelta(days=5))))
     conn.commit()
+    from app import tsdb
+
+    series = tsdb.for_conn(conn)
+    if series is not None:      # the graphs start with the same weeks of history as the uptime page
+        series.reset()
+        series.backfill(conn, force=True)
     return ids

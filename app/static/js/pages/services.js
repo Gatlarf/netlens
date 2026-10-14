@@ -2,6 +2,7 @@ import { get, post, patch, del } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 import { heartbeatBar, uptimeText, uptimeClass } from "../heartbeat.js";
 import { buildServiceForm } from "../cards/service_form.js";
+import { buildPerformanceCard } from "../cards/performance.js";
 
 const STATE_LABEL = { up: "Up", down: "Down", null: "Waiting" };
 
@@ -21,6 +22,7 @@ async function heartbeats(check) {
 
 export async function render(container) {
   let destroyed = false;
+  const openGraphs = new Set();      // checks whose graph is open (kept when the table is redrawn)
   const top = h("div", { class: "toolbar" }, h("strong", {}, "Service checks"), h("span", { class: "hint" }, "HTTP pages, TCP ports and DNS lookups, checked at the interval you choose."));
   const addBtn = h("button", { class: "btn admin-only", type: "button" }, "Add check");
   top.appendChild(addBtn);
@@ -83,11 +85,27 @@ export async function render(container) {
         }
         load();
       });
+      const graphBtn = h("button", { class: "btn", type: "button", "aria-expanded": String(openGraphs.has(c.id)) }, "Graph");
+      const graphRow = h("tr", { class: "svc-graph-row", hidden: !openGraphs.has(c.id) }, h("td", { colspan: 9 }));
+      const showGraph = async () => {
+        const cell = graphRow.firstChild;
+        if (cell.firstChild) return;
+        const card = await buildPerformanceCard("service", c.id, { title: `${c.name}: history` });
+        cell.appendChild(card || h("p", { class: "hint" }, "No measurements yet. They appear after the first checks."));
+      };
+      if (openGraphs.has(c.id)) showGraph();
+      graphBtn.addEventListener("click", () => {
+        const open = graphRow.hidden;
+        graphRow.hidden = !open;
+        graphBtn.setAttribute("aria-expanded", String(open));
+        if (open) { openGraphs.add(c.id); showGraph(); } else openGraphs.delete(c.id);
+      });
       tbody.appendChild(h("tr", {},
         h("td", {}, stateDot(c)), h("td", {}, c.name, c.state === "down" && c.last_detail ? h("div", { class: "hint" }, c.last_detail) : null),
         h("td", { class: "mono" }, c.target), h("td", {}, c.device_id ? h("a", { href: `#/device/${c.device_id}` }, c.device_name || `device ${c.device_id}`) : ""),
         hb, h("td", { class: uptimeClass(c.uptime_24h) }, uptimeText(c.uptime_24h)), h("td", {}, c.last_ms === null ? "–" : `${Math.round(c.last_ms)} ms`),
-        h("td", {}, c.last_ts ? timeAgo(c.last_ts) : "never"), h("td", { class: "actions" }, run, edit, pause, remove)));
+        h("td", {}, c.last_ts ? timeAgo(c.last_ts) : "never"), h("td", { class: "actions" }, run, graphBtn, edit, pause, remove)));
+      tbody.appendChild(graphRow);
     }
     table.appendChild(tbody);
     body.replaceChildren(h("div", { class: "table-wrap" }, table));

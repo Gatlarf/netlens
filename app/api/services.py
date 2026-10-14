@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from app import tsdb
 from app.api.devices import get_conn
 from app.db import utcnow
 from app.services import CheckError, describe, record_result, run_check, validate_check
@@ -103,6 +104,9 @@ def delete_check(check_id: int, conn=Depends(get_conn)) -> dict:
     _row(conn, check_id)
     conn.execute("DELETE FROM service_checks WHERE id = ?", (check_id,))
     conn.commit()
+    store = tsdb.for_conn(conn)
+    if store is not None:
+        store.forget("service", check_id)
     return {"removed": check_id}
 
 

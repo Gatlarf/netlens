@@ -1,6 +1,7 @@
 import sqlite3
 import ipaddress
 from datetime import datetime, timedelta, timezone
+from app import tsdb
 from app.db import utcnow
 
 
@@ -40,6 +41,7 @@ def record_checks(
     devices = conn.execute("SELECT id, primary_ip FROM devices").fetchall()
 
     inserted = 0
+    samples: list[tuple] = []
     for row in devices:
         device_id = row["id"]
         primary_ip = row["primary_ip"]
@@ -68,6 +70,13 @@ def record_checks(
             (device_id, now, up, rtt_ms),
         )
         inserted += 1
+        samples.append(("device", device_id, "up", up, "", "state"))
+        if rtt_ms is not None:
+            samples.append(("device", device_id, "rtt_ms", rtt_ms, "", "ms"))
+
+    store = tsdb.for_conn(conn)
+    if store is not None and samples:
+        store.record(samples, ts=int(_parse_ts(now).timestamp()))
 
     cutoff = _cutoff(now, keep_days)
     conn.execute("DELETE FROM checks WHERE ts < ?", (cutoff,))

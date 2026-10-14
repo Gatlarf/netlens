@@ -133,7 +133,7 @@ label.check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .svc-dot.svc-up { background: #16a34a; }
 .svc-dot.svc-down { background: #dc2626; }
 .svc-dot.svc-paused { background: transparent; border: 2px solid #94a3b8; }
-td.actions { white-space: nowrap; }
+td.actions { white-space: normal; min-width: 170px; }
 td.actions .btn { padding: 2px 8px; font-size: 0.85em; }
 .service-form { max-width: 560px; }
 .check-row { display: block; margin: 3px 0; }
@@ -393,3 +393,31 @@ dialog.whats-new h2 { margin: 0; }
   .remote { grid-template-columns: minmax(0, 1fr); }
   .remote-list { max-height: 40vh; }
 }
+
+/* performance graphs (js/timegraph.js) */
+.tg-card .upc-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.tg-card .range-tabs { flex-wrap: wrap; border-radius: 14px; }
+.tg-card .range-tabs button { padding: 4px 10px; font-size: 0.8rem; }
+.tg-grid-list { display: grid; gap: 14px; margin-top: 10px; grid-template-columns: minmax(0, 1fr); }
+.tg-box { min-width: 0; }
+.tg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.tg-now { font-variant-numeric: tabular-nums; font-weight: 600; }
+.tg-foot { margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tg { position: relative; }
+.tg-svg { display: block; max-width: 100%; height: auto; touch-action: pan-y; }
+.tg-grid { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.tg-axis { fill: var(--muted); font-size: 10px; font-family: var(--font); }
+.tg-line { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.tg-band { fill: var(--accent); opacity: 0.16; stroke: none; }
+.tg-dot { fill: var(--accent); }
+.tg-limit { stroke-width: 1; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.tg-warn { stroke: var(--warn); }
+.tg-crit { stroke: var(--bad); }
+.tg-cursor { stroke: var(--muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.tg-marker { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+.tg-tip { position: absolute; top: 4px; z-index: 5; pointer-events: none; padding: 5px 9px; border-radius: 7px; font-size: 0.8rem; line-height: 1.35;
+  background: var(--text); color: var(--surface); box-shadow: 0 2px 8px #0003; font-variant-numeric: tabular-nums; }
+.tg-tip[hidden] { display: none; }
+.tg-tip-time { font-weight: 600; }
+.tg-tip-note { opacity: 0.8; }
+.tg-empty { margin: 14px 0; }

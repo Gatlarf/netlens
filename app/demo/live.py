@@ -84,6 +84,16 @@ def tick(conn, sim: Sim, now: datetime) -> None:
         else:
             conn.execute("UPDATE devices SET online = 0 WHERE id = ?", (device_id,))
     conn.commit()
+    from app import tsdb
+
+    series = tsdb.for_conn(conn)
+    if series is not None:
+        points = []
+        for row in conn.execute("SELECT device_id, up, rtt_ms FROM checks WHERE ts = ?", (stamp,)):
+            points.append(("device", row["device_id"], "up", row["up"], "", "state"))
+            if row["rtt_ms"] is not None:
+                points.append(("device", row["device_id"], "rtt_ms", row["rtt_ms"], "", "ms"))
+        series.record(points, ts=int(now.timestamp()))
     for s in DEVICES:
         device_id = ids.get(s.name)
         if device_id is not None and before.get(device_id) != state[s.key]:
@@ -105,6 +115,8 @@ def tick(conn, sim: Sim, now: datetime) -> None:
             conn.execute("UPDATE service_checks SET since = ? WHERE id = ?", (stamp, row["id"]))
             add_event(conn, "service_up" if up else "service_down", f"{name} ({kind} {host}:{port}) is {'up again' if up else 'down: timed out'}", device_id=ids.get(BY_KEY[key].name), now=stamp)
         conn.execute("UPDATE service_checks SET last_ts = ?, last_up = ?, last_ms = ?, last_detail = ? WHERE id = ?", (stamp, 1 if up else 0, ms, "answered" if up else "timed out", row["id"]))
+        if series is not None:
+            series.record([("service", row["id"], "up", 1 if up else 0, "", "state")] + ([("service", row["id"], "response_ms", ms, "", "ms")] if ms is not None else []), ts=int(now.timestamp()))
     # wifi clients roam now and then
     for s in DEVICES:
         if s.medium == "wifi" and s.link == "asus" and state[s.key] and ids.get(s.name):
@@ -151,6 +163,11 @@ def step(db_path: str, data_dir: Path, mode: str, sim: Sim, now: datetime | None
             log.info("demo data started over")
         else:
             tick(conn, sim, now)
+            from app import tsdb
+
+            series = tsdb.for_conn(conn)
+            if series is not None:
+                series.maintain()
     finally:
         conn.close()
 
