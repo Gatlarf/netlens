@@ -64,7 +64,7 @@ def test_admin_user_can_do_everything_viewer_is_read_only(env):
     for path in ("/api/devices", "/api/devices/1", "/api/map", "/api/stats/summary", "/api/stats?range=7d", "/api/events", "/api/hierarchy", "/api/scans/current", "/api/service-checks", "/api/update", "/api/map-settings", "/api/dashboard"):
         assert vera.get(path).status_code == 200, path
     # ...but not secrets, settings, exports, backups or admin pages
-    for path in ("/api/users", "/api/backup", "/api/backups", "/api/notifications", "/api/plugins", "/api/export/devices.json", "/api/notify-channels", "/api/config", "/api/ignored", "/api/plugin-index"):
+    for path in ("/api/users", "/api/backup", "/api/backups", "/api/plugins", "/api/export/devices.json", "/api/notify-channels", "/api/config", "/api/ignored", "/api/plugin-index"):
         assert vera.get(path).status_code == 403, path
     # and changes nothing
     assert vera.post("/api/scans", json={"kind": "quick"}).status_code == 403

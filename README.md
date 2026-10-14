@@ -101,7 +101,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
 - A **setup guide** that walks a new install through the settings that matter (networks, names, always-on devices, alerts, checks, plugins, backups); reopen it any time under Settings → System → Setup guide
 - Uptime history like Uptime Kuma: heartbeat bars with a response-time line, 24 h / 7 d / 30 d, hover details, and **always-on (core) devices** whose availability is shown apart from phones and tablets
-- E-mail notifications for new and offline devices, with an on/off switch per device
+- Alerts by e-mail, ntfy, Telegram, Discord, Pushover or webhook, each channel with its own events and an on/off switch per device
 - Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: Proxmox VE and ASUS AiMesh come built in (which VM runs on which host, which device is connected to which mesh node); TP-Link Omada and Ubiquiti UniFi are available from the plugin index (community, not yet tested on hardware)
 - Known and unknown devices, better device identification (router names, mDNS and UPnP details, name hints), Wi-Fi signal history and roaming, service checks (HTTP, TCP, DNS), more notification channels (ntfy, Telegram, Discord, Pushover, webhook) with quiet hours, and Prometheus metrics with a Grafana dashboard
 - Statistics page: devices by type/vendor/OS, uptime and reliability, flapping devices, ports and services, scan performance, event history, hierarchy and plugin health, with 24 h to 90 day periods; a compact `/api/stats/summary` for integrations such as Home Assistant
@@ -374,7 +374,7 @@ Order of precedence: the web setting, then `NETLENS_RANGES`, then auto-detection
 
 ## Settings in the web interface
 
-Settings has a menu on the left, grouped into General, Notifications, Integrations, Data and System. **Every entry is its own page** with its own address (so you can bookmark it or use Back): `#/settings/ranges`, `nmap`, `schedule`, `map`, `notifications`, `dns`, `ignored`, `users`, `terminal`, `plugins`, `plugin-browse`, `plugin-<id>` (for example `plugin-proxmox`, `plugin-asus`), `plugin-guide` (linked from the Plugins page), `backup`, `export`, `about` and `session`, for example `http://<docker-host>:8080/#/settings/plugin-proxmox`. On a narrow screen the menu becomes a row of buttons on top. The older addresses `#/settings/proxmox` and `#/settings/asus` still work.
+Settings has a menu on the left, grouped into General, Notifications, Integrations, Data and System. **Every entry is its own page** with its own address (so you can bookmark it or use Back): `#/settings/ranges`, `nmap`, `schedule`, `map`, `channels`, `dns`, `ignored`, `users`, `terminal`, `plugins`, `plugin-browse`, `plugin-<id>` (for example `plugin-proxmox`, `plugin-asus`), `plugin-guide` (linked from the Plugins page), `backup`, `export`, `about` and `session`, for example `http://<docker-host>:8080/#/settings/plugin-proxmox`. On a narrow screen the menu becomes a row of buttons on top. The older addresses `#/settings/proxmox` and `#/settings/asus` still work.
 
 Everything below is saved in the data directory, so it survives updates and rebuilds. Values set in the browser take precedence over the matching environment variables; "Reset" returns to the environment value.
 
@@ -384,7 +384,7 @@ Everything below is saved in the data directory, so it survives updates and rebu
 | Scan performance (nmap) | ports, timing and detection used by quick and deep scans, with presets (see "Making scans faster"). The **Scan settings** item in the **Scan** menu of the top bar jumps straight to it |
 | Scan schedule | how often quick and deep scans run. Takes effect from the next scheduler cycle, no restart |
 | Web terminal | the web terminal on/off (System group) |
-| E-mail notifications | SMTP server and recipients (see below) |
+| Alert channels & quiet hours | e-mail (SMTP), ntfy, Telegram, Discord, Pushover and webhook channels, each with its own events (see below) |
 | Plugins and one page per plugin | turn plugins on or off, upload your own, and each plugin's own settings (see "Plugins" below) |
 | Ignored devices | devices that scans skip, with a button to stop ignoring them |
 | Backup and restore | download a snapshot, restore one |
@@ -422,13 +422,16 @@ After every scan Netlens records, for each device inside the scanned ranges, whe
 
 ### E-mail notifications
 
-1. Open **Settings → E-mail notifications**, enter your SMTP server, port and security (STARTTLS, SSL/TLS or none), username and password, the sender and one or more recipients (comma separated).
-2. Press **Save**, then **Send test email** to check the settings. A failure is explained in plain words (wrong password, host not found, connection refused, ...).
-3. Tick **Send e-mail notifications** and save.
+E-mail is a notification channel like the others.
 
-After each scan Netlens sends **one digest mail** listing the devices that appeared ("new devices") and the devices that went offline. Switching notifications on starts from that moment: you never get a mail about the backlog. If the mail server is down, the events are kept and sent after a later scan.
+1. Open **Settings → Alert channels & quiet hours** and press **Add channel**. The service is **E-mail (SMTP)** by default: enter your SMTP server, the security (STARTTLS, SSL/TLS or none; the port follows from it unless you set one), user name and password, the sender and one or more recipients (comma separated). Tick the events you want mails for.
+2. Press **Add channel**, then **Send test** to check the settings. A failure is explained in plain words (wrong password, host not found, connection refused, ...).
 
-You can switch the offline mails off **per device** with the checkbox "Send an e-mail when this device goes offline" on the device page (useful for phones and laptops that come and go). New-device mails always go out when that option is on.
+After each scan Netlens sends **one digest mail** per channel listing what happened since the last one. A new channel starts from that moment: you never get a mail about the backlog. If the mail server is down, the events are kept and sent later. Quiet hours apply to e-mail too, and you can have several e-mail channels (for example one for the family).
+
+You can switch the offline alerts off **per device** with the checkbox "Alert me when it goes offline" on the device page (useful for phones and laptops that come and go).
+
+An installation that used the former separate **E-mail notifications** page has it converted to an e-mail channel automatically (same server, recipients and events); the old page address redirects to the channels page.
 
 The SMTP password is stored in the database in plain text (like all settings) and is included in backups, so protect the data directory and the backup files.
 
@@ -470,7 +473,7 @@ When a topology plugin reports the signal of Wi-Fi clients (the ASUS plugin does
 
 ### Notification channels and quiet hours
 
-Besides e-mail, **Settings → Channels & quiet hours** sends alerts to **ntfy**, **Telegram**, **Discord**, **Pushover** or any **webhook** (a JSON POST, which works with Home Assistant webhooks, n8n and Node-RED). Each channel chooses the events it wants (new unknown device, device offline or back, service down or recovered, new open port, IP change, IP reused, OS change, Wi-Fi move, scan time-out), has its own *Send test* button, and keeps its own place in the event log: a channel that fails catches up later without disturbing the others, and error messages never contain tokens. **Quiet hours** hold messages back and deliver them afterwards as one digest (a service going down can still break through). Tokens are stored in the database like the SMTP password.
+**Settings → Alert channels & quiet hours** sends alerts by **e-mail** and to **ntfy**, **Telegram**, **Discord**, **Pushover** or any **webhook** (a JSON POST, which works with Home Assistant webhooks, n8n and Node-RED). Each channel chooses the events it wants (new unknown device, device offline or back, service down or recovered, new open port, IP change, IP reused, OS change, Wi-Fi move, scan time-out), has its own *Send test* button, and keeps its own place in the event log: a channel that fails catches up later without disturbing the others, and error messages never contain tokens. **Quiet hours** hold messages back and deliver them afterwards as one digest (a service going down can still break through). Tokens are stored in the database like the SMTP password.
 
 ### Prometheus and Grafana
 
@@ -782,7 +785,7 @@ NETLENS_DATA_DIR=./data python -m app.main   # open http://localhost:8080 and cr
 
 ```
 app/scanner      nmap runner, parsing, scheduling, relations
-app/notify       e-mail notifications (config, SMTP, digest, service)
+app/notify       notification channels (e-mail/SMTP, ntfy, Telegram, ...), quiet hours
 app/plugins      plugin system: manifest and output contract, runner, registry, service; builtin/ has the Proxmox and ASUS plugins; PLUGINS.md is the plugin guide
 app/terminal     SSH/Telnet backends
 app/api          REST API routers
@@ -812,7 +815,7 @@ tests
 
   If `docker compose up` itself refuses to start, the message names the missing variable (none of the shipped compose files require one). Run `docker compose config` to see the final configuration with all variables filled in.
 - **Proxmox sync fails:** the message on the plugin's settings page says why. `the TLS certificate could not be verified`: untick *Verify TLS certificate* (Proxmox's default certificate is self-signed). `authentication failed`: check the token ID (`user@realm!tokenname`), the secret, or the password. `permission denied (... PVEAuditor)`: give the token or user the PVEAuditor role on `/`. `cannot connect`: wrong URL/port or a firewall.
-- **No notification mails:** use **Send test email** first. Check that *Send e-mail notifications* is ticked, that the device has not opted out, and the status line under the card for the last problem. Gmail and most providers need an app password, not your normal password.
+- **No notification mails:** use **Send test** on the e-mail channel first. Check that the channel is switched on and has the events you expect, that the device has not opted out, and the status line next to the channel for the last problem. Gmail and most providers need an app password, not your normal password.
 - **A guest does not show under its Proxmox host:** the connector matches by MAC address, so Netlens must have scanned that guest at least once on the same network. Run a scan and press *Sync now*.
 - **No devices found:** Check ranges, host networking, and that nmap has capabilities. Check `docker logs netlens`; scan errors appear under "Scans & events".
 - **OS detection empty:** Needs deep scan and root-capable nmap.

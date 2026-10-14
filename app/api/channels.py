@@ -115,9 +115,10 @@ async def test_channel(request: Request, channel_id: str) -> dict:
     finally:
         conn.close()
     poster = getattr(request.app.state, "channel_poster", ch.http_post)
+    mailer = getattr(request.app.state, "mail_sender", ch.send_mail)
     sample = [{"id": 0, "ts": "", "kind": "device_new", "name": "Test device", "ip": "192.168.0.99", "mac": None, "vendor": "Netlens", "trusted": 0, "detail": "", "device_id": None}]
     try:
-        await asyncio.to_thread(ch.send_channel, channel, "[Netlens] Test message", "This is a test from Netlens. If you can read this, the channel works.", sample, poster=poster)
+        await asyncio.to_thread(ch.send_channel, channel, "[Netlens] Test message", "This is a test from Netlens. If you can read this, the channel works.", sample, poster=poster, mailer=mailer)
     except ch.ChannelError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     return {"ok": True}

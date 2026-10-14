@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.166 — 2026-10-14
+
+### Changed
+- ★ **E-mail is now a notification channel**: the separate *E-mail notifications* page is gone. Under Settings → Alert channels & quiet hours you add an **E-mail (SMTP)** channel the same way as ntfy or Telegram, with its own events, *Send test* button, status line and quiet hours, and you can have several. An existing e-mail setup is converted automatically (same server, password, recipients and events, and it carries on from where it was, so nothing is mailed twice). The old page address opens the channels page.
+
 ## 0.3.165 — 2026-10-14
 
 ### Added

@@ -386,10 +386,8 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
         try:
             if await run_due_checks(db_path):
                 from app.notify.channels import process_channels  # a service going down should not wait for the next scan
-                from app.notify.service import process_notifications
 
                 await process_channels(db_path)
-                await process_notifications(db_path)
             if time.monotonic() - last_prune > 3600:
                 last_prune = time.monotonic()
                 conn = connect(db_path)
@@ -400,10 +398,8 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                     outcome = await asyncio.to_thread(backup_schedule.run_if_due, conn, db_path)
                     if outcome and not outcome["ok"]:
                         from app.notify.channels import process_channels
-                        from app.notify.service import process_notifications
 
                         await process_channels(db_path)
-                        await process_notifications(db_path)
                     from app import netchecks
                     from app.api import vendor_db as vendor_db_api
 
@@ -417,10 +413,8 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                         checked = await netchecks.check_dhcp(conn)
                         if checked["rogue"]:
                             from app.notify.channels import process_channels
-                            from app.notify.service import process_notifications
 
                             await process_channels(db_path)
-                            await process_notifications(db_path)
                     await asyncio.to_thread(_housekeeping_checks, conn)
                     from app import speedtest
 

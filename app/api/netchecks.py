@@ -53,10 +53,8 @@ async def run_dhcp(request: Request) -> dict:
         result = await netchecks.check_dhcp(conn, getattr(request.app.state, "action_runner", None))
         if result["rogue"]:
             from app.notify.channels import process_channels
-            from app.notify.service import process_notifications
 
             await process_channels(request.app.state.db_path)
-            await process_notifications(request.app.state.db_path)
         if not result["ok"]:
             raise HTTPException(status_code=502, detail=result["error"])
         return {**_view(conn), "result": result}

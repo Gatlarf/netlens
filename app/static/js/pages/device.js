@@ -301,7 +301,7 @@ function buildEditCard(device, onSaved) {
 
   const notifyField = h("div", { class: "field" });
   const notifyInput = h("input", { type: "checkbox", name: "notify_offline", checked: device.notify_offline !== false });
-  notifyField.appendChild(h("label", { title: "Needs e-mail notifications to be set up under Settings." }, notifyInput, " E-mail me when it goes offline"));
+  notifyField.appendChild(h("label", { title: "Needs an alert channel (for example e-mail) under Settings." }, notifyInput, " Alert me when it goes offline"));
   form.appendChild(notifyField);
 
   const alwaysField = h("div", { class: "field" });

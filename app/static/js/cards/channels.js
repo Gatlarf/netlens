@@ -16,11 +16,11 @@ function eventBoxes(overview, selected) {
   return box;
 }
 
-function channelForm(overview, channel, onDone) {
+function channelForm(overview, channel, onDone, defaultType) {
   const form = h("form", { class: "edit-form" });
   const typeSel = h("select", { name: "type" });
   for (const [key, spec] of Object.entries(overview.types)) typeSel.appendChild(h("option", { value: key }, spec.label));
-  typeSel.value = channel ? channel.type : "ntfy";
+  typeSel.value = channel ? channel.type : (defaultType || "email");
   typeSel.disabled = Boolean(channel);
   const nameInput = h("input", { type: "text", name: "name", value: channel ? channel.name : "", placeholder: "My phone" });
   const fieldsBox = h("div", {});
@@ -31,10 +31,16 @@ function channelForm(overview, channel, onDone) {
     for (const f of overview.types[typeSel.value].fields) {
       const secretSet = channel && channel.secrets_set && channel.secrets_set[f.key];
       const value = channel && channel.type === typeSel.value && !f.secret ? channel.settings[f.key] : undefined;
-      const input = h("input", {
-        type: f.secret ? "password" : "text", name: `setting-${f.key}`, autocomplete: "off",
-        value: value ?? (f.secret ? "" : f.default || ""), placeholder: f.secret && secretSet ? "unchanged" : "",
-      });
+      let input;
+      if (f.kind === "select") {
+        input = h("select", { name: `setting-${f.key}` }, f.options.map(([v, label]) => h("option", { value: v }, label)));
+        input.value = value ?? f.default ?? f.options[0][0];
+      } else {
+        input = h("input", {
+          type: f.secret ? "password" : f.kind === "number" ? "number" : "text", name: `setting-${f.key}`, autocomplete: "off",
+          value: value ?? (f.secret ? "" : f.default || ""), placeholder: f.secret && secretSet ? "unchanged" : "",
+        });
+      }
       fieldsBox.appendChild(h("div", { class: "field" }, h("label", {}, f.label + (f.required ? " *" : "")), input, f.help ? h("p", { class: "hint" }, f.help) : null));
     }
   }
@@ -113,7 +119,7 @@ export async function buildChannelsCard() {
     clear(wrap);
     const card = h("div", { class: "card" }, h("h2", {}, "Notification channels"));
     card.appendChild(h("p", { class: "hint" },
-      "Send alerts to your phone or chat: ntfy, Telegram, Discord, Pushover or any webhook (for example Home Assistant). E-mail is set up on its own page. Each channel picks the events it wants."));
+      "Send alerts by e-mail, to your phone or to a chat: e-mail (SMTP), ntfy, Telegram, Discord, Pushover or any webhook (for example Home Assistant). Each channel picks the events it wants."));
     const slot = h("div", {});
     const add = h("button", { class: "btn", type: "button" }, "Add channel");
     add.addEventListener("click", () => {

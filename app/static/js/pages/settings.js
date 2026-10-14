@@ -3,7 +3,6 @@ import { get, post, put } from "../api.js";
 import { h, clear, toast, isAdmin, fmtTime } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
 import { buildScheduleCard, buildTerminalCard } from "../cards/general.js";
-import { buildNotificationsCard } from "../cards/notifications.js";
 import { buildPluginCard } from "../cards/plugin.js";
 import { buildPluginsCard } from "../cards/plugins.js";
 import { buildPluginGuideCard } from "../cards/plugin_guide.js";
@@ -229,8 +228,7 @@ const STATIC_GROUPS = [
   {
     title: "Notifications",
     items: [
-      { key: "notifications", label: "E-mail notifications", build: buildNotificationsCard },
-      { key: "channels", label: "Channels & quiet hours", build: buildChannelsCard },
+      { key: "channels", label: "Alert channels & quiet hours", build: buildChannelsCard },
       { key: "maintenance", label: "Maintenance windows", build: buildMaintenanceCard },
     ],
   },
@@ -256,7 +254,7 @@ const STATIC_GROUPS = [
 const DEFAULT_PAGE = "ranges";
 const VIEWER_PAGE = "session";
 // the connectors were plugins-to-be before: keep their old addresses working
-const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus" };
+const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus", notifications: "channels" };  // e-mail is a channel now
 
 function integrationsGroup(plugins, updates = 0) {
   const items = [

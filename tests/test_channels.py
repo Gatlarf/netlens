@@ -261,7 +261,7 @@ def test_api_crud_masks_secrets(client):
     cid = created["id"]
     listing = client.get("/api/notify-channels").json()
     assert [c["id"] for c in listing["channels"]] == [cid] and "SECRETTOKEN" not in json.dumps(listing)
-    assert set(listing["types"]) == {"ntfy", "telegram", "discord", "pushover", "webhook"} and listing["default_events"] == ch.DEFAULT_EVENTS
+    assert set(listing["types"]) == {"email", "ntfy", "telegram", "discord", "pushover", "webhook"} and listing["default_events"] == ch.DEFAULT_EVENTS
     assert listing["events"][0] == {"key": "device_new", "label": "A new (unknown) device appears"}
 
     updated = client.put(f"/api/notify-channels/{cid}", json={"settings": {"chat_id": "43", "bot_token": ""}, "events": ["service_down"], "name": "Renamed"}).json()
@@ -296,3 +296,106 @@ def test_api_test_message_and_quiet_settings(client):
     q = client.put("/api/notify-quiet", json={"enabled": True, "start": "22:30", "end": "06:00", "tz": "Europe/Brussels", "offset_min": 60}).json()
     assert q["start"] == "22:30" and client.get("/api/notify-channels").json()["quiet"]["enabled"] is True
     assert client.put("/api/notify-quiet", json={"enabled": True, "start": "99:99"}).status_code == 422
+
+
+# ------------------------------------------------------------------ e-mail as a channel
+EMAIL = {"smtp_host": "smtp.example.com", "security": "starttls", "smtp_port": "", "username": "u", "password": "pw", "from_addr": "netlens@example.com", "to_addrs": "a@example.com, b@example.com"}
+
+
+class Mailer:
+    def __init__(self, error=None):
+        self.sent, self.error = [], error
+
+    def __call__(self, cfg, subject, body):
+        from app.notify.mail import MailError
+
+        if self.error:
+            raise MailError(self.error)
+        self.sent.append((cfg, subject, body))
+
+
+def test_email_settings_are_validated_and_normalised():
+    s = clean_settings("email", EMAIL)
+    assert s["to_addrs"] == "a@example.com, b@example.com" and s["security"] == "starttls"
+    for bad in ({"to_addrs": ""}, {"to_addrs": "nope"}, {"from_addr": "a@example.com, b@example.com"}, {"smtp_host": ""}, {"security": "tls13"}, {"smtp_port": "abc"}, {"smtp_port": "70000"}):
+        with pytest.raises(ValueError):
+            clean_settings("email", {**EMAIL, **bad})
+    assert clean_settings("email", {**EMAIL, "password": ""}, {"password": "kept"})["password"] == "kept"
+
+
+def test_email_channel_sends_through_the_mailer():
+    m = Mailer()
+    send_channel(channel("email", **clean_settings("email", EMAIL)), "[Netlens] 1 new device", "New device: x", [], mailer=m)
+    cfg, subject, body = m.sent[0]
+    assert (cfg.smtp_host, cfg.smtp_port, cfg.security, cfg.to_addrs) == ("smtp.example.com", 587, "starttls", ["a@example.com", "b@example.com"])
+    assert subject == "[Netlens] 1 new device" and body.startswith("New device: x")
+    ssl = clean_settings("email", {**EMAIL, "security": "ssl"})
+    send_channel(channel("email", **ssl), "t", "b", [], mailer=m)
+    assert m.sent[1][0].smtp_port == 465
+    custom = clean_settings("email", {**EMAIL, "smtp_port": "2525"})
+    send_channel(channel("email", **custom), "t", "b", [], mailer=m)
+    assert m.sent[2][0].smtp_port == 2525
+    with pytest.raises(ChannelError, match="authentication failed"):
+        send_channel(channel("email", **ssl), "t", "b", [], mailer=Mailer("authentication failed (check username and password)"))
+
+
+async def test_email_channel_takes_part_in_processing(db):
+    path, conn = db
+    add_channels(conn, {"id": "m", "type": "email", "name": "E-mail", "enabled": True, "events": ["device_new"], "settings": clean_settings("email", EMAIL), "last_event_id": 0})
+    add_event(conn, "device_new", "10.0.0.1", device_id=1)
+    conn.commit()
+    m = Mailer()
+    assert await process_channels(str(path), poster=Poster(), mailer=m) == {"sent": 1, "failed": 0}
+    assert "new device" in m.sent[0][1]
+    failing = Mailer("connection refused by SMTP server")
+    ch.save_channels(conn, [{**ch.load_channels(conn)[0], "last_event_id": 0}])
+    assert await process_channels(str(path), poster=Poster(), mailer=failing) == {"sent": 0, "failed": 1}
+    assert "refused" in ch.load_channels(conn)[0]["status"]["error"]
+
+
+def test_old_mail_setup_becomes_an_email_channel_once(tmp_path):
+    from app.notify.config import NotifyConfig, save_config
+
+    conn = connect(tmp_path / "t.db")
+    init_db(conn)
+    save_config(conn, NotifyConfig(enabled=True, smtp_host="smtp.example.com", smtp_port=465, security="ssl", username="u", password="pw",
+                                   from_addr="n@example.com", to_addrs=["a@example.com"], notify_new=True, notify_offline=False, notify_services=True, last_event_id=7))
+    ch.save_channels(conn, [chan("keep", kind="discord")])
+    channels = ch.load_channels(conn)
+    mail = next(c for c in channels if c["type"] == "email")
+    assert mail["enabled"] is True and mail["last_event_id"] == 7 and mail["events"] == ["device_new", "service_down", "service_up"]
+    assert mail["settings"]["smtp_port"] == "465" and mail["settings"]["password"] == "pw" and mail["settings"]["to_addrs"] == "a@example.com"
+    assert [c["id"] for c in channels if c["type"] != "email"] == ["keep"]
+    assert len(ch.load_channels(conn)) == 2          # not again
+    ch.save_channels(conn, [])                       # deleted on purpose: it stays deleted
+    assert ch.load_channels(conn) == []
+
+
+def test_nothing_is_migrated_without_a_mail_setup(tmp_path):
+    conn = connect(tmp_path / "t.db")
+    init_db(conn)
+    assert ch.load_channels(conn) == []
+
+
+def test_email_through_the_api(client):
+    r = client.post("/api/notify-channels", json={"type": "email", "name": "Home", "settings": EMAIL})
+    assert r.status_code == 201 and "pw" not in r.text and r.json()["secrets_set"] == {"password": True}
+    assert client.get("/api/notify-channels").json()["types"]["email"]["fields"][1]["kind"] == "select"
+    client.app.state.mail_sender = Mailer()
+    assert client.post(f"/api/notify-channels/{r.json()['id']}/test").json() == {"ok": True}
+    assert client.app.state.mail_sender.sent[0][1] == "[Netlens] Test message"
+    client.app.state.mail_sender = Mailer("authentication failed (check username and password)")
+    bad = client.post(f"/api/notify-channels/{r.json()['id']}/test")
+    assert bad.status_code == 502 and "authentication failed" in bad.json()["detail"]
+    assert client.post("/api/notify-channels", json={"type": "email", "settings": {**EMAIL, "to_addrs": "x"}}).status_code == 422
+
+
+def test_per_device_offline_switch_via_api(client):
+    from app.db import get_or_create_device
+
+    conn = connect(client.app.state.db_path)
+    d = get_or_create_device(conn, "aa:bb:cc:00:00:01", "192.168.1.5")
+    conn.close()
+    assert client.get(f"/api/devices/{d}").json()["notify_offline"] is True
+    assert client.patch(f"/api/devices/{d}", json={"notify_offline": False}).json()["notify_offline"] is False
+    assert next(x for x in client.get("/api/devices").json() if x["id"] == d)["notify_offline"] is False

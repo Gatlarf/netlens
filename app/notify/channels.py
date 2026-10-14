@@ -1,4 +1,4 @@
-"""Notification channels beyond e-mail: ntfy, Telegram, Discord, Pushover and a generic webhook.
+"""Notification channels: e-mail (SMTP), ntfy, Telegram, Discord, Pushover and a generic webhook.
 
 Every channel has its own list of events it wants, and its own position in the event log, so a channel that fails
 catches up later without disturbing the others. Quiet hours hold messages back (a service going down can still break
@@ -20,6 +20,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 from app.db import connect, get_setting, set_setting, utcnow
+from app.notify.config import load_config as load_old_mail_config, parse_addresses, ALLOWED_SECURITY
+from app.notify.mail import MailError, send_mail
 
 log = logging.getLogger(__name__)
 CHANNELS_KEY = "notify.channels"
@@ -29,7 +31,20 @@ MAX_EVENTS_PER_MESSAGE = 40
 CRITICAL = {"service_down", "dhcp_rogue", "gateway_changed"}  # these break through quiet hours
 _lock = asyncio.Lock()
 
+MIGRATED_KEY = "notify.email_migrated"
+SECURITY_PORT = {"starttls": 587, "ssl": 465, "none": 25}
+
 TYPES: dict[str, dict[str, Any]] = {
+    "email": {"label": "E-mail (SMTP)", "fields": [
+        {"key": "smtp_host", "label": "SMTP server", "required": True, "help": "The mail server of your provider or your own, for example smtp.gmail.com"},
+        {"key": "security", "label": "Security", "kind": "select", "default": "starttls",
+         "options": [["starttls", "STARTTLS (usually port 587)"], ["ssl", "SSL/TLS (usually port 465)"], ["none", "None (port 25, only on your own network)"]]},
+        {"key": "smtp_port", "label": "Port", "kind": "number", "help": "Leave empty to use the usual port for the security you chose."},
+        {"key": "username", "label": "User name", "help": "Leave empty when the server needs no login."},
+        {"key": "password", "label": "Password", "secret": True, "help": "For Gmail and similar services this is an app password."},
+        {"key": "from_addr", "label": "Sender address", "required": True, "help": "Shown as the sender, for example netlens@example.com"},
+        {"key": "to_addrs", "label": "Send to", "required": True, "help": "One or more addresses, separated by commas."},
+    ]},
     "ntfy": {"label": "ntfy", "fields": [
         {"key": "server", "label": "Server", "default": "https://ntfy.sh", "required": True, "help": "https://ntfy.sh or your own ntfy server"},
         {"key": "topic", "label": "Topic", "required": True, "help": "Anyone who knows the topic name can read it on ntfy.sh: pick a long random one."},
@@ -91,7 +106,28 @@ class ChannelError(Exception):
 
 
 # ----------------------------------------------------------------------------- storage
+def _migrate_old_mail(conn: sqlite3.Connection) -> None:
+    """E-mail used to be set up on its own page. Turn that setup into an e-mail channel once (also after restoring an old backup)."""
+    if get_setting(conn, MIGRATED_KEY):
+        return
+    set_setting(conn, MIGRATED_KEY, "1")
+    old = load_old_mail_config(conn)
+    if not (old.smtp_host.strip() and old.from_addr.strip() and old.to_addrs):
+        return
+    events = (["device_new"] if old.notify_new else []) + (["device_offline"] if old.notify_offline else []) + (["service_down", "service_up"] if old.notify_services else [])
+    try:
+        existing = json.loads(get_setting(conn, CHANNELS_KEY) or "[]")
+    except ValueError:
+        existing = []
+    channel = {"id": new_channel_id(), "type": "email", "name": "E-mail", "enabled": bool(old.enabled), "events": events,
+               "settings": {"smtp_host": old.smtp_host, "security": old.security, "smtp_port": str(old.smtp_port), "username": old.username,
+                            "password": old.password, "from_addr": old.from_addr, "to_addrs": ", ".join(old.to_addrs)},
+               "last_event_id": old.last_event_id}
+    set_setting(conn, CHANNELS_KEY, json.dumps([channel, *(existing if isinstance(existing, list) else [])]))
+
+
 def load_channels(conn: sqlite3.Connection) -> list[dict]:
+    _migrate_old_mail(conn)
     try:
         data = json.loads(get_setting(conn, CHANNELS_KEY) or "[]")
     except ValueError:
@@ -144,6 +180,19 @@ def clean_settings(channel_type: str, values: dict, current: dict | None = None)
             parsed = urllib.parse.urlparse(out[key])
             if parsed.scheme not in ("http", "https") or not parsed.hostname:
                 raise ValueError("the address must start with http:// or https://")
+    if channel_type == "email":
+        if out["security"] not in ALLOWED_SECURITY:
+            raise ValueError("security must be STARTTLS, SSL/TLS or none")
+        if out["smtp_port"]:
+            if not out["smtp_port"].isdigit() or not 1 <= int(out["smtp_port"]) <= 65535:
+                raise ValueError("the port must be a number between 1 and 65535")
+        addresses = parse_addresses(out["to_addrs"])
+        sender = parse_addresses(out["from_addr"])
+        if not addresses:
+            raise ValueError("Send to is required")
+        if len(sender) != 1:
+            raise ValueError("the sender must be one e-mail address")
+        out["to_addrs"], out["from_addr"] = ", ".join(addresses), sender[0]
     if channel_type == "ntfy":
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", out["topic"]):
             raise ValueError("the topic may only contain letters, digits, '-' and '_'")
@@ -278,11 +327,26 @@ def http_post(url: str, data: bytes, headers: dict[str, str], timeout: float = 1
 Poster = Callable[[str, bytes, dict[str, str], float], tuple[int, str]]
 
 
-def send_channel(channel: dict, title: str, body: str, events: list[dict], *, poster: Poster = http_post) -> None:
+def _send_email(s: dict, title: str, body: str, mailer: Callable) -> None:
+    from app.notify.config import NotifyConfig
+
+    port = int(s["smtp_port"]) if str(s.get("smtp_port") or "").isdigit() else SECURITY_PORT.get(s.get("security") or "starttls", 587)
+    cfg = NotifyConfig(smtp_host=s["smtp_host"], smtp_port=port, security=s.get("security") or "starttls", username=s.get("username") or "",
+                       password=s.get("password") or "", from_addr=s["from_addr"], to_addrs=parse_addresses(s.get("to_addrs")))
+    try:
+        mailer(cfg, title, body + "\n\n-- sent by Netlens")
+    except MailError as exc:
+        raise ChannelError(str(exc)) from None
+
+
+def send_channel(channel: dict, title: str, body: str, events: list[dict], *, poster: Poster = http_post, mailer: Callable = send_mail) -> None:
     """Send one message through a channel; raises ChannelError with a message that never contains a token."""
     s = channel["settings"]
     kind = channel["type"]
     json_headers = {"Content-Type": "application/json"}
+    if kind == "email":
+        _send_email(s, title, body, mailer)
+        return
     if kind == "ntfy":
         headers = {"Title": title.encode("ascii", "replace").decode(), "Priority": s.get("priority") or "default", "Tags": "satellite"}
         if s.get("token"):
@@ -327,7 +391,7 @@ def _pending_events(conn: sqlite3.Connection, after_id: int) -> list[dict]:
     return out
 
 
-async def process_channels(db_path: str, *, now: datetime | None = None, poster: Poster = http_post) -> dict:
+async def process_channels(db_path: str, *, now: datetime | None = None, poster: Poster = http_post, mailer: Callable = send_mail) -> dict:
     """Send what each enabled channel wants to hear about. Never raises for a failing channel."""
     now = now or datetime.now(timezone.utc)
     result = {"sent": 0, "failed": 0}
@@ -360,7 +424,7 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
                     continue  # held back until the quiet hours end
                 title, body = build_digest(wanted)
                 try:
-                    await asyncio.to_thread(send_channel, ch, title, body, wanted, poster=poster)
+                    await asyncio.to_thread(send_channel, ch, title, body, wanted, poster=poster, mailer=mailer)
                 except ChannelError as exc:
                     ch["status"] = {"ts": utcnow(), "ok": False, "error": str(exc), "pending": len(wanted)}
                     result["failed"] += 1

@@ -10,8 +10,6 @@ from app.config import load_settings
 from app.db import add_event, connect, get_or_create_device, init_db
 from app.main import create_app
 from app.notify import channels as ch
-from app.notify.config import NotifyConfig
-from app.notify.digest import collect_events
 
 AUTH = {"Authorization": "Bearer t"}
 
@@ -116,13 +114,7 @@ def test_events_in_a_window_are_tagged_and_not_sent(db):
     add_event(db, "port_opened", "22", device_id=a, now="2026-10-12T03:00:00Z")                  # not an alarm kind
     tags = [(r["device_id"], r["kind"], r["maintenance"]) for r in db.execute("SELECT * FROM events ORDER BY id")]
     assert tags == [(a, "device_offline", "Reboot"), (b, "device_offline", None), (a, "device_offline", None), (a, "port_opened", None)]
-    # the e-mail digest leaves the held-back one out
-    cfg = NotifyConfig(notify_offline=True)
-    db.execute("UPDATE devices SET notify_offline = 1")
-    db.commit()
-    kept, _ = collect_events(db, 0, cfg)
-    assert [(e["device_id"]) for e in kept] == [b, a]
-    # and so do the channels
+    # the channels leave the held-back one out
     pending = ch._pending_events(db, 0)
     assert [e["maintenance"] for e in pending] == ["Reboot", None, None, None]
 
