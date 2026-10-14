@@ -70,7 +70,50 @@ def outages(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
 
 MIN_ADDRESS_CHANGES = 3   # fewer address changes than this in the period is just a note
 SEEN_TOGETHER = timedelta(hours=1)
-ZABBLY_PREFIX = "10:66:6a"   # the default MAC prefix of Incus containers and VMs (Incus is made by Zabbly)
+# where to look for the virtual network card, per virtualisation product (the product names come from scanner.vendor.VIRTUAL_PREFIXES)
+WHERE_TO_LOOK = {
+    "Incus": "In TrueNAS that is the instance's network device under Instances.",
+    "Proxmox": "In Proxmox that is the guest's Network Device (VM) or Network tab (container).",
+    "VMware": "In VMware that is the virtual machine's network adapter settings.",
+    "Microsoft Hyper-V": "In Hyper-V Manager that is the virtual machine's Network Adapter settings.",
+    "QEMU/KVM": "With libvirt or virt-manager that is the guest's NIC in its hardware list.",
+    "VirtualBox": "In VirtualBox that is the virtual machine's Network settings.",
+    "Docker": "For Docker that is the container's network (a macvlan or bridge network).",
+}
+STANDALONE_CAUSES = (
+    "The same causes exist on a physical device: a fixed address plus a lease from the router on one network card, extra addresses added to the same card, "
+    "or a device that answers for others (a Wi-Fi extender or bridge, a VPN, or a router with proxy ARP shows other addresses with its own MAC)."
+)
+
+
+def _virtual_product(mac: str | None) -> str | None:
+    """The virtualisation product behind a MAC prefix (VMware, Hyper-V, Proxmox, Incus ...), from the table the scanner already uses."""
+    from app.scanner.vendor import VIRTUAL_PREFIXES
+
+    value = (mac or "").lower()
+    best = max((p for p in VIRTUAL_PREFIXES if value.startswith(p)), key=len, default=None)
+    return VIRTUAL_PREFIXES[best].replace(" (virtual)", "") if best else None
+
+
+def _guest_hint(conn: sqlite3.Connection, device_id: int, device) -> str:
+    """What kind of thing it is and where its extra address probably comes from: a guest of a hypervisor or a physical device."""
+    guest = conn.execute("SELECT kind, host_name, plugin_id FROM hypervisor_guests WHERE device_id = ? LIMIT 1", (device_id,)).fetchone()
+    product = _virtual_product(device["mac"])
+    effective = device["type_override"] or device["device_type"]
+    if guest is None and product is None and effective not in ("vm", "container"):
+        return STANDALONE_CAUSES
+    parts = []
+    if guest is not None:
+        on = f" on {guest['host_name']}" if guest["host_name"] else ""
+        parts.append(f"Netlens knows it as a {guest['kind']}{on} (from the {guest['plugin_id']} plugin).")
+    elif product:
+        parts.append(f"Its MAC address prefix belongs to {product} virtual machines or containers.")
+    else:
+        parts.append("It is registered as a virtual machine or container.")
+    parts.append("So look at the network settings inside the guest (most likely it asks for an address by DHCP and also has a fixed one), and at its virtual network card on the host that runs it.")
+    if product in WHERE_TO_LOOK:
+        parts.append(WHERE_TO_LOOK[product])
+    return " ".join(parts)
 
 
 def address_findings(conn: sqlite3.Connection, device_id: int, since: str) -> tuple[list[dict[str, str]], dict[str, Any]]:
@@ -80,7 +123,7 @@ def address_findings(conn: sqlite3.Connection, device_id: int, since: str) -> tu
     container that copies its host's MAC, ...) answers on both in every scan, so its entry's address "changes" back and forth
     and the history fills up with address changes. That is not an outage, but it explains odd uptime, names and DNS records.
     """
-    device = conn.execute("SELECT mac, vendor, primary_ip FROM devices WHERE id = ?", (device_id,)).fetchone()
+    device = conn.execute("SELECT mac, vendor, primary_ip, device_type, type_override FROM devices WHERE id = ?", (device_id,)).fetchone()
     changes = conn.execute("SELECT ts, detail FROM events WHERE device_id = ? AND kind = 'ip_changed' AND ts >= ? ORDER BY ts", (device_id, since)).fetchall()
     seen = conn.execute("SELECT ip, last_seen FROM device_ips WHERE device_id = ? AND last_seen >= ? ORDER BY last_seen DESC, ip", (device_id, since)).fetchall()
     info: dict[str, Any] = {"changes": len(changes), "addresses": [{"ip": r["ip"], "last_seen": r["last_seen"]} for r in seen], "at_once": False}
@@ -107,19 +150,17 @@ def address_findings(conn: sqlite3.Connection, device_id: int, since: str) -> tu
     names = ", ".join(sorted(addresses))
     router_name = conn.execute("SELECT name FROM device_names WHERE device_id = ? AND source = 'router' ORDER BY last_seen DESC LIMIT 1", (device_id,)).fetchone()
     mac = device["mac"] or "?"
-    incus = (device["mac"] or "").lower().startswith(ZABBLY_PREFIX) or (device["vendor"] or "").lower() == "zabbly"
     if at_once and len(changes) >= MIN_ADDRESS_CHANGES:
-        extra = []
+        extra = [_guest_hint(conn, device_id, device)]
         if router_name:
             extra.append(f"The router knows it as \u201c{router_name['name']}\u201d, so one of the addresses is probably a DHCP lease from the router.")
-        if incus:
-            extra.append("The MAC address starts with 10:66:6a, which is what the virtual machines and containers of TrueNAS (and of Incus, the software TrueNAS uses for them) get. So this is most likely a virtual machine or container: look at its network settings inside the guest (it is probably set to get an address by DHCP and also has a fixed address), and at its network device in TrueNAS under Instances.")
         return [_finding(
             "warn", f"It answers on {len(together) if len(together) >= 2 else 2} addresses at the same time",
-            f"{names} {'both' if len(addresses) == 2 else 'all'} answer with the same MAC address ({mac}), so this is one network card (or one container or VM) with more than one address. Netlens keeps one entry per MAC, so "
-            f"in {swaps or 'many'} scans the entry's address \u201cchanged\u201d back and forth ({len(changes)} address changes in this period). It is not an outage, but it fills the history with changes and can "
-            "confuse names and DNS records. Usual causes: a fixed address configured on the device while it also still asks the router for one (DHCP), or two interfaces sharing one MAC. "
-            "On the device, `ip -4 addr` lists its addresses; remove the one you do not want (turn off DHCP on that interface), or delete its lease/reservation in the router. "
+            f"{names} {'both' if len(addresses) == 2 else 'all'} answer with the same MAC address ({mac}), so this is one network card (or one virtual one) with more than one address. "
+            f"Netlens keeps one entry per MAC, so in {swaps or 'many'} scans the entry's address \u201cchanged\u201d back and forth ({len(changes)} address changes in this period). "
+            "It is not an outage, but it fills the history with changes and can confuse names and DNS records. "
+            "To see its addresses, run `ip -4 addr` (Linux) or `ipconfig /all` (Windows) on the device, then remove the one you do not want: switch off DHCP on that interface, "
+            "or delete its lease or reservation in the router. "
             + " ".join(extra))], info
     if len(changes) >= MIN_ADDRESS_CHANGES:
         return [_finding(

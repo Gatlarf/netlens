@@ -225,7 +225,7 @@ def test_two_addresses_at_once_are_named_as_the_cause(conn):
     report = flapping.analyze(conn, 3, days=1, now=stamp(0))
     top = report["findings"][0]
     assert top["level"] == "warn" and "2 addresses at the same time" in top["title"]
-    for part in ("192.168.0.135", "192.168.0.201", "same MAC", "proxmox-pbs", "Incus", "DHCP"):
+    for part in ("192.168.0.135", "192.168.0.201", "both answer", "same MAC", "proxmox-pbs", "Incus", "TrueNAS", "DHCP", "ipconfig /all"):
         assert part in top["detail"], part
     assert report["address"]["at_once"] is True and report["address"]["changes"] == 12
 
@@ -247,3 +247,32 @@ def test_one_address_change_is_only_a_note_and_none_adds_nothing(conn):
     conn.commit()
     first = flapping.analyze(conn, 5, days=7, now=stamp(0))["findings"][0]
     assert first["level"] == "info" and first["title"] == "Its address changed"
+
+
+def _at_once(conn, device_id, mac, **device_fields):
+    sets = ", ".join(f"{k} = ?" for k in ("mac", *device_fields))
+    conn.execute(f"UPDATE devices SET {sets} WHERE id = ?", (mac, *device_fields.values(), device_id))
+    for ip in ("10.0.5.10", "10.0.5.77"):
+        conn.execute("INSERT INTO device_ips (device_id, ip, first_seen, last_seen) VALUES (?, ?, ?, ?)", (device_id, ip, stamp(5000), stamp(5)))
+    for i in range(4):
+        _ip_swap(conn, device_id, 15 * (i + 1), "10.0.5.10", "10.0.5.77")
+    conn.commit()
+    return flapping.analyze(conn, device_id, days=1, now=stamp(0))["findings"][0]
+
+
+def test_other_hypervisors_are_named_from_the_mac_prefix(conn):
+    f = _at_once(conn, 3, "00:15:5d:aa:bb:cc")
+    assert "Microsoft Hyper-V virtual machines" in f["detail"] and "Hyper-V Manager" in f["detail"] and "Incus" not in f["detail"]
+    f = _at_once(conn, 4, "00:50:56:aa:bb:cc")
+    assert "VMware" in f["detail"] and "TrueNAS" not in f["detail"]
+
+
+def test_a_guest_known_to_a_hypervisor_plugin_names_its_host(conn):
+    conn.execute("INSERT INTO hypervisor_guests (plugin_id, guest_id, name, kind, host_name, status, updated, device_id) VALUES ('proxmox', '101', 'pbs', 'VM', 'pve1', 'running', 'x', 5)")
+    f = _at_once(conn, 5, "02:11:22:33:44:55")
+    assert "VM on pve1 (from the proxmox plugin)" in f["detail"] and "virtual network card" in f["detail"]
+
+
+def test_a_physical_device_gets_the_standalone_causes(conn):
+    f = _at_once(conn, 6, "a4:12:34:56:78:9a")
+    assert f["level"] == "warn" and "Wi-Fi extender" in f["detail"] and "virtual machine" not in f["detail"] and "inside the guest" not in f["detail"]

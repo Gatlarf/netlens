@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.174 — 2026-10-14
+
+### Changed
+- The address check in Investigate no longer assumes TrueNAS. It names the virtualisation product from the MAC prefix (VMware, Hyper-V, Proxmox, QEMU/KVM, VirtualBox, Docker, Incus/TrueNAS) or from a hypervisor plugin (the host it runs on), says where to look for that product, and for a physical device lists the usual causes (a fixed address plus a DHCP lease, extra addresses on one card, a device that answers for others). It also gives the Windows command next to the Linux one.
+
 ## 0.3.173 — 2026-10-14
 
 ### Changed
