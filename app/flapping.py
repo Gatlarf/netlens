@@ -113,11 +113,11 @@ def address_findings(conn: sqlite3.Connection, device_id: int, since: str) -> tu
         if router_name:
             extra.append(f"The router knows it as \u201c{router_name['name']}\u201d, so one of the addresses is probably a DHCP lease from the router.")
         if incus:
-            extra.append("The MAC address starts with 10:66:6a, the prefix Incus gives its containers and virtual machines, so look at the network settings inside that container or VM (an image configured for DHCP plus a fixed address you added).")
+            extra.append("The MAC address starts with 10:66:6a, which is what the virtual machines and containers of TrueNAS (and of Incus, the software TrueNAS uses for them) get. So this is most likely a virtual machine or container: look at its network settings inside the guest (it is probably set to get an address by DHCP and also has a fixed address), and at its network device in TrueNAS under Instances.")
         return [_finding(
             "warn", f"It answers on {len(together) if len(together) >= 2 else 2} addresses at the same time",
-            f"{names} all answer with the same MAC address ({mac}), so this is one network card (or one container or VM) with more than one address. Netlens keeps one entry per MAC, so "
-            f"in {swaps or 'many'} scan(s) the entry's address \u201cchanged\u201d back and forth ({len(changes)} address changes in this period). It is not an outage, but it fills the history with changes and can "
+            f"{names} {'both' if len(addresses) == 2 else 'all'} answer with the same MAC address ({mac}), so this is one network card (or one container or VM) with more than one address. Netlens keeps one entry per MAC, so "
+            f"in {swaps or 'many'} scans the entry's address \u201cchanged\u201d back and forth ({len(changes)} address changes in this period). It is not an outage, but it fills the history with changes and can "
             "confuse names and DNS records. Usual causes: a fixed address configured on the device while it also still asks the router for one (DHCP), or two interfaces sharing one MAC. "
             "On the device, `ip -4 addr` lists its addresses; remove the one you do not want (turn off DHCP on that interface), or delete its lease/reservation in the router. "
             + " ".join(extra))], info

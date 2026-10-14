@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.173 — 2026-10-14
+
+### Changed
+- The address check in Investigate explains the 10:66:6a MAC prefix in plain words (TrueNAS and Incus virtual machines and containers) and reads better for two addresses.
+
 ## 0.3.172 — 2026-10-14
 
 ### Added
