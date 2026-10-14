@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commit count>`. Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.3.168 — 2026-10-14
+
+### Added
+- ★ **Share dashboard cards with everyone**: an administrator can press **Share with everyone** on a card of their own (Customize → Your own cards). The card then appears under **Shared by your administrator** in every user's card pool, where they add it like any built-in card. The administrator can change it (for everybody), stop sharing it (it goes back to their own cards) or delete it.
+
 ## 0.3.167 — 2026-10-14
 
 ### Changed

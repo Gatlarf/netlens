@@ -127,6 +127,7 @@ def _layout_key(principal) -> str:
 
 
 DEFAULT_KEY = "dashboard.layout.default"       # set by an administrator: what everybody sees until they arrange their own
+SHARED_KEY = "dashboard.shared_cards"          # cards an administrator made available to every user (the "shared library")
 
 
 def get_layout(conn: sqlite3.Connection, principal) -> dict | None:
@@ -137,6 +138,29 @@ def get_layout(conn: sqlite3.Connection, principal) -> dict | None:
 def get_default(conn: sqlite3.Connection) -> dict | None:
     """The dashboard an administrator set for everybody, or None (then the built-in cards are used)."""
     return _read(conn, DEFAULT_KEY)
+
+
+def get_shared(conn: sqlite3.Connection) -> list[dict]:
+    """The cards an administrator shared: every user can add them to their own dashboard."""
+    from app.db import get_setting
+
+    try:
+        value = json.loads(get_setting(conn, SHARED_KEY) or "[]")
+    except ValueError:
+        return []
+    try:
+        return clean_custom(value)
+    except ValueError:
+        return []
+
+
+def set_shared(conn: sqlite3.Connection, cards) -> list[dict]:
+    from app.db import set_setting
+
+    cards = clean_custom(cards or [])
+    set_setting(conn, SHARED_KEY, json.dumps(cards))
+    conn.commit()
+    return cards
 
 
 def _read(conn: sqlite3.Connection, key: str) -> dict | None:
@@ -269,7 +293,7 @@ def _write(conn: sqlite3.Connection, key: str, order, custom=None) -> dict:
     from app.db import set_setting
 
     custom = clean_custom(custom or [])
-    known = {c["id"] for c in custom}
+    known = {c["id"] for c in custom} | {c["id"] for c in get_shared(conn)}      # your own cards and the shared ones
     order = [c for c in clean_order(order) if not c.startswith("c-") or c in known]      # a card of your own that no longer exists is dropped
     set_setting(conn, key, json.dumps({"order": order, "custom": custom}))
     conn.commit()

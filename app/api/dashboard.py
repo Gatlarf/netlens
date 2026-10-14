@@ -67,6 +67,25 @@ def delete_layout(request: Request, conn=Depends(get_conn)) -> dict:
     return {"order": None, "custom": []}
 
 
+class SharedBody(BaseModel):
+    cards: list[dict] = []
+
+
+@router.get("/dashboard/shared")
+def get_shared(conn=Depends(get_conn)) -> dict:
+    """Cards an administrator made available to everybody (they are added from the card pool)."""
+    return {"cards": dashboard.get_shared(conn)}
+
+
+@router.put("/dashboard/shared")
+def put_shared(body: SharedBody, request: Request, conn=Depends(get_conn)) -> dict:
+    require_admin(request)
+    try:
+        return {"cards": dashboard.set_shared(conn, body.cards)}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
 @router.get("/dashboard/default")
 def get_default(conn=Depends(get_conn)) -> dict:
     """The dashboard an administrator set for everybody (null while there is none)."""

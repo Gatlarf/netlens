@@ -173,6 +173,15 @@ async function loadDefault() {
   return null;
 }
 
+// The cards an administrator shared with everybody (they are added from the pool like the built-in ones)
+async function loadLibrary() {
+  try {
+    return (await get("/api/dashboard/shared")).cards || [];
+  } catch (e) {
+    return [];
+  }
+}
+
 async function loadLayout(shared) {
   let server = EMPTY, reachable = true;
   try {
@@ -259,6 +268,7 @@ function miniMap() {
 export async function render(container) {
   const shared = await loadDefault();
   const layout = await loadLayout(shared);
+  let library = await loadLibrary();
   const base = () => (shared ? { order: shared.order, custom: shared.custom } : { order: DEFAULT_ORDER, custom: [] });
   let data = null, order = layout.order, custom = layout.custom, own = layout.own, editing = false, disposed = false, timer = null;
   const map = miniMap();
@@ -289,7 +299,8 @@ export async function render(container) {
   const registry = () => {
     const all = new Map(CARDS.map((c) => [c.id, c]));
     for (const pc of data ? data.plugin_cards || [] : []) { const c = pluginCard(pc); all.set(c.id, c); }
-    for (const def of custom) { const c = customCard(def, data); all.set(c.id, c); }
+    for (const def of library) { const c = customCard(def, data); c.shared = true; all.set(c.id, c); }
+    for (const def of custom) { const c = customCard(def, data); all.set(c.id, c); }        // your own copy wins over a shared one
     return all;
   };
   const byId = (id) => registry().get(id);
@@ -312,7 +323,20 @@ export async function render(container) {
     persist();
     draw();
   }
+  const isShared = (id) => library.some((c) => c.id === id) && !custom.some((c) => c.id === id);
+  async function saveLibrary(next) {
+    await put("/api/dashboard/shared", { cards: next });
+    library = next;
+  }
   function edit(def) {
+    if (def && isShared(def.id)) {                                               // a shared card: changing it changes it for everybody
+      if (!isAdmin()) return;
+      openEditor({ def, data, onSave: async (saved) => {
+        await saveLibrary(library.map((c) => (c.id === saved.id ? saved : c)));
+        draw();
+      } });
+      return;
+    }
     openEditor({ def, data, onSave: async (saved) => {
       const next = custom.some((c) => c.id === saved.id) ? custom.map((c) => (c.id === saved.id ? saved : c)) : [...custom, saved];
       const placed = order.includes(saved.id) ? order : [...order, saved.id];
@@ -327,6 +351,38 @@ export async function render(container) {
     persist();
     draw();
   }
+  // administrators: move one of their own cards into the shared library (everybody can then add it) and back
+  async function shareCard(def) {
+    try {
+      await saveLibrary([...library, def]);
+      custom = custom.filter((c) => c.id !== def.id);
+      await persist();
+      toast("Everybody can now add this card from their card pool", "success");
+    } catch (e) {
+      toast(e.message || "Could not share the card", "error");
+    }
+    draw();
+  }
+  async function unshareCard(def) {
+    try {
+      await saveLibrary(library.filter((c) => c.id !== def.id));
+      custom = [...custom, def];
+      await persist();
+    } catch (e) {
+      toast(e.message || "Could not stop sharing the card", "error");
+    }
+    draw();
+  }
+  async function deleteShared(def) {
+    try {
+      await saveLibrary(library.filter((c) => c.id !== def.id));
+      order = order.filter((x) => x !== def.id);
+      await persist();
+    } catch (e) {
+      toast(e.message || "Could not delete the card", "error");
+    }
+    draw();
+  }
 
   function cardEl(card) {
     const tone = card.tone ? card.tone(data) : "";
@@ -336,7 +392,7 @@ export async function render(container) {
     if (editing) {
       const i = order.indexOf(card.id);
       head.append(h("span", { class: "d-tools" },
-        card.custom ? h("button", { class: "btn d-tool", type: "button", "aria-label": `Change ${card.title}`, title: "Change", onclick: () => edit(card.custom) }, "✎") : null,
+        card.custom && (!card.shared || isAdmin()) ? h("button", { class: "btn d-tool", type: "button", "aria-label": `Change ${card.title}`, title: "Change", onclick: () => edit(card.custom) }, "✎") : null,
         h("button", { class: "btn d-tool", type: "button", disabled: i === 0, "aria-label": `Move ${card.title} earlier`, title: "Earlier", onclick: () => move(card.id, -1) }, "◀"),
         h("button", { class: "btn d-tool", type: "button", disabled: i === order.length - 1, "aria-label": `Move ${card.title} later`, title: "Later", onclick: () => move(card.id, 1) }, "▶"),
         h("button", { class: "btn d-tool", type: "button", "aria-label": `Remove ${card.title}`, title: "Remove", onclick: () => { order = order.filter((x) => x !== card.id); persist(); draw(); } }, "✕")));
@@ -409,12 +465,21 @@ export async function render(container) {
     if (!editing) return;
     const all = [...registry().values()];
     const free = all.filter((c) => !order.includes(c.id) && visible(c) && !c.custom && !c.plugin);
-    const mine = all.filter((c) => c.custom && !order.includes(c.id));
+    const mine = all.filter((c) => c.custom && !c.shared && !order.includes(c.id));
+    const sharedFree = all.filter((c) => c.shared && !order.includes(c.id));
     const plugins = all.filter((c) => c.plugin && !order.includes(c.id));
     pool.append(h("div", { class: "toolbar" }, h("h2", {}, "Your own cards"), h("button", { class: "btn primary", type: "button", onclick: () => edit(null) }, "Create a card")),
       mine.length ? h("div", { class: "pool-list" }, mine.map((c) => poolItem({ ...c, about: TYPE_ABOUT[c.custom.type] || c.about }, [
-        h("button", { class: "btn", type: "button", onclick: () => edit(c.custom) }, "Change"), h("button", { class: "btn danger", type: "button", onclick: () => deleteCard(c.id) }, "Delete")])))
+        h("button", { class: "btn", type: "button", onclick: () => edit(c.custom) }, "Change"),
+        isAdmin() ? h("button", { class: "btn", type: "button", title: "Let every user add this card to their dashboard", onclick: () => shareCard(c.custom) }, "Share with everyone") : null,
+        h("button", { class: "btn danger", type: "button", onclick: () => deleteCard(c.id) }, "Delete")])))
         : h("p", { class: "hint" }, "Make a card that shows any value, a device, a group, a service check, or notes and links."));
+    if (sharedFree.length) {
+      pool.append(h("h2", {}, "Shared by your administrator"), h("div", { class: "pool-list" }, sharedFree.map((c) => poolItem({ ...c, about: TYPE_ABOUT[c.custom.type] || c.about }, isAdmin() ? [
+        h("button", { class: "btn", type: "button", onclick: () => edit(c.custom) }, "Change"),
+        h("button", { class: "btn", type: "button", title: "Take it out of the shared cards; it stays in your own cards", onclick: () => unshareCard(c.custom) }, "Stop sharing"),
+        h("button", { class: "btn danger", type: "button", title: "Delete it for everybody", onclick: () => deleteShared(c.custom) }, "Delete")] : []))));
+    }
     if (plugins.length) pool.append(h("h2", {}, "Cards from your plugins"), h("div", { class: "pool-list" }, plugins.map((c) => poolItem(c))));
     pool.append(h("h2", {}, "Add a card"), free.length ? h("div", { class: "pool-list" }, free.map((c) => poolItem(c))) : h("p", { class: "hint" }, "All cards are on your dashboard."));
   }

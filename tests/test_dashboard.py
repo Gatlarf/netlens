@@ -252,3 +252,26 @@ def test_attention_separates_core_and_other_devices():
     # nothing marked: all flapping devices stay a warning, as before
     plain = dashboard._attention(_summary_stub(devices={"flapping": 2, "unknown": 0}), [], 0, [])
     assert plain == [{"level": "warn", "text": "2 other devices keep going up and down", "href": "#/uptime"}]
+
+
+def test_shared_cards_are_available_to_every_user(tmp_path):
+    from tests.test_users import make, sign_in
+
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    with TestClient(app, headers={"Authorization": "Bearer secret"}) as c:
+        make(c, "vera", "viewer")
+        vera = sign_in(app, "vera")
+        assert vera.get("/api/dashboard/shared").json() == {"cards": []}
+        assert vera.put("/api/dashboard/shared", json={"cards": [VALUE]}).status_code == 403            # only an administrator shares
+        assert c.put("/api/dashboard/shared", json={"cards": [VALUE, {"id": "c-bad", "type": "nope"}]}).status_code == 422
+        saved = c.put("/api/dashboard/shared", json={"cards": [VALUE]}).json()["cards"]
+        assert [x["id"] for x in saved] == [VALUE["id"]]
+        assert [x["id"] for x in vera.get("/api/dashboard/shared").json()["cards"]] == [VALUE["id"]]
+        # a user may put a shared card on their own dashboard without having made it
+        mine = vera.put("/api/dashboard/layout", json={"order": ["uptime", VALUE["id"]], "custom": []}).json()
+        assert mine["order"] == ["uptime", VALUE["id"]]
+        # a card that is neither theirs nor shared is still dropped
+        assert vera.put("/api/dashboard/layout", json={"order": ["uptime", "c-ghost1"], "custom": []}).json()["order"] == ["uptime"]
+        # unshared: it silently leaves the layouts when they are saved again
+        c.put("/api/dashboard/shared", json={"cards": []})
+        assert vera.put("/api/dashboard/layout", json={"order": ["uptime", VALUE["id"]], "custom": []}).json()["order"] == ["uptime"]
