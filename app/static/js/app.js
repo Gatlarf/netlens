@@ -339,6 +339,14 @@ async function applySession() {
   return session;
 }
 
+// Open on the page the user chose (only when no page was asked for: a link to a page, a reload and the back button are left alone)
+function goToStartPage(session) {
+  const hash = location.hash;
+  if ((!hash || hash === "#") && session && session.start_page && ROUTES[session.start_page]) {
+    location.replace(session.start_page);
+  }
+}
+
 async function handleLogin(e) {
   e.preventDefault();
   const body = loginByUser
@@ -350,7 +358,8 @@ async function handleLogin(e) {
     closeLoginDialog();
     clearLoginError();
     el("#login-password").value = "";
-    await applySession();
+    const session = await applySession();
+    goToStartPage(session);
     displayLoaded = false;
     startPoll();
     renderPage();
@@ -414,6 +423,7 @@ async function init() {
     if (session.token_login === false) hideTokenLogin();
     openLoginDialog();
   } else {
+    goToStartPage(session);
     startPoll();
     renderPage();
   }

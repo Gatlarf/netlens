@@ -1,4 +1,4 @@
-import { post } from "../api.js";
+import { get, put, post } from "../api.js";
 import { h, toast, sessionInfo } from "../util.js";
 
 // The signed-in account: who it is, password change (users only) and logout.
@@ -28,6 +28,24 @@ export function buildAccountCard() {
     });
     card.appendChild(form);
   }
+
+  // the page Netlens opens on
+  const start = h("select", { id: "start-page", "aria-label": "Start page" }, h("option", { value: "" }, "Dashboard (default)"));
+  const startRow = h("div", { class: "field" }, h("label", { for: "start-page" }, "Start page"), start,
+    h("p", { class: "hint" }, "The page Netlens opens on when you open it without a link to a page. Kept on the server, so it follows you to every browser."));
+  card.appendChild(startRow);
+  get("/api/me/preferences").then((p) => {
+    for (const o of p.start_pages) if (o.value !== "#/dashboard") start.appendChild(h("option", { value: o.value }, o.label));
+    start.value = p.start_page && p.start_page !== "#/dashboard" ? p.start_page : "";
+    start.addEventListener("change", async () => {
+      try {
+        await put("/api/me/preferences", { start_page: start.value || null });
+        toast(start.value ? "Saved: Netlens will open on this page" : "Netlens opens on the dashboard", "success");
+      } catch (err) {
+        toast(err.message || "Could not save", "error");
+      }
+    });
+  }).catch(() => { startRow.hidden = true; });
 
   const logoutBtn = h("button", { class: "btn", type: "button" }, "Log out");
   logoutBtn.addEventListener("click", async () => {

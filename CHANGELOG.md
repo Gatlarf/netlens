@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.7 — 2026-10-15
+
+### Added
+- ★ **Start page**: under Settings → Account every user (viewers too) can choose the page Netlens opens on: the map, Health, Devices, Reports and others instead of the dashboard. It is kept per user on the server, and only applies when Netlens is opened without a link to a page.
+- ★ **Synology plugin** (Settings → Integrations → Browse plugins): a Synology NAS (DSM 7) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, matched to your devices by IP or MAC. Read-only; it needs a dedicated administrator account because DSM has no read-only API role, and the plugin's page says how to limit it. Tested against a simulated DSM only: a Run diagnostic report from a real DS923+ is welcome.
+
 ## 0.4.6 — 2026-10-15
 
 ### Added

@@ -169,7 +169,8 @@ def require_auth(request: HTTPConnection) -> None:
         method = request.scope.get("method", "GET")
         path = request.url.path
         allowed = ((method in ("GET", "HEAD") and VIEWER_READABLE.match(path)) or (method == "POST" and path in VIEWER_MAY_POST)
-                   or (method in ("PUT", "DELETE") and path == "/api/dashboard/layout"))     # everybody arranges their own dashboard
+                   or (method in ("PUT", "DELETE") and path == "/api/dashboard/layout")     # everybody arranges their own dashboard
+                   or (method in ("GET", "PUT") and path == "/api/me/preferences"))          # and chooses the page to start on
         if not allowed:
             raise HTTPException(status_code=403, detail="this needs an administrator")
 

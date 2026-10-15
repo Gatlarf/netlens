@@ -153,9 +153,17 @@ async def session(request: Request) -> JSONResponse:
             "token_login": bool(request.app.state.settings.token),  # False: only user name and password sign in
             **_demo_info(request),
         })
+    from app import preferences
+
+    db = connect(request.app.state.db_path)
+    try:
+        start_page = preferences.get(db, principal)["start_page"]
+    finally:
+        db.close()
     return JSONResponse({
         "authenticated": True,
         "user": {"username": principal.username, "role": principal.role, "builtin": principal.builtin},
+        "start_page": start_page,
         **_demo_info(request),
     })
 

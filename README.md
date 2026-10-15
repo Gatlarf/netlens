@@ -665,6 +665,10 @@ The result is always a tree: an assignment that would put a device below itself 
 
 The same data is available as `GET /api/hierarchy`, and `PATCH /api/devices/<id>` accepts `parent_mode` (`auto`, `none`, `device`) and `parent_device_id`.
 
+### Start page
+
+Under **Settings → Account → Start page** each user chooses the page Netlens opens on (the map, Health, Devices, Reports and so on instead of the dashboard). It is kept on the server per user, so it follows you to every browser, and it only applies when you open Netlens without a link to a page: a bookmark, a reload and the back button are left alone.
+
 ### Dark mode
 
 The **moon / sun button** at the top right of the bar, left of the account menu, switches between light and dark mode. Without a choice Netlens follows your operating system's setting; once you click the button your choice is remembered in that browser (it is not shared between browsers or users). Charts and the map follow the theme too (the map draws brighter device colours and links with outlined dots and haloed labels in dark mode, and offline devices get a dashed outline).
