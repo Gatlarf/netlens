@@ -26,6 +26,11 @@ class MonitorBody(BaseModel):
     version: str | None = None
     username: str | None = None
     password: str | None = None
+    auth_proto: str | None = None
+    auth_password: str | None = None
+    priv_proto: str | None = None
+    priv_password: str | None = None
+    platform: str | None = None
     private_key: str | None = None
     passphrase: str | None = None
     clear_password: bool | None = None
@@ -48,7 +53,7 @@ def _data(body: MonitorBody) -> dict[str, Any]:
 def get_monitor(device_id: int, conn=Depends(get_conn)) -> dict:
     device = _device(conn, device_id)
     row = hm.get_monitor(conn, device_id)
-    return {"monitor": hm.public(conn, row) if row else None, "default_address": device["primary_ip"], "groups": GROUP_TITLES,
+    return {"monitor": ({**hm.public(conn, row), "managed": row["source"] == "central"} if row else None), "default_address": device["primary_ip"], "groups": GROUP_TITLES,
             "state": _state(conn, row["id"]) if row else []}
 
 
@@ -96,6 +101,9 @@ async def test_monitor(device_id: int, body: MonitorBody, conn=Depends(get_conn)
 @router.put("/devices/{device_id}/monitor")
 async def put_monitor(device_id: int, body: MonitorBody, conn=Depends(get_conn)) -> dict:
     device = _device(conn, device_id)
+    existing = hm.get_monitor(conn, device_id)
+    if existing is not None and existing["source"] == "central":
+        raise HTTPException(status_code=409, detail="this monitor is managed by the central Netlens and cannot be changed here")
     data = _data(body)
     data.setdefault("address", device["primary_ip"])
     try:
@@ -125,6 +133,8 @@ def delete_monitor(device_id: int, conn=Depends(get_conn)) -> dict:
     row = hm.get_monitor(conn, device_id)
     if row is None:
         raise HTTPException(status_code=404, detail="this device has no monitor")
+    if row["source"] == "central":
+        raise HTTPException(status_code=409, detail="this monitor is managed by the central Netlens and cannot be removed here")
     conn.execute("DELETE FROM metric_state WHERE monitor_id = ?", (row["id"],))
     conn.execute("DELETE FROM host_monitors WHERE id = ?", (row["id"],))
     conn.commit()
@@ -133,43 +143,7 @@ def delete_monitor(device_id: int, conn=Depends(get_conn)) -> dict:
 
 
 # ----------------------------------------------------------------------------- overview and limits
-def _latest(store, device_id: int) -> dict[str, Any]:
-    out: dict[str, Any] = {"cpu": None, "mem": None, "disk": None, "disk_label": None, "temp": None, "battery": None, "uptime": None, "rx": None, "tx": None,
-                           "supply": None, "supply_label": None}
-    if store is None:
-        return out
-    now = time.time()
-    worst = None
-    rx = tx = 0.0
-    seen_net = False
-    for s in store.metrics_of("device", device_id):
-        if s["last"] is None or s["last_ts"] is None or now - s["last_ts"] > 3600:
-            continue
-        m = s["metric"]
-        if m == "cpu_pct":
-            out["cpu"] = s["last"]
-        elif m == "mem_pct":
-            out["mem"] = s["last"]
-        elif m == "disk_pct" and (worst is None or s["last"] > worst[0]):
-            worst = (s["last"], s["label"])
-        elif m == "supply_pct" and (out["supply"] is None or s["last"] < out["supply"]):
-            out["supply"], out["supply_label"] = s["last"], s["label"]
-        elif m == "temp_c" and (out["temp"] is None or s["last"] > out["temp"]):
-            out["temp"] = s["last"]
-        elif m == "battery_pct":
-            out["battery"] = s["last"]
-        elif m == "uptime_s":
-            out["uptime"] = s["last"]
-        elif m == "net_rx_bps":
-            rx += s["last"]
-            seen_net = True
-        elif m == "net_tx_bps":
-            tx += s["last"]
-    if worst:
-        out["disk"], out["disk_label"] = worst
-    if seen_net:
-        out["rx"], out["tx"] = rx, tx
-    return out
+_latest = hm.latest_readings
 
 
 @router.get("/monitors")

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 
 
 def utcnow() -> str:
@@ -712,6 +712,9 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+
+    # --- schema v24: a health monitor can be set up by the central Netlens (source = 'central')
+    _add_column_if_missing(conn, "host_monitors", "source", "TEXT")
 
     # Indexes
     cur.execute("CREATE INDEX IF NOT EXISTS idx_device_ips_ip ON device_ips(ip)")

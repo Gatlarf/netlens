@@ -496,6 +496,39 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
     }
 
 
+def _health(conn: sqlite3.Connection) -> tuple[dict, dict[int, dict]]:
+    """The health monitors in numbers, and the newest readings of each monitored device (for the per-device entities)."""
+    from app import forecast, tsdb
+    from app.hostmetrics import service as hm
+
+    rows = conn.execute("SELECT device_id, last_ok FROM host_monitors WHERE enabled = 1").fetchall()
+    levels: dict[int, str] = {}
+    problems = hm.problems(conn)
+    for p in problems:
+        cur = levels.get(p["device_id"], "ok")
+        levels[p["device_id"]] = "critical" if "critical" in (cur, p["level"]) else "warning"
+    store = tsdb.for_conn(conn)
+    per_device = {}
+    for r in rows:
+        latest = hm.latest_readings(store, r["device_id"])
+        per_device[r["device_id"]] = {"level": levels.get(r["device_id"], "ok"), "readable": None if r["last_ok"] is None else bool(r["last_ok"]),
+                                      **{k: latest[k] for k in ("cpu", "mem", "disk", "temp", "battery", "rx", "tx")}}
+    days = [f["days_to_full"] for f in forecast.cached(conn) if f["days_to_full"] is not None]
+    block = {"monitored": len(rows), "warning": sum(1 for d in per_device.values() if d["level"] == "warning"),
+             "critical": sum(1 for d in per_device.values() if d["level"] == "critical"),
+             "unreadable": sum(1 for d in per_device.values() if d["readable"] is False), "problems": len(problems),
+             "days_to_full": round(min(days), 1) if days else None}
+    return block, per_device
+
+
+def _remote_sites(conn: sqlite3.Connection) -> dict:
+    from app import probes
+
+    sites = [probes.present(conn, r) for r in conn.execute("SELECT * FROM probes WHERE enabled = 1")]
+    return {"total": len(sites), "silent": sum(1 for s in sites if s["state"] == "silent"), "problems": sum(s["problems"]["count"] for s in sites),
+            "devices_down": sum(s["devices"]["total"] - s["devices"]["online"] for s in sites), "services_down": sum(s["services"]["down"] for s in sites)}
+
+
 def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool = False, stale_after_s: int = 3 * 3600, data_dir=None, passive: dict | None = None) -> dict:
     """The small, versioned document Home Assistant polls (see SUMMARY_API). Keys never disappear within one API version."""
     now = now or utcnow()
@@ -513,6 +546,10 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         }
         for i in sorted(devs)
     ]
+    health, health_by_device = _health(conn)
+    for d in devices:
+        if d["id"] in health_by_device:
+            d["health"] = health_by_device[d["id"]]
     day = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ?", (_ago(now, hours=24),)).fetchone()
     week = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ?", (_ago(now, days=7),)).fetchone()
     month = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ?", (_ago(now, days=30),)).fetchone()
@@ -561,6 +598,8 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "containers": {k: container_numbers[k] for k in ("total", "running", "stopped", "restarting", "unhealthy", "exposed", "hosts")},
         "guests": {k: guest_numbers[k] for k in ("total", "running", "stopped", "hosts", "by_kind", "update_available", "image_updates", "old_images")},
         "sites": sites.summary(conn),
+        "health": health,
+        "remote_sites": _remote_sites(conn),
         "speed": speedtest.summary(conn, now),
         "passive": None if passive is None else {k: passive.get(k) for k in ("enabled", "running", "frames", "applied")},
         "wifi": {k: wifi[k] for k in ("clients", "weak", "avg_rssi")},

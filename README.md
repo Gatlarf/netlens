@@ -488,18 +488,29 @@ When a topology plugin reports the signal of Wi-Fi clients (the ASUS plugin does
 
 ### Performance graphs and health monitoring
 
-Netlens keeps a time series of what it measures in its own small database file, `metrics.db`, next to `netlens.db`: the response time and availability of every device (from the scans) and of every service check. Full detail is kept for 7 days, 5-minute values for 90 days and hourly values (lowest, average, highest) for 2 years, so a graph can show anything from 6 hours to a year. The file is derived data and is not part of a backup; the first start after an update fills it from the uptime history that already exists.
+Netlens keeps a time series of what it measures in its own small database file, `metrics.db`, next to `netlens.db`: the response time and availability of every device (from the scans) and of every service check. Full detail is kept for 7 days, 5-minute values for 90 days and hourly values (lowest, average, highest) for 2 years, so a graph can show anything from 6 hours to a year. A backup carries a trimmed copy of it (the last day in full, 14 days at 5 minutes and all the hourly values), so a restore brings the graphs and the growth trend back; the first start after an update fills it from the uptime history that already exists.
 
 **Health monitoring** adds what a ping cannot tell you. On a device's page choose *Set up health monitoring* and pick how to ask it:
 
 | Method | For | Reads |
 | --- | --- | --- |
-| **SNMP** v1 / v2c | switches, routers, NAS boxes, printers, UPS units, Windows with the SNMP service, Linux with `snmpd` | processor, memory, swap, disks (used and free), traffic per interface, temperatures (net-snmp), uptime, printer supplies, UPS battery and runtime |
+| **SNMP** v1, v2c and **v3** | switches, routers, NAS boxes, printers, UPS units, Windows with the SNMP service, Linux with `snmpd` | processor, memory, swap, disks (used and free), traffic, load, errors and link state per interface (port), temperatures (net-snmp), uptime, printer supplies, UPS battery and runtime |
 | **SSH** | Linux and other systems with `/proc` | processor, load, memory, swap, disks, traffic per interface, temperatures, uptime |
+| **SSH to Windows** | Windows 10/11 and Server 2019+ with the OpenSSH server (an optional Windows feature) | processor, memory, swap, disks, traffic per adapter, uptime. Netlens recognises Windows by itself and runs one read-only PowerShell command; nothing is installed |
 
-Nothing is installed on the device and only read requests are sent: SNMP `GET` / `GETNEXT` / `GETBULK`, or one short shell command over SSH that reads `/proc`, `/sys` and `df`. An ordinary (non-root) SSH account is enough. The SSH host key is remembered the first time and shared with the web terminal. The login is stored encrypted (see *Stored passwords*). *Test* shows what the device answers before you save. Windows can be read through the SNMP service; there is no WinRM or agent.
+Nothing is installed on the device and only read requests are sent: SNMP `GET` / `GETNEXT` / `GETBULK`, or one short shell command over SSH that reads `/proc`, `/sys` and `df`. An ordinary (non-root) SSH account is enough. The SSH host key is remembered the first time and shared with the web terminal. The login is stored encrypted (see *Stored passwords*). *Test* shows what the device answers before you save. Windows can be read through the SNMP service or through its OpenSSH server (there is no WinRM or agent). **SNMPv3** uses a user name with authentication (MD5, SHA, SHA-256, SHA-512) and optionally encryption (AES or DES); create a read-only user on the device.
 
-**Warnings**: a reading has to stay past its limit for a few rounds in a row (processor 5, others 2-3) before anything is said, so a short peak is not an alarm. Defaults: processor 90 / 98 %, memory 90 / 97 %, disk 85 / 95 % full, temperature 80 / 90 °C, printer supplies and UPS battery below 15 / 5 % and 50 / 25 %, and a UPS running on battery. Change them on **Monitoring → Health**. The events *Health warning*, *Health critical* and *Health normal* go through the notification channels, respect maintenance windows, and show on the dashboard. `/metrics` carries the readings as `netlens_host_*`.
+**Warnings**: a reading has to stay past its limit for a few rounds in a row (processor 5, others 2-3) before anything is said, so a short peak is not an alarm. Defaults: processor 90 / 98 %, memory 90 / 97 %, disk 85 / 95 % full, temperature 80 / 90 °C, printer supplies and UPS battery below 15 / 5 % and 50 / 25 %, and a UPS running on battery. Change them on **Monitoring → Health**, or for one device only on its Health tab under *Limits for this device* (a NAS that runs at 90 % by design). Switch ports also get *Port busy* (85 / 95 % of the link speed) and *Port errors* (1 / 10 per second) limits. The events *Health warning*, *Health critical* and *Health normal* go through the notification channels, respect maintenance windows, and show on the dashboard. `/metrics` carries the readings as `netlens_host_*`.
+
+**Ports.** A switch (or any device with three or more interfaces) gets a *Ports* table on its Health tab with the link state, traffic in and out, how full the link is and errors; click a port for its graphs. A cable that is unplugged shows as *down* without an alarm; ports that were switched off on purpose are left out.
+
+**Running out soon.** From the growth of the last weeks Netlens works out when each monitored disk will be full (a steady disk gets no date, one big file is not a trend, and a disk needs three days of history first). The dashboard card *Running out soon* lists them, and a notification (*Disk filling up*, *Disk almost full*) is sent once when a disk is on course to fill within 14 days (3 days for the critical one). The 14 days can be changed with the setting `forecast.alert_days`.
+
+**Dashboard.** The *Health* card shows a heat-map with one tile per monitored device (coloured by its worst level, with bars for processor, memory and the fullest disk); with more than 24 devices the healthy ones shrink to small squares.
+
+### Reports
+
+**Monitoring → Reports** has two things. The **weekly report** is a summary in plain language of the last seven days: what was down and for how long, health readings past a limit, disks that are filling up, new devices and silent remote sites. Switch it on there, choose the day and hour (the time of the server) and tick *Weekly report* on the notification channels that should get it (Settings → Notifications); *Send it now* tries it. The **monthly availability report** lists every device and service for a calendar month with its availability, number of outages, longest outage and time down; print it or download it as a CSV file.
 
 ### Remote sites
 
@@ -510,7 +521,9 @@ Netlens can watch more than one network. Run a Netlens at each location (a branc
 
 The remote Netlens keeps working on its own (scans, checks, health monitoring, its own alerts) and sends a report every minute: its devices, service checks, health problems and the measurements made since the last report. **The connection always goes out from the remote site**, so nothing there has to be reachable from outside; across the internet the central Netlens should be reachable over `https://` (a plain `http://` address is accepted for a server on your own network, for example through a VPN). The token is the only credential: a new one can be made at any time, which locks the old one out.
 
-The central Netlens keeps the remote devices apart from its own (two sites may use the same address range). Each site shows its devices, service checks and health problems with graphs of their history, and raises alerts through the notification channels: a device offline or new, a service down, a health problem, and **a site that stops reporting** (until it reports again its devices are shown as not watched rather than all offline). Alerts also appear on the dashboard and in Prometheus (`netlens_remote_site_*`). What a remote site shows is limited to what it chose to report: names, addresses, MAC addresses, vendors, ports and measurements, never passwords.
+The central Netlens keeps the remote devices apart from its own (two sites may use the same address range). Each site shows its devices, service checks and health problems with graphs of their history, and raises alerts through the notification channels: a device offline or new, a service down, a health problem, and **a site that stops reporting** (until it reports again its devices are shown as not watched rather than all offline). Alerts also appear on the dashboard and in Prometheus (`netlens_remote_site_*`).
+
+**Managing a site from the central Netlens.** On the page of a site, *Managed from here* lets you set up service checks and health monitors that run at the remote location (on its own network). The remote Netlens only accepts this when you tick *Accept configuration from the central Netlens* in its **Settings → Report to a central Netlens**; what it receives is marked as managed from the central Netlens and cannot be edited there. The logins are stored encrypted on both sides and travel in the reply to the site's report, so use `https://` or a VPN. What a remote site shows is limited to what it chose to report: names, addresses, MAC addresses, vendors, ports and measurements, never passwords.
 
 ### Maintenance windows
 
@@ -856,6 +869,9 @@ app/plugins      plugin system: manifest and output contract, runner, registry, 
 app/terminal     SSH/Telnet backends
 app/api          REST API routers
 app/uptime.py    uptime history, app/backup.py  backup and restore
+app/forecast.py  when will a disk be full (growth trend) and the alert for it
+app/reports.py   weekly summary and monthly availability report
+app/probe_config.py  checks and monitors that the central Netlens sets up at a remote site
 app/tsdb.py      metrics store (metrics.db): raw, 5-minute and hourly tiers behind the performance graphs
 app/hostmetrics  health readings: SNMP client, SSH collector, monitors, limits and alerts
 app/probes.py    remote sites (central side), app/central.py  reporting to a central Netlens (remote side)

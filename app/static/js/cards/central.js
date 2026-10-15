@@ -24,8 +24,10 @@ export async function buildCentralCard() {
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = info.enabled;
     const result = h("div", {});
+    const accept = h("input", { type: "checkbox" });
+    accept.checked = !!info.accept_config;
     const body = () => {
-      const out = { url: url.value.trim(), enabled: enabled.checked };
+      const out = { url: url.value.trim(), enabled: enabled.checked, accept_config: accept.checked };
       if (token.value.trim()) out.token = token.value.trim();
       return out;
     };
@@ -58,10 +60,16 @@ export async function buildCentralCard() {
       result.appendChild(h("p", { class: st.ok ? "" : "error" },
         st.ok ? `Last report ${timeAgo(st.ts)}: ${st.devices} devices, ${st.services} service checks, ${st.samples} measurements.` : `Last report ${timeAgo(st.ts)} failed: ${st.error}`));
     }
+    if (st.config) {
+      const c = st.config;
+      result.appendChild(h("p", { class: c.error ? "error" : "hint" }, c.error ? c.error : `Configuration from the central Netlens (revision ${info.config_rev}): ${c.services} service check(s), ${c.monitors} monitor(s).${c.skipped && c.skipped.length ? ` Skipped: ${c.skipped.join("; ")}` : ""}`));
+    }
     card.appendChild(h("form", { class: "edit-form", onsubmit: (e) => e.preventDefault() },
       field("Address of the central Netlens", url, "Use https:// across the internet. A plain http:// address is accepted for a server on your own network (a VPN, for example)."),
       field("Token", token, "Made on the central Netlens for this location. It is stored encrypted here."),
       h("label", {}, enabled, " Report to the central Netlens"),
+      h("label", {}, accept, " Accept configuration from the central Netlens"),
+      h("p", { class: "hint" }, "When ticked, the central Netlens may set up service checks and health monitors here (they appear marked as managed from the central Netlens and cannot be changed here). Leave it off to keep all settings at this location. Logins it sends are stored encrypted."),
       h("div", { class: "form-actions" }, save, send), result));
   }
 

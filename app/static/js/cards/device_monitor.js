@@ -89,7 +89,7 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
 
   // The limits of this device alone: empty boxes follow the general limits (Monitoring -> Health)
   const LIMIT_ROWS = [["cpu_pct", "Processor busy (%)"], ["mem_pct", "Memory in use (%)"], ["disk_pct", "Disk full (%)"], ["temp_c", "Temperature (°C)"],
-    ["supply_pct", "Supply left (%)"], ["battery_pct", "UPS battery (%)"]];
+    ["supply_pct", "Supply left (%)"], ["battery_pct", "UPS battery (%)"], ["if_util_pct", "Port busy (%)"], ["if_err_ps", "Port errors (per second)"]];
   function limitsBox() {
     const box = h("details", { class: "limits-box" }, h("summary", {}, "Limits for this device"));
     box.addEventListener("toggle", async () => {
@@ -138,25 +138,42 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     formOpen = true;
     clear(card);
     card.appendChild(h("h2", {}, "Health monitoring"));
-    const method = h("select", { name: "method" }, h("option", { value: "snmp" }, "SNMP (switch, NAS, printer, UPS, Windows ...)"), h("option", { value: "ssh" }, "SSH (Linux)"));
+    const method = h("select", { name: "method" }, h("option", { value: "snmp" }, "SNMP (switch, NAS, printer, UPS, Windows ...)"), h("option", { value: "ssh" }, "SSH (Linux, or Windows with OpenSSH)"));
     method.value = m ? m.method : (device.ports || []).some((p) => p.port === 22 && (!p.state || p.state === "open")) ? "ssh" : "snmp";
     const address = h("input", { type: "text", name: "address", value: m ? m.address : device.primary_ip || "", required: true });
     const port = h("input", { type: "number", min: "1", max: "65535", placeholder: method.value === "ssh" ? "22" : "161", value: m ? String(m.port) : "" });
     const community = h("input", { type: "password", autocomplete: "off", placeholder: m && m.has_community ? "(kept, type to change)" : "public" });
-    const version = h("select", {}, h("option", { value: "2c" }, "2c (normal)"), h("option", { value: "1" }, "1 (old devices)"));
+    const version = h("select", {}, h("option", { value: "2c" }, "2c (normal)"), h("option", { value: "3" }, "3 (user name and passwords, more secure)"), h("option", { value: "1" }, "1 (old devices)"));
     version.value = m && m.version ? m.version : "2c";
+    const v3user = h("input", { type: "text", autocomplete: "off", value: m && m.version === "3" && m.username ? m.username : "" });
+    const authProto = h("select", {}, h("option", { value: "" }, "none"), ...["SHA", "SHA256", "SHA512", "MD5"].map((p) => h("option", { value: p }, p)));
+    authProto.value = m && m.auth_proto ? m.auth_proto : "SHA";
+    const authPw = h("input", { type: "password", autocomplete: "new-password", placeholder: m && m.has_auth_password ? "(kept, type to change)" : "at least 8 characters" });
+    const privProto = h("select", {}, h("option", { value: "" }, "none (not encrypted)"), h("option", { value: "AES" }, "AES"), h("option", { value: "DES" }, "DES (old devices)"));
+    privProto.value = m && m.priv_proto ? m.priv_proto : "AES";
+    const privPw = h("input", { type: "password", autocomplete: "new-password", placeholder: m && m.has_priv_password ? "(kept, type to change)" : "at least 8 characters" });
     const username = h("input", { type: "text", autocomplete: "off", value: m && m.username ? m.username : "" });
     const password = h("input", { type: "password", autocomplete: "new-password", placeholder: m && m.has_password ? "(kept, type to change)" : "" });
+    const platform = h("select", {}, h("option", { value: "auto" }, "Detect automatically"), h("option", { value: "linux" }, "Linux / Unix"), h("option", { value: "windows" }, "Windows"));
+    platform.value = m && m.platform ? m.platform : "auto";
     const key = h("textarea", { rows: "3", placeholder: m && m.has_private_key ? "(kept, paste to change)" : "-----BEGIN OPENSSH PRIVATE KEY-----", spellcheck: "false" });
     const interval = h("select", {}, INTERVALS.map(([s, t]) => h("option", { value: String(s) }, t)));
     interval.value = String(m ? m.interval_s : 60);
     const alerts = h("input", { type: "checkbox" });
     alerts.checked = m ? m.alerts : true;
-    const snmpBox = h("div", {}, field("Community", community, "The read community string set on the device. Many devices use “public”. Read-only access is all that is needed."), field("SNMP version", version));
-    const sshBox = h("div", {}, field("User name", username, "An ordinary account is enough; nothing is changed on the host."), field("Password", password), field("Private key (instead of a password)", key));
+    const communityField = field("Community", community, "The read community string set on the device. Many devices use “public”. Read-only access is all that is needed.");
+    const v3Box = h("div", {}, field("SNMPv3 user name", v3user, "A read-only user created on the device."), field("Authentication", authProto), field("Authentication password", authPw),
+      field("Encryption", privProto), field("Encryption password", privPw));
+    const snmpBox = h("div", {}, field("SNMP version", version), communityField, v3Box);
+    const sshBox = h("div", {}, field("User name", username, "An ordinary account is enough; nothing is changed on the host."), field("Password", password), field("Private key (instead of a password)", key),
+      field("System", platform, "Windows needs the OpenSSH server (Settings → Optional features) and a user that may read performance data. Nothing is installed."));
     const result = h("div", { class: "monitor-result" });
-    const show = () => { snmpBox.hidden = method.value !== "snmp"; sshBox.hidden = method.value !== "ssh"; port.placeholder = method.value === "ssh" ? "22" : "161"; };
+    const show = () => {
+      snmpBox.hidden = method.value !== "snmp"; sshBox.hidden = method.value !== "ssh"; port.placeholder = method.value === "ssh" ? "22" : "161";
+      communityField.hidden = version.value === "3"; v3Box.hidden = version.value !== "3";
+    };
     method.addEventListener("change", show);
+    version.addEventListener("change", show);
     show();
 
     const body = () => {
@@ -164,9 +181,18 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
       if (port.value) out.port = Number(port.value);
       if (method.value === "snmp") {
         out.version = version.value;
-        if (community.value) out.community = community.value;
+        if (version.value === "3") {
+          out.username = v3user.value.trim();
+          out.auth_proto = authProto.value;
+          out.priv_proto = authProto.value ? privProto.value : "";
+          if (authPw.value) out.auth_password = authPw.value;
+          if (privPw.value) out.priv_password = privPw.value;
+        } else if (community.value) {
+          out.community = community.value;
+        }
       } else {
         out.username = username.value.trim();
+        out.platform = platform.value;
         if (password.value) out.password = password.value;
         if (key.value.trim()) out.private_key = key.value.trim();
       }

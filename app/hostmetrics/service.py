@@ -17,7 +17,7 @@ from typing import Any
 
 from app import tsdb, vault
 from app.db import add_event, connect, get_setting, set_setting, utcnow
-from app.hostmetrics import snmp, ssh
+from app.hostmetrics import snmp, snmpv3, ssh
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +34,8 @@ DEFAULT_RULES: dict[str, dict[str, Any]] = {
     "cpu_pct": {"title": "Processor busy", "unit": "%", "warn": 90, "crit": 98, "confirm": 5},
     "mem_pct": {"title": "Memory in use", "unit": "%", "warn": 90, "crit": 97, "confirm": 3},
     "disk_pct": {"title": "Disk full", "unit": "%", "warn": 85, "crit": 95, "confirm": 2},
+    "if_util_pct": {"title": "Port busy", "unit": "%", "warn": 85, "crit": 95, "confirm": 5},
+    "if_err_ps": {"title": "Port errors", "unit": "/s", "warn": 1, "crit": 10, "confirm": 3},
     "temp_c": {"title": "Temperature", "unit": "°C", "warn": 80, "crit": 90, "confirm": 3},
     "supply_pct": {"title": "Supply low", "unit": "%", "warn": 15, "crit": 5, "confirm": 1, "low": True},
     "battery_pct": {"title": "UPS battery", "unit": "%", "warn": 50, "crit": 25, "confirm": 1, "low": True},
@@ -43,6 +45,15 @@ DEFAULT_RULES: dict[str, dict[str, Any]] = {
 
 class MonitorError(ValueError):
     """The definition of a monitor is not valid."""
+
+
+def make_agent(address: str, port: int, secret: dict[str, Any], timeout: float = 2.5, retries: int = 1):
+    """The SNMP client for a monitor: v1, v2c with a community, or v3 with a user (and optional authentication and privacy)."""
+    where = address if port == 161 else f"{address}:{port}"
+    if str(secret.get("version", "2c")) == "3":
+        return snmpv3.AgentV3(where, secret.get("username", ""), secret.get("auth_proto", ""), secret.get("auth_password", ""),
+                              secret.get("priv_proto", ""), secret.get("priv_password", ""), timeout=timeout, retries=retries)
+    return snmp.Agent(where, secret.get("community", "public"), secret.get("version", "2c"), timeout=timeout, retries=retries)
 
 
 # ----------------------------------------------------------------------------- rules
@@ -164,18 +175,50 @@ def validate(data: dict[str, Any], current: dict[str, Any] | None = None) -> dic
         raise MonitorError(f"the interval must be between {MIN_INTERVAL} and {MAX_INTERVAL} seconds")
     secret = dict(cur.get("secret") or {})
     if method == "snmp":
-        secret = {k: v for k, v in secret.items() if k in ("community", "version")}
+        secret = {k: v for k, v in secret.items() if k in ("community", "version", "username", "auth_proto", "auth_password", "priv_proto", "priv_password")}
         community = data.get("community")
         if community is not None and str(community) != "":
             secret["community"] = str(community)
         version = data.get("version", secret.get("version", "2c"))
-        if str(version) not in ("1", "2c"):
-            raise MonitorError("SNMP version must be 1 or 2c")
+        if str(version) not in ("1", "2c", "3"):
+            raise MonitorError("SNMP version must be 1, 2c or 3")
         secret["version"] = str(version)
-        if not secret.get("community"):
-            secret["community"] = "public"
+        if str(version) == "3":
+            for key in ("username", "auth_proto", "priv_proto"):
+                if data.get(key) is not None:
+                    secret[key] = str(data[key]).strip()
+            for key in ("auth_password", "priv_password"):
+                if data.get(key) not in (None, ""):
+                    secret[key] = str(data[key])
+            if not secret.get("username"):
+                raise MonitorError("give the SNMPv3 user name")
+            auth, priv = secret.get("auth_proto", ""), secret.get("priv_proto", "")
+            if auth and auth not in snmpv3.AUTH:
+                raise MonitorError("the authentication protocol must be " + ", ".join(snmpv3.AUTH))
+            if priv and priv not in snmpv3.PRIV:
+                raise MonitorError("the privacy protocol must be AES or DES")
+            if priv and not auth:
+                raise MonitorError("encryption needs authentication as well")
+            if not auth:
+                secret.pop("auth_password", None)
+            if not priv:
+                secret.pop("priv_password", None)
+            if auth and len(secret.get("auth_password", "")) < 8:
+                raise MonitorError("the authentication password must be at least 8 characters")
+            if priv and len(secret.get("priv_password", "")) < 8:
+                raise MonitorError("the privacy password must be at least 8 characters")
+            secret.pop("community", None)
+        else:
+            for key in ("username", "auth_proto", "auth_password", "priv_proto", "priv_password"):
+                secret.pop(key, None)
+            if not secret.get("community"):
+                secret["community"] = "public"
     else:
-        secret = {k: v for k, v in secret.items() if k in ("username", "password", "private_key", "passphrase")}
+        secret = {k: v for k, v in secret.items() if k in ("username", "password", "private_key", "passphrase", "platform")}
+        if data.get("platform") is not None:
+            if data["platform"] not in ("auto", "linux", "windows"):
+                raise MonitorError("the system must be Automatic, Linux or Windows")
+            secret["platform"] = data["platform"]
         for key in ("username", "password", "private_key", "passphrase"):
             if key in data and data[key] is not None and (str(data[key]) != "" or key == "username"):
                 secret[key] = str(data[key])
@@ -214,9 +257,14 @@ def public(conn, row) -> dict[str, Any]:
         "last_error": row["last_error"], "since": row["since"],
         "has_community": bool(secret.get("community")) if row["method"] == "snmp" else None,
         "version": secret.get("version", "2c") if row["method"] == "snmp" else None,
-        "username": secret.get("username") if row["method"] == "ssh" else None,
+        "username": secret.get("username") if row["method"] in ("ssh", "snmp") else None,
+        "auth_proto": secret.get("auth_proto", "") if row["method"] == "snmp" else None,
+        "priv_proto": secret.get("priv_proto", "") if row["method"] == "snmp" else None,
+        "has_auth_password": bool(secret.get("auth_password")) if row["method"] == "snmp" else None,
+        "has_priv_password": bool(secret.get("priv_password")) if row["method"] == "snmp" else None,
         "has_password": bool(secret.get("password")) if row["method"] == "ssh" else None,
         "has_private_key": bool(secret.get("private_key")) if row["method"] == "ssh" else None,
+        "platform": secret.get("platform", "auto") if row["method"] == "ssh" else None,
         "secret_unreadable": bool(row["credential"]) and not secret,
     }
 
@@ -246,6 +294,46 @@ def save_monitor(conn, device_id: int, data: dict[str, Any], groups: list[str] |
     return public(conn, get_monitor(conn, device_id))
 
 
+# ----------------------------------------------------------------------------- newest readings
+def latest_readings(store, device_id: int) -> dict[str, Any]:
+    out: dict[str, Any] = {"cpu": None, "mem": None, "disk": None, "disk_label": None, "temp": None, "battery": None, "uptime": None, "rx": None, "tx": None,
+                           "supply": None, "supply_label": None}
+    if store is None:
+        return out
+    now = time.time()
+    worst = None
+    rx = tx = 0.0
+    seen_net = False
+    for s in store.metrics_of("device", device_id):
+        if s["last"] is None or s["last_ts"] is None or now - s["last_ts"] > 3600:
+            continue
+        m = s["metric"]
+        if m == "cpu_pct":
+            out["cpu"] = s["last"]
+        elif m == "mem_pct":
+            out["mem"] = s["last"]
+        elif m == "disk_pct" and (worst is None or s["last"] > worst[0]):
+            worst = (s["last"], s["label"])
+        elif m == "supply_pct" and (out["supply"] is None or s["last"] < out["supply"]):
+            out["supply"], out["supply_label"] = s["last"], s["label"]
+        elif m == "temp_c" and (out["temp"] is None or s["last"] > out["temp"]):
+            out["temp"] = s["last"]
+        elif m == "battery_pct":
+            out["battery"] = s["last"]
+        elif m == "uptime_s":
+            out["uptime"] = s["last"]
+        elif m == "net_rx_bps":
+            rx += s["last"]
+            seen_net = True
+        elif m == "net_tx_bps":
+            tx += s["last"]
+    if worst:
+        out["disk"], out["disk_label"] = worst
+    if seen_net:
+        out["rx"], out["tx"] = rx, tx
+    return out
+
+
 # ----------------------------------------------------------------------------- reading
 async def read(method: str, address: str, port: int, secret: dict[str, Any], groups: list[str] | None, state: dict,
                known_fingerprint: str | None = None, now: float | None = None) -> tuple[list[tuple], list[str], str | None]:
@@ -253,7 +341,7 @@ async def read(method: str, address: str, port: int, secret: dict[str, Any], gro
     now = now if now is not None else time.time()
     if method == "snmp":
         def work():
-            agent = snmp.Agent(address if port == 161 else f"{address}:{port}", secret.get("community", "public"), secret.get("version", "2c"), timeout=2.5, retries=1)
+            agent = make_agent(address, port, secret)
             return snmp.collect(agent, groups or None, state, now)
 
         try:
@@ -264,9 +352,26 @@ async def read(method: str, address: str, port: int, secret: dict[str, Any], gro
             raise MonitorError("the device answered but reported nothing Netlens can use (is SNMP switched on, and is this the right community?)")
         return points, found, None
     try:
-        out, fingerprint = await ssh.run(address, port, secret.get("username", ""), secret.get("password"), secret.get("private_key"),
-                                         secret.get("passphrase"), known_fingerprint)
-        points, found = ssh.parse(out, state, now)
+        platform = secret.get("platform", "auto")
+        if platform == "auto":
+            platform = state.get("platform", "auto")
+        points, found, fingerprint = [], [], None
+        if platform in ("auto", "linux"):
+            try:
+                out, fingerprint = await ssh.run(address, port, secret.get("username", ""), secret.get("password"), secret.get("private_key"),
+                                                 secret.get("passphrase"), known_fingerprint)
+                points, found = ssh.parse(out, state, now)
+                if found:
+                    state["platform"] = "linux"
+            except ssh.SshError:
+                if platform == "linux":
+                    raise
+        if not found and platform in ("auto", "windows"):          # not a /proc system: try it as Windows (OpenSSH + PowerShell)
+            out, _status, fingerprint = await ssh.run_command(address, port, secret.get("username", ""), secret.get("password"), secret.get("private_key"),
+                                                              secret.get("passphrase"), ssh.WIN_COMMAND, known_fingerprint, timeout=30.0)
+            points, found = ssh.parse_windows(out, state, now)
+            if found:
+                state["platform"] = "windows"
     except ssh.SshError as exc:
         raise MonitorError(str(exc)) from None
     if not points and not found:
@@ -309,8 +414,7 @@ async def check_process(db_path: str, device_id: int | None, name: str, timeout:
     try:
         if row["method"] == "snmp":
             def work():
-                agent = snmp.Agent(row["address"] if row["port"] == 161 else f"{row['address']}:{row['port']}", secret.get("community", "public"),
-                                   secret.get("version", "2c"), timeout=min(timeout, 4.0), retries=1)
+                agent = make_agent(row["address"], row["port"], secret, timeout=min(timeout, 4.0))
                 return [snmp._text(v, 120) for _suffix, v in agent.walk(snmp.HR_SW_RUN_NAME)]
             names = await asyncio.to_thread(work)
             wanted = name.lower().removesuffix(".exe")
@@ -318,7 +422,13 @@ async def check_process(db_path: str, device_id: int | None, name: str, timeout:
             detail = "running" if running else ("not in the list of running programs" if names else "the device reports no running programs over SNMP")
         else:
             quoted = name  # validated above: nothing a shell treats specially
-            command = f"sh -c 'pgrep -x {quoted} >/dev/null 2>&1 || systemctl is-active --quiet {quoted} >/dev/null 2>&1'"
+            state_platform = _STATES.get(row["id"], {}).get("platform")
+            windows = secret.get("platform", "auto") == "windows" or (secret.get("platform", "auto") == "auto" and state_platform == "windows")
+            if windows:
+                bare = quoted[:-4] if quoted.lower().endswith(".exe") else quoted
+                command = ssh.powershell(f"if ((Get-Process -Name '{bare}' -ErrorAction SilentlyContinue) -or (Get-Service -Name '{bare}' -ErrorAction SilentlyContinue | Where-Object Status -eq 'Running')) {{exit 0}} else {{exit 1}}")
+            else:
+                command = f"sh -c 'pgrep -x {quoted} >/dev/null 2>&1 || systemctl is-active --quiet {quoted} >/dev/null 2>&1'"
             _out, status, _fp = await ssh.run_command(row["address"], row["port"], secret.get("username", ""), secret.get("password"),
                                                       secret.get("private_key"), secret.get("passphrase"), command, known, timeout)
             running = status == 0

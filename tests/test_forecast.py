@@ -164,3 +164,18 @@ def test_the_api(tmp_path):
         assert tc.put("/api/devices/1/limits", json={"rules": {"disk_pct": {"warn": 99, "crit": 50}}}).status_code == 422
         assert tc.get("/api/devices/9/limits").status_code == 404
     tsdb.forget_all()
+
+
+def test_the_summary_for_home_assistant_has_health_and_remote_sites(conn):
+    from app.stats import summary
+
+    now = feed(conn, per_day=1.0, days=10, start=70)
+    conn.execute("INSERT INTO metric_state (monitor_id, metric, label, level, since, value) VALUES (1, 'disk_pct', '/data', 'warning', 'x', 80)")
+    conn.execute("UPDATE host_monitors SET last_ok = 1 WHERE id = 1")
+    conn.commit()
+    s = summary(conn)
+    assert s["health"]["monitored"] == 1 and s["health"]["warning"] == 1 and s["health"]["critical"] == 0
+    assert s["health"]["days_to_full"] is not None
+    nas = next(d for d in s["device_list"] if d["id"] == 1)
+    assert nas["health"]["level"] == "warning" and nas["health"]["disk"] is not None
+    assert s["remote_sites"] == {"total": 0, "silent": 0, "problems": 0, "devices_down": 0, "services_down": 0}

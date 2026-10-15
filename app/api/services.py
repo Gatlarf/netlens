@@ -79,6 +79,8 @@ def create_check(body: CheckBody, conn=Depends(get_conn)) -> dict:
 @router.patch("/service-checks/{check_id}")
 def update_check(check_id: int, body: CheckBody, conn=Depends(get_conn)) -> dict:
     current = _row(conn, check_id)
+    if str(current["source"] or "").startswith("central:"):
+        raise HTTPException(status_code=409, detail="this check is managed by the central Netlens and cannot be changed here")
     merged = {**{k: current[k] for k in ("name", "kind", "host", "port", "path", "expect", "interval_s", "timeout_s")}, "enabled": bool(current["enabled"])}
     merged.update(body.model_dump(exclude_none=True, exclude={"device_id"}))
     try:
@@ -103,7 +105,9 @@ def update_check(check_id: int, body: CheckBody, conn=Depends(get_conn)) -> dict
 
 @router.delete("/service-checks/{check_id}")
 def delete_check(check_id: int, conn=Depends(get_conn)) -> dict:
-    _row(conn, check_id)
+    row = _row(conn, check_id)
+    if str(row["source"] or "").startswith("central:"):
+        raise HTTPException(status_code=409, detail="this check is managed by the central Netlens and cannot be removed here")
     conn.execute("DELETE FROM service_checks WHERE id = ?", (check_id,))
     conn.commit()
     store = tsdb.for_conn(conn)

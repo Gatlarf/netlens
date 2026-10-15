@@ -167,7 +167,7 @@ def weekly(conn, now: datetime | None = None) -> dict[str, Any]:
 
         for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
             p = probes.present(conn, row)
-            sites.append({"name": p["name"], "state": p["state"], "problems": p.get("problems", 0) if isinstance(p.get("problems", 0), int) else len(p.get("problems") or [])})
+            sites.append({"name": p["name"], "state": p["state"], "problems": (p.get("problems") or {}).get("count", 0)})
     except Exception:  # noqa: BLE001 - remote sites are optional
         log.debug("remote sites left out of the weekly report", exc_info=True)
     return {"start": a, "end": _fmt(now), "devices": {"total": total, "online": online, "new": new[:10], "new_count": len(new)},

@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 LINK_KEY = "central.link"
 STATUS_KEY = "central.status"
 MARK_KEY = "central.pushed_ts"
+REV_KEY = "central.config_rev"
 DEFAULT_INTERVAL = 60
 MAX_BODY = 8 * 1024 * 1024
 TIMEOUT = 25.0
@@ -45,7 +46,7 @@ def get_link(conn) -> dict[str, Any]:
     except ValueError:
         data = {}
     return {"url": str(data.get("url") or ""), "token": str(data.get("token") or ""), "enabled": bool(data.get("enabled")),
-            "interval_s": int(data.get("interval_s") or DEFAULT_INTERVAL)}
+            "interval_s": int(data.get("interval_s") or DEFAULT_INTERVAL), "accept_config": bool(data.get("accept_config"))}
 
 
 def public_link(conn) -> dict[str, Any]:
@@ -54,7 +55,8 @@ def public_link(conn) -> dict[str, Any]:
         status = json.loads(get_setting(conn, STATUS_KEY) or "{}")
     except ValueError:
         status = {}
-    return {"url": link["url"], "has_token": bool(link["token"]), "enabled": link["enabled"], "interval_s": link["interval_s"], "status": status}
+    return {"url": link["url"], "has_token": bool(link["token"]), "enabled": link["enabled"], "interval_s": link["interval_s"], "accept_config": link["accept_config"],
+            "config_rev": get_config_rev(conn), "status": status}
 
 
 def _check_url(url: str) -> str:
@@ -85,10 +87,16 @@ def set_link(conn, data: dict[str, Any]) -> dict[str, Any]:
     if isinstance(interval, bool) or not isinstance(interval, int) or not 15 <= interval <= 3600:
         raise LinkError("the interval must be between 15 and 3600 seconds")
     enabled = bool(data.get("enabled", cur["enabled"]))
+    accept = bool(data.get("accept_config", cur["accept_config"]))
     if enabled and not (url and token):
         raise LinkError("enter the address of the central Netlens and the token it gave you")
-    set_setting(conn, LINK_KEY, json.dumps({"url": url, "token": token, "enabled": enabled, "interval_s": interval}))
+    set_setting(conn, LINK_KEY, json.dumps({"url": url, "token": token, "enabled": enabled, "interval_s": interval, "accept_config": accept}))
     return public_link(conn)
+
+
+def get_config_rev(conn) -> int:
+    value = get_setting(conn, REV_KEY)
+    return int(value) if value and value.isdigit() else 0
 
 
 # ----------------------------------------------------------------------------- what is reported
@@ -158,7 +166,7 @@ def send(url: str, token: str, payload: dict[str, Any], timeout: float = TIMEOUT
         headers={"Content-Type": "application/json", "Content-Encoding": "gzip", "Authorization": f"Bearer {token}", "User-Agent": f"Netlens/{VERSION}"})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310 - scheme checked when the link was saved
-            return json.loads(resp.read(65536).decode("utf-8", "replace") or "{}")
+            return json.loads(resp.read(2 * 1024 * 1024).decode("utf-8", "replace") or "{}")
     except urllib.error.HTTPError as exc:
         if exc.code == 401:
             raise LinkError("the central Netlens refused the token: it was removed or replaced there") from None
@@ -182,12 +190,24 @@ def push_once(db_path: str, now_ts: float | None = None, force: bool = False) ->
         since = int(mark) if mark and mark.isdigit() else int(now_ts) - 3600     # a first report does not replay a week
         payload = snapshot(conn, since, now_ts)
         payload["interval_s"] = link["interval_s"]
+        payload["accepts_config"] = link["accept_config"]
+        payload["config_rev"] = get_config_rev(conn)
         newest = max([s["ts"] for s in payload["samples"]] + [since])
         try:
             reply = send(link["url"], link["token"], payload)
             status = {"ts": utcnow(), "ok": True, "error": None, "devices": len(payload["devices"]), "services": len(payload["services"]),
                       "samples": len(payload["samples"]), "central_events": reply.get("events")}
             set_setting(conn, MARK_KEY, str(newest))
+            config = reply.get("config") if link["accept_config"] and isinstance(reply, dict) else None
+            if isinstance(config, dict) and isinstance(config.get("rev"), int) and not isinstance(config.get("rev"), bool):
+                from app import probe_config
+
+                try:
+                    status["config"] = probe_config.apply(conn, config)
+                    set_setting(conn, REV_KEY, str(config["rev"]))
+                except Exception:  # noqa: BLE001 - a bad configuration must not stop the reports
+                    log.exception("applying the configuration of the central Netlens failed")
+                    status["config"] = {"error": "the configuration could not be applied"}
         except LinkError as exc:
             status = {"ts": utcnow(), "ok": False, "error": str(exc), "devices": len(payload["devices"]), "services": len(payload["services"]), "samples": 0}
         set_setting(conn, STATUS_KEY, json.dumps(status))

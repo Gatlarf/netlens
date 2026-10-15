@@ -56,7 +56,8 @@ def probe_detail(probe_id: int, conn=Depends(get_conn)) -> dict[str, Any]:
                  "detail": r["detail"], "since": r["since"], "checked": r["checked"]}
                 for r in conn.execute("SELECT * FROM remote_services WHERE probe_id = ? ORDER BY name COLLATE NOCASE", (probe_id,))]
     return {"probe": probes_mod.present(conn, row), "devices": devices, "services": services, "problems": summary.get("problems") or [],
-            "monitors": summary.get("monitors") or [], "scan": summary.get("scan")}
+            "monitors": summary.get("monitors") or [], "scan": summary.get("scan"),
+            "config_state": {"accepts": bool(summary.get("accepts_config")), "site_rev": summary.get("config_rev") or 0}}
 
 
 @router.patch("/probes/{probe_id}")
@@ -81,6 +82,31 @@ def new_token(probe_id: int, conn=Depends(get_conn)) -> dict:
     """A new token; the old one stops working at once."""
     _row(conn, probe_id)
     return {"token": probes_mod.rotate_token(conn, probe_id)}
+
+
+class ConfigBody(BaseModel):
+    services: list[dict] = []
+    monitors: list[dict] = []
+
+
+@router.get("/probes/{probe_id}/config")
+def get_config(probe_id: int, conn=Depends(get_conn)) -> dict[str, Any]:
+    from app import probe_config
+
+    _row(conn, probe_id)
+    return probe_config.public(probe_config.load(conn, probe_id))
+
+
+@router.put("/probes/{probe_id}/config")
+def put_config(probe_id: int, body: ConfigBody, conn=Depends(get_conn)) -> dict[str, Any]:
+    from app import probe_config
+
+    _row(conn, probe_id)
+    try:
+        cfg = probe_config.save(conn, probe_id, body.model_dump())
+    except probe_config.ConfigError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return probe_config.public(cfg)
 
 
 @router.delete("/probes/{probe_id}")
@@ -127,6 +153,12 @@ async def push(request: Request) -> dict:
             result = probes_mod.ingest(conn, probe, payload, remote_ip=host)
         except probes_mod.ProbeError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
+        if isinstance(payload, dict):
+            from app import probe_config
+
+            config = probe_config.for_probe(conn, probe["id"], payload)
+            if config is not None:
+                result["config"] = config
     finally:
         conn.close()
     # the events this report raised should reach the channels now, not at the next scan

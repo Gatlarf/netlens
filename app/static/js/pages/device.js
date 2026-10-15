@@ -5,6 +5,7 @@ import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 import { buildDeviceMonitorCard, isMonitorFormOpen } from "../cards/device_monitor.js";
 import { buildHealthGlance } from "../cards/health_glance.js";
+import { buildDevicePortsCard, PORT_METRICS } from "../cards/device_ports.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
 import { stateDot } from "./services.js";
@@ -756,8 +757,13 @@ export async function render(container, params) {
     const health = h("div", { class: "dev-health" });
     const performanceSlot = slot();
     health.appendChild(performanceSlot);
-    buildPerformanceCard("device", device.id, { unlessOnly: ["up", "rtt_ms"], skip: ["up"] })
-      .then((c) => { if (c && !disposed) performanceSlot.appendChild(c); }).catch(() => {});
+    const portsSlot = slot();
+    health.insertBefore(portsSlot, performanceSlot);
+    // a switch with many ports gets a table of ports; its per-port graphs are then left out of the general graphs
+    buildDevicePortsCard(device).catch(() => null).then((ports) => {
+      if (ports && !disposed) portsSlot.appendChild(ports);
+      return buildPerformanceCard("device", device.id, { unlessOnly: ["up", "rtt_ms"], skip: ports ? ["up", ...PORT_METRICS] : ["up"] });
+    }).then((c) => { if (c && !disposed) performanceSlot.appendChild(c); }).catch(() => {});
     const hLeft = column();
     const hRight = column();
     if (isAdmin()) {

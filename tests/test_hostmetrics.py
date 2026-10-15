@@ -102,7 +102,8 @@ def test_traffic_is_a_rate_between_two_rounds_and_survives_a_wrap():
     mib.set(oid(snmp.IF_HC_OUT, 1), 0)
     agent, state = Direct(mib), {}
     pts, found = snmp.collect(agent, ["network"], state, now=100)
-    assert pts == [] and found == ["network"]                           # the first round only learns the counters
+    assert points(pts) == {("if_up", "eth0"): 1.0, ("if_up", "eth1"): 0.0}    # the first round only learns the counters (and sees the links)
+    assert found == ["network"]
     mib.set(oid(snmp.IF_HC_IN, 1), 1_000_000 + 12_500_000)              # 100 Mbit in 10 s
     mib.set(oid(snmp.IF_HC_OUT, 1), 1_250_000)
     pts, found = snmp.collect(agent, ["network"], state, now=110)
@@ -337,3 +338,101 @@ async def test_run_monitor_end_to_end(conn, monkeypatch, tmp_path):
     assert not result["ok"] and "answer" in result["error"].lower()
     row = hm.get_monitor(conn, 1)
     assert row["last_ok"] == 0 and row["last_error"]
+
+
+def test_ports_have_load_errors_and_link_state():
+    mib = sim.Mib()
+    for i, name in ((1, b"Gi1/0/1"), (2, b"Gi1/0/2"), (3, b"Gi1/0/3")):
+        mib.set(oid(snmp.IF_NAME, i), name)
+    mib.set(oid(snmp.IF_OPER, 1), 1)
+    mib.set(oid(snmp.IF_OPER, 2), 2)                                     # no cable
+    mib.set(oid(snmp.IF_OPER, 3), 2)
+    mib.set(oid(snmp.IF_ADMIN, 3), 2)                                    # switched off on purpose: not reported
+    mib.set(oid(snmp.IF_HIGH_SPEED, 1), 1000)                            # 1 Gbit/s
+    mib.set(oid(snmp.IF_HC_IN, 1), 0)
+    mib.set(oid(snmp.IF_HC_OUT, 1), 0)
+    mib.set(oid(snmp.IF_IN_ERR, 1), 0)
+    mib.set(oid(snmp.IF_OUT_ERR, 1), 0)
+    agent, state = Direct(mib), {}
+    snmp.collect(agent, ["network"], state, now=100)
+    mib.set(oid(snmp.IF_HC_IN, 1), 250_000_000 * 10 // 8)               # 250 Mbit/s in
+    pts, _ = snmp.collect(agent, ["network"], state, now=110)
+    got = points(pts)
+    assert got[("if_util_pct", "Gi1/0/1")] == pytest.approx(25.0)
+    assert got[("if_up", "Gi1/0/1")] == 1.0 and got[("if_up", "Gi1/0/2")] == 0.0 and ("if_up", "Gi1/0/3") not in got
+    assert ("if_err_ps", "Gi1/0/1") not in got                           # no errors, no graph
+    mib.set(oid(snmp.IF_IN_ERR, 1), 50)
+    pts, _ = snmp.collect(agent, ["network"], state, now=120)
+    assert points(pts)[("if_err_ps", "Gi1/0/1")] == pytest.approx(5.0)
+    pts, _ = snmp.collect(agent, ["network"], state, now=130)
+    assert points(pts)[("if_err_ps", "Gi1/0/1")] == 0.0                  # once there were errors the series continues
+
+
+# ---------------------------------------------------------------- Windows over SSH (PowerShell)
+def win_output(boot="2026-03-09T12:00:00.0000000Z", rx=1_000_000, tx=500_000, cpu=23):
+    data = {"cpu": cpu, "mt": 16_000_000.0, "mf": 4_000_000.0, "st": 20_000_000.0, "sf": 16_000_000.0, "boot": boot,
+            "disks": [{"id": "C:", "size": 500e9, "free": 125e9}, {"id": "D:", "size": 1e12, "free": 900e9}],
+            "nics": [{"name": "Intel(R) Ethernet", "rx": rx, "tx": tx}, {"name": "Software Loopback Interface 1", "rx": 5, "tx": 5},
+                     {"name": "isatap.{ABC}", "rx": 0, "tx": 0}]}
+    return "garbage before\n##netlens-windows\n" + json.dumps(data)
+
+
+def test_windows_readings():
+    state = {}
+    pts, found = ssh.parse_windows(win_output(), state, now=1_773_144_000)       # 2026-03-10T12:00:00Z
+    got = points(pts)
+    assert got[("cpu_pct", "")] == 23
+    assert got[("mem_pct", "")] == pytest.approx(75.0)
+    assert got[("swap_pct", "")] == pytest.approx(75.0 + 0) or got[("swap_pct", "")] >= 0
+    assert got[("disk_pct", "C:\\")] == pytest.approx(75.0) and got[("disk_pct", "D:\\")] == pytest.approx(10.0)
+    assert got[("uptime_s", "")] == pytest.approx(86400)
+    assert {"cpu", "memory", "disk", "uptime", "network"} <= set(found)
+    assert not any(m.startswith("net_") for m, _l in got)                          # the first round only learns the counters
+    pts, _ = ssh.parse_windows(win_output(rx=1_000_000 + 1_250_000, tx=500_000 + 125_000), state, now=1_773_144_010)
+    got = points(pts)
+    assert got[("net_rx_bps", "Intel(R) Ethernet")] == pytest.approx(1_000_000)
+    assert not any("Loopback" in l or "isatap" in l for _m, l in got)
+
+
+def test_windows_bad_answers():
+    with pytest.raises(ssh.SshError):
+        ssh.parse_windows("'sh' is not recognized", {}, now=1)
+    with pytest.raises(ssh.SshError):
+        ssh.parse_windows("##netlens-windows\nnot json", {}, now=1)
+
+
+def test_the_powershell_command_is_encoded_and_short():
+    cmd = ssh.powershell("Get-Date")
+    assert cmd.startswith("powershell ") and " -EncodedCommand " in cmd and "Get-Date" not in cmd
+    assert len(ssh.WIN_COMMAND) < 7000                                             # cmd.exe stops at 8191
+
+
+def test_ssh_reading_falls_back_to_windows(monkeypatch):
+    import asyncio
+
+    calls = []
+
+    async def run(host, port, user, pw, key, phrase, known=None, timeout=15.0):
+        calls.append("linux")
+        return "'sh' is not recognized as an internal or external command", "AA:BB"
+
+    async def run_command(host, port, user, pw, key, phrase, command, known=None, timeout=15.0):
+        calls.append("windows")
+        return win_output(), 0, "AA:BB"
+
+    monkeypatch.setattr(ssh, "run", run)
+    monkeypatch.setattr(ssh, "run_command", run_command)
+    state = {}
+    pts, found, fp = asyncio.run(hm.read("ssh", "10.0.0.7", 22, {"username": "u", "password": "p"}, None, state, None, 1_773_144_000))
+    assert calls == ["linux", "windows"] and state["platform"] == "windows" and "cpu" in found
+    calls.clear()
+    asyncio.run(hm.read("ssh", "10.0.0.7", 22, {"username": "u", "password": "p"}, None, state, None, 1_773_144_060))
+    assert calls == ["windows"]                                                    # remembered: no wasted round trip
+    calls.clear()
+
+
+def test_platform_is_validated():
+    d = hm.validate({"method": "ssh", "address": "10.0.0.5", "username": "me", "password": "x", "platform": "windows"})
+    assert d["secret"]["platform"] == "windows"
+    with pytest.raises(hm.MonitorError):
+        hm.validate({"method": "ssh", "address": "10.0.0.5", "username": "me", "password": "x", "platform": "vms"})

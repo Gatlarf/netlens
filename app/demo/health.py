@@ -60,11 +60,27 @@ def readings(key: str, t: float, now: float) -> list[tuple]:
         up = down * {"router": 0.25, "nas": 0.5, "backup": 6.0}.get(kind, 0.35)
         if kind == "backup" and 1.0 <= (t % 86400) / 3600.0 <= 3.0:
             down *= 40
-        out.append(("net_rx_bps", "eth0" if kind != "router" else "WAN", max(1e3, down), "bps"))
-        out.append(("net_tx_bps", "eth0" if kind != "router" else "WAN", max(1e3, up), "bps"))
+        if kind != "switch":                     # a switch reports its ports instead
+            out.append(("net_rx_bps", "eth0" if kind != "router" else "WAN", max(1e3, down), "bps"))
+            out.append(("net_tx_bps", "eth0" if kind != "router" else "WAN", max(1e3, up), "bps"))
     if kind in ("router", "switch", "hypervisor", "nas", "pi"):
         temp = {"router": 52, "switch": 41, "hypervisor": 58, "nas": 44, "pi": 51}[kind] + day * 5 + _noise(t, salt + 7) * 1.2
         out.append(("temp_c", "CPU" if kind != "nas" else "Disk 1", temp, "\u00b0C"))
+    if kind == "switch":
+        # a few ports: some in use, one with a flaky cable (errors), the uplink the busiest, two without a link
+        ports = [("Gi1/0/1", 0.62, 0.0), ("Gi1/0/2", 0.18, 0.0), ("Gi1/0/3", 0.07, 2.4), ("Gi1/0/4", 0.03, 0.0), ("Gi1/0/5", 0.0, 0.0), ("Gi1/0/6", 0.0, 0.0),
+                 ("Gi1/0/10", 0.11, 0.0), ("Gi1/0/11", 0.0, 0.0)]
+        for i, (name, load, errors) in enumerate(ports):
+            if load == 0.0 and name != "Gi1/0/11":
+                out.append(("if_up", name, 0.0, "state"))
+                continue
+            out.append(("if_up", name, 1.0, "state"))
+            frac = min(0.97, max(0.001, load * (0.35 + day) + _noise(t // 120, salt + 20 + i) * 0.02)) if load else 0.002
+            out.append(("net_rx_bps", name, frac * 1e9 * 0.8, "bps"))
+            out.append(("net_tx_bps", name, frac * 1e9 * 0.4, "bps"))
+            out.append(("if_util_pct", name, frac * 80, "%"))
+            if errors:
+                out.append(("if_err_ps", name, max(0.0, errors * (0.5 + abs(_noise(t // 300, salt + 40)))), "/s"))
     if kind == "hypervisor":
         out.append(("disk_pct", "/", 38.0 + (1 - age_days / 40) * 3, "%"))
         out.append(("disk_free_b", "/", 0.62 * 480 * GB, "B"))

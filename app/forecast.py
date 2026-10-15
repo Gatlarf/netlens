@@ -88,6 +88,21 @@ def forecasts(conn, now: float | None = None) -> list[dict[str, Any]]:
     return out
 
 
+_CACHE: dict[str, tuple[float, list]] = {}
+
+
+def cached(conn, ttl: float = 600.0, now: float | None = None) -> list[dict[str, Any]]:
+    """The forecasts, recomputed at most every `ttl` seconds (the summary that Home Assistant polls asks often)."""
+    now = now if now is not None else time.time()
+    key = tsdb.db_file(conn)
+    hit = _CACHE.get(key)
+    if hit and now - hit[0] < ttl:
+        return hit[1]
+    value = forecasts(conn, now)
+    _CACHE[key] = (now, value)
+    return value
+
+
 def alert_days(conn) -> int:
     try:
         v = int(get_setting(conn, ALERT_DAYS_KEY) or DEFAULT_ALERT_DAYS)

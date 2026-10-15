@@ -7,8 +7,11 @@ restricted account, a read-only account is enough. The host key is pinned the fi
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 import re
 import time
+from datetime import datetime, timezone
 
 import asyncssh
 
@@ -30,8 +33,109 @@ SKIP_TYPES = {"tmpfs", "devtmpfs", "squashfs", "overlay", "efivarfs", "ramfs", "
 SKIP_IFACES = re.compile(r"^(lo|veth.*|docker\d*|br-.*|virbr.*|tap.*|cali.*|flannel.*|cni.*)$")
 
 
+# Windows (the OpenSSH server that comes with Windows 10/11 and Server 2019+): one PowerShell script, sent as an encoded command
+# so no quoting of the login shell (cmd.exe) can get in the way. It only reads: processor load, memory, disks, adapters, boot time.
+WIN_SCRIPT = (
+    "$ErrorActionPreference='SilentlyContinue';"
+    "$o=Get-CimInstance Win32_OperatingSystem;"
+    "$c=(Get-CimInstance Win32_Processor|Measure-Object LoadPercentage -Average).Average;"
+    "$d=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3'|%{@{id=$_.DeviceID;size=[double]$_.Size;free=[double]$_.FreeSpace}});"
+    "$n=@(Get-CimInstance Win32_PerfRawData_Tcpip_NetworkInterface|%{@{name=$_.Name;rx=[double]$_.BytesReceivedPersec;tx=[double]$_.BytesSentPersec}});"
+    "$r=@{cpu=$c;mt=[double]$o.TotalVisibleMemorySize;mf=[double]$o.FreePhysicalMemory;st=[double]$o.TotalVirtualMemorySize;sf=[double]$o.FreeVirtualMemory;"
+    "boot=$o.LastBootUpTime.ToUniversalTime().ToString('o');disks=$d;nics=$n};"
+    "'##netlens-windows';$r|ConvertTo-Json -Compress -Depth 4"
+)
+
+
+def powershell(script: str) -> str:
+    """The command line that runs `script` in PowerShell without any quoting problems."""
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode()
+    return f"powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand {encoded}"
+
+
+WIN_COMMAND = powershell(WIN_SCRIPT)
+SKIP_WIN_NICS = re.compile(r"(loopback|isatap|teredo|wan miniport|pseudo|kernel debug|bluetooth)", re.I)
+
+
 class SshError(Exception):
     pass
+
+
+def parse_windows(text: str, state: dict, now: float | None = None) -> tuple[list[tuple], list[str]]:
+    """Readings from the Windows script (the same shape as `parse`)."""
+    now = now if now is not None else time.time()
+    at = text.find("##netlens-windows")
+    if at < 0:
+        raise SshError("the answer from the host was cut off")
+    try:
+        data = json.loads(text[at + len("##netlens-windows"):].strip())
+    except ValueError:
+        raise SshError("the answer from the host could not be read") from None
+    if not isinstance(data, dict):
+        raise SshError("the answer from the host could not be read")
+    points: list[tuple] = []
+    found: list[str] = []
+
+    def num(v):
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+    def many(v):
+        return v if isinstance(v, list) else ([v] if isinstance(v, dict) else [])
+
+    boot = data.get("boot")
+    if isinstance(boot, str):
+        try:
+            started = datetime.fromisoformat(boot.replace("Z", "+00:00"))
+            points.append(("uptime_s", "", max(0.0, now - started.astimezone(timezone.utc).timestamp()), "s"))
+            found.append("uptime")
+        except ValueError:
+            pass
+    cpu = num(data.get("cpu"))
+    if cpu is not None:
+        points.append(("cpu_pct", "", max(0.0, min(100.0, cpu)), "%"))
+        found.append("cpu")
+    mt, mf = num(data.get("mt")), num(data.get("mf"))
+    if mt and mf is not None:
+        points.append(("mem_pct", "", 100.0 * (1 - mf / mt), "%"))
+        found.append("memory")
+        st, sf = num(data.get("st")), num(data.get("sf"))
+        if st and sf is not None and st > mt:                       # virtual memory includes the physical memory
+            swap_total, swap_free = st - mt, max(0.0, sf - mf)
+            if swap_total > 0:
+                points.append(("swap_pct", "", max(0.0, min(100.0, 100.0 * (1 - swap_free / swap_total))), "%"))
+    disks = []
+    for d in many(data.get("disks")):
+        size, free, ident = num(d.get("size")), num(d.get("free")), str(d.get("id") or "")
+        if ident and size and free is not None and size > 0:
+            disks.append(("disk_pct", ident[:40] + "\\", 100.0 * (size - free) / size, "%"))
+            disks.append(("disk_free_b", ident[:40] + "\\", free, "B"))
+    if disks:
+        points.extend(disks[:80])
+        found.append("disk")
+    traffic, seen = [], False
+    for n in many(data.get("nics")):
+        name, rx, tx = str(n.get("name") or ""), num(n.get("rx")), num(n.get("tx"))
+        if not name or rx is None or tx is None or SKIP_WIN_NICS.search(name):
+            continue
+        seen = True
+        mark = state.get(("if", name))
+        state[("if", name)] = (now, rx, tx)
+        if mark is None or now - mark[0] <= 0:
+            continue
+        da, db = _delta(int(rx), int(mark[1]), 64), _delta(int(tx), int(mark[2]), 64)
+        if da is None or db is None:
+            continue
+        dt = now - mark[0]
+        traffic.append(("net_rx_bps", name[:40], da * 8 / dt, "bps"))
+        traffic.append(("net_tx_bps", name[:40], db * 8 / dt, "bps"))
+        if len(traffic) >= MAX_INTERFACES * 2:
+            break
+    if traffic:
+        points.extend(traffic)
+        found.append("network")
+    elif seen:
+        found.append("network")
+    return points, found
 
 
 def _sections(text: str) -> dict[str, list[str]]:

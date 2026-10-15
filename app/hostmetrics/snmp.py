@@ -283,6 +283,10 @@ IF_DESCR = (1, 3, 6, 1, 2, 1, 2, 2, 1, 2)
 IF_OPER = (1, 3, 6, 1, 2, 1, 2, 2, 1, 8)
 IF_HC_IN, IF_HC_OUT = (1, 3, 6, 1, 2, 1, 31, 1, 1, 1, 6), (1, 3, 6, 1, 2, 1, 31, 1, 1, 1, 10)
 IF_IN, IF_OUT = (1, 3, 6, 1, 2, 1, 2, 2, 1, 10), (1, 3, 6, 1, 2, 1, 2, 2, 1, 16)
+IF_ADMIN = (1, 3, 6, 1, 2, 1, 2, 2, 1, 7)                    # 1 up, 2 down: a port switched off on purpose is not a fault
+IF_SPEED = (1, 3, 6, 1, 2, 1, 2, 2, 1, 5)                    # bits per second (capped at 4.29 Gbit/s)
+IF_HIGH_SPEED = (1, 3, 6, 1, 2, 1, 31, 1, 1, 1, 15)          # megabits per second
+IF_IN_ERR, IF_OUT_ERR = (1, 3, 6, 1, 2, 1, 2, 2, 1, 14), (1, 3, 6, 1, 2, 1, 2, 2, 1, 20)
 LM_TEMP_DESCR = (1, 3, 6, 1, 4, 1, 2021, 13, 16, 2, 1, 2)
 LM_TEMP_VALUE = (1, 3, 6, 1, 4, 1, 2021, 13, 16, 2, 1, 3)  # milli degrees Celsius
 PRT_SUPPLY_DESCR = (1, 3, 6, 1, 2, 1, 43, 11, 1, 1, 6)
@@ -297,7 +301,7 @@ GROUPS = ("uptime", "cpu", "memory", "disk", "network", "temperature", "supplies
 GROUP_TITLES = {"uptime": "Time since start", "cpu": "Processor", "memory": "Memory", "disk": "Disks", "network": "Network traffic",
                 "temperature": "Temperatures", "supplies": "Printer supplies", "ups": "UPS battery"}
 SKIP_MOUNTS = ("/dev", "/sys", "/proc", "/run", "/snap", "/var/lib/docker", "/var/lib/containers", "/boot/efi", "/var/lib/kubelet")
-MAX_INTERFACES = 24
+MAX_INTERFACES = 64                       # ports of a switch; each gets traffic, load, link state and (when there are any) errors
 
 
 def _text(raw, limit=60):
@@ -404,35 +408,57 @@ def _delta(now_value, before, bits):
 
 
 def read_network(agent, state, now):
-    """(points, seen): traffic per interface that is up, in bits per second since the previous round. The first round only
-    learns the counters, so it has no points but `seen` says the interfaces are there."""
+    """(points, seen): per interface the traffic in bits per second since the previous round, how full the link is, errors
+    per second, and whether the link is up (for ports that are switched on). The first round only learns the counters, so
+    it has no rates but `seen` says the interfaces are there."""
     names = _table(agent, IF_NAME) or _table(agent, IF_DESCR)
     oper = _table(agent, IF_OPER)
+    admin = _table(agent, IF_ADMIN)
     rx, tx, bits = _table(agent, IF_HC_IN), _table(agent, IF_HC_OUT), 64
     if not rx:
         rx, tx, bits = _table(agent, IF_IN), _table(agent, IF_OUT), 32
-    out, seen = [], False
+    high, plain = _table(agent, IF_HIGH_SPEED), _table(agent, IF_SPEED)
+    err_in, err_out = _table(agent, IF_IN_ERR), _table(agent, IF_OUT_ERR)
+    out, seen, handled = [], False, 0
     for key, name in names.items():
         label = _text(name, 40)
         low = label.lower()
-        if not label or low == "lo" or low.startswith(("loopback", "software loopback")) or _num(oper.get(key)) != 1:
+        if not label or low == "lo" or low.startswith(("loopback", "software loopback")):
+            continue
+        if handled >= MAX_INTERFACES:
+            break
+        link = _num(oper.get(key))
+        if link is None:
+            continue
+        handled += 1
+        if _num(admin.get(key)) != 2:                      # a port that was switched off is not reported as "down"
+            out.append(("if_up", label, 1.0 if link == 1 else 0.0, "state"))
+        if link != 1:
             continue
         a, b = _num(rx.get(key)), _num(tx.get(key))
         if a is None or b is None:
             continue
         seen = True
+        ea, eb = _num(err_in.get(key)) or 0, _num(err_out.get(key)) or 0
         mark = state.get(("if", key))
-        state[("if", key)] = (now, a, b)
+        state[("if", key)] = (now, a, b, ea + eb)
         if mark is None or now - mark[0] <= 0:
             continue
         da, db = _delta(a, mark[1], bits), _delta(b, mark[2], bits)
         if da is None or db is None:
             continue
         dt = now - mark[0]
-        out.append(("net_rx_bps", label, da * 8 / dt, "bps"))
-        out.append(("net_tx_bps", label, db * 8 / dt, "bps"))
-        if len(out) >= MAX_INTERFACES * 2:
-            break
+        rx_bps, tx_bps = da * 8 / dt, db * 8 / dt
+        out.append(("net_rx_bps", label, rx_bps, "bps"))
+        out.append(("net_tx_bps", label, tx_bps, "bps"))
+        speed = (_num(high.get(key)) or 0) * 1_000_000 or (_num(plain.get(key)) or 0)
+        if speed > 0:
+            out.append(("if_util_pct", label, min(100.0, max(rx_bps, tx_bps) / speed * 100), "%"))
+        errors = _delta(ea + eb, mark[3], 32) if len(mark) > 3 else None
+        flag = ("iferr", key)
+        if errors is not None and (errors > 0 or state.get(flag)):     # a port that never had an error gets no graph
+            state[flag] = True
+            out.append(("if_err_ps", label, errors / dt, "/s"))
     return out, seen
 
 

@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.6 — 2026-10-15
+
+### Added
+- ★ **SNMPv3**: health monitoring can use SNMPv3 with a user name, authentication (MD5, SHA, SHA-256, SHA-512) and encryption (AES or DES). Choose version 3 in the monitoring form. Passwords are at least 8 characters and stored encrypted; the clocks of the device and Netlens are synchronised automatically.
+- ★ **Windows over SSH**: a Windows computer with the OpenSSH server can be monitored like a Linux host (processor, memory, swap, disks, traffic per adapter, uptime, and process checks). The form has a *System* choice (detected automatically); one read-only PowerShell command is sent as an encoded command and nothing is installed.
+- ★ **Ports of a switch**: a *Ports* table on the Health tab shows the link state, traffic in and out, how full the link is and errors of every port, with the graphs of a port one click away. New limits *Port busy* and *Port errors*. A port without a cable shows as down without an alarm; a port that was switched off on purpose is left out.
+- ★ **Manage a remote site from the central Netlens**: the page of a remote site has a *Managed from here* card to set up service checks and health monitors that run at the remote location. The remote Netlens must tick *Accept configuration from the central Netlens*; managed items cannot be edited there, logins are stored encrypted.
+- **Home Assistant**: the summary that the integration polls now carries health and remote site numbers (netlens-ha 0.13.0 adds sensors for them, and Health, Processor, Memory, Fullest disk, Temperature and UPS battery sensors for tracked devices).
+
 ## 0.4.5 — 2026-10-15
 
 ### Added

@@ -33,7 +33,7 @@ STAMP = "%Y-%m-%dT%H:%M:%SZ"
 NAME_RE = re.compile(r"^[^\x00-\x1f]{1,60}$")
 # the measurements a site may report: the names Netlens itself produces, so a misbehaving site cannot fill the store with its own
 ALLOWED_METRICS = frozenset({"up", "rtt_ms", "response_ms", "cert_days", "cpu_pct", "load1", "mem_pct", "swap_pct", "disk_pct", "disk_free_b", "net_rx_bps",
-                             "net_tx_bps", "temp_c", "uptime_s", "supply_pct", "battery_pct", "battery_minutes", "on_battery"})
+                             "net_tx_bps", "if_util_pct", "if_err_ps", "if_up", "temp_c", "uptime_s", "supply_pct", "battery_pct", "battery_minutes", "on_battery"})
 
 
 class ProbeError(ValueError):
@@ -291,7 +291,9 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
     interval = payload.get("interval_s")
     interval = int(interval) if isinstance(interval, int) and not isinstance(interval, bool) and 15 <= interval <= 3600 else probe["interval_s"]
     summary = {"problems": problems, "monitors": _monitors(payload.get("monitors")), "scan": _scan(payload.get("scan")),
-               "counts": {"devices": len(devices), "services": len(services), "samples": recorded}}
+               "counts": {"devices": len(devices), "services": len(services), "samples": recorded},
+               "accepts_config": bool(payload.get("accepts_config")),
+               "config_rev": payload.get("config_rev") if isinstance(payload.get("config_rev"), int) and not isinstance(payload.get("config_rev"), bool) else 0}
     conn.execute(
         "UPDATE probes SET last_seen = ?, last_ip = ?, version = ?, interval_s = ?, snapshot_ts = ?, summary = ?, offline_notified = 0 WHERE id = ?",
         (now, remote_ip, _text(payload.get("version"), 40), interval, now, json.dumps(summary), probe_id))

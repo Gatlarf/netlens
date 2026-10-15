@@ -19,6 +19,7 @@ class LinkBody(BaseModel):
     token: str | None = None
     enabled: bool | None = None
     interval_s: int | None = None
+    accept_config: bool | None = None
 
 
 @router.get("/central")

@@ -1,4 +1,4 @@
-import { get, post, patch, del } from "../api.js";
+import { get, post, patch, put, del } from "../api.js";
 import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin, fmtTime } from "../util.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 
@@ -37,6 +37,92 @@ function setupSteps(name, token) {
     copyBox(location.origin),
     h("p", {}, "Token:"), copyBox(token),
     h("p", { class: "hint" }, "Nothing at the other location needs to be reachable from here: it always connects out. If this Netlens sits behind a reverse proxy, its public https address is the one to enter."));
+}
+
+let managedDirty = false;      // the "Managed from here" card has changes that are not saved: the page must not redraw itself
+const KIND_TITLE = { http: "Website (HTTP/HTTPS)", tcp: "Port (TCP)", dns: "DNS lookup", cert: "Certificate" };
+
+// "Managed from here": the checks and monitors this Netlens sets up at the remote site (the site must accept configuration).
+async function buildManagedCard(probe, devices, state) {
+  const card = h("div", { class: "card admin-only" });
+  let cfg = await get(`/api/probes/${probe.id}/config`);
+  let draft = JSON.parse(JSON.stringify(cfg));
+  let dirty = false;
+  managedDirty = false;
+
+  function status() {
+    if (!state.accepts) return h("p", { class: "hint" }, "This site does not accept configuration yet. On the remote Netlens tick Settings → Report to a central Netlens → “Accept configuration from the central Netlens”.");
+    if (cfg.rev === state.site_rev) return h("p", { class: "hint" }, `The site has revision ${state.site_rev}: it is up to date.`);
+    return h("p", { class: "hint" }, `Revision ${cfg.rev} is waiting; the site has ${state.site_rev}. It arrives with the next report.`);
+  }
+
+  function draw() {
+    managedDirty = dirty;
+    clear(card);
+    card.appendChild(h("h2", {}, "Managed from here"));
+    card.appendChild(h("p", { class: "hint" }, "Service checks and health monitors that this Netlens sets up at the remote site. They run there, on its own network, and show on its devices. Logins are stored encrypted."));
+    card.appendChild(status());
+    card.appendChild(h("h3", {}, "Service checks"));
+    if (!draft.services.length) card.appendChild(h("p", { class: "hint" }, "None."));
+    for (const [i, s] of draft.services.entries()) {
+      card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, s.name),
+        h("span", {}, `${KIND_TITLE[s.kind] || s.kind} · ${s.host}${s.port ? `:${s.port}` : ""}${s.path || ""}`, " ",
+          h("button", { class: "btn", type: "button", onclick: () => { draft.services.splice(i, 1); dirty = true; draw(); } }, "Remove"))));
+    }
+    const name = h("input", { type: "text", placeholder: "Name" }), kind = h("select", {}, Object.entries(KIND_TITLE).map(([k, t]) => h("option", { value: k }, t)));
+    const host = h("input", { type: "text", placeholder: "Host or address" }), port = h("input", { type: "number", placeholder: "Port" }), path = h("input", { type: "text", placeholder: "Path or name (/ , example.com)" });
+    const addService = h("button", { class: "btn", type: "button" }, "Add the check");
+    addService.addEventListener("click", () => {
+      if (!name.value.trim() || !host.value.trim()) { toast("Give the check a name and a host", "error"); return; }
+      const item = { name: name.value.trim(), kind: kind.value, host: host.value.trim(), path: path.value.trim(), interval_s: 60, timeout_s: 5 };
+      if (port.value) item.port = Number(port.value);
+      draft.services.push(item);
+      dirty = true;
+      draw();
+    });
+    card.appendChild(h("div", { class: "rs-add" }, name, kind, host, port, path, addService));
+
+    card.appendChild(h("h3", {}, "Health monitors"));
+    if (!draft.monitors.length) card.appendChild(h("p", { class: "hint" }, "None."));
+    for (const [i, m] of draft.monitors.entries()) {
+      const dev = devices.find((d) => d.key === m.device_key);
+      card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, dev ? dev.name : m.device_key),
+        h("span", {}, `${m.method.toUpperCase()}${m.version ? ` ${m.version}` : ""} · every ${m.interval_s} s`, " ",
+          h("button", { class: "btn", type: "button", onclick: () => { draft.monitors.splice(i, 1); dirty = true; draw(); } }, "Remove"))));
+    }
+    const free = devices.filter((d) => !draft.monitors.some((m) => m.device_key === d.key));
+    const device = h("select", {}, free.map((d) => h("option", { value: d.key }, `${d.name}${d.ip ? ` (${d.ip})` : ""}`)));
+    const method = h("select", {}, h("option", { value: "snmp" }, "SNMP"), h("option", { value: "ssh" }, "SSH"));
+    const community = h("input", { type: "password", autocomplete: "off", placeholder: "Community (SNMP)" });
+    const user = h("input", { type: "text", autocomplete: "off", placeholder: "User (SSH)" }), pass = h("input", { type: "password", autocomplete: "new-password", placeholder: "Password (SSH)" });
+    const addMonitor = h("button", { class: "btn", type: "button" }, "Add the monitor");
+    addMonitor.addEventListener("click", () => {
+      if (!device.value) return;
+      const item = { device_key: device.value, method: method.value, interval_s: 60, alerts: true };
+      if (method.value === "snmp") { item.version = "2c"; item.community = community.value || "public"; } else { item.username = user.value.trim(); item.password = pass.value; }
+      draft.monitors.push(item);
+      dirty = true;
+      draw();
+    });
+    if (free.length) card.appendChild(h("div", { class: "rs-add" }, device, method, community, user, pass, addMonitor));
+    const save = h("button", { class: "btn primary", type: "button", disabled: !dirty }, "Save and send to the site");
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      try {
+        cfg = await put(`/api/probes/${probe.id}/config`, { services: draft.services, monitors: draft.monitors });
+        draft = JSON.parse(JSON.stringify(cfg));
+        dirty = false;
+        toast("Saved. The site picks it up with its next report.", "success");
+        draw();
+      } catch (err) {
+        toast(err.message || "Could not save", "error");
+        save.disabled = false;
+      }
+    });
+    card.appendChild(h("div", { class: "form-actions" }, save));
+  }
+  draw();
+  return card;
 }
 
 export async function render(container) {
@@ -170,6 +256,13 @@ export async function render(container) {
     // devices
     const monitorByKey = new Map((data.monitors || []).map((m) => [m.device_key, m]));
     let filter = "";
+    if (admin) {
+      try {
+        body.appendChild(await buildManagedCard(p, data.devices, data.config_state || { accepts: false, site_rev: 0 }));
+      } catch (err) {
+        /* an older server: nothing to manage */
+      }
+    }
     const devCard = h("div", { class: "card" }, h("h2", {}, "Devices"));
     const devTools = h("div", { class: "up-tools" });
     const devTable = h("div", { class: "table-wrap" });
@@ -216,6 +309,6 @@ export async function render(container) {
   }
 
   await showList();
-  timer = setInterval(() => { if (!disposed && !form.firstChild && !body.querySelector("tr.rs-graph:not([hidden])")) refresh(); }, REFRESH_MS);
+  timer = setInterval(() => { if (!disposed && !form.firstChild && !managedDirty && !body.querySelector(".rs-add :focus") && !body.querySelector("tr.rs-graph:not([hidden])")) refresh(); }, REFRESH_MS);
   return () => { disposed = true; if (timer) clearInterval(timer); };
 }
