@@ -1,0 +1,56 @@
+{
+  "id": "synology",
+  "name": "Synology",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows a Synology NAS (DiskStation Manager 7, 6.2 works too) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, each matched to the device Netlens found by MAC address (then IP). Reads through the DSM web API over HTTPS, read-only. Needs a dedicated user in the administrators group (DSM offers no read-only API role); the settings page says how to limit it.",
+  "info": {
+    "title": "Set up a user for Netlens on the Synology",
+    "text": "DSM's web API only lets administrators read the container, virtual machine and package lists, so Netlens needs its own account in the administrators group. Keep it dedicated and small: in DSM open Control Panel > User & Group > Create, name it netlens with a long password, put it in the administrators group, and under Applications allow only DSM (deny File Station, FTP, SMB and the rest). Then in Control Panel > Security > Firewall allow port 5001 only from the machine Netlens runs on. Use the account without two-step verification (create it as a separate user; 2FA cannot be answered by a program). The address is https://<NAS address>:5001; leave 'Verify TLS certificate' off while the NAS uses its self-signed certificate. Netlens signs in for a few seconds at each sync and signs out again.",
+    "code": "# Control Panel > User & Group > Create\n#   Name: netlens   (a long, random password)\n#   Groups: administrators\n#   Applications: allow DSM only\n# Control Panel > Security > Firewall: allow TCP 5001 from the Netlens machine only\n# In Netlens: address https://<NAS address>:5001, user netlens, that password"
+  },
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Synology systems",
+      "required": true,
+      "help": "One line per Synology: its address (https://host:5001; 5001 is the DSM https port, 5000 the http port), and the user name and password of the Netlens user.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "https://192.168.0.20:5001", "required": true},
+        {"key": "username", "label": "User name", "placeholder": "netlens", "required": true},
+        {"key": "password", "label": "Password", "type": "password", "required": true}
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Leave this off while the NAS uses its own self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "guests",
+      "title": "Synology containers and VMs",
+      "about": "Running and stopped containers, virtual machines and packages on your Synology.",
+      "href": "#/hierarchy",
+      "rows": [
+        {"label": "Running", "count": "guests", "where": {"status": "running"}},
+        {"label": "Stopped", "count": "guests", "where": {"status": ["stopped"]}, "tone_if_positive": "warn"},
+        {"label": "Last sync", "value": "status.ts"}
+      ]
+    }
+  ]
+}

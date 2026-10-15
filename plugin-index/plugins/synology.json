@@ -1,0 +1,24 @@
+{
+  "id": "synology",
+  "name": "Synology",
+  "kind": "hypervisor",
+  "description": "Shows a Synology NAS (DiskStation Manager 7) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, matched to your network devices by IP or MAC. Read-only, over the DSM web API with HTTPS; needs a dedicated administrator account (DSM has no read-only API role). Tested against a simulated DSM only; a real DS923+ test is pending.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/synology",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Synology DSM 7.2 (not tested on hardware yet)",
+    "Synology DSM 6.2 (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.0.0/synology.zip",
+      "sha256": "b7d87f32a50ec782d4eed6d9a46f2a149aace435fbbc2c2385ff6c0ef7be4e18",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-15",
+      "changelog": "First release. Containers, virtual machines and packages of a Synology NAS as guests of the NAS. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}
