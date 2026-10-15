@@ -130,3 +130,16 @@ def test_backfill_copies_existing_history_once(tmp_path):
     out = store.query("device", 1, "up", span=400 * 86400, end=now, points=600)
     assert out["points"] and out["points"][0][1] == 0.5             # the two checks, as one hourly bucket
     tsdb.forget_all()
+
+
+def test_history_added_after_a_rollup_still_reaches_the_long_tiers(store):
+    now = T0 + 40 * 86400
+    store.record([("device", 1, "m", 1.0)], ts=now - 60)
+    store.rollup(now)                                        # the marks are now at "now"
+    rows = [(now - 20 * 86400 + i * 600, "device", 1, "disk_pct", 50 + i / 100, "/", "%") for i in range(2000)]
+    store.record_bulk(rows)
+    store.rollup(now)
+    store.prune(now)
+    out = store.query("device", 1, "disk_pct", "/", span=30 * 86400, end=now, points=300)
+    assert len(out["points"]) > 50
+    assert out["points"][0][1] < out["points"][-1][1]

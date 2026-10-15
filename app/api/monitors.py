@@ -189,17 +189,43 @@ def overview(conn=Depends(get_conn)) -> dict:
             "method": row["method"], "enabled": bool(row["enabled"]), "alerts": bool(row["alerts"]), "last_ts": row["last_ts"],
             "last_ok": None if row["last_ok"] is None else bool(row["last_ok"]), "last_error": row["last_error"],
             "level": levels.get(row["device_id"], "ok"), "latest": _latest(store, row["device_id"]),
+            "limits": hm.rules(conn, row["device_id"]) if hm.device_overrides(conn, row["device_id"]) else None,
         })
     return {"monitors": out, "problems": hm.problems(conn)}
+
+
+class LimitsBody(BaseModel):
+    rules: dict[str, dict[str, Any]]
+
+
+@router.get("/devices/{device_id}/limits")
+def get_device_limits(device_id: int, conn=Depends(get_conn)) -> dict:
+    """The limits that apply to this device, and which of them were set for it alone."""
+    _device(conn, device_id)
+    return {"rules": hm.rules(conn, device_id), "general": hm.rules(conn), "overrides": hm.device_overrides(conn, device_id)}
+
+
+@router.put("/devices/{device_id}/limits")
+def put_device_limits(device_id: int, body: LimitsBody, conn=Depends(get_conn)) -> dict:
+    _device(conn, device_id)
+    try:
+        hm.save_device_limits(conn, device_id, body.rules)
+    except hm.MonitorError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"rules": hm.rules(conn, device_id), "general": hm.rules(conn), "overrides": hm.device_overrides(conn, device_id)}
+
+
+@router.get("/forecast")
+def get_forecast(conn=Depends(get_conn)) -> dict:
+    """Monitored disks with their growth trend and the day they run full, the ones that fill soonest first."""
+    from app import forecast
+
+    return {"items": forecast.forecasts(conn), "alert_days": forecast.alert_days(conn)}
 
 
 @router.get("/monitoring/limits")
 def get_limits(conn=Depends(get_conn)) -> dict:
     return {"rules": hm.rules(conn)}
-
-
-class LimitsBody(BaseModel):
-    rules: dict[str, dict[str, Any]]
 
 
 @router.put("/monitoring/limits")

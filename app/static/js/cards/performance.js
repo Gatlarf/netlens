@@ -44,7 +44,7 @@ export async function buildPerformanceCard(entity, id, { title = "Performance", 
   if (unlessOnly.length && series.every((s) => unlessOnly.includes(s.metric))) return null;     // nothing beyond what the Uptime card shows
   let limits = {};
   try {
-    limits = (await get("/api/monitoring/limits")).rules || {};
+    limits = (await get(entity === "device" ? `/api/devices/${id}/limits` : "/api/monitoring/limits")).rules || {};   // a device may have limits of its own
   } catch (err) {
     limits = {};
   }

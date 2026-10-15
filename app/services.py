@@ -503,6 +503,21 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                 conn = connect(db_path)
                 try:
                     prune_results(conn)
+                    try:
+                        from app import forecast
+
+                        if await asyncio.to_thread(forecast.check, conn):          # a disk is on course to fill up
+                            from app.notify.channels import process_channels
+
+                            await process_channels(db_path)
+                    except Exception:  # noqa: BLE001 - a forecast is a convenience
+                        log.exception("capacity forecast failed")
+                    try:
+                        from app import reports
+
+                        await reports.send_weekly(db_path)                      # only when it is due
+                    except Exception:  # noqa: BLE001
+                        log.exception("weekly report failed")
                     from app import backup_schedule
 
                     outcome = await asyncio.to_thread(backup_schedule.run_if_due, conn, db_path)

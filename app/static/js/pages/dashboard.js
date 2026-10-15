@@ -7,12 +7,13 @@ import { big, customCard, linkList, pluginCard, plural, rows, sparkline, toneUp 
 import { openEditor } from "../dashboard_editor.js";
 import { layoutHorizontal } from "../layout_horizontal.js";
 import { buildHealthCard, healthTone } from "../cards/health_map.js";
+import { buildCapacityCard, capacityTone } from "../cards/capacity.js";
 
 const REFRESH_MS = 30000;
 const KINDS = {
   device_new: "New device", device_online: "Came online", device_offline: "Went offline", device_changed: "Changed", port_opened: "Port opened",
   port_closed: "Port closed", wifi_roamed: "Roamed", login_failed: "Failed sign-ins", cert_expiring: "Certificate", service_down: "Service down", service_up: "Service up",
-  metric_warning: "Health warning", metric_critical: "Health critical", metric_ok: "Health normal",
+  metric_warning: "Health warning", metric_critical: "Health critical", metric_ok: "Health normal", capacity_warning: "Disk filling up", capacity_critical: "Disk almost full",
   remote_new: "Remote: new device", remote_offline: "Remote: offline", remote_online: "Remote: online", remote_service_down: "Remote: service down", remote_service_up: "Remote: service up", remote_metric_warning: "Remote: health warning", remote_metric_critical: "Remote: health critical", remote_metric_ok: "Remote: health normal", probe_offline: "Remote site silent", probe_online: "Remote site reporting",
 };
 const kindText = (k) => KINDS[k] || k.replace(/_/g, " ");
@@ -98,6 +99,9 @@ const CARDS = [
   { id: "health", title: "Health", href: "#/health", size: "w", def: true, about: "A heat-map of the devices whose health is monitored (processor, memory, disk), with what is past a limit.",
     show: (d) => !!d.health && d.health.monitors.some((m) => m.enabled), tone: (d) => healthTone(d.health.monitors, d.health.problems),
     build: ({ health }) => buildHealthCard(health) },
+  { id: "capacity", title: "Running out soon", href: "#/health", size: "w", def: true, about: "Disks that are filling up, with the day they will be full, worked out from how fast they have grown.",
+    show: (d) => !!d.capacity && d.capacity.items.length > 0, tone: (d) => capacityTone(d.capacity),
+    build: ({ capacity }) => buildCapacityCard(capacity) },
   { id: "events", title: "Recent events", href: "#/scans", size: "w", def: true, about: "The latest things that happened on the network.",
     build: ({ events }) => (events.length ? h("ul", { class: "d-events" }, events.slice(0, 8).map((e) => h("li", {},
       h("span", { class: "d-time" }, timeAgo(e.ts)), h("span", { class: "d-kind" }, kindText(e.kind)),
@@ -517,6 +521,11 @@ export async function render(container) {
         data.health = { monitors: m.monitors || [], problems: m.problems || [], rules: l.rules || {} };
       } catch (e) {
         data.health = null;      // an older server or no access: the card simply does not show
+      }
+      try {
+        data.capacity = await get("/api/forecast");
+      } catch (e) {
+        data.capacity = null;
       }
       if (!disposed && !(editing && grid.children.length)) draw();
     } catch (err) {

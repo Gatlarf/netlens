@@ -83,7 +83,7 @@ def test_a_backup_is_still_a_valid_netlens_database_and_old_backups_restore(tmp_
     create_backup(root / "netlens.db", root / "b.db", root)           # no plugins installed: an empty table
     validate_backup(root / "b.db")
     from app.backup import restore_backup
-    assert restore_backup(root / "netlens.db", root / "b.db", root) == {"plugins": [], "plugins_failed": []}
+    assert restore_backup(root / "netlens.db", root / "b.db", root) == {"plugins": [], "plugins_failed": [], "metrics": False}
     conn = connect(root / "netlens.db")
     conn.execute("DROP TABLE IF EXISTS backup_plugins")
     conn.close()

@@ -20,6 +20,7 @@ const ROUTES = {
   "#/services": "services",
   "#/health": "health",
   "#/remote-sites": "remote_sites",
+  "#/reports": "reports",
   "#/scans": "scans",
   "#/settings": "settings",
   "#/wizard": "wizard",

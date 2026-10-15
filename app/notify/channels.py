@@ -28,7 +28,7 @@ CHANNELS_KEY = "notify.channels"
 QUIET_KEY = "notify.quiet"
 MAX_CHANNELS = 20
 MAX_EVENTS_PER_MESSAGE = 40
-CRITICAL = {"service_down", "dhcp_rogue", "gateway_changed", "metric_critical", "remote_service_down", "remote_metric_critical", "probe_offline"}  # these break through quiet hours
+CRITICAL = {"service_down", "dhcp_rogue", "gateway_changed", "metric_critical", "capacity_critical", "remote_service_down", "remote_metric_critical", "probe_offline"}  # these break through quiet hours
 _lock = asyncio.Lock()
 
 MIGRATED_KEY = "notify.email_migrated"
@@ -77,6 +77,9 @@ EVENT_LABELS = {
     "metric_warning": "A device's health reading goes past its warning limit (processor, memory, disk, temperature, UPS ...)",
     "metric_critical": "A device's health reading goes past its critical limit",
     "metric_ok": "A health reading is back to normal",
+    "report_weekly": "The weekly report: a summary of the week in plain language (sent once a week, not an event)",
+    "capacity_warning": "A disk is on course to be full within the chosen number of days",
+    "capacity_critical": "A disk will be full within three days",
     "remote_new": "A new device appears at a remote site",
     "remote_offline": "A device at a remote site goes offline",
     "remote_online": "A device at a remote site comes back online",
@@ -314,6 +317,8 @@ def _line(e: dict) -> str:
         "metric_warning": f"Warning: {detail}",
         "metric_critical": f"CRITICAL: {detail}",
         "metric_ok": f"Normal again: {detail}",
+        "capacity_warning": f"Disk filling up: {detail}",
+        "capacity_critical": f"DISK ALMOST FULL: {detail}",
         "container_unhealthy": f"Container unhealthy: {detail}",
         "container_restarting": f"Container restarting: {detail}",
         "container_stopped": f"Container stopped: {detail}",
@@ -333,7 +338,7 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
         "remote_new": "remote device new", "remote_offline": "remote offline", "remote_online": "remote online", "remote_service_down": "remote service down",
         "remote_service_up": "remote service up", "remote_metric_warning": "remote health warning", "remote_metric_critical": "remote health critical",
         "remote_metric_ok": "remote health normal", "probe_offline": "site silent", "probe_online": "site reporting",
-        "metric_warning": "health warning", "metric_critical": "health critical", "metric_ok": "health normal", "unreachable": "behind an offline device",
+        "metric_warning": "health warning", "metric_critical": "health critical", "metric_ok": "health normal", "capacity_warning": "disk filling up", "capacity_critical": "disk almost full", "unreachable": "behind an offline device",
         "container_unhealthy": "container unhealthy", "container_restarting": "container restarting", "container_stopped": "container stopped",
         "guest_stopped": "guest stopped", "guest_started": "guest started", "guest_update_available": "update available", "cert_expiring": "certificate expiring", "login_failed": "failed logins",
     }

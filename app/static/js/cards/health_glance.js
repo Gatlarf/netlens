@@ -31,7 +31,7 @@ export async function buildHealthGlance(device, onOpen) {
   }
   let rules = {};
   try {
-    rules = (await get("/api/monitoring/limits")).rules || {};
+    rules = (await get(`/api/devices/${device.id}/limits`)).rules || {};
   } catch (err) {
     rules = {};
   }

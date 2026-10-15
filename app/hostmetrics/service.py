@@ -26,6 +26,7 @@ DEFAULT_PORT = {"snmp": 161, "ssh": 22}
 MIN_INTERVAL, MAX_INTERVAL, DEFAULT_INTERVAL = 30, 3600, 60
 MAX_CONCURRENT = 6
 THRESHOLDS_KEY = "hostmetrics.thresholds"
+DEVICE_LIMITS_KEY = "hostmetrics.device_limits"      # {device id: {metric: {warn, crit, enabled}}}: a device that differs from the rest
 
 # What is worth a message by default. `low` means the value is bad when it is LOW (battery, supplies). `confirm` is the number
 # of readings in a row that must agree before the level changes, so one busy second is not an alarm.
@@ -45,28 +46,47 @@ class MonitorError(ValueError):
 
 
 # ----------------------------------------------------------------------------- rules
-def rules(conn) -> dict[str, dict[str, Any]]:
-    """The default rules with the user's changes applied: {metric: {title, unit, warn, crit, confirm, low, enabled}}."""
+def _apply(base: dict[str, dict[str, Any]], saved: Any) -> None:
+    """Lay the saved changes (warn, crit, enabled) over `base`, ignoring what is not valid."""
+    if not isinstance(saved, dict):
+        return
+    for metric, mine in saved.items():
+        if metric not in base or not isinstance(mine, dict):
+            continue
+        for k in ("warn", "crit"):
+            if k in mine and (mine[k] is None or isinstance(mine[k], (int, float)) and not isinstance(mine[k], bool)):
+                base[metric][k] = mine[k]
+        if isinstance(mine.get("enabled"), bool):
+            base[metric]["enabled"] = mine["enabled"]
+
+
+def _saved(conn, key: str) -> Any:
     try:
-        saved = json.loads(get_setting(conn, THRESHOLDS_KEY) or "{}")
+        return json.loads(get_setting(conn, key) or "{}")
     except ValueError:
-        saved = {}
-    out = {}
-    for metric, base in DEFAULT_RULES.items():
-        merged = {**base, "enabled": True}
-        mine = saved.get(metric) if isinstance(saved, dict) else None
+        return {}
+
+
+def rules(conn, device_id: int | None = None) -> dict[str, dict[str, Any]]:
+    """The default rules with the user's changes applied: {metric: {title, unit, warn, crit, confirm, low, enabled}}.
+    With a device id the limits that were set for that device alone are applied on top."""
+    out = {metric: {**base, "enabled": True} for metric, base in DEFAULT_RULES.items()}
+    _apply(out, _saved(conn, THRESHOLDS_KEY))
+    if device_id is not None:
+        mine = _saved(conn, DEVICE_LIMITS_KEY)
         if isinstance(mine, dict):
-            for k in ("warn", "crit"):
-                if k in mine and (mine[k] is None or isinstance(mine[k], (int, float)) and not isinstance(mine[k], bool)):
-                    merged[k] = mine[k]
-            if isinstance(mine.get("enabled"), bool):
-                merged["enabled"] = mine["enabled"]
-        out[metric] = merged
+            _apply(out, mine.get(str(device_id)))
     return out
 
 
-def save_rules(conn, data: dict) -> dict[str, dict[str, Any]]:
-    """Validate and store changed limits. Only warn, crit and enabled can be changed."""
+def device_overrides(conn, device_id: int) -> dict[str, dict[str, Any]]:
+    """Only what was changed for this device (empty when it follows the general limits)."""
+    mine = _saved(conn, DEVICE_LIMITS_KEY)
+    item = mine.get(str(device_id)) if isinstance(mine, dict) else None
+    return item if isinstance(item, dict) else {}
+
+
+def _clean_rules(data: dict) -> dict[str, dict]:
     clean: dict[str, dict] = {}
     for metric, mine in (data or {}).items():
         if metric not in DEFAULT_RULES:
@@ -88,8 +108,26 @@ def save_rules(conn, data: dict) -> dict[str, dict[str, Any]]:
             if (low and crit > warn) or (not low and crit < warn):
                 raise MonitorError(f"{DEFAULT_RULES[metric]['title']}: the critical limit must be {'below' if low else 'above'} the warning limit")
         clean[metric] = item
-    set_setting(conn, THRESHOLDS_KEY, json.dumps(clean))
+    return clean
+
+
+def save_rules(conn, data: dict) -> dict[str, dict[str, Any]]:
+    """Validate and store changed limits. Only warn, crit and enabled can be changed."""
+    set_setting(conn, THRESHOLDS_KEY, json.dumps(_clean_rules(data)))
     return rules(conn)
+
+
+def save_device_limits(conn, device_id: int, data: dict) -> dict[str, dict[str, Any]]:
+    """Limits for one device. An empty object makes it follow the general limits again."""
+    clean = _clean_rules(data)
+    mine = _saved(conn, DEVICE_LIMITS_KEY)
+    mine = mine if isinstance(mine, dict) else {}
+    if clean:
+        mine[str(device_id)] = clean
+    else:
+        mine.pop(str(device_id), None)
+    set_setting(conn, DEVICE_LIMITS_KEY, json.dumps(mine))
+    return rules(conn, device_id)
 
 
 def level_of(rule: dict[str, Any], value: float) -> str:
@@ -306,7 +344,7 @@ def _describe(rule: dict[str, Any], metric: str, label: str, value: float, level
 def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: list[tuple], now: str | None = None) -> list[str]:
     """Move each reading through its level (ok / warning / critical). Returns the events that were raised."""
     now = now or utcnow()
-    the_rules = rules(conn)
+    the_rules = rules(conn, device_id)
     raised: list[str] = []
     for metric, label, value, _unit in points:
         rule = the_rules.get(metric)
@@ -342,12 +380,16 @@ def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: li
 
 def problems(conn) -> list[dict[str, Any]]:
     """Readings that are beyond a limit now (for the dashboard and the health page)."""
-    the_rules = rules(conn)
+    general = rules(conn)
+    per_device: dict[int, dict] = {}
     out = []
     for r in conn.execute(
         "SELECT s.metric, s.label, s.level, s.since, s.value, m.device_id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name "
         "FROM metric_state s JOIN host_monitors m ON m.id = s.monitor_id JOIN devices d ON d.id = m.device_id "
         "WHERE s.level != 'ok' AND m.alerts = 1 AND m.enabled = 1 ORDER BY s.level DESC, name"):
+        the_rules = per_device.get(r["device_id"])
+        if the_rules is None:
+            the_rules = per_device[r["device_id"]] = rules(conn, r["device_id"]) if device_overrides(conn, r["device_id"]) else general
         rule = the_rules.get(r["metric"])
         if rule:
             out.append({"device_id": r["device_id"], "device": r["name"], "metric": r["metric"], "label": r["label"], "level": r["level"], "since": r["since"],

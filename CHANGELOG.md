@@ -2,6 +2,21 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.5 — 2026-10-15
+
+### Added
+- ★ **Running out soon**: a new dashboard card and an alert for disks that are filling up. From the growth of the last weeks Netlens works out the day a monitored disk will be full ("Backup server /mnt/datastore: full in about 13 days, around 28 October"). A disk that is steady or shrinking gets no date, one big file does not count as a trend, and a disk needs a few days of history first. A notification is sent when a disk is on course to fill within 14 days (a critical one within 3 days); it is raised once, not on every round, and not for a disk that already has a critical reading of its own.
+- ★ **Limits per device**: on a device's Health tab, "Limits for this device" sets other warning and critical limits for that device alone (a NAS that runs at 90% by design, a database server that should warn earlier). Empty boxes follow the general limits. The warnings, the lines in the graphs and the dashboard tiles use them.
+- ★ **The history is in the backups**: a backup now carries a trimmed copy of the measurement history (the last day in full, 14 days at 5 minutes, and all the hourly values), and a restore brings it back. Before, losing the data folder lost the graphs and the growth trend.
+
+- ★ **Reports**: new page Monitoring → Reports. The **weekly report** summarises the last seven days in plain language (what was down and for how long, health readings past a limit, disks filling up, new devices, silent remote sites). Turn it on there and choose the day and hour, then tick "Weekly report" on the notification channels that should get it; "Send it now" tries it. The **monthly availability report** shows every device and service for a calendar month with availability, number of outages, longest outage and time down; it can be printed or downloaded as a CSV file for a spreadsheet.
+
+### Changed
+- The Health card on the dashboard stays readable with many devices: above 24 monitored devices only the devices that need a look are shown as tiles, and the healthy ones shrink to one small square each (a button shows them as tiles again).
+
+### Fixed
+- Graphs of 30 days and longer were nearly empty after an update: the history that was copied in once (and the demo's) stayed in the fine tier, which is trimmed after a week. It is folded into the long tiers now, and an installation that already ran the copy does it once more.
+
 ## 0.4.4 — 2026-10-15
 
 ### Added

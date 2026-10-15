@@ -54,7 +54,7 @@ def test_restore_roundtrip(env):
         assert _marker(db) == ("changed", 2)
 
         r = c.post("/api/restore", content=snapshot)
-        assert r.status_code == 200 and r.json() == {"ok": True, "backup_schema_version": SCHEMA_VERSION, "devices": 1, "plugins": [], "plugins_failed": []}
+        assert r.status_code == 200 and r.json() == {"ok": True, "backup_schema_version": SCHEMA_VERSION, "devices": 1, "plugins": [], "plugins_failed": [], "metrics": False}
         assert _marker(db) == ("original", 1)
         # the API keeps working on the restored data
         assert len(c.get("/api/devices").json()) == 1

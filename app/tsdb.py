@@ -158,6 +158,7 @@ class Store:
     def record_bulk(self, rows: Iterable[tuple]) -> int:
         """Many samples with their own times in one go: (ts, entity, entity_id, metric, value, label, unit)."""
         n = 0
+        oldest = None
         try:
             conn = self._connect()
             try:
@@ -166,7 +167,10 @@ class Store:
                         continue
                     sid = self._series_id(conn, entity, int(entity_id), str(metric), str(label or ""), str(unit or ""))
                     conn.execute("INSERT OR REPLACE INTO raw (series, ts, v) VALUES (?,?,?)", (sid, int(ts), float(value)))
+                    oldest = int(ts) if oldest is None else min(oldest, int(ts))
                     n += 1
+                if oldest is not None:
+                    self._rewind(conn, oldest)
                 conn.commit()
             finally:
                 conn.close()
@@ -226,7 +230,10 @@ class Store:
         """
         conn = self._connect()
         try:
-            if not force and conn.execute("SELECT 1 FROM meta WHERE k = 'backfill_done'").fetchone():
+            # version 2: the history is also folded into the 5-minute and hourly tiers (version 1 left it in the raw tier,
+            # where it was pruned after a week), so an installation that did version 1 does it once more
+            done = conn.execute("SELECT v FROM meta WHERE k = 'backfill_done'").fetchone()
+            if not force and done and done["v"] >= 2:
                 return 0
             count = 0
 
@@ -251,7 +258,7 @@ class Store:
 
             count += feed("device", ((r[0], r[1], r[2], r[3]) for r in main.execute("SELECT device_id, ts, up, rtt_ms FROM checks ORDER BY id")))
             count += feed("service", ((r[0], r[1], r[2], r[3]) for r in main.execute("SELECT check_id, ts, up, ms FROM service_results ORDER BY id")))
-            conn.execute("INSERT OR REPLACE INTO meta (k, v) VALUES ('backfill_done', 1)")
+            conn.execute("INSERT OR REPLACE INTO meta (k, v) VALUES ('backfill_done', 2)")
             conn.commit()
         finally:
             conn.close()
@@ -261,12 +268,22 @@ class Store:
 
     def _bulk(self, conn: sqlite3.Connection, batch: list[tuple]) -> int:
         n = 0
+        oldest = None
         for entity, ident, metric, value, label, unit, ts in batch:
             sid = self._series_id(conn, entity, int(ident), metric, label, unit)
             conn.execute("INSERT OR IGNORE INTO raw (series, ts, v) VALUES (?,?,?)", (sid, ts, float(value)))
+            oldest = ts if oldest is None else min(oldest, ts)
             n += 1
+        if oldest is not None:
+            self._rewind(conn, oldest)
         conn.commit()
         return n
+
+    @staticmethod
+    def _rewind(conn: sqlite3.Connection, ts: int) -> None:
+        """Samples older than what the rollup has already folded in must be folded in too: move its marks back."""
+        for key, step in (("m5_done", STEP_5M), ("h1_done", STEP_1H)):
+            conn.execute("UPDATE meta SET v = MIN(v, ?) WHERE k = ?", (int(ts) // step * step, key))
 
     # ------------------------------------------------------------------ maintenance
     def rollup(self, now: int | None = None) -> None:

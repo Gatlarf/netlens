@@ -84,7 +84,54 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
       try { await del(`/api/devices/${device.id}/monitor`); toast("Health monitoring removed", "success"); } catch (err) { toast(err.message || "Could not remove", "error"); }
       await load();
     });
-    card.append(h("div", { class: "form-actions" }, run, h("button", { class: "btn", type: "button", onclick: () => showForm(m) }, "Edit"), remove));
+    card.append(limitsBox(), h("div", { class: "form-actions" }, run, h("button", { class: "btn", type: "button", onclick: () => showForm(m) }, "Edit"), remove));
+  }
+
+  // The limits of this device alone: empty boxes follow the general limits (Monitoring -> Health)
+  const LIMIT_ROWS = [["cpu_pct", "Processor busy (%)"], ["mem_pct", "Memory in use (%)"], ["disk_pct", "Disk full (%)"], ["temp_c", "Temperature (°C)"],
+    ["supply_pct", "Supply left (%)"], ["battery_pct", "UPS battery (%)"]];
+  function limitsBox() {
+    const box = h("details", { class: "limits-box" }, h("summary", {}, "Limits for this device"));
+    box.addEventListener("toggle", async () => {
+      if (!box.open || box.dataset.ready) return;
+      box.dataset.ready = "1";
+      let data;
+      try {
+        data = await get(`/api/devices/${device.id}/limits`);
+      } catch (err) {
+        box.appendChild(h("p", { class: "error" }, "The limits could not be loaded"));
+        return;
+      }
+      const table = h("div", { class: "limits-table" }, h("span", { class: "limits-head" }, ""), h("span", { class: "limits-head" }, "Warn at"), h("span", { class: "limits-head" }, "Critical at"));
+      const inputs = {};
+      for (const [metric, title] of LIMIT_ROWS) {
+        const mine = data.overrides[metric] || {};
+        const base = data.general[metric] || {};
+        const warn = h("input", { type: "number", step: "any", placeholder: base.warn == null ? "" : String(base.warn), value: mine.warn == null ? "" : String(mine.warn) });
+        const crit = h("input", { type: "number", step: "any", placeholder: base.crit == null ? "" : String(base.crit), value: mine.crit == null ? "" : String(mine.crit) });
+        inputs[metric] = { warn, crit };
+        table.append(h("span", {}, title), warn, crit);
+      }
+      const save = h("button", { class: "btn primary", type: "button" }, "Save");
+      save.addEventListener("click", async () => {
+        const rules = {};
+        for (const [metric, f] of Object.entries(inputs)) {
+          const item = {};
+          if (f.warn.value !== "") item.warn = Number(f.warn.value);
+          if (f.crit.value !== "") item.crit = Number(f.crit.value);
+          if (Object.keys(item).length) rules[metric] = item;
+        }
+        try {
+          await put(`/api/devices/${device.id}/limits`, { rules });
+          toast(Object.keys(rules).length ? "Limits for this device saved" : "This device follows the general limits", "success");
+          if (onChange) onChange();
+        } catch (err) {
+          toast(err.message || "Could not save the limits", "error");
+        }
+      });
+      box.append(h("p", { class: "hint" }, "Leave a box empty to use the general limit shown in grey. Changes apply to the warnings and to the lines in the graphs."), table, h("div", { class: "form-actions" }, save));
+    });
+    return box;
   }
 
   function showForm(m) {

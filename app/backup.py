@@ -1,8 +1,11 @@
+import gzip
 import hashlib
 import io
 import logging
 import os
 import sqlite3
+import tempfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -10,6 +13,9 @@ from app.db import SCHEMA_VERSION, connect, init_db
 
 log = logging.getLogger(__name__)
 
+METRICS_TABLE = "backup_metrics"    # only inside a backup file: a trimmed copy of metrics.db (the history behind the graphs and forecasts)
+METRICS_KEEP_RAW = 86400            # what the copy holds: the last day in full, 14 days at 5 minutes, all hours
+METRICS_KEEP_M5 = 14 * 86400
 PLUGIN_TABLE = "backup_plugins"     # only exists inside a backup file: the installed plugins, so a restore brings them back too
 
 
@@ -48,6 +54,60 @@ def _plugin_zips(data_dir: "str | os.PathLike") -> list[tuple[str, str, bytes]]:
     return out
 
 
+def _metrics_snapshot(db_path: "str | os.PathLike") -> bytes | None:
+    """A compressed, trimmed copy of the metrics store that sits next to the main database; None when there is none."""
+    src_path = Path(os.fspath(db_path)).resolve().with_name("metrics.db")
+    if not src_path.is_file():
+        return None
+    now = int(time.time())
+    with tempfile.TemporaryDirectory() as tmp:
+        copy = os.path.join(tmp, "metrics.db")
+        src = sqlite3.connect(f"file:{src_path}?mode=ro", uri=True, timeout=15)
+        dst = sqlite3.connect(copy)
+        try:
+            src.backup(dst)
+            dst.execute("DELETE FROM raw WHERE ts < ?", (now - METRICS_KEEP_RAW,))
+            dst.execute("DELETE FROM m5 WHERE ts < ?", (now - METRICS_KEEP_M5,))
+            dst.commit()
+            dst.execute("VACUUM")
+        finally:
+            src.close()
+            dst.close()
+        with open(copy, "rb") as f:
+            return gzip.compress(f.read(), 6)
+
+
+def _restore_metrics(src: sqlite3.Connection, db_path: "str | os.PathLike") -> bool:
+    try:
+        row = src.execute(f"SELECT data FROM {METRICS_TABLE} LIMIT 1").fetchone()
+    except sqlite3.Error:
+        return False                                  # a backup from before the history was included: keep what is here
+    if row is None:
+        return False
+    from app import tsdb
+
+    target = Path(os.fspath(db_path)).resolve().with_name("metrics.db")
+    try:
+        data = gzip.decompress(bytes(row[0]))
+        if not data.startswith(b"SQLite format 3\x00"):
+            return False
+        tmp = target.with_name("metrics.db.restoring")
+        tmp.write_bytes(data)
+        if target.exists():
+            os.replace(target, target.with_name("metrics.db.pre-restore"))
+        for suffix in ("-wal", "-shm"):
+            try:
+                os.unlink(str(target) + suffix)
+            except FileNotFoundError:
+                pass
+        os.replace(tmp, target)
+    except (OSError, EOFError, gzip.BadGzipFile) as exc:
+        log.warning("could not restore the metrics history: %s", exc)
+        return False
+    tsdb.forget_all()
+    return True
+
+
 def create_backup(db_path: "str | os.PathLike", dest_path: "str | os.PathLike", data_dir: "str | os.PathLike | None" = None) -> None:
     """Copy the database to dest_path and put the installed plugins (their files) into the copy."""
     data_dir = data_dir if data_dir is not None else Path(os.fspath(db_path)).parent
@@ -61,6 +121,15 @@ def create_backup(db_path: "str | os.PathLike", dest_path: "str | os.PathLike", 
             dst.execute(f"DELETE FROM {PLUGIN_TABLE}")
             dst.executemany(f"INSERT INTO {PLUGIN_TABLE} (plugin_id, version, sha256, data) VALUES (?,?,?,?)",
                             [(pid, version, hashlib.sha256(data).hexdigest(), data) for pid, version, data in plugins])
+            dst.execute(f"CREATE TABLE IF NOT EXISTS {METRICS_TABLE} (id INTEGER PRIMARY KEY CHECK (id = 1), data BLOB NOT NULL)")
+            dst.execute(f"DELETE FROM {METRICS_TABLE}")
+            try:
+                metrics = _metrics_snapshot(db_path)
+            except (sqlite3.Error, OSError) as exc:        # the history is a convenience: a backup without it is still a backup
+                log.warning("the metrics history is not included in the backup: %s", exc)
+                metrics = None
+            if metrics:
+                dst.execute(f"INSERT INTO {METRICS_TABLE} (id, data) VALUES (1, ?)", (metrics,))
             dst.commit()
         finally:
             src.close()
@@ -153,9 +222,12 @@ def restore_backup(db_path: "str | os.PathLike", src_path: "str | os.PathLike", 
         try:
             src.backup(dst)
             dst.execute(f"DROP TABLE IF EXISTS {PLUGIN_TABLE}")      # the copies live in the plugin folder now
+            dst.execute(f"DROP TABLE IF EXISTS {METRICS_TABLE}")     # the history lives in metrics.db next to it
             init_db(dst)
             dst.commit()
-            return _restore_plugins(src, data_dir)
+            result = _restore_plugins(src, data_dir)
+            result["metrics"] = _restore_metrics(src, db_path)
+            return result
         finally:
             src.close()
             dst.close()

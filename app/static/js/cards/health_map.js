@@ -5,6 +5,7 @@ import { formatValue } from "../timegraph.js";
 // A tile is coloured by the worst level of that device; its three bars show processor, memory and the fullest disk,
 // each coloured by its own level, so a glance tells which device is in trouble and with what.
 const BARS = [["cpu", "Processor", "cpu_pct"], ["mem", "Memory", "mem_pct"], ["disk", "Disk", "disk_pct"]];
+const COMPACT_ABOVE = 24;      // more devices than this: the healthy ones become small squares
 const RANK = { ok: 0, warning: 1, critical: 2 };
 
 function levelOf(value, rule) {
@@ -22,7 +23,8 @@ function tileState(m) {
 
 const STATE_TEXT = { ok: "healthy", warning: "warning", critical: "critical", unreachable: "cannot be read", waiting: "waiting for the first reading", off: "monitoring paused" };
 
-function tile(m, rules) {
+function tile(m, general) {
+  const rules = m.limits || general;          // limits set for this device alone win
   const state = tileState(m);
   const bars = BARS.map(([key, title, metric]) => {
     const v = m.latest[key];
@@ -54,7 +56,29 @@ export function buildHealthCard({ monitors, problems, rules }) {
     headline = `${silent} of ${monitors.length} cannot be read`;
     cls = "warn";
   }
-  const body = h("div", { class: "hm" }, h("p", { class: `hm-headline d-${cls}` }, headline), h("div", { class: "hm-grid" }, ...tiles.map((m) => tile(m, rules))));
+  const body = h("div", { class: "hm" }, h("p", { class: `hm-headline d-${cls}` }, headline));
+  if (tiles.length <= COMPACT_ABOVE) {
+    body.appendChild(h("div", { class: "hm-grid" }, ...tiles.map((m) => tile(m, rules))));
+  } else {
+    // many devices: the ones that need a look stay full tiles, the healthy ones shrink to one small square each
+    const bigTiles = tiles.filter((m) => tileState(m) !== "ok");
+    const calm = tiles.filter((m) => tileState(m) === "ok");
+    if (bigTiles.length) body.appendChild(h("div", { class: "hm-grid" }, ...bigTiles.map((m) => tile(m, rules))));
+    const dots = h("div", { class: "hm-dots" }, ...calm.map((m) => {
+      const worst = Math.max(m.latest.cpu ?? 0, m.latest.mem ?? 0, m.latest.disk ?? 0);
+      return h("a", { class: "hm-dot", href: `#/device/${m.device_id}`, title: `${m.name}: ${worst ? `busiest reading ${formatValue(worst, "%")}` : "healthy"}`,
+        onclick: () => { try { sessionStorage.setItem("netlens.devicetab", "health"); } catch (e) { /* ignore */ } } });
+    }));
+    const full = h("div", { class: "hm-grid", hidden: true }, ...calm.map((m) => tile(m, rules)));
+    const toggle = h("button", { type: "button", class: "btn hm-toggle" }, "Show them as tiles");
+    toggle.addEventListener("click", (e) => {
+      e.preventDefault();
+      full.hidden = !full.hidden;
+      dots.hidden = !full.hidden;
+      toggle.textContent = full.hidden ? "Show them as tiles" : "Show them as squares";
+    });
+    if (calm.length) body.append(h("p", { class: "hint hm-calm" }, `${calm.length} healthy`), dots, full, toggle);
+  }
   if (problems.length) {
     const list = [...problems].sort((a, b) => (RANK[b.level] ?? 0) - (RANK[a.level] ?? 0)).slice(0, 5);
     body.appendChild(h("ul", { class: "d-attention hm-problems" }, list.map((p) => h("li", { class: p.level === "critical" ? "d-bad" : "d-warn" },
