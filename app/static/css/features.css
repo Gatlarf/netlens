@@ -18,7 +18,9 @@
 a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .field input[type="file"] { width: 100%; }
 .scan-time { font-size: 0.9em; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.scan-info { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 6px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.scan-info { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 6px 16px; background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -2px 8px rgba(0,0,0,0.12);
+  /* floats over the page, so the page does not shift (and terminals do not resize) when a scan starts */
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; }
 .scan-info[hidden] { display: none; }
 
 /* Settings page: side menu + sections */

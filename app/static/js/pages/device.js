@@ -791,7 +791,9 @@ export async function render(container, params) {
     panels.network = twoColumns(nLeft, nRight);
 
     // Console (administrators)
-    const newSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
+    // a console that is in use is moved into the new page as it is: a refresh must not drop the session
+    const keepConsole = !!(terminalSlot && terminalHandle && isTerminalActive(terminalSlot));
+    const newSlot = keepConsole ? terminalSlot : h("div", { id: "terminal-slot", class: "terminal-slot" });
     if (isAdmin()) panels.console = newSlot;
 
     // Settings (administrators): edit, parent, delete
@@ -835,11 +837,17 @@ export async function render(container, params) {
     select(activeTab);
     buildHealthGlance(device, () => select("health")).then((el) => { if (el && !disposed) strip.appendChild(el); }).catch(() => {});
 
-    disposeTerminal();
+    if (!keepConsole) disposeTerminal();
     editResult = newEdit;
     terminalSlot = newSlot;
+    // swap the page in without the scroll position jumping: hold the old height until the cards have filled in
+    const oldHeight = container.offsetHeight;
+    const scrollY = window.scrollY;
+    if (oldHeight) container.style.minHeight = `${oldHeight}px`;
     clear(container);
     container.appendChild(page);
+    window.scrollTo(0, scrollY);
+    setTimeout(() => { if (!disposed) container.style.minHeight = ""; }, 4000);
 
     if (!isAdmin()) return; // the terminal is for administrators
     // RDP and VNC open on the Remote access page
@@ -848,22 +856,25 @@ export async function render(container, params) {
         && (proto === "rdp" ? p.port === 3389 || ["ms-wbt-server", "rdp"].includes(p.service) : (p.port >= 5900 && p.port <= 5909) || String(p.service || "").includes("vnc")));
       if (open) heading.appendChild(h("a", { class: "btn admin-only", href: `#/remote?device=${device.id}&proto=${proto}`, id: `jump-${proto}`, title: `Open ${label} on the Remote access page` }, label));
     }
+    const addConsoleButtons = (handle) => {
+      for (const p of (handle && handle.protos) || []) {
+        heading.appendChild(h("button", {
+          class: "btn admin-only",
+          type: "button",
+          id: `jump-${p.proto}`,
+          title: `Open the ${p.proto.toUpperCase()} console below`,
+          onclick: () => { select("console"); handle.open(p.proto); },
+        }, p.proto === "ssh" ? "SSH" : "Telnet"));
+      }
+    };
+    if (keepConsole) { addConsoleButtons(terminalHandle); return; }
     try {
       const handle = await mountTerminal(newSlot, device);
       if (disposed || terminalSlot !== newSlot) {
         if (handle && typeof handle.dispose === "function") handle.dispose();
       } else {
         terminalHandle = handle;
-        // jump straight to the console from the top of the page
-        for (const p of (handle && handle.protos) || []) {
-          heading.appendChild(h("button", {
-            class: "btn admin-only",
-            type: "button",
-            id: `jump-${p.proto}`,
-            title: `Open the ${p.proto.toUpperCase()} console below`,
-            onclick: () => { select("console"); handle.open(p.proto); },
-          }, p.proto === "ssh" ? "SSH" : "Telnet"));
-        }
+        addConsoleButtons(handle);  // jump straight to the console from the top of the page
       }
     } catch (err) {
       if (!disposed) toast("Terminal failed to load", "error");
