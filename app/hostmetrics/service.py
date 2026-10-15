@@ -17,12 +17,12 @@ from typing import Any
 
 from app import tsdb, vault
 from app.db import add_event, connect, get_setting, set_setting, utcnow
-from app.hostmetrics import snmp, snmpv3, ssh
+from app.hostmetrics import snmp, snmpv3, ssh, winrm
 
 log = logging.getLogger(__name__)
 
-METHODS = ("snmp", "ssh")
-DEFAULT_PORT = {"snmp": 161, "ssh": 22}
+METHODS = ("snmp", "ssh", "winrm")
+DEFAULT_PORT = {"snmp": 161, "ssh": 22, "winrm": 5986}
 MIN_INTERVAL, MAX_INTERVAL, DEFAULT_INTERVAL = 30, 3600, 60
 MAX_CONCURRENT = 6
 THRESHOLDS_KEY = "hostmetrics.thresholds"
@@ -162,7 +162,7 @@ def validate(data: dict[str, Any], current: dict[str, Any] | None = None) -> dic
     cur = current or {}
     method = data.get("method", cur.get("method"))
     if method not in METHODS:
-        raise MonitorError("choose how to ask the device: SNMP or SSH")
+        raise MonitorError("choose how to ask the device: SNMP, SSH or WinRM")
     address = str(data.get("address", cur.get("address")) or "").strip()
     if not HOST_RE.match(address):
         raise MonitorError("the address must be a host name or an IP address")
@@ -213,6 +213,32 @@ def validate(data: dict[str, Any], current: dict[str, Any] | None = None) -> dic
                 secret.pop(key, None)
             if not secret.get("community"):
                 secret["community"] = "public"
+    elif method == "winrm":
+        secret = {k: v for k, v in secret.items() if k in ("username", "password", "auth", "verify_tls")}
+        if data.get("username") is not None:
+            secret["username"] = str(data["username"]).strip()
+        if data.get("password") not in (None, ""):
+            secret["password"] = str(data["password"])
+        if data.get("auth") is not None:
+            if data["auth"] not in ("ntlm", "basic"):
+                raise MonitorError("the login method must be NTLM or Basic")
+            secret["auth"] = data["auth"]
+        secret.setdefault("auth", "ntlm")
+        if data.get("verify_tls") is not None:
+            secret["verify_tls"] = bool(data["verify_tls"])
+        secret.setdefault("verify_tls", False)
+        if not secret.get("username") or not secret.get("password"):
+            raise MonitorError("give the user name and the password of a Windows account that may use remote management")
+        if port == 5985:
+            import ipaddress
+
+            try:
+                ip = ipaddress.ip_address(address)
+                private = ip.is_private or ip.is_loopback
+            except ValueError:
+                private = "." not in address or address.endswith(".local")
+            if not private:
+                raise MonitorError("plain http (port 5985) is only used on your own network; use https, port 5986")
     else:
         secret = {k: v for k, v in secret.items() if k in ("username", "password", "private_key", "passphrase", "platform")}
         if data.get("platform") is not None:
@@ -257,14 +283,16 @@ def public(conn, row) -> dict[str, Any]:
         "last_error": row["last_error"], "since": row["since"],
         "has_community": bool(secret.get("community")) if row["method"] == "snmp" else None,
         "version": secret.get("version", "2c") if row["method"] == "snmp" else None,
-        "username": secret.get("username") if row["method"] in ("ssh", "snmp") else None,
+        "username": secret.get("username") if row["method"] in ("ssh", "snmp", "winrm") else None,
         "auth_proto": secret.get("auth_proto", "") if row["method"] == "snmp" else None,
         "priv_proto": secret.get("priv_proto", "") if row["method"] == "snmp" else None,
         "has_auth_password": bool(secret.get("auth_password")) if row["method"] == "snmp" else None,
         "has_priv_password": bool(secret.get("priv_password")) if row["method"] == "snmp" else None,
-        "has_password": bool(secret.get("password")) if row["method"] == "ssh" else None,
+        "has_password": bool(secret.get("password")) if row["method"] in ("ssh", "winrm") else None,
         "has_private_key": bool(secret.get("private_key")) if row["method"] == "ssh" else None,
         "platform": secret.get("platform", "auto") if row["method"] == "ssh" else None,
+        "auth": secret.get("auth", "ntlm") if row["method"] == "winrm" else None,
+        "verify_tls": bool(secret.get("verify_tls")) if row["method"] == "winrm" else None,
         "secret_unreadable": bool(row["credential"]) and not secret,
     }
 
@@ -351,6 +379,26 @@ async def read(method: str, address: str, port: int, secret: dict[str, Any], gro
         if not points and not found:
             raise MonitorError("the device answered but reported nothing Netlens can use (is SNMP switched on, and is this the right community?)")
         return points, found, None
+    if method == "winrm":
+        def work():
+            session = winrm.Session(address, port, port != 5985, secret.get("username", ""), secret.get("password", ""), secret.get("auth", "ntlm"),
+                                    bool(secret.get("verify_tls")), timeout=20)
+            try:
+                return session.run_powershell(ssh.WIN_SCRIPT)
+            finally:
+                session.close()          # also after a refused login: the connection must not stay open
+
+        try:
+            out, err, _code = await asyncio.to_thread(work)
+        except winrm.WinrmError as exc:
+            raise MonitorError(str(exc)) from None
+        try:
+            points, found = ssh.parse_windows(out, state, now)
+        except ssh.SshError:
+            raise MonitorError(winrm.powershell_error(err) or "the host answered but gave no readings") from None
+        if not points and not found:
+            raise MonitorError("the host answered but gave no readings")
+        return points, found, None
     try:
         platform = secret.get("platform", "auto")
         if platform == "auto":
@@ -412,7 +460,23 @@ async def check_process(db_path: str, device_id: int | None, name: str, timeout:
         return False, "the stored login cannot be read, enter it again on the device page", None
     start = time.monotonic()
     try:
-        if row["method"] == "snmp":
+        if row["method"] == "winrm":
+            bare = name[:-4] if name.lower().endswith(".exe") else name
+            script = (f"if ((Get-Process -Name '{bare}' -ErrorAction SilentlyContinue) -or (Get-Service -Name '{bare}' -ErrorAction SilentlyContinue | "
+                      "Where-Object Status -eq 'Running')) {exit 0} else {exit 1}")
+
+            def probe():
+                session = winrm.Session(row["address"], row["port"], row["port"] != 5985, secret.get("username", ""), secret.get("password", ""),
+                                        secret.get("auth", "ntlm"), bool(secret.get("verify_tls")), timeout=min(timeout, 15.0))
+                try:
+                    return session.run_powershell(script)
+                finally:
+                    session.close()
+
+            _out, _err, code = await asyncio.to_thread(probe)
+            running = code == 0
+            detail = "running" if running else "not running"
+        elif row["method"] == "snmp":
             def work():
                 agent = make_agent(row["address"], row["port"], secret, timeout=min(timeout, 4.0))
                 return [snmp._text(v, 120) for _suffix, v in agent.walk(snmp.HR_SW_RUN_NAME)]
@@ -433,7 +497,7 @@ async def check_process(db_path: str, device_id: int | None, name: str, timeout:
                                                       secret.get("private_key"), secret.get("passphrase"), command, known, timeout)
             running = status == 0
             detail = "running" if running else "not running"
-    except (snmp.SnmpError, ssh.SshError) as exc:
+    except (snmp.SnmpError, ssh.SshError, winrm.WinrmError) as exc:
         return False, str(exc)[:200], None
     return running, detail, round((time.monotonic() - start) * 1000, 1)
 

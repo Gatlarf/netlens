@@ -1,6 +1,7 @@
 import { get, put, post, del } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
+const PORTS = { snmp: "161", ssh: "22", winrm: "5986" };
 const INTERVALS = [[30, "every 30 seconds"], [60, "every minute"], [120, "every 2 minutes"], [300, "every 5 minutes"], [600, "every 10 minutes"], [1800, "every 30 minutes"]];
 
 function field(label, input, hint) {
@@ -138,10 +139,11 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     formOpen = true;
     clear(card);
     card.appendChild(h("h2", {}, "Health monitoring"));
-    const method = h("select", { name: "method" }, h("option", { value: "snmp" }, "SNMP (switch, NAS, printer, UPS, Windows ...)"), h("option", { value: "ssh" }, "SSH (Linux, or Windows with OpenSSH)"));
-    method.value = m ? m.method : (device.ports || []).some((p) => p.port === 22 && (!p.state || p.state === "open")) ? "ssh" : "snmp";
+    const method = h("select", { name: "method" }, h("option", { value: "snmp" }, "SNMP (switch, NAS, printer, UPS, Windows ...)"), h("option", { value: "ssh" }, "SSH (Linux, or Windows with OpenSSH)"), h("option", { value: "winrm" }, "WinRM (Windows, built in)"));
+    const hasPort = (n) => (device.ports || []).some((p) => p.port === n && (!p.state || p.state === "open"));
+    method.value = m ? m.method : hasPort(5986) || hasPort(5985) ? "winrm" : hasPort(22) ? "ssh" : "snmp";
     const address = h("input", { type: "text", name: "address", value: m ? m.address : device.primary_ip || "", required: true });
-    const port = h("input", { type: "number", min: "1", max: "65535", placeholder: method.value === "ssh" ? "22" : "161", value: m ? String(m.port) : "" });
+    const port = h("input", { type: "number", min: "1", max: "65535", placeholder: PORTS[method.value], value: m ? String(m.port) : "" });
     const community = h("input", { type: "password", autocomplete: "off", placeholder: m && m.has_community ? "(kept, type to change)" : "public" });
     const version = h("select", {}, h("option", { value: "2c" }, "2c (normal)"), h("option", { value: "3" }, "3 (user name and passwords, more secure)"), h("option", { value: "1" }, "1 (old devices)"));
     version.value = m && m.version ? m.version : "2c";
@@ -156,6 +158,12 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     const password = h("input", { type: "password", autocomplete: "new-password", placeholder: m && m.has_password ? "(kept, type to change)" : "" });
     const platform = h("select", {}, h("option", { value: "auto" }, "Detect automatically"), h("option", { value: "linux" }, "Linux / Unix"), h("option", { value: "windows" }, "Windows"));
     platform.value = m && m.platform ? m.platform : "auto";
+    const wUser = h("input", { type: "text", autocomplete: "off", value: m && m.method === "winrm" && m.username ? m.username : "" });
+    const wPass = h("input", { type: "password", autocomplete: "new-password", placeholder: m && m.method === "winrm" && m.has_password ? "(kept, type to change)" : "" });
+    const wAuth = h("select", {}, h("option", { value: "ntlm" }, "NTLM (default; local and domain users)"), h("option", { value: "basic" }, "Basic (only when you turned it on in WinRM)"));
+    wAuth.value = m && m.auth ? m.auth : "ntlm";
+    const wVerify = h("input", { type: "checkbox" });
+    wVerify.checked = !!(m && m.verify_tls);
     const key = h("textarea", { rows: "3", placeholder: m && m.has_private_key ? "(kept, paste to change)" : "-----BEGIN OPENSSH PRIVATE KEY-----", spellcheck: "false" });
     const interval = h("select", {}, INTERVALS.map(([s, t]) => h("option", { value: String(s) }, t)));
     interval.value = String(m ? m.interval_s : 60);
@@ -167,9 +175,15 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     const snmpBox = h("div", {}, field("SNMP version", version), communityField, v3Box);
     const sshBox = h("div", {}, field("User name", username, "An ordinary account is enough; nothing is changed on the host."), field("Password", password), field("Private key (instead of a password)", key),
       field("System", platform, "Windows needs the OpenSSH server (Settings → Optional features) and a user that may read performance data. Nothing is installed."));
+    const winBox = h("div", {},
+      field("User name", wUser, "A Windows account in the group Remote Management Users (a domain user is DOMAIN\\name). It only reads."),
+      field("Password", wPass), field("Login method", wAuth),
+      h("label", {}, wVerify, " Verify the TLS certificate (leave off for the self-signed one WinRM makes)"),
+      h("details", {}, h("summary", {}, "How to switch WinRM over HTTPS on"), h("pre", { class: "remote-code" },
+        "# PowerShell as administrator on the Windows computer\nEnable-PSRemoting -Force -SkipNetworkProfileCheck\n$cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(10)\nNew-Item -Path WSMan:\\localhost\\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force\nNew-NetFirewallRule -DisplayName 'Netlens WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow\n# let 'Remote Management Users' open a shell (WinRM only lets administrators in by default)\n$sddl = (Get-Item WSMan:\\localhost\\Service\\RootSDDL).Value\nif ($sddl -notmatch ';;;RM\\)') { $dacl, $sacl = $sddl -split 'S:', 2; Set-Item WSMan:\\localhost\\Service\\RootSDDL -Value ($dacl + '(A;;GXGR;;;RM)S:' + $sacl) -Force }\nRestart-Service WinRM -Force")));
     const result = h("div", { class: "monitor-result" });
     const show = () => {
-      snmpBox.hidden = method.value !== "snmp"; sshBox.hidden = method.value !== "ssh"; port.placeholder = method.value === "ssh" ? "22" : "161";
+      snmpBox.hidden = method.value !== "snmp"; sshBox.hidden = method.value !== "ssh"; winBox.hidden = method.value !== "winrm"; port.placeholder = PORTS[method.value];
       communityField.hidden = version.value === "3"; v3Box.hidden = version.value !== "3";
     };
     method.addEventListener("change", show);
@@ -179,7 +193,12 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     const body = () => {
       const out = { method: method.value, address: address.value.trim(), interval_s: Number(interval.value), alerts: alerts.checked };
       if (port.value) out.port = Number(port.value);
-      if (method.value === "snmp") {
+      if (method.value === "winrm") {
+        out.username = wUser.value.trim();
+        out.auth = wAuth.value;
+        out.verify_tls = wVerify.checked;
+        if (wPass.value) out.password = wPass.value;
+      } else if (method.value === "snmp") {
         out.version = version.value;
         if (version.value === "3") {
           out.username = v3user.value.trim();
@@ -239,7 +258,7 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     });
     const form = h("form", { class: "edit-form", onsubmit: (e) => e.preventDefault() },
       field("How to ask", method), field("Address", address, "Where to ask. It is the device's address unless it has a separate management address."),
-      field("Port", port, "Leave empty for the usual one."), snmpBox, sshBox, field("How often", interval),
+      field("Port", port, "Leave empty for the usual one (5986 is WinRM over https; 5985 is plain http, only on your own network)."), snmpBox, sshBox, winBox, field("How often", interval),
       h("label", {}, alerts, " Warn me when a value gets too high or too low (limits under Monitoring → Health)"),
       h("div", { class: "form-actions" }, test, save, h("button", { class: "btn", type: "button", onclick: () => draw() }, "Cancel")), result);
     card.appendChild(form);

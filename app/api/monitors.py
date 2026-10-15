@@ -31,6 +31,8 @@ class MonitorBody(BaseModel):
     priv_proto: str | None = None
     priv_password: str | None = None
     platform: str | None = None
+    auth: str | None = None
+    verify_tls: bool | None = None
     private_key: str | None = None
     passphrase: str | None = None
     clear_password: bool | None = None
@@ -85,7 +87,7 @@ async def test_monitor(device_id: int, body: MonitorBody, conn=Depends(get_conn)
     state: dict = {}
     try:
         points, found, fingerprint = await hm.read(d["method"], d["address"], d["port"], d["secret"], None, state, known)
-        if d["method"] in ("snmp",) or (d["method"] == "ssh" and "network" in found):
+        if d["method"] in ("snmp",) or (d["method"] in ("ssh", "winrm") and "network" in found):
             # traffic and processor need two rounds: take a second reading a moment later so the test shows real numbers
             import asyncio
 
