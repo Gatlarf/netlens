@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.4 — 2026-10-15
+
+### Added
+- ★ **Health on the dashboard**: a new Health card shows a heat-map with one tile per monitored device, coloured by its worst level, with three bars for processor, memory and the fullest disk (each in its own level colour). Above it a sentence says how many devices need attention; below it are the readings past a limit, worst first, and when nothing is wrong the busiest device per reading. A tile opens that device on its Health section. It is on the default dashboard; if you arranged your own, add it with Customize.
+
 ## 0.4.3 — 2026-10-15
 
 ### Fixed

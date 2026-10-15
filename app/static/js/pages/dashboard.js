@@ -6,6 +6,7 @@ import { cssVar } from "../theme.js";
 import { big, customCard, linkList, pluginCard, plural, rows, sparkline, toneUp } from "../dashboard_cards.js";
 import { openEditor } from "../dashboard_editor.js";
 import { layoutHorizontal } from "../layout_horizontal.js";
+import { buildHealthCard, healthTone } from "../cards/health_map.js";
 
 const REFRESH_MS = 30000;
 const KINDS = {
@@ -94,6 +95,9 @@ const CARDS = [
     build: ({ attention }) => (attention.length
       ? h("ul", { class: "d-attention" }, attention.map((a) => h("li", { class: `d-${a.level}` }, h("a", { href: a.href }, a.text))))
       : h("p", { class: "d-quiet" }, "All quiet. Nothing needs your attention.")) },
+  { id: "health", title: "Health", href: "#/health", size: "w", def: true, about: "A heat-map of the devices whose health is monitored (processor, memory, disk), with what is past a limit.",
+    show: (d) => !!d.health && d.health.monitors.some((m) => m.enabled), tone: (d) => healthTone(d.health.monitors, d.health.problems),
+    build: ({ health }) => buildHealthCard(health) },
   { id: "events", title: "Recent events", href: "#/scans", size: "w", def: true, about: "The latest things that happened on the network.",
     build: ({ events }) => (events.length ? h("ul", { class: "d-events" }, events.slice(0, 8).map((e) => h("li", {},
       h("span", { class: "d-time" }, timeAgo(e.ts)), h("span", { class: "d-kind" }, kindText(e.kind)),
@@ -508,6 +512,12 @@ export async function render(container) {
   async function refresh() {
     try {
       data = await get("/api/dashboard");
+      try {
+        const [m, l] = await Promise.all([get("/api/monitors"), get("/api/monitoring/limits")]);
+        data.health = { monitors: m.monitors || [], problems: m.problems || [], rules: l.rules || {} };
+      } catch (e) {
+        data.health = null;      // an older server or no access: the card simply does not show
+      }
       if (!disposed && !(editing && grid.children.length)) draw();
     } catch (err) {
       if (!data && !disposed) clear(grid), grid.append(h("p", { class: "error" }, err.message || "The dashboard could not be loaded."));

@@ -664,7 +664,11 @@ export async function render(container, params) {
   let deleteOpen = false;
   let terminalSlot = null;
   let terminalHandle = null;
-  let activeTab = "overview";     // the chosen section stays when the page refreshes itself
+  let activeTab = "overview";
+  try {      // the dashboard's health card opens the device on its Health tab
+    const wanted = sessionStorage.getItem("netlens.devicetab");
+    if (wanted) { activeTab = wanted; sessionStorage.removeItem("netlens.devicetab"); }
+  } catch (e) { /* no storage */ }     // the chosen section stays when the page refreshes itself
 
   const disposeTerminal = () => {
     if (terminalHandle && typeof terminalHandle.dispose === "function") {

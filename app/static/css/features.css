@@ -457,3 +457,23 @@ dialog.whats-new h2 { margin: 0; }
 .glance-value { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .glance-warn .glance-value { color: var(--warn); }
 .glance-crit .glance-value { color: var(--bad); }
+
+/* Dashboard health card: heat-map of monitored devices */
+.hm { display: flex; flex-direction: column; gap: 10px; }
+.hm-headline { margin: 0; font-weight: 600; }
+.hm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+.hm-tile { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); text-decoration: none; overflow: hidden; }
+.hm-tile:hover { border-color: var(--accent); }
+.hm-name { font-size: 0.85rem; font-weight: 600; line-height: 1.2; min-height: 2.4em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.hm-bars { display: flex; gap: 5px; height: 34px; }
+.hm-bar { flex: 1; display: flex; align-items: flex-end; border-radius: 3px; background: var(--border); overflow: hidden; }
+.hm-fill { display: block; width: 100%; background: var(--ok); }
+.hm-bar.hm-warning .hm-fill { background: var(--warn); }
+.hm-bar.hm-critical .hm-fill { background: var(--bad); }
+.hm-bar.hm-none .hm-fill { background: var(--muted); }
+.hm-state-ok { border-left: 4px solid var(--ok); background: color-mix(in srgb, var(--ok) 9%, var(--surface)); }
+.hm-state-warning { border-left: 4px solid var(--warn); background: color-mix(in srgb, var(--warn) 16%, var(--surface)); }
+.hm-state-critical { border-left: 4px solid var(--bad); background: color-mix(in srgb, var(--bad) 18%, var(--surface)); }
+.hm-state-unreachable, .hm-state-waiting, .hm-state-off { border-left: 4px solid var(--muted); background: repeating-linear-gradient(135deg, var(--surface) 0 8px, color-mix(in srgb, var(--muted) 14%, var(--surface)) 8px 16px); }
+.hm-problems .d-note { color: var(--muted); font-size: 0.82rem; }
+.hm-legend, .hm-busiest { margin: 0; }
