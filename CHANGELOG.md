@@ -2,6 +2,18 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.12 — 2026-10-15
+
+### Added
+- ★ **Search**: press `/` or Ctrl+K (or use the magnifier in the top bar, or *Search settings…* in the Settings menu) to find pages, settings and devices by name, address, manufacturer or a related word ("smtp", "retention", "winrm"). A setting is opened, scrolled to and highlighted.
+- ★ **What changed** (Monitoring menu): one timeline of what happened in the last 6 hours up to 30 days: new and removed devices, up and down, alerts, address and port changes, and (for administrators) the changes people made. Filter by kind; entries since your last visit are marked *new*.
+- ★ **Stopped Windows services**: an automatic service that stopped with an error (a crash, not a normal stop) is a warning, read over WinRM or SSH together with the other Windows readings, and announced again as running when it is back.
+- **Certificates, renewal style**: a certificate check now knows whether the certificate renews itself. *auto* (the default for Let's Encrypt, ZeroSSL and similar, as renewed by Nginx Proxy Manager) goes down below 14 days left, because the renewal should have happened by then; *manual* gives 30 days of notice; or enter a number of days.
+
+### Changed
+- **WinRM without administrator rights**: when Windows refuses WMI ("Access denied"), the readings fall back to .NET and performance counters, which an ordinary account in *Remote Management Users* and *Performance Monitor Users* may use. The setup notes say which groups to use.
+- The scan progress bar floats at the bottom of the window instead of pushing the page down.
+
 ## 0.4.11 — 2026-10-15
 
 ### Fixed

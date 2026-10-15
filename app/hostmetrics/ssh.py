@@ -38,13 +38,25 @@ SKIP_IFACES = re.compile(r"^(lo|veth.*|docker\d*|br-.*|virbr.*|tap.*|cali.*|flan
 # Windows (the OpenSSH server that comes with Windows 10/11 and Server 2019+): one PowerShell script, sent as an encoded command
 # so no quoting of the login shell (cmd.exe) can get in the way. It only reads: processor load, memory, disks, adapters, boot time.
 WIN_SCRIPT = (
+    # Each part tries WMI first and, when Windows says "Access denied" (an account that is not an administrator), reads the same
+    # thing through .NET and performance counters, which an ordinary account may use. The failure is only reported when both fail.
     "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='Stop';$r=@{};$e=@();"
     "try{$o=Get-CimInstance Win32_OperatingSystem;$r.mt=[double]$o.TotalVisibleMemorySize;$r.mf=[double]$o.FreePhysicalMemory;"
-    "$r.st=[double]$o.TotalVirtualMemorySize;$r.sf=[double]$o.FreeVirtualMemory;$r.boot=$o.LastBootUpTime.ToUniversalTime().ToString('o')}catch{$e+='memory: '+$_.Exception.Message};"
-    "try{$r.cpu=(Get-CimInstance Win32_Processor|Measure-Object LoadPercentage -Average).Average}catch{$e+='processor: '+$_.Exception.Message};"
-    "try{$r.disks=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3'|%{@{id=$_.DeviceID;size=[double]$_.Size;free=[double]$_.FreeSpace}})}catch{$e+='disks: '+$_.Exception.Message};"
-    "try{$r.nics=@(Get-CimInstance Win32_PerfRawData_Tcpip_NetworkInterface|%{@{name=$_.Name;rx=[double]$_.BytesReceivedPersec;tx=[double]$_.BytesSentPersec}})}catch{$e+='network: '+$_.Exception.Message};"
+    "$r.st=[double]$o.TotalVirtualMemorySize;$r.sf=[double]$o.FreeVirtualMemory;$r.boot=$o.LastBootUpTime.ToUniversalTime().ToString('o')}"
+    "catch{$m=$_.Exception.Message;try{Add-Type -AssemblyName Microsoft.VisualBasic;$c=[Microsoft.VisualBasic.Devices.ComputerInfo]::new();"
+    "$r.mt=[double]$c.TotalPhysicalMemory/1024;$r.mf=[double]$c.AvailablePhysicalMemory/1024}catch{$e+='memory: '+$m}"
+    "try{$u=(Get-Counter '\\System\\System Up Time' -ErrorAction Stop).CounterSamples[0].CookedValue;$r.boot=(Get-Date).ToUniversalTime().AddSeconds(-$u).ToString('o')}catch{}};"
+    "try{$r.cpu=(Get-CimInstance Win32_Processor|Measure-Object LoadPercentage -Average).Average}"
+    "catch{$m=$_.Exception.Message;try{$r.cpu=(Get-Counter '\\Processor(_Total)\\% Processor Time' -ErrorAction Stop).CounterSamples[0].CookedValue}catch{$e+='processor: '+$m}};"
+    "try{$r.disks=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3'|%{@{id=$_.DeviceID;size=[double]$_.Size;free=[double]$_.FreeSpace}})}"
+    "catch{$m=$_.Exception.Message;try{$r.disks=@([System.IO.DriveInfo]::GetDrives()|?{$_.DriveType -eq 'Fixed' -and $_.IsReady}|"
+    "%{@{id=$_.Name.TrimEnd('\\');size=[double]$_.TotalSize;free=[double]$_.AvailableFreeSpace}})}catch{$e+='disks: '+$m}};"
+    "try{$r.nics=@(Get-CimInstance Win32_PerfRawData_Tcpip_NetworkInterface|%{@{name=$_.Name;rx=[double]$_.BytesReceivedPersec;tx=[double]$_.BytesSentPersec}})}"
+    "catch{$m=$_.Exception.Message;try{$r.nics=@([System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()|?{$_.OperationalStatus -eq 'Up'}|"
+    "%{$t=$_.GetIPv4Statistics();@{name=$_.Description;rx=[double]$t.BytesReceived;tx=[double]$t.BytesSent}})}catch{$e+='network: '+$m}};"
     "try{$r.pd=@(Get-PhysicalDisk|%{@{n=$_.FriendlyName;h=[string]$_.HealthStatus}})}catch{};"
+    # automatic services that stopped with an error (a clean stop has exit code 0, 1077 = never started: both are normal)
+    "try{$r.sv=@(Get-CimInstance Win32_Service -Filter \"StartMode='Auto' AND State='Stopped' AND ExitCode<>0 AND ExitCode<>1077\"|Select-Object -First 20|%{[string]$_.DisplayName})}catch{};"
     "$r.e=$e;'##netlens-windows';$r|ConvertTo-Json -Compress -Depth 4"
 )
 
@@ -146,8 +158,14 @@ def parse_windows(text: str, state: dict, now: float | None = None) -> tuple[lis
     if storage:
         points.extend(storage[:40])
         found.append("storage")
+    if isinstance(data.get("sv"), (list, str)):               # the service list was read: a service that is not in it any more is running again
+        points.append(("service_stopped", "", 0.0, "state"))
+        for name in many(data.get("sv")) if isinstance(data.get("sv"), list) else [data["sv"]]:
+            if isinstance(name, str) and name.strip():
+                points.append(("service_stopped", name.strip()[:60], 1.0, "state"))
+        found.append("services")
     if not points and problems:
-        raise SshError("Windows refused the readings: " + "; ".join(problems[:3]) + ". The account may need permission to read WMI data (see the setup notes).")
+        raise SshError("Windows refused the readings: " + "; ".join(problems[:3]) + ". Make the account a member of the local Administrators group, or of Performance Monitor Users (see the setup notes).")
     return points, found
 
 

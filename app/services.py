@@ -78,8 +78,8 @@ def validate_check(data: dict[str, Any]) -> dict[str, Any]:
         port = 443 if port in (None, "") else port
         if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
             raise CheckError("port must be a number from 1 to 65535")
-        if expect and not re.fullmatch(r"\d{1,3}", expect):
-            raise CheckError("expect is the number of days: the check goes down when fewer are left (default 14)")
+        if expect and not re.fullmatch(r"\d{1,3}|auto|manual", expect):
+            raise CheckError("expect is auto (renews itself, warns below 14 days), manual (warns below 30 days) or a number of days; empty picks auto for Let's Encrypt and similar, manual for the rest")
         path = ""
     elif kind == "process":
         from app.hostmetrics.service import PROCESS_RE
@@ -308,7 +308,6 @@ async def check_cert(check: dict[str, Any], timeout: float) -> Result:
     """Days left of the certificate a TLS service presents (a web site, a mail server, an RDP host ...)."""
     from cryptography import x509
 
-    warn_days = int(check["expect"]) if check["expect"] else 14
     start = time.monotonic()
     try:
         der = await asyncio.wait_for(asyncio.to_thread(_read_certificate, check["host"], check["port"], timeout), timeout + 1)
@@ -321,12 +320,41 @@ async def check_cert(check: dict[str, Any], timeout: float) -> Result:
     ends = cert.not_valid_after_utc
     days = (ends - datetime.now(timezone.utc)).total_seconds() / 86400
     when = ends.strftime("%Y-%m-%d")
+    issuer = _issuer_name(cert)
+    style, warn_days = cert_policy(check.get("expect") or "", issuer)
     metrics = {"cert_days": round(days, 1)}
     if days < 0:
-        return Result(False, ms, f"expired {int(-days)} day{'s' if int(-days) != 1 else ''} ago ({when})", metrics)
+        return Result(False, ms, f"expired {int(-days)} day{'s' if int(-days) != 1 else ''} ago ({when})" + (", the automatic renewal did not happen" if style == "auto" else ""), metrics)
     if days < warn_days:
-        return Result(False, ms, f"ends in {int(days)} day{'s' if int(days) != 1 else ''} ({when}), limit {warn_days}", metrics)
-    return Result(True, ms, f"valid for {int(days)} more days (until {when})", metrics)
+        why = ", it should have renewed itself by now" if style == "auto" else ""
+        return Result(False, ms, f"ends in {int(days)} day{'s' if int(days) != 1 else ''} ({when}){why}, limit {warn_days}", metrics)
+    return Result(True, ms, f"valid for {int(days)} more days (until {when})" + (f", {issuer}" if issuer else ""), metrics)
+
+
+AUTO_ISSUERS = ("let's encrypt", "lets encrypt", "zerossl", "google trust", "buypass", "isrg", "sectigo acme")
+
+
+def _issuer_name(cert) -> str:
+    from cryptography.x509.oid import NameOID
+
+    for oid in (NameOID.ORGANIZATION_NAME, NameOID.COMMON_NAME):
+        found = cert.issuer.get_attributes_for_oid(oid)
+        if found:
+            return str(found[0].value)[:60]
+    return ""
+
+
+def cert_policy(expect: str, issuer: str) -> tuple[str, int]:
+    """(renewal style, warn below this many days). A number is taken as given; auto and manual pick their own limit.
+
+    Certificates that renew themselves (Let's Encrypt through Nginx Proxy Manager and the like) are renewed about
+    30 days before the end, so fewer than 14 days left means the renewal is stuck. A certificate renewed by hand
+    needs a month of notice.
+    """
+    if expect.isdigit():
+        return "custom", int(expect)
+    style = expect if expect in ("auto", "manual") else ("auto" if any(a in issuer.lower() for a in AUTO_ISSUERS) else "manual")
+    return style, 14 if style == "auto" else 30
 
 
 async def run_check(check: dict[str, Any], db_path: str | None = None) -> Result:

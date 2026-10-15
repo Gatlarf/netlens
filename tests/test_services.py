@@ -422,3 +422,15 @@ async def test_process_check_over_snmp(tmp_path, monkeypatch):
     assert (await hm.check_process(db, 1, "sqlservr"))[:2] == (True, "running")
     assert (await hm.check_process(db, 1, "SQLSERVR.EXE"))[0] is True
     assert (await hm.check_process(db, 1, "nginx"))[0] is False
+
+
+# ---------------------------------------------------------------- certificate renewal style
+def test_certificate_policy():
+    from app.services import cert_policy
+
+    assert cert_policy("", "Let's Encrypt") == ("auto", 14)
+    assert cert_policy("", "ZeroSSL") == ("auto", 14)
+    assert cert_policy("", "My Own CA") == ("manual", 30)
+    assert cert_policy("manual", "Let's Encrypt") == ("manual", 30)
+    assert cert_policy("auto", "My Own CA") == ("auto", 14)
+    assert cert_policy("45", "Let's Encrypt") == ("custom", 45)

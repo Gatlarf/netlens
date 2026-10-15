@@ -83,7 +83,7 @@ export function buildHealthCard({ monitors, problems, rules }) {
     const list = [...problems].sort((a, b) => (RANK[b.level] ?? 0) - (RANK[a.level] ?? 0)).slice(0, 5);
     body.appendChild(h("ul", { class: "d-attention hm-problems" }, list.map((p) => h("li", { class: p.level === "critical" ? "d-bad" : "d-warn" },
       h("a", { href: `#/device/${p.device_id}`, onclick: () => { try { sessionStorage.setItem("netlens.devicetab", "health"); } catch (e) { /* ignore */ } } },
-        `${shortName(p.device)} · ${p.title}${p.label ? ` (${p.label})` : ""} ${(p.metric === "storage_status" ? (p.level === "critical" ? "failed" : "degraded") : formatValue(p.value, p.unit))}`),
+        `${shortName(p.device)} · ${p.title}${p.label ? ` (${p.label})` : ""} ${(p.metric === "service_stopped" ? "stopped" : p.metric === "storage_status" ? (p.level === "critical" ? "failed" : "degraded") : formatValue(p.value, p.unit))}`),
       h("span", { class: "d-note" }, ` ${p.level} since ${timeAgo(p.since)}`)))));
   } else {
     const busiest = [];

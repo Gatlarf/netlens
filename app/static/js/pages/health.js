@@ -3,8 +3,8 @@ import { snoozeMenu, wakeButton, untilText } from "../snooze.js";
 import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin } from "../util.js";
 
 const REFRESH_MS = 30000;
-const METRIC_ORDER = ["cpu_pct", "mem_pct", "disk_pct", "temp_c", "battery_pct", "supply_pct", "on_battery", "storage_status"];
-const EVENT_ONLY = ["on_battery", "storage_status"];       // no numbers to set: it is a problem as soon as it happens
+const METRIC_ORDER = ["cpu_pct", "mem_pct", "disk_pct", "temp_c", "battery_pct", "supply_pct", "on_battery", "storage_status", "service_stopped"];
+const EVENT_ONLY = ["on_battery", "storage_status", "service_stopped"];       // no numbers to set: it is a problem as soon as it happens
 
 const fmtRate = (bps) => (bps === null || bps === undefined ? "–" : bps >= 1e9 ? `${(bps / 1e9).toFixed(1)} Gbit/s` : bps >= 1e6 ? `${(bps / 1e6).toFixed(1)} Mbit/s` : `${Math.round(bps / 1e3)} kbit/s`);
 const fmtUptime = (s) => (s === null || s === undefined ? "–" : s >= 86400 ? `${Math.floor(s / 86400)} d` : s >= 3600 ? `${Math.floor(s / 3600)} h` : `${Math.floor(s / 60)} min`);
@@ -57,7 +57,7 @@ export async function render(container) {
       for (const p of data.problems) {
         card.appendChild(h("div", { class: "kv" },
           h("span", { class: "kv-label" }, h("span", { class: `hl-badge ${p.level === "critical" ? "bad" : "warn"}` }, p.level === "critical" ? "Critical" : "Warning"), " ", h("a", { href: `#/device/${p.device_id}` }, shortName(p.device))),
-          h("span", {}, `${p.title}${p.label ? ` · ${p.label}` : ""}: ${p.metric === "storage_status" ? (p.level === "critical" ? "failed" : "degraded") : p.unit === "%" ? `${Math.round(p.value)}%` : p.unit === "°C" ? `${Math.round(p.value)} °C` : Math.round(p.value * 10) / 10}`, " ", h("span", { class: "hint" }, `since ${timeAgo(p.since)}`), " ",
+          h("span", {}, `${p.title}${p.label ? ` · ${p.label}` : ""}: ${p.metric === "service_stopped" ? "stopped" : p.metric === "storage_status" ? (p.level === "critical" ? "failed" : "degraded") : p.unit === "%" ? `${Math.round(p.value)}%` : p.unit === "°C" ? `${Math.round(p.value)} °C` : Math.round(p.value * 10) / 10}`, " ", h("span", { class: "hint" }, `since ${timeAgo(p.since)}`), " ",
             p.snoozed_until ? h("span", {}, h("span", { class: "hint" }, `snoozed for another ${untilText(p.snoozed_until)}`), " ", wakeButton(p.snooze)) : snoozeMenu(p.snooze))));
       }
       problems.appendChild(card);

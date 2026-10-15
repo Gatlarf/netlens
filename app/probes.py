@@ -33,7 +33,7 @@ STAMP = "%Y-%m-%dT%H:%M:%SZ"
 NAME_RE = re.compile(r"^[^\x00-\x1f]{1,60}$")
 # the measurements a site may report: the names Netlens itself produces, so a misbehaving site cannot fill the store with its own
 ALLOWED_METRICS = frozenset({"up", "rtt_ms", "response_ms", "cert_days", "cpu_pct", "load1", "mem_pct", "swap_pct", "disk_pct", "disk_free_b", "net_rx_bps",
-                             "net_tx_bps", "if_util_pct", "if_err_ps", "if_up", "storage_status", "temp_c", "uptime_s", "supply_pct", "battery_pct", "battery_minutes", "on_battery"})
+                             "net_tx_bps", "if_util_pct", "if_err_ps", "if_up", "storage_status", "temp_c", "uptime_s", "supply_pct", "battery_pct", "battery_minutes", "on_battery", "service_stopped"})
 
 
 class ProbeError(ValueError):

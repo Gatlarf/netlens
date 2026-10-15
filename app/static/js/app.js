@@ -1,3 +1,4 @@
+import { initSearch } from "./search.js";
 import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
 import { initUpdateBadge } from "./update.js";
@@ -22,6 +23,7 @@ const ROUTES = {
   "#/remote-sites": "remote_sites",
   "#/reports": "reports",
   "#/scans": "scans",
+  "#/changes": "changes",
   "#/settings": "settings",
   "#/wizard": "wizard",
   "#/remote": "remote",
@@ -478,6 +480,7 @@ fetch("/api/health").then((r) => r.json()).then((d) => {
 initThemeToggle();
 initUpdateBadge();
 initTopbar();
+initSearch();
 
 // Installable app (needs HTTPS or localhost); the worker only caches the public interface files, see sw.js
 if ("serviceWorker" in navigator && window.isSecureContext) {

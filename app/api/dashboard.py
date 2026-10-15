@@ -49,6 +49,8 @@ def get_dashboard(request: Request) -> dict:
                 text = f"{p['device']}: {p['title'].lower()}{where} is {value}"
                 if p["metric"] == "storage_status":
                     text = f"{p['device']}: {p['label'] or 'storage'} is {'degraded or needs attention' if p['level'] == 'warning' else 'failed'}"
+                if p["metric"] == "service_stopped":
+                    text = f"{p['device']}: the service {p['label']} has stopped with an error"
                 doc["attention"].append({"level": "bad" if p["level"] == "critical" else "warn",
                                          "text": text, "href": f"#/device/{p['device_id']}", "snooze": p["snooze"]})
             from app import probes as probes_mod

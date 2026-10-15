@@ -42,6 +42,7 @@ DEFAULT_RULES: dict[str, dict[str, Any]] = {
     "battery_pct": {"title": "UPS battery", "unit": "%", "warn": 50, "crit": 25, "confirm": 1, "low": True},
     "on_battery": {"title": "UPS on battery power", "unit": "", "warn": 1, "crit": None, "confirm": 1},
     "storage_status": {"title": "Storage problem", "unit": "", "warn": 1, "crit": 2, "confirm": 1},
+    "service_stopped": {"title": "Service stopped", "unit": "", "warn": 1, "crit": None, "confirm": 2},
 }
 
 
@@ -519,6 +520,9 @@ def _describe(rule: dict[str, Any], metric: str, label: str, value: float, level
         if level == "ok":
             return f"{device}: {what} is healthy again"
         return f"{device}: {what} is {'degraded or needs attention (a disk may be failing or rebuilding)' if level == 'warning' else 'FAILED'}"
+    if metric == "service_stopped":
+        what = f"the service {label}" if label else "a service"
+        return f"{device}: {what} is running again" if level == "ok" else f"{device}: {what} has stopped with an error"
     if level == "ok":
         return f"{device}: {rule['title'].lower()}{where} is back to normal ({shown})"
     limit = rule["crit"] if level == "critical" else rule["warn"]
@@ -558,6 +562,18 @@ def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: li
         kind = {"ok": "metric_ok", "warning": "metric_warning", "critical": "metric_critical"}[level]
         add_event(conn, kind, _describe(rule, metric, label, value, level, device_name), device_id=device_id, now=now, subject=f"metric:{device_id}:{metric}:{label}")
         raised.append(kind)
+    # a service that is no longer in the list of stopped ones runs again (the empty-label reading says the list was read)
+    rule = the_rules.get("service_stopped")
+    if rule and rule["enabled"] and any(m == "service_stopped" and not lbl for m, lbl, _v, _u in points):
+        present = {lbl for m, lbl, _v, _u in points if m == "service_stopped"}
+        for row in conn.execute("SELECT label FROM metric_state WHERE monitor_id = ? AND metric = 'service_stopped' AND label != '' AND level != 'ok'", (monitor_id,)).fetchall():
+            if row["label"] in present:
+                continue
+            conn.execute("UPDATE metric_state SET level = 'ok', since = ?, value = 0, pending = NULL, pending_n = 0 WHERE monitor_id = ? AND metric = 'service_stopped' AND label = ?",
+                         (now, monitor_id, row["label"]))
+            add_event(conn, "metric_ok", _describe(rule, "service_stopped", row["label"], 0.0, "ok", device_name), device_id=device_id, now=now,
+                      subject=f"metric:{device_id}:service_stopped:{row['label']}")
+            raised.append("metric_ok")
     conn.commit()
     return raised
 

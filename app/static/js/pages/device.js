@@ -762,7 +762,7 @@ export async function render(container, params) {
     // a switch with many ports gets a table of ports; its per-port graphs are then left out of the general graphs
     buildDevicePortsCard(device).catch(() => null).then((ports) => {
       if (ports && !disposed) portsSlot.appendChild(ports);
-      return buildPerformanceCard("device", device.id, { unlessOnly: ["up", "rtt_ms"], skip: ports ? ["up", "storage_status", ...PORT_METRICS] : ["up", "storage_status"] });
+      return buildPerformanceCard("device", device.id, { unlessOnly: ["up", "rtt_ms"], skip: ports ? ["up", "storage_status", "service_stopped", ...PORT_METRICS] : ["up", "storage_status", "service_stopped"] });
     }).then((c) => { if (c && !disposed) performanceSlot.appendChild(c); }).catch(() => {});
     const hLeft = column();
     const hRight = column();

@@ -21,7 +21,7 @@ const fmtValue = (v) => {
 };
 const NAMES = {
   cpu_pct: "Processor", load1: "Load", mem_pct: "Memory in use", swap_pct: "Swap in use", disk_pct: "Disk used", disk_free_b: "Disk free", net_rx_bps: "Received",
-  net_tx_bps: "Sent", temp_c: "Temperature", uptime_s: "Running for", supply_pct: "Supply", battery_pct: "UPS battery", battery_minutes: "UPS runtime", on_battery: "On battery power", storage_status: "Storage",
+  net_tx_bps: "Sent", temp_c: "Temperature", uptime_s: "Running for", supply_pct: "Supply", battery_pct: "UPS battery", battery_minutes: "UPS runtime", on_battery: "On battery power", storage_status: "Storage", service_stopped: "Stopped service",
 };
 
 let formOpen = false;
@@ -176,7 +176,7 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     const sshBox = h("div", {}, field("User name", username, "An ordinary account is enough; nothing is changed on the host."), field("Password", password), field("Private key (instead of a password)", key),
       field("System", platform, "Windows needs the OpenSSH server (Settings → Optional features) and a user that may read performance data. Nothing is installed."));
     const winBox = h("div", {},
-      field("User name", wUser, "A Windows account in the group Remote Management Users (a domain user is DOMAIN\\name). It only reads."),
+      field("User name", wUser, "A Windows account in the group Remote Management Users and Performance Monitor Users (a domain user is DOMAIN\\name). It only reads. If the test says 'Access denied' the account may not read WMI: put it in the local group Administrators, or add it to Performance Monitor Users; Netlens then reads through performance counters instead."),
       field("Password", wPass), field("Login method", wAuth),
       h("label", {}, wVerify, " Verify the TLS certificate (leave off for the self-signed one WinRM makes)"),
       h("details", {}, h("summary", {}, "How to switch WinRM over HTTPS on"), h("pre", { class: "remote-code" },

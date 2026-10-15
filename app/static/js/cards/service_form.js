@@ -5,7 +5,7 @@ const KIND_HELP = {
   http: { target: "Path", placeholder: "/", expect: "Expect", expectHint: "empty = any status from 200 to 399; a status code such as 401; or text:words that must appear in the page", port: "80" },
   tcp: { target: null, placeholder: "", expect: null, expectHint: "", port: "22" },
   dns: { target: "Name to look up", placeholder: "example.com", expect: "Expected address", expectHint: "optional: the IP address the answer must contain", port: "53" },
-  cert: { target: null, placeholder: "", expect: "Warn when fewer days are left", expectHint: "a number of days; empty = 14. The check goes down when the certificate ends sooner than that (or has ended).", port: "443" },
+  cert: { target: null, placeholder: "", expect: "Renewal", expectHint: "auto = renews itself (Let's Encrypt, Nginx Proxy Manager): goes down below 14 days left, which means the renewal is stuck. manual = you renew it: goes down below 30 days. Or a number of days. Empty picks auto for Let's Encrypt and similar, manual for other certificates.", port: "443" },
   process: { target: "Process or service name", placeholder: "nginx", expect: null, expectHint: "", port: null },
 };
 

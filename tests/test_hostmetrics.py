@@ -510,3 +510,29 @@ def test_windows_script_errors_are_reported_and_progress_noise_is_not():
     assert "Access denied" in winrm.powershell_error(error)
     script = ssh.WIN_SCRIPT
     assert "$ProgressPreference='SilentlyContinue'" in script and len(ssh.WIN_COMMAND) < 7000
+
+
+# ---------------------------------------------------------------- stopped Windows services
+def test_windows_stopped_services_are_read():
+    data = json.loads(win_output().split("##netlens-windows\n", 1)[1])
+    data["sv"] = ["Backup Agent", "SQL Server (MSSQLSERVER)"]
+    pts, found = ssh.parse_windows("##netlens-windows\n" + json.dumps(data), {}, now=1_773_144_000)
+    got = {label: v for m, label, v, _u in pts if m == "service_stopped"}
+    assert got == {"": 0.0, "Backup Agent": 1.0, "SQL Server (MSSQLSERVER)": 1.0} and "services" in found
+    data["sv"] = "Spooler"       # PowerShell gives a single answer as a plain string
+    pts, _ = ssh.parse_windows("##netlens-windows\n" + json.dumps(data), {}, now=1_773_144_000)
+    assert {label for m, label, _v, _u in pts if m == "service_stopped"} == {"", "Spooler"}
+
+
+def test_stopped_service_raises_and_clears(conn):
+    monitor(conn)
+    mid = hm.get_monitor(conn, 1)["id"]
+    sentinel = ("service_stopped", "", 0.0, "state")
+    stopped = ("service_stopped", "Backup Agent", 1.0, "state")
+    assert hm.evaluate(conn, mid, 1, "pc", [sentinel, stopped], NOW) == ["metric_warning"]
+    assert hm.evaluate(conn, mid, 1, "pc", [sentinel], "2026-03-10T12:01:00Z") == ["metric_ok"]     # gone from the list: running again
+    assert any("the service Backup Agent is running again" in d for _k, d in events(conn))
+    assert hm.evaluate(conn, mid, 1, "pc", [sentinel], "2026-03-10T12:02:00Z") == []
+    # a round that did not read the services (no sentinel) clears nothing
+    hm.evaluate(conn, mid, 1, "pc", [sentinel, stopped], "2026-03-10T12:03:00Z")
+    assert hm.evaluate(conn, mid, 1, "pc", [("cpu_pct", "", 10, "%")], "2026-03-10T12:04:00Z") == []

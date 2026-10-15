@@ -22,6 +22,7 @@ import { buildIgnoredCard } from "../cards/ignored.js";
 import { buildPassiveCard } from "../cards/passive.js";
 import { buildDnsCard } from "../cards/dns.js";
 import { buildChangelogCard } from "../changelog.js";
+import { revealFound, openSearch } from "../search.js";
 
 function kvRow(label, value) {
   const row = h("div", { class: "kv" });
@@ -321,7 +322,8 @@ export async function render(container, params) {
   // narrow screens: the page list folds into one button that names the current page
   const toggle = h("button", { type: "button", class: "btn settings-nav-toggle", "aria-expanded": "false", id: "settings-nav-toggle" },
     h("span", {}, `Settings: ${item.label}`), h("span", { class: "caret" }, "▾"));
-  const side = h("div", { class: "settings-side" }, toggle, nav);
+  const finder = h("button", { type: "button", class: "btn settings-find", title: "Search pages, settings and devices (press /)", onclick: () => openSearch() }, "Search settings…  ( / )");
+  const side = h("div", { class: "settings-side" }, toggle, finder, nav);
   toggle.addEventListener("click", () => {
     const open = !side.classList.contains("open");
     side.classList.toggle("open", open);
@@ -354,6 +356,7 @@ export async function render(container, params) {
     if (destroyed) return;
     clear(content);
     content.appendChild(card);
+    setTimeout(() => revealFound(content), 150);    // a setting that was searched for is scrolled to and highlighted
   } catch (err) {
     if (destroyed) return;
     clear(content);
