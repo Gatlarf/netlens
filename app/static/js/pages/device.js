@@ -3,7 +3,8 @@ import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, s
 import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildPerformanceCard } from "../cards/performance.js";
-import { buildDeviceMonitorCard } from "../cards/device_monitor.js";
+import { buildDeviceMonitorCard, isMonitorFormOpen } from "../cards/device_monitor.js";
+import { buildHealthGlance } from "../cards/health_glance.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
 import { stateDot } from "./services.js";
@@ -663,6 +664,7 @@ export async function render(container, params) {
   let deleteOpen = false;
   let terminalSlot = null;
   let terminalHandle = null;
+  let activeTab = "overview";     // the chosen section stays when the page refreshes itself
 
   const disposeTerminal = () => {
     if (terminalHandle && typeof terminalHandle.dispose === "function") {
@@ -719,19 +721,21 @@ export async function render(container, params) {
     }
     page.appendChild(heading);
 
-    const grid = h("div", { class: "grid-2" });
-    const left = h("div", { class: "col-left" });
-    left.appendChild(buildDetailsCard(device));
-    const why = buildWhyCard(device);
-    if (why) left.appendChild(why);
-    left.appendChild(buildPortsCard(device, () => load()));
-    const newSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
-    left.appendChild(newSlot);  // the console is the last card of the left column
-    grid.appendChild(left);
+    // The page is split into sections behind a tab bar, so the health graphs are one click away
+    // instead of far down a long page. `panels` keeps every section in the page; only one is visible.
+    const panels = {};
+    const column = () => h("div", { class: "col-left" });
+    const twoColumns = (a, b) => h("div", { class: "grid-2" }, a, b);
+    const slot = () => h("div", {});
 
-    const right = h("div", { class: "col-right" });
-    const uptimeSlot = h("div", {});
-    right.appendChild(uptimeSlot);
+    // Overview: who it is, whether it is up, what happened lately
+    const ovLeft = column();
+    ovLeft.appendChild(buildDetailsCard(device));
+    const why = buildWhyCard(device);
+    if (why) ovLeft.appendChild(why);
+    const ovRight = column();
+    const uptimeSlot = slot();
+    ovRight.appendChild(uptimeSlot);
     buildDeviceUptimeCard(device.id).then((c) => {
       if (disposed) return;
       if (isAdmin()) {
@@ -741,37 +745,85 @@ export async function render(container, params) {
       }
       uptimeSlot.appendChild(c);
     }).catch(() => {});
-    const performanceSlot = h("div", {});
-    right.appendChild(performanceSlot);
+    ovRight.appendChild(buildEventsCard(device));
+    panels.overview = twoColumns(ovLeft, ovRight);
+
+    // Health: the graphs first, then how it is read and the service checks
+    const health = h("div", { class: "dev-health" });
+    const performanceSlot = slot();
+    health.appendChild(performanceSlot);
     buildPerformanceCard("device", device.id, { unlessOnly: ["up", "rtt_ms"], skip: ["up"] })
       .then((c) => { if (c && !disposed) performanceSlot.appendChild(c); }).catch(() => {});
+    const hLeft = column();
+    const hRight = column();
     if (isAdmin()) {
-      const monitorSlot = h("div", {});
-      right.appendChild(monitorSlot);
-      buildDeviceMonitorCard(device).then((c) => { if (c && !disposed) monitorSlot.appendChild(c); }).catch(() => {});
+      const monitorSlot = slot();
+      hLeft.appendChild(monitorSlot);
+      buildDeviceMonitorCard(device, { onChange: () => load() }).then((c) => { if (c && !disposed) monitorSlot.appendChild(c); }).catch(() => {});
     }
-    const servicesSlot = h("div", {});
-    right.appendChild(servicesSlot);
+    const servicesSlot = slot();
+    hRight.appendChild(servicesSlot);
     buildDeviceServicesCard(device).then((c) => { if (!disposed) servicesSlot.appendChild(c); }).catch(() => {});
-    const wifiSlot = h("div", {});
-    right.appendChild(wifiSlot);
+    health.appendChild(twoColumns(hLeft, hRight));
+    panels.health = health;
+
+    // Network: ports, names, Wi-Fi, virtual machines, proxied sites
+    const nLeft = column();
+    nLeft.appendChild(buildPortsCard(device, () => load()));
+    const nRight = column();
+    const wifiSlot = slot();
+    nRight.appendChild(wifiSlot);
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
     const virtualizationCard = buildVirtualizationCard(device);
-    if (virtualizationCard) right.appendChild(virtualizationCard);
-    for (const siteCard of buildDeviceSitesCards(device)) right.appendChild(siteCard);
+    if (virtualizationCard) nRight.appendChild(virtualizationCard);
+    for (const siteCard of buildDeviceSitesCards(device)) nRight.appendChild(siteCard);
+    nRight.appendChild(buildNamesCard(device));
+    panels.network = twoColumns(nLeft, nRight);
+
+    // Console (administrators)
+    const newSlot = h("div", { id: "terminal-slot", class: "terminal-slot" });
+    if (isAdmin()) panels.console = newSlot;
+
+    // Settings (administrators): edit, parent, delete
     const newEdit = buildEditCard(device, () => load());
     newEdit.card.classList.add("admin-only");
-    right.appendChild(newEdit.card);
-    buildParentCard(device, (message) => { toast(message, "success"); load(); })
-      .then((c) => { if (!disposed) newEdit.parentSlot.appendChild(c); })
-      .catch(() => {});
-    right.appendChild(buildNamesCard(device));
-    right.appendChild(buildEventsCard(device));
-    const deleteCard = buildDeleteCard(device, (open) => { deleteOpen = open; });
-    deleteCard.classList.add("admin-only");
-    right.appendChild(deleteCard);
-    grid.appendChild(right);
-    page.appendChild(grid);
+    if (isAdmin()) {
+      const sLeft = column();
+      sLeft.appendChild(newEdit.card);
+      const sRight = column();
+      const deleteCard = buildDeleteCard(device, (open) => { deleteOpen = open; });
+      deleteCard.classList.add("admin-only");
+      sRight.appendChild(deleteCard);
+      panels.settings = twoColumns(sLeft, sRight);
+      buildParentCard(device, (message) => { toast(message, "success"); load(); })
+        .then((c) => { if (!disposed) newEdit.parentSlot.appendChild(c); })
+        .catch(() => {});
+    }
+
+    const TABS = [["overview", "Overview"], ["health", "Health"], ["network", "Network"], ["console", "Console"], ["settings", "Settings"]]
+      .filter(([key]) => panels[key]);
+    if (!panels[activeTab]) activeTab = "overview";
+    const tabBar = h("div", { class: "dev-tabs", role: "tablist" });
+    const buttons = {};
+    const select = (key) => {
+      activeTab = key;
+      for (const [k, el] of Object.entries(panels)) el.hidden = k !== key;
+      for (const [k, b] of Object.entries(buttons)) { b.setAttribute("aria-selected", String(k === key)); b.classList.toggle("active", k === key); }
+    };
+    for (const [key, label] of TABS) {
+      const b = h("button", { type: "button", class: "dev-tab", role: "tab", id: `tab-${key}`, onclick: () => select(key) }, label);
+      buttons[key] = b;
+      tabBar.appendChild(b);
+    }
+    page.appendChild(tabBar);
+    const strip = h("div", { class: "dev-glance" });
+    page.appendChild(strip);
+    for (const [key, el] of Object.entries(panels)) {
+      el.classList.add("dev-panel");
+      page.appendChild(el);
+    }
+    select(activeTab);
+    buildHealthGlance(device, () => select("health")).then((el) => { if (el && !disposed) strip.appendChild(el); }).catch(() => {});
 
     disposeTerminal();
     editResult = newEdit;
@@ -787,12 +839,7 @@ export async function render(container, params) {
       if (open) heading.appendChild(h("a", { class: "btn admin-only", href: `#/remote?device=${device.id}&proto=${proto}`, id: `jump-${proto}`, title: `Open ${label} on the Remote access page` }, label));
     }
     try {
-      // "Wide view" lifts the console above both columns, "Narrow view" puts it back under the details
-      const placeWide = (wide) => {
-        if (wide) page.insertBefore(newSlot, grid);
-        else left.appendChild(newSlot);
-      };
-      const handle = await mountTerminal(newSlot, device, { onWideChange: placeWide });
+      const handle = await mountTerminal(newSlot, device);
       if (disposed || terminalSlot !== newSlot) {
         if (handle && typeof handle.dispose === "function") handle.dispose();
       } else {
@@ -804,7 +851,7 @@ export async function render(container, params) {
             type: "button",
             id: `jump-${p.proto}`,
             title: `Open the ${p.proto.toUpperCase()} console below`,
-            onclick: () => handle.open(p.proto),
+            onclick: () => { select("console"); handle.open(p.proto); },
           }, p.proto === "ssh" ? "SSH" : "Telnet"));
         }
       }
@@ -848,13 +895,13 @@ export async function render(container, params) {
     if (terminalSlot && isTerminalActive(terminalSlot)) return;
     if (isStabilityOpen()) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
-    if (deleteOpen) return;
+    if (deleteOpen || isMonitorFormOpen()) return;     // never wipe a form someone is filling in
     load();
   }, 20000);
 
   // show the result of a (full) scan as soon as it is done
   const onScanFinished = () => {
-    if (deleteOpen || isStabilityOpen() || (terminalSlot && isTerminalActive(terminalSlot))) return;
+    if (deleteOpen || isMonitorFormOpen() || isStabilityOpen() || (terminalSlot && isTerminalActive(terminalSlot))) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
     load();
   };

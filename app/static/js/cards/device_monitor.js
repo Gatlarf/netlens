@@ -23,8 +23,15 @@ const NAMES = {
   net_tx_bps: "Sent", temp_c: "Temperature", uptime_s: "Running for", supply_pct: "Supply", battery_pct: "UPS battery", battery_minutes: "UPS runtime", on_battery: "On battery power",
 };
 
+let formOpen = false;
+// While the set-up form is open the device page must not refresh itself, or what was typed would vanish
+export function isMonitorFormOpen() {
+  return formOpen;
+}
+
 // Health monitoring of one device: how it is read (SNMP or SSH), what it answers, and the form to set it up.
-export async function buildDeviceMonitorCard(device) {
+export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
+  formOpen = false;
   const card = h("div", { class: "card admin-only monitor-card" });
   let info = null;
 
@@ -39,6 +46,7 @@ export async function buildDeviceMonitorCard(device) {
   }
 
   function draw() {
+    formOpen = false;
     clear(card);
     card.appendChild(h("h2", {}, "Health monitoring"));
     const m = info.monitor;
@@ -80,6 +88,7 @@ export async function buildDeviceMonitorCard(device) {
   }
 
   function showForm(m) {
+    formOpen = true;
     clear(card);
     card.appendChild(h("h2", {}, "Health monitoring"));
     const method = h("select", { name: "method" }, h("option", { value: "snmp" }, "SNMP (switch, NAS, printer, UPS, Windows ...)"), h("option", { value: "ssh" }, "SSH (Linux)"));
@@ -147,7 +156,9 @@ export async function buildDeviceMonitorCard(device) {
         await put(`/api/devices/${device.id}/monitor`, body());
         toast("Saved. The first reading follows in a moment.", "success");
         try { await post(`/api/devices/${device.id}/monitor/run`, {}); } catch (err) { /* the status line shows what went wrong */ }
-        await load();
+        formOpen = false;
+        if (onChange) onChange();      // redraw the page so the graphs appear straight away
+        else await load();
       } catch (err) {
         toast(err.message || "Could not save", "error");
         save.disabled = false;

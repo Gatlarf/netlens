@@ -440,3 +440,20 @@ dialog.whats-new h2 { margin: 0; }
 .rs-stats { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
 .rs-setup ol { padding-left: 20px; }
 .rs-setup li { margin: 6px 0; }
+
+/* Device page: section tabs and the health summary row */
+.dev-tabs { position: sticky; top: var(--topbar-vis, var(--topbar-h, 0px)); transition: top 0.18s ease-out; z-index: 10; display: flex; gap: 4px; overflow-x: auto; padding: 8px 0 0; margin: 8px 0 12px; background: var(--bg); border-bottom: 1px solid var(--border); scrollbar-width: thin; }
+.dev-tab { appearance: none; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); font: inherit; font-weight: 600; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.dev-tab:hover { color: var(--text); }
+.dev-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.dev-panel:not(.grid-2) { display: flex; flex-direction: column; gap: 16px; }
+.dev-panel[hidden] { display: none !important; }
+.dev-panel.grid-2, .dev-panel > .grid-2 { align-items: start; }
+.glance-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.glance-chip { appearance: none; display: flex; flex-direction: column; gap: 2px; min-width: 96px; padding: 6px 12px; border: 1px solid var(--border); border-left: 4px solid var(--ok); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.glance-chip.glance-warn { border-left-color: var(--warn); }
+.glance-chip.glance-crit { border-left-color: var(--bad); }
+.glance-title { color: var(--muted); font-size: 0.78rem; }
+.glance-value { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.glance-warn .glance-value { color: var(--warn); }
+.glance-crit .glance-value { color: var(--bad); }
