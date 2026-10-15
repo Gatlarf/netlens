@@ -56,6 +56,9 @@ class SecurityHeadersMiddleware:
                     # Static UI files: always revalidate (cheap 304 via ETag) so a
                     # redeploy is picked up immediately instead of a stale cached module.
                     add_header("Cache-Control", "no-cache")
+                    # A CDN in front (Cloudflare caches .js and .css by default, for hours) must not keep an old
+                    # copy either; this header is for the CDN only and leaves the browser behaviour above alone.
+                    add_header("Cloudflare-CDN-Cache-Control", "no-store")
 
                 message["headers"] = headers
 

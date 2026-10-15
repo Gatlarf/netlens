@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.3 — 2026-10-15
+
+### Fixed
+- **Behind Cloudflare**: the interface files now carry a `Cloudflare-CDN-Cache-Control: no-store` header, so Cloudflare no longer serves an old copy of the scripts and styles for hours after an update. If a Cloudflare cache rule overrides the origin's headers, purge the cache once after updating.
+
 ## 0.4.2 — 2026-10-15
 
 ### Changed
