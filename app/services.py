@@ -384,7 +384,7 @@ def record_result(conn, check: dict[str, Any], result: Result, now: str | None =
         store.record(points, ts=int(_parse(now).timestamp()))
     if flipped:
         text = f"{check['name']} ({describe(check)}) is {flipped}" + (f": {result.detail}" if flipped == "down" else "")
-        add_event(conn, f"service_{flipped}", text, device_id=check.get("device_id"), now=now)
+        add_event(conn, f"service_{flipped}", text, device_id=check.get("device_id"), now=now, subject=f"service:{check['id']}")
     conn.commit()
     return flipped
 
@@ -466,6 +466,19 @@ def _maintain_metrics(db_path: str, prune: bool) -> None:
         log.exception("metrics maintenance failed")
 
 
+def _expire_snoozes(db_path: str) -> bool:
+    from app import snooze
+
+    conn = connect(db_path)
+    try:
+        return bool(snooze.expire(conn))
+    except Exception:  # noqa: BLE001
+        log.exception("ending snoozes failed")
+        return False
+    finally:
+        conn.close()
+
+
 def _check_probes(db_path: str) -> bool:
     from app import probes
 
@@ -494,6 +507,10 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
             if time.monotonic() - last_rollup > 60:       # fold the new samples of the graphs into the coarser tiers
                 last_rollup = time.monotonic()
                 await asyncio.to_thread(_maintain_metrics, db_path, time.monotonic() - last_prune > 3600)
+                if await asyncio.to_thread(_expire_snoozes, db_path):      # a snooze ended and its problem is still there
+                    from app.notify.channels import process_channels
+
+                    await process_channels(db_path)
                 if await asyncio.to_thread(_check_probes, db_path):       # a remote site stopped reporting
                     from app.notify.channels import process_channels
 
@@ -503,6 +520,12 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                 conn = connect(db_path)
                 try:
                     prune_results(conn)
+                    try:
+                        from app import audit
+
+                        audit.prune(conn)
+                    except Exception:  # noqa: BLE001
+                        log.exception("pruning the audit log failed")
                     try:
                         from app import forecast
 

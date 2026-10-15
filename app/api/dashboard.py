@@ -43,18 +43,21 @@ def get_dashboard(request: Request) -> dict:
                                             "href": "#/settings/backup"})
             from app.hostmetrics import service as host_monitors
 
-            for p in host_monitors.problems(conn)[:5]:      # a disk filling up, a hot server, a UPS on battery
+            for p in host_monitors.problems(conn)[:8]:      # a disk filling up, a hot server, a UPS on battery
                 where = f" on {p['label']}" if p["label"] else ""
                 value = f"{p['value']:.0f}{p['unit']}" if p["unit"] else f"{p['value']:g}"
+                text = f"{p['device']}: {p['title'].lower()}{where} is {value}"
+                if p["metric"] == "storage_status":
+                    text = f"{p['device']}: {p['label'] or 'storage'} is {'degraded or needs attention' if p['level'] == 'warning' else 'failed'}"
                 doc["attention"].append({"level": "bad" if p["level"] == "critical" else "warn",
-                                         "text": f"{p['device']}: {p['title'].lower()}{where} is {value}", "href": f"#/device/{p['device_id']}"})
+                                         "text": text, "href": f"#/device/{p['device_id']}", "snooze": p["snooze"]})
             from app import probes as probes_mod
 
             for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
                 site = probes_mod.present(conn, row)
                 href = f"#/remote-sites?id={site['id']}"
                 if site["state"] == "silent":
-                    doc["attention"].append({"level": "bad", "text": f"{site['name']} has stopped reporting", "href": href})
+                    doc["attention"].append({"level": "bad", "text": f"{site['name']} has stopped reporting", "href": href, "snooze": f"site:{site['id']}"})
                     continue
                 down = site["devices"]["core_down"]
                 if down:
@@ -69,7 +72,27 @@ def get_dashboard(request: Request) -> dict:
         finally:
             conn.close()
 
-    return _cached(request, ("dashboard", db_path), build)
+    doc = dict(_cached(request, ("dashboard", db_path), build))
+    # what someone acknowledged moves to its own list, so it stops counting as "needs attention" (not cached: it changes at once)
+    from app import snooze
+
+    conn = connect(db_path)
+    try:
+        asleep = snooze.active(conn)
+    finally:
+        conn.close()
+    if asleep:
+        keep, held = [], []
+        for item in doc["attention"]:
+            entry = asleep.get(item.get("snooze"))
+            if entry:
+                held.append({**item, "until": entry["until"], "by": entry.get("by"), "note": entry.get("note")})
+            else:
+                keep.append(item)
+        doc["attention"], doc["snoozed"] = keep, held
+    else:
+        doc["snoozed"] = []
+    return doc
 
 
 class LayoutBody(BaseModel):

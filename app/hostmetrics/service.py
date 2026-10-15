@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import logging
 import time
 from datetime import datetime, timezone
@@ -40,6 +41,7 @@ DEFAULT_RULES: dict[str, dict[str, Any]] = {
     "supply_pct": {"title": "Supply low", "unit": "%", "warn": 15, "crit": 5, "confirm": 1, "low": True},
     "battery_pct": {"title": "UPS battery", "unit": "%", "warn": 50, "crit": 25, "confirm": 1, "low": True},
     "on_battery": {"title": "UPS on battery power", "unit": "", "warn": 1, "crit": None, "confirm": 1},
+    "storage_status": {"title": "Storage problem", "unit": "", "warn": 1, "crit": 2, "confirm": 1},
 }
 
 
@@ -394,8 +396,11 @@ async def read(method: str, address: str, port: int, secret: dict[str, Any], gro
             raise MonitorError(str(exc)) from None
         try:
             points, found = ssh.parse_windows(out, state, now)
-        except ssh.SshError:
-            raise MonitorError(winrm.powershell_error(err) or "the host answered but gave no readings") from None
+        except ssh.SshError as exc:
+            # say what came back, so a permission problem or a PowerShell restriction can be recognised
+            seen = re.sub(r"\s+", " ", out or "").strip()[:160]
+            detail = winrm.powershell_error(err) or (f"the script printed: {seen}" if seen else "the script printed nothing")
+            raise MonitorError(f"{exc}: {detail}") from None
         if not points and not found:
             raise MonitorError("the host answered but gave no readings")
         return points, found, None
@@ -509,6 +514,11 @@ def _describe(rule: dict[str, Any], metric: str, label: str, value: float, level
     where = f" on {label}" if label else ""
     if metric == "on_battery":
         return f"{device}: the UPS is running on battery power"
+    if metric == "storage_status":
+        what = label or "storage"
+        if level == "ok":
+            return f"{device}: {what} is healthy again"
+        return f"{device}: {what} is {'degraded or needs attention (a disk may be failing or rebuilding)' if level == 'warning' else 'FAILED'}"
     if level == "ok":
         return f"{device}: {rule['title'].lower()}{where} is back to normal ({shown})"
     limit = rule["crit"] if level == "critical" else rule["warn"]
@@ -531,7 +541,7 @@ def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: li
                          (monitor_id, metric, label, level, now, value))
             if level != "ok":     # a problem that exists the first time we look is a problem: tell about it
                 kind = "metric_critical" if level == "critical" else "metric_warning"
-                add_event(conn, kind, _describe(rule, metric, label, value, level, device_name), device_id=device_id, now=now)
+                add_event(conn, kind, _describe(rule, metric, label, value, level, device_name), device_id=device_id, now=now, subject=f"metric:{device_id}:{metric}:{label}")
                 raised.append(kind)
             continue
         if level == row["level"]:
@@ -546,14 +556,18 @@ def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: li
         conn.execute("UPDATE metric_state SET level = ?, since = ?, value = ?, pending = NULL, pending_n = 0 WHERE monitor_id = ? AND metric = ? AND label = ?",
                      (level, now, value, monitor_id, metric, label))
         kind = {"ok": "metric_ok", "warning": "metric_warning", "critical": "metric_critical"}[level]
-        add_event(conn, kind, _describe(rule, metric, label, value, level, device_name), device_id=device_id, now=now)
+        add_event(conn, kind, _describe(rule, metric, label, value, level, device_name), device_id=device_id, now=now, subject=f"metric:{device_id}:{metric}:{label}")
         raised.append(kind)
     conn.commit()
     return raised
 
 
-def problems(conn) -> list[dict[str, Any]]:
-    """Readings that are beyond a limit now (for the dashboard and the health page)."""
+def problems(conn, include_snoozed: bool = True) -> list[dict[str, Any]]:
+    """Readings that are beyond a limit now (for the dashboard and the health page). Each carries `snooze` (its subject) and
+    `snoozed_until` (None unless someone said "I know"); `include_snoozed=False` leaves those out."""
+    from app import snooze
+
+    asleep = snooze.active(conn)
     general = rules(conn)
     per_device: dict[int, dict] = {}
     out = []
@@ -566,8 +580,12 @@ def problems(conn) -> list[dict[str, Any]]:
             the_rules = per_device[r["device_id"]] = rules(conn, r["device_id"]) if device_overrides(conn, r["device_id"]) else general
         rule = the_rules.get(r["metric"])
         if rule:
+            key = f"metric:{r['device_id']}:{r['metric']}:{r['label']}"
+            sleeping = asleep.get(key)
+            if sleeping and not include_snoozed:
+                continue
             out.append({"device_id": r["device_id"], "device": r["name"], "metric": r["metric"], "label": r["label"], "level": r["level"], "since": r["since"],
-                        "value": r["value"], "title": rule["title"], "unit": rule["unit"]})
+                        "value": r["value"], "title": rule["title"], "unit": rule["unit"], "snooze": key, "snoozed_until": sleeping["until"] if sleeping else None})
     return out
 
 

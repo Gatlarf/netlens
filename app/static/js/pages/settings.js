@@ -13,6 +13,7 @@ import { buildUpdateCard } from "../update.js";
 import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
 import { buildAccountCard } from "../cards/account.js";
+import { buildAuditCard } from "../cards/audit.js";
 import { buildUsersCard } from "../cards/users.js";
 import { buildSharesCard } from "../cards/shares.js";
 import { buildNetchecksCard } from "../cards/netchecks.js";
@@ -247,6 +248,7 @@ const STATIC_GROUPS = [
     title: "System",
     items: [
       { key: "wizard", label: "Setup guide", build: buildWizardCard },
+      { key: "audit", label: "Audit log", build: buildAuditCard },
       { key: "about", label: "About", build: buildAboutCard },
       { key: "session", label: "Account", build: buildAccountCard },
     ],

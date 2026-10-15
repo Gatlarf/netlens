@@ -319,8 +319,10 @@ class Session:
 
 
 def powershell_error(text):
-    """The readable part of what PowerShell wrote to stderr (it arrives as CLIXML)."""
+    """The readable part of what PowerShell wrote to stderr (it arrives as CLIXML). Progress records are not errors: they give ''."""
     parts = re.findall(r'<S S="Error">(.*?)</S>', text or "", re.S)
+    if not parts and "CLIXML" in (text or ""):
+        return ""
     message = "".join(parts) if parts else re.sub(r"<[^>]+>", "", text or "")
     message = re.sub(r"_x([0-9A-Fa-f]{4})_", lambda m: chr(int(m.group(1), 16)), message)
     return re.sub(r"\s+", " ", message).strip().replace("#< CLIXML", "").strip()[:400]

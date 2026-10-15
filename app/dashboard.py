@@ -8,13 +8,19 @@ from app.stats import _ago, _pct, utcnow
 from app import sites as sites_mod, speedtest
 
 
-def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], core_down: list[dict] | None = None) -> list[dict]:
+def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], core_down: list[dict] | None = None, down_checks: list[dict] | None = None) -> list[dict]:
     items: list[dict] = []
 
-    def add(level: str, text: str, href: str) -> None:
-        items.append({"level": level, "text": text, "href": href})
+    def add(level: str, text: str, href: str, snooze: str | None = None) -> None:
+        item = {"level": level, "text": text, "href": href}
+        if snooze:
+            item["snooze"] = snooze          # the subject someone can acknowledge (see app/snooze.py)
+        items.append(item)
 
-    if down:
+    if down and down_checks and len(down_checks) <= 3:
+        for c in down_checks:
+            add("bad", f"Service {c['name']} is down", "#/services", f"service:{c['id']}")
+    elif down:
         add("bad", f"{len(down)} service{'s' if len(down) != 1 else ''} down: {', '.join(down[:3])}{'…' if len(down) > 3 else ''}", "#/services")
     for p in s["plugins"]:
         if p["enabled"] and p["ok"] is False:
@@ -39,7 +45,7 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
     if s["sites"]["down"]:
         add("bad", f"{s['sites']['down']} proxy site{'s' if s['sites']['down'] != 1 else ''} not answering", "#/stats")
     for dev in (core_down or [])[:3]:
-        add("bad", f"{dev['name']} should always be online but is not answering", f"#/device/{dev['id']}")
+        add("bad", f"{dev['name']} should always be online but is not answering", f"#/device/{dev['id']}", f"device:{dev['id']}")
     if len(core_down or []) > 3:
         add("bad", f"{len(core_down) - 3} more always-on devices are not answering", "#/uptime")
     core_flap = (s.get("core") or {}).get("flapping", 0)
@@ -74,7 +80,8 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
     ]
     login_failed = conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'login_failed' AND ts >= ?", (_ago(now, hours=24),)).fetchone()[0]
     certs = sites_mod.certificates(conn)
-    down = [r["name"] for r in conn.execute("SELECT name FROM service_checks WHERE enabled = 1 AND last_up = 0 ORDER BY name COLLATE NOCASE")]
+    down_checks = [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM service_checks WHERE enabled = 1 AND last_up = 0 ORDER BY name COLLATE NOCASE")]
+    down = [c["name"] for c in down_checks]
     worst = [
         {"id": r["device_id"], "name": names.get(r["device_id"]), "pct": _pct(r["u"], r["n"])}
         for r in conn.execute("SELECT device_id, SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ? GROUP BY device_id HAVING SUM(up) < COUNT(*) ORDER BY CAST(SUM(up) AS REAL) / COUNT(*) LIMIT 5", (_ago(now, days=7),))
@@ -95,7 +102,7 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "summary": s,
         "devices_uptime": uptime,
         "service_checks": _services(conn, now)["checks"],
-        "attention": _attention(s, certs, login_failed, down, core_down),
+        "attention": _attention(s, certs, login_failed, down, core_down, down_checks),
         "events": events,
         "services_down": down,
         "login_failed_24h": login_failed,

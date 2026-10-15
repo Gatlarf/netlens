@@ -523,3 +523,8 @@ dialog.whats-new h2 { margin: 0; }
 .ports-table th:nth-child(n+3) { text-align: right; }
 .rs-add { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
 .rs-add input, .rs-add select { min-width: 0; flex: 1 1 140px; }
+.snooze-menu { margin-left: 6px; font-size: 0.8rem; padding: 1px 4px; max-width: 8.5em; }
+.snooze-wake { padding: 1px 8px; font-size: 0.8rem; }
+.snoozed-list { margin-top: 10px; }
+.snoozed-list summary { cursor: pointer; color: var(--muted); }
+.d-snoozed { opacity: 0.75; }

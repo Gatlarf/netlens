@@ -33,7 +33,7 @@ STAMP = "%Y-%m-%dT%H:%M:%SZ"
 NAME_RE = re.compile(r"^[^\x00-\x1f]{1,60}$")
 # the measurements a site may report: the names Netlens itself produces, so a misbehaving site cannot fill the store with its own
 ALLOWED_METRICS = frozenset({"up", "rtt_ms", "response_ms", "cert_days", "cpu_pct", "load1", "mem_pct", "swap_pct", "disk_pct", "disk_free_b", "net_rx_bps",
-                             "net_tx_bps", "if_util_pct", "if_err_ps", "if_up", "temp_c", "uptime_s", "supply_pct", "battery_pct", "battery_minutes", "on_battery"})
+                             "net_tx_bps", "if_util_pct", "if_err_ps", "if_up", "storage_status", "temp_c", "uptime_s", "supply_pct", "battery_pct", "battery_minutes", "on_battery"})
 
 
 class ProbeError(ValueError):
@@ -301,7 +301,7 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
     if probe["offline_notified"] and not baseline:
         events.insert(0, ("probe_online", f"{site} is reporting again"))
     for kind, text in events:
-        add_event(conn, kind, text, now=now)
+        add_event(conn, kind, text, now=now, subject=f"site:{probe_id}" if kind in ("probe_online", "probe_offline") else None)
     return {"ok": True, "interval_s": interval, "devices": len(devices), "services": len(services), "samples": recorded, "events": len(events)}
 
 
@@ -341,7 +341,8 @@ def check_silent(conn: sqlite3.Connection, now: float | None = None) -> list[str
         if seen is not None and now - seen > max(SILENT_AFTER_S, row["interval_s"] * 4):
             conn.execute("UPDATE probes SET offline_notified = 1 WHERE id = ?", (row["id"],))
             conn.commit()
-            add_event(conn, "probe_offline", f"{row['name']} has not reported since {row['last_seen']}: its devices are not being watched", now=datetime.fromtimestamp(now, timezone.utc).strftime(STAMP))
+            add_event(conn, "probe_offline", f"{row['name']} has not reported since {row['last_seen']}: its devices are not being watched", now=datetime.fromtimestamp(now, timezone.utc).strftime(STAMP),
+                      subject=f"site:{row['id']}")
             raised.append(row["name"])
     return raised
 

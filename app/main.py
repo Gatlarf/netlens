@@ -1,6 +1,7 @@
 """Netlens application entry point."""
 
 import asyncio
+import logging
 import contextlib
 import os
 from pathlib import Path
@@ -11,7 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
-from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api, probes as probes_api, central as central_api, reports as reports_api, preferences as preferences_api
+from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api, probes as probes_api, central as central_api, reports as reports_api, preferences as preferences_api, snoozes as snoozes_api, audit as audit_api
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, identify, require_auth
@@ -143,6 +144,27 @@ def create_app(
                   openapi_url="/openapi.json" if docs else None)
 
     app.add_middleware(SecurityHeadersMiddleware)
+
+    @app.middleware("http")
+    async def audit_requests(request, call_next):
+        """Write down who changed what (see app/audit.py). It never changes the answer, and a failure to write is only logged."""
+        response = await call_next(request)
+        try:
+            if request.method in ("POST", "PUT", "PATCH", "DELETE") and 200 <= response.status_code < 300 and request.url.path.startswith("/api/"):
+                principal = getattr(request.state, "user", None)
+                if principal is not None:
+                    from app import audit
+                    from app.auth import client_ip
+                    from app.db import connect as db_connect
+
+                    db = db_connect(request.app.state.db_path)
+                    try:
+                        audit.log_request(db, principal, client_ip(request), request.method, request.url.path, response.status_code)
+                    finally:
+                        db.close()
+        except Exception:  # noqa: BLE001
+            logging.getLogger(__name__).exception("could not write the audit log")
+        return response
     if getattr(settings, "demo", False):
         from app.demo import guard
 
@@ -199,6 +221,8 @@ def create_app(
     app.include_router(central_api.router, dependencies=auth_deps)
     app.include_router(reports_api.router, dependencies=auth_deps)
     app.include_router(preferences_api.router, dependencies=auth_deps)
+    app.include_router(snoozes_api.router, dependencies=auth_deps)
+    app.include_router(audit_api.router, dependencies=auth_deps)
     app.include_router(probes_api.push_router)       # a probe signs in with its own token (checked there), not with a user session
     app.include_router(speedtest_api.router, dependencies=auth_deps)
     app.include_router(wifi.router, dependencies=auth_deps)

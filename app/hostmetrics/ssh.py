@@ -26,6 +26,8 @@ SCRIPT = (
     'echo "##df"; df -PkT 2>/dev/null; '
     'echo "##net"; cat /proc/net/dev 2>/dev/null; '
     'echo "##temp"; for z in /sys/class/thermal/thermal_zone*; do [ -r "$z/temp" ] && echo "$(cat "$z/type" 2>/dev/null | tr " " "_") $(cat "$z/temp")"; done 2>/dev/null; '
+    'echo "##mdstat"; cat /proc/mdstat 2>/dev/null; '
+    'echo "##zpool"; PATH="$PATH:/sbin:/usr/sbin:/usr/local/sbin" zpool list -H -o name,health 2>/dev/null; '
     'echo "##end"'
 )
 COMMAND = "sh -c " + "'" + SCRIPT.replace("'", "'\\''") + "'"
@@ -36,14 +38,14 @@ SKIP_IFACES = re.compile(r"^(lo|veth.*|docker\d*|br-.*|virbr.*|tap.*|cali.*|flan
 # Windows (the OpenSSH server that comes with Windows 10/11 and Server 2019+): one PowerShell script, sent as an encoded command
 # so no quoting of the login shell (cmd.exe) can get in the way. It only reads: processor load, memory, disks, adapters, boot time.
 WIN_SCRIPT = (
-    "$ErrorActionPreference='SilentlyContinue';"
-    "$o=Get-CimInstance Win32_OperatingSystem;"
-    "$c=(Get-CimInstance Win32_Processor|Measure-Object LoadPercentage -Average).Average;"
-    "$d=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3'|%{@{id=$_.DeviceID;size=[double]$_.Size;free=[double]$_.FreeSpace}});"
-    "$n=@(Get-CimInstance Win32_PerfRawData_Tcpip_NetworkInterface|%{@{name=$_.Name;rx=[double]$_.BytesReceivedPersec;tx=[double]$_.BytesSentPersec}});"
-    "$r=@{cpu=$c;mt=[double]$o.TotalVisibleMemorySize;mf=[double]$o.FreePhysicalMemory;st=[double]$o.TotalVirtualMemorySize;sf=[double]$o.FreeVirtualMemory;"
-    "boot=$o.LastBootUpTime.ToUniversalTime().ToString('o');disks=$d;nics=$n};"
-    "'##netlens-windows';$r|ConvertTo-Json -Compress -Depth 4"
+    "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='Stop';$r=@{};$e=@();"
+    "try{$o=Get-CimInstance Win32_OperatingSystem;$r.mt=[double]$o.TotalVisibleMemorySize;$r.mf=[double]$o.FreePhysicalMemory;"
+    "$r.st=[double]$o.TotalVirtualMemorySize;$r.sf=[double]$o.FreeVirtualMemory;$r.boot=$o.LastBootUpTime.ToUniversalTime().ToString('o')}catch{$e+='memory: '+$_.Exception.Message};"
+    "try{$r.cpu=(Get-CimInstance Win32_Processor|Measure-Object LoadPercentage -Average).Average}catch{$e+='processor: '+$_.Exception.Message};"
+    "try{$r.disks=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3'|%{@{id=$_.DeviceID;size=[double]$_.Size;free=[double]$_.FreeSpace}})}catch{$e+='disks: '+$_.Exception.Message};"
+    "try{$r.nics=@(Get-CimInstance Win32_PerfRawData_Tcpip_NetworkInterface|%{@{name=$_.Name;rx=[double]$_.BytesReceivedPersec;tx=[double]$_.BytesSentPersec}})}catch{$e+='network: '+$_.Exception.Message};"
+    "try{$r.pd=@(Get-PhysicalDisk|%{@{n=$_.FriendlyName;h=[string]$_.HealthStatus}})}catch{};"
+    "$r.e=$e;'##netlens-windows';$r|ConvertTo-Json -Compress -Depth 4"
 )
 
 
@@ -75,6 +77,7 @@ def parse_windows(text: str, state: dict, now: float | None = None) -> tuple[lis
         raise SshError("the answer from the host could not be read")
     points: list[tuple] = []
     found: list[str] = []
+    problems = [str(x)[:200] for x in (data.get("e") if isinstance(data.get("e"), list) else [data["e"]] if isinstance(data.get("e"), str) else [])]
 
     def num(v):
         return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
@@ -135,6 +138,16 @@ def parse_windows(text: str, state: dict, now: float | None = None) -> tuple[lis
         found.append("network")
     elif seen:
         found.append("network")
+    storage = []
+    for d in many(data.get("pd")):
+        name, health = str(d.get("n") or "").strip(), str(d.get("h") or "").strip().lower()
+        if name and health in WIN_DISK_LEVEL:
+            storage.append(("storage_status", name[:40], float(WIN_DISK_LEVEL[health]), "state"))
+    if storage:
+        points.extend(storage[:40])
+        found.append("storage")
+    if not points and problems:
+        raise SshError("Windows refused the readings: " + "; ".join(problems[:3]) + ". The account may need permission to read WMI data (see the setup notes).")
     return points, found
 
 
@@ -147,6 +160,36 @@ def _sections(text: str) -> dict[str, list[str]]:
             out[current] = []
         elif current is not None:
             out[current].append(line)
+    return out
+
+
+ZPOOL_LEVEL = {"ONLINE": 0, "DEGRADED": 1, "OFFLINE": 2, "FAULTED": 2, "UNAVAIL": 2, "REMOVED": 2, "SUSPENDED": 2}
+WIN_DISK_LEVEL = {"healthy": 0, "warning": 1, "unhealthy": 2}
+
+
+def parse_mdstat(lines: list[str]) -> list[tuple]:
+    """Linux software RAID: 0 for a complete array, 1 when a member is missing or failed, 2 when the array is not active."""
+    out, name, state_line = [], None, ""
+    arrays: dict[str, dict] = {}
+    for line in lines:
+        m = re.match(r"^(md\d+)\s*:\s*(\S+)\s+(.*)$", line)
+        if m:
+            name = m.group(1)
+            arrays[name] = {"active": m.group(2), "failed": "(F)" in m.group(3), "missing": False, "has_status": False}
+            continue
+        if name and arrays.get(name) is not None:
+            bracket = re.search(r"\[(\d+)/(\d+)\]\s*\[([U_]+)\]", line)
+            if bracket:
+                arrays[name]["has_status"] = True
+                arrays[name]["missing"] = "_" in bracket.group(3) or bracket.group(1) != bracket.group(2)
+    for name, a in arrays.items():
+        if a["active"] == "inactive":
+            level = 2.0
+        elif a["failed"] or a["missing"]:
+            level = 1.0
+        else:
+            level = 0.0
+        out.append(("storage_status", name, level, "state"))
     return out
 
 
@@ -265,6 +308,12 @@ def parse(text: str, state: dict, now: float | None = None) -> tuple[list[tuple]
         except ValueError:
             pass
     add("temperature", temps[:12])
+    storage = parse_mdstat(sec.get("mdstat", []))
+    for item in sec.get("zpool", []):
+        cols = item.split()
+        if len(cols) >= 2 and cols[1].upper() in ZPOOL_LEVEL:
+            storage.append(("storage_status", cols[0][:40], float(ZPOOL_LEVEL[cols[1].upper()]), "state"))
+    add("storage", storage)
     return points, found
 
 

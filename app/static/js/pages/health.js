@@ -1,8 +1,10 @@
 import { get, put } from "../api.js";
+import { snoozeMenu, wakeButton, untilText } from "../snooze.js";
 import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin } from "../util.js";
 
 const REFRESH_MS = 30000;
-const METRIC_ORDER = ["cpu_pct", "mem_pct", "disk_pct", "temp_c", "battery_pct", "supply_pct", "on_battery"];
+const METRIC_ORDER = ["cpu_pct", "mem_pct", "disk_pct", "temp_c", "battery_pct", "supply_pct", "on_battery", "storage_status"];
+const EVENT_ONLY = ["on_battery", "storage_status"];       // no numbers to set: it is a problem as soon as it happens
 
 const fmtRate = (bps) => (bps === null || bps === undefined ? "–" : bps >= 1e9 ? `${(bps / 1e9).toFixed(1)} Gbit/s` : bps >= 1e6 ? `${(bps / 1e6).toFixed(1)} Mbit/s` : `${Math.round(bps / 1e3)} kbit/s`);
 const fmtUptime = (s) => (s === null || s === undefined ? "–" : s >= 86400 ? `${Math.floor(s / 86400)} d` : s >= 3600 ? `${Math.floor(s / 3600)} h` : `${Math.floor(s / 60)} min`);
@@ -55,7 +57,8 @@ export async function render(container) {
       for (const p of data.problems) {
         card.appendChild(h("div", { class: "kv" },
           h("span", { class: "kv-label" }, h("span", { class: `hl-badge ${p.level === "critical" ? "bad" : "warn"}` }, p.level === "critical" ? "Critical" : "Warning"), " ", h("a", { href: `#/device/${p.device_id}` }, shortName(p.device))),
-          h("span", {}, `${p.title}${p.label ? ` · ${p.label}` : ""}: ${p.unit === "%" ? `${Math.round(p.value)}%` : p.unit === "°C" ? `${Math.round(p.value)} °C` : Math.round(p.value * 10) / 10}`, " ", h("span", { class: "hint" }, `since ${timeAgo(p.since)}`))));
+          h("span", {}, `${p.title}${p.label ? ` · ${p.label}` : ""}: ${p.metric === "storage_status" ? (p.level === "critical" ? "failed" : "degraded") : p.unit === "%" ? `${Math.round(p.value)}%` : p.unit === "°C" ? `${Math.round(p.value)} °C` : Math.round(p.value * 10) / 10}`, " ", h("span", { class: "hint" }, `since ${timeAgo(p.since)}`), " ",
+            p.snoozed_until ? h("span", {}, h("span", { class: "hint" }, `snoozed for another ${untilText(p.snoozed_until)}`), " ", wakeButton(p.snooze)) : snoozeMenu(p.snooze))));
       }
       problems.appendChild(card);
     }
@@ -97,12 +100,12 @@ export async function render(container) {
       const r = rules[metric];
       if (!r) continue;
       const warn = h("input", { type: "number", step: "any", value: r.warn === null ? "" : String(r.warn), "aria-label": `${r.title} warning limit`, disabled: !isAdmin() });
-      const crit = h("input", { type: "number", step: "any", value: r.crit === null ? "" : String(r.crit), "aria-label": `${r.title} critical limit`, disabled: !isAdmin() || metric === "on_battery" });
+      const crit = h("input", { type: "number", step: "any", value: r.crit === null ? "" : String(r.crit), "aria-label": `${r.title} critical limit`, disabled: !isAdmin() || EVENT_ONLY.includes(metric) });
       const on = h("input", { type: "checkbox", disabled: !isAdmin() });
       on.checked = r.enabled;
       inputs[metric] = { warn, crit, on };
       body.appendChild(h("tr", {}, h("td", {}, r.title, r.low ? h("span", { class: "hint" }, " (warns when it falls below the limit)") : null),
-        h("td", {}, metric === "on_battery" ? h("span", { class: "hint" }, "as soon as it happens") : warn, r.unit ? ` ${r.unit}` : ""), h("td", {}, metric === "on_battery" ? "" : crit, r.unit && metric !== "on_battery" ? ` ${r.unit}` : ""), h("td", {}, on)));
+        h("td", {}, EVENT_ONLY.includes(metric) ? h("span", { class: "hint" }, "as soon as it happens") : warn, r.unit ? ` ${r.unit}` : ""), h("td", {}, EVENT_ONLY.includes(metric) ? "" : crit, r.unit && !EVENT_ONLY.includes(metric) ? ` ${r.unit}` : ""), h("td", {}, on)));
     }
     table.appendChild(body);
     const save = h("button", { class: "btn primary admin-only", type: "button" }, "Save limits");
@@ -111,7 +114,7 @@ export async function render(container) {
       for (const [metric, f] of Object.entries(inputs)) {
         const num = (el) => (el.value === "" ? null : Number(el.value));
         payload[metric] = { enabled: f.on.checked };
-        if (metric !== "on_battery") { payload[metric].warn = num(f.warn); payload[metric].crit = num(f.crit); }
+        if (!EVENT_ONLY.includes(metric)) { payload[metric].warn = num(f.warn); payload[metric].crit = num(f.crit); }
       }
       save.disabled = true;
       try {
@@ -127,6 +130,8 @@ export async function render(container) {
     limitsSlot.appendChild(card);
   }
 
+  const onSnoozed = () => { if (!disposed) load(); };
+  document.addEventListener("netlens:snoozed", onSnoozed);
   async function load() {
     try {
       const [overview, limits] = await Promise.all([get("/api/monitors"), get("/api/monitoring/limits")]);
@@ -148,5 +153,5 @@ export async function render(container) {
   list.append(h("p", { class: "hint" }, "Loading…"));
   await load();
   timer = setInterval(load, REFRESH_MS);
-  return () => { disposed = true; if (timer) clearInterval(timer); };
+  return () => { disposed = true; if (timer) clearInterval(timer); document.removeEventListener("netlens:snoozed", onSnoozed); };
 }

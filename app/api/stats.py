@@ -21,6 +21,11 @@ def _cached(request: Request, key: tuple, build):
     return value
 
 
+def _cache_clear(request: Request) -> None:
+    """Forget the cached documents (after a snooze, so the page shows it at once)."""
+    request.app.state.__dict__.get("stats_cache", {}).clear()
+
+
 def _passive(request: Request) -> dict | None:
     control = getattr(request.app.state, "passive", None)
     return control.status() if control is not None else None

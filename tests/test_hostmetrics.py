@@ -436,3 +436,77 @@ def test_platform_is_validated():
     assert d["secret"]["platform"] == "windows"
     with pytest.raises(hm.MonitorError):
         hm.validate({"method": "ssh", "address": "10.0.0.5", "username": "me", "password": "x", "platform": "vms"})
+
+
+# ---------------------------------------------------------------- storage health
+MDSTAT_OK = ["Personalities : [raid1] [raid6]", "md0 : active raid1 sdb1[1] sda1[0]", "      976630464 blocks super 1.2 [2/2] [UU]", "", "unused devices: <none>"]
+MDSTAT_BAD = ["Personalities : [raid5]", "md1 : active raid5 sdc[0] sdd[1](F) sde[2]", "      1953260928 blocks super 1.2 level 5 [3/2] [U_U]",
+              "      [=>...................]  recovery =  8.0% (78125000/976630464)", "md2 : inactive sdf[0](S)", "      1000 blocks super 1.2", "md3 : active raid0 sdg[0] sdh[1]", "      2000 blocks 64k chunks"]
+
+
+def test_mdstat_levels():
+    got = {label: v for _m, label, v, _u in ssh.parse_mdstat(MDSTAT_OK + MDSTAT_BAD[1:])}
+    assert got == {"md0": 0.0, "md1": 1.0, "md2": 2.0, "md3": 0.0}
+
+
+def test_ssh_reports_arrays_and_pools():
+    text = proc()
+    text = text.replace("##end", "##mdstat\n" + "\n".join(MDSTAT_BAD) + "\n##zpool\ntank\tONLINE\nbackup\tDEGRADED\nold\tFAULTED\n##end")
+    pts, found = ssh.parse(text, {}, now=100)
+    got = {(m, label): v for m, label, v, _u in pts if m == "storage_status"}
+    assert got[("storage_status", "md1")] == 1.0 and got[("storage_status", "tank")] == 0.0
+    assert got[("storage_status", "backup")] == 1.0 and got[("storage_status", "old")] == 2.0 and "storage" in found
+
+
+def test_windows_physical_disks():
+    data = json.loads(win_output().split("##netlens-windows\n", 1)[1])
+    data["pd"] = [{"n": "Samsung SSD", "h": "Healthy"}, {"n": "WD Red", "h": "Warning"}, {"n": "Old", "h": "Unhealthy"}]
+    pts, found = ssh.parse_windows("##netlens-windows\n" + json.dumps(data), {}, now=1_773_144_000)
+    got = {label: v for m, label, v, _u in pts if m == "storage_status"}
+    assert got == {"Samsung SSD": 0.0, "WD Red": 1.0, "Old": 2.0} and "storage" in found
+
+
+def test_synology_raid_and_disks_over_snmp():
+    mib = sim.Mib()
+    for i, (name, status) in enumerate([(b"Volume 1", 1), (b"Volume 2", 11)], start=1):
+        mib.set(oid(snmp.SYNO_RAID_NAME, i), name)
+        mib.set(oid(snmp.SYNO_RAID_STATUS, i), status)
+    for i, (name, status, temp) in enumerate([(b"Disk 1", 1, 38), (b"Disk 2", 5, 41), (b"Disk 3", 3, 0)], start=1):
+        mib.set(oid(snmp.SYNO_DISK_ID, i), name)
+        mib.set(oid(snmp.SYNO_DISK_STATUS, i), status)
+        mib.set(oid(snmp.SYNO_DISK_TEMP, i), temp)
+    pts, found = snmp.collect(Direct(mib), ["storage"], {}, now=1)
+    got = {(m, label): v for m, label, v, _u in pts}
+    assert got[("storage_status", "Volume 1")] == 0 and got[("storage_status", "Volume 2")] == 1
+    assert got[("storage_status", "Disk 1")] == 0 and got[("storage_status", "Disk 2")] == 2 and got[("storage_status", "Disk 3")] == 0
+    assert got[("temp_c", "Disk 1")] == 38 and ("temp_c", "Disk 3") not in got and found == ["storage"]
+
+
+def test_a_degraded_array_alerts_with_words(tmp_path):
+    from app.db import connect as db_connect, init_db as db_init
+
+    c = db_connect(tmp_path / "s.db")
+    db_init(c)
+    c.execute("INSERT INTO devices (id, mac, primary_ip, hostname, online, first_seen, last_seen) VALUES (1, 'aa:00:00:00:00:01', '10.0.0.5', 'nas', 1, 'x', 'x')")
+    c.execute("INSERT INTO host_monitors (id, device_id, method, address, port, credential, interval_s, groups, alerts, enabled, created) VALUES (1,1,'ssh','10.0.0.5',22,'',60,'[]',1,1,'x')")
+    c.commit()
+    assert hm.evaluate(c, 1, 1, "nas", [("storage_status", "md1", 1.0, "state")], NOW) == ["metric_warning"]
+    text = c.execute("SELECT detail FROM events ORDER BY id DESC LIMIT 1").fetchone()[0]
+    assert "nas: md1 is degraded" in text
+    assert hm.evaluate(c, 1, 1, "nas", [("storage_status", "md1", 2.0, "state")], NOW) == ["metric_critical"]
+    assert hm.evaluate(c, 1, 1, "nas", [("storage_status", "md1", 0.0, "state")], NOW) == ["metric_ok"]
+    c.close()
+
+
+def test_windows_script_errors_are_reported_and_progress_noise_is_not():
+    from app.hostmetrics import winrm
+
+    refused = "##netlens-windows\n" + json.dumps({"e": ["memory: Access denied", "processor: Access denied"]})
+    with pytest.raises(ssh.SshError, match="Access denied"):
+        ssh.parse_windows(refused, {}, now=1)
+    progress = '#< CLIXML\n<Objs Version="1.1.0.1"><Obj S="progress"><TN><T>System.Management.Automation.PSCustomObject</T></TN><PR N="Activity">Preparing modules for first use.</PR></Obj></Objs>'
+    assert winrm.powershell_error(progress) == ""
+    error = '#< CLIXML\n<Objs><S S="Error">Get-CimInstance : Access denied_x000D__x000A_</S></Objs>'
+    assert "Access denied" in winrm.powershell_error(error)
+    script = ssh.WIN_SCRIPT
+    assert "$ProgressPreference='SilentlyContinue'" in script and len(ssh.WIN_COMMAND) < 7000

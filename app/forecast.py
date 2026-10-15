@@ -143,7 +143,7 @@ def check(conn, now: float | None = None) -> list[str]:
         where = f" on {f['label']}" if f["label"] else ""
         text = f"{f['device']}: the disk{where} is {f['current']:.0f}% full and will be full in about {max(1, round(days))} day{'s' if round(days) != 1 else ''} (around {f['full_on']})"
         kind = "capacity_critical" if level == "critical" else "capacity_warning"
-        add_event(conn, kind, text, device_id=f["device_id"], now=stamp)
+        add_event(conn, kind, text, device_id=f["device_id"], now=stamp, subject=f"metric:{f['device_id']}:disk_pct:{f['label']}")
         raised.append(kind)
     set_setting(conn, STATE_KEY, json.dumps(new_state))
     conn.commit()

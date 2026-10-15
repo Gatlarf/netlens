@@ -85,6 +85,7 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
         if cookie is None:
             limiter.record_failure(host)
             user_limiter.record_failure(user_key)
+            _audit(request, _clean(body.username)[:40] if body.username else "", "", f"Failed sign-in as {_clean(body.username)[:40]!r}", 401)
             if limiter.reached(host):
                 _alarm(request, f"{limiter.max_failures} wrong sign-in attempts from {host} within a minute (last user name tried: {_clean(body.username)!r}); that address is blocked for a minute")
             if user_limiter.reached(user_key):
@@ -92,6 +93,7 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
             raise HTTPException(status_code=401, detail="wrong user name or password")
         limiter.reset(host)
         user_limiter.reset(user_key)
+        _audit(request, body.username.strip(), "", "Signed in", 200)
         response = JSONResponse({"ok": True})
         _session_cookie(response, request, cookie)
         return response
@@ -103,6 +105,7 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
         raise HTTPException(status_code=401, detail="invalid token")
 
     limiter.reset(host)
+    _audit(request, "access token", "admin", "Signed in with the access token", 200)
     response = JSONResponse({"ok": True})
     _session_cookie(response, request, session_value(settings.token))
     return response
@@ -110,6 +113,9 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
 
 @router.post("/logout")
 async def logout(request: Request) -> JSONResponse:
+    who = identify(request)
+    if who is not None:
+        _audit(request, who.username, who.role, "Signed out", 200)
     db = connect(request.app.state.db_path)
     try:
         users.end_session(db, request.cookies.get(COOKIE_NAME))
@@ -134,6 +140,19 @@ def _demo_info(request: Request) -> dict:
     from app.demo.seed import DEMO_PASSWORD, DEMO_USER
 
     return {"demo": {"username": DEMO_USER, "password": DEMO_PASSWORD, "reset": settings.demo_reset}}
+
+
+def _audit(request: Request, user: str, role: str, action: str, status: int) -> None:
+    try:
+        from app import audit
+
+        db = connect(request.app.state.db_path)
+        try:
+            audit.record(db, user, role, client_ip(request), request.method, request.url.path, status, action)
+        finally:
+            db.close()
+    except Exception:  # noqa: BLE001 - the log must never stop a sign-in
+        pass
 
 
 @router.get("/session")

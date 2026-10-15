@@ -503,7 +503,7 @@ def _health(conn: sqlite3.Connection) -> tuple[dict, dict[int, dict]]:
 
     rows = conn.execute("SELECT device_id, last_ok FROM host_monitors WHERE enabled = 1").fetchall()
     levels: dict[int, str] = {}
-    problems = hm.problems(conn)
+    problems = hm.problems(conn, include_snoozed=False)       # what someone has acknowledged is not counted
     for p in problems:
         cur = levels.get(p["device_id"], "ok")
         levels[p["device_id"]] = "critical" if "critical" in (cur, p["level"]) else "warning"

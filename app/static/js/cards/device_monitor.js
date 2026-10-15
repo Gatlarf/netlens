@@ -21,7 +21,7 @@ const fmtValue = (v) => {
 };
 const NAMES = {
   cpu_pct: "Processor", load1: "Load", mem_pct: "Memory in use", swap_pct: "Swap in use", disk_pct: "Disk used", disk_free_b: "Disk free", net_rx_bps: "Received",
-  net_tx_bps: "Sent", temp_c: "Temperature", uptime_s: "Running for", supply_pct: "Supply", battery_pct: "UPS battery", battery_minutes: "UPS runtime", on_battery: "On battery power",
+  net_tx_bps: "Sent", temp_c: "Temperature", uptime_s: "Running for", supply_pct: "Supply", battery_pct: "UPS battery", battery_minutes: "UPS runtime", on_battery: "On battery power", storage_status: "Storage",
 };
 
 let formOpen = false;

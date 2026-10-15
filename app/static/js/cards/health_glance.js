@@ -13,7 +13,9 @@ const CHIPS = [
   { metric: "battery_pct", title: "UPS battery", unit: "%", pick: "min", lowIsBad: true },
   { metric: "net_rx_bps", title: "In", unit: "bps", pick: "sum" },
   { metric: "net_tx_bps", title: "Out", unit: "bps", pick: "sum" },
+  { metric: "storage_status", title: "Storage", unit: "storage", pick: "max", always: true },
 ];
+const STORAGE_TEXT = ["healthy", "degraded", "failed"];
 const FRESH = 3600;      // a reading older than this is not shown as "now"
 
 function level(value, rule, lowIsBad) {
@@ -42,10 +44,11 @@ export async function buildHealthGlance(device, onOpen) {
     if (!rows.length) continue;
     const values = rows.map((s) => s.last);
     const value = c.pick === "sum" ? values.reduce((a, b) => a + b, 0) : c.pick === "min" ? Math.min(...values) : Math.max(...values);
-    const label = rows.length > 1 && c.pick !== "sum" ? (rows.find((s) => s.last === value) || {}).label : "";
-    const lvl = level(value, rules[c.metric], c.lowIsBad);
+    const label = (rows.length > 1 || c.unit === "storage") && c.pick !== "sum" ? (rows.find((s) => s.last === value) || {}).label : "";
+    const lvl = c.unit === "storage" ? (value >= 2 ? "crit" : value >= 1 ? "warn" : "ok") : level(value, rules[c.metric], c.lowIsBad);
+    const shown = c.unit === "storage" ? `${STORAGE_TEXT[Math.min(2, Math.round(value))]}${value >= 1 && label ? ` (${label})` : ""}` : formatValue(value, c.unit);
     chips.push(h("button", { type: "button", class: `glance-chip glance-${lvl}`, title: `${c.title}${label ? ` (${label})` : ""}: open the health graphs`, onclick: onOpen },
-      h("span", { class: "glance-title" }, c.title), h("span", { class: "glance-value" }, formatValue(value, c.unit))));
+      h("span", { class: "glance-title" }, c.title), h("span", { class: "glance-value" }, shown)));
   }
   if (!chips.length) return null;
   return h("div", { class: "glance-row" }, ...chips);

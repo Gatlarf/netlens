@@ -88,10 +88,12 @@ def readings(key: str, t: float, now: float) -> list[tuple]:
         pct = 74.0 + (1 - min(age_days, 60) / 60) * 14 + (_noise(t // 86400, salt) * 0.2)        # 14 points in 60 days: now 88 %
         out.append(("disk_pct", "/mnt/tank", pct, "%"))
         out.append(("disk_free_b", "/mnt/tank", (100 - pct) / 100 * 12 * TB, "B"))
+        out.append(("storage_status", "tank", 0.0, "state"))
         out.append(("disk_pct", "/mnt/backup", 52.0 + (1 - min(age_days, 60) / 60) * 4, "%"))
         out.append(("disk_free_b", "/mnt/backup", 0.44 * 8 * TB, "B"))
     if kind == "backup":
         pct = 61.0 + (1 - min(age_days, 30) / 30) * 27             # growing about a point a day: 88 % now
+        out.append(("storage_status", "md0", 1.0 if age_days < 2 else 0.0, "state"))        # a disk of the mirror dropped out two days ago
         out.append(("disk_pct", "/mnt/datastore", pct, "%"))
         out.append(("disk_free_b", "/mnt/datastore", (100 - pct) / 100 * 4 * TB, "B"))
     if kind == "pi":
@@ -142,7 +144,9 @@ def seed(conn, ids: dict[str, int], now: datetime, days: int = 14) -> None:
                 level, since = "warning", (now - timedelta(days=3, hours=4)).strftime("%Y-%m-%dT%H:%M:%SZ")
             if metric == "supply_pct" and label == "Black toner" and value <= 15:
                 level, since = "warning", (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
-            if metric in ("disk_pct", "cpu_pct", "mem_pct", "temp_c", "supply_pct", "battery_pct"):
+            if metric == "storage_status" and value >= 1:
+                level, since = ("critical" if value >= 2 else "warning"), (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            if metric in ("disk_pct", "cpu_pct", "mem_pct", "temp_c", "supply_pct", "battery_pct", "storage_status"):
                 conn.execute("INSERT OR REPLACE INTO metric_state (monitor_id, metric, label, level, since, value) VALUES (?,?,?,?,?,?)", (monitor_id, metric, label, level, since, value))
     if store is not None:
         rows = []

@@ -205,7 +205,7 @@ def announce_still_down(conn: sqlite3.Connection, now: datetime | None = None) -
         if row["id"] in held:
             continue
         last = conn.execute("SELECT kind, maintenance FROM events WHERE device_id = ? AND kind IN ('device_offline', 'device_online') ORDER BY id DESC LIMIT 1", (row["id"],)).fetchone()
-        if last and last["kind"] == "device_offline" and last["maintenance"]:
+        if last and last["kind"] == "device_offline" and last["maintenance"] and last["maintenance"] != "Snoozed":
             add_event(conn, "device_offline", f"{row['primary_ip'] or ''} still offline after maintenance '{last['maintenance']}'".strip(), device_id=row["id"], now=now.strftime(STAMP))
             announced += 1
     return announced

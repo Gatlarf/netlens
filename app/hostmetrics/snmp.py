@@ -296,10 +296,15 @@ UPS_OUTPUT_SOURCE = (1, 3, 6, 1, 2, 1, 33, 1, 4, 1, 0)    # 3 normal, 5 on batte
 UPS_MINUTES = (1, 3, 6, 1, 2, 1, 33, 1, 2, 3, 0)
 UPS_CHARGE = (1, 3, 6, 1, 2, 1, 33, 1, 2, 4, 0)
 
+SYNO_DISK_ID = (1, 3, 6, 1, 4, 1, 6574, 2, 1, 1, 2)         # Synology: one row per disk (name such as "Disk 1")
+SYNO_DISK_STATUS = (1, 3, 6, 1, 4, 1, 6574, 2, 1, 1, 5)     # 1 normal, 2 initialized, 3 not initialized, 4 system partition failed, 5 crashed
+SYNO_DISK_TEMP = (1, 3, 6, 1, 4, 1, 6574, 2, 1, 1, 6)
+SYNO_RAID_NAME = (1, 3, 6, 1, 4, 1, 6574, 3, 1, 1, 2)       # one row per volume / RAID group
+SYNO_RAID_STATUS = (1, 3, 6, 1, 4, 1, 6574, 3, 1, 1, 3)     # 1 normal ... 11 degraded, 12 crashed
 HR_SW_RUN_NAME = (1, 3, 6, 1, 2, 1, 25, 4, 2, 1, 2)       # the programs that run, one row each
-GROUPS = ("uptime", "cpu", "memory", "disk", "network", "temperature", "supplies", "ups")
+GROUPS = ("uptime", "cpu", "memory", "disk", "network", "temperature", "supplies", "ups", "storage")
 GROUP_TITLES = {"uptime": "Time since start", "cpu": "Processor", "memory": "Memory", "disk": "Disks", "network": "Network traffic",
-                "temperature": "Temperatures", "supplies": "Printer supplies", "ups": "UPS battery"}
+                "temperature": "Temperatures", "supplies": "Printer supplies", "ups": "UPS battery", "storage": "Storage health"}
 SKIP_MOUNTS = ("/dev", "/sys", "/proc", "/run", "/snap", "/var/lib/docker", "/var/lib/containers", "/boot/efi", "/var/lib/kubelet")
 MAX_INTERFACES = 64                       # ports of a switch; each gets traffic, load, link state and (when there are any) errors
 
@@ -462,6 +467,31 @@ def read_network(agent, state, now):
     return out, seen
 
 
+# storage_status: 0 healthy, 1 degraded or needs attention, 2 failed
+SYNO_RAID_LEVEL = {1: 0, 2: 1, 3: 0, 4: 0, 5: 1, 6: 0, 7: 1, 8: 0, 9: 0, 10: 0, 11: 1, 12: 2, 13: 0, 14: 0}      # repairing and syncing are 1, routine checks 0
+SYNO_DISK_LEVEL = {1: 0, 2: 0, 3: 0, 4: 1, 5: 2}
+
+
+def read_storage(agent):
+    """RAID groups and disks of a Synology (its own MIB). Nothing on other devices."""
+    out = []
+    names, status = _table(agent, SYNO_RAID_NAME), _table(agent, SYNO_RAID_STATUS)
+    for key, name in names.items():
+        code = _num(status.get(key))
+        if code is not None:
+            out.append(("storage_status", _text(name, 40) or "RAID", float(SYNO_RAID_LEVEL.get(int(code), 1)), "state"))
+    disks, dstatus, dtemp = _table(agent, SYNO_DISK_ID), _table(agent, SYNO_DISK_STATUS), _table(agent, SYNO_DISK_TEMP)
+    for key, name in disks.items():
+        label = _text(name, 40) or "Disk"
+        code = _num(dstatus.get(key))
+        if code is not None:
+            out.append(("storage_status", label, float(SYNO_DISK_LEVEL.get(int(code), 1)), "state"))
+        temp = _num(dtemp.get(key))
+        if temp is not None and 0 < temp < 120:
+            out.append(("temp_c", label, float(temp), "\u00b0C"))
+    return out
+
+
 def read_temperature(agent):
     names, values = _table(agent, LM_TEMP_DESCR), _table(agent, LM_TEMP_VALUE)
     out = []
@@ -530,6 +560,8 @@ def collect(agent, groups=None, state=None, now=None):
             got = _safe(agent, read_supplies, agent)
         elif group == "ups":
             got = _safe(agent, read_ups, agent)
+        elif group == "storage":
+            got = _safe(agent, read_storage, agent)
         else:
             got = []
         if got:

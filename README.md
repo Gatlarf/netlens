@@ -503,6 +503,8 @@ Nothing is installed on the device and only read requests are sent: SNMP `GET` /
 
 **Warnings**: a reading has to stay past its limit for a few rounds in a row (processor 5, others 2-3) before anything is said, so a short peak is not an alarm. Defaults: processor 90 / 98 %, memory 90 / 97 %, disk 85 / 95 % full, temperature 80 / 90 °C, printer supplies and UPS battery below 15 / 5 % and 50 / 25 %, and a UPS running on battery. Change them on **Monitoring → Health**, or for one device only on its Health tab under *Limits for this device* (a NAS that runs at 90 % by design). Switch ports also get *Port busy* (85 / 95 % of the link speed) and *Port errors* (1 / 10 per second) limits. The events *Health warning*, *Health critical* and *Health normal* go through the notification channels, respect maintenance windows, and show on the dashboard. `/metrics` carries the readings as `netlens_host_*`.
 
+**Storage health.** A degraded or failed disk set raises a warning or a critical alert (*Storage problem*): Linux software RAID (`/proc/mdstat`) and ZFS pools (`zpool`) over SSH, the physical disks of Windows over WinRM or SSH, and the RAID groups and disks (with temperatures) of a Synology over SNMP. The device's Health tab shows a *Storage* tile. SMART values are not read, because they need root on the host.
+
 **Ports.** A switch (or any device with three or more interfaces) gets a *Ports* table on its Health tab with the link state, traffic in and out, how full the link is and errors; click a port for its graphs. A cable that is unplugged shows as *down* without an alarm; ports that were switched off on purpose are left out.
 
 **Running out soon.** From the growth of the last weeks Netlens works out when each monitored disk will be full (a steady disk gets no date, one big file is not a trend, and a disk needs three days of history first). The dashboard card *Running out soon* lists them, and a notification (*Disk filling up*, *Disk almost full*) is sent once when a disk is on course to fill within 14 days (3 days for the critical one). The 14 days can be changed with the setting `forecast.alert_days`.
@@ -665,6 +667,14 @@ The result is always a tree: an assignment that would put a device below itself 
 - **Device page**, section **Network position** (inside the collapsed **Edit** card): shows what the device sits below and why, lists the devices below it, and lets you choose the parent: *Automatic*, *None (top level)* or a specific device. Devices below the current one are not offered, so a loop is impossible. If a chosen parent is deleted, the device goes back to automatic.
 
 The same data is available as `GET /api/hierarchy`, and `PATCH /api/devices/<id>` accepts `parent_mode` (`auto`, `none`, `device`) and `parent_device_id`.
+
+### Snooze and acknowledge
+
+On the dashboard and on the Health page every problem has a **Snooze…** menu (1 hour, 4 hours, 24 hours, 7 days). A snoozed problem moves to a *Snoozed* list and stops counting as "needs attention"; its notifications are held back (they are still recorded and marked *Snoozed*). It ends by itself when the problem is over, and when the time is up a problem that is still there is announced once more; *Wake* ends it by hand. A snooze is about one thing (one disk, one service, one device being offline), so snoozing a full disk does not silence an offline alert for the same device.
+
+### Audit log
+
+**Settings → Audit log** (administrators) lists who changed what and when: changes to settings, devices, users, monitors, backups and snoozes, and every sign-in, failed sign-in and sign-out, with the address each came from. Passwords and the contents of requests are never stored. It can be searched, filtered by user and downloaded as CSV; entries are kept for a year.
 
 ### Start page
 

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 25
 
 
 def utcnow() -> str:
@@ -716,6 +716,24 @@ def init_db(conn: sqlite3.Connection) -> None:
     # --- schema v24: a health monitor can be set up by the central Netlens (source = 'central')
     _add_column_if_missing(conn, "host_monitors", "source", "TEXT")
 
+    # --- schema v25: audit log (who changed what) -----------------------------------------------------------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY,
+            ts TEXT NOT NULL,
+            user TEXT NOT NULL DEFAULT '',
+            role TEXT NOT NULL DEFAULT '',
+            ip TEXT NOT NULL DEFAULT '',
+            method TEXT NOT NULL,
+            path TEXT NOT NULL,
+            status INTEGER NOT NULL,
+            action TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts)")
+
     # Indexes
     cur.execute("CREATE INDEX IF NOT EXISTS idx_device_ips_ip ON device_ips(ip)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts)")
@@ -818,8 +836,10 @@ def add_event(
     detail: str | None = None,
     device_id: int | None = None,
     now: str | None = None,
+    subject: str | None = None,
 ) -> int:
-    """Insert an event, commit, and return the event id."""
+    """Insert an event, commit, and return the event id. `subject` names what the event is about (for snoozes); a device
+    that goes offline or comes back is its own subject."""
     if now is None:
         now = utcnow()
 
@@ -829,6 +849,15 @@ def add_event(
         window = tag_for(conn, kind, device_id, now)
     except Exception:  # noqa: BLE001 - a broken window list must never lose an event
         window = None
+    if subject is None and device_id is not None and kind in ("device_offline", "device_online"):
+        subject = f"device:{device_id}"
+    if window is None and subject:
+        try:
+            from app import snooze
+
+            window = snooze.tag(conn, kind, subject, now)
+        except Exception:  # noqa: BLE001 - same: never lose an event over a broken snooze list
+            window = None
     cur = conn.cursor()
     cur.execute(
         """

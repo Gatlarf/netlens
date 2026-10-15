@@ -2,6 +2,17 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.10 — 2026-10-15
+
+### Added
+- ★ **Storage health**: a degraded or failed disk set is now an alert, the most expensive failure of a small office. Netlens reads Linux software RAID (`/proc/mdstat`) and ZFS pools (`zpool`) over SSH, the physical disks of Windows (over WinRM or SSH), and the RAID groups and disks of a **Synology** through its SNMP MIB (including disk temperatures). A degraded or rebuilding set raises a warning, a failed one a critical alert, and the device's Health tab shows a *Storage* tile. Smart (SMART) values are not read: they need root on the host.
+- ★ **Acknowledge and snooze**: next to a problem on the dashboard and on the Health page there is a *Snooze…* menu (1 hour, 4 hours, 24 hours, 7 days). A snoozed problem is moved to a *Snoozed* list, no longer counts as "needs attention" and its notifications are held back. It ends by itself when the problem is over, and when the time is up a problem that is still there is announced once more. *Wake* ends a snooze by hand.
+
+- ★ **Audit log**: Settings → Audit log lists who changed what and when (settings, devices, users, monitors, backups, snoozes) and every sign-in, failed sign-in and sign-out, with the address it came from. Passwords and request contents are never stored; entries are kept for a year, can be searched and filtered by user, and downloaded as CSV.
+
+### Fixed
+- **WinRM**: PowerShell's own progress messages ("Preparing modules for first use") were shown as the error when a reading failed, hiding the real reason. They are suppressed, each part of the Windows script reports its own failure (for example "Access denied" on WMI), and the message says what came back.
+
 ## 0.4.9 — 2026-10-15
 
 ### Added

@@ -8,6 +8,7 @@ import { openEditor } from "../dashboard_editor.js";
 import { layoutHorizontal } from "../layout_horizontal.js";
 import { buildHealthCard, healthTone } from "../cards/health_map.js";
 import { buildCapacityCard, capacityTone } from "../cards/capacity.js";
+import { snoozeMenu, snoozedList } from "../snooze.js";
 
 const REFRESH_MS = 30000;
 const KINDS = {
@@ -93,9 +94,11 @@ const CARDS = [
     ]) },
   { id: "attention", title: "Needs attention", size: "w", def: true, about: "Everything that is wrong or worth a look, worst first.",
     tone: (d) => (d.attention.some((a) => a.level === "bad") ? "bad" : d.attention.some((a) => a.level === "warn") ? "warn" : "ok"),
-    build: ({ attention }) => (attention.length
-      ? h("ul", { class: "d-attention" }, attention.map((a) => h("li", { class: `d-${a.level}` }, h("a", { href: a.href }, a.text))))
-      : h("p", { class: "d-quiet" }, "All quiet. Nothing needs your attention.")) },
+    build: ({ attention, snoozed }) => h("div", {},
+      attention.length
+        ? h("ul", { class: "d-attention" }, attention.map((a) => h("li", { class: `d-${a.level}` }, h("a", { href: a.href }, a.text), a.snooze ? " " : null, snoozeMenu(a.snooze))))
+        : h("p", { class: "d-quiet" }, snoozed && snoozed.length ? "All quiet. What you snoozed is below." : "All quiet. Nothing needs your attention."),
+      snoozedList(snoozed)) },
   { id: "health", title: "Health", href: "#/health", size: "w", def: true, about: "A heat-map of the devices whose health is monitored (processor, memory, disk), with what is past a limit.",
     show: (d) => !!d.health && d.health.monitors.some((m) => m.enabled), tone: (d) => healthTone(d.health.monitors, d.health.problems),
     build: ({ health }) => buildHealthCard(health) },
@@ -534,7 +537,9 @@ export async function render(container) {
   }
 
   grid.append(h("p", { class: "hint" }, "Loading…"));
+  const onSnoozed = () => { if (!disposed) refresh(); };
+  document.addEventListener("netlens:snoozed", onSnoozed);
   await refresh();
   timer = setInterval(() => { if (!editing && !document.hidden) refresh(); }, REFRESH_MS);
-  return () => { disposed = true; clearInterval(timer); map.destroy(); };
+  return () => { disposed = true; clearInterval(timer); map.destroy(); document.removeEventListener("netlens:snoozed", onSnoozed); };
 }
