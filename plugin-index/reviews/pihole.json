@@ -1,0 +1,16 @@
+{
+  "id": "pihole",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "829ee524ddac71a9261cf39775d71c13cf8c4f201a5139e8dd85690d9cbee724",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Pi-hole v6.4.3 (Docker): add, change, remove records, wrong password, web server restart after a change"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Only the Pi-hole API is called. Writes only Local DNS records and CNAMEs, never PTR."
+    }
+  ]
+}

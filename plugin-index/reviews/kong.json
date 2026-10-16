@@ -1,0 +1,16 @@
+{
+  "id": "kong",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "8ac4e5b3cc37874ccceb150ba8d9da4b63c480dcc71a1f8e8d9d5e1bd1b52ffc",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Kong 3.9.4 DB-less (3 services and routes)"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). Database mode, TCP routes and Enterprise RBAC tokens untested."
+    }
+  ]
+}

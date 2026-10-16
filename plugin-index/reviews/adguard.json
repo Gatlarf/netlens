@@ -1,0 +1,16 @@
+{
+  "id": "adguard",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "96d07fba8d44491488eb4874db1f36e7beb3553996e8c74323cd6dd10f3e04d7",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "AdGuard Home v0.107.79 (Docker) and, reported by the maintainer, a real installation"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Writes only DNS rewrites; reads the list before and after every write because the server answers 200 to everything."
+    }
+  ]
+}

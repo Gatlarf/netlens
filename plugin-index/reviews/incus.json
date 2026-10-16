@@ -1,0 +1,16 @@
+{
+  "id": "incus",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "e586a7061c53c681008b603dc9274fdc6c59e1de9aed3e7cd197a29477c75137",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Incus 6.0.4 on Debian 13: containers (running and stopped), NAT bridge, client certificate login"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). The client certificate is written to a private temporary file for a moment and removed. Virtual machines and clusters untested (no hardware virtualization in the lab)."
+    }
+  ]
+}

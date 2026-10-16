@@ -1,0 +1,16 @@
+{
+  "id": "swarm",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "a4d8951f95d23b12cac9504c496b54b6d9da267f0bcdd88c8de6c63808c68bb1",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Docker 26.1.5 swarm mode, one manager, a replicated service with a published port"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET) through a socket proxy; reads /info instead of /swarm so join tokens are never requested. Multi-node swarms untested."
+    }
+  ]
+}

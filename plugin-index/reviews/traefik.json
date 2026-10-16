@@ -1,0 +1,16 @@
+{
+  "id": "traefik",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "9446f26be46ef134a4d916102f6f70c97736d3ef29dcd898cca4c7b8f6518d88",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Traefik v3.7.15 with the Docker provider"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). TCP routers, redirect middlewares, TLS routers and basic authentication untested on a real Traefik."
+    }
+  ]
+}

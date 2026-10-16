@@ -22,7 +22,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "AdGuard Home v0.107.79 (Docker) and, reported by the maintainer, a real installation"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Writes only DNS rewrites; reads the list before and after every write because the server answers 200 to everything."
      }
     }
    ]
@@ -63,7 +69,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "BIND 9.20 (Docker): AXFR and RFC 2136 updates signed with HMAC-SHA256 TSIG, A/AAAA/CNAME/PTR, wrong key, refused update"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Speaks DNS itself (standard library). Every change carries a prerequisite checked by the server. Only the request signature is verified, not the response signature."
      }
     }
    ]
@@ -89,7 +101,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Caddy v2.11.7 (Caddyfile with two reverse proxies and a redirect)"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET /config/...). HTTPS upstreams and automatic HTTPS details untested."
      }
     }
    ]
@@ -226,7 +244,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "HAProxy 3.4.7 (Docker) statistics CSV with show-legends, a disabled server"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET of the statistics page)."
      }
     }
    ]
@@ -316,7 +340,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Incus 6.0.4 on Debian 13: containers (running and stopped), NAT bridge, client certificate login"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). The client certificate is written to a private temporary file for a moment and removed. Virtual machines and clusters untested (no hardware virtualization in the lab)."
      }
     }
    ]
@@ -343,7 +373,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Kong 3.9.4 DB-less (3 services and routes)"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). Database mode, TCP routes and Enterprise RBAC tokens untested."
      }
     }
    ]
@@ -370,7 +406,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "k3s v1.36.5, one node, Deployments, DaemonSets and Jobs"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET) with a service account token that may only list nodes and pods. Multi-node clusters and LAN-routable pod addresses untested."
      }
     }
    ]
@@ -397,7 +439,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "RouterOS 7.12.1 CHR under QEMU: login as admin and as a read-only user, bridge hosts, ARP, DHCP leases"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). The lab router has no radio and no neighbours: Wi-Fi registration tables and MNDP neighbours are untested."
      }
     }
    ]
@@ -424,7 +472,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "NetBox 4.7.3 (netbox-docker): router, switch, access point, server, interfaces, MAC and IP addresses, cables"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). Sites, tags and virtual machines are not used."
      }
     }
    ]
@@ -451,7 +505,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Nomad 2.0.7 dev mode with a Docker job (2 allocations)"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). ACL-protected clusters and several namespaces untested."
      }
     }
    ]
@@ -574,7 +634,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "OpenWrt 25.12.5 x86-64 under QEMU: login as root and as a read-only rpcd user, DHCP leases, neighbours"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only ubus calls. The lab router has no radio, so Wi-Fi stations, band, signal and rates are untested."
      }
     }
    ]
@@ -601,7 +667,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "OPNsense 26.7 under QEMU: API key of root and of a restricted user, interfaces, ARP"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET; a POST only to page through a long search result). The DHCP lease lists were empty in the lab and are untested."
      }
     }
    ]
@@ -628,7 +700,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Pi-hole v6.4.3 (Docker): add, change, remove records, wrong password, web server restart after a change"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Only the Pi-hole API is called. Writes only Local DNS records and CNAMEs, never PTR."
      }
     }
    ]
@@ -655,7 +733,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Portainer CE 2.45.2 with its local Docker environment (6 containers)"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). Agent, Edge and Kubernetes environments are untested."
      }
     }
    ]
@@ -681,7 +765,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "PowerDNS Authoritative 4.9.17 (Docker, sqlite): add, change, remove, foreign record sets, wrong key"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Only record sets that carry the marker comment and hold exactly the record Netlens wrote are changed or removed."
      }
     }
    ]
@@ -759,7 +849,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Docker 26.1.5 swarm mode, one manager, a replicated service with a published port"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET) through a socket proxy; reads /info instead of /swarm so join tokens are never requested. Multi-node swarms untested."
      }
     }
    ]
@@ -895,7 +991,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Traefik v3.7.15 with the Docker provider"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). TCP routers, redirect middlewares, TLS routers and basic authentication untested on a real Traefik."
      }
     }
    ]
@@ -1043,7 +1145,11 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Tested only against the govmomi simulator vcsim (vCenter 6.5 API); no real ESXi or vCenter was available, so it is not marked verified. Read-only SOAP calls, logs out at the end. VMware Tools addresses and host management addresses follow the API documentation."
      }
     }
    ]
@@ -1070,7 +1176,13 @@
      "released": "2026-10-16",
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "VyOS 2026.10 rolling live ISO under QEMU: API login, interfaces, ARP, NAT test, wrong key"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Only show and showConfig requests are sent. The DHCP lease table was empty in the lab and is untested."
      }
     }
    ]

@@ -1,0 +1,16 @@
+{
+  "id": "netbox",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "f2892a36a3becc39dcb191008d51370e5dc7b41da95a73703a846174627b165e",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "NetBox 4.7.3 (netbox-docker): router, switch, access point, server, interfaces, MAC and IP addresses, cables"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). Sites, tags and virtual machines are not used."
+    }
+  ]
+}

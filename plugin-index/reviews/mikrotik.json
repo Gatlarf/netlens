@@ -1,0 +1,16 @@
+{
+  "id": "mikrotik",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "df2e239b0bb450c707fce50cc63d0e53f8985e15776ba10899d862850e3761b0",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "RouterOS 7.12.1 CHR under QEMU: login as admin and as a read-only user, bridge hosts, ARP, DHCP leases"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). The lab router has no radio and no neighbours: Wi-Fi registration tables and MNDP neighbours are untested."
+    }
+  ]
+}

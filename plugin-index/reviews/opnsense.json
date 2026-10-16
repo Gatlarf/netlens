@@ -1,0 +1,16 @@
+{
+  "id": "opnsense",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "d21f2b64b005febd815f802f6e734963ed9bad4921f5c945a38a0b60f06d50fe",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "OPNsense 26.7 under QEMU: API key of root and of a restricted user, interfaces, ARP"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET; a POST only to page through a long search result). The DHCP lease lists were empty in the lab and are untested."
+    }
+  ]
+}

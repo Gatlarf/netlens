@@ -1,0 +1,16 @@
+{
+  "id": "openwrt",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "d7f0f4a8e2660259e361447678ff1c880c6166d0fb75970b3b3b4f615cc3dc49",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "OpenWrt 25.12.5 x86-64 under QEMU: login as root and as a read-only rpcd user, DHCP leases, neighbours"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only ubus calls. The lab router has no radio, so Wi-Fi stations, band, signal and rates are untested."
+    }
+  ]
+}

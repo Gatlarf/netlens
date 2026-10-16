@@ -1,0 +1,16 @@
+{
+  "id": "kubernetes",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "30b913d09c3f6d86ac75e49ba23a7639161533945c81a3c0b3c123cf1498ce62",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "k3s v1.36.5, one node, Deployments, DaemonSets and Jobs"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET) with a service account token that may only list nodes and pods. Multi-node clusters and LAN-routable pod addresses untested."
+    }
+  ]
+}

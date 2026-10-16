@@ -1,0 +1,16 @@
+{
+  "id": "powerdns",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "af1e2797f393175ce6f4510b13035b991fd81f34966c771db887e6c9b871a3de",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "PowerDNS Authoritative 4.9.17 (Docker, sqlite): add, change, remove, foreign record sets, wrong key"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Only record sets that carry the marker comment and hold exactly the record Netlens wrote are changed or removed."
+    }
+  ]
+}

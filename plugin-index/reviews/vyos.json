@@ -1,0 +1,16 @@
+{
+  "id": "vyos",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "3367b3a2cffa5225e3505871ac712ff03268428701950926fadc6c03fd2d5630",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "VyOS 2026.10 rolling live ISO under QEMU: API login, interfaces, ARP, NAT test, wrong key"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Only show and showConfig requests are sent. The DHCP lease table was empty in the lab and is untested."
+    }
+  ]
+}

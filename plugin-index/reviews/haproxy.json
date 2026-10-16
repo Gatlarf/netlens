@@ -1,0 +1,16 @@
+{
+  "id": "haproxy",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "ada05f5bd8a9bd71eeac2699f24129e5e31213224141f86fcc28ebd0c027a789",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "HAProxy 3.4.7 (Docker) statistics CSV with show-legends, a disabled server"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET of the statistics page)."
+    }
+  ]
+}

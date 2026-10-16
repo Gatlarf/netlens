@@ -1,0 +1,16 @@
+{
+  "id": "portainer",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "2fb2bef4617e89d4d01cc4d1a82bb43dbecc1e9e7cecca1001e5e7c712bf31fd",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Portainer CE 2.45.2 with its local Docker environment (6 containers)"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). Agent, Edge and Kubernetes environments are untested."
+    }
+  ]
+}

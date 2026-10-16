@@ -1,0 +1,16 @@
+{
+  "id": "bind",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "347d00169ecca8f092da2b041782cdeb73276910bf730340d048f00fab4ee034",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "BIND 9.20 (Docker): AXFR and RFC 2136 updates signed with HMAC-SHA256 TSIG, A/AAAA/CNAME/PTR, wrong key, refused update"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Speaks DNS itself (standard library). Every change carries a prerequisite checked by the server. Only the request signature is verified, not the response signature."
+    }
+  ]
+}

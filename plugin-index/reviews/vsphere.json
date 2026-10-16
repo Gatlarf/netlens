@@ -1,0 +1,14 @@
+{
+  "id": "vsphere",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "df9455dab2be1e70f98fe6b5a9a8a819f60d8200a0638339920ac8b0b1c273ee",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Tested only against the govmomi simulator vcsim (vCenter 6.5 API); no real ESXi or vCenter was available, so it is not marked verified. Read-only SOAP calls, logs out at the end. VMware Tools addresses and host management addresses follow the API documentation."
+    }
+  ]
+}
