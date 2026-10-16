@@ -128,6 +128,27 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
             out.sample("netlens_certificate_expires_timestamp_seconds", _ts(cert["expires"]), "When a certificate used by a reverse proxy site ends", certificate=cert["name"], proxy=cert["proxy"] or "")
             out.sample("netlens_certificate_days_left", cert["days"], "Days until a certificate used by a reverse proxy site ends (negative: expired)", certificate=cert["name"], proxy=cert["proxy"] or "")
 
+    gb = doc.get("guest_backups") or {}
+    if gb.get("configured"):
+        from app import guestbackups
+
+        view = guestbackups.overview(conn)
+        out.sample("netlens_backup_guests_unprotected", gb["unprotected"], "Guests (virtual machines and containers) that no backup is matched to")
+        out.sample("netlens_backup_targets_failed", gb["failed"], "Backed up guests or hosts whose last backup failed")
+        out.sample("netlens_backup_targets_late", gb["late"], "Backed up guests or hosts without a new backup for longer than usual")
+        for t in view["targets"]:
+            labels = {"name": t["name"], "type": t["type"], "id": t["backup_id"]}
+            if t["age_s"] is not None:
+                out.sample("netlens_backup_age_seconds", t["age_s"], "Seconds since the newest backup of a guest or host", **labels)
+            out.sample("netlens_backup_last_ok", 0 if t["last_state"] == "failed" else 1, "0 when the last backup of a guest or host failed", **labels)
+        for st in view["stores"]:
+            labels = {"store": st["name"]}
+            for key, name, helptext in (("used", "used_bytes", "Bytes used"), ("total", "total_bytes", "Size in bytes")):
+                if st[key] is not None:
+                    out.sample(f"netlens_backup_store_{name}", st[key], f"{helptext} of a backup datastore", **labels)
+            if st["days_to_full"] is not None:
+                out.sample("netlens_backup_store_days_to_full", st["days_to_full"], "Days until the datastore is expected to be full (the backup server's own estimate)", **labels)
+
     sp = doc["speed"]
     if sp["internet"]:
         net = sp["internet"]

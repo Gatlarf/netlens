@@ -17,7 +17,7 @@ def test_problem_text_has_no_address(pid):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     if module._problem.__code__.co_argcount == 2:           # the newer plugins take the server whose address is to be hidden
-        out = module._problem(Exception(TEXTS[0]), type("S", (), {"id": "192.168.0.5:8080"})())
+        out = module._problem(Exception(TEXTS[0]), type("S", (), {"id": "192.168.0.5:8080", "host": "192.168.0.5"})())
         assert "192.168" not in out and ":8080" not in out
         return
     for text in TEXTS:

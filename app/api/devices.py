@@ -232,6 +232,9 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
     from app import sites
 
     result["sites"] = sites.device_sites(conn, device_id)
+    from app import guestbackups
+
+    result["guest_backup"] = guestbackups.for_device(conn, device_id)
     result["parent"] = _parent_info(conn, device_id)
 
     return result

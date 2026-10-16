@@ -62,7 +62,7 @@ may change that folder.
      ]
    }
    ```
-   `max_netlens` on a release is optional: the last Netlens version this release is known to work with. When a user's Netlens is newer, the Plugin manager warns that the plugin may no longer work and offers a newer release (add it to the release that broke, once you know). `category` is optional and only decides where Netlens lists the plugin (`virtualization`, `network`, `dns`, `proxy`, `storage` or `documentation`);
+   `max_netlens` on a release is optional: the last Netlens version this release is known to work with. When a user's Netlens is newer, the Plugin manager warns that the plugin may no longer work and offers a newer release (add it to the release that broke, once you know). `category` is optional and only decides where Netlens lists the plugin (`virtualization`, `network`, `dns`, `backup`, `proxy`, `storage` or `documentation`);
    without it the plugin is listed under the default of its `kind` (hypervisor: virtualization, topology: network, dns, proxy). Older Netlens versions ignore it.
    `kind` is `hypervisor`, `topology`, `dns` or `proxy`. `download_url` must be an `https://github.com/...` release asset. `version`, `kind` and
    `api_version` must match the `plugin.json` inside the zip.

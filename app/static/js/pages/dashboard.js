@@ -65,6 +65,13 @@ const CARDS = [
       return big(`${ctr.running} / ${ctr.total}`, `containers running on ${plural(s.guests.hosts, "host")}`, {
         extra: [h("div", { class: "d-mini" }, `${vms.running} / ${vms.total} virtual machines and LXCs running`), warn] });
     } },
+  { id: "guestbackups", title: "Guest backups", href: "#/backups", size: "s", def: true, about: "Which guests have a backup, and whether the newest ones worked (needs a backup plugin).",
+    show: (d) => !!(d.summary.guest_backups && d.summary.guest_backups.configured),
+    tone: (d) => { const g = d.summary.guest_backups; return g.failed ? "bad" : g.late || g.unprotected || g.stores_at_risk ? "warn" : "ok"; },
+    build: ({ summary: s }) => { const g = s.guest_backups;
+      const notes = [g.failed ? `${g.failed} failed` : null, g.late ? `${g.late} late` : null, g.unprotected ? `${g.unprotected} without a backup` : null, g.stores_at_risk ? `${g.stores_at_risk} store filling up` : null].filter(Boolean);
+      return big(`${g.protected} / ${g.guests}`, "guests have a backup", { extra: [h("div", { class: `d-mini${notes.length ? " d-warn" : ""}` }, notes.length ? notes.join(" · ") : "all up to date"),
+        g.newest ? h("div", { class: "d-mini" }, `newest backup ${timeAgo(g.newest)}`) : null] }); } },
   { id: "sites", title: "Sites & certificates", href: "#/stats", size: "s", def: true, about: "Reverse-proxy sites and when their certificates end.",
     show: (d) => d.summary.sites.total > 0,
     tone: (d) => (d.summary.sites.down || d.summary.sites.certificates_expired ? "bad" : d.summary.sites.certificates_expiring ? "warn" : "ok"),

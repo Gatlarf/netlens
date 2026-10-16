@@ -64,6 +64,15 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
         add("warn", f"{login_failed} burst{'s' if login_failed != 1 else ''} of failed sign-ins in the last 24 hours", "#/scans")
     if s["update"]["available"]:
         add("info", f"Netlens {s['update']['latest']} is available", "#/settings/about")
+    gb = s.get("guest_backups") or {}
+    if gb.get("failed"):
+        add("bad", f"{gb['failed']} guest backup{'s' if gb['failed'] != 1 else ''} failed", "#/backups")
+    if gb.get("late"):
+        add("warn", f"{gb['late']} guest{'s' if gb['late'] != 1 else ''} not backed up on time", "#/backups")
+    if gb.get("stores_at_risk"):
+        add("warn", f"{gb['stores_at_risk']} backup store{'s' if gb['stores_at_risk'] != 1 else ''} filling up", "#/backups")
+    if gb.get("unprotected"):
+        add("info", f"{gb['unprotected']} guest{'s' if gb['unprotected'] != 1 else ''} without a backup", "#/backups")
     if s["update"].get("plugin_problems"):
         n = s["update"]["plugin_problems"]
         add("warn", f"{n} plugin{'s' if n != 1 else ''} may not work with this Netlens version", "#/settings/plugins")

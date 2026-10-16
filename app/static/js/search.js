@@ -14,6 +14,7 @@ const PAGES = [
   ["Health", "#/health", "cpu memory disk temperature limits snmp ssh winrm monitoring"],
   ["Remote sites", "#/remote-sites", "probes branch offices central sites"],
   ["Services", "#/services", "service checks http tcp dns certificate process"],
+  ["Backups", "#/backups", "backup proxmox backup server pbs guests vm snapshot datastore failed late"],
   ["Statistics", "#/stats", "charts numbers vendors types"],
   ["Reports", "#/reports", "weekly monthly availability csv"],
   ["What changed", "#/changes", "timeline new devices alerts history last night changes"],

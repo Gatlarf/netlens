@@ -11,7 +11,7 @@ import re
 from typing import Any
 
 API_VERSION = 1
-KINDS = ("hypervisor", "topology", "dns", "proxy")
+KINDS = ("hypervisor", "topology", "dns", "proxy", "backup")
 DNS_CAPABILITIES = ("marker", "delete")   # what a DNS plugin can do besides adding and updating records
 DNS_TYPES = ("A", "AAAA", "PTR", "CNAME")
 MAX_DNS_RECORDS = 50000
@@ -436,6 +436,8 @@ def validate_output(kind: str, data: Any) -> dict:
         return _dns(data)
     if kind == "proxy":
         return _proxy(data)
+    if kind == "backup":
+        return _backup(data)
     raise ContractError(f"unknown plugin kind {kind!r}")
 
 
@@ -672,6 +674,102 @@ def _proxy(data: Any) -> dict:
             "protocols": [p for p in (_text(x, f"{path}.protocols[{j}]", max_len=5).lower() for j, x in enumerate(_list(raw.get("protocols"), f"{path}.protocols")[:4])) if p in ("tcp", "udp")],
         })
     return {"proxies": proxies, "certificates": certificates, "sites": sites}
+
+
+BACKUP_TYPES = ("vm", "ct", "host", "other")
+BACKUP_STATES = ("ok", "warning", "failed", "unknown")
+JOB_STATES = ("ok", "warning", "failed", "none")
+PROBLEM_KINDS = ("backup", "prune", "gc", "verify", "sync", "other")
+
+
+def _byte_count(value: Any, path: str) -> int | None:
+    number = _optional_number(value, path, 0, 1e18, integer=True)
+    return None if number is None else int(number)
+
+
+def _choice(value: Any, path: str, allowed: tuple[str, ...], default: str) -> str:
+    value = default if value in (None, "") else value
+    if value not in allowed:
+        _fail(path, f"must be one of {', '.join(allowed)}, got {value!r}")
+    return value
+
+
+def _backup(data: Any) -> dict:
+    """A backup plugin's snapshot of a backup server (Proxmox Backup Server ...): the stores (disk usage and job results), what is backed up
+    (one *target* per guest or host: last backup, number of copies, whether it was verified) and the recent problems."""
+    data = _dict(data, "output")
+    servers, server_ids = [], set()
+    for i, raw in enumerate(_list(data.get("servers"), "servers")):
+        path = f"servers[{i}]"
+        raw = _dict(raw, path)
+        server_id = _id(raw.get("id"), f"{path}.id")
+        if server_id in server_ids:
+            _fail(f"{path}.id", f"{server_id!r} is used twice")
+        server_ids.add(server_id)
+        servers.append({
+            "id": server_id, "name": _text(raw.get("name"), f"{path}.name", default=server_id), "ip": _ipv4(raw.get("ip"), f"{path}.ip"),
+            "version": _text(raw.get("version"), f"{path}.version", max_len=40), "online": bool(raw.get("online", True)),
+            "warnings": [_text(w, f"{path}.warnings[{j}]", required=True, max_len=300) for j, w in enumerate(_list(raw.get("warnings"), f"{path}.warnings")[:10])],
+        })
+    stores, store_ids = [], set()
+    for i, raw in enumerate(_list(data.get("stores"), "stores")):
+        path = f"stores[{i}]"
+        raw = _dict(raw, path)
+        store_id = _id(raw.get("id"), f"{path}.id")
+        if store_id in store_ids:
+            _fail(f"{path}.id", f"{store_id!r} is used twice")
+        store_ids.add(store_id)
+        server_id = _id(raw.get("server_id"), f"{path}.server_id")
+        if server_id not in server_ids:
+            _fail(f"{path}.server_id", f"{server_id!r} is not the id of any entry in servers")
+        store = {"id": store_id, "server_id": server_id, "name": _text(raw.get("name"), f"{path}.name", default=store_id, max_len=100),
+                 "total": _byte_count(raw.get("total"), f"{path}.total"), "used": _byte_count(raw.get("used"), f"{path}.used"), "avail": _byte_count(raw.get("avail"), f"{path}.avail"),
+                 "full": _stamp(raw.get("full"), f"{path}.full")}
+        for job in ("gc", "prune", "verify", "sync"):
+            store[f"{job}_state"] = _choice(raw.get(f"{job}_state"), f"{path}.{job}_state", JOB_STATES, "none")
+            store[f"{job}_at"] = _stamp(raw.get(f"{job}_at"), f"{path}.{job}_at")
+        stores.append(store)
+    targets, target_ids = [], set()
+    if len(_list(data.get("targets"), "targets")) > MAX_ITEMS:
+        _fail("targets", f"at most {MAX_ITEMS} targets")
+    for i, raw in enumerate(_list(data.get("targets"), "targets")):
+        path = f"targets[{i}]"
+        raw = _dict(raw, path)
+        target_id = _id(raw.get("id"), f"{path}.id")
+        if target_id in target_ids:
+            _fail(f"{path}.id", f"{target_id!r} is used twice")
+        target_ids.add(target_id)
+        server_id = _id(raw.get("server_id"), f"{path}.server_id")
+        if server_id not in server_ids:
+            _fail(f"{path}.server_id", f"{server_id!r} is not the id of any entry in servers")
+        store_id = raw.get("store_id")
+        store_id = _id(store_id, f"{path}.store_id") if store_id not in (None, "") else None
+        if store_id is not None and store_id not in store_ids:
+            _fail(f"{path}.store_id", f"{store_id!r} is not the id of any entry in stores")
+        targets.append({
+            "id": target_id, "server_id": server_id, "store_id": store_id, "type": _choice(raw.get("type"), f"{path}.type", BACKUP_TYPES, "other"),
+            "backup_id": _text(raw.get("backup_id"), f"{path}.backup_id", required=True, max_len=100), "name": _text(raw.get("name"), f"{path}.name", max_len=200),
+            "count": _byte_count(raw.get("count"), f"{path}.count") or 0, "last_backup": _stamp(raw.get("last_backup"), f"{path}.last_backup"),
+            "last_state": _choice(raw.get("last_state"), f"{path}.last_state", BACKUP_STATES, "unknown"), "last_size": _byte_count(raw.get("last_size"), f"{path}.last_size"),
+            "verify_state": _choice(raw.get("verify_state"), f"{path}.verify_state", JOB_STATES, "none"), "interval": _byte_count(raw.get("interval"), f"{path}.interval"),
+            "protected": _byte_count(raw.get("protected"), f"{path}.protected") or 0,
+        })
+    problems, problem_ids = [], set()
+    for i, raw in enumerate(_list(data.get("problems"), "problems")[:200]):
+        path = f"problems[{i}]"
+        raw = _dict(raw, path)
+        problem_id = _id(raw.get("id"), f"{path}.id")
+        if problem_id in problem_ids:
+            continue
+        problem_ids.add(problem_id)
+        server_id = _id(raw.get("server_id"), f"{path}.server_id")
+        if server_id not in server_ids:
+            _fail(f"{path}.server_id", f"{server_id!r} is not the id of any entry in servers")
+        target_id = raw.get("target_id")
+        problems.append({"id": problem_id, "server_id": server_id, "kind": _choice(raw.get("kind"), f"{path}.kind", PROBLEM_KINDS, "other"),
+                         "state": _choice(raw.get("state"), f"{path}.state", ("warning", "failed"), "failed"), "at": _stamp(raw.get("at"), f"{path}.at"),
+                         "text": _text(raw.get("text"), f"{path}.text", max_len=300), "target_id": _id(target_id, f"{path}.target_id") if target_id not in (None, "") else None})
+    return {"servers": servers, "stores": stores, "targets": targets, "problems": problems}
 
 
 def _topology(data: Any) -> dict:

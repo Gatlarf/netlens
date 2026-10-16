@@ -9,6 +9,7 @@ Netlens can learn about your network from other systems through **plugins**. A p
 | `dns` | a DNS server that Netlens writes device names and addresses to | Technitium DNS (more welcome: BIND with RFC 2136, Pi-hole, AdGuard Home, dnsmasq) |
 | `topology` | network nodes (router, switch, access point, mesh node) and the clients connected to them | ASUS AiMesh (built in), Omada, UniFi, Fritz!Box, MikroTik |
 | `proxy` | a reverse proxy and the sites it publishes (domain → upstream host and port, certificate) | Nginx Proxy Manager (more welcome: Traefik, Caddy, HAProxy) |
+| `backup` | a backup server: what is backed up (per guest), how old, whether it worked, and how full its stores are | Proxmox Backup Server |
 
 Plugin API version: **1**.
 
@@ -55,7 +56,7 @@ my-router/            (the folder is optional)
 | `name` | yes | Shown in the menu and plugin list (max 60). |
 | `version` | yes | Like `1.0.0`. |
 | `api_version` | yes | Must be `1`. |
-| `kind` | yes | `hypervisor`, `topology`, `dns` or `proxy`. |
+| `kind` | yes | `hypervisor`, `topology`, `dns`, `proxy` or `backup`. |
 | `description` | no | A sentence or two (max 500). |
 | `author`, `homepage` | no | Shown in the plugin list. |
 | `info` | no | A collapsed box at the top of the plugin's settings page: `{"title": ..., "text": ..., "code": ...}`. `code` is shown in a block with a Copy button, for example the docker-compose lines the plugin needs on the other side. Needs Netlens 0.3.115; older versions ignore it. |
@@ -372,6 +373,17 @@ warning step before a certificate expires (the later steps are 7, 3 and 1 days a
   "certificates": [{"id": "1", "proxy_id": "npm", "name": "wildcard", "provider": "letsencrypt", "domains": ["*.example.com"], "expires": "2027-01-31T10:20:30Z"}]
 }
 ```
+
+## Output for kind `backup`
+
+Return `{"servers": [...], "stores": [...], "targets": [...], "problems": [...]}`. Times are UTC text like `2026-10-16T03:01:05Z`; sizes are bytes.
+
+- **servers**: `id`, `name`, `ip` (to find the device), `version`, `online`, `warnings` (short texts).
+- **stores** (a datastore, repository or bucket): `id`, `server_id`, `name`, `total`, `used`, `avail`, `full` (when it is expected to be full), and per job kind `gc`, `prune`, `verify`, `sync` a `<job>_state` (`ok`, `warning`, `failed`, `none`) and a `<job>_at`.
+- **targets** (one per guest or host that is backed up): `id`, `server_id`, `store_id`, `type` (`vm`, `ct`, `host`, `other`), `backup_id` (for a VM or container the id of the guest on the hypervisor, as text), `name`, `count` (copies kept), `last_backup`, `last_state` (`ok`, `warning`, `failed`, `unknown`), `last_size`, `verify_state`, `interval` (the usual seconds between two backups; Netlens warns when a backup is older than 2.5 times that), `protected` (copies that cannot be pruned).
+- **problems**: recent failed or warning jobs: `id`, `server_id`, `kind` (`backup`, `prune`, `gc`, `verify`, `sync`, `other`), `state` (`warning`, `failed`), `at`, `text`, `target_id`.
+
+Netlens matches a `vm` or `ct` target to the guest of a hypervisor plugin with the same id (type-aware: a container 100 is not the VM 100), shows the state on that guest's device page and raises events when a backup starts failing, when it is late, and when a store is on course to fill up. Guests of the hypervisor plugins that no target matches are listed as *without a backup* (only once a backup plugin has reported).
 
 ## Output for kind `topology`
 

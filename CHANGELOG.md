@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.31 — 2026-10-16
+
+### Added
+- ★ **Backups**: a new plugin kind, `backup`, and a first plugin for **Proxmox Backup Server**. The new *Backups* page (Monitoring) shows for every VM, container and host the newest backup, its age, the copies, the size and whether the last backup worked and was verified, the usage of each datastore with the date it is expected to be full, the results of the garbage collection, prune, verify and sync jobs, recent problems, and the **guests that have no backup**. Each backup is tied to its guest (by type and Proxmox VM id): the guest's device page gets a *Backup* card, the dashboard gets a *Guest backups* card and attention items, and Netlens raises events when a backup fails, when a guest is not backed up on time (more than 2.5 times its usual interval) and when a datastore is on course to fill up. `/metrics` carries `netlens_backup_*`.
+
 ## 0.4.29 — 2026-10-16
 
 ### Changed

@@ -13,6 +13,7 @@ from app.plugins.contract import ContractError, _dict, _fail, _list, _text
 SOURCES = {  # what a row may count, and the columns it may filter on
     "guests": ("hypervisor_guests", ("kind", "status", "host_name")),
     "sites": ("proxy_sites", ("type", "enabled", "scheme", "proxy_name")),
+    "targets": ("backup_targets", ("type", "last_state", "stale")),
 }
 VALUES = {"status.ok", "status.ts", "status.error"}
 TONES = ("warn", "bad")
@@ -111,6 +112,11 @@ def resolve(conn: sqlite3.Connection, manifest: dict, status: dict | None) -> li
         total = _count(conn, plugin_id, "guests", {})
         if total:
             base += [{"label": "Guests", "value": total, "format": "number", "tone": None}, {"label": "Running", "value": _count(conn, plugin_id, "guests", {"status": ["running"]}), "format": "number", "tone": None}]
+    if manifest["kind"] == "backup":
+        total = _count(conn, plugin_id, "targets", {})
+        if total:
+            base += [{"label": "Backed up", "value": total, "format": "number", "tone": None},
+                     {"label": "Failed or late", "value": _count(conn, plugin_id, "targets", {"last_state": ["failed"]}) + _count(conn, plugin_id, "targets", {"stale": [1]}), "format": "number", "tone": "warn"}]
     if manifest["kind"] == "proxy":
         total = _count(conn, plugin_id, "sites", {})
         if total:

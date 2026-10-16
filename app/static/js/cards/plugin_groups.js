@@ -5,6 +5,7 @@ const FALLBACK = [
   { id: "virtualization", label: "Virtualization & containers", short: "Virtualization" },
   { id: "network", label: "Network devices", short: "Network devices" },
   { id: "dns", label: "DNS", short: "DNS" },
+  { id: "backup", label: "Backups", short: "Backups" },
   { id: "proxy", label: "Reverse proxies", short: "Reverse proxies" },
   { id: "storage", label: "Storage & NAS", short: "Storage & NAS" },
   { id: "documentation", label: "Documentation", short: "Documentation" },

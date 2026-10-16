@@ -489,6 +489,48 @@ def init_db(conn: sqlite3.Connection) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_proxy_sites_target ON proxy_sites(target_device_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_proxy_sites_proxy ON proxy_sites(proxy_device_id)")
 
+    # --- schema v22: what a backup plugin (Proxmox Backup Server ...) reports: servers, stores, what is backed up, recent problems ---------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS backup_servers (
+            plugin_id TEXT NOT NULL, server_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', ip TEXT, version TEXT NOT NULL DEFAULT '',
+            online INTEGER NOT NULL DEFAULT 1, device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL, warnings TEXT NOT NULL DEFAULT '[]', updated TEXT NOT NULL,
+            PRIMARY KEY (plugin_id, server_id)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS backup_stores (
+            plugin_id TEXT NOT NULL, store_id TEXT NOT NULL, server_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '',
+            total INTEGER, used INTEGER, avail INTEGER, full TEXT, level TEXT NOT NULL DEFAULT 'ok',
+            gc_state TEXT NOT NULL DEFAULT 'none', gc_at TEXT, prune_state TEXT NOT NULL DEFAULT 'none', prune_at TEXT,
+            verify_state TEXT NOT NULL DEFAULT 'none', verify_at TEXT, sync_state TEXT NOT NULL DEFAULT 'none', sync_at TEXT, updated TEXT NOT NULL,
+            PRIMARY KEY (plugin_id, store_id)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS backup_targets (
+            plugin_id TEXT NOT NULL, target_id TEXT NOT NULL, server_id TEXT NOT NULL, store_id TEXT, type TEXT NOT NULL DEFAULT 'other', backup_id TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '', count INTEGER NOT NULL DEFAULT 0, last_backup TEXT, last_state TEXT NOT NULL DEFAULT 'unknown', last_size INTEGER,
+            verify_state TEXT NOT NULL DEFAULT 'none', interval INTEGER, protected INTEGER NOT NULL DEFAULT 0,
+            guest_plugin_id TEXT, guest_id TEXT, device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL, stale INTEGER NOT NULL DEFAULT 0, updated TEXT NOT NULL,
+            PRIMARY KEY (plugin_id, target_id)
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_backup_targets_device ON backup_targets(device_id)")
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS backup_problems (
+            plugin_id TEXT NOT NULL, problem_id TEXT NOT NULL, server_id TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'other', state TEXT NOT NULL DEFAULT 'failed',
+            at TEXT, text TEXT NOT NULL DEFAULT '', target_id TEXT, PRIMARY KEY (plugin_id, problem_id)
+        )
+        """
+    )
+
     # --- schema v21: "always on" devices (the core devices the availability can be limited to) ----------------
     _add_column_if_missing(conn, "devices", "always_on", "INTEGER NOT NULL DEFAULT 0")
 

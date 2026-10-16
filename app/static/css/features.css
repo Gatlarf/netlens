@@ -628,3 +628,12 @@ table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 .compat-box { border-left: 4px solid var(--warn, #d9a400); }
 .compat-box ul { margin: 6px 0 10px 18px; }
 .compat-box { padding: 6px 12px; } .plist td { padding-right: 10px; }
+.card-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.card-row .tile.bad .tile-value { color: #b91c1c; }
+:root[data-theme="dark"] .card-row .tile.bad .tile-value { color: #f87171; }
+.usage-bar { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; margin: 6px 0; }
+.usage-fill { height: 100%; background: #16a34a; }
+.usage-fill.warn { background: #d97706; }
+.usage-fill.bad { background: #dc2626; }
+.warn-text { color: #b45309; }
+:root[data-theme="dark"] .warn-text { color: #fbbf24; }

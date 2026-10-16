@@ -605,6 +605,10 @@ Under **Settings → Integrations** you find:
 
 **Uploaded and downloaded plugins are Python code that runs inside the Netlens container.** Each runs in its own process with a stripped environment, a time limit and no database path, and everything it returns is validated, but this is not a sandbox: it runs as the same user and could read the data volume. Only install plugins you trust and have read. Uploading needs the Netlens login.
 
+#### Proxmox Backup Server plugin and the Backups page
+
+A **backup** plugin (`plugins/pbs`, install it from *Plugin store*) that reads a **Proxmox Backup Server** with a read-only API token (the *Audit* role for both the user and the token) and shows, for every VM, container and host: the newest backup and its age, the copies kept, the size, whether the last backup worked and whether it was verified; for every datastore: used space, the date the server expects it to be full and the last result of the garbage collection, prune, verify and sync jobs. Netlens ties each backup to the **guest** of your Proxmox plugin (by type and VM id) and gives you a **Backups** page (*Monitoring → Backups*), a *Guest backups* dashboard card, a *Backup* card on each guest's device page, `netlens_backup_*` values in `/metrics`, and events when a backup **fails**, a guest is **late** (older than 2.5 times its usual interval) or a datastore is on course to fill up (30 days; critical at 3). It also lists the **guests that have no backup at all**. Tested against a real Proxmox Backup Server 4.2. Other backup servers can be added as plugins of the new `backup` kind (see the plugin guide).
+
 #### Nginx Proxy Manager plugin
 
 A **proxy** plugin (`plugins/npm`, install it from *Plugin store*) that shows what your Nginx Proxy Manager publishes. In Nginx Proxy Manager create a user for Netlens that is not an administrator, has no two-factor login, sees **All Items** and has **View Only** on everything (the plugin's settings show these steps, and warn when the account is wrong); enter the proxy's address (port 81), the e-mail address and the password. Netlens then:

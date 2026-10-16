@@ -445,6 +445,22 @@ function containerRows(card, g) {
   if (ports) card.appendChild(kvRow("Published ports", h("span", {}, ports, d.exposed ? h("span", { class: "tag unknown-tag", title: "Reachable from the whole network" }, "all interfaces") : null)));
 }
 
+// The newest backup of this guest, from a backup plugin (Proxmox Backup Server ...)
+function buildBackupCard(device) {
+  const b = device.guest_backup;
+  if (!b) return null;
+  const card = h("div", { class: "card" }, h("h2", {}, "Backup"));
+  const days = b.age_s === null ? "never" : b.age_s < 3600 ? `${Math.max(1, Math.round(b.age_s / 60))} min ago` : b.age_s < 172800 ? `${Math.round(b.age_s / 3600)} h ago` : `${Math.round(b.age_s / 86400)} days ago`;
+  const state = b.last_state === "failed" ? h("span", { class: "error" }, "last backup failed") : b.late ? h("span", { class: "warn-text" }, "late") : h("span", { class: "run-ok" }, "up to date");
+  card.appendChild(kvRow("State", state));
+  card.appendChild(kvRow("Newest backup", h("span", { title: b.last_backup || "" }, days)));
+  card.appendChild(kvRow("Copies kept", h("span", {}, String(b.count))));
+  if (b.verify_state !== "none") card.appendChild(kvRow("Verified", h("span", {}, b.verify_state === "ok" ? "yes" : "failed")));
+  card.appendChild(kvRow("Reported by", h("span", {}, b.plugin_id)));
+  card.appendChild(h("p", { class: "hint" }, h("a", { href: "#/backups" }, "All backups")));
+  return card;
+}
+
 function buildVirtualizationCard(device) {
   const info = device.virtualization;
   if (!info) return null;
@@ -786,6 +802,8 @@ export async function render(container, params) {
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
     const virtualizationCard = buildVirtualizationCard(device);
     if (virtualizationCard) nRight.appendChild(virtualizationCard);
+    const backupCard = buildBackupCard(device);
+    if (backupCard) nRight.appendChild(backupCard);
     for (const siteCard of buildDeviceSitesCards(device)) nRight.appendChild(siteCard);
     nRight.appendChild(buildNamesCard(device));
     panels.network = twoColumns(nLeft, nRight);

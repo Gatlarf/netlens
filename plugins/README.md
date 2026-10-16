@@ -29,6 +29,7 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 | [`kong/`](kong/README.md) | Kong Gateway | routes and upstreams (a `proxy` plugin) | tested on a real Kong 3.9.4 (DB-less) |
 | [`haproxy/`](haproxy/README.md) | HAProxy | backends and their servers from the statistics page (a `proxy` plugin) | tested on a real HAProxy 3.4.7 |
 | [`vyos/`](vyos/README.md) | VyOS | router, ARP and DHCP clients over the HTTPS API (a `topology` plugin) | tested on a VyOS rolling live ISO (QEMU) |
+| [`pbs/`](pbs/README.md) | Proxmox Backup Server | what is backed up per guest, its age and state, datastore usage and job results (a `backup` plugin) | tested on a real Proxmox Backup Server 4.2 |
 | [`netbox/`](netbox/README.md) | NetBox | the documented devices and cables as nodes, clients and the tree (a `topology` plugin) | tested on a real NetBox 4.7.3 (Docker) |
 | [`kea/`](kea/README.md) | Kea DHCP | DHCP leases and reservations as clients with names (a `topology` plugin) | tested on a real Kea 2.6.3 (leases added with the API; no real DHCP clients) |
 | [`librenms/`](librenms/README.md) | LibreNMS | devices, LLDP/CDP links and switch forwarding tables as nodes, clients and the tree (a `topology` plugin) | tested on a real LibreNMS 26.9.1 (Docker); links and forwarding table rows inserted by hand |

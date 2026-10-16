@@ -1,0 +1,76 @@
+{
+  "id": "pbs",
+  "name": "Proxmox Backup Server",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "backup",
+  "author": "Netlens",
+  "description": "Shows what a Proxmox Backup Server holds: for every VM, container and host the newest backup, its age, the copies kept and whether the last backup worked and was verified, plus datastore usage with the expected full date and the garbage collection, prune, verify and sync results. Netlens ties each backup to its guest by VM id, warns when a backup fails or is late, and lists guests that have no backup. Read-only (GET, API token with the Audit role).",
+  "timeout": 120,
+  "diagnose": true,
+  "info": {
+    "title": "Make a read-only API token",
+    "text": "In Proxmox Backup Server: Configuration > Access Control. Add a user (for example netlens@pbs) and an API token for it (netlens@pbs!netlens; the secret is shown once). Then Permissions > Add: give BOTH the user and the token the role Audit on path / with Propagate ticked (User Permission and API Token Permission). A token can never have more rights than its user, so both are needed. For a server with a self-signed certificate fill in its fingerprint (Dashboard > Show Fingerprint): Netlens then trusts exactly that certificate."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Backup servers",
+      "required": true,
+      "help": "One line per Proxmox Backup Server.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.0.201:8007",
+          "required": true
+        },
+        {
+          "key": "token_id",
+          "label": "Token ID",
+          "placeholder": "netlens@pbs!netlens",
+          "required": true
+        },
+        {
+          "key": "secret",
+          "label": "Token secret",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "fingerprint",
+          "label": "Certificate fingerprint",
+          "placeholder": "B7:5B:65:5B:...",
+          "help": "SHA-256 fingerprint of the server's certificate. When filled in, exactly that certificate is trusted (also a self-signed one); when empty the certificate is checked the normal way (see 'Verify TLS certificate').",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "problem_days",
+      "type": "number",
+      "label": "Show problems of the last days",
+      "default": 7,
+      "min": 1,
+      "max": 60,
+      "help": "Failed backups and failed or warning prune, verify, sync and garbage collection jobs of the last days."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only used for a server without a fingerprint."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/pbs"
+}
