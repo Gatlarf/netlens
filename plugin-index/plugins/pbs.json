@@ -1,0 +1,23 @@
+{
+  "id": "pbs",
+  "name": "Proxmox Backup Server",
+  "kind": "backup",
+  "description": "Shows what a Proxmox Backup Server holds: for every VM, container and host the newest backup, its age, the copies kept and whether the last backup worked and was verified, plus datastore usage with the expected full date and the garbage collection, prune, verify and sync results. Netlens ties each backup to its guest by VM id, warns when a backup fails or is late, and lists guests that have no backup. Read-only (GET, API token with the Audit role).",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/pbs",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Proxmox Backup Server 4.2 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pbs-v1.0.0/pbs.zip",
+      "sha256": "c2bbb79da498dd27ae9c6cfb3ff16e1ea935ab0550aed3168cb7749d7df8c1da",
+      "api_version": 1,
+      "min_netlens": "0.4.31",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.4.31 or newer (the Backups page)."
+    }
+  ]
+}

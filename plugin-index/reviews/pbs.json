@@ -1,0 +1,16 @@
+{
+  "id": "pbs",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "c2bbb79da498dd27ae9c6cfb3ff16e1ea935ab0550aed3168cb7749d7df8c1da",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Proxmox Backup Server 4.2 (the maintainer's server, with a Proxmox VE node's backups): version, datastore usage, 113 snapshots in 11 groups, backup tasks, prune and garbage collection jobs, certificate pinning, a token without rights, a wrong token"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude against the maintainer's real server, confirmed by the maintainer. Read-only (GET) with a token that has the Audit role. Verify and sync jobs and namespaces were not present on that server and follow the API documentation."
+    }
+  ]
+}
