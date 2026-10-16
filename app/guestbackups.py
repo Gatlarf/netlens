@@ -151,13 +151,15 @@ def _age(text: str | None, now: datetime) -> int | None:
     return None if when is None else max(0, int((now - when).total_seconds()))
 
 
+COVERED = "(SELECT DISTINCT guest_plugin_id FROM backup_targets WHERE guest_plugin_id IS NOT NULL)"
+
+
 def unprotected(conn: sqlite3.Connection) -> list[dict]:
-    """Guests (virtual machines and containers of the hypervisor plugins) that no backup target is matched to. Empty until a backup plugin has data."""
-    if not conn.execute("SELECT 1 FROM backup_targets LIMIT 1").fetchone():
-        return []
+    """Guests that no backup target is matched to. Only guests of a hypervisor plugin that the backup server does back up count (at least one of its
+    guests has a backup): a Hyper-V host that the Proxmox backup server never touches is not "without a backup". Empty until a backup plugin has data."""
     rows = conn.execute(
-        """SELECT g.plugin_id, g.guest_id, g.name, g.kind, g.status, g.device_id FROM hypervisor_guests g
-           WHERE g.kind IN ('qemu', 'vm', 'lxc', 'ct')
+        f"""SELECT g.plugin_id, g.guest_id, g.name, g.kind, g.status, g.device_id FROM hypervisor_guests g
+           WHERE g.kind IN ('qemu', 'vm', 'lxc', 'ct') AND g.plugin_id IN {COVERED}
              AND NOT EXISTS (SELECT 1 FROM backup_targets t WHERE t.guest_plugin_id = g.plugin_id AND t.guest_id = g.guest_id)
            ORDER BY g.name COLLATE NOCASE"""
     ).fetchall()
@@ -186,7 +188,7 @@ def overview(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str,
     problems = [{"plugin_id": r["plugin_id"], "id": r["problem_id"], "server_id": r["server_id"], "kind": r["kind"], "state": r["state"], "at": r["at"], "text": r["text"], "target_id": r["target_id"]}
                 for r in conn.execute("SELECT * FROM backup_problems ORDER BY at DESC")]
     missing = unprotected(conn)
-    guests_total = conn.execute("SELECT COUNT(*) FROM hypervisor_guests WHERE kind IN ('qemu', 'vm', 'lxc', 'ct')").fetchone()[0]
+    guests_total = conn.execute(f"SELECT COUNT(*) FROM hypervisor_guests WHERE kind IN ('qemu', 'vm', 'lxc', 'ct') AND plugin_id IN {COVERED}").fetchone()[0]
     matched = sum(1 for t in targets if t["matched"])
     return {"servers": servers, "stores": stores, "targets": targets, "problems": problems, "unprotected": missing,
             "summary": {"configured": bool(servers), "guests": guests_total, "protected": guests_total - len(missing) if servers else 0, "unprotected": len(missing), "targets": len(targets), "matched": matched,
@@ -199,9 +201,9 @@ def summary(conn: sqlite3.Connection) -> dict[str, Any]:
     servers = conn.execute("SELECT COUNT(*) FROM backup_servers").fetchone()[0]
     if not servers:
         return {"configured": False, "targets": 0, "failed": 0, "late": 0, "unprotected": 0, "guests": 0, "protected": 0, "stores_at_risk": 0, "problems": 0, "newest": None}
-    guests = conn.execute("SELECT COUNT(*) FROM hypervisor_guests WHERE kind IN ('qemu', 'vm', 'lxc', 'ct')").fetchone()[0]
+    guests = conn.execute(f"SELECT COUNT(*) FROM hypervisor_guests WHERE kind IN ('qemu', 'vm', 'lxc', 'ct') AND plugin_id IN {COVERED}").fetchone()[0]
     matched = conn.execute(
-        """SELECT COUNT(*) FROM hypervisor_guests g WHERE g.kind IN ('qemu', 'vm', 'lxc', 'ct')
+        f"""SELECT COUNT(*) FROM hypervisor_guests g WHERE g.kind IN ('qemu', 'vm', 'lxc', 'ct') AND g.plugin_id IN {COVERED}
            AND EXISTS (SELECT 1 FROM backup_targets t WHERE t.guest_plugin_id = g.plugin_id AND t.guest_id = g.guest_id)""").fetchone()[0]
     one = lambda sql: conn.execute(sql).fetchone()[0]    # noqa: E731 - fixed statements, no user input
     return {"configured": True, "targets": one("SELECT COUNT(*) FROM backup_targets"), "failed": one("SELECT COUNT(*) FROM backup_targets WHERE last_state = 'failed'"),

@@ -109,8 +109,10 @@ def test_a_store_that_will_fill_up_raises_capacity_events_once(conn):
 def test_unprotected_guests_appear_only_once_a_backup_plugin_has_data(conn):
     assert gb.unprotected(conn) == []
     gb.apply_backup(conn, "pbs", output(target("a", "vm", "100", "BlueIris", at(hours=3)), target("c", "ct", "102", "lxc-web1", at(hours=2))), now=NOW)
+    conn.execute("INSERT INTO hypervisor_guests (plugin_id, guest_id, name, kind, host_name, status, macs, ips, updated) VALUES ('hyperv', '1', 'HyperVGuest', 'vm', 'hv', 'running', '[]', '[]', 'x')")
+    conn.commit()
     names = [g["name"] for g in gb.unprotected(conn)]
-    assert names == ["never-backed-up", "vm-siemens"]                                  # Docker containers are not guests to back up
+    assert names == ["never-backed-up", "vm-siemens"]                                  # Docker containers are no guests to back up, and a hypervisor the backup server never touches is not counted
     summary = gb.summary(conn)
     assert summary["configured"] and summary["guests"] == 4 and summary["protected"] == 2 and summary["unprotected"] == 2
 

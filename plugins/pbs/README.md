@@ -24,5 +24,5 @@ Netlens ties each backup to the **guest** it belongs to (the backup id is the Pr
 - Netlens only sends GET requests. The Audit role cannot change anything.
 - With a fingerprint, exactly that certificate is trusted (a self-signed one is fine); without it the normal certificate check applies.
 - A backup of something that no longer exists in Proxmox (an old VM id) is kept in the list but never raises a *late* warning once it is more than two weeks old.
-- The *Guests without a backup* list only appears once a backup plugin has reported data, and counts the virtual machines and containers of your hypervisor plugins (not Docker containers).
+- The *Guests without a backup* list only appears once a backup plugin has reported data, and counts the virtual machines and containers of the hypervisor plugins that this backup server backs up at all (at least one of their guests has a backup). A Hyper-V or TrueNAS guest is not listed as unprotected just because Proxmox Backup Server never backs it up. Docker containers are never counted.
 - A datastore that never ran a verify job is pointed out on the Backups page: backups that are never verified can be damaged without anyone noticing.
