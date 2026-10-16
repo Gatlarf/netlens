@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from app.db import connect
 from app.plugins import index as idx
 from app.plugins import index_install as inst
+from app.plugins.categories import listing as category_listing
 from app.plugins.registry import InstallError, discover
 from app.version import VERSION
 
@@ -29,6 +30,7 @@ def _build(request: Request, force: bool = False, offline: bool = False) -> dict
             "updates": sum(1 for p in plugins if p["update_available"]),
             "netlens_version": VERSION,
             "levels": {level: idx.level_text(level) for level in idx.LEVELS},
+            "categories": category_listing(),
         }
     finally:
         conn.close()

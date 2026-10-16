@@ -62,7 +62,9 @@ may change that folder.
      ]
    }
    ```
-   `kind` is `hypervisor` or `topology`. `download_url` must be an `https://github.com/...` release asset. `version`, `kind` and
+   `category` is optional and only decides where Netlens lists the plugin (`virtualization`, `network`, `dns`, `proxy`, `storage` or `documentation`);
+   without it the plugin is listed under the default of its `kind` (hypervisor: virtualization, topology: network, dns, proxy). Older Netlens versions ignore it.
+   `kind` is `hypervisor`, `topology`, `dns` or `proxy`. `download_url` must be an `https://github.com/...` release asset. `version`, `kind` and
    `api_version` must match the `plugin.json` inside the zip.
 4. **Automatic checks** run on your pull request (see below). Fix what they report.
 5. **Review**: reviewers read the code of your release. They need a way to judge it, so please say in the pull request which

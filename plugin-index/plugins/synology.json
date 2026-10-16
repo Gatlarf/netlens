@@ -2,6 +2,7 @@
   "id": "synology",
   "name": "Synology",
   "kind": "hypervisor",
+  "category": "storage",
   "description": "Shows a Synology NAS (DiskStation Manager 7) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, matched to your network devices by IP or MAC. Read-only, over the DSM web API with HTTPS; needs a dedicated administrator account (DSM has no read-only API role). Tested against a simulated DSM only; a real DS923+ test is pending.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/synology",

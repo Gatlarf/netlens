@@ -495,7 +495,12 @@ export async function render(container) {
         h("button", { class: "btn", type: "button", title: "Take it out of the shared cards; it stays in your own cards", onclick: () => unshareCard(c.custom) }, "Stop sharing"),
         h("button", { class: "btn danger", type: "button", title: "Delete it for everybody", onclick: () => deleteShared(c.custom) }, "Delete")] : []))));
     }
-    if (plugins.length) pool.append(h("h2", {}, "Cards from your plugins"), h("div", { class: "pool-list" }, plugins.map((c) => poolItem(c))));
+    if (plugins.length) {
+      // every enabled plugin offers a card: with many plugins this list is long, so it folds away (the Plugins card already summarises them all)
+      const folded = h("details", { class: "pool-plugins" }, h("summary", {}, h("strong", {}, `Cards from your plugins (${plugins.length})`)), h("div", { class: "pool-list" }, plugins.map((c) => poolItem(c))));
+      folded.open = plugins.length <= 6;
+      pool.append(folded);
+    }
     pool.append(h("h2", {}, "Add a card"), free.length ? h("div", { class: "pool-list" }, free.map((c) => poolItem(c))) : h("p", { class: "hint" }, "All cards are on your dashboard."));
   }
 

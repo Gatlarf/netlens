@@ -10,6 +10,8 @@ import json
 from app.db import connect, set_setting, utcnow
 from app.plugins import index_install as inst
 from app.plugins import registry
+from app.plugins.categories import category_of, listing as category_listing
+from app.plugins.index import category_map
 from app.plugins.contract import API_VERSION, ContractError, KINDS, clean_config, missing_required
 from app.plugins.example import build_example_zip
 from app.plugins.registry import InstallError
@@ -43,7 +45,7 @@ def _plugin(service: PluginService, plugin_id: str):
     return plugin
 
 
-def _summary(conn, plugin) -> dict:
+def _summary(conn, plugin, categories: dict | None = None) -> dict:
     full = public_state(conn, plugin)
     manifest = full["manifest"] or {}
     return {
@@ -51,6 +53,7 @@ def _summary(conn, plugin) -> dict:
         "name": plugin.name,
         "version": manifest.get("version"),
         "kind": manifest.get("kind"),
+        "category": category_of(manifest.get("kind"), (categories or {}).get(plugin.id)),
         "description": manifest.get("description", ""),
         "author": manifest.get("author", ""),
         "builtin": plugin.builtin,
@@ -67,11 +70,12 @@ def list_plugins(request: Request) -> dict:
     conn = connect(request.app.state.db_path)
     try:
         plugins = service.plugins()
-        items = [_summary(conn, p) for p in plugins.values()]
+        categories = category_map(conn)
+        items = [_summary(conn, p, categories) for p in plugins.values()]
         missing = missing_plugins(conn, plugins)
     finally:
         conn.close()
-    return {"plugins": items, "missing": missing, "api_version": API_VERSION, "kinds": list(KINDS)}
+    return {"plugins": items, "missing": missing, "api_version": API_VERSION, "kinds": list(KINDS), "categories": category_listing()}
 
 
 @router.get("/plugins/guide")

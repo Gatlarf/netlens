@@ -17,6 +17,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from app.db import get_setting, set_setting, utcnow
+from app.plugins.categories import category_of
 from app.plugins.contract import API_VERSION, ID_RE, VERSION_RE
 from app.plugins.registry import MAX_ZIP_BYTES
 
@@ -131,7 +132,7 @@ def parse_index(data: Any, official: bool = False) -> tuple[list[dict], int]:
         releases.sort(key=lambda r: version_tuple(r["version"]), reverse=True)
         seen.add(raw["id"])
         entries.append({
-            "id": raw["id"], "name": _text(raw["name"], 60), "kind": kind, "description": _text(raw.get("description"), 500),
+            "id": raw["id"], "name": _text(raw["name"], 60), "kind": kind, "category": category_of(kind, raw.get("category")), "description": _text(raw.get("description"), 500),
             "author": _text(raw.get("author"), 80), "license": _text(raw.get("license"), 40), "homepage": raw["homepage"] if isinstance(raw.get("homepage"), str) and raw["homepage"].startswith("https://") else "",
             "supports": [_text(s, 80) for s in raw.get("supports", []) if isinstance(s, str)][:30] if isinstance(raw.get("supports"), list) else [],
             "builtin": builtin, "releases": releases,
@@ -259,7 +260,7 @@ def view(entries: list[dict], installed: dict[str, dict], netlens_version: str) 
         have = installed.get(e["id"])
         update = bool(have and not have["builtin"] and best and have.get("version") and is_newer(best["version"], have["version"]))
         out.append({
-            **{k: e[k] for k in ("id", "name", "kind", "description", "author", "license", "homepage", "supports", "builtin")},
+            **{k: e[k] for k in ("id", "name", "kind", "category", "description", "author", "license", "homepage", "supports", "builtin")},
             "installed": have is not None,
             "installed_version": have["version"] if have else None,
             "installed_source": have["source"] if have else None,
@@ -276,3 +277,11 @@ def view(entries: list[dict], installed: dict[str, dict], netlens_version: str) 
 
 def level_text(level: str) -> str:
     return {"verified": "Verified (code read and tested on real hardware)", "reviewed": "Reviewed (code read, not tested on hardware)", "community": "Community (automatic checks only)"}.get(level, level)
+
+
+def category_map(conn) -> dict[str, str]:
+    """{plugin id: category} from the index copy that is already known (never the network); empty when there is none."""
+    try:
+        return {e["id"]: e["category"] for e in get_index(conn, offline=True)["entries"]}
+    except Exception:  # noqa: BLE001 - a missing or damaged cache only means the default categories are shown
+        return {}

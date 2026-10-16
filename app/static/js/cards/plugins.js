@@ -1,13 +1,22 @@
 import { get, post, put, upload } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
+import { groupByCategory, openSet, remember } from "./plugin_groups.js";
 
-const KIND_LABEL = { hypervisor: "Hypervisor", topology: "Network topology", dns: "DNS", proxy: "Reverse proxy" };
+
+// one coloured dot and a short text: green synced, red failed or in trouble, grey off or waiting
+function health(p) {
+  if (p.problem && !p.status) return "bad";
+  if (p.status && !p.status.ok) return "bad";
+  if (p.status && p.status.ok) return p.enabled ? "ok" : "off";
+  return "off";
+}
 
 function statusCell(p) {
-  if (p.problem && !p.status) return h("td", { class: "error" }, p.problem);
-  if (!p.status) return h("td", { class: "hint" }, p.enabled ? "waiting for the first sync" : "");
-  if (p.status.ok) return h("td", { class: "hint" }, `synced ${timeAgo(p.status.ts)}`);
-  return h("td", { class: "error" }, `failed ${timeAgo(p.status.ts)}: ${p.status.error}`);
+  const dot = h("span", { class: `sdot ${health(p)}`, "aria-hidden": "true" });
+  if (p.problem && !p.status) return h("td", { class: "error" }, dot, p.problem);
+  if (!p.status) return h("td", { class: "hint" }, dot, p.enabled ? "waiting for the first sync" : "");
+  if (p.status.ok) return h("td", { class: "hint" }, dot, `synced ${timeAgo(p.status.ts)}`);
+  return h("td", { class: "error" }, dot, `failed ${timeAgo(p.status.ts)}: ${p.status.error}`);
 }
 
 function fillPluginsCard(card, data, notice = null) {
@@ -52,39 +61,58 @@ function fillPluginsCard(card, data, notice = null) {
     card.appendChild(box);
   }
 
-  const table = h("table", { class: "data" });
-  const head = h("tr");
-  ["Plugin", "Type", "Version", "Source", "Status", ""].forEach((t) => head.appendChild(h("th", {}, t)));
-  table.appendChild(h("thead", {}, head));
-  const body = h("tbody");
-  for (const p of data.plugins) {
-    const toggle = h("button", { type: "button", class: "btn" }, p.enabled ? "Turn off" : "Turn on");
-    toggle.disabled = !p.version;
-    toggle.addEventListener("click", async () => {
-      toggle.disabled = true;
-      try {
-        await put(`/api/plugins/${p.id}`, { enabled: !p.enabled });
-        toast(p.enabled ? `${p.name} turned off` : `${p.name} turned on`, "success");
-      } catch (err) {
-        toast(err.message || "Could not change the plugin", "error");
-      }
-      document.dispatchEvent(new CustomEvent("netlens:plugins-changed"));
-      try {
-        fillPluginsCard(card, await get("/api/plugins"));
-      } catch (err) {
-        toast(err.message || "Could not refresh the list", "error");
-      }
-    });
-    body.appendChild(h("tr", {},
-      h("td", {}, h("a", { href: `#/settings/plugin-${p.id}` }, p.name), h("span", { class: p.enabled ? "tag" : "tag off" }, p.enabled ? "on" : "off")),
-      h("td", {}, KIND_LABEL[p.kind] || p.kind || ""),
-      h("td", {}, p.version || ""),
-      h("td", {}, p.builtin ? "built in" : "uploaded"),
-      statusCell(p),
-      h("td", {}, toggle)));
+  // one collapsible table per category; a category with a failing plugin opens by itself, and with few plugins everything is open
+  const open = openSet("installed");
+  const groups = groupByCategory([...data.plugins].sort((a, b) => a.name.localeCompare(b.name)), data.categories);
+  const roomy = data.plugins.length <= 8;
+  if (data.plugins.length > 8) {
+    const all = h("button", { type: "button", class: "btn linklike" }, "Open all");
+    const none = h("button", { type: "button", class: "btn linklike" }, "Close all");
+    const set = (state) => () => card.querySelectorAll("details.pcat").forEach((d) => { d.open = state; });
+    all.addEventListener("click", set(true));
+    none.addEventListener("click", set(false));
+    card.appendChild(h("p", { class: "hint" }, `${data.plugins.length} plugins · ${data.plugins.filter((p) => p.enabled).length} on `, all, " ", none));
   }
-  table.appendChild(body);
-  card.appendChild(h("div", { class: "table-wrap" }, table));
+  for (const group of groups) {
+    const failing = group.items.filter((p) => health(p) === "bad").length;
+    const on = group.items.filter((p) => p.enabled).length;
+    const section = h("details", { class: "pcat", "data-category": group.id });
+    section.open = roomy || failing > 0 || open.has(group.id);
+    section.appendChild(h("summary", { class: "pcat-head" }, h("span", { class: "pcat-name" }, group.label), h("span", { class: "pcat-count" }, String(group.items.length)),
+      h("span", { class: "pcat-names" }, group.items.map((p) => p.name).join(", ")),
+      h("span", { class: `pcat-note${failing ? " bad" : ""}` }, failing ? `${failing} failing` : `${on} on`)));
+    remember(section, open, group.id);
+    const table = h("table", { class: "data plist" });          // no header: name, version, status and the switch speak for themselves
+    const body = h("tbody");
+    for (const p of group.items) {
+      const toggle = h("button", { type: "button", class: "btn" }, p.enabled ? "Turn off" : "Turn on");
+      toggle.disabled = !p.version;
+      toggle.addEventListener("click", async () => {
+        toggle.disabled = true;
+        try {
+          await put(`/api/plugins/${p.id}`, { enabled: !p.enabled });
+          toast(p.enabled ? `${p.name} turned off` : `${p.name} turned on`, "success");
+        } catch (err) {
+          toast(err.message || "Could not change the plugin", "error");
+        }
+        document.dispatchEvent(new CustomEvent("netlens:plugins-changed"));
+        try {
+          fillPluginsCard(card, await get("/api/plugins"));
+        } catch (err) {
+          toast(err.message || "Could not refresh the list", "error");
+        }
+      });
+      body.appendChild(h("tr", {},
+        h("td", {}, h("a", { href: `#/settings/plugin-${p.id}` }, p.name), h("span", { class: p.enabled ? "tag" : "tag off" }, p.enabled ? "on" : "off"),
+          p.builtin ? h("span", { class: "tag" }, "built in") : null),
+        h("td", {}, p.version || ""),
+        statusCell(p),
+        h("td", {}, toggle)));
+    }
+    table.appendChild(body);
+    section.appendChild(h("div", { class: "table-wrap" }, table));
+    card.appendChild(section);
+  }
 
   card.appendChild(h("h3", {}, "Install a plugin"));
   if (notice) card.appendChild(h("p", { class: notice.error ? "error" : "hint" }, notice.text));

@@ -573,3 +573,59 @@ dialog.whats-new h2 { margin: 0; }
 .search-foot { padding: 8px 14px; border-top: 1px solid var(--border); margin: 0; font-size: 0.8em; }
 .search-found { outline: 2px solid var(--accent, #2563eb); outline-offset: 4px; border-radius: 4px; animation: search-pulse 1.2s ease-out 2; }
 @keyframes search-pulse { 0% { background: color-mix(in srgb, var(--accent, #2563eb) 30%, transparent); } 100% { background: transparent; } }
+
+/* ---- plugin lists grouped by category (Browse plugins, Plugins, the Settings menu, the dashboard picker) ---- */
+.toolbar .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 14px; font-size: 0.85em; cursor: pointer; white-space: nowrap; }
+.toolbar .chip:has(input:checked) { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); border-color: var(--accent); }
+.pcat { border-top: 1px solid var(--border); }
+.pcat:last-child { border-bottom: 1px solid var(--border); }
+.pcat-head { display: flex; align-items: baseline; gap: 10px; padding: 9px 4px; cursor: pointer; list-style: none; }
+.pcat-head::-webkit-details-marker { display: none; }
+.pcat-head::before { content: "▸"; color: var(--muted); width: 1em; }
+.pcat[open] > .pcat-head::before { content: "▾"; }
+.pcat-head:hover { background: var(--bg); }
+.pcat-name { font-weight: 600; flex: 0 0 auto; white-space: nowrap; }
+.pcat-count { font-size: 0.8em; padding: 0 8px; border-radius: 10px; background: var(--bg); color: var(--muted); }
+.pcat-names { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 0.85em; }
+.pcat[open] > .pcat-head .pcat-names { visibility: hidden; }
+.pcat-note { margin-left: auto; flex: 0 0 auto; font-size: 0.82em; color: var(--muted); }
+.pcat-note.warn { color: #b45309; font-weight: 600; }
+.pcat-note.bad { color: #b91c1c; font-weight: 600; }
+.prow-list { padding: 0 0 8px 1.4em; }
+.prow { border-top: 1px dashed var(--border); }
+.prow:first-child { border-top: 0; }
+.prow-sum { display: flex; align-items: center; gap: 8px; padding: 6px 4px; cursor: pointer; list-style: none; min-width: 0; }
+.prow-sum::-webkit-details-marker { display: none; }
+.prow-sum:hover { background: var(--bg); }
+.prow-name { flex: 0 0 auto; min-width: 9em; }
+.prow-desc { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 0.9em; }
+.prow-state { flex: 0 0 auto; text-align: right; min-width: 6em; font-size: 0.85em; }
+.prow-body { padding: 4px 6px 12px 6px; }
+.prow-body p { margin: 4px 0; }
+.sdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; background: var(--border); vertical-align: middle; }
+.sdot.ok { background: #16a34a; }
+.sdot.bad { background: #dc2626; }
+.btn.linklike { border: 0; background: none; color: var(--accent); padding: 0 4px; text-decoration: underline; }
+.settings-nav .nav-sub { margin: 0; }
+.settings-nav .nav-sub > summary { display: flex; align-items: center; gap: 6px; padding: 5px 12px 5px 14px; font-size: 0.88em; color: var(--muted); cursor: pointer; list-style: none; border-radius: 6px; }
+.settings-nav .nav-sub > summary::-webkit-details-marker { display: none; }
+.settings-nav .nav-sub > summary::before { content: "▸"; width: 1em; }
+.settings-nav .nav-sub[open] > summary::before { content: "▾"; }
+.settings-nav .nav-sub > summary:hover { background: var(--bg); }
+.settings-nav .nav-sub-count { margin-left: auto; font-size: 0.85em; opacity: 0.8; }
+.settings-nav .nav-sub > a { padding-left: 30px; }
+.pool-plugins > summary { cursor: pointer; padding: 6px 0; }
+@media (max-width: 640px) {
+  .prow-sum { flex-wrap: wrap; row-gap: 2px; }
+  .prow-desc { order: 5; flex-basis: 100%; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .prow-state { margin-left: auto; }
+  .prow-list { padding-left: 0.6em; }
+}
+table.plist { table-layout: fixed; width: 100%; }
+table.plist td { padding: 4px 8px; vertical-align: middle; }
+table.plist td:nth-child(1) { width: 36%; }
+table.plist td:nth-child(2) { width: 9%; }
+table.plist td:nth-child(4) { width: 110px; text-align: right; }
+table.plist td:nth-child(3) { overflow: hidden; text-overflow: ellipsis; }
+table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
+@media (max-width: 640px) { table.plist td:nth-child(1) { width: 44%; } table.plist td:nth-child(2) { display: none; } table.plist td:nth-child(4) { width: 84px; } }

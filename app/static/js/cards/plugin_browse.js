@@ -1,7 +1,7 @@
 import { get, post, put } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
+import { groupByCategory, openSet, remember } from "./plugin_groups.js";
 
-const KIND = { hypervisor: "Hypervisor", topology: "Network topology", dns: "DNS", proxy: "Reverse proxy" };
 const LEVEL_TEXT = { verified: "Verified", reviewed: "Reviewed", community: "Community" };
 
 function badge(level) {
@@ -26,37 +26,37 @@ function shortText(text) {
   return first.slice(0, 150).replace(/\s+\S*$/, "") + "…";
 }
 
-function entryCard(p, reload) {
-  const card = h("div", { class: "browse-item" });
+// One plugin as a compact row. The first line is a summary (name, badge, a short sentence, state); everything else opens under it.
+function entryRow(p, reload) {
   const latest = p.latest;
   const level = p.builtin ? "verified" : latest ? latest.review.level : "community";
-  const version = p.builtin ? null
-    : p.update_available ? h("span", { class: "tag unknown-tag" }, `update ${latest.version} available`)
-    : p.installed ? h("span", { class: "hint" }, `installed ${p.installed_version}`)
-    : latest ? h("span", { class: "hint" }, `version ${latest.version}`) : null;
-  card.appendChild(h("div", { class: "browse-head" },
-    h("div", { class: "browse-title" }, h("strong", {}, p.name), " ", h("span", { class: "tag" }, KIND[p.kind] || p.kind), " ", p.builtin ? h("span", { class: "tag" }, "built in") : badge(level)),
-    version));
-  if (p.description) card.appendChild(h("p", { class: "browse-short" }, shortText(p.description)));
-  if (p.incompatible) card.appendChild(h("p", { class: "error" }, `Cannot be installed here: ${p.incompatible}`));
-
-  // everything else, one click away
-  const more = h("details", { class: "browse-more" }, h("summary", {}, "Details"));
-  if (p.description && p.description !== shortText(p.description)) more.appendChild(h("p", {}, p.description));
+  const state = p.builtin ? h("span", { class: "tag" }, "built in")
+    : p.update_available ? h("span", { class: "tag unknown-tag" }, `update ${latest.version}`)
+    : p.installed ? h("span", { class: "tag" }, `installed ${p.installed_version}`)
+    : latest ? h("span", { class: "hint" }, `v${latest.version}`) : null;
+  const row = h("details", { class: "prow", "data-plugin": p.id });
+  row.appendChild(h("summary", { class: "prow-sum" },
+    h("strong", { class: "prow-name" }, p.name),
+    p.builtin ? null : badge(level),
+    h("span", { class: "prow-desc" }, shortText(p.description)),
+    h("span", { class: "prow-state" }, state)));
+  const body = h("div", { class: "prow-body" });
+  if (p.description) body.appendChild(h("p", {}, p.description));
+  if (p.incompatible) body.appendChild(h("p", { class: "error" }, `Cannot be installed here: ${p.incompatible}`));
   const meta = [];
   if (p.author) meta.push(`by ${p.author}`);
   if (p.license) meta.push(p.license);
   if (latest && !p.builtin) meta.push(`latest ${latest.version}`);
   if (p.installed && !p.builtin) meta.push(`installed ${p.installed_version}`);
-  more.appendChild(h("p", { class: "hint" }, meta.join(" · "), p.homepage ? [" · ", h("a", { href: p.homepage, target: "_blank", rel: "noopener noreferrer" }, "homepage")] : null));
-  if (p.supports.length) more.appendChild(h("div", { class: "hint" }, "Works with:", h("ul", {}, ...p.supports.map((t) => h("li", {}, t)))));
+  body.appendChild(h("p", { class: "hint" }, meta.join(" · "), p.homepage ? [" · ", h("a", { href: p.homepage, target: "_blank", rel: "noopener noreferrer" }, "homepage")] : null));
+  if (p.supports.length) body.appendChild(h("div", { class: "hint" }, "Works with:", h("ul", {}, ...p.supports.map((t) => h("li", {}, t)))));
   if (latest && !p.builtin && latest.review.level !== "community") {
     const r = latest.review;
-    more.appendChild(h("p", { class: "hint" }, `Reviewed by ${r.reviewer}${r.date ? ` on ${r.date}` : ""}${r.tested_on.length ? `; tested on ${r.tested_on.join(", ")}` : "; not tested on real hardware"}${r.notes ? `. ${r.notes}` : ""}`));
+    body.appendChild(h("p", { class: "hint" }, `Reviewed by ${r.reviewer}${r.date ? ` on ${r.date}` : ""}${r.tested_on.length ? `; tested on ${r.tested_on.join(", ")}` : "; not tested on real hardware"}${r.notes ? `. ${r.notes}` : ""}`));
   }
-  if (latest && latest.changelog && !p.builtin) more.appendChild(h("p", { class: "hint" }, `What's new: ${latest.changelog}`));
+  if (latest && latest.changelog && !p.builtin) body.appendChild(h("p", { class: "hint" }, `What's new: ${latest.changelog}`));
   if (!p.builtin && latest && latest.review.level === "community") {
-    more.appendChild(h("p", { class: "warn-note" }, "Not reviewed: only automatic checks were done. It is code that runs inside Netlens."));
+    body.appendChild(h("p", { class: "warn-note" }, "Not reviewed: only automatic checks were done. It is code that runs inside Netlens."));
   }
 
   const actions = h("div", { class: "browse-actions" });
@@ -98,14 +98,14 @@ function entryCard(p, reload) {
       actions.appendChild(back);
     }
   }
-  card.appendChild(actions);
-  card.appendChild(more);
-  return card;
+  body.appendChild(actions);
+  row.appendChild(body);
+  return row;
 }
 
 export async function buildBrowseCard() {
   const wrap = h("div", {});
-  const state = { q: "", kind: "", onlyUpdates: false };
+  const state = { q: "", category: "", onlyInstalled: false, onlyUpdates: false, onlyVerified: false };
 
   async function load(refresh = false) {
     const data = await get(`/api/plugin-index${refresh ? "?refresh=true" : ""}`);
@@ -124,26 +124,54 @@ export async function buildBrowseCard() {
       card.appendChild(h("p", { class: idx.error ? "error" : "hint" }, idx.error ? `${line} ${idx.error}` : line));
     }
     const search = h("input", { type: "search", placeholder: "Search by name, device or author", value: state.q, "aria-label": "Search plugins" });
-    const kind = h("select", { "aria-label": "Type" });
-    kind.appendChild(h("option", { value: "" }, "All types"));
-    for (const [k, v] of Object.entries(KIND)) kind.appendChild(h("option", { value: k }, v));
-    kind.value = state.kind;
+    const category = h("select", { "aria-label": "Category" });
+    category.appendChild(h("option", { value: "" }, "All categories"));
+    for (const c of data.categories || []) category.appendChild(h("option", { value: c.id }, c.label));
+    category.value = state.category;
+    const chip = (key, text) => {
+      const box = h("input", { type: "checkbox", checked: state[key] });
+      box.addEventListener("change", () => { state[key] = box.checked; render(); });
+      return h("label", { class: "chip" }, box, " ", text);
+    };
     const refreshBtn = h("button", { class: "btn", type: "button" }, "Refresh");
     refreshBtn.addEventListener("click", () => load(true));
-    card.appendChild(h("div", { class: "toolbar" }, search, kind, refreshBtn));
+    card.appendChild(h("div", { class: "toolbar" }, search, category, chip("onlyInstalled", "Installed"), chip("onlyUpdates", "Updates"), chip("onlyVerified", "Verified"), refreshBtn));
+    const summary = h("p", { class: "hint" });
     const list = h("div", { class: "browse-list" });
-    card.appendChild(list);
+    card.append(summary, list);
+    const open = openSet("browse");
 
     function render() {
       clear(list);
       const q = state.q.toLowerCase();
-      const items = data.plugins.filter((p) => (!state.kind || p.kind === state.kind) &&
-        (!q || [p.name, p.description, p.author, ...p.supports].join(" ").toLowerCase().includes(q)));
+      const labels = new Map((data.categories || []).map((c) => [c.id, c.label]));
+      const items = data.plugins.filter((p) => (p.installed || !/^example-/.test(p.id)) && (!state.category || p.category === state.category) &&
+        (!state.onlyInstalled || p.installed) && (!state.onlyUpdates || p.update_available) &&
+        (!state.onlyVerified || p.builtin || (p.latest && p.latest.review.level === "verified")) &&
+        (!q || [p.name, p.description, p.author, labels.get(p.category), ...p.supports].join(" ").toLowerCase().includes(q)));
+      const filtering = Boolean(q || state.category || state.onlyInstalled || state.onlyUpdates || state.onlyVerified);
+      const installed = data.plugins.filter((p) => p.installed && !p.builtin).length;
+      summary.textContent = idx.enabled ? `${items.length} of ${data.plugins.length} plugins${installed ? ` · ${installed} installed` : ""}${data.updates ? ` · ${data.updates} update${data.updates === 1 ? "" : "s"} available` : ""}` : "";
       if (!items.length) list.appendChild(h("p", { class: "hint" }, idx.enabled ? "No plugins match." : ""));
-      for (const p of items) list.appendChild(entryCard(p, () => load()));
+      for (const group of groupByCategory(items, data.categories)) {
+        const ups = group.items.filter((p) => p.update_available).length;
+        const have = group.items.filter((p) => p.installed && !p.builtin).length;
+        const note = [have ? `${have} installed` : "", ups ? `${ups} update${ups === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · ");
+        const section = h("details", { class: "pcat", "data-category": group.id });
+        section.open = filtering || ups > 0 || open.has(group.id);
+        // closed, the heading still tells what is inside: the names of the plugins
+        section.appendChild(h("summary", { class: "pcat-head" }, h("span", { class: "pcat-name" }, group.label), h("span", { class: "pcat-count" }, String(group.items.length)),
+          h("span", { class: "pcat-names" }, group.items.map((p) => p.name).join(", ")),
+          note ? h("span", { class: `pcat-note${ups ? " warn" : ""}` }, note) : null));
+        if (!filtering) remember(section, open, group.id);
+        const rows = h("div", { class: "prow-list" });
+        for (const p of group.items) rows.appendChild(entryRow(p, () => load()));
+        section.appendChild(rows);
+        list.appendChild(section);
+      }
     }
     search.addEventListener("input", () => { state.q = search.value; render(); });
-    kind.addEventListener("change", () => { state.kind = kind.value; render(); });
+    category.addEventListener("change", () => { state.category = category.value; render(); });
     render();
     wrap.appendChild(card);
     wrap.appendChild(await settingsCard(load));

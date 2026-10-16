@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.18 — 2026-10-16
+
+### Changed
+- ★ **Plugin lists grouped by category**: with dozens of plugins the lists became long, so **Browse plugins**, the **Plugins** page, the **Settings menu** and the dashboard's *Cards from your plugins* are now organised in six categories (Virtualization & containers, Network devices, DNS, Reverse proxies, Storage & NAS, Documentation). Browse plugins shows one compact line per plugin under collapsible headings (a closed heading lists the plugin names, and opens by itself for updates and search results), with filters for *Installed*, *Updates* and *Verified* and a category selector; the search also finds a plugin by the devices it supports. In the Settings menu the installed plugins sit under category sub-headings (the one with the current page is open), and the Plugins page shows a status dot per plugin and opens the category that has a failing plugin. A plugin index entry may name its `category` (optional).
+
 ## 0.4.13 — 2026-10-16
 
 ### Added

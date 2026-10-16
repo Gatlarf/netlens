@@ -451,3 +451,30 @@ def test_a_removed_plugin_is_not_listed_as_missing(client):
     client.post("/api/plugins", content=z, headers={"Content-Type": "application/zip"})
     client.delete("/api/plugins/manual")                      # forgotten on purpose: nothing to restore
     assert client.get("/api/plugins").json()["missing"] == []
+
+
+# ------------------------------------------------------------------ display categories
+def test_category_comes_from_the_entry_or_the_default_of_its_kind():
+    from app.plugins.categories import category_of, listing
+
+    assert [c["id"] for c in listing()] == ["virtualization", "network", "dns", "proxy", "storage", "documentation"]
+    assert category_of("hypervisor") == "virtualization" and category_of("topology") == "network" and category_of("dns") == "dns" and category_of("proxy") == "proxy"
+    assert category_of("hypervisor", "storage") == "storage"
+    assert category_of("hypervisor", "not-a-category") == "virtualization" and category_of("topology", 7) == "network"
+    r = publish(Server(), "1.0.0")
+    entries, skipped = parse_index(index_doc(entry("aa", kind="dns", releases=[r]), entry("bb", kind="hypervisor", category="storage", releases=[r]),
+                                              entry("cc", kind="proxy", category="bogus", releases=[r])))
+    assert skipped == 0 and {e["id"]: e["category"] for e in entries} == {"aa": "dns", "bb": "storage", "cc": "proxy"}
+
+
+def test_api_lists_categories_and_installed_plugins_get_theirs(client):
+    s = client.server
+    r1 = publish(s, "1.0.0", level="verified")
+    s.put_index(index_doc(entry("omada", category="documentation", releases=[r1])))
+    body = client.get("/api/plugin-index").json()
+    assert [c["id"] for c in body["categories"]][:2] == ["virtualization", "network"] and body["plugins"][0]["category"] == "documentation"
+    assert all({"id", "label", "short"} <= set(c) for c in body["categories"])
+    assert client.post("/api/plugin-index/omada/install", json={}).status_code == 200
+    listing = client.get("/api/plugins").json()
+    assert next(p for p in listing["plugins"] if p["id"] == "omada")["category"] == "documentation" and len(listing["categories"]) == 6
+    assert next(p for p in listing["plugins"] if p["builtin"])["category"] in {c["id"] for c in listing["categories"]}
