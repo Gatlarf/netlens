@@ -1,0 +1,23 @@
+{
+  "id": "swarm",
+  "name": "Docker Swarm",
+  "kind": "hypervisor",
+  "description": "Shows a Docker Swarm cluster: every node as a host (role, availability, state, address) and every task (a running copy of a service) as a guest of the node it runs on, with service name, stack, image, published ports and state. Read-only through a socket proxy on one manager node. Use the Docker plugin as well if you also want the plain containers and their health.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/swarm",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Docker 26 swarm, one manager (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-swarm-v1.0.0/swarm.zip",
+      "sha256": "a4d8951f95d23b12cac9504c496b54b6d9da267f0bcdd88c8de6c63808c68bb1",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

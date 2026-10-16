@@ -1,0 +1,24 @@
+{
+  "id": "incus",
+  "name": "Incus / LXD",
+  "kind": "hypervisor",
+  "description": "Shows an Incus (or LXD) server or cluster: the servers as hosts and every container and virtual machine as a guest, with state, MAC and IP addresses (when the instance sits on your LAN rather than behind NAT), image, CPU and memory limits, and autostart. Read-only: it only sends GET requests with a client certificate that you add to the trust store as restricted.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/incus",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Incus 6.0 containers (tested)",
+    "Incus virtual machines and clusters, LXD (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-incus-v1.0.0/incus.zip",
+      "sha256": "e586a7061c53c681008b603dc9274fdc6c59e1de9aed3e7cd197a29477c75137",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

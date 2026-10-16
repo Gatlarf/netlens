@@ -1,0 +1,23 @@
+{
+  "id": "adguard",
+  "name": "AdGuard Home",
+  "kind": "dns",
+  "description": "Registers your devices in AdGuard Home as DNS rewrites (Filters, DNS rewrites): an A record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Netlens only changes rewrites it wrote itself (it remembers them, AdGuard Home has no comment field) and never touches rewrites you or anything else made.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/adguard",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "AdGuard Home v0.107 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-v1.0.0/adguard.zip",
+      "sha256": "96d07fba8d44491488eb4874db1f36e7beb3553996e8c74323cd6dd10f3e04d7",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

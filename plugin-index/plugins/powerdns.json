@@ -1,0 +1,23 @@
+{
+  "id": "powerdns",
+  "name": "PowerDNS Authoritative",
+  "kind": "dns",
+  "description": "Registers your devices in PowerDNS Authoritative Server (4.x): an A record and a reverse (PTR) record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Netlens marks every record set it writes with a comment and only changes or removes record sets that carry it, so records made by anything else are never touched.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/powerdns",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "PowerDNS Authoritative 4.9 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-powerdns-v1.0.0/powerdns.zip",
+      "sha256": "af1e2797f393175ce6f4510b13035b991fd81f34966c771db887e6c9b871a3de",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

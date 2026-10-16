@@ -1,0 +1,24 @@
+{
+  "id": "opnsense",
+  "name": "OPNsense",
+  "kind": "topology",
+  "description": "Reads an OPNsense firewall (24.7 or newer): the firewall itself as the gateway node, and every device in its ARP table as a client, with the manufacturer and host name OPNsense knows, enriched with names from the DHCP leases (Dnsmasq or Kea). Netlens uses this to place devices in the hierarchy under the firewall. Read-only: it only sends GET requests with an API key that may only read these lists.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/opnsense",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "OPNsense 26.7 (tested)",
+    "DHCP lease lists (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.0.0/opnsense.zip",
+      "sha256": "d21f2b64b005febd815f802f6e734963ed9bad4921f5c945a38a0b60f06d50fe",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "haproxy",
+  "name": "HAProxy",
+  "kind": "proxy",
+  "description": "Shows the backends of an HAProxy load balancer as sites: the first healthy server of each backend as the upstream (address and port), and whether the backend is in maintenance. HAProxy's statistics do not contain host names, so you can list them per backend yourself, otherwise the sites show without a domain. Netlens ties every backend to the device or container behind it. Read-only: it only reads the statistics page (CSV).",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/haproxy",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "HAProxy 3.4 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-haproxy-v1.0.0/haproxy.zip",
+      "sha256": "ada05f5bd8a9bd71eeac2699f24129e5e31213224141f86fcc28ebd0c027a789",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "openwrt",
+  "name": "OpenWrt",
+  "kind": "topology",
+  "description": "Reads an OpenWrt router or access point: the router itself as a network node, and every device it knows as a client: DHCP leases and neighbours (wired), and the Wi-Fi stations that are associated with each radio, with band, signal strength (RSSI) and link speed. Netlens uses this to place devices in the hierarchy and to show Wi-Fi signal history and roaming. Read-only: it only calls a few read functions through the router's ubus web interface.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/openwrt",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "OpenWrt 25.12 without Wi-Fi radio (tested)",
+    "Wi-Fi stations (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.0.0/openwrt.zip",
+      "sha256": "d7f0f4a8e2660259e361447678ff1c880c6166d0fb75970b3b3b4f615cc3dc49",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

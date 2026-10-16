@@ -1,0 +1,24 @@
+{
+  "id": "vsphere",
+  "name": "VMware ESXi / vCenter",
+  "kind": "hypervisor",
+  "description": "Shows VMware ESXi hosts and vCenter inventories: every host (connection state, management address) and every virtual machine as a guest of its host, with power state, MAC and IP addresses (from VMware Tools), guest operating system, CPUs and memory. Works with a standalone ESXi and with vCenter through VMware's SOAP web service, read-only: it only reads properties. Use an account with the Read-only role.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/vsphere",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "govmomi vcsim simulator (tested)",
+    "VMware ESXi and vCenter (not tested on real systems)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.0.0/vsphere.zip",
+      "sha256": "df9455dab2be1e70f98fe6b5a9a8a819f60d8200a0638339920ac8b0b1c273ee",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

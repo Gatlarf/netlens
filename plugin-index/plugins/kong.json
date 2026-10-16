@@ -1,0 +1,24 @@
+{
+  "id": "kong",
+  "name": "Kong Gateway",
+  "kind": "proxy",
+  "description": "Shows the routes a Kong Gateway (OSS or Enterprise, DB-less or with a database) publishes: host names, the upstream service address and port, protocols (http, https, tcp) and whether a route is enabled. Netlens ties every route to the device or container behind it, can keep an HTTPS check per site and can register the host names in DNS. Read-only: it only sends GET requests to the Admin API.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/kong",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Kong 3.9 DB-less (tested)",
+    "Kong with a database and Kong Enterprise (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kong-v1.0.0/kong.zip",
+      "sha256": "8ac4e5b3cc37874ccceb150ba8d9da4b63c480dcc71a1f8e8d9d5e1bd1b52ffc",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

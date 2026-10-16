@@ -2,6 +2,32 @@
  "schema": 1,
  "plugins": [
   {
+   "id": "adguard",
+   "name": "AdGuard Home",
+   "kind": "dns",
+   "description": "Registers your devices in AdGuard Home as DNS rewrites (Filters, DNS rewrites): an A record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Netlens only changes rewrites it wrote itself (it remembers them, AdGuard Home has no comment field) and never touches rewrites you or anything else made.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/adguard",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "AdGuard Home v0.107 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-v1.0.0/adguard.zip",
+     "sha256": "96d07fba8d44491488eb4874db1f36e7beb3553996e8c74323cd6dd10f3e04d7",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
    "id": "asus",
    "name": "ASUS router (AiMesh)",
    "kind": "topology",
@@ -13,6 +39,59 @@
    "supports": [
     "ASUS RT-AX92U (tested)",
     "other stock ASUSWRT/AiMesh routers"
+   ]
+  },
+  {
+   "id": "bind",
+   "name": "BIND 9",
+   "kind": "dns",
+   "description": "Registers your devices in a BIND 9 (or any RFC 2136 compatible) DNS server: an A record and a reverse (PTR) record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Reads zones by zone transfer (AXFR) and writes by dynamic update (RFC 2136), both signed with a TSIG key. Every change is guarded by a prerequisite, so a record that changed meanwhile is never overwritten. Netlens only changes records it remembers writing.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/bind",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "BIND 9.20 (tested)",
+    "Other RFC 2136 servers with TSIG (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-bind-v1.0.0/bind.zip",
+     "sha256": "347d00169ecca8f092da2b041782cdeb73276910bf730340d048f00fab4ee034",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "caddy",
+   "name": "Caddy",
+   "kind": "proxy",
+   "description": "Shows the sites a Caddy 2 web server publishes as a reverse proxy: domains, the upstream address and port, redirects, and whether Caddy makes the HTTPS certificate itself. Netlens ties every site to the device or container behind it, keeps an HTTPS check per site and can give the domains a DNS name. Read-only: it only reads Caddy's admin API (GET /config/). Caddy's admin API has no password: it must only be reachable from a network you trust.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/caddy",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Caddy 2.11 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-caddy-v1.0.0/caddy.zip",
+     "sha256": "e2c655c5ec320b86555dc3b51981b1ccab6e2256f6869dc68b63be2e7e4befd3",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
    ]
   },
   {
@@ -127,6 +206,32 @@
    ]
   },
   {
+   "id": "haproxy",
+   "name": "HAProxy",
+   "kind": "proxy",
+   "description": "Shows the backends of an HAProxy load balancer as sites: the first healthy server of each backend as the upstream (address and port), and whether the backend is in maintenance. HAProxy's statistics do not contain host names, so you can list them per backend yourself, otherwise the sites show without a domain. Netlens ties every backend to the device or container behind it. Read-only: it only reads the statistics page (CSV).",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/haproxy",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "HAProxy 3.4 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-haproxy-v1.0.0/haproxy.zip",
+     "sha256": "ada05f5bd8a9bd71eeac2699f24129e5e31213224141f86fcc28ebd0c027a789",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
    "id": "hyperv",
    "name": "Microsoft Hyper-V",
    "kind": "hypervisor",
@@ -183,6 +288,167 @@
      "min_netlens": "0.3.115",
      "released": "2026-10-11",
      "changelog": "First release. Virtual machines of a Hyper-V host through WinRM over HTTPS, matched to devices by MAC address then IP. Needs Netlens 0.3.115 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "incus",
+   "name": "Incus / LXD",
+   "kind": "hypervisor",
+   "description": "Shows an Incus (or LXD) server or cluster: the servers as hosts and every container and virtual machine as a guest, with state, MAC and IP addresses (when the instance sits on your LAN rather than behind NAT), image, CPU and memory limits, and autostart. Read-only: it only sends GET requests with a client certificate that you add to the trust store as restricted.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/incus",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Incus 6.0 containers (tested)",
+    "Incus virtual machines and clusters, LXD (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-incus-v1.0.0/incus.zip",
+     "sha256": "e586a7061c53c681008b603dc9274fdc6c59e1de9aed3e7cd197a29477c75137",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "kong",
+   "name": "Kong Gateway",
+   "kind": "proxy",
+   "description": "Shows the routes a Kong Gateway (OSS or Enterprise, DB-less or with a database) publishes: host names, the upstream service address and port, protocols (http, https, tcp) and whether a route is enabled. Netlens ties every route to the device or container behind it, can keep an HTTPS check per site and can register the host names in DNS. Read-only: it only sends GET requests to the Admin API.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/kong",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Kong 3.9 DB-less (tested)",
+    "Kong with a database and Kong Enterprise (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kong-v1.0.0/kong.zip",
+     "sha256": "8ac4e5b3cc37874ccceb150ba8d9da4b63c480dcc71a1f8e8d9d5e1bd1b52ffc",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "kubernetes",
+   "name": "Kubernetes",
+   "kind": "hypervisor",
+   "description": "Shows a Kubernetes cluster (k3s, kubeadm, RKE2, Talos, microk8s, ...) as hosts and guests: the nodes as hosts with their address and Ready state, the pods as guests of the node they run on, with namespace, workload, image, ports, restarts and readiness. Read-only: it only lists nodes and pods with a service account that may do nothing else. Pods that finished (Completed jobs) are left out.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/kubernetes",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "k3s 1.36, one node (tested)",
+    "kubeadm, RKE2, Talos, microk8s (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kubernetes-v1.0.0/kubernetes.zip",
+     "sha256": "30b913d09c3f6d86ac75e49ba23a7639161533945c81a3c0b3c123cf1498ce62",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "mikrotik",
+   "name": "MikroTik RouterOS",
+   "kind": "topology",
+   "description": "Reads a MikroTik router, switch or access point (RouterOS 7.1+): the device as a network node, MikroTik neighbours (MNDP/LLDP) as child nodes, and the devices it knows as clients with their bridge port, DHCP lease, ARP entry or Wi-Fi registration (band, signal, link speed). Netlens uses this to place devices in the hierarchy and to show Wi-Fi signal history. Read-only: only GET requests to the REST API.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/mikrotik",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "RouterOS 7.12 CHR (tested)",
+    "Wi-Fi registration tables and MNDP neighbours (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.0.0/mikrotik.zip",
+     "sha256": "df2e239b0bb450c707fce50cc63d0e53f8985e15776ba10899d862850e3761b0",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "netbox",
+   "name": "NetBox",
+   "kind": "topology",
+   "description": "Imports your documented network from NetBox (4.x): devices with a network role (router, switch, access point ...) become network nodes, every other device a client, and the cables between interfaces decide who hangs below whom, including the port a device is plugged into. Netlens matches them to what it finds on the network by MAC address, so the hierarchy shows your documentation. Read-only: it only sends GET requests with an API token that has read-only permissions.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/netbox",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "NetBox 4.7 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netbox-v1.0.0/netbox.zip",
+     "sha256": "f2892a36a3becc39dcb191008d51370e5dc7b41da95a73703a846174627b165e",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "nomad",
+   "name": "HashiCorp Nomad",
+   "kind": "hypervisor",
+   "description": "Shows a Nomad cluster as hosts and guests: the client nodes as hosts with their address, state and eligibility, and the allocations (running tasks of your jobs) as guests of the node they run on, with namespace, job, image, published ports, restarts and start time. Read-only: it only reads nodes and allocations, with an ACL token that has the read-job and node read capabilities if your cluster uses ACLs.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/nomad",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Nomad 2.0 dev mode (tested)",
+    "Nomad with ACLs (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nomad-v1.0.0/nomad.zip",
+     "sha256": "f693a6b6a9c3597ac17fd4f38a29db0837f970fc96ca06ddcac7761b2a4bf928",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
       "level": "community"
      }
@@ -286,6 +552,140 @@
    ]
   },
   {
+   "id": "openwrt",
+   "name": "OpenWrt",
+   "kind": "topology",
+   "description": "Reads an OpenWrt router or access point: the router itself as a network node, and every device it knows as a client: DHCP leases and neighbours (wired), and the Wi-Fi stations that are associated with each radio, with band, signal strength (RSSI) and link speed. Netlens uses this to place devices in the hierarchy and to show Wi-Fi signal history and roaming. Read-only: it only calls a few read functions through the router's ubus web interface.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/openwrt",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "OpenWrt 25.12 without Wi-Fi radio (tested)",
+    "Wi-Fi stations (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.0.0/openwrt.zip",
+     "sha256": "d7f0f4a8e2660259e361447678ff1c880c6166d0fb75970b3b3b4f615cc3dc49",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "opnsense",
+   "name": "OPNsense",
+   "kind": "topology",
+   "description": "Reads an OPNsense firewall (24.7 or newer): the firewall itself as the gateway node, and every device in its ARP table as a client, with the manufacturer and host name OPNsense knows, enriched with names from the DHCP leases (Dnsmasq or Kea). Netlens uses this to place devices in the hierarchy under the firewall. Read-only: it only sends GET requests with an API key that may only read these lists.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/opnsense",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "OPNsense 26.7 (tested)",
+    "DHCP lease lists (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.0.0/opnsense.zip",
+     "sha256": "d21f2b64b005febd815f802f6e734963ed9bad4921f5c945a38a0b60f06d50fe",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "pihole",
+   "name": "Pi-hole",
+   "kind": "dns",
+   "description": "Registers your devices in Pi-hole's Local DNS (Pi-hole v6): an A record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Pi-hole makes the reverse (PTR) answer by itself. Netlens only changes records it wrote itself (it remembers them, Pi-hole has no comment field) and never touches records you or anything else made.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/pihole",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Pi-hole v6.4 (tested)",
+    "Pi-hole v5 and older (not supported: different API)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-v1.0.0/pihole.zip",
+     "sha256": "829ee524ddac71a9261cf39775d71c13cf8c4f201a5139e8dd85690d9cbee724",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "portainer",
+   "name": "Portainer",
+   "kind": "hypervisor",
+   "description": "Shows every Docker environment that a Portainer manages (local socket, Portainer agents and Edge agents) with its containers: state, health, restarts, image, compose project and published ports. One connection covers all your Docker hosts, without opening each host's Docker port. Read-only: it only lists environments, containers and networks. Kubernetes and Azure environments are skipped.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/portainer",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Portainer CE 2.45 with a local Docker environment (tested)",
+    "Portainer agent and Edge environments (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-portainer-v1.0.0/portainer.zip",
+     "sha256": "2fb2bef4617e89d4d01cc4d1a82bb43dbecc1e9e7cecca1001e5e7c712bf31fd",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "powerdns",
+   "name": "PowerDNS Authoritative",
+   "kind": "dns",
+   "description": "Registers your devices in PowerDNS Authoritative Server (4.x): an A record and a reverse (PTR) record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Netlens marks every record set it writes with a comment and only changes or removes record sets that carry it, so records made by anything else are never touched.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/powerdns",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "PowerDNS Authoritative 4.9 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-powerdns-v1.0.0/powerdns.zip",
+     "sha256": "af1e2797f393175ce6f4510b13035b991fd81f34966c771db887e6c9b871a3de",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
    "id": "proxmox",
    "name": "Proxmox VE",
    "kind": "hypervisor",
@@ -331,6 +731,32 @@
      "min_netlens": "0.2.90",
      "released": "2026-10-10",
      "changelog": "First release. Written from the standard MIBs and tested against simulated switches only: please test it on a real switch and report back (see the README).",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "swarm",
+   "name": "Docker Swarm",
+   "kind": "hypervisor",
+   "description": "Shows a Docker Swarm cluster: every node as a host (role, availability, state, address) and every task (a running copy of a service) as a guest of the node it runs on, with service name, stack, image, published ports and state. Read-only through a socket proxy on one manager node. Use the Docker plugin as well if you also want the plain containers and their health.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/swarm",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Docker 26 swarm, one manager (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-swarm-v1.0.0/swarm.zip",
+     "sha256": "a4d8951f95d23b12cac9504c496b54b6d9da267f0bcdd88c8de6c63808c68bb1",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
       "level": "community"
      }
@@ -439,6 +865,33 @@
      "min_netlens": "0.2.96",
      "released": "2026-10-10",
      "changelog": "First release. Written from the official API documentation and tested against a simulated Technitium server only: please try it on a scratch zone first and report back (see the README).",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "traefik",
+   "name": "Traefik",
+   "kind": "proxy",
+   "description": "Shows the sites a Traefik v2/v3 reverse proxy publishes: domains from the router rules, the upstream address and port, whether TLS is on, and redirects. Netlens ties every site to the device or container behind it, keeps an HTTPS check per site and can give the domains a DNS name. Read-only: it only calls Traefik's API. Traefik does not list the certificates it holds, so certificate expiry is read by Netlens' own HTTPS checks.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/traefik",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Traefik 3.7 with the Docker provider (tested)",
+    "Traefik 2.x (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-traefik-v1.0.0/traefik.zip",
+     "sha256": "9446f26be46ef134a4d916102f6f70c97736d3ef29dcd898cca4c7b8f6518d88",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
       "level": "community"
      }
@@ -559,6 +1012,60 @@
      "min_netlens": "0.2.45",
      "released": "2026-10-09",
      "changelog": "Adds a diagnostic report: a Run diagnostic button on the plugin's page (Netlens 0.2.67 or newer) shows an anonymised description of what the controller answers, to copy or download.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "vsphere",
+   "name": "VMware ESXi / vCenter",
+   "kind": "hypervisor",
+   "description": "Shows VMware ESXi hosts and vCenter inventories: every host (connection state, management address) and every virtual machine as a guest of its host, with power state, MAC and IP addresses (from VMware Tools), guest operating system, CPUs and memory. Works with a standalone ESXi and with vCenter through VMware's SOAP web service, read-only: it only reads properties. Use an account with the Read-only role.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/vsphere",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "govmomi vcsim simulator (tested)",
+    "VMware ESXi and vCenter (not tested on real systems)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.0.0/vsphere.zip",
+     "sha256": "df9455dab2be1e70f98fe6b5a9a8a819f60d8200a0638339920ac8b0b1c273ee",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "vyos",
+   "name": "VyOS",
+   "kind": "topology",
+   "description": "Reads a VyOS router (1.4 or newer): the router itself as a network node (host name, version, interface MAC addresses) and every device in its ARP table and DHCP server leases as a client, with the interface it is reached on. Netlens uses this to place devices in the hierarchy under the router. Read-only: it only sends show and showConfig requests to VyOS's HTTPS API.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/vyos",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "VyOS rolling 2026.10 (tested)",
+    "DHCP lease table (not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vyos-v1.0.0/vyos.zip",
+     "sha256": "3367b3a2cffa5225e3505871ac712ff03268428701950926fadc6c03fd2d5630",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
       "level": "community"
      }

@@ -1,0 +1,24 @@
+{
+  "id": "vyos",
+  "name": "VyOS",
+  "kind": "topology",
+  "description": "Reads a VyOS router (1.4 or newer): the router itself as a network node (host name, version, interface MAC addresses) and every device in its ARP table and DHCP server leases as a client, with the interface it is reached on. Netlens uses this to place devices in the hierarchy under the router. Read-only: it only sends show and showConfig requests to VyOS's HTTPS API.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/vyos",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "VyOS rolling 2026.10 (tested)",
+    "DHCP lease table (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vyos-v1.0.0/vyos.zip",
+      "sha256": "3367b3a2cffa5225e3505871ac712ff03268428701950926fadc6c03fd2d5630",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

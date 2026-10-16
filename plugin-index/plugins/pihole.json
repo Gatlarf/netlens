@@ -1,0 +1,24 @@
+{
+  "id": "pihole",
+  "name": "Pi-hole",
+  "kind": "dns",
+  "description": "Registers your devices in Pi-hole's Local DNS (Pi-hole v6): an A record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Pi-hole makes the reverse (PTR) answer by itself. Netlens only changes records it wrote itself (it remembers them, Pi-hole has no comment field) and never touches records you or anything else made.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/pihole",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Pi-hole v6.4 (tested)",
+    "Pi-hole v5 and older (not supported: different API)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-v1.0.0/pihole.zip",
+      "sha256": "829ee524ddac71a9261cf39775d71c13cf8c4f201a5139e8dd85690d9cbee724",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

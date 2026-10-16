@@ -1,0 +1,24 @@
+{
+  "id": "bind",
+  "name": "BIND 9",
+  "kind": "dns",
+  "description": "Registers your devices in a BIND 9 (or any RFC 2136 compatible) DNS server: an A record and a reverse (PTR) record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Reads zones by zone transfer (AXFR) and writes by dynamic update (RFC 2136), both signed with a TSIG key. Every change is guarded by a prerequisite, so a record that changed meanwhile is never overwritten. Netlens only changes records it remembers writing.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/bind",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "BIND 9.20 (tested)",
+    "Other RFC 2136 servers with TSIG (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-bind-v1.0.0/bind.zip",
+      "sha256": "347d00169ecca8f092da2b041782cdeb73276910bf730340d048f00fab4ee034",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

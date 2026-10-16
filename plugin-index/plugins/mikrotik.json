@@ -1,0 +1,24 @@
+{
+  "id": "mikrotik",
+  "name": "MikroTik RouterOS",
+  "kind": "topology",
+  "description": "Reads a MikroTik router, switch or access point (RouterOS 7.1+): the device as a network node, MikroTik neighbours (MNDP/LLDP) as child nodes, and the devices it knows as clients with their bridge port, DHCP lease, ARP entry or Wi-Fi registration (band, signal, link speed). Netlens uses this to place devices in the hierarchy and to show Wi-Fi signal history. Read-only: only GET requests to the REST API.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/mikrotik",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "RouterOS 7.12 CHR (tested)",
+    "Wi-Fi registration tables and MNDP neighbours (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.0.0/mikrotik.zip",
+      "sha256": "df2e239b0bb450c707fce50cc63d0e53f8985e15776ba10899d862850e3761b0",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

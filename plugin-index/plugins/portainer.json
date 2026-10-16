@@ -1,0 +1,24 @@
+{
+  "id": "portainer",
+  "name": "Portainer",
+  "kind": "hypervisor",
+  "description": "Shows every Docker environment that a Portainer manages (local socket, Portainer agents and Edge agents) with its containers: state, health, restarts, image, compose project and published ports. One connection covers all your Docker hosts, without opening each host's Docker port. Read-only: it only lists environments, containers and networks. Kubernetes and Azure environments are skipped.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/portainer",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Portainer CE 2.45 with a local Docker environment (tested)",
+    "Portainer agent and Edge environments (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-portainer-v1.0.0/portainer.zip",
+      "sha256": "2fb2bef4617e89d4d01cc4d1a82bb43dbecc1e9e7cecca1001e5e7c712bf31fd",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

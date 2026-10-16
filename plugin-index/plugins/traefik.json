@@ -1,0 +1,24 @@
+{
+  "id": "traefik",
+  "name": "Traefik",
+  "kind": "proxy",
+  "description": "Shows the sites a Traefik v2/v3 reverse proxy publishes: domains from the router rules, the upstream address and port, whether TLS is on, and redirects. Netlens ties every site to the device or container behind it, keeps an HTTPS check per site and can give the domains a DNS name. Read-only: it only calls Traefik's API. Traefik does not list the certificates it holds, so certificate expiry is read by Netlens' own HTTPS checks.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/traefik",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Traefik 3.7 with the Docker provider (tested)",
+    "Traefik 2.x (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-traefik-v1.0.0/traefik.zip",
+      "sha256": "9446f26be46ef134a4d916102f6f70c97736d3ef29dcd898cca4c7b8f6518d88",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}
