@@ -46,6 +46,13 @@ The plugin's settings page shows the same lines in a collapsed box (**What to ad
 Then add a line for every Docker host in the plugin's settings (`http://<host address>:2375`; **+ Add server** adds a line, **Test** on a line tests that host) and turn it on.
 If Netlens runs on the Docker host itself and reaches the proxy as `127.0.0.1`, fill in *Host's own address* under *More* (for example `192.168.0.189`) so Netlens can find the host's device.
 
+## Podman
+
+Podman's Docker-compatible API works with this plugin as it is (checked on Podman 5.4: containers, state, ports, image, restart count, start time).
+Start the API service with `podman system service --time=0 tcp:192.168.0.189:2375` (or a systemd unit) and enter `http://192.168.0.189:2375` as the
+proxy address. Podman's API has **no read-only mode**, so reach it only from the Netlens machine (firewall) or through the socket proxy of a
+rootless user's socket. Containers of a rootless Podman appear for that user only.
+
 ## Privacy
 
 A container's inspect data contains its environment variables, which often hold passwords. The plugin reads that data to get the

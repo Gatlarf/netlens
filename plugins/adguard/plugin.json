@@ -1,0 +1,58 @@
+{
+  "id": "adguard",
+  "name": "AdGuard Home",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "dns",
+  "author": "Netlens",
+  "description": "Registers your devices in AdGuard Home as DNS rewrites (Filters, DNS rewrites): an A record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Netlens only changes rewrites it wrote itself (it remembers them, AdGuard Home has no comment field) and never touches rewrites you or anything else made.",
+  "timeout": 60,
+  "diagnose": true,
+  "capabilities": [
+    "delete"
+  ],
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "AdGuard Home servers",
+      "required": true,
+      "help": "Every AdGuard Home that should carry the records. AdGuard Home has one kind of login, so use a user of its own (in AdGuardHome.yaml under users:) rather than your everyday admin.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "AdGuard Home address",
+          "placeholder": "http://192.168.0.2:3000",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses. Turn it off for a self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/adguard"
+}

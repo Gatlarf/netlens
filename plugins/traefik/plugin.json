@@ -1,0 +1,63 @@
+{
+  "id": "traefik",
+  "name": "Traefik",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "proxy",
+  "author": "Netlens",
+  "description": "Shows the sites a Traefik v2/v3 reverse proxy publishes: domains from the router rules, the upstream address and port, whether TLS is on, and redirects. Netlens ties every site to the device or container behind it, keeps an HTTPS check per site and can give the domains a DNS name. Read-only: it only calls Traefik's API. Traefik does not list the certificates it holds, so certificate expiry is read by Netlens' own HTTPS checks.",
+  "timeout": 60,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Traefik servers",
+      "required": true,
+      "help": "The address of Traefik's API (the 'traefik' entry point, port 8080 when you use api.insecure, or your own entry point). The API gives a read-only view; do not publish it to the internet.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "API address",
+          "placeholder": "http://192.168.0.4:8080",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "help": "Only when the API is behind basic authentication.",
+          "optional": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "optional": true
+        },
+        {
+          "key": "lan",
+          "label": "Traefik host's own address",
+          "placeholder": "192.168.0.4",
+          "help": "The address of the machine Traefik runs on, when the API is reached by name or as 127.0.0.1. Site checks are sent to it.",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/traefik"
+}

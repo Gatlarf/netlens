@@ -11,6 +11,25 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 | [`technitium/`](technitium/README.md) | Technitium DNS | registers devices in Technitium DNS (a `dns` plugin): A and PTR records, primary/secondary and cluster, never touches records it did not make | tested against a simulated Technitium server only |
 | [`synology/`](synology/README.md) | Synology | a Synology NAS (DSM 7): Container Manager containers, Virtual Machine Manager machines and packages as guests (a `hypervisor` plugin) | tested against a simulated DSM only |
 | [`truenas/`](truenas/README.md) | TrueNAS | TrueNAS Community 25.04+: containers, VMs and apps as guests of the NAS (a `hypervisor` plugin) | tested on a real TrueNAS 25.10.6 (VMs with simulated data) |
+| [`pihole/`](pihole/README.md) | Pi-hole | registers devices in Pi-hole v6's Local DNS (a `dns` plugin) | tested on a real Pi-hole 6.4.3 (Docker) |
+| [`adguard/`](adguard/README.md) | AdGuard Home | registers devices as AdGuard Home DNS rewrites (a `dns` plugin) | tested on a real AdGuard Home 0.107.79 (Docker) |
+| [`portainer/`](portainer/README.md) | Portainer | every Docker environment a Portainer manages: containers as guests (a `hypervisor` plugin) | tested on a real Portainer 2.45.2 (local environment) |
+| [`kubernetes/`](kubernetes/README.md) | Kubernetes | nodes as hosts, pods as guests (a `hypervisor` plugin) | tested on a real k3s 1.36 (one node) |
+| [`nomad/`](nomad/README.md) | HashiCorp Nomad | client nodes as hosts, allocations as guests (a `hypervisor` plugin) | tested on a real Nomad 2.0.7 (dev mode) |
+| [`traefik/`](traefik/README.md) | Traefik | the sites a Traefik v2/v3 publishes (a `proxy` plugin) | tested on a real Traefik 3.7.15 (Docker provider) |
+| [`caddy/`](caddy/README.md) | Caddy | the reverse-proxy sites of a Caddy 2 (a `proxy` plugin) | tested on a real Caddy 2.11.7 |
+| [`openwrt/`](openwrt/README.md) | OpenWrt | router/access point and its clients over ubus (a `topology` plugin) | tested on OpenWrt 25.12.5 (QEMU, no Wi-Fi radio) |
+| [`mikrotik/`](mikrotik/README.md) | MikroTik RouterOS | router/switch, neighbours and clients over the REST API (a `topology` plugin) | tested on RouterOS 7.12.1 CHR (QEMU, no radio) |
+| [`opnsense/`](opnsense/README.md) | OPNsense | the firewall as gateway and its ARP/DHCP clients (a `topology` plugin) | tested on OPNsense 26.7 (QEMU) |
+| [`powerdns/`](powerdns/README.md) | PowerDNS Authoritative | registers devices in PowerDNS 4.x through its API, with comments as marker (a `dns` plugin) | tested on a real PowerDNS 4.9.17 (Docker) |
+| [`bind/`](bind/README.md) | BIND 9 | registers devices by RFC 2136 dynamic update, zones read by AXFR, TSIG-signed (a `dns` plugin) | tested on a real BIND 9.20 (Docker) |
+| [`swarm/`](swarm/README.md) | Docker Swarm | swarm nodes as hosts, tasks as guests (a `hypervisor` plugin) | tested on a real swarm (one manager) |
+| [`incus/`](incus/README.md) | Incus / LXD | servers and their containers and VMs (a `hypervisor` plugin) | tested on a real Incus 6.0.4 (containers only) |
+| [`vsphere/`](vsphere/README.md) | VMware ESXi / vCenter | hosts and virtual machines over SOAP (a `hypervisor` plugin) | tested against the vcsim simulator only |
+| [`kong/`](kong/README.md) | Kong Gateway | routes and upstreams (a `proxy` plugin) | tested on a real Kong 3.9.4 (DB-less) |
+| [`haproxy/`](haproxy/README.md) | HAProxy | backends and their servers from the statistics page (a `proxy` plugin) | tested on a real HAProxy 3.4.7 |
+| [`vyos/`](vyos/README.md) | VyOS | router, ARP and DHCP clients over the HTTPS API (a `topology` plugin) | tested on a VyOS rolling live ISO (QEMU) |
+| [`netbox/`](netbox/README.md) | NetBox | the documented devices and cables as nodes, clients and the tree (a `topology` plugin) | tested on a real NetBox 4.7.3 (Docker) |
 
 Omada, UniFi and SNMP are `topology` plugins: they tell Netlens which switch or access point every device is connected to, and which device hangs
 below which, so the hierarchy and the map show the real network position. They only read.

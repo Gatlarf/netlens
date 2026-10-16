@@ -1,0 +1,49 @@
+{
+  "id": "swarm",
+  "name": "Docker Swarm",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows a Docker Swarm cluster: every node as a host (role, availability, state, address) and every task (a running copy of a service) as a guest of the node it runs on, with service name, stack, image, published ports and state. Read-only through a socket proxy on one manager node. Use the Docker plugin as well if you also want the plain containers and their health.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "What to add to a manager node (docker compose)",
+    "text": "Docker's API gives full control, so never open port 2375 itself. Add this read-only proxy on one manager node (only managers know the cluster), change the address on the ports line to that node's LAN address, start it and enter http://<that address>:2375 below.",
+    "code": "services:\n  docker-socket-proxy:\n    image: tecnativa/docker-socket-proxy\n    restart: unless-stopped\n    environment:\n      INFO: 1       # cluster information (not SWARM: that would expose the join tokens)\n      NODES: 1      # the nodes\n      SERVICES: 1   # the services and their published ports\n      TASKS: 1      # the running copies of each service\n      POST: 0       # nothing that changes anything\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n    ports:\n      - 192.168.0.189:2375:2375   # this manager's LAN address"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Swarm managers",
+      "required": true,
+      "help": "One line per swarm: the read-only socket proxy of one manager node.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Proxy address",
+          "placeholder": "http://192.168.0.189:2375",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only matters for https:// addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/swarm"
+}

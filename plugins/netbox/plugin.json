@@ -1,0 +1,75 @@
+{
+  "id": "netbox",
+  "name": "NetBox",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Imports your documented network from NetBox (4.x): devices with a network role (router, switch, access point ...) become network nodes, every other device a client, and the cables between interfaces decide who hangs below whom, including the port a device is plugged into. Netlens matches them to what it finds on the network by MAC address, so the hierarchy shows your documentation. Read-only: it only sends GET requests with an API token that has read-only permissions.",
+  "timeout": 120,
+  "diagnose": true,
+  "info": {
+    "title": "Make a read-only API token",
+    "text": "In NetBox: Admin > Users: make a user 'netlens' with only 'view' permissions on dcim and ipam objects (a permission with action View, objects dcim | device, dcim | interface, dcim | cable, ipam | ip address), then a token for that user with 'write enabled' off. Netlens only sees what the documentation has: a device without a MAC address on one of its interfaces cannot be matched and is skipped."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "NetBox servers",
+      "required": true,
+      "help": "One line per NetBox.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://netbox.example.com",
+          "required": true
+        },
+        {
+          "key": "token",
+          "label": "API token",
+          "type": "password",
+          "help": "NetBox 4.5+: the whole token as shown once, like nbt_<key>.<token>. Older NetBox: the 40 character token.",
+          "required": true
+        },
+        {
+          "key": "sites",
+          "label": "Only these sites (slugs)",
+          "placeholder": "main, annex",
+          "help": "Comma separated site slugs. Empty: all sites.",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "network_roles",
+      "type": "text",
+      "label": "Network roles",
+      "default": "router, firewall, gateway, switch, access-point, ap, wireless-ap",
+      "help": "Comma separated device role slugs that count as network equipment (nodes). Every other device is a client. Roles named router, firewall or gateway become the gateway; switch becomes a switch; access-point, ap and wireless-ap an access point."
+    },
+    {
+      "key": "only_active",
+      "type": "bool",
+      "label": "Only devices with status Active",
+      "default": true
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/netbox"
+}

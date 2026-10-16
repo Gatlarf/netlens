@@ -1,0 +1,63 @@
+{
+  "id": "kong",
+  "name": "Kong Gateway",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "proxy",
+  "author": "Netlens",
+  "description": "Shows the routes a Kong Gateway (OSS or Enterprise, DB-less or with a database) publishes: host names, the upstream service address and port, protocols (http, https, tcp) and whether a route is enabled. Netlens ties every route to the device or container behind it, can keep an HTTPS check per site and can register the host names in DNS. Read-only: it only sends GET requests to the Admin API.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Reach the Admin API safely",
+    "text": "Kong's Admin API can change everything and has no login in the open-source edition. Never publish it. Let it listen on a private address only (KONG_ADMIN_LISTEN=192.168.0.4:8001) and allow only Netlens to connect; in Kong Enterprise create an RBAC user with a read-only role and use its token below.",
+    "code": "KONG_ADMIN_LISTEN=192.168.0.4:8001"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Kong Admin APIs",
+      "required": true,
+      "help": "One line per Kong.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Admin API address",
+          "placeholder": "http://192.168.0.4:8001",
+          "required": true
+        },
+        {
+          "key": "token",
+          "label": "Admin token",
+          "type": "password",
+          "help": "Only for Kong Enterprise with RBAC (sent as Kong-Admin-Token).",
+          "optional": true
+        },
+        {
+          "key": "lan",
+          "label": "Kong host's own address",
+          "placeholder": "192.168.0.4",
+          "help": "The address of the machine Kong runs on, when the Admin API is reached by name or as 127.0.0.1. Site checks are sent to it.",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/kong"
+}

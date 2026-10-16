@@ -1,0 +1,68 @@
+{
+  "id": "opnsense",
+  "name": "OPNsense",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads an OPNsense firewall (24.7 or newer): the firewall itself as the gateway node, and every device in its ARP table as a client, with the manufacturer and host name OPNsense knows, enriched with names from the DHCP leases (Dnsmasq or Kea). Netlens uses this to place devices in the hierarchy under the firewall. Read-only: it only sends GET requests with an API key that may only read these lists.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Make a read-only API key (once)",
+    "text": "In OPNsense: System > Access > Groups > add a group 'netlens' with the privileges listed below, System > Access > Users > add a user 'netlens' in that group (give it a long random password you will not use), then edit the user and press the + under 'API keys': a file with the key and secret is downloaded. Enter them below.",
+    "code": "Privileges for the group 'netlens' (checked on OPNsense 26.7):\n  Diagnostics: ARP Table\n  Lobby: Dashboard                    (host name and version)\n  Status: Interfaces\n  Services: Dnsmasq DNS/DHCP: Settings   (lease list, if Dnsmasq is your DHCP server)\n  Services: DHCP: Kea(v4)                (lease list, if you use Kea)"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Firewalls",
+      "required": true,
+      "help": "One line per OPNsense. An OPNsense high-availability pair: list both; the first is the gateway.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.1.1",
+          "required": true
+        },
+        {
+          "key": "api_key",
+          "label": "API key",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "api_secret",
+          "label": "API secret",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "interfaces",
+      "type": "text",
+      "label": "Only these interfaces",
+      "placeholder": "LAN, IOT",
+      "help": "Comma separated names as OPNsense shows them (LAN, OPT1 ...). Leave empty for every interface except the WAN."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "OPNsense makes a self-signed certificate until you install your own."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/opnsense"
+}

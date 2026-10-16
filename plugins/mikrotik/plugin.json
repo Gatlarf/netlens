@@ -1,0 +1,74 @@
+{
+  "id": "mikrotik",
+  "name": "MikroTik RouterOS",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads a MikroTik router, switch or access point (RouterOS 7.1+): the device as a network node, MikroTik neighbours (MNDP/LLDP) as child nodes, and the devices it knows as clients with their bridge port, DHCP lease, ARP entry or Wi-Fi registration (band, signal, link speed). Netlens uses this to place devices in the hierarchy and to show Wi-Fi signal history. Read-only: only GET requests to the REST API.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Set up the router (once)",
+    "text": "RouterOS 7.1+ has a REST API on its web service (www on port 80 or www-ssl on 443). Create a user in a group that can only read, enable the service, and limit it to the machine that runs Netlens. Paste these lines into the router's terminal (change the password and the address).",
+    "code": "/user group add name=netlens-ro policy=read,api,rest-api,test,!local,!telnet,!ssh,!ftp,!reboot,!write,!policy,!winbox,!password,!web,!sniff,!sensitive,!romon\n/user add name=netlens group=netlens-ro password=CHANGE-ME address=192.168.0.10\n/ip service enable www-ssl\n/ip service set www-ssl address=192.168.0.10/32\n# plain http instead of https: /ip service enable www  (the password then travels unencrypted)"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "MikroTik devices",
+      "required": true,
+      "help": "One line per RouterOS device. List the router and every MikroTik switch or access point; give each switch or access point the address of the device it is plugged into under 'Uplink' if the neighbour list does not already show it.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.88.1",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "role",
+          "label": "Role",
+          "placeholder": "auto, gateway, switch, ap or node",
+          "help": "auto: a device that does NAT (masquerade) is the gateway, any other is a switch.",
+          "optional": true
+        },
+        {
+          "key": "uplink",
+          "label": "Uplink (address of its parent)",
+          "placeholder": "192.168.88.1",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Only for https addresses. RouterOS uses a self-signed certificate unless you installed your own."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/mikrotik"
+}

@@ -1,0 +1,69 @@
+{
+  "id": "kubernetes",
+  "name": "Kubernetes",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows a Kubernetes cluster (k3s, kubeadm, RKE2, Talos, microk8s, ...) as hosts and guests: the nodes as hosts with their address and Ready state, the pods as guests of the node they run on, with namespace, workload, image, ports, restarts and readiness. Read-only: it only lists nodes and pods with a service account that may do nothing else. Pods that finished (Completed jobs) are left out.",
+  "timeout": 90,
+  "diagnose": true,
+  "info": {
+    "title": "Create a read-only account in the cluster",
+    "text": "Apply this once with kubectl (it can only list nodes and pods), then create the token with the last command and paste it below. The address is the API server, usually https://<node>:6443.",
+    "code": "apiVersion: v1\nkind: ServiceAccount\nmetadata: {name: netlens, namespace: kube-system}\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata: {name: netlens-readonly}\nrules:\n  - apiGroups: [\"\"]\n    resources: [nodes, pods]\n    verbs: [get, list]\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRoleBinding\nmetadata: {name: netlens-readonly}\nroleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: netlens-readonly}\nsubjects: [{kind: ServiceAccount, name: netlens, namespace: kube-system}]\n# then make a token (valid ten years):\n#   kubectl -n kube-system create token netlens --duration=87600h"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Clusters",
+      "required": true,
+      "help": "One line per cluster: the API server address and the token of the read-only account.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "API server address",
+          "placeholder": "https://192.168.0.10:6443",
+          "required": true
+        },
+        {
+          "key": "token",
+          "label": "Token",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "namespaces",
+          "label": "Only these namespaces",
+          "placeholder": "default, apps",
+          "help": "Comma separated. Leave empty for all namespaces (needs the cluster-wide pod rights above).",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Clusters made by k3s, kubeadm and similar tools sign their API server with their own certificate authority; leave this off unless the certificate is trusted."
+    },
+    {
+      "key": "pod_ips",
+      "type": "bool",
+      "label": "Report pod addresses",
+      "default": false,
+      "help": "Pod addresses are normally inside the cluster network and unknown to Netlens. Switch this on when your pods have addresses on your LAN (for example with Cilium or Calico BGP, or MetalLB-style routing) so Netlens can match them to scanned devices."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/kubernetes"
+}

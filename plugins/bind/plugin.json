@@ -1,0 +1,81 @@
+{
+  "id": "bind",
+  "name": "BIND 9",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "dns",
+  "author": "Netlens",
+  "description": "Registers your devices in a BIND 9 (or any RFC 2136 compatible) DNS server: an A record and a reverse (PTR) record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Reads zones by zone transfer (AXFR) and writes by dynamic update (RFC 2136), both signed with a TSIG key. Every change is guarded by a prerequisite, so a record that changed meanwhile is never overwritten. Netlens only changes records it remembers writing.",
+  "timeout": 120,
+  "diagnose": true,
+  "capabilities": [
+    "delete"
+  ],
+  "info": {
+    "title": "Allow Netlens in named.conf",
+    "text": "Make a TSIG key (tsig-keygen netlens-key), add it to named.conf, and allow it to transfer and update your zones. The zones must be dynamic: BIND then keeps a journal next to the zone file and the directory must be writable by named. Reload with rndc reload.",
+    "code": "key \"netlens-key\" {\n    algorithm hmac-sha256;\n    secret \"...paste the secret from tsig-keygen...\";\n};\nzone \"home.lan\" {\n    type primary;\n    file \"/var/lib/bind/home.lan.db\";\n    allow-transfer { key netlens-key; };\n    allow-update   { key netlens-key; };\n};\nzone \"0.168.192.in-addr.arpa\" {\n    type primary;\n    file \"/var/lib/bind/0.168.192.db\";\n    allow-transfer { key netlens-key; };\n    allow-update   { key netlens-key; };\n};"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "BIND servers",
+      "required": true,
+      "help": "The primary server that holds the zones (secondaries get the change by zone transfer and must not be listed).",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Server address",
+          "placeholder": "192.168.0.2",
+          "help": "An address, optionally with a port: 192.168.0.2:5353",
+          "required": true
+        },
+        {
+          "key": "key_name",
+          "label": "TSIG key name",
+          "placeholder": "netlens-key",
+          "required": true
+        },
+        {
+          "key": "key_secret",
+          "label": "TSIG secret (base64)",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "algorithm",
+          "label": "Algorithm",
+          "placeholder": "hmac-sha256",
+          "help": "hmac-sha256 (default), hmac-sha384, hmac-sha512 or hmac-sha1.",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "reverse_zones",
+      "type": "text",
+      "label": "Reverse zones",
+      "placeholder": "0.168.192.in-addr.arpa",
+      "help": "Comma separated. DNS cannot list zones, so name the reverse zones Netlens should keep up to date (the forward zones come from the DNS registration page)."
+    },
+    {
+      "key": "ttl",
+      "type": "number",
+      "label": "TTL for new records (seconds)",
+      "default": 3600,
+      "min": 30,
+      "max": 86400,
+      "help": "A dynamic update must carry a TTL."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 10,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/bind"
+}

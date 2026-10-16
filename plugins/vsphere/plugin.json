@@ -1,0 +1,60 @@
+{
+  "id": "vsphere",
+  "name": "VMware ESXi / vCenter",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows VMware ESXi hosts and vCenter inventories: every host (connection state, management address) and every virtual machine as a guest of its host, with power state, MAC and IP addresses (from VMware Tools), guest operating system, CPUs and memory. Works with a standalone ESXi and with vCenter through VMware's SOAP web service, read-only: it only reads properties. Use an account with the Read-only role.",
+  "timeout": 120,
+  "diagnose": true,
+  "info": {
+    "title": "A read-only account",
+    "text": "Create a user (in ESXi: Host > Manage > Security & users, or in vCenter: Administration > Users) and give it the built-in 'Read-only' role on the root of the inventory. Netlens never changes anything. IP addresses and MAC addresses of guests come from VMware Tools; without Tools only the MAC addresses of the virtual network cards are known."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "ESXi hosts and vCenters",
+      "required": true,
+      "help": "One line per ESXi or vCenter. For a vCenter list the vCenter only: it already knows all hosts.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.0.30",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens@vsphere.local",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "ESXi and vCenter use a self-signed certificate until you install your own."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 5,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/vsphere"
+}

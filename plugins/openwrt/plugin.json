@@ -1,0 +1,75 @@
+{
+  "id": "openwrt",
+  "name": "OpenWrt",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads an OpenWrt router or access point: the router itself as a network node, and every device it knows as a client: DHCP leases and neighbours (wired), and the Wi-Fi stations that are associated with each radio, with band, signal strength (RSSI) and link speed. Netlens uses this to place devices in the hierarchy and to show Wi-Fi signal history and roaming. Read-only: it only calls a few read functions through the router's ubus web interface.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Set up the router (once)",
+    "text": "Netlens talks to OpenWrt's ubus over HTTP(S), the same way LuCI does. Install the packages below, then either use root or create a login that may only read what Netlens needs (recommended). Wi-Fi details need the iwinfo module.",
+    "code": "# 1. as root on the router: the luci-rpc calls and the web server for ubus\napk add uhttpd-mod-ubus rpcd-mod-iwinfo luci-base     # opkg install ... on OpenWrt before 25.12\n\n# 2. a login that can only read what Netlens needs\ncat > /usr/share/rpcd/acl.d/netlens.json <<'EOF2'\n{\"netlens\": {\"description\": \"Netlens, read only\",\n  \"read\": {\"ubus\": {\"luci-rpc\": [\"getHostHints\", \"getDHCPLeases\", \"getWirelessDevices\"],\n                    \"system\": [\"board\"], \"network.interface\": [\"dump\"], \"network.device\": [\"status\"],\n                    \"iwinfo\": [\"info\", \"assoclist\"]}}}}\nEOF2\necho 'netlens:x:1500:1500:netlens:/var:/bin/false' >> /etc/passwd\necho 'netlens:x:0:0:99999:7:::' >> /etc/shadow\npasswd netlens                                          # choose a password\nuci add rpcd login; uci set rpcd.@login[-1].username=netlens\nuci set rpcd.@login[-1].password='$p$netlens'; uci add_list rpcd.@login[-1].read=netlens\nuci commit rpcd; /etc/init.d/rpcd restart"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Routers and access points",
+      "required": true,
+      "help": "One line per OpenWrt device. List the main router and every OpenWrt access point; give each access point the address of the router it is plugged into under 'Uplink' so the hierarchy is right.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "http://192.168.1.1",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "role",
+          "label": "Role",
+          "placeholder": "auto, gateway or ap",
+          "help": "auto: a device with an active WAN interface is the gateway, any other is an access point.",
+          "optional": true
+        },
+        {
+          "key": "uplink",
+          "label": "Uplink (address of its parent)",
+          "placeholder": "192.168.1.1",
+          "help": "For an access point: the address of the OpenWrt router (or the node) it is connected to.",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Only for https addresses. OpenWrt makes a self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/openwrt"
+}

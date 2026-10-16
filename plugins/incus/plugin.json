@@ -1,0 +1,63 @@
+{
+  "id": "incus",
+  "name": "Incus / LXD",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows an Incus (or LXD) server or cluster: the servers as hosts and every container and virtual machine as a guest, with state, MAC and IP addresses (when the instance sits on your LAN rather than behind NAT), image, CPU and memory limits, and autostart. Read-only: it only sends GET requests with a client certificate that you add to the trust store as restricted.",
+  "timeout": 90,
+  "diagnose": true,
+  "info": {
+    "title": "Make a client certificate (once)",
+    "text": "Incus authenticates API clients with a certificate. Make one, give the server a listening address, trust the certificate (restricted: read-only is enough because Netlens only reads) and paste the two files below. LXD works the same with 'lxc'.",
+    "code": "openssl req -x509 -newkey rsa:2048 -nodes -keyout netlens.key -out netlens.crt -days 3650 -subj \"/CN=netlens\"\nincus config set core.https_address :8443\nincus config trust add-certificate netlens.crt --name netlens --restricted"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Incus servers",
+      "required": true,
+      "help": "One line per server or cluster (one cluster member is enough, it lists the others).",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Server address",
+          "placeholder": "https://192.168.0.20:8443",
+          "required": true
+        },
+        {
+          "key": "cert",
+          "label": "Client certificate (PEM)",
+          "type": "password",
+          "help": "The whole text of netlens.crt, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----.",
+          "required": true
+        },
+        {
+          "key": "key",
+          "label": "Client key (PEM)",
+          "type": "password",
+          "help": "The whole text of netlens.key.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify the server's certificate",
+      "default": false,
+      "help": "Incus makes its own self-signed server certificate; leave this off unless you installed a trusted one."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/incus"
+}

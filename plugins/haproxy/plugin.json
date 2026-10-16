@@ -1,0 +1,74 @@
+{
+  "id": "haproxy",
+  "name": "HAProxy",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "proxy",
+  "author": "Netlens",
+  "description": "Shows the backends of an HAProxy load balancer as sites: the first healthy server of each backend as the upstream (address and port), and whether the backend is in maintenance. HAProxy's statistics do not contain host names, so you can list them per backend yourself, otherwise the sites show without a domain. Netlens ties every backend to the device or container behind it. Read-only: it only reads the statistics page (CSV).",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Switch on the statistics page",
+    "text": "Add a statistics listener to haproxy.cfg, keep it on a private address and protect it with a user name and password. 'show-legends' makes HAProxy list each server's address, which Netlens needs.",
+    "code": "listen stats\n    bind 192.168.0.4:8404\n    stats enable\n    stats uri /stats\n    stats show-legends\n    stats auth netlens:CHANGE-ME"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "HAProxy statistics pages",
+      "required": true,
+      "help": "One line per HAProxy.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Statistics address",
+          "placeholder": "http://192.168.0.4:8404/stats",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "optional": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "optional": true
+        },
+        {
+          "key": "lan",
+          "label": "HAProxy host's own address",
+          "placeholder": "192.168.0.4",
+          "help": "The address of the machine HAProxy runs on, when the statistics are reached by name or as 127.0.0.1. Site checks are sent to it.",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "domains",
+      "type": "text",
+      "label": "Host names per backend",
+      "placeholder": "be_files=files.example.com, be_who=who.example.com",
+      "help": "Optional. Comma separated 'backend=host name' pairs (repeat a backend for several names). HAProxy does not tell Netlens which names reach which backend."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/haproxy"
+}

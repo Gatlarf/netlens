@@ -1,0 +1,57 @@
+{
+  "id": "portainer",
+  "name": "Portainer",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows every Docker environment that a Portainer manages (local socket, Portainer agents and Edge agents) with its containers: state, health, restarts, image, compose project and published ports. One connection covers all your Docker hosts, without opening each host's Docker port. Read-only: it only lists environments, containers and networks. Kubernetes and Azure environments are skipped.",
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Portainer servers",
+      "required": true,
+      "help": "In Portainer: your account (top right) → My account → Access tokens → Add access token. For a read-only view create a separate user, give it the Standard user or Read-only role on the environments, and make the token for that user.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Portainer address",
+          "placeholder": "https://192.168.0.5:9443",
+          "required": true
+        },
+        {
+          "key": "api_key",
+          "label": "Access token",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "lan",
+          "label": "Portainer host's own address",
+          "placeholder": "192.168.0.5",
+          "help": "Only needed when Portainer is reached by name or as 127.0.0.1: the address of the machine whose Docker socket Portainer manages locally.",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Portainer makes a self-signed certificate on port 9443; leave this off unless you installed your own."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/portainer"
+}

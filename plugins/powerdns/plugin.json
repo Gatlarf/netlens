@@ -1,0 +1,75 @@
+{
+  "id": "powerdns",
+  "name": "PowerDNS Authoritative",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "dns",
+  "author": "Netlens",
+  "description": "Registers your devices in PowerDNS Authoritative Server (4.x): an A record and a reverse (PTR) record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Netlens marks every record set it writes with a comment and only changes or removes record sets that carry it, so records made by anything else are never touched.",
+  "timeout": 120,
+  "diagnose": true,
+  "capabilities": [
+    "marker",
+    "delete"
+  ],
+  "info": {
+    "title": "Switch on the API (pdns.conf)",
+    "text": "PowerDNS's built-in API needs a key and a web server. Add these lines, restart pdns and keep the port closed to everything but Netlens: the key can change every zone.",
+    "code": "api=yes\napi-key=CHANGE-ME\nwebserver=yes\nwebserver-address=0.0.0.0\nwebserver-allow-from=192.168.0.10/32\nwebserver-port=8081"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "PowerDNS servers",
+      "required": true,
+      "help": "The primary (or only) server that holds the zones. Secondaries that get the zone by transfer must not be listed.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "API address",
+          "placeholder": "http://192.168.0.2:8081",
+          "required": true
+        },
+        {
+          "key": "api_key",
+          "label": "API key",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "server_id",
+          "label": "Server id",
+          "placeholder": "localhost",
+          "help": "Almost always 'localhost'.",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "ttl",
+      "type": "number",
+      "label": "TTL for new records (seconds)",
+      "default": 3600,
+      "min": 30,
+      "max": 86400,
+      "help": "PowerDNS needs a TTL on every record set. A record set that already exists keeps its own."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/powerdns"
+}

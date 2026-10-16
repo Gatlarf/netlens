@@ -1,0 +1,44 @@
+{
+  "id": "caddy",
+  "name": "Caddy",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "proxy",
+  "author": "Netlens",
+  "description": "Shows the sites a Caddy 2 web server publishes as a reverse proxy: domains, the upstream address and port, redirects, and whether Caddy makes the HTTPS certificate itself. Netlens ties every site to the device or container behind it, keeps an HTTPS check per site and can give the domains a DNS name. Read-only: it only reads Caddy's admin API (GET /config/). Caddy's admin API has no password: it must only be reachable from a network you trust.",
+  "timeout": 60,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Caddy servers",
+      "required": true,
+      "help": "The address of Caddy's admin API. By default it listens on localhost:2019 only; to let Netlens reach it, set `admin 0.0.0.0:2019` (or the LAN address) in the global options of your Caddyfile and keep that port closed to everything but Netlens.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Admin API address",
+          "placeholder": "http://192.168.0.4:2019",
+          "required": true
+        },
+        {
+          "key": "lan",
+          "label": "Caddy host's own address",
+          "placeholder": "192.168.0.4",
+          "help": "The address of the machine Caddy runs on, when the admin API is reached by name or as 127.0.0.1. Site checks are sent to it.",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/caddy"
+}

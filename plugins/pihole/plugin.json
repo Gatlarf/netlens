@@ -1,0 +1,53 @@
+{
+  "id": "pihole",
+  "name": "Pi-hole",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "dns",
+  "author": "Netlens",
+  "description": "Registers your devices in Pi-hole's Local DNS (Pi-hole v6): an A record for every device Netlens knows and DNS does not, and a changed address for devices whose IP changed (DHCP). Pi-hole makes the reverse (PTR) answer by itself. Netlens only changes records it wrote itself (it remembers them, Pi-hole has no comment field) and never touches records you or anything else made.",
+  "timeout": 60,
+  "diagnose": true,
+  "capabilities": [
+    "delete"
+  ],
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Pi-hole servers",
+      "required": true,
+      "help": "Every Pi-hole that should carry the records (with two Pi-holes kept in sync by Gravity Sync or Orbital Sync, list only the one you write to). Use an app password (Settings → Web interface / API → Configure app password) instead of the admin password.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Pi-hole address",
+          "placeholder": "http://192.168.0.2",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "App password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses. Turn it off for the self-signed certificate Pi-hole makes itself."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 15,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/pihole"
+}

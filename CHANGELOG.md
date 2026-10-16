@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.13 — 2026-10-16
+
+### Added
+- ★ **Nineteen new plugins** (Settings → Integrations → Browse plugins), each tested against the real software in a lab where that was possible. Everything is read-only unless it is a DNS plugin (which writes only after you approve) and every plugin has a *Run diagnostic* button.
+- ★ **DNS registration** now also works with **Pi-hole** (v6 Local DNS), **AdGuard Home** (DNS rewrites), **PowerDNS Authoritative** (record sets marked with a comment) and **BIND 9** (zone transfer plus signed dynamic updates; every change is guarded by a prerequisite that the server checks, so a record that changed meanwhile is never overwritten). Records on Pi-hole, AdGuard Home and BIND cannot carry a marker, so Netlens only changes records it remembers writing.
+- ★ **Hypervisor plugins**: **Portainer** (every Docker environment it manages), **Docker Swarm** (nodes and tasks), **Kubernetes** (nodes and pods, tested on k3s), **HashiCorp Nomad**, **Incus / LXD** (client-certificate login) and **VMware ESXi / vCenter** (tested against the vcsim simulator only). Podman needs no new plugin: the Docker plugin works with Podman's API, see its README.
+- ★ **Reverse-proxy plugins**: **Traefik**, **Caddy**, **Kong Gateway** and **HAProxy** show the sites they publish and tie each one to the device or container behind it (HAProxy's statistics have no host names, so you can list them per backend).
+- ★ **Topology plugins**: **OpenWrt** (router and access point over ubus, with Wi-Fi stations, band and signal), **MikroTik RouterOS** (bridge hosts with their port, DHCP, ARP, Wi-Fi, MikroTik neighbours), **OPNsense** (ARP and DHCP clients under the firewall), **VyOS** and **NetBox** (your documented devices and cables become the hierarchy). The Wi-Fi parts of OpenWrt and MikroTik, MikroTik neighbours, OPNsense DHCP lists and VyOS DHCP leases follow the vendors' documentation and are covered by simulated answers only: a *Run diagnostic* report is welcome.
+
 ## 0.4.12 — 2026-10-15
 
 ### Added

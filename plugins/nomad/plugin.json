@@ -1,0 +1,56 @@
+{
+  "id": "nomad",
+  "name": "HashiCorp Nomad",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows a Nomad cluster as hosts and guests: the client nodes as hosts with their address, state and eligibility, and the allocations (running tasks of your jobs) as guests of the node they run on, with namespace, job, image, published ports, restarts and start time. Read-only: it only reads nodes and allocations, with an ACL token that has the read-job and node read capabilities if your cluster uses ACLs.",
+  "timeout": 90,
+  "diagnose": true,
+  "info": {
+    "title": "ACL policy for the token (only when ACLs are on)",
+    "text": "A policy that can only read. Save it as netlens.policy.hcl, then: nomad acl policy apply netlens netlens.policy.hcl && nomad acl token create -name=netlens -policy=netlens",
+    "code": "namespace \"*\" {\n  capabilities = [\"list-jobs\", \"read-job\"]\n}\nnode {\n  policy = \"read\"\n}"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Nomad clusters",
+      "required": true,
+      "help": "The address of any Nomad server or client (port 4646). One line per cluster.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "http://192.168.0.10:4646",
+          "required": true
+        },
+        {
+          "key": "token",
+          "label": "ACL token",
+          "type": "password",
+          "help": "Only when ACLs are enabled (the 'Secret ID' of the token).",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/nomad"
+}

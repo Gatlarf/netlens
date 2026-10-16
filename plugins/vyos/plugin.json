@@ -1,0 +1,62 @@
+{
+  "id": "vyos",
+  "name": "VyOS",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads a VyOS router (1.4 or newer): the router itself as a network node (host name, version, interface MAC addresses) and every device in its ARP table and DHCP server leases as a client, with the interface it is reached on. Netlens uses this to place devices in the hierarchy under the router. Read-only: it only sends show and showConfig requests to VyOS's HTTPS API.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Switch on the HTTPS API (once)",
+    "text": "VyOS has a REST API with a shared key. Give it a long random key and let it listen on the management address only. Netlens only uses 'show' and 'showConfig' requests. Note that every key can also configure the router (VyOS has no read-only keys), so keep the key private and the port closed to everything but Netlens.",
+    "code": "configure\nset service https api keys id netlens key 'CHANGE-ME-LONG-RANDOM'\nset service https api rest\nset service https listen-address 192.168.1.1\nset service https allow-client address 192.168.0.10\ncommit\nsave"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "VyOS routers",
+      "required": true,
+      "help": "One line per router. The first with a NAT rule (or role 'gateway') is the gateway.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.1.1",
+          "required": true
+        },
+        {
+          "key": "api_key",
+          "label": "API key",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "role",
+          "label": "Role",
+          "placeholder": "auto, gateway or node",
+          "help": "auto: a router with a source NAT rule is the gateway.",
+          "optional": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "VyOS makes a self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/vyos"
+}
