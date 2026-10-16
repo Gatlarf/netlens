@@ -640,3 +640,5 @@ table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 .rep-filter, .rep-schedule { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 8px 0; }
 .rep-part { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; }
 .rep-target { width: 6em; }
+.rep-options { margin: 10px 0; }
+.rep-options summary { cursor: pointer; font-weight: 600; }

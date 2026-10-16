@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.36 — 2026-10-16
+
+### Added
+- **Leave a device out of the reports**: a tick box on the device's edit form. The weekly and monthly reports then neither count its outages nor name it as a new device.
+- **Business hours and planned maintenance in the reports**: both reports can count only the business hours (days and hours you set, on the server's clock) and can leave out the time that falls in a planned maintenance window of the device. The monthly report page has both as switches; the weekly report and the monthly mail use the saved choice.
+- **Monthly report by mail**: the availability of the last full month, in plain language, goes to the notification channels that tick the new *Monthly report* event, on the day and hour you choose, with an optional availability target. *Send it now* tries it out.
+- **How many items the weekly text lists** (outages, disks, problems) is a setting (1 to 30; it was always 5).
+
 ## 0.4.35 — 2026-10-16
 
 ### Changed

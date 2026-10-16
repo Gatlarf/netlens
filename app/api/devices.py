@@ -34,6 +34,7 @@ class DevicePatch(BaseModel):
     tags: list[str] | None = None
     type_override: str | None = None
     notify_offline: bool | None = None
+    report_exclude: bool | None = None      # True = left out of the weekly and monthly reports
     always_on: bool | None = None           # a core device: it should always be online (counts for the core availability)
     trusted: bool | None = None             # True = a device the user knows
     gentle: bool | None = None              # True = scans only check its ports, they never probe its services
@@ -76,6 +77,7 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
         "open_ports": row["open_ports"],
         "notify_offline": bool(row["notify_offline"]),
         "always_on": bool(row["always_on"]),
+        "report_exclude": bool(row["report_exclude"]),
         "trusted": bool(row["trusted"]),
         "gentle": bool(row["gentle"]),
         "dns_mode": row["dns_mode"] or "auto",
@@ -269,6 +271,7 @@ def list_devices(
             pos_y,
             notify_offline,
             always_on,
+            report_exclude,
             trusted,
             gentle,
             dns_mode,
@@ -384,6 +387,7 @@ def get_device(
             pos_y,
             notify_offline,
             always_on,
+            report_exclude,
             trusted,
             gentle,
             dns_mode,
@@ -431,6 +435,7 @@ def patch_device(
             pos_y,
             notify_offline,
             always_on,
+            report_exclude,
             trusted,
             gentle,
             dns_mode,
@@ -506,6 +511,9 @@ def patch_device(
     if "notify_offline" in fields_set:
         updates["notify_offline"] = 0 if body.notify_offline is False else 1
 
+    if "report_exclude" in fields_set:
+        updates["report_exclude"] = 1 if body.report_exclude else 0
+
     if "always_on" in fields_set:
         updates["always_on"] = 1 if body.always_on else 0
         request.app.state.__dict__.get("stats_cache", {}).clear()      # the uptime pages show the new choice at once
@@ -575,6 +583,7 @@ def patch_device(
             pos_y,
             notify_offline,
             always_on,
+            report_exclude,
             trusted,
             gentle,
             dns_mode,

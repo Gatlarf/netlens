@@ -579,8 +579,9 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                         from app import reports
 
                         await reports.send_weekly(db_path)                      # only when it is due
+                        await reports.send_monthly(db_path)                     # likewise
                     except Exception:  # noqa: BLE001
-                        log.exception("weekly report failed")
+                        log.exception("weekly or monthly report failed")
                     from app import backup_schedule
 
                     outcome = await asyncio.to_thread(backup_schedule.run_if_due, conn, db_path)

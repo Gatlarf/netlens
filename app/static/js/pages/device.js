@@ -313,6 +313,11 @@ function buildEditCard(device, onSaved) {
   alwaysField.appendChild(h("label", { title: "Tick it for devices that should be on all the time (router, switch, server, NAS, camera). The Uptime page and the dashboard can then show the availability of these core devices separately from phones, tablets and laptops that come and go." }, alwaysInput, " Always-on device (should always be online)"));
   form.appendChild(alwaysField);
 
+  const excludeField = h("div", { class: "field" });
+  const excludeInput = h("input", { type: "checkbox", name: "report_exclude", checked: device.report_exclude === true });
+  excludeField.appendChild(h("label", { title: "The weekly and monthly reports leave this device out: its outages and availability do not count. Use it for a test machine or a phone that comes and goes." }, excludeInput, " Leave out of reports"));
+  form.appendChild(excludeField);
+
   const gentleField = h("div", { class: "field" });
   const gentleInput = h("input", { type: "checkbox", name: "gentle", checked: device.gentle === true });
   gentleField.appendChild(h("label", { title: "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself." }, gentleInput, " Gentle scanning (don't probe its services)"));
@@ -338,7 +343,7 @@ function buildEditCard(device, onSaved) {
   let dirty = false;
   let focused = false;
 
-  const fields = [nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, alwaysInput, trustInput, dnsMode, dnsName];
+  const fields = [nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, alwaysInput, excludeInput, trustInput, dnsMode, dnsName];
   for (const f of fields) {
     f.addEventListener("input", () => { dirty = true; });
     f.addEventListener("change", () => { dirty = true; });
@@ -356,6 +361,7 @@ function buildEditCard(device, onSaved) {
       notes: notesTextarea.value,
       notify_offline: notifyInput.checked,
       always_on: alwaysInput.checked,
+      report_exclude: excludeInput.checked,
       trusted: trustInput.checked,
       gentle: gentleInput.checked,
       dns_mode: dnsMode.value,

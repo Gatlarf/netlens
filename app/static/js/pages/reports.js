@@ -15,7 +15,7 @@ function table(head, rows) {
 
 // what the monthly report covers, remembered in this browser
 const FILTER_KEY = "netlens.reports.filter";
-const DEFAULT_FILTER = { scope: "all", services: true, group: "", only_outages: false, target: "" };
+const DEFAULT_FILTER = { scope: "all", services: true, group: "", only_outages: false, target: "", hours: null, ignore: null };      // hours / ignore null: what the report settings say
 function loadFilter() {
   try { return { ...DEFAULT_FILTER, ...JSON.parse(localStorage.getItem(FILTER_KEY) || "{}") }; } catch (e) { return { ...DEFAULT_FILTER }; }
 }
@@ -30,9 +30,66 @@ function filterQuery(month, f) {
   if (f.group) q.set("group", f.group);
   if (f.only_outages) q.set("only_outages", "true");
   if (f.target !== "" && !Number.isNaN(Number(f.target))) q.set("target", String(f.target));
+  if (f.hours) q.set("hours", f.hours);
+  if (f.ignore !== null && f.ignore !== undefined) q.set("ignore_maintenance", String(f.ignore));
   const text = q.toString();
   return text ? `?${text}` : "";
 }
+
+// settings that both reports share: how many items the text lists, planned maintenance, business hours, and the monthly mail
+function reportOptions(s) {
+  const save = async (changes, redraw = true) => {
+    try { await put("/api/reports/weekly/settings", changes); toast("Saved", "success"); if (redraw) drawAll(); } catch (err) { toast(err.message || "Could not save", "error"); }
+  };
+  const max = h("input", { type: "number", min: "1", max: "30", value: String(s.max_items), class: "rep-target" });
+  max.addEventListener("change", () => save({ max_items: Number(max.value) }));
+  const quiet = h("input", { type: "checkbox" });
+  quiet.checked = s.ignore_maintenance;
+  quiet.addEventListener("change", () => save({ ignore_maintenance: quiet.checked }));
+  const hours = h("select", {}, h("option", { value: "all" }, "All hours"), h("option", { value: "business" }, "Business hours only"));
+  hours.value = s.hours;
+  hours.addEventListener("change", () => save({ hours: hours.value }));
+  const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const days = names.map((n, i) => { const b = h("input", { type: "checkbox" }); b.checked = s.business_days.includes(i); return [i, b, h("label", { class: "rep-part" }, b, ` ${n}`)]; });
+  const hourSelect = (value, from, to) => h("select", {}, Array.from({ length: to - from + 1 }, (_, i) => h("option", { value: String(from + i) }, `${String(from + i).padStart(2, "0")}:00`)));
+  const start = hourSelect(s.business_start, 0, 23), end = hourSelect(s.business_end, 1, 24);
+  start.value = String(s.business_start);
+  end.value = String(s.business_end);
+  const saveBusiness = () => save({ business_days: days.filter(([, b]) => b.checked).map(([i]) => i), business_start: Number(start.value), business_end: Number(end.value) });
+  for (const [, b] of days) b.addEventListener("change", saveBusiness);
+  start.addEventListener("change", saveBusiness);
+  end.addEventListener("change", saveBusiness);
+  const monthly = h("input", { type: "checkbox" });
+  monthly.checked = s.monthly;
+  const mday = h("select", {}, Array.from({ length: 28 }, (_, i) => h("option", { value: String(i + 1) }, String(i + 1))));
+  mday.value = String(s.monthly_day);
+  const mhour = hourSelect(s.monthly_hour, 0, 23);
+  mhour.value = String(s.monthly_hour);
+  const mtarget = h("input", { type: "number", min: "0", max: "100", step: "0.1", placeholder: "e.g. 99.9", class: "rep-target", value: s.monthly_target === null ? "" : String(s.monthly_target) });
+  monthly.addEventListener("change", () => save({ monthly: monthly.checked }, false));
+  mday.addEventListener("change", () => save({ monthly_day: Number(mday.value) }, false));
+  mhour.addEventListener("change", () => save({ monthly_hour: Number(mhour.value) }, false));
+  mtarget.addEventListener("change", () => save({ monthly_target: mtarget.value === "" ? null : Number(mtarget.value) }, false));
+  const send = h("button", { class: "btn", type: "button" }, "Send it now");
+  send.addEventListener("click", async () => {
+    send.disabled = true;
+    try {
+      const r = await post("/api/reports/monthly/send", {});
+      toast(r.failed ? `Sent to ${r.sent}, failed for ${r.failed}: ${r.errors.join("; ")}` : `Sent to ${r.sent} channel(s)`, r.failed ? "error" : "success");
+    } catch (err) {
+      toast(err.message || "Could not send", "error");
+    }
+    send.disabled = false;
+  });
+  return h("details", { class: "rep-options" }, h("summary", {}, "More report settings"),
+    h("div", { class: "rep-schedule" }, h("strong", {}, "List at most "), max, " outages, disks and problems in the text"),
+    h("div", { class: "rep-schedule" }, h("strong", {}, "Count: "), hours, h("label", { class: "rep-part", title: "Leave out the checks that fall in a planned maintenance window (Settings → Maintenance windows)." }, quiet, " Leave out planned maintenance")),
+    h("div", { class: "rep-schedule" }, h("strong", {}, "Business hours: "), ...days.map((d) => d[2]), start, " to ", end, h("span", { class: "hint" }, " (the time of the server)")),
+    h("div", { class: "rep-schedule" }, h("label", { class: "rep-part" }, monthly, " Also send the report of the last month on day "), mday, " at ", mhour, " with target ", mtarget, " %", send),
+    h("p", { class: "hint" }, "The monthly report goes to the notification channels that have “Monthly report” ticked (Settings → Alert channels), and follows the choices above."));
+}
+
+let drawAll = () => {};
 
 export async function render(container) {
   let disposed = false;
@@ -88,6 +145,7 @@ export async function render(container) {
         try { await put("/api/reports/weekly/settings", { scope: scope.value }); drawWeekly(); } catch (err) { toast(err.message || "Could not save", "error"); }
       });
       card.append(h("div", { class: "rep-schedule" }, h("strong", {}, "Covers: "), scope), h("div", { class: "rep-schedule" }, h("strong", {}, "Include: "), ...boxes));
+      card.appendChild(reportOptions(w.settings));
       const send = h("button", { class: "btn", type: "button" }, "Send it now");
       send.addEventListener("click", async () => {
         send.disabled = true;
@@ -136,10 +194,18 @@ export async function render(container) {
     const outages = h("input", { type: "checkbox" });
     outages.checked = filter.only_outages;
     const target = h("input", { type: "number", min: "0", max: "100", step: "0.1", placeholder: "e.g. 99.9", value: filter.target, class: "rep-target" });
-    const apply = () => { filter.scope = scope.value; filter.services = services.checked; filter.group = group.value; filter.only_outages = outages.checked; filter.target = target.value; saveFilter(filter); drawMonth(); };
-    for (const el of [scope, services, group, outages]) el.addEventListener("change", apply);
+    const hours = h("select", { title: "The business hours are set in the weekly report settings above (the time of the server)." }, h("option", { value: "all" }, "All hours"), h("option", { value: "business" }, "Business hours only"));
+    hours.value = filter.hours || r.summary.hours || "all";
+    const quiet = h("input", { type: "checkbox" });
+    quiet.checked = filter.ignore === null ? !!r.summary.ignore_maintenance : !!filter.ignore;
+    const apply = () => {
+      Object.assign(filter, { scope: scope.value, services: services.checked, group: group.value, only_outages: outages.checked, target: target.value, hours: hours.value, ignore: quiet.checked });
+      saveFilter(filter); drawMonth();
+    };
+    for (const el of [scope, services, group, outages, hours, quiet]) el.addEventListener("change", apply);
     target.addEventListener("change", apply);
-    card.appendChild(h("div", { class: "rep-filter" }, scope, h("label", { class: "rep-part" }, services, " Services"), (r.groups || []).length ? group : null,
+    card.appendChild(h("div", { class: "rep-filter" }, scope, h("label", { class: "rep-part" }, services, " Services"), (r.groups || []).length ? group : null, hours,
+      h("label", { class: "rep-part", title: "Leave out the checks that fall in a planned maintenance window of the device (Settings → Maintenance windows)." }, quiet, " Leave out planned maintenance"),
       h("label", { class: "rep-part" }, outages, " Only with an outage"), h("label", { class: "rep-part" }, "Target ", target, " %")));
     if (!r.devices.length && !r.services.length) {
       card.appendChild(h("p", { class: "hint" }, "Netlens has no checks for this month yet."));
@@ -166,6 +232,7 @@ export async function render(container) {
     monthSlot.appendChild(card);
   }
 
+  drawAll = () => { drawWeekly(); drawMonth(); };
   await Promise.all([drawWeekly(), drawMonth()]);
   return () => { disposed = true; };
 }

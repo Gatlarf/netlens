@@ -220,3 +220,140 @@ def test_api_filters_and_weekly_options(tmp_path, conn):
         assert saved["scope"] == "core" and saved["health"] is False
         assert tc.put("/api/reports/weekly/settings", json={"scope": "x"}).status_code == 422
         assert tc.get("/api/reports/weekly").json()["data"]["options"]["scope"] == "core"
+
+
+# ------------------------------------------------------------------ left out, business hours, maintenance, item count, monthly mail
+@pytest.fixture
+def utc(monkeypatch):
+    import time
+
+    monkeypatch.setenv("TZ", "UTC")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
+
+
+def test_a_device_can_be_left_out_of_the_reports(conn):
+    conn.execute("UPDATE devices SET report_exclude = 1 WHERE id = 2")
+    conn.commit()
+    assert [d["id"] for d in reports.availability(conn, *SPAN)["devices"]] == [1]
+    week = reports.weekly(conn, NOW, {})
+    assert week["devices"]["total"] == 1 and week["devices"]["new_count"] == 0                      # phone (id 2) is neither counted nor named as new
+
+
+def test_the_device_form_can_set_the_flag(tmp_path, conn):
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret", "NETLENS_DATA_DIR": str(tmp_path)}), db_path=conn.execute("PRAGMA database_list").fetchone()[2])
+    with TestClient(app, headers=AUTH) as tc:
+        assert tc.get("/api/devices/2").json()["report_exclude"] is False
+        assert tc.patch("/api/devices/2", json={"report_exclude": True}).json()["report_exclude"] is True
+        month = NOW.strftime("%Y-%m")
+        assert [d["id"] for d in tc.get(f"/api/reports/availability?month={month}").json()["devices"]] == [1]
+
+
+def test_business_hours_count_only_those_hours(conn, utc):
+    business = {"business_days": [0, 1, 2, 3, 4], "business_start": 8, "business_end": 18}
+    during = reports.availability(conn, *SPAN, hours="business", business=business)
+    nas = next(d for d in during["devices"] if d["id"] == 1)
+    assert nas["outages"] == 1 and nas["checks"] < 240 and during["summary"]["hours"] == "business"        # the outage was Monday 09:00-12:00
+    evenings = reports.availability(conn, *SPAN, hours="business", business={**business, "business_start": 13, "business_end": 18})
+    assert next(d for d in evenings["devices"] if d["id"] == 1)["outages"] == 0
+    weekend = reports.availability(conn, *SPAN, hours="business", business={**business, "business_days": [5, 6]})
+    assert next(d for d in weekend["devices"] if d["id"] == 1)["outages"] == 0
+    assert next(d for d in reports.availability(conn, *SPAN)["devices"] if d["id"] == 1)["outages"] == 1
+
+
+def test_business_spans_follow_the_servers_clock(utc):
+    spans = reports.business_spans(datetime(2026, 10, 12, 0, 0, tzinfo=timezone.utc), datetime(2026, 10, 14, 0, 0, tzinfo=timezone.utc), reports.DEFAULTS)
+    assert spans.contains("2026-10-12T09:00:00Z") and not spans.contains("2026-10-12T07:59:59Z") and not spans.contains("2026-10-12T18:00:00Z") and spans.contains("2026-10-13T17:59:59Z")
+    assert not spans.contains("2026-10-17T10:00:00Z")                                                         # a Saturday
+
+
+def test_planned_maintenance_can_be_left_out(conn):
+    from app import maintenance
+
+    window = maintenance.clean_window({"name": "Updates", "scope": {"all": True}, "schedule": {"type": "once", "start": "2026-10-12T08:30:00Z", "end": "2026-10-12T12:30:00Z"}})
+    maintenance.save_windows(conn, [window])
+    normal = next(d for d in reports.availability(conn, *SPAN)["devices"] if d["id"] == 1)
+    quiet = reports.availability(conn, *SPAN, ignore_maintenance=True)
+    nas = next(d for d in quiet["devices"] if d["id"] == 1)
+    assert normal["outages"] == 1 and nas["outages"] == 0 and nas["availability"] == 100.0 and nas["checks"] < normal["checks"] and quiet["summary"]["ignore_maintenance"] is True
+    weekly = maintenance.clean_window({"name": "Nights", "scope": {"all": True}, "schedule": {"type": "weekly", "days": [0], "start": "08:30", "end": "12:30"}, "tz": "UTC"})
+    maintenance.save_windows(conn, [weekly])
+    assert next(d for d in reports.availability(conn, *SPAN, ignore_maintenance=True)["devices"] if d["id"] == 1)["outages"] == 0        # every Monday 08:30-12:30
+
+
+def test_the_number_of_listed_items_is_a_setting(conn):
+    for i in range(3, 9):
+        conn.execute("INSERT INTO devices (id, mac, primary_ip, hostname, online, first_seen, last_seen) VALUES (?, ?, ?, ?, 1, 'x', 'x')", (i, f"aa:00:00:00:00:{i:02x}", f"10.0.1.{i}", f"d{i}"))
+        for k, up in enumerate([1, 0, 1]):
+            conn.execute("INSERT INTO checks (device_id, ts, up, rtt_ms) VALUES (?, ?, ?, 1.0)", (i, stamp(NOW - timedelta(hours=5 - k)), up))
+    conn.commit()
+    assert len(reports.weekly(conn, NOW, {"max_items": 3})["worst_devices"]) == 3
+    assert len(reports.weekly(conn, NOW, {"max_items": 10})["worst_devices"]) == 7
+    reports.save_settings(conn, {"max_items": 4})
+    assert len(reports.weekly(conn, NOW)["worst_devices"]) == 4
+    for bad in (0, 31, "5", True):
+        with pytest.raises(ValueError):
+            reports.save_settings(conn, {"max_items": bad})
+
+
+def test_settings_for_hours_and_the_monthly_report_are_checked(conn):
+    out = reports.save_settings(conn, {"hours": "business", "business_days": [4, 0, 0], "business_start": 9, "business_end": 17, "monthly": True, "monthly_day": 3, "monthly_target": 99.9})
+    assert out["business_days"] == [0, 4] and out["monthly"] and out["monthly_target"] == 99.9
+    assert reports.save_settings(conn, {"monthly_target": None})["monthly_target"] is None
+    for bad in ({"hours": "night"}, {"business_days": []}, {"business_days": [7]}, {"business_end": 25}, {"monthly_day": 29}, {"monthly_target": 120}, {"nope": 1}, {"business_start": 18}):
+        with pytest.raises(ValueError):
+            reports.save_settings(conn, bad)
+    assert reports.get_settings(conn)["business_start"] == 9
+
+
+def test_the_monthly_report_text_and_schedule(conn, utc):
+    reports.save_settings(conn, {"monthly": True, "monthly_day": 2, "monthly_hour": 8, "monthly_target": 99.5, "ignore_maintenance": True})
+    data = reports.monthly(conn, "2026-10", now=NOW)
+    title, text = reports.monthly_text(data)
+    assert title == "Netlens availability report for October 2026" and "were reachable" in text and "Target 99.5%" in text and "time in planned maintenance windows is left out" in text
+    assert "nas" in text and "Below the 99.5% target" in text
+    assert reports.previous_month(NOW) == "2026-09"
+    assert reports.monthly(conn, now=NOW)["month"] == "2026-09"
+    assert not reports.monthly_due(conn, datetime(2026, 11, 1, 23, 0, tzinfo=timezone.utc))               # not yet the 2nd
+    assert reports.monthly_due(conn, datetime(2026, 11, 2, 8, 0, tzinfo=timezone.utc))
+    from app.db import set_setting
+
+    set_setting(conn, reports.MONTHLY_KEY, "2026-10")
+    assert not reports.monthly_due(conn, datetime(2026, 11, 5, 8, 0, tzinfo=timezone.utc)) and reports.monthly_due(conn, datetime(2026, 12, 2, 9, 0, tzinfo=timezone.utc))
+    reports.save_settings(conn, {"monthly": False})
+    assert not reports.monthly_due(conn, datetime(2026, 12, 20, 9, 0, tzinfo=timezone.utc))
+
+
+def test_the_monthly_report_is_sent_to_the_channels_that_ask_for_it(conn, tmp_path):
+    from app.notify import channels as ch
+
+    sent = []
+    channel = {"id": "a", "name": "ntfy", "type": "ntfy", "enabled": True, "events": ["report_monthly"], "topic": "t"}
+    other = {"id": "b", "name": "other", "type": "ntfy", "enabled": True, "events": ["report_weekly"], "topic": "t"}
+    orig_load, orig_send = ch.load_channels, ch.send_channel
+    ch.load_channels = lambda c: [channel, other]
+    ch.send_channel = lambda c, title, body, attachments=(), **kw: sent.append((c["name"], title, body))
+    try:
+        result = asyncio.run(reports.send_monthly(conn.execute("PRAGMA database_list").fetchone()[2], force=True))
+    finally:
+        ch.load_channels, ch.send_channel = orig_load, orig_send
+    assert result["sent"] == 1 and result["channels"] == 1 and [s[0] for s in sent] == ["ntfy"] and "availability report" in sent[0][1]
+    assert "report_monthly" in ch.EVENT_LABELS
+
+
+def test_api_monthly_and_new_report_settings(tmp_path, conn):
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret", "NETLENS_DATA_DIR": str(tmp_path)}), db_path=conn.execute("PRAGMA database_list").fetchone()[2])
+    with TestClient(app, headers=AUTH) as tc:
+        month = NOW.strftime("%Y-%m")
+        saved = tc.put("/api/reports/weekly/settings", json={"hours": "business", "business_days": [0, 1], "monthly": True, "monthly_target": 99}).json()["settings"]
+        assert saved["hours"] == "business" and saved["business_days"] == [0, 1] and saved["monthly"] is True
+        assert tc.put("/api/reports/weekly/settings", json={"max_items": 99}).status_code == 422
+        rep = tc.get(f"/api/reports/availability?month={month}").json()
+        assert rep["summary"]["hours"] == "business" and rep["business"]["business_days"] == [0, 1]       # the saved choice is the default
+        assert tc.get(f"/api/reports/availability?month={month}&hours=all&ignore_maintenance=true").json()["summary"]["hours"] == "all"
+        assert tc.get(f"/api/reports/availability?month={month}&hours=night").status_code == 422
+        body = tc.get("/api/reports/monthly").json()
+        assert body["title"].startswith("Netlens availability report for") and body["settings"]["monthly"] is True
+        assert tc.post("/api/reports/monthly/send").status_code == 409                                      # no channel asks for it yet

@@ -78,6 +78,7 @@ EVENT_LABELS = {
     "metric_critical": "A device's health reading goes past its critical limit",
     "metric_ok": "A health reading is back to normal",
     "report_weekly": "The weekly report: a summary of the week in plain language (sent once a week, not an event)",
+    "report_monthly": "The monthly report: the availability of the last month in plain language (sent once a month, not an event)",
     "capacity_warning": "A disk is on course to be full within the chosen number of days",
     "capacity_critical": "A disk will be full within three days",
     "remote_new": "A new device appears at a remote site",

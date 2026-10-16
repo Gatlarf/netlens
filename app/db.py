@@ -533,6 +533,8 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     # --- schema v21: "always on" devices (the core devices the availability can be limited to) ----------------
     _add_column_if_missing(conn, "devices", "always_on", "INTEGER NOT NULL DEFAULT 0")
+    # --- schema v23: a device that is left out of the weekly and monthly reports (a test machine, a guest's phone) ---
+    _add_column_if_missing(conn, "devices", "report_exclude", "INTEGER NOT NULL DEFAULT 0")
 
     # --- schema v20: speed tests (internet, iperf3, browser) ----------------------------------------------------
     cur.execute(
