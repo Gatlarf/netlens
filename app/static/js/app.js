@@ -100,11 +100,18 @@ async function renderPage() {
   fresh.className = "page";
 
   clear(view);
+  // a spinner until the page has its data (the script of the page may still have to load, and the page asks the server for its numbers)
+  const waiting = document.createElement("div");
+  waiting.className = "page-loading";
+  waiting.setAttribute("role", "status");
+  waiting.textContent = "Loading…";
+  view.appendChild(waiting);
   view.appendChild(fresh);
 
   try {
     const mod = await import(`./pages/${route.name}.js`);
     const cleanup = await mod.render(fresh, route.params);
+    waiting.remove();
 
     if (gen !== renderGen) {
       if (typeof cleanup === "function") cleanup();
@@ -115,6 +122,7 @@ async function renderPage() {
       currentCleanup = cleanup;
     }
   } catch (err) {
+    waiting.remove();
     if (gen !== renderGen) return;
 
     const card = document.createElement("div");
@@ -417,8 +425,14 @@ function hideTokenLogin() {
   if (switchBtn) switchBtn.hidden = true;
 }
 
+function hideBoot() {
+  const boot = document.getElementById("boot");      // the spinner of index.html, shown until the scripts are here and the session is known
+  if (boot) boot.remove();
+}
+
 async function init() {
   const session = await applySession();
+  hideBoot();
 
   if (!session.authenticated && session.setup_required) {
     startSetup();
@@ -471,7 +485,7 @@ async function init() {
   window.addEventListener("hashchange", renderPage);
 }
 
-init();
+init().finally(hideBoot);       // never leave the spinner on the screen, also when something went wrong
 // Show the running version next to the logo.
 fetch("/api/health").then((r) => r.json()).then((d) => {
   const el = document.getElementById("app-version");

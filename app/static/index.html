@@ -10,6 +10,18 @@
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
   <meta name="theme-color" content="#2563eb">
   <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
+  <!-- The first thing that is painted while the scripts load (the first visit after an update fetches everything again): a spinner, in the colours of the theme -->
+  <style>
+    #boot { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #f5f6f8; color: #475569; font: 15px system-ui, sans-serif; }
+    #boot .boot-spin { width: 36px; height: 36px; border: 3px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: boot-spin 0.9s linear infinite; }
+    #boot .boot-slow { opacity: 0; font-size: 13px; max-width: 28em; text-align: center; animation: boot-show 0.1s 6s forwards; }
+    @keyframes boot-spin { to { transform: rotate(360deg); } }
+    @keyframes boot-show { to { opacity: 0.85; } }
+    @media (prefers-color-scheme: dark) { #boot { background: #0f172a; color: #94a3b8; } }
+    :root[data-theme="dark"] #boot { background: #0f172a; color: #94a3b8; }
+    :root[data-theme="light"] #boot { background: #f5f6f8; color: #475569; }
+    @media (prefers-reduced-motion: reduce) { #boot .boot-spin { animation-duration: 3s; } }
+  </style>
   <script src="js/theme-init.js"></script>
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/pages.css">
@@ -19,6 +31,12 @@
   <link rel="stylesheet" href="css/phone.css">
 </head>
 <body>
+  <div id="boot" role="status" aria-live="polite">
+    <div class="boot-spin" aria-hidden="true"></div>
+    <div>Loading Netlens…</div>
+    <div class="boot-slow">This is taking longer than usual. After an update the browser has to fetch the new version first; it only happens once.</div>
+    <noscript>Netlens needs JavaScript.</noscript>
+  </div>
   <div id="demo-banner" class="demo-banner" role="note" hidden></div>
   <header class="topbar" id="topbar">
     <a class="brand" href="#/"><img class="brand-icon" src="img/favicon.svg" alt="" width="24" height="24">Netlens</a>

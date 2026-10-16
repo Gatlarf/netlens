@@ -93,3 +93,16 @@ def test_every_static_import_resolves():
     """A script that imports a file that does not exist would break the page; the preload list must never name a missing file."""
     graph = assets.module_graph()
     assert all((assets.STATIC / p).is_file() for p in graph) and len(graph) > 10
+
+
+def test_the_page_shows_a_spinner_until_the_scripts_are_there(client):
+    html = client.get("/").text
+    assert 'id="boot"' in html and "Loading Netlens" in html and html.index('id="boot"') < html.index("</body>")
+    assert html.index("<style>") < html.index('src="v/9.9.9/js/app.js"')                           # its style is in the page itself, not in a file that must load first
+    js = (assets.STATIC / "js" / "app.js").read_text()
+    assert 'getElementById("boot")' in js and "init().finally(hideBoot)" in js and "page-loading" in js
+
+
+def test_a_page_script_loading_state_is_removed_again():
+    js = (assets.STATIC / "js" / "app.js").read_text()
+    assert js.count("waiting.remove()") >= 2                                                       # after a successful render and after an error

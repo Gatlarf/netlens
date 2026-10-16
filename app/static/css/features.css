@@ -642,3 +642,7 @@ table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 .rep-target { width: 6em; }
 .rep-options { margin: 10px 0; }
 .rep-options summary { cursor: pointer; font-weight: 600; }
+.page-loading { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--muted); }
+.page-loading::before { content: ""; width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: page-spin 0.9s linear infinite; }
+@keyframes page-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .page-loading::before { animation-duration: 3s; } }
