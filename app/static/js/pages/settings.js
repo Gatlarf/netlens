@@ -11,7 +11,6 @@ import { buildChannelsCard } from "../cards/channels.js";
 import { buildCentralCard } from "../cards/central.js";
 import { buildUpdateCard } from "../update.js";
 import { buildBrowseCard } from "../cards/plugin_browse.js";
-import { groupByCategory, openSet, remember } from "../cards/plugin_groups.js";
 import { buildBackupCard } from "../cards/backup.js";
 import { buildAccountCard } from "../cards/account.js";
 import { buildAuditCard } from "../cards/audit.js";
@@ -262,26 +261,23 @@ const VIEWER_PAGE = "session";
 // the connectors were plugins-to-be before: keep their old addresses working
 const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus", notifications: "channels" };  // e-mail is a channel now
 
-function integrationsGroup(plugins, updates = 0, categories = null) {
+function integrationsGroup(plugins, updates = 0) {
   const items = [
-    { key: "plugins", label: "Plugins", build: buildPluginsCard },
-    { key: "plugin-browse", label: updates ? `Browse plugins (${updates} update${updates === 1 ? "" : "s"})` : "Browse plugins", build: buildBrowseCard },
-    // the plugin pages are listed under a sub-heading per category (see fillNav); `category` marks them
-    ...plugins.map((p) => ({ key: `plugin-${p.id}`, label: p.name, category: p.category, build: () => buildPluginCard(p.id) })),
-    { key: "plugin-guide", label: "Plugin guide", hidden: true, build: buildPluginGuideCard },
+    { key: "plugins", label: "Plugin manager", build: buildPluginsCard },
+    { key: "plugin-browse", label: updates ? `Plugin store (${updates} update${updates === 1 ? "" : "s"})` : "Plugin store", build: buildBrowseCard },
+    // a plugin's own page is not in the menu: open it from the Plugin manager (its name is a link)
+    ...plugins.map((p) => ({ key: `plugin-${p.id}`, label: p.name, hidden: true, parent: "plugins", build: () => buildPluginCard(p.id) })),
+    { key: "plugin-guide", label: "Plugin guide", hidden: true, parent: "plugins", build: buildPluginGuideCard },
   ];
-  return { title: "Integrations", items, categories };
+  return { title: "Integrations", items };
 }
 
 async function loadGroups() {
   if (!isAdmin()) return [{ title: "Account", items: [{ key: "session", label: "Account", build: buildAccountCard }] }];
   let plugins = [];
   let updates = 0;
-  let categories = null;
   try {
-    const listing = await get("/api/plugins");
-    plugins = listing.plugins;
-    categories = listing.categories;
+    plugins = (await get("/api/plugins")).plugins;
   } catch (err) {
     // the Plugins page shows the error itself; the rest of Settings still works
   }
@@ -291,35 +287,24 @@ async function loadGroups() {
     updates = 0;
   }
   plugins = [...plugins].sort((a, b) => a.name.localeCompare(b.name));
-  return STATIC_GROUPS.map((g) => (g === "integrations" ? integrationsGroup(plugins, updates, categories) : g));
-}
-
-const navOpen = openSet("settings-nav");   // the plugin categories the user opened in the menu
-
-function navLink(entry, activeKey) {
-  const link = h("a", { href: `#/settings/${entry.key}`, "data-section": entry.key }, entry.label);
-  if (entry.key === activeKey) {
-    link.classList.add("active");
-    link.setAttribute("aria-current", "page");
-  }
-  return link;
+  return STATIC_GROUPS.map((g) => (g === "integrations" ? integrationsGroup(plugins, updates) : g));
 }
 
 function fillNav(nav, groups, activeKey) {
   clear(nav);
+  const all = groups.flatMap((g) => g.items);
+  const here = all.find((e) => e.key === activeKey);
+  const current = here && here.parent ? here.parent : activeKey;     // on a plugin's page the Plugin manager is the one lit up
   for (const group of groups) {
     nav.appendChild(h("div", { class: "nav-group" }, group.title));
-    const visible = group.items.filter((entry) => !entry.hidden); // hidden pages are reachable by address (linked from the Plugins page), not listed in the menu
-    for (const entry of visible.filter((e) => !e.category)) nav.appendChild(navLink(entry, activeKey));
-    // the pages of installed plugins: one collapsible sub-heading per category, the one with the current page open
-    const active = visible.find((e) => e.key === activeKey);
-    for (const sub of groupByCategory(visible.filter((e) => e.category), group.categories)) {
-      const details = h("details", { class: "nav-sub" });
-      details.open = navOpen.has(sub.id) || Boolean(active && active.category === sub.id);
-      details.appendChild(h("summary", {}, sub.short, h("span", { class: "nav-sub-count" }, String(sub.items.length))));
-      for (const entry of sub.items) details.appendChild(navLink(entry, activeKey));
-      remember(details, navOpen, sub.id);
-      nav.appendChild(details);
+    for (const entry of group.items) {
+      if (entry.hidden) continue; // reachable by address (linked from the Plugin manager), not listed in the menu
+      const link = h("a", { href: `#/settings/${entry.key}`, "data-section": entry.key }, entry.label);
+      if (entry.key === current) {
+        link.classList.add("active");
+        link.setAttribute("aria-current", "page");
+      }
+      nav.appendChild(link);
     }
   }
 }

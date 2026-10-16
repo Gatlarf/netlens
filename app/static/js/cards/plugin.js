@@ -128,12 +128,14 @@ function fillPluginCard(card, plugin, onChange) {
   clear(card);
   const manifest = plugin.manifest;
   if (!manifest) {
+    card.appendChild(h("p", { class: "hint" }, h("a", { href: "#/settings/plugins" }, "← Plugin manager")));
     card.appendChild(h("h2", {}, plugin.id));
     card.appendChild(h("p", { class: "error" }, `This plugin is broken: ${plugin.problem}`));
     if (!plugin.builtin) card.appendChild(removeButton(plugin, onChange));
     return;
   }
 
+  card.appendChild(h("p", { class: "hint" }, h("a", { href: "#/settings/plugins" }, "← Plugin manager")));
   card.appendChild(h("h2", {}, manifest.name));
   const meta = [KIND_LABEL[manifest.kind] || manifest.kind, `version ${manifest.version}`, plugin.builtin ? "built in" : "uploaded"];
   if (manifest.author) meta.push(`by ${manifest.author}`);

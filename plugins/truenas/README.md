@@ -14,7 +14,7 @@ It only reads. It uses the TrueNAS **JSON-RPC WebSocket API** (`wss://<truenas>/
 
 1. In TrueNAS create a user for Netlens, for example `netlens`, with a **read-only role** (for example *Readonly Admin*), no shell and no password login.
 2. Open that user's menu (top right) → **API Keys → Add**, and copy the key. (TrueNAS shows it only once.)
-3. In Netlens: *Settings → Integrations → Browse plugins → TrueNAS → Install* (community plugins ask for an extra confirmation), open its page under *Integrations*,
+3. In Netlens: *Settings → Integrations → Plugin store → TrueNAS → Install* (community plugins ask for an extra confirmation), open its page under *Integrations*,
    enter the address (`https://192.168.0.200`) and paste the key on a line (**+ Add server** for another TrueNAS, **Test** on a line tests that system), leave *Verify TLS certificate* off while TrueNAS uses its self-signed certificate.
 4. **Test connection**, **Save**, **Turn on**, **Sync now**.
 

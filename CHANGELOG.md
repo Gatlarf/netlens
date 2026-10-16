@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.20 — 2026-10-16
+
+### Changed
+- **Plugin manager and Plugin store**: *Plugins* is now **Plugin manager** and *Browse plugins* is now **Plugin store**. In the Plugin manager each row shows the plugin's last sync, a green **Running**, a red **Failing** or a red **Off** before the Turn on / Turn off button; the on/off and "built in" tags next to the names are gone. The Settings menu no longer lists the categories and the individual plugins: open a plugin from the Plugin manager (its page has a link back).
+
 ## 0.4.18 — 2026-10-16
 
 ### Changed

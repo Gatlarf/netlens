@@ -7,7 +7,7 @@ seriously. Thank you for taking the time to report one responsibly.
 
 Only the **newest published release** (`ghcr.io/gatlarf/netlens:latest`) receives security fixes. Netlens does not update itself:
 pull the newest image to get a fix (see [Updating](README.md#updating-to-a-new-version)). Plugins are separate: a fix for a plugin
-is a new plugin release under **Settings → Plugins → Browse plugins**.
+is a new plugin release under **Settings → Plugin store**.
 
 ## Reporting a vulnerability
 

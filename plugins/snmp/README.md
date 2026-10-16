@@ -29,7 +29,7 @@ carries the fewest addresses (the edge). Multicast and the switches' own address
 1. On each switch switch SNMP on (v2c) and set a **read** community (not `private`, and not a write community). Many switches have it under
    *System → SNMP*. TP-Link Omada / JetStream smart switches: *System → SNMP → Global Config*, then *Community Config* with *Read Only*.
    Also switch **LLDP** on if the switch has it (it is how Netlens learns that two switches are connected).
-2. In Netlens: *Settings → Integrations → Browse plugins → SNMP switches → Install* (community plugins ask for an extra confirmation), then open its
+2. In Netlens: *Settings → Integrations → Plugin store → SNMP switches → Install* (community plugins ask for an extra confirmation), then open its
    page, enter the switches' addresses (`192.168.1.2, 192.168.1.3`), the community and, if you like, the core switch.
 3. **Test connection**, **Save**, **Turn on**, **Sync now**. Netlens asks again after every scan.
 

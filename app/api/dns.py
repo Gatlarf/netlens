@@ -110,7 +110,7 @@ async def refresh(request: Request) -> dict:
     try:
         active = _active(service, conn, dns.get_settings(conn))
         if active is None:
-            raise HTTPException(status_code=409, detail="no DNS plugin is turned on: install one under Settings → Integrations → Browse plugins")
+            raise HTTPException(status_code=409, detail="no DNS plugin is turned on: install one under Settings → Integrations → Plugin store")
     finally:
         conn.close()
     result = await service.sync(active.id)

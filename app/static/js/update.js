@@ -71,7 +71,7 @@ export async function buildUpdateCard() {
       ["docker run", "docker pull ghcr.io/gatlarf/netlens:latest, then remove and start the container again with the same options"],
     ]) how.appendChild(h("li", {}, `${where}: `, what.startsWith("docker ") ? h("code", {}, what) : what));
     card.appendChild(how);
-    card.appendChild(h("p", { class: "hint" }, "Plugins are the exception: update those under Settings → Plugins → Browse plugins, no new image needed. Take a backup first under Settings → Backup & restore if you like."));
+    card.appendChild(h("p", { class: "hint" }, "Plugins are the exception: update those under Settings → Plugin store, no new image needed. Take a backup first under Settings → Backup & restore if you like."));
   }
   await fill(await get("/api/update"));
   return card;

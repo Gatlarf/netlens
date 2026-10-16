@@ -24,7 +24,7 @@ The session is closed again afterwards, so no sessions pile up.
 ## Set-up
 
 1. In Omada create an account with the **Viewer** role (Settings → Admin → Add) so the plugin can never change anything.
-2. In Netlens: *Settings → Integrations → Browse plugins → TP-Link Omada → Install* (community plugins ask for an extra confirmation), then open
+2. In Netlens: *Settings → Integrations → Plugin store → TP-Link Omada → Install* (community plugins ask for an extra confirmation), then open
    its page under *Integrations*, enter the address (`https://<controller>:8043` for the software controller, `https://<controller>` for an
    OC200/OC300), the account, the site name (empty = all sites) and leave *Verify TLS certificate* off unless you installed a real certificate.
 3. **Test connection**, **Save**, **Turn on**, **Sync now**.

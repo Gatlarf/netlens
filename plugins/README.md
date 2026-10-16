@@ -1,6 +1,6 @@
 # Netlens plugins
 
-Plugins that are **not built into Netlens**. They are installed from *Settings → Integrations → Browse plugins* (they are listed in
+Plugins that are **not built into Netlens**. They are installed from *Settings → Integrations → Plugin store* (they are listed in
 [`plugin-index/`](../plugin-index/README.md)) or uploaded as a zip, and start switched off.
 
 | Folder | Plugin | Reads | Status |

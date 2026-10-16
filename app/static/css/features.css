@@ -606,14 +606,6 @@ dialog.whats-new h2 { margin: 0; }
 .sdot.ok { background: #16a34a; }
 .sdot.bad { background: #dc2626; }
 .btn.linklike { border: 0; background: none; color: var(--accent); padding: 0 4px; text-decoration: underline; }
-.settings-nav .nav-sub { margin: 0; }
-.settings-nav .nav-sub > summary { display: flex; align-items: center; gap: 6px; padding: 5px 12px 5px 14px; font-size: 0.88em; color: var(--muted); cursor: pointer; list-style: none; border-radius: 6px; }
-.settings-nav .nav-sub > summary::-webkit-details-marker { display: none; }
-.settings-nav .nav-sub > summary::before { content: "▸"; width: 1em; }
-.settings-nav .nav-sub[open] > summary::before { content: "▾"; }
-.settings-nav .nav-sub > summary:hover { background: var(--bg); }
-.settings-nav .nav-sub-count { margin-left: auto; font-size: 0.85em; opacity: 0.8; }
-.settings-nav .nav-sub > a { padding-left: 30px; }
 .pool-plugins > summary { cursor: pointer; padding: 6px 0; }
 @media (max-width: 640px) {
   .prow-sum { flex-wrap: wrap; row-gap: 2px; }
@@ -625,7 +617,10 @@ table.plist { table-layout: fixed; width: 100%; }
 table.plist td { padding: 4px 8px; vertical-align: middle; }
 table.plist td:nth-child(1) { width: 36%; }
 table.plist td:nth-child(2) { width: 9%; }
-table.plist td:nth-child(4) { width: 110px; text-align: right; }
+table.plist td:nth-child(4) { width: 84px; font-weight: 600; text-align: right; }
+table.plist td:nth-child(5) { width: 110px; text-align: right; }
+.run-ok { color: #15803d; }
+.run-bad { color: #b91c1c; }
 table.plist td:nth-child(3) { overflow: hidden; text-overflow: ellipsis; }
 table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
-@media (max-width: 640px) { table.plist td:nth-child(1) { width: 44%; } table.plist td:nth-child(2) { display: none; } table.plist td:nth-child(4) { width: 84px; } }
+@media (max-width: 640px) { table.plist td:nth-child(1) { width: 36%; } table.plist td:nth-child(2), table.plist td:nth-child(3) { display: none; } table.plist td:nth-child(4) { width: 64px; } table.plist td:nth-child(5) { width: 84px; } }

@@ -431,7 +431,7 @@ General rules for both kinds: MAC addresses are `aa:bb:cc:dd:ee:ff` or `aa-bb-cc
 
 ## Publishing your plugin
 
-Plugins can be listed in the **plugin index** so that other people can find and install them under *Settings → Browse plugins*.
+Plugins can be listed in the **plugin index** so that other people can find and install them under *Settings → Plugin store*.
 Include a `diagnose(config)` (see above) so that people who try your plugin can report problems with one click. Release your plugin as a zip on GitHub, check it with `plugin-index/tools/check_plugin.py` (a copy of the Netlens repository is
 enough; it runs the same checks Netlens runs), and submit an entry by pull request. Reviewers read the code and set the review level
 (*Verified*, *Reviewed* or *Community*). The whole process, the entry format and a plugin template are in

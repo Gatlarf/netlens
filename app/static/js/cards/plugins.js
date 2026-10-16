@@ -11,17 +11,23 @@ function health(p) {
   return "off";
 }
 
+// the last sync, in words
 function statusCell(p) {
-  const dot = h("span", { class: `sdot ${health(p)}`, "aria-hidden": "true" });
-  if (p.problem && !p.status) return h("td", { class: "error" }, dot, p.problem);
-  if (!p.status) return h("td", { class: "hint" }, dot, p.enabled ? "waiting for the first sync" : "");
-  if (p.status.ok) return h("td", { class: "hint" }, dot, `synced ${timeAgo(p.status.ts)}`);
-  return h("td", { class: "error" }, dot, `failed ${timeAgo(p.status.ts)}: ${p.status.error}`);
+  if (p.problem && !p.status) return h("td", { class: "error" }, p.problem);
+  if (!p.status) return h("td", { class: "hint" }, p.enabled ? "waiting for the first sync" : "");
+  if (p.status.ok) return h("td", { class: "hint" }, `synced ${timeAgo(p.status.ts)}`);
+  return h("td", { class: "error" }, `failed ${timeAgo(p.status.ts)}: ${p.status.error}`);
+}
+
+// the running state before the switch: green Running, red Failing or Off
+function runCell(p) {
+  const state = !p.enabled ? ["Off", "bad"] : health(p) === "bad" ? ["Failing", "bad"] : ["Running", "ok"];
+  return h("td", { class: `run run-${state[1]}` }, state[0]);
 }
 
 function fillPluginsCard(card, data, notice = null) {
   clear(card);
-  card.appendChild(h("h2", {}, "Plugins"));
+  card.appendChild(h("h2", {}, "Plugin manager"));
   card.appendChild(h("p", { class: "hint" },
     "Plugins connect Netlens to routers and hypervisors. Each one reports what is connected to what, and Netlens shows it on the map and in the hierarchy. " +
     "Turn a plugin on or off here; its own settings are on its page in the menu."));
@@ -71,16 +77,16 @@ function fillPluginsCard(card, data, notice = null) {
     const set = (state) => () => card.querySelectorAll("details.pcat").forEach((d) => { d.open = state; });
     all.addEventListener("click", set(true));
     none.addEventListener("click", set(false));
-    card.appendChild(h("p", { class: "hint" }, `${data.plugins.length} plugins · ${data.plugins.filter((p) => p.enabled).length} on `, all, " ", none));
+    card.appendChild(h("p", { class: "hint" }, `${data.plugins.length} plugins · ${data.plugins.filter((p) => p.enabled && health(p) !== "bad").length} running `, all, " ", none));
   }
   for (const group of groups) {
     const failing = group.items.filter((p) => health(p) === "bad").length;
-    const on = group.items.filter((p) => p.enabled).length;
+    const on = group.items.filter((p) => p.enabled && health(p) !== "bad").length;
     const section = h("details", { class: "pcat", "data-category": group.id });
     section.open = roomy || failing > 0 || open.has(group.id);
     section.appendChild(h("summary", { class: "pcat-head" }, h("span", { class: "pcat-name" }, group.label), h("span", { class: "pcat-count" }, String(group.items.length)),
       h("span", { class: "pcat-names" }, group.items.map((p) => p.name).join(", ")),
-      h("span", { class: `pcat-note${failing ? " bad" : ""}` }, failing ? `${failing} failing` : `${on} on`)));
+      h("span", { class: `pcat-note${failing ? " bad" : ""}` }, failing ? `${failing} failing` : `${on} running`)));
     remember(section, open, group.id);
     const table = h("table", { class: "data plist" });          // no header: name, version, status and the switch speak for themselves
     const body = h("tbody");
@@ -103,10 +109,10 @@ function fillPluginsCard(card, data, notice = null) {
         }
       });
       body.appendChild(h("tr", {},
-        h("td", {}, h("a", { href: `#/settings/plugin-${p.id}` }, p.name), h("span", { class: p.enabled ? "tag" : "tag off" }, p.enabled ? "on" : "off"),
-          p.builtin ? h("span", { class: "tag" }, "built in") : null),
+        h("td", {}, h("a", { href: `#/settings/plugin-${p.id}` }, p.name)),
         h("td", {}, p.version || ""),
         statusCell(p),
+        runCell(p),
         h("td", {}, toggle)));
     }
     table.appendChild(body);
@@ -123,7 +129,7 @@ function fillPluginsCard(card, data, notice = null) {
   const uploadBtn = h("button", { type: "button", class: "btn" }, "Upload plugin");
   const resultEl = h("p", { class: "hint" }, "");
   card.appendChild(h("div", { class: "field" }, fileInput));
-  card.appendChild(h("div", { class: "button-row" }, uploadBtn, h("a", { class: "btn", href: "#/settings/plugin-browse" }, "Browse plugins")));
+  card.appendChild(h("div", { class: "button-row" }, uploadBtn, h("a", { class: "btn", href: "#/settings/plugin-browse" }, "Plugin store")));
   card.appendChild(resultEl);
 
   uploadBtn.addEventListener("click", async () => {

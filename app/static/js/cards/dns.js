@@ -51,7 +51,7 @@ function render(card, state) {
     "Nothing is written before you approve it here."));
 
   if (!state.plugins.length) {
-    card.appendChild(h("p", {}, "No DNS plugin is installed yet. Install one under ", h("a", { href: "#/settings/plugin-browse" }, "Settings → Browse plugins"), " (for example Technitium DNS)."));
+    card.appendChild(h("p", {}, "No DNS plugin is installed yet. Install one under ", h("a", { href: "#/settings/plugin-browse" }, "Settings → Plugin store"), " (for example Technitium DNS)."));
     return;
   }
   const active = state.plugins.find((p) => p.id === state.plugin);

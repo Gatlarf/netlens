@@ -1,6 +1,6 @@
 # Netlens plugin index
 
-The plugin index is the public list of plugins that Netlens shows under **Settings → Integrations → Browse plugins**.
+The plugin index is the public list of plugins that Netlens shows under **Settings → Integrations → Plugin store**.
 It only **points at** plugins: the code stays in the author's own repository or release. Netlens downloads a plugin only
 when a user presses *Install*, checks the file against the SHA-256 pinned here, and then applies the same safety checks as
 a manual upload. Installed plugins start switched off.
@@ -118,6 +118,6 @@ someone really ran it against the device. To become a reviewer, ask in a pull re
 
 ## Running your own index
 
-The index address is a setting in Netlens (Browse plugins → Plugin index settings). A custom index is any `https://` URL serving a
+The index address is a setting in Netlens (Plugin store → Plugin index settings). A custom index is any `https://` URL serving a
 file in the same format (`"schema": 1`); it may point at downloads on any https host. `tools/build_index.py` builds one from a
 folder of entries.

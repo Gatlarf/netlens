@@ -59,8 +59,8 @@ const SETTINGS = [
   ["Updates", "about", "new version check docker pull", "Update"],
   ["Account", "session", "password change my profile start page preferences", ""],
   ["Start page", "session", "home page opens on landing default", "Start page"],
-  ["Plugins", "plugins", "install integrations proxmox unifi hyper-v synology npm", ""],
-  ["Browse plugins", "plugin-browse", "index catalogue download install new", ""],
+  ["Plugin manager", "plugins", "plugins install integrations proxmox unifi hyper-v synology npm turn on off running", ""],
+  ["Plugin store", "plugin-browse", "plugins browse index catalogue download install new", ""],
 ];
 
 let devices = null;
@@ -120,7 +120,7 @@ function search(query, devs) {
 function sectionName(key) {
   const names = { ranges: "Scan ranges", nmap: "Scan performance", schedule: "Scan schedule", map: "Map", groups: "Groups", netchecks: "Network checks", dns: "DNS registration",
     ignored: "Ignored devices", central: "Central Netlens", users: "Users & tokens", terminal: "Web terminal", channels: "Alert channels", maintenance: "Maintenance windows",
-    backup: "Backup & restore", export: "Export", shares: "Share links", audit: "Audit log", about: "About", session: "Account", plugins: "Plugins", "plugin-browse": "Browse plugins" };
+    backup: "Backup & restore", export: "Export", shares: "Share links", audit: "Audit log", about: "About", session: "Account", plugins: "Plugin manager", "plugin-browse": "Plugin store" };
   return names[key] || key;
 }
 

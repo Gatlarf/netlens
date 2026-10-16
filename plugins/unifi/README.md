@@ -26,7 +26,7 @@ One login, three reads per site and a logout per sync (Netlens syncs after every
 
 1. In UniFi create a **local** account with read-only access (UniFi OS: *Admins & Users → Create new*, role *Limited Admin* / read-only for Network; classic:
    *Settings → Admins*, *Read Only*). It must be a local account **without two-factor authentication**; a Ubiquiti cloud (SSO) account does not work.
-2. In Netlens: *Settings → Integrations → Browse plugins → Ubiquiti UniFi → Install* (community plugins ask for an extra confirmation), then open its
+2. In Netlens: *Settings → Integrations → Plugin store → Ubiquiti UniFi → Install* (community plugins ask for an extra confirmation), then open its
    page under *Integrations*, enter the address (`https://<console>` or `https://<server>:8443`), the account, the site (empty = all sites) and leave
    *Verify TLS certificate* off unless you installed a real certificate.
 3. **Test connection**, **Save**, **Turn on**, **Sync now**.

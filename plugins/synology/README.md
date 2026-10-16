@@ -18,7 +18,7 @@ DSM has no read-only role for its web API: the container, virtual machine and pa
 1. *Control Panel → User & Group → Create*: name `netlens`, a long random password, member of the **administrators** group, and under **Applications** allow **DSM** only (deny File Station, FTP, SMB, and so on).
 2. *Control Panel → Security → Firewall*: allow TCP port **5001** only from the machine Netlens runs on.
 3. Do **not** switch on two-step verification for this account (a program cannot answer it; the plugin says so when it meets it).
-4. In Netlens: *Settings → Integrations → Browse plugins → Synology → Install*, open its page, enter the address (`https://192.168.0.20:5001`), the user name and the password on a line (**+ Add server** for another NAS, **Test** on a line tests that NAS), leave *Verify TLS certificate* off while the NAS uses its self-signed certificate.
+4. In Netlens: *Settings → Integrations → Plugin store → Synology → Install*, open its page, enter the address (`https://192.168.0.20:5001`), the user name and the password on a line (**+ Add server** for another NAS, **Test** on a line tests that NAS), leave *Verify TLS certificate* off while the NAS uses its self-signed certificate.
 5. **Test connection**, **Save**, **Turn on**, **Sync now**.
 
 A refused login stops automatic syncing until you save the settings or press *Sync now* again, so DSM's auto-block does not lock the account out.

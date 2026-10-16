@@ -1,4 +1,4 @@
-"""Display categories of plugins: how the plugin lists (Browse plugins, Plugins, the Settings menu) are grouped.
+"""Display categories of plugins: how the plugin lists (Plugin store, Plugins, the Settings menu) are grouped.
 
 A category is only for showing; the plugin's *kind* (hypervisor, topology, dns, proxy) is the technical contract. An entry of the plugin index may
 name its category; without one (or with an unknown one) it falls back to the default of its kind.

@@ -111,7 +111,7 @@ export async function buildBrowseCard() {
     const data = await get(`/api/plugin-index${refresh ? "?refresh=true" : ""}`);
     document.dispatchEvent(new CustomEvent("netlens:plugins-changed")); // the menu shows how many updates there are
     clear(wrap);
-    const card = h("div", { class: "card" }, h("h2", {}, "Browse plugins"));
+    const card = h("div", { class: "card" }, h("h2", {}, "Plugin store"));
     card.appendChild(h("p", { class: "hint" }, "Plugins from the community. Every download is checked against the checksum in the index."));
     card.appendChild(h("details", { class: "browse-more browse-intro" }, h("summary", {}, "What the badges mean"),
       h("p", { class: "hint" }, "Verified: a trusted reviewer read the code and tested it on real hardware. Reviewed: a trusted reviewer read the code. " +
