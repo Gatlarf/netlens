@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-snmp-v1.1.1/snmp.zip",
+      "sha256": "52f6970cae581393fc046ce16afa46c4bc6e34c237d56fb66aa6315e7ffee77b",
+      "api_version": 1,
+      "min_netlens": "0.3.109",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-snmp-v1.1.0/snmp.zip",
       "sha256": "9cd00ce3caa59ac5e16ae61a1124665440f6dd4de4d9890b850d7846e8debfc1",

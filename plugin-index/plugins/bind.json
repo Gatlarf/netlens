@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-bind-v1.0.1/bind.zip",
+      "sha256": "dd16b82b4e6132ce1d31de2411deade6bb3a43f344c69d6688c98db17ce2b98a",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-bind-v1.0.0/bind.zip",
       "sha256": "347d00169ecca8f092da2b041782cdeb73276910bf730340d048f00fab4ee034",

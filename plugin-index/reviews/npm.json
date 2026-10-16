@@ -1,0 +1,16 @@
+{
+  "id": "npm",
+  "reviews": [
+    {
+      "version": "1.1.1",
+      "sha256": "cacd1035dae14a10797929b1a13451e875ae786ef18a4b80c2a595538ef7d720",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    }
+  ]
+}

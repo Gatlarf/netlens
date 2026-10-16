@@ -2,6 +2,17 @@
   "id": "traefik",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "74ab1610e5fd1bebd6474066b66166f97e18872df333902b24a6d009f732e2f8",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "9446f26be46ef134a4d916102f6f70c97736d3ef29dcd898cca4c7b8f6518d88",
       "level": "verified",

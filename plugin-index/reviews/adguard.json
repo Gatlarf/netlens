@@ -2,6 +2,17 @@
   "id": "adguard",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "afd9cde98dbaa40aec88f4a4baadc0fa3c408e51a1e7dc3293f97a8b590ecf1e",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "96d07fba8d44491488eb4874db1f36e7beb3553996e8c74323cd6dd10f3e04d7",
       "level": "verified",

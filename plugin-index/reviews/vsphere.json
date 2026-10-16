@@ -2,6 +2,17 @@
   "id": "vsphere",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "a19878c0cc5f59e05406f9bb98da9ea6d1199af1acfcf16ef0e387ed19c03abb",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "df9455dab2be1e70f98fe6b5a9a8a819f60d8200a0638339920ac8b0b1c273ee",
       "level": "reviewed",

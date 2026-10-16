@@ -2,6 +2,17 @@
   "id": "caddy",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "920fcb07229b018d299c5f73d77566f1decd38bc44cf16b2cba52899a7887aad",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "e2c655c5ec320b86555dc3b51981b1ccab6e2256f6869dc68b63be2e7e4befd3",
       "level": "verified",

@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.0.1/opnsense.zip",
+      "sha256": "7fb65f70581b908cded0c41f2c18534b15265e935f4833bc86077ade28d4766c",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.0.0/opnsense.zip",
       "sha256": "d21f2b64b005febd815f802f6e734963ed9bad4921f5c945a38a0b60f06d50fe",

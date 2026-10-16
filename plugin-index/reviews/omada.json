@@ -2,6 +2,17 @@
   "id": "omada",
   "reviews": [
     {
+      "version": "1.0.3",
+      "sha256": "9a85874a3896363bf80b1ace7d7eb5d37b7e10c9a0269deab1a17856dfac3b60",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.2",
       "sha256": "ab042c001323534c1d3ec34ab302096601fdc878f176b0d6bde3dd7a8f26a764",
       "level": "verified",

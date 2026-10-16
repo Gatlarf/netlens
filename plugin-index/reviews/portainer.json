@@ -2,6 +2,17 @@
   "id": "portainer",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "60af2c6a4daf8c6656703664ab4a6dec650045106a52cec7ea70a7965fc5eea5",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "2fb2bef4617e89d4d01cc4d1a82bb43dbecc1e9e7cecca1001e5e7c712bf31fd",
       "level": "verified",

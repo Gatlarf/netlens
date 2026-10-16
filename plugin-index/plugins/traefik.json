@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-traefik-v1.0.1/traefik.zip",
+      "sha256": "74ab1610e5fd1bebd6474066b66166f97e18872df333902b24a6d009f732e2f8",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-traefik-v1.0.0/traefik.zip",
       "sha256": "9446f26be46ef134a4d916102f6f70c97736d3ef29dcd898cca4c7b8f6518d88",

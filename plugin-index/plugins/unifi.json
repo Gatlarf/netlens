@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.0.2/unifi.zip",
+      "sha256": "0a2c8a93d055e4c381e4db6c27876fd013f93d1b13e354ca70583337b7ae8de4",
+      "api_version": 1,
+      "min_netlens": "0.2.45",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.0.0/unifi.zip",
       "sha256": "7ef3b9ece28bf52024e941034193ae2024f6123872612758b859ba02b58e2ef5",

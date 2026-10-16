@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kong-v1.0.1/kong.zip",
+      "sha256": "632f5243e5736ec6063aa81ccdd7e8f108254579195a814aeaa0f15b5c800524",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kong-v1.0.0/kong.zip",
       "sha256": "8ac4e5b3cc37874ccceb150ba8d9da4b63c480dcc71a1f8e8d9d5e1bd1b52ffc",

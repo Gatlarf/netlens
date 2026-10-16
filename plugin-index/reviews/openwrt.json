@@ -2,6 +2,17 @@
   "id": "openwrt",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "17d9f6dde3b533f9a0364679970cc56642fcc7c0fccca8883e25db0b27aadf2a",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "d7f0f4a8e2660259e361447678ff1c880c6166d0fb75970b3b3b4f615cc3dc49",
       "level": "verified",

@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netbox-v1.0.1/netbox.zip",
+      "sha256": "2738c831d3fda16ddfce50ceb4618fbf1a93b221944e993d02e7f84b35fc5419",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netbox-v1.0.0/netbox.zip",
       "sha256": "f2892a36a3becc39dcb191008d51370e5dc7b41da95a73703a846174627b165e",

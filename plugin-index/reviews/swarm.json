@@ -2,6 +2,17 @@
   "id": "swarm",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "f38e096d7cfb1d921ba8cfd8671c32d847e8e7f1f9f458d0d3f5fa72951bc410",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "a4d8951f95d23b12cac9504c496b54b6d9da267f0bcdd88c8de6c63808c68bb1",
       "level": "verified",

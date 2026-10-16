@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vyos-v1.0.1/vyos.zip",
+      "sha256": "b4ed79d9a916384229d9a6c5d758252335e87f84589d66436195381e044110f0",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vyos-v1.0.0/vyos.zip",
       "sha256": "3367b3a2cffa5225e3505871ac712ff03268428701950926fadc6c03fd2d5630",

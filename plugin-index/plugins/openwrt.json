@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.0.1/openwrt.zip",
+      "sha256": "17d9f6dde3b533f9a0364679970cc56642fcc7c0fccca8883e25db0b27aadf2a",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.0.0/openwrt.zip",
       "sha256": "d7f0f4a8e2660259e361447678ff1c880c6166d0fb75970b3b3b4f615cc3dc49",

@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-swarm-v1.0.1/swarm.zip",
+      "sha256": "f38e096d7cfb1d921ba8cfd8671c32d847e8e7f1f9f458d0d3f5fa72951bc410",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-swarm-v1.0.0/swarm.zip",
       "sha256": "a4d8951f95d23b12cac9504c496b54b6d9da267f0bcdd88c8de6c63808c68bb1",

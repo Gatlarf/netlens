@@ -2,6 +2,17 @@
   "id": "incus",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "f266e0a82cb959d8bab4361e26d9f8b77f91ae2d4ba8f29c76b7c54f20d1b5a3",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "e586a7061c53c681008b603dc9274fdc6c59e1de9aed3e7cd197a29477c75137",
       "level": "verified",

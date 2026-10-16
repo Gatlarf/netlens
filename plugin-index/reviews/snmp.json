@@ -1,0 +1,16 @@
+{
+  "id": "snmp",
+  "reviews": [
+    {
+      "version": "1.1.1",
+      "sha256": "52f6970cae581393fc046ce16afa46c4bc6e34c237d56fb66aa6315e7ffee77b",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    }
+  ]
+}

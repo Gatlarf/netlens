@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.0.1/vsphere.zip",
+      "sha256": "a19878c0cc5f59e05406f9bb98da9ea6d1199af1acfcf16ef0e387ed19c03abb",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.0.0/vsphere.zip",
       "sha256": "df9455dab2be1e70f98fe6b5a9a8a819f60d8200a0638339920ac8b0b1c273ee",

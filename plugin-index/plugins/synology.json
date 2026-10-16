@@ -13,6 +13,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.0.1/synology.zip",
+      "sha256": "8fe624f5bec5908a65d57f6b1c4a92dce5921e6d5179c9bde916de8d011a6d9c",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.0.0/synology.zip",
       "sha256": "b7d87f32a50ec782d4eed6d9a46f2a149aace435fbbc2c2385ff6c0ef7be4e18",

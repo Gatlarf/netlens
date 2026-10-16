@@ -2,6 +2,17 @@
   "id": "docker",
   "reviews": [
     {
+      "version": "1.5.1",
+      "sha256": "cbfe498ea32d67952ef86022e83ce9010c841285a183a4d3cede2a9af1af063a",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.3.0",
       "sha256": "b3ada467a739b02c7f564ad9198c62868f745f383ba1c016228039a841765162",
       "level": "verified",

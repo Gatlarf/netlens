@@ -2,6 +2,17 @@
   "id": "kubernetes",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "9a09e846508349e0f6453798902286e218bcd5ee2730d4f6c9d842a00f8a3e2d",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "30b913d09c3f6d86ac75e49ba23a7639161533945c81a3c0b3c123cf1498ce62",
       "level": "verified",

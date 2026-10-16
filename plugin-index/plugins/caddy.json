@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-caddy-v1.0.1/caddy.zip",
+      "sha256": "920fcb07229b018d299c5f73d77566f1decd38bc44cf16b2cba52899a7887aad",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-caddy-v1.0.0/caddy.zip",
       "sha256": "e2c655c5ec320b86555dc3b51981b1ccab6e2256f6869dc68b63be2e7e4befd3",

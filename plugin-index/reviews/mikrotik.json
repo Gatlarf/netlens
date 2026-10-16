@@ -2,6 +2,17 @@
   "id": "mikrotik",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "3de567f3ecc80619ca4a292d1cea39df44bcb0edd884f9288312454fb71c3981",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "df2e239b0bb450c707fce50cc63d0e53f8985e15776ba10899d862850e3761b0",
       "level": "verified",

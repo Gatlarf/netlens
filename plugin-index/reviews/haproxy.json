@@ -2,6 +2,17 @@
   "id": "haproxy",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "0d4775ed900d18f5062c06358a583849d6bf38539ee9516a9c6436f8d484a29d",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "ada05f5bd8a9bd71eeac2699f24129e5e31213224141f86fcc28ebd0c027a789",
       "level": "verified",

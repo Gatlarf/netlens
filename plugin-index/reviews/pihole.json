@@ -2,6 +2,17 @@
   "id": "pihole",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "3d9522c6bbd2e3645f172dbaac92d312ed0d296bff45978b5da38d11ae0e717d",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "829ee524ddac71a9261cf39775d71c13cf8c4f201a5139e8dd85690d9cbee724",
       "level": "verified",

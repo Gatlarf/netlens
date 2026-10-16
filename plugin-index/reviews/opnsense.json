@@ -2,6 +2,17 @@
   "id": "opnsense",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "7fb65f70581b908cded0c41f2c18534b15265e935f4833bc86077ade28d4766c",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "d21f2b64b005febd815f802f6e734963ed9bad4921f5c945a38a0b60f06d50fe",
       "level": "verified",

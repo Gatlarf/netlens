@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-v1.0.1/adguard.zip",
+      "sha256": "afd9cde98dbaa40aec88f4a4baadc0fa3c408e51a1e7dc3293f97a8b590ecf1e",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-v1.0.0/adguard.zip",
       "sha256": "96d07fba8d44491488eb4874db1f36e7beb3553996e8c74323cd6dd10f3e04d7",

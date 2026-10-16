@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.0.1/mikrotik.zip",
+      "sha256": "3de567f3ecc80619ca4a292d1cea39df44bcb0edd884f9288312454fb71c3981",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.0.0/mikrotik.zip",
       "sha256": "df2e239b0bb450c707fce50cc63d0e53f8985e15776ba10899d862850e3761b0",

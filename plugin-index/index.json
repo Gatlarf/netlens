@@ -14,6 +14,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-v1.0.1/adguard.zip",
+     "sha256": "afd9cde98dbaa40aec88f4a4baadc0fa3c408e51a1e7dc3293f97a8b590ecf1e",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-v1.0.0/adguard.zip",
      "sha256": "96d07fba8d44491488eb4874db1f36e7beb3553996e8c74323cd6dd10f3e04d7",
@@ -126,6 +144,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-bind-v1.0.1/bind.zip",
+     "sha256": "dd16b82b4e6132ce1d31de2411deade6bb3a43f344c69d6688c98db17ce2b98a",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-bind-v1.0.0/bind.zip",
      "sha256": "347d00169ecca8f092da2b041782cdeb73276910bf730340d048f00fab4ee034",
@@ -157,6 +193,24 @@
     "Caddy 2.11 (tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-caddy-v1.0.1/caddy.zip",
+     "sha256": "920fcb07229b018d299c5f73d77566f1decd38bc44cf16b2cba52899a7887aad",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-caddy-v1.0.0/caddy.zip",
@@ -222,6 +276,24 @@
     "Containers on macvlan / ipvlan networks (not yet tested on a real host)"
    ],
    "releases": [
+    {
+     "version": "1.5.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.5.1/docker.zip",
+     "sha256": "cbfe498ea32d67952ef86022e83ce9010c841285a183a4d3cede2a9af1af063a",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.5.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.5.0/docker.zip",
@@ -365,6 +437,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-haproxy-v1.0.1/haproxy.zip",
+     "sha256": "0d4775ed900d18f5062c06358a583849d6bf38539ee9516a9c6436f8d484a29d",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-haproxy-v1.0.0/haproxy.zip",
      "sha256": "ada05f5bd8a9bd71eeac2699f24129e5e31213224141f86fcc28ebd0c027a789",
@@ -397,6 +487,24 @@
     "NTLM or Basic login; Kerberos is not supported"
    ],
    "releases": [
+    {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.1.1/hyperv.zip",
+     "sha256": "88c9c4fa27c6d74c06942a0987ee3f43a1cc768b36265536935d847769c25bf1",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.1.0/hyperv.zip",
@@ -460,6 +568,24 @@
     "Incus virtual machines and clusters, LXD (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-incus-v1.0.1/incus.zip",
+     "sha256": "f266e0a82cb959d8bab4361e26d9f8b77f91ae2d4ba8f29c76b7c54f20d1b5a3",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-incus-v1.0.0/incus.zip",
@@ -527,6 +653,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kong-v1.0.1/kong.zip",
+     "sha256": "632f5243e5736ec6063aa81ccdd7e8f108254579195a814aeaa0f15b5c800524",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kong-v1.0.0/kong.zip",
      "sha256": "8ac4e5b3cc37874ccceb150ba8d9da4b63c480dcc71a1f8e8d9d5e1bd1b52ffc",
@@ -559,6 +703,24 @@
     "kubeadm, RKE2, Talos, microk8s (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kubernetes-v1.0.1/kubernetes.zip",
+     "sha256": "9a09e846508349e0f6453798902286e218bcd5ee2730d4f6c9d842a00f8a3e2d",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kubernetes-v1.0.0/kubernetes.zip",
@@ -625,6 +787,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.0.1/mikrotik.zip",
+     "sha256": "3de567f3ecc80619ca4a292d1cea39df44bcb0edd884f9288312454fb71c3981",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.0.0/mikrotik.zip",
      "sha256": "df2e239b0bb450c707fce50cc63d0e53f8985e15776ba10899d862850e3761b0",
@@ -657,6 +837,24 @@
     "NetBox 4.7 (tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netbox-v1.0.1/netbox.zip",
+     "sha256": "2738c831d3fda16ddfce50ceb4618fbf1a93b221944e993d02e7f84b35fc5419",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netbox-v1.0.0/netbox.zip",
@@ -691,6 +889,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nomad-v1.0.1/nomad.zip",
+     "sha256": "8858448498162338c5a994360aa4068ffe1d1d01950fe4d799ec45797d1cd9c1",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nomad-v1.0.0/nomad.zip",
      "sha256": "f693a6b6a9c3597ac17fd4f38a29db0837f970fc96ca06ddcac7761b2a4bf928",
@@ -723,6 +939,24 @@
     "Sites, certificates and access lists read with simulated data matching the 2.x API"
    ],
    "releases": [
+    {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.1.1/npm.zip",
+     "sha256": "cacd1035dae14a10797929b1a13451e875ae786ef18a4b80c2a595538ef7d720",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.1.0/npm.zip",
@@ -762,6 +996,24 @@
     "OC200 / OC300 hardware controllers (not yet tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.3",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.0.3/omada.zip",
+     "sha256": "9a85874a3896363bf80b1ace7d7eb5d37b7e10c9a0269deab1a17856dfac3b60",
+     "api_version": 1,
+     "min_netlens": "0.2.45",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.0.0/omada.zip",
@@ -820,6 +1072,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.0.1/openwrt.zip",
+     "sha256": "17d9f6dde3b533f9a0364679970cc56642fcc7c0fccca8883e25db0b27aadf2a",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.0.0/openwrt.zip",
      "sha256": "d7f0f4a8e2660259e361447678ff1c880c6166d0fb75970b3b3b4f615cc3dc49",
@@ -853,6 +1123,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.0.1/opnsense.zip",
+     "sha256": "7fb65f70581b908cded0c41f2c18534b15265e935f4833bc86077ade28d4766c",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.0.0/opnsense.zip",
      "sha256": "d21f2b64b005febd815f802f6e734963ed9bad4921f5c945a38a0b60f06d50fe",
@@ -885,6 +1173,24 @@
     "Pi-hole v5 and older (not supported: different API)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-v1.0.1/pihole.zip",
+     "sha256": "3d9522c6bbd2e3645f172dbaac92d312ed0d296bff45978b5da38d11ae0e717d",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-v1.0.0/pihole.zip",
@@ -952,6 +1258,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-portainer-v1.0.1/portainer.zip",
+     "sha256": "60af2c6a4daf8c6656703664ab4a6dec650045106a52cec7ea70a7965fc5eea5",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-portainer-v1.0.0/portainer.zip",
      "sha256": "2fb2bef4617e89d4d01cc4d1a82bb43dbecc1e9e7cecca1001e5e7c712bf31fd",
@@ -983,6 +1307,24 @@
     "PowerDNS Authoritative 4.9 (tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-powerdns-v1.0.1/powerdns.zip",
+     "sha256": "a77320509e131eb9134557ee25d6ff89d945c808ad6586f6442fd25131937dd2",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-powerdns-v1.0.0/powerdns.zip",
@@ -1030,6 +1372,24 @@
    ],
    "releases": [
     {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-snmp-v1.1.1/snmp.zip",
+     "sha256": "52f6970cae581393fc046ce16afa46c4bc6e34c237d56fb66aa6315e7ffee77b",
+     "api_version": 1,
+     "min_netlens": "0.3.109",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-snmp-v1.1.0/snmp.zip",
      "sha256": "9cd00ce3caa59ac5e16ae61a1124665440f6dd4de4d9890b850d7846e8debfc1",
@@ -1068,6 +1428,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-swarm-v1.0.1/swarm.zip",
+     "sha256": "f38e096d7cfb1d921ba8cfd8671c32d847e8e7f1f9f458d0d3f5fa72951bc410",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-swarm-v1.0.0/swarm.zip",
      "sha256": "a4d8951f95d23b12cac9504c496b54b6d9da267f0bcdd88c8de6c63808c68bb1",
@@ -1102,6 +1480,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.0.1/synology.zip",
+     "sha256": "8fe624f5bec5908a65d57f6b1c4a92dce5921e6d5179c9bde916de8d011a6d9c",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.0.0/synology.zip",
      "sha256": "b7d87f32a50ec782d4eed6d9a46f2a149aace435fbbc2c2385ff6c0ef7be4e18",
@@ -1128,6 +1524,24 @@
     "Technitium DNS cluster (not yet tested on a real server)"
    ],
    "releases": [
+    {
+     "version": "1.2.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.2.1/technitium.zip",
+     "sha256": "d31eeb429ab52816ccbd7a218a093a90eaa4205ae70f5d287d6458f331c2d3be",
+     "api_version": 1,
+     "min_netlens": "0.3.109",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.2.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.2.0/technitium.zip",
@@ -1210,6 +1624,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-traefik-v1.0.1/traefik.zip",
+     "sha256": "74ab1610e5fd1bebd6474066b66166f97e18872df333902b24a6d009f732e2f8",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-traefik-v1.0.0/traefik.zip",
      "sha256": "9446f26be46ef134a4d916102f6f70c97736d3ef29dcd898cca4c7b8f6518d88",
@@ -1243,6 +1675,24 @@
     "TrueNAS 25.04 (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.3.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.3.1/truenas.zip",
+     "sha256": "a1081cc91dc84588837c1bf61be79905e1233705f9a9a830b0abb44b3dc584f3",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.3.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.3.0/truenas.zip",
@@ -1325,6 +1775,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.0.2/unifi.zip",
+     "sha256": "0a2c8a93d055e4c381e4db6c27876fd013f93d1b13e354ca70583337b7ae8de4",
+     "api_version": 1,
+     "min_netlens": "0.2.45",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.0.0/unifi.zip",
      "sha256": "7ef3b9ece28bf52024e941034193ae2024f6123872612758b859ba02b58e2ef5",
@@ -1364,6 +1832,24 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.0.1/vsphere.zip",
+     "sha256": "a19878c0cc5f59e05406f9bb98da9ea6d1199af1acfcf16ef0e387ed19c03abb",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.0.0/vsphere.zip",
      "sha256": "df9455dab2be1e70f98fe6b5a9a8a819f60d8200a0638339920ac8b0b1c273ee",
@@ -1394,6 +1880,24 @@
     "DHCP lease table (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vyos-v1.0.1/vyos.zip",
+     "sha256": "b4ed79d9a916384229d9a6c5d758252335e87f84589d66436195381e044110f0",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vyos-v1.0.0/vyos.zip",

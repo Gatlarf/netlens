@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.2.1/technitium.zip",
+      "sha256": "d31eeb429ab52816ccbd7a218a093a90eaa4205ae70f5d287d6458f331c2d3be",
+      "api_version": 1,
+      "min_netlens": "0.3.109",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.2.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.2.0/technitium.zip",
       "sha256": "e70fb03ab0023cd82830438e65697e65059c18c8710c11c7c21676ef68682ba1",

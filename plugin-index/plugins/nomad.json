@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nomad-v1.0.1/nomad.zip",
+      "sha256": "8858448498162338c5a994360aa4068ffe1d1d01950fe4d799ec45797d1cd9c1",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nomad-v1.0.0/nomad.zip",
       "sha256": "f693a6b6a9c3597ac17fd4f38a29db0837f970fc96ca06ddcac7761b2a4bf928",

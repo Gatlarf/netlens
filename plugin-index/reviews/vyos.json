@@ -2,6 +2,17 @@
   "id": "vyos",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "b4ed79d9a916384229d9a6c5d758252335e87f84589d66436195381e044110f0",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.0.0",
       "sha256": "3367b3a2cffa5225e3505871ac712ff03268428701950926fadc6c03fd2d5630",
       "level": "verified",

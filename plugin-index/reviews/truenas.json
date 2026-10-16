@@ -2,6 +2,17 @@
   "id": "truenas",
   "reviews": [
     {
+      "version": "1.3.1",
+      "sha256": "a1081cc91dc84588837c1bf61be79905e1233705f9a9a830b0abb44b3dc584f3",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+      ],
+      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+    },
+    {
       "version": "1.2.0",
       "sha256": "084f106d5fafe6700436e89c6b26a056b2de3ae4ad7de1d4879f26e4a95565d4",
       "level": "verified",

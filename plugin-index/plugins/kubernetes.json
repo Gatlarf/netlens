@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kubernetes-v1.0.1/kubernetes.zip",
+      "sha256": "9a09e846508349e0f6453798902286e218bcd5ee2730d4f6c9d842a00f8a3e2d",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kubernetes-v1.0.0/kubernetes.zip",
       "sha256": "30b913d09c3f6d86ac75e49ba23a7639161533945c81a3c0b3c123cf1498ce62",
