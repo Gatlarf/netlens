@@ -1,0 +1,24 @@
+{
+  "id": "adguard-clients",
+  "name": "AdGuard Home clients",
+  "kind": "topology",
+  "category": "dns",
+  "description": "Reads what AdGuard Home knows about your devices: the DHCP leases and static leases (MAC address, IP address, host name) and the clients you named in AdGuard (with a MAC address among their identifiers), including the device type and operating system from AdGuard's tags (device_tv, os_android ...). Netlens matches them by MAC address and uses the names and types. Read-only. (To register names in AdGuard Home, use the AdGuard Home DNS plugin.)",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/adguard-clients",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "AdGuard Home 0.107 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-clients-v1.0.0/adguard-clients.zip",
+      "sha256": "2f4f44447712c01470c1036d05f105f21c177e62dcad2c8b052a5412e7c41a7e",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

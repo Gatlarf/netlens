@@ -1,0 +1,16 @@
+{
+  "id": "pihole-clients",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "fd448cea19cbd24ce46a3b65e01bff30acb4f6ca12cf11af99ba4d577f0b20fc",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Pi-hole 6.4.3 (Docker): login, version, network table (one client behind the Docker bridge), a wrong password"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only. Not verified because the lab table had a single device: names, manufacturers and devices with several addresses have only been seen in simulated answers of the recorded shape."
+    }
+  ]
+}

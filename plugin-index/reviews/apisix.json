@@ -1,0 +1,16 @@
+{
+  "id": "apisix",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "5a9ed14762673c2f852f899cae0f649a908afda46d7cd8d4f446b905a3ce8fc9",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Apache APISIX 3.11.0 with etcd (Docker): routes with hosts, shared and inline upstreams, a service, a redirect, a disabled route, a wildcard TLS certificate (expiry read from the PEM), the viewer role, a wrong key"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET) with the viewer key. Stream routes were not enabled in the lab and follow the documentation."
+    }
+  ]
+}

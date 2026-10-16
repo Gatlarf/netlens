@@ -1,0 +1,23 @@
+{
+  "id": "envoy",
+  "name": "Envoy",
+  "kind": "proxy",
+  "description": "Shows the sites an Envoy proxy publishes: every virtual host of its HTTP listeners (domains, the upstream cluster and its endpoint, redirects) and every TCP proxy listener (port and upstream). Works with Envoy configured by files and with Envoy configured through xDS (Istio, Contour, Envoy Gateway ...): it reads the running configuration from the admin interface. Read-only: it only sends GET requests.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/envoy",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Envoy 1.32 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-envoy-v1.0.0/envoy.zip",
+      "sha256": "83d19f2daaf8eedb8d7d7b6a1662a0899f19f9f089a6704e868f325db0bc5239",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

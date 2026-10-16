@@ -1,0 +1,16 @@
+{
+  "id": "librenms",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "7165c888e9bddb198ffd8f0ddf60f9fa22923e6d484272954217f788e40a7c64",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "LibreNMS 26.9.1 (Docker): two SNMP devices (Linux snmpd), ports with MAC addresses, ARP table, API token, a wrong token"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). Not verified because the LLDP link and forwarding-table (FDB) rows were inserted into the database by hand: the lab has no managed switch, so switch-port placement of clients has not been seen on real data."
+    }
+  ]
+}

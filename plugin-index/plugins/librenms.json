@@ -1,0 +1,23 @@
+{
+  "id": "librenms",
+  "name": "LibreNMS",
+  "kind": "topology",
+  "description": "Imports the network that LibreNMS has discovered over SNMP: devices of type network, firewall and wireless become network nodes, the LLDP/CDP links between them decide who hangs below whom, every other device is a client, and the switches' forwarding tables (FDB) tell which switch port every other MAC address was learned on. Netlens matches them to what it finds on the network by MAC address, so the hierarchy shows what your switches see. Read-only: it only sends GET requests with an API token.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/librenms",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "LibreNMS 26.9 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-librenms-v1.0.0/librenms.zip",
+      "sha256": "7165c888e9bddb198ffd8f0ddf60f9fa22923e6d484272954217f788e40a7c64",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

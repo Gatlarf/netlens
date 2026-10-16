@@ -1,0 +1,23 @@
+{
+  "id": "consul",
+  "name": "HashiCorp Consul",
+  "kind": "hypervisor",
+  "description": "Lists what is registered in a Consul service catalog: the nodes become hosts (with their address and whether the agent is alive) and every registered service instance becomes a guest of its node, with its health (passing, warning or critical), tags and port. Netlens ties the nodes and services to the devices it found by address. Read-only: it only sends GET requests.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/consul",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Consul 1.20 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-consul-v1.0.0/consul.zip",
+      "sha256": "92490e844f01fac06f4f3144ce98c6ebf1217bdaaece0b52981ae89b6f75b872",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

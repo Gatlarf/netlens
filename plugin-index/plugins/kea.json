@@ -1,0 +1,24 @@
+{
+  "id": "kea",
+  "name": "Kea DHCP",
+  "kind": "topology",
+  "category": "network",
+  "description": "Reads the DHCP leases (and the fixed reservations) of ISC Kea through its Control Agent: every lease with a MAC address becomes a client with its IP address and the host name the device gave. Netlens matches them to what it finds on the network by MAC address and uses the names. Read-only: it only runs the lease4-get-all and config-get commands.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/kea",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Kea 2.6 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kea-v1.0.0/kea.zip",
+      "sha256": "ebbee71f818af22b191f1b1d153125069a5455c101a3a2932453b8a5ee997d87",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

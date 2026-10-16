@@ -1,0 +1,16 @@
+{
+  "id": "kea",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "ebbee71f818af22b191f1b1d153125069a5455c101a3a2932453b8a5ee997d87",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Kea 2.6.3 (Debian 13 packages): kea-dhcp4 with the lease_cmds hook, Control Agent with basic authentication; leases added through the API, a reservation in the configuration, a wrong password"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (version-get, lease4-get-all, config-get). No real DHCP client was used and no database back end (MySQL/PostgreSQL); the answers have the same shape."
+    }
+  ]
+}

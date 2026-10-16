@@ -34,6 +34,71 @@
    ]
   },
   {
+   "id": "adguard-clients",
+   "name": "AdGuard Home clients",
+   "kind": "topology",
+   "category": "dns",
+   "description": "Reads what AdGuard Home knows about your devices: the DHCP leases and static leases (MAC address, IP address, host name) and the clients you named in AdGuard (with a MAC address among their identifiers), including the device type and operating system from AdGuard's tags (device_tv, os_android ...). Netlens matches them by MAC address and uses the names and types. Read-only. (To register names in AdGuard Home, use the AdGuard Home DNS plugin.)",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/adguard-clients",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "AdGuard Home 0.107 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-clients-v1.0.0/adguard-clients.zip",
+     "sha256": "2f4f44447712c01470c1036d05f105f21c177e62dcad2c8b052a5412e7c41a7e",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "AdGuard Home v0.107.79 (Docker): a named client with a MAC address, an IP address and a CIDR as identifiers, device tags, a static DHCP lease, a wrong password"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). A running DHCP server with dynamic leases was not tried; it uses the same fields as the static leases."
+     }
+    }
+   ]
+  },
+  {
+   "id": "apisix",
+   "name": "Apache APISIX",
+   "kind": "proxy",
+   "description": "Shows the routes an Apache APISIX gateway publishes: host names, the upstream (also through a shared upstream or a service), redirects, whether a route is switched off, and the TLS certificates with their expiry date. Read-only: it only sends GET requests, with the key of the built-in viewer role.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/apisix",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Apache APISIX 3.11 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-apisix-v1.0.0/apisix.zip",
+     "sha256": "5a9ed14762673c2f852f899cae0f649a908afda46d7cd8d4f446b905a3ce8fc9",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Apache APISIX 3.11.0 with etcd (Docker): routes with hosts, shared and inline upstreams, a service, a redirect, a disabled route, a wildcard TLS certificate (expiry read from the PEM), the viewer role, a wrong key"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET) with the viewer key. Stream routes were not enabled in the lab and follow the documentation."
+     }
+    }
+   ]
+  },
+  {
    "id": "asus",
    "name": "ASUS router (AiMesh)",
    "kind": "topology",
@@ -108,6 +173,38 @@
        "Caddy v2.11.7 (Caddyfile with two reverse proxies and a redirect)"
       ],
       "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET /config/...). HTTPS upstreams and automatic HTTPS details untested."
+     }
+    }
+   ]
+  },
+  {
+   "id": "consul",
+   "name": "HashiCorp Consul",
+   "kind": "hypervisor",
+   "description": "Lists what is registered in a Consul service catalog: the nodes become hosts (with their address and whether the agent is alive) and every registered service instance becomes a guest of its node, with its health (passing, warning or critical), tags and port. Netlens ties the nodes and services to the devices it found by address. Read-only: it only sends GET requests.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/consul",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Consul 1.20 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-consul-v1.0.0/consul.zip",
+     "sha256": "92490e844f01fac06f4f3144ce98c6ebf1217bdaaece0b52981ae89b6f75b872",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Consul 1.20.6 (Docker, dev mode): nodes and services registered through the catalog API with passing, warning and critical checks, agent/self"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). ACL tokens, several datacenters and mesh services follow the documentation and are covered by simulated answers only."
      }
     }
    ]
@@ -189,6 +286,38 @@
      "changelog": "First release. Docker hosts and their containers as guests of the host: state, health, restarts, image and its age, compose project, published ports, and macvlan / ipvlan containers matched to devices. Needs Netlens 0.2.106 or newer.",
      "review": {
       "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "envoy",
+   "name": "Envoy",
+   "kind": "proxy",
+   "description": "Shows the sites an Envoy proxy publishes: every virtual host of its HTTP listeners (domains, the upstream cluster and its endpoint, redirects) and every TCP proxy listener (port and upstream). Works with Envoy configured by files and with Envoy configured through xDS (Istio, Contour, Envoy Gateway ...): it reads the running configuration from the admin interface. Read-only: it only sends GET requests.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/envoy",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Envoy 1.32 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-envoy-v1.0.0/envoy.zip",
+     "sha256": "83d19f2daaf8eedb8d7d7b6a1662a0899f19f9f089a6704e868f325db0bc5239",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Envoy 1.32.13 (Docker, file configuration): two virtual hosts, a TCP proxy listener, clusters with several endpoints"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET /server_info, /config_dump, /clusters). Envoy configured through xDS, TLS listeners and RDS route configurations follow the documentation and are covered by simulated answers only."
      }
     }
    ]
@@ -352,6 +481,39 @@
    ]
   },
   {
+   "id": "kea",
+   "name": "Kea DHCP",
+   "kind": "topology",
+   "category": "network",
+   "description": "Reads the DHCP leases (and the fixed reservations) of ISC Kea through its Control Agent: every lease with a MAC address becomes a client with its IP address and the host name the device gave. Netlens matches them to what it finds on the network by MAC address and uses the names. Read-only: it only runs the lease4-get-all and config-get commands.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/kea",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Kea 2.6 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kea-v1.0.0/kea.zip",
+     "sha256": "ebbee71f818af22b191f1b1d153125069a5455c101a3a2932453b8a5ee997d87",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Kea 2.6.3 (Debian 13 packages): kea-dhcp4 with the lease_cmds hook, Control Agent with basic authentication; leases added through the API, a reservation in the configuration, a wrong password"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (version-get, lease4-get-all, config-get). No real DHCP client was used and no database back end (MySQL/PostgreSQL); the answers have the same shape."
+     }
+    }
+   ]
+  },
+  {
    "id": "kong",
    "name": "Kong Gateway",
    "kind": "proxy",
@@ -413,6 +575,38 @@
        "k3s v1.36.5, one node, Deployments, DaemonSets and Jobs"
       ],
       "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET) with a service account token that may only list nodes and pods. Multi-node clusters and LAN-routable pod addresses untested."
+     }
+    }
+   ]
+  },
+  {
+   "id": "librenms",
+   "name": "LibreNMS",
+   "kind": "topology",
+   "description": "Imports the network that LibreNMS has discovered over SNMP: devices of type network, firewall and wireless become network nodes, the LLDP/CDP links between them decide who hangs below whom, every other device is a client, and the switches' forwarding tables (FDB) tell which switch port every other MAC address was learned on. Netlens matches them to what it finds on the network by MAC address, so the hierarchy shows what your switches see. Read-only: it only sends GET requests with an API token.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/librenms",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "LibreNMS 26.9 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-librenms-v1.0.0/librenms.zip",
+     "sha256": "7165c888e9bddb198ffd8f0ddf60f9fa22923e6d484272954217f788e40a7c64",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "LibreNMS 26.9.1 (Docker): two SNMP devices (Linux snmpd), ports with MAC addresses, ARP table, API token, a wrong token"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). Not verified because the LLDP link and forwarding-table (FDB) rows were inserted into the database by hand: the lab has no managed switch, so switch-port placement of clients has not been seen on real data."
      }
     }
    ]
@@ -707,6 +901,39 @@
        "Pi-hole v6.4.3 (Docker): add, change, remove records, wrong password, web server restart after a change"
       ],
       "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Only the Pi-hole API is called. Writes only Local DNS records and CNAMEs, never PTR."
+     }
+    }
+   ]
+  },
+  {
+   "id": "pihole-clients",
+   "name": "Pi-hole clients",
+   "kind": "topology",
+   "category": "dns",
+   "description": "Reads the network table of Pi-hole v6: every device that asked Pi-hole for a DNS answer, with its MAC address, current IP address, the host name Pi-hole resolved for it and the manufacturer it looked up. Netlens matches them to what it finds on the network by MAC address and uses the names and manufacturers. Read-only: it only reads the table. (To register names in Pi-hole, use the Pi-hole DNS plugin.)",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/pihole-clients",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Pi-hole 6.4 (tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-clients-v1.0.0/pihole-clients.zip",
+     "sha256": "fd448cea19cbd24ce46a3b65e01bff30acb4f6ca12cf11af99ba4d577f0b20fc",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-16",
+     "changelog": "First release. Needs Netlens 0.3.157 or newer.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+       "Pi-hole 6.4.3 (Docker): login, version, network table (one client behind the Docker bridge), a wrong password"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only. Not verified because the lab table had a single device: names, manufacturers and devices with several addresses have only been seen in simulated answers of the recorded shape."
      }
     }
    ]

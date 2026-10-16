@@ -1,0 +1,16 @@
+{
+  "id": "consul",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "92490e844f01fac06f4f3144ce98c6ebf1217bdaaece0b52981ae89b6f75b872",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Consul 1.20.6 (Docker, dev mode): nodes and services registered through the catalog API with passing, warning and critical checks, agent/self"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). ACL tokens, several datacenters and mesh services follow the documentation and are covered by simulated answers only."
+    }
+  ]
+}

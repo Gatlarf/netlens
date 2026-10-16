@@ -1,0 +1,24 @@
+{
+  "id": "pihole-clients",
+  "name": "Pi-hole clients",
+  "kind": "topology",
+  "category": "dns",
+  "description": "Reads the network table of Pi-hole v6: every device that asked Pi-hole for a DNS answer, with its MAC address, current IP address, the host name Pi-hole resolved for it and the manufacturer it looked up. Netlens matches them to what it finds on the network by MAC address and uses the names and manufacturers. Read-only: it only reads the table. (To register names in Pi-hole, use the Pi-hole DNS plugin.)",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/pihole-clients",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Pi-hole 6.4 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-clients-v1.0.0/pihole-clients.zip",
+      "sha256": "fd448cea19cbd24ce46a3b65e01bff30acb4f6ca12cf11af99ba4d577f0b20fc",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

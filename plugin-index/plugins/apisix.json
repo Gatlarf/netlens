@@ -1,0 +1,23 @@
+{
+  "id": "apisix",
+  "name": "Apache APISIX",
+  "kind": "proxy",
+  "description": "Shows the routes an Apache APISIX gateway publishes: host names, the upstream (also through a shared upstream or a service), redirects, whether a route is switched off, and the TLS certificates with their expiry date. Read-only: it only sends GET requests, with the key of the built-in viewer role.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/apisix",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Apache APISIX 3.11 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-apisix-v1.0.0/apisix.zip",
+      "sha256": "5a9ed14762673c2f852f899cae0f649a908afda46d7cd8d4f446b905a3ce8fc9",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-16",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

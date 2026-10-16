@@ -1,0 +1,16 @@
+{
+  "id": "envoy",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "83d19f2daaf8eedb8d7d7b6a1662a0899f19f9f089a6704e868f325db0bc5239",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "Envoy 1.32.13 (Docker, file configuration): two virtual hosts, a TCP proxy listener, clusters with several endpoints"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET /server_info, /config_dump, /clusters). Envoy configured through xDS, TLS listeners and RDS route configurations follow the documentation and are covered by simulated answers only."
+    }
+  ]
+}

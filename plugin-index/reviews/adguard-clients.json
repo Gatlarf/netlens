@@ -1,0 +1,16 @@
+{
+  "id": "adguard-clients",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "2f4f44447712c01470c1036d05f105f21c177e62dcad2c8b052a5412e7c41a7e",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-16",
+      "tested_on": [
+        "AdGuard Home v0.107.79 (Docker): a named client with a MAC address, an IP address and a CIDR as identifiers, device tags, a static DHCP lease, a wrong password"
+      ],
+      "notes": "Written and lab-tested on 2026-10-16 with the assistant Claude, confirmed by the maintainer. Read-only (GET). A running DHCP server with dynamic leases was not tried; it uses the same fields as the static leases."
+    }
+  ]
+}
