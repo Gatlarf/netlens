@@ -702,12 +702,12 @@
    "id": "snmp",
    "name": "SNMP switches",
    "kind": "topology",
-   "description": "Asks managed switches over SNMP v1 / v2c (read-only) which device is plugged into which port: the MAC address table and LLDP. Netlens shows each device's switch and port and places the switches in the hierarchy. Works with switches that have the standard bridge MIB (TP-Link, Netgear, HP / Aruba, Cisco, Zyxel, MikroTik, Ubiquiti and others). Tested against simulated switches only.",
+   "description": "Asks managed switches over SNMP v1 / v2c (read-only) which device is plugged into which port: the MAC address table and LLDP. Netlens shows each device's switch and port and places the switches in the hierarchy. Works with switches that have the standard bridge MIB (TP-Link, Netgear, HP / Aruba, Cisco, Zyxel, MikroTik, Ubiquiti and others). Verified against a real device; more switch models are welcome.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/snmp",
    "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
-    "Managed switches with SNMP v1/v2c and the BRIDGE-MIB or Q-BRIDGE-MIB (not yet tested on hardware)",
+    "Managed switches with SNMP v1/v2c and the BRIDGE-MIB or Q-BRIDGE-MIB (verified on a real device)",
     "LLDP-MIB for links between switches (optional)"
    ],
    "releases": [

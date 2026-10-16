@@ -5,7 +5,7 @@ shows **"Connected to: SW_GARDEN · port gi1/0/5"** on every device's page and p
 the hierarchy and on the map. It works with any switch that offers SNMP v1 or v2c and the standard bridge MIB: TP-Link (JetStream / Smart),
 Netgear, HP / Aruba, Cisco, Zyxel, MikroTik, Ubiquiti and others. Read-only: it only ever sends SNMP *get* requests.
 
-> **Status: tested against simulated switches only** (a codec checked against a real SNMP packet, and a simulated network of two switches with LLDP).
+> **Status: verified against a real device** (reported by the maintainer, 2026-10-16), after tests against simulated switches (a codec checked against a real SNMP packet, and a simulated network of two switches with LLDP). More switch models are still welcome: *Run diagnostic* makes a report.
 > Please try it on a real switch and report what you see, see *Testing* below.
 
 ## What it reads
