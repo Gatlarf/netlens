@@ -4,7 +4,7 @@ A `dns` plugin.
 
 Registers your devices in AdGuard Home as **DNS rewrites** (*Filters → DNS rewrites*): an A record for every device Netlens knows and DNS does not, a CNAME for a container alias, and a changed address when a device's IP changes. AdGuard Home makes no reverse (PTR) answers for rewrites, so none are written.
 
-> **Status: tested against the real software in a lab** (AdGuard Home v0.107.79 (Docker), adding, changing and removing rewrites, duplicates, a wrong password.) Please report what you see; *Run diagnostic* on the plugin's page makes an anonymised report (counts and field names, never names or addresses).
+> **Status: verified on a real installation** (reported by the maintainer, 2026-10-16), after lab tests on AdGuard Home v0.107.79 (Docker): adding, changing and removing rewrites, duplicates, a wrong password. Please report what you see; *Run diagnostic* on the plugin's page makes an anonymised report (counts and field names, never names or addresses).
 
 ## Set-up
 
