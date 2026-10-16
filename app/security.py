@@ -50,8 +50,12 @@ class SecurityHeadersMiddleware:
                     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
                 )
 
+                from app import assets
+
                 if is_api:
                     add_header("Cache-Control", "no-store")
+                elif path.startswith(f"/v/{assets.VERSION}/") and message.get("status") == 200 and assets.cacheable():
+                    add_header("Cache-Control", assets.IMMUTABLE)       # the address contains the version: a new version is a new address
                 else:
                     # Static UI files: always revalidate (cheap 304 via ETag) so a
                     # redeploy is picked up immediately instead of a stale cached module.

@@ -203,10 +203,10 @@ async function loadLibrary() {
   }
 }
 
-async function loadLayout(shared) {
+async function loadLayout(shared, pending = null) {
   let server = EMPTY, reachable = true;
   try {
-    server = await get("/api/dashboard/layout");
+    server = await (pending || get("/api/dashboard/layout"));
   } catch (e) {
     reachable = false;
   }
@@ -287,9 +287,12 @@ function miniMap() {
 // ---------- the page ----------
 
 export async function render(container) {
-  const shared = await loadDefault();
-  const layout = await loadLayout(shared);
-  let library = await loadLibrary();
+  // the three requests do not depend on each other: ask for them together (one round trip instead of three, which matters over the internet)
+  const layoutRequest = get("/api/dashboard/layout");
+  layoutRequest.catch(() => {});
+  const [shared, library0] = await Promise.all([loadDefault(), loadLibrary()]);
+  const layout = await loadLayout(shared, layoutRequest);
+  let library = library0;
   const base = () => (shared ? { order: shared.order, custom: shared.custom } : { order: DEFAULT_ORDER, custom: [] });
   let data = null, order = layout.order, custom = layout.custom, own = layout.own, editing = false, disposed = false, timer = null;
   const map = miniMap();
@@ -531,18 +534,15 @@ export async function render(container) {
 
   async function refresh() {
     try {
-      data = await get("/api/dashboard");
-      try {
-        const [m, l] = await Promise.all([get("/api/monitors"), get("/api/monitoring/limits")]);
-        data.health = { monitors: m.monitors || [], problems: m.problems || [], rules: l.rules || {} };
-      } catch (e) {
-        data.health = null;      // an older server or no access: the card simply does not show
-      }
-      try {
-        data.capacity = await get("/api/forecast");
-      } catch (e) {
-        data.capacity = null;
-      }
+      // everything the cards need, asked for at the same time; the extras may fail without hiding the dashboard
+      const [main, health, capacity] = await Promise.all([
+        get("/api/dashboard"),
+        Promise.all([get("/api/monitors"), get("/api/monitoring/limits")]).then(([m, l]) => ({ monitors: m.monitors || [], problems: m.problems || [], rules: l.rules || {} }), () => null),   // an older server or no access: the card simply does not show
+        get("/api/forecast").catch(() => null),
+      ]);
+      data = main;
+      data.health = health;
+      data.capacity = capacity;
       if (!disposed && !(editing && grid.children.length)) draw();
     } catch (err) {
       if (!data && !disposed) clear(grid), grid.append(h("p", { class: "error" }, err.message || "The dashboard could not be loaded."));

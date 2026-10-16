@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.35 — 2026-10-16
+
+### Changed
+- **Faster page loads over the internet** (behind a reverse proxy): the interface files are now served under an address with the version in it (`v/<version>/js/...`) and cached for a year, so a second visit fetches almost nothing but the data, and a new version still shows up at once. The page lists the scripts it needs up front, so the browser no longer finds them one import at a time. The dashboard asks for its data at the same time instead of one after another, and the "What's new" check no longer downloads the whole changelog on every page load. On a simulated internet connection (80 ms, 20 Mbit/s) the dashboard went from 2.1 s to 1.5 s on a first visit and to 1.0 s on a return visit.
+
 ## 0.4.33 — 2026-10-16
 
 ### Changed

@@ -75,7 +75,7 @@ export async function buildChangelogCard() {
 // After an update: a window with the notable changes since the version this browser last saw
 export async function maybeShowWhatsNew() {
   try {
-    const current = (await get("/api/changelog")).current;
+    const current = (await get("/api/health")).version;          // not the whole changelog, only to learn the version
     if (!current || current.includes("dev")) return;
     const seen = remembered();
     if (!seen) { remember(current); return; }        // first visit of this browser: nothing to compare with

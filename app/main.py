@@ -251,6 +251,14 @@ def create_app(
 
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
+        from app import assets
+
+        @app.get("/", include_in_schema=False)
+        @app.get("/index.html", include_in_schema=False)
+        async def index_page(request: Request):
+            return assets.page_response("index.html", request.headers.get("if-none-match"))
+
+        app.mount("/v", assets.VersionedStatic(directory=static_dir), name="static-versioned")
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
     return app
