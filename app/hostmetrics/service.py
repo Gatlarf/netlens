@@ -574,6 +574,10 @@ def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: li
             add_event(conn, "metric_ok", _describe(rule, "service_stopped", row["label"], 0.0, "ok", device_name), device_id=device_id, now=now,
                       subject=f"metric:{device_id}:service_stopped:{row['label']}")
             raised.append("metric_ok")
+    # a reading that is no longer taken cannot stay a problem: a container used to report the temperature of its host and no longer does, so the old warning would
+    # never clear. Only when the rest of the read worked (processor or memory present), so a failed read does not wipe the state.
+    if points and not any(m == "temp_c" for m, _l, _v, _u in points) and any(m in ("cpu_pct", "mem_pct") for m, _l, _v, _u in points):
+        conn.execute("UPDATE metric_state SET level = 'ok', since = ?, pending = NULL, pending_n = 0 WHERE monitor_id = ? AND metric = 'temp_c' AND level != 'ok'", (now, monitor_id))
     conn.commit()
     return raised
 

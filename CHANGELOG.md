@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.34 — 2026-10-16
+
+### Fixed
+- **Containers reported the temperature of their host**: an LXC or Docker container sees the sensors of the machine it runs on, so every container monitored over SSH raised the same temperature warning as its host (for example `lxc-docker1: temperature on x86_pkg_temp is 84°C`). Netlens now notices that the target is a container and does not read temperatures there; an old temperature warning of such a guest clears by itself at the next read. Read the temperature on the host (or the Proxmox node), where it belongs.
+
 ## 0.4.31 — 2026-10-16
 
 ### Added

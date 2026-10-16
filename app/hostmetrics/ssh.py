@@ -25,6 +25,9 @@ SCRIPT = (
     'echo "##uptime"; cat /proc/uptime 2>/dev/null; '
     'echo "##df"; df -PkT 2>/dev/null; '
     'echo "##net"; cat /proc/net/dev 2>/dev/null; '
+    # a container (LXC, Docker) shares the kernel of its host: the sensors it can see are the HOST's, so they are not read there
+    'echo "##container"; if [ -r /run/systemd/container ]; then head -n1 /run/systemd/container; elif [ -e /.dockerenv ] || [ -e /run/.containerenv ]; then echo container; '
+    'elif command -v systemd-detect-virt >/dev/null 2>&1; then systemd-detect-virt -c 2>/dev/null | head -n1; fi; '
     'echo "##temp"; for z in /sys/class/thermal/thermal_zone*; do [ -r "$z/temp" ] && echo "$(cat "$z/type" 2>/dev/null | tr " " "_") $(cat "$z/temp")"; done 2>/dev/null; '
     'echo "##mdstat"; cat /proc/mdstat 2>/dev/null; '
     'echo "##zpool"; PATH="$PATH:/sbin:/usr/sbin:/usr/local/sbin" zpool list -H -o name,health 2>/dev/null; '
@@ -319,7 +322,9 @@ def parse(text: str, state: dict, now: float | None = None) -> tuple[list[tuple]
         found.append("network")
 
     temps = []
-    for item in sec.get("temp", []):
+    inside = [x.strip().lower() for x in sec.get("container", []) if x.strip()]
+    in_container = bool(inside) and inside[0] != "none"          # the host's temperatures, not this guest's: reading them would raise the same warning on every container
+    for item in [] if in_container else sec.get("temp", []):
         name, _, value = item.rpartition(" ")
         try:
             temps.append(("temp_c", (name or "sensor")[:40], int(value) / 1000.0, "°C"))

@@ -195,6 +195,26 @@ def proc(user=1000, system=500, idle=8000, iowait=500, rx=0, tx=0):
     return PROC.format(user=user, system=system, idle=idle, iowait=iowait, rx=rx, tx=tx)
 
 
+def test_a_container_does_not_report_the_temperatures_of_its_host():
+    """LXC and Docker guests see the sensors of the machine they run on; reading them gave every guest the same warning."""
+    for kind in ("lxc", "docker", "container", "podman"):
+        pts, found = ssh.parse(proc().replace("##temp", f"##container\n{kind}\n##temp"), {}, now=100)
+        assert "temperature" not in found and ("temp_c", "x86_pkg_temp") not in points(pts), kind
+    pts, found = ssh.parse(proc().replace("##temp", "##container\nnone\n##temp"), {}, now=100)
+    assert points(pts)[("temp_c", "x86_pkg_temp")] == pytest.approx(61)                   # systemd-detect-virt says "none" on a real machine
+    pts, found = ssh.parse(proc().replace("##temp", "##container\n##temp"), {}, now=100)
+    assert points(pts)[("temp_c", "x86_pkg_temp")] == pytest.approx(61)                   # nothing detected
+
+
+def test_the_container_check_in_the_script_is_valid_shell_and_answers():
+    import subprocess
+
+    script = ssh.SCRIPT
+    assert subprocess.run(["sh", "-n", "-c", script], capture_output=True).returncode == 0
+    out = subprocess.run(["sh", "-c", script], capture_output=True, text=True).stdout
+    assert "##container" in out and out.index("##container") < out.index("##temp") < out.index("##end")
+
+
 def test_ssh_parser_first_round_and_second_round():
     state = {}
     pts, found = ssh.parse(proc(), state, now=100)
@@ -536,3 +556,19 @@ def test_stopped_service_raises_and_clears(conn):
     # a round that did not read the services (no sentinel) clears nothing
     hm.evaluate(conn, mid, 1, "pc", [sentinel, stopped], "2026-03-10T12:03:00Z")
     assert hm.evaluate(conn, mid, 1, "pc", [("cpu_pct", "", 10, "%")], "2026-03-10T12:04:00Z") == []
+
+
+def test_a_temperature_warning_clears_when_the_reading_is_no_longer_taken(tmp_path):
+    from app.db import connect, init_db
+    from app.hostmetrics import service
+
+    conn = connect(tmp_path / "t.db")
+    init_db(conn)
+    dev = conn.execute("INSERT INTO devices (primary_ip, first_seen, last_seen) VALUES ('10.0.0.5', 'x', 'x')").lastrowid
+    conn.execute("INSERT INTO host_monitors (id, device_id, method, address, port, created) VALUES (1, ?, 'ssh', '10.0.0.5', 22, 'x')", (dev,))
+    conn.execute("INSERT INTO metric_state (monitor_id, metric, label, level, since, value, pending, pending_n) VALUES (1, 'temp_c', 'x86_pkg_temp', 'warning', 'x', 84, NULL, 0)")
+    service.evaluate(conn, 1, dev, "lxc", [("cpu_pct", "", 10.0, "%")])                      # the read worked, there is no temperature any more
+    assert conn.execute("SELECT level FROM metric_state").fetchone()[0] == "ok"
+    conn.execute("UPDATE metric_state SET level = 'warning'")
+    service.evaluate(conn, 1, dev, "lxc", [])                                                 # a failed read changes nothing
+    assert conn.execute("SELECT level FROM metric_state").fetchone()[0] == "warning"
