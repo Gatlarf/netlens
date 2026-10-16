@@ -10,7 +10,7 @@
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/adguard",
    "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
-    "AdGuard Home v0.107 (tested)"
+    "AdGuard Home v0.107 (tested in a lab and verified on a real installation)"
    ],
    "releases": [
     {

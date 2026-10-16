@@ -12,7 +12,7 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 | [`synology/`](synology/README.md) | Synology | a Synology NAS (DSM 7): Container Manager containers, Virtual Machine Manager machines and packages as guests (a `hypervisor` plugin) | tested against a simulated DSM only |
 | [`truenas/`](truenas/README.md) | TrueNAS | TrueNAS Community 25.04+: containers, VMs and apps as guests of the NAS (a `hypervisor` plugin) | tested on a real TrueNAS 25.10.6 (VMs with simulated data) |
 | [`pihole/`](pihole/README.md) | Pi-hole | registers devices in Pi-hole v6's Local DNS (a `dns` plugin) | tested on a real Pi-hole 6.4.3 (Docker) |
-| [`adguard/`](adguard/README.md) | AdGuard Home | registers devices as AdGuard Home DNS rewrites (a `dns` plugin) | tested on a real AdGuard Home 0.107.79 (Docker) |
+| [`adguard/`](adguard/README.md) | AdGuard Home | registers devices as AdGuard Home DNS rewrites (a `dns` plugin) | verified on a real installation (and tested on AdGuard Home 0.107.79 in Docker) |
 | [`portainer/`](portainer/README.md) | Portainer | every Docker environment a Portainer manages: containers as guests (a `hypervisor` plugin) | tested on a real Portainer 2.45.2 (local environment) |
 | [`kubernetes/`](kubernetes/README.md) | Kubernetes | nodes as hosts, pods as guests (a `hypervisor` plugin) | tested on a real k3s 1.36 (one node) |
 | [`nomad/`](nomad/README.md) | HashiCorp Nomad | client nodes as hosts, allocations as guests (a `hypervisor` plugin) | tested on a real Nomad 2.0.7 (dev mode) |
