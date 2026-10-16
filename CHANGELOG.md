@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.35 — 2026-10-16
+
+### Changed
+- **Reports can be limited and tuned**: both reports can now cover **only the always-on devices** instead of every device. The weekly report has a *Covers* choice (all devices or always-on only) and tick boxes for its parts (service checks, new devices, health readings past a limit, disks filling up, remote sites), saved on the server and used for what is sent. The monthly availability report has a filter bar (always-on devices only, services on or off, one device group, only what had an outage, and an availability **target** in percent that marks everything below it); the choice is remembered in the browser, and the CSV download follows it.
+
 ## 0.4.34 — 2026-10-16
 
 ### Fixed

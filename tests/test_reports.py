@@ -129,7 +129,94 @@ def test_api(tmp_path):
         assert tc.get("/api/reports/availability.csv").headers["content-type"].startswith("text/csv")
         w = tc.get("/api/reports/weekly").json()
         assert w["settings"]["enabled"] is False and "text" in w
-        assert tc.put("/api/reports/weekly/settings", json={"enabled": True, "day": 2, "hour": 7}).json()["settings"] == {"enabled": True, "day": 2, "hour": 7}
+        assert tc.put("/api/reports/weekly/settings", json={"enabled": True, "day": 2, "hour": 7}).json()["settings"] == {**reports.DEFAULTS, "enabled": True, "day": 2, "hour": 7}
         assert tc.put("/api/reports/weekly/settings", json={"hour": 30}).status_code == 422
         assert tc.post("/api/reports/weekly/send").status_code == 409
     tsdb.forget_all()
+
+
+# ------------------------------------------------------------------ what the reports cover
+SPAN = (NOW - timedelta(days=10, hours=1), NOW + timedelta(hours=1))
+
+
+def test_the_report_can_be_limited_to_the_always_on_devices(conn):
+    everything = reports.availability(conn, *SPAN)
+    core = reports.availability(conn, *SPAN, scope="core")
+    assert {d["id"] for d in everything["devices"]} == {1, 2} and {d["id"] for d in core["devices"]} == {1}
+    assert core["summary"]["devices"] == 1 and core["summary"]["scope"] == "core" and core["services"] == everything["services"]
+
+
+def test_services_can_be_left_out(conn):
+    r = reports.availability(conn, *SPAN, with_services=False)
+    assert r["services"] == [] and r["summary"]["services"] == 0 and r["summary"]["services_availability"] is None and len(r["devices"]) == 2
+
+
+def test_one_group_only(conn):
+    conn.execute("INSERT INTO device_groups (id, name, color) VALUES (1, 'Servers', '#fff')")
+    conn.execute("UPDATE devices SET group_id = 1 WHERE id = 2")
+    conn.commit()
+    assert [d["id"] for d in reports.availability(conn, *SPAN, group_id=1)["devices"]] == [2]
+
+
+def test_only_what_had_an_outage_and_a_target(conn):
+    r = reports.availability(conn, *SPAN, only_outages=True, target=99.5)
+    assert [d["id"] for d in r["devices"]] == [1] and [s["name"] for s in r["services"]] == ["Website"]
+    assert r["summary"]["devices"] == 2                          # the summary still counts what was selected, not what is listed
+    assert r["summary"]["with_outages"] == 2 and r["summary"]["target"] == 99.5
+    full = reports.availability(conn, *SPAN, target=99.5)
+    flags = {("d", d["id"]): d["below_target"] for d in full["devices"]} | {("s", s["id"]): s["below_target"] for s in full["services"]}
+    assert flags == {("d", 1): True, ("d", 2): False, ("s", 1): True} and full["summary"]["below_target"] == 2
+    assert "Below target" in reports.availability_csv(full).splitlines()[0] and "Below target" not in reports.availability_csv(reports.availability(conn, *SPAN)).splitlines()[0]
+
+
+def test_weekly_settings_scope_and_sections(conn):
+    assert reports.get_settings(conn)["scope"] == "all" and all(reports.get_settings(conn)[k] for k in reports.SECTIONS)
+    out = reports.save_settings(conn, {"scope": "core", "services": False, "new_devices": False})
+    assert out["scope"] == "core" and out["services"] is False and out["new_devices"] is False and out["health"] is True
+    for bad in ({"scope": "nope"}, {"services": "yes"}):
+        with pytest.raises(ValueError):
+            reports.save_settings(conn, bad)
+    assert reports.get_settings(conn)["scope"] == "core"
+
+
+def test_the_weekly_report_follows_its_settings(conn):
+    everything = reports.weekly(conn, NOW, {"scope": "all"})
+    core = reports.weekly(conn, NOW, {"scope": "core", "services": False, "new_devices": False})
+    assert everything["devices"]["total"] == 2 and core["devices"]["total"] == 1 and core["devices"]["online"] == 1
+    assert everything["devices"]["new_count"] == 1 and core["devices"]["new_count"] == 0
+    assert core["worst_services"] == [] and everything["worst_services"] != []
+    title, text = reports.weekly_text(core)
+    assert "1 of 1 always-on devices are online now." in text and "new device" not in text and "(service)" not in text and "Service checks" not in text
+    _, full_text = reports.weekly_text(everything)
+    assert "1 of 2 devices are online now." in full_text and "1 new device(s) appeared" in full_text and "(service)" in full_text
+
+
+def test_always_on_scope_limits_health_and_disks_too(conn):
+    from app.hostmetrics import service as hm
+
+    conn.execute("INSERT INTO host_monitors (id, device_id, method, address, port, created) VALUES (1, 1, 'ssh', 'a', 22, 'x'), (2, 2, 'ssh', 'b', 22, 'x')")
+    for mon in (1, 2):
+        conn.execute("INSERT INTO metric_state (monitor_id, metric, label, level, since, value, pending, pending_n) VALUES (?, 'cpu_pct', '', 'warning', 'x', 95, NULL, 0)", (mon,))
+    conn.commit()
+    assert {p["device"] for p in reports.weekly(conn, NOW, {"scope": "all"})["problems"]} == {"nas", "phone"}
+    assert {p["device"] for p in reports.weekly(conn, NOW, {"scope": "core"})["problems"]} == {"nas"}
+    assert reports.weekly(conn, NOW, {"health": False})["problems"] == []
+
+
+def test_api_filters_and_weekly_options(tmp_path, conn):
+    path = tmp_path / "t.db"
+    conn.commit()
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret", "NETLENS_DATA_DIR": str(tmp_path)}), db_path=conn.execute("PRAGMA database_list").fetchone()[2])
+    with TestClient(app, headers=AUTH) as tc:
+        month = NOW.strftime("%Y-%m")
+        full = tc.get(f"/api/reports/availability?month={month}").json()
+        core = tc.get(f"/api/reports/availability?month={month}&scope=core&services=false&target=99").json()
+        assert len(full["devices"]) == 2 and len(core["devices"]) == 1 and core["services"] == [] and core["summary"]["target"] == 99 and "groups" in core
+        assert tc.get(f"/api/reports/availability?month={month}&scope=weird").status_code == 422
+        assert tc.get(f"/api/reports/availability?month={month}&target=500").status_code == 422
+        csv = tc.get(f"/api/reports/availability.csv?month={month}&scope=core&services=false")
+        assert csv.status_code == 200 and "Service" not in csv.text.replace("Type", "")
+        saved = tc.put("/api/reports/weekly/settings", json={"scope": "core", "health": False}).json()["settings"]
+        assert saved["scope"] == "core" and saved["health"] is False
+        assert tc.put("/api/reports/weekly/settings", json={"scope": "x"}).status_code == 422
+        assert tc.get("/api/reports/weekly").json()["data"]["options"]["scope"] == "core"

@@ -511,7 +511,7 @@ dialog.whats-new h2 { margin: 0; }
 .rep-table th, .rep-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .rep-table th { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
 @media print {
-  .topbar, .demo-banner, .rep-tools, .rep-schedule, .heading-row, .toast-stack { display: none !important; }
+  .topbar, .demo-banner, .rep-tools, .rep-schedule, .rep-filter, .heading-row, .toast-stack { display: none !important; }
   body { background: #fff; color: #000; }
   .card { border: 0; box-shadow: none; }
   .rep-page > :nth-child(2) { display: none; }
@@ -637,3 +637,6 @@ table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 .usage-fill.bad { background: #dc2626; }
 .warn-text { color: #b45309; }
 :root[data-theme="dark"] .warn-text { color: #fbbf24; }
+.rep-filter, .rep-schedule { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 8px 0; }
+.rep-part { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+.rep-target { width: 6em; }

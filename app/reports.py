@@ -19,7 +19,11 @@ log = logging.getLogger(__name__)
 
 SETTINGS_KEY = "reports.weekly"
 SENT_KEY = "reports.weekly_sent"
-DEFAULTS = {"enabled": False, "day": 0, "hour": 8}          # Monday, 08:00 (the time of the server)
+DEFAULTS = {"enabled": False, "day": 0, "hour": 8,           # Monday, 08:00 (the time of the server)
+            "scope": "all",                                  # all devices, or only the always-on ("core") devices
+            "services": True, "new_devices": True, "health": True, "disks": True, "sites": True}     # the parts of the weekly text
+SECTIONS = ("services", "new_devices", "health", "disks", "sites")
+SCOPES = ("all", "core")
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
@@ -90,12 +94,24 @@ def _outages(rows, start: datetime, end: datetime) -> tuple[list[dict], float]:
     return out, sum(o["seconds"] for o in out)
 
 
-def availability(conn, start: datetime, end: datetime) -> dict[str, Any]:
-    """Per device and per service: availability in [start, end), and the outages."""
+def availability(conn, start: datetime, end: datetime, scope: str = "all", with_services: bool = True, group_id: int | None = None,
+                 only_outages: bool = False, target: float | None = None) -> dict[str, Any]:
+    """Per device and per service: availability in [start, end), and the outages.
+
+    scope "core": only the always-on devices; with_services=False leaves the service checks out; group_id: only the devices of one group; target: an availability
+    goal in percent (rows below it are flagged); only_outages: list only what had an outage (the summary still counts everything that was selected).
+    """
     a, b = _fmt(start), _fmt(end)
     span = (end - start).total_seconds()
     devices = []
-    for d in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip AS ip, COALESCE(type_override, device_type) AS type, always_on FROM devices ORDER BY name COLLATE NOCASE"):
+    where, args = ["1 = 1"], []
+    if scope == "core":
+        where.append("always_on = 1")
+    if group_id is not None:
+        where.append("group_id = ?")
+        args.append(group_id)
+    for d in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip AS ip, COALESCE(type_override, device_type) AS type, always_on FROM devices "
+                          f"WHERE {' AND '.join(where)} ORDER BY name COLLATE NOCASE", args):
         rows = conn.execute("SELECT ts, up FROM checks WHERE device_id = ? AND ts >= ? AND ts < ? ORDER BY ts, id", (d["id"], a, b)).fetchall()
         if not rows:
             continue
@@ -105,7 +121,7 @@ def availability(conn, start: datetime, end: datetime) -> dict[str, Any]:
                         "availability": round(up / len(rows) * 100, 2), "down_seconds": round(down_s), "down_text": duration(down_s),
                         "outages": len(outs), "longest": duration(max([o["seconds"] for o in outs], default=0)), "ongoing": any(o["ongoing"] for o in outs)})
     services = []
-    for s in conn.execute("SELECT id, name, kind, host, port FROM service_checks WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
+    for s in conn.execute("SELECT id, name, kind, host, port FROM service_checks WHERE enabled = 1 ORDER BY name COLLATE NOCASE") if with_services else []:
         rows = conn.execute("SELECT ts, up, ms FROM service_results WHERE check_id = ? AND ts >= ? AND ts < ? ORDER BY ts, id", (s["id"], a, b)).fetchall()
         if not rows:
             continue
@@ -122,10 +138,16 @@ def availability(conn, start: datetime, end: datetime) -> dict[str, Any]:
         total = sum(i["checks"] for i in items)
         return round(sum(i["availability"] * i["checks"] for i in items) / total, 2) if total else None
 
-    return {"start": a, "end": b, "span_days": round(span / 86400, 1), "devices": devices, "services": services,
-            "summary": {"devices": len(devices), "devices_availability": mean(devices), "core_devices": len(core), "core_availability": mean(core),
-                        "services": len(services), "services_availability": mean(services),
-                        "with_outages": sum(1 for d in devices if d["outages"]) + sum(1 for s in services if s["outages"])}}
+    summary = {"devices": len(devices), "devices_availability": mean(devices), "core_devices": len(core), "core_availability": mean(core),
+               "services": len(services), "services_availability": mean(services),
+               "with_outages": sum(1 for d in devices if d["outages"]) + sum(1 for s in services if s["outages"]), "scope": scope, "target": target}
+    if target is not None:
+        for row in devices + services:
+            row["below_target"] = row["availability"] < target
+        summary["below_target"] = sum(1 for row in devices + services if row["below_target"])
+    if only_outages:
+        devices, services = [d for d in devices if d["outages"]], [s for s in services if s["outages"]]
+    return {"start": a, "end": b, "span_days": round(span / 86400, 1), "devices": devices, "services": services, "summary": summary}
 
 
 def availability_csv(report: dict[str, Any]) -> str:
@@ -135,35 +157,45 @@ def availability_csv(report: dict[str, Any]) -> str:
             t = "'" + t
         return '"' + t.replace('"', '""') + '"'
 
-    lines = [",".join(map(cell, ["Type", "Name", "Address", "Always on", "Availability %", "Checks", "Outages", "Longest outage", "Time down (s)", "Average ms"]))]
+    goal = report["summary"].get("target") is not None
+    lines = [",".join(map(cell, ["Type", "Name", "Address", "Always on", "Availability %", "Checks", "Outages", "Longest outage", "Time down (s)", "Average ms"] + (["Below target"] if goal else [])))]
     for d in report["devices"]:
-        lines.append(",".join(map(cell, ["Device", d["name"], d["ip"], "yes" if d["always_on"] else "", d["availability"], d["checks"], d["outages"], d["longest"], d["down_seconds"], ""])))
+        lines.append(",".join(map(cell, ["Device", d["name"], d["ip"], "yes" if d["always_on"] else "", d["availability"], d["checks"], d["outages"], d["longest"], d["down_seconds"], ""]
+                                  + (["yes" if d.get("below_target") else ""] if goal else []))))
     for s in report["services"]:
-        lines.append(",".join(map(cell, ["Service", s["name"], s["target"], "", s["availability"], s["checks"], s["outages"], s["longest"], s["down_seconds"], s["avg_ms"]])))
+        lines.append(",".join(map(cell, ["Service", s["name"], s["target"], "", s["availability"], s["checks"], s["outages"], s["longest"], s["down_seconds"], s["avg_ms"]]
+                                  + (["yes" if s.get("below_target") else ""] if goal else []))))
     return "\r\n".join(lines) + "\r\n"
 
 
 # ----------------------------------------------------------------------------- the weekly summary
-def weekly(conn, now: datetime | None = None) -> dict[str, Any]:
-    """What happened in the last seven days and what needs a look, as data (`weekly_text` writes it out)."""
+def weekly(conn, now: datetime | None = None, options: dict[str, Any] | None = None) -> dict[str, Any]:
+    """What happened in the last seven days and what needs a look, as data (`weekly_text` writes it out). `options` default to the saved settings
+    (scope: all devices or only the always-on ones; which parts to include)."""
     from app import forecast
     from app.hostmetrics import service as hm
 
+    opts = {**get_settings(conn), **(options or {})}
+    core = opts["scope"] == "core"
+    only = " AND always_on = 1" if core else ""
     now = now or datetime.now(timezone.utc)
     start = now - timedelta(days=7)
-    av = availability(conn, start, now + timedelta(seconds=1))
+    av = availability(conn, start, now + timedelta(seconds=1), scope=opts["scope"], with_services=opts["services"])
     a = _fmt(start)
     counts = {r["kind"]: r["n"] for r in conn.execute("SELECT kind, COUNT(*) AS n FROM events WHERE ts >= ? GROUP BY kind", (a,))}
-    total = conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
-    online = conn.execute("SELECT COUNT(*) FROM devices WHERE online = 1").fetchone()[0]
+    total = conn.execute(f"SELECT COUNT(*) FROM devices WHERE 1 = 1{only}").fetchone()[0]
+    online = conn.execute(f"SELECT COUNT(*) FROM devices WHERE online = 1{only}").fetchone()[0]
     new = [r["n"] for r in conn.execute(
-        "SELECT COALESCE(custom_name, hostname, primary_ip) AS n FROM devices WHERE first_seen >= ? ORDER BY first_seen", (a,))]
+        "SELECT COALESCE(custom_name, hostname, primary_ip) AS n FROM devices WHERE first_seen >= ? ORDER BY first_seen", (a,))] if opts["new_devices"] else []
+    core_ids = {r["id"] for r in conn.execute("SELECT id FROM devices WHERE always_on = 1")} if core else None
     worst = sorted([d for d in av["devices"] if d["outages"]], key=lambda d: -d["down_seconds"])[:5]
     worst_services = sorted([s for s in av["services"] if s["outages"]], key=lambda s: -s["down_seconds"])[:5]
-    problems = hm.problems(conn)
-    filling = [f for f in forecast.forecasts(conn, now.timestamp()) if f["days_to_full"] is not None][:5]
+    problems = [p for p in hm.problems(conn) if core_ids is None or p["device_id"] in core_ids] if opts["health"] else []
+    filling = [f for f in forecast.forecasts(conn, now.timestamp()) if f["days_to_full"] is not None and (core_ids is None or f["device_id"] in core_ids)][:5] if opts["disks"] else []
     sites = []
     try:
+        if not opts["sites"]:
+            raise LookupError("left out by the settings")
         from app import probes
 
         for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
@@ -171,7 +203,7 @@ def weekly(conn, now: datetime | None = None) -> dict[str, Any]:
             sites.append({"name": p["name"], "state": p["state"], "problems": (p.get("problems") or {}).get("count", 0)})
     except Exception:  # noqa: BLE001 - remote sites are optional
         log.debug("remote sites left out of the weekly report", exc_info=True)
-    return {"start": a, "end": _fmt(now), "devices": {"total": total, "online": online, "new": new[:10], "new_count": len(new)},
+    return {"options": {k: opts[k] for k in ("scope",) + SECTIONS}, "start": a, "end": _fmt(now), "devices": {"total": total, "online": online, "new": new[:10], "new_count": len(new)},
             "availability": av["summary"], "worst_devices": worst, "worst_services": worst_services, "events": counts,
             "problems": [{k: p[k] for k in ("device", "title", "label", "value", "unit", "level", "since")} for p in problems[:10]],
             "filling": [{k: f[k] for k in ("device", "label", "current", "days_to_full", "full_on")} for f in filling], "sites": sites}
@@ -187,19 +219,21 @@ def weekly_text(r: dict[str, Any]) -> tuple[str, str]:
     attention = len(r["problems"]) + len(r["filling"]) + sum(1 for s in r["sites"] if s["state"] == "silent")
     title = f"Netlens weekly report: {'everything looks fine' if not attention and not r['worst_devices'] and not r['worst_services'] else f'{attention} thing(s) to look at'}"
     lines = [f"Period: {r['start'][:10]} to {r['end'][:10]}", ""]
-    lines.append(f"Network: {d['online']} of {d['total']} devices are online now."
-                 + (f" {d['new_count']} new device(s) appeared: {', '.join(d['new'][:5])}{'...' if d['new_count'] > 5 else ''}." if d["new_count"] else " No new devices."))
+    opts = r.get("options") or {}
+    core = opts.get("scope") == "core"
+    new_part = "" if opts.get("new_devices") is False else (f" {d['new_count']} new device(s) appeared: {', '.join(d['new'][:5])}{'...' if d['new_count'] > 5 else ''}." if d["new_count"] else " No new devices.")
+    lines.append(f"Network: {d['online']} of {d['total']} {'always-on ' if core else ''}devices are online now." + new_part)
     if av["core_devices"]:
         lines.append(f"Your always-on devices were reachable {_pct(av['core_availability'])} of the time.")
     elif av["devices"]:
         lines.append(f"Devices were reachable {_pct(av['devices_availability'])} of the time.")
-    if av["services"]:
+    if av["services"] and opts.get("services", True):
         lines.append(f"Service checks: {_pct(av['services_availability'])} available over {av['services']} check(s).")
-    if r["worst_devices"] or r["worst_services"]:
+    if r["worst_devices"] or (r["worst_services"] and opts.get("services", True)):
         lines += ["", "Outages this week:"]
         for x in r["worst_devices"]:
             lines.append(f"  - {x['name']}: down {x['down_text']} in {x['outages']} outage(s), longest {x['longest']}{' (still down)' if x['ongoing'] else ''}")
-        for x in r["worst_services"]:
+        for x in (r["worst_services"] if opts.get("services", True) else []):
             lines.append(f"  - {x['name']} (service): down {x['down_text']} in {x['outages']} outage(s){' (still down)' if x['ongoing'] else ''}")
     else:
         lines += ["", "No device or service had an outage this week."]
@@ -215,8 +249,9 @@ def weekly_text(r: dict[str, Any]) -> tuple[str, str]:
     for s in r["sites"]:
         if s["state"] == "silent":
             lines += ["", f"Remote site {s['name']} has stopped reporting."]
-    if not (r["problems"] or r["filling"]):
-        lines += ["", "No health readings are past a limit and no disk is on course to fill up."]
+    if not (r["problems"] or r["filling"]) and (opts.get("health", True) or opts.get("disks", True)):
+        lines += ["", "No health readings are past a limit and no disk is on course to fill up." if opts.get("health", True) and opts.get("disks", True)
+                  else "No health readings are past a limit." if opts.get("health", True) else "No disk is on course to fill up."]
     return title, "\n".join(lines)
 
 
@@ -234,6 +269,11 @@ def get_settings(conn) -> dict[str, Any]:
             v = data.get(k)
             if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= hi:
                 out[k] = v
+        if data.get("scope") in SCOPES:
+            out["scope"] = data["scope"]
+        for k in SECTIONS:
+            if isinstance(data.get(k), bool):
+                out[k] = data[k]
     return out
 
 
@@ -247,6 +287,15 @@ def save_settings(conn, data: dict[str, Any]) -> dict[str, Any]:
             cur[k] = v
     if "enabled" in data:
         cur["enabled"] = bool(data["enabled"])
+    if "scope" in data:
+        if data["scope"] not in SCOPES:
+            raise ValueError(f"scope must be one of {', '.join(SCOPES)}")
+        cur["scope"] = data["scope"]
+    for k in SECTIONS:
+        if k in data:
+            if not isinstance(data[k], bool):
+                raise ValueError(f"{k} must be true or false")
+            cur[k] = data[k]
     set_setting(conn, SETTINGS_KEY, json.dumps(cur))
     return cur
 

@@ -18,29 +18,35 @@ def _month(conn, month: str | None) -> str:
     return month or datetime.now(timezone.utc).strftime("%Y-%m")
 
 
-@router.get("/availability")
-def availability(month: str | None = Query(None), conn=Depends(get_conn)) -> dict:
-    """Availability of every device and service in one calendar month (default: this one)."""
+def _report(conn, month, scope, services, group, only_outages, target):
     month = _month(conn, month)
     try:
         start, end = reports.month_bounds(month)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    out = reports.availability(conn, start, end)
+    if scope not in reports.SCOPES:
+        raise HTTPException(status_code=422, detail=f"scope must be one of {', '.join(reports.SCOPES)}")
+    out = reports.availability(conn, start, end, scope=scope, with_services=services, group_id=group, only_outages=only_outages, target=target)
     out["month"] = month
+    return out
+
+
+@router.get("/availability")
+def availability(month: str | None = Query(None), scope: str = Query("all"), services: bool = Query(True), group: int | None = Query(None),
+                 only_outages: bool = Query(False), target: float | None = Query(None, ge=0, le=100), conn=Depends(get_conn)) -> dict:
+    """Availability of the devices and services in one calendar month (default: this one). `scope=core`: only the always-on devices; `services=false`: no service
+    checks; `group`: one device group; `only_outages`: list only what had an outage; `target`: an availability goal in percent (rows below it are flagged)."""
+    out = _report(conn, month, scope, services, group, only_outages, target)
     out["months"] = reports.months_available(conn)
+    out["groups"] = [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM device_groups ORDER BY name COLLATE NOCASE")]
     return out
 
 
 @router.get("/availability.csv")
-def availability_csv(month: str | None = Query(None), conn=Depends(get_conn)) -> PlainTextResponse:
-    month = _month(conn, month)
-    try:
-        start, end = reports.month_bounds(month)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    body = reports.availability_csv(reports.availability(conn, start, end))
-    return PlainTextResponse(body, media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="netlens-availability-{month}.csv"'})
+def availability_csv(month: str | None = Query(None), scope: str = Query("all"), services: bool = Query(True), group: int | None = Query(None),
+                     only_outages: bool = Query(False), target: float | None = Query(None, ge=0, le=100), conn=Depends(get_conn)) -> PlainTextResponse:
+    out = _report(conn, month, scope, services, group, only_outages, target)
+    return PlainTextResponse(reports.availability_csv(out), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="netlens-availability-{out["month"]}.csv"'})
 
 
 @router.get("/weekly")
@@ -55,6 +61,12 @@ class SettingsBody(BaseModel):
     enabled: bool | None = None
     day: int | None = None
     hour: int | None = None
+    scope: str | None = None            # "all" or "core" (only the always-on devices)
+    services: bool | None = None
+    new_devices: bool | None = None
+    health: bool | None = None
+    disks: bool | None = None
+    sites: bool | None = None
 
 
 @router.put("/weekly/settings")
