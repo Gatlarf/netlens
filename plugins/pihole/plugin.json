@@ -1,7 +1,7 @@
 {
   "id": "pihole",
   "name": "Pi-hole",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api_version": 1,
   "kind": "dns",
   "author": "Netlens",

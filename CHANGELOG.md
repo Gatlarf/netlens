@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.26 — 2026-10-16
+
+### Fixed
+- **Plugin diagnostic reports no longer contain server addresses**: *Run diagnostic* is meant to be pasted into public issues, but the error text of a failed step could still contain a bare `host:port`, an IP address or a host name. All 28 older plugins strip them now (new versions: pihole, adguard, powerdns, bind, portainer, swarm, kubernetes, nomad, incus, vsphere, traefik, caddy, kong, haproxy, openwrt, mikrotik, opnsense, vyos, netbox, docker, hyperv, npm, omada, snmp, synology, technitium, truenas, unifi). Update them in *Plugin manager*; the plugin index lists the new versions as *Reviewed*.
+
 ## 0.4.23 — 2026-10-16
 
 ### Added

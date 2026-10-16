@@ -1,7 +1,7 @@
 {
   "id": "opnsense",
   "name": "OPNsense",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",

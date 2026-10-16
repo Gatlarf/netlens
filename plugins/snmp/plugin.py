@@ -485,7 +485,12 @@ def fetch(config):
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
 def _problem(exc):
-    return type(exc).__name__ + ": " + re.sub(r"\b\d{1,3}(\.\d{1,3}){3}\b", "<ip>", str(exc))[:300]
+    """The error text for a diagnostic report, without any server address (URL, IP address, host:port or host name)."""
+    text = re.sub(r"https?://\S+", "<ip>", str(exc))
+    text = re.sub(r"\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b", "<ip>", text)
+    text = re.sub(r"\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*:\d{2,5}\b", "<ip>", text)
+    text = re.sub(r"\b(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}\b", "<ip>", text)
+    return type(exc).__name__ + ": " + text[:300]
 
 
 def diagnose(config):

@@ -299,7 +299,12 @@ def fetch(config):
 
 
 def _problem(exc):
-    return type(exc).__name__ + ": " + re.sub(r"https?://[^\s/]+", "<router>", str(exc))[:300]
+    """The error text for a diagnostic report, without any server address (URL, IP address, host:port or host name)."""
+    text = re.sub(r"https?://[^\s/]+", "<router>", str(exc))
+    text = re.sub(r"\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b", "<router>", text)
+    text = re.sub(r"\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*:\d{2,5}\b", "<router>", text)
+    text = re.sub(r"\b(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}\b", "<router>", text)
+    return type(exc).__name__ + ": " + text[:300]
 
 
 def diagnose(config):
