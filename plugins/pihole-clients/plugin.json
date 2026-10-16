@@ -1,0 +1,53 @@
+{
+  "id": "pihole-clients",
+  "name": "Pi-hole clients",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads the network table of Pi-hole v6: every device that asked Pi-hole for a DNS answer, with its MAC address, current IP address, the host name Pi-hole resolved for it and the manufacturer it looked up. Netlens matches them to what it finds on the network by MAC address and uses the names and manufacturers. Read-only: it only reads the table. (To register names in Pi-hole, use the Pi-hole DNS plugin.)",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Use an app password",
+    "text": "In Pi-hole: Settings > Web interface / API > Configure app password. Pi-hole only knows devices that sent it queries and that are on the same network segment (it reads their MAC address from the neighbour table), so devices behind a router appear with the router's MAC address."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Pi-hole servers",
+      "required": true,
+      "help": "One line per Pi-hole.",
+      "columns": [
+        {"key": "host", "label": "Pi-hole address", "placeholder": "http://192.168.0.2", "required": true},
+        {"key": "password", "label": "App password", "type": "password", "required": true}
+      ]
+    },
+    {
+      "key": "days",
+      "type": "number",
+      "label": "Only devices seen in the last days",
+      "default": 30,
+      "min": 1,
+      "max": 3650,
+      "help": "Pi-hole keeps devices forever; older ones are left out."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/pihole-clients"
+}

@@ -1,0 +1,52 @@
+{
+  "id": "kea",
+  "name": "Kea DHCP",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads the DHCP leases (and the fixed reservations) of ISC Kea through its Control Agent: every lease with a MAC address becomes a client with its IP address and the host name the device gave. Netlens matches them to what it finds on the network by MAC address and uses the names. Read-only: it only runs the lease4-get-all and config-get commands.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "What Kea needs",
+    "text": "Kea must run the Control Agent (kea-ctrl-agent, port 8000 by default) and the DHCPv4 server needs the lease_cmds hook library (libdhcp_lease_cmds.so) in its hooks-libraries; without it Kea answers 'lease4-get-all command not supported'. Give the agent an 'authentication' block (type basic) and use that user here. Only DHCPv4 is read."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Kea servers",
+      "required": true,
+      "help": "One line per Kea Control Agent.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "http://192.168.0.2:8000", "required": true},
+        {"key": "user", "label": "User", "placeholder": "netlens", "optional": true, "help": "Empty when the agent has no authentication (not advised)."},
+        {"key": "password", "label": "Password", "type": "password", "optional": true}
+      ]
+    },
+    {
+      "key": "reservations",
+      "type": "bool",
+      "label": "Also read the reservations",
+      "default": true,
+      "help": "Fixed addresses from the Kea configuration (hosts with a MAC address) are reported too, so a device that is off still gets its name."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/kea"
+}

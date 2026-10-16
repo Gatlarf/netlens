@@ -1,0 +1,45 @@
+{
+  "id": "envoy",
+  "name": "Envoy",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "proxy",
+  "author": "Netlens",
+  "description": "Shows the sites an Envoy proxy publishes: every virtual host of its HTTP listeners (domains, the upstream cluster and its endpoint, redirects) and every TCP proxy listener (port and upstream). Works with Envoy configured by files and with Envoy configured through xDS (Istio, Contour, Envoy Gateway ...): it reads the running configuration from the admin interface. Read-only: it only sends GET requests.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Reach the admin interface safely",
+    "text": "Envoy's admin interface has no login and can stop the proxy, so never publish it. Let it listen on a private address only and allow only Netlens to connect. Netlens only uses GET /server_info, /config_dump and /clusters.",
+    "code": "admin:\n  address:\n    socket_address: { address: 192.168.0.4, port_value: 9901 }"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Envoy admin interfaces",
+      "required": true,
+      "help": "One line per Envoy.",
+      "columns": [
+        {"key": "host", "label": "Admin address", "placeholder": "http://192.168.0.4:9901", "required": true},
+        {"key": "lan", "label": "Envoy host's own address", "placeholder": "192.168.0.4", "help": "The address of the machine Envoy runs on, when the admin interface is reached by name or as 127.0.0.1. Site checks are sent to it.", "optional": true}
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/envoy"
+}

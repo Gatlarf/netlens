@@ -30,6 +30,13 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 | [`haproxy/`](haproxy/README.md) | HAProxy | backends and their servers from the statistics page (a `proxy` plugin) | tested on a real HAProxy 3.4.7 |
 | [`vyos/`](vyos/README.md) | VyOS | router, ARP and DHCP clients over the HTTPS API (a `topology` plugin) | tested on a VyOS rolling live ISO (QEMU) |
 | [`netbox/`](netbox/README.md) | NetBox | the documented devices and cables as nodes, clients and the tree (a `topology` plugin) | tested on a real NetBox 4.7.3 (Docker) |
+| [`kea/`](kea/README.md) | Kea DHCP | DHCP leases and reservations as clients with names (a `topology` plugin) | tested on a real Kea 2.6.3 (leases added with the API; no real DHCP clients) |
+| [`librenms/`](librenms/README.md) | LibreNMS | devices, LLDP/CDP links and switch forwarding tables as nodes, clients and the tree (a `topology` plugin) | tested on a real LibreNMS 26.9.1 (Docker); links and forwarding table rows inserted by hand |
+| [`envoy/`](envoy/README.md) | Envoy | virtual hosts and TCP proxies with their upstreams (a `proxy` plugin) | tested on a real Envoy 1.32.13 (Docker, file configuration); xDS from documentation |
+| [`apisix/`](apisix/README.md) | Apache APISIX | routes, upstreams, services and certificate expiry (a `proxy` plugin) | tested on a real APISIX 3.11.0 (Docker); stream routes from documentation |
+| [`consul/`](consul/README.md) | HashiCorp Consul | catalog nodes as hosts and service instances with their health as guests (a `hypervisor` plugin) | tested on a real Consul 1.20.6 (Docker, dev mode) |
+| [`pihole-clients/`](pihole-clients/README.md) | Pi-hole clients | the devices Pi-hole has seen, with names and manufacturers (a `topology` plugin) | tested on a real Pi-hole 6.4.3 (Docker); only one client in the lab |
+| [`adguard-clients/`](adguard-clients/README.md) | AdGuard Home clients | DHCP leases and named clients with device types (a `topology` plugin) | tested on a real AdGuard Home v0.107.79 (Docker); static leases only |
 
 Omada, UniFi and SNMP are `topology` plugins: they tell Netlens which switch or access point every device is connected to, and which device hangs
 below which, so the hierarchy and the map show the real network position. They only read.

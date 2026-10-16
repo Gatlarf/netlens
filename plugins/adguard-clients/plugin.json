@@ -1,0 +1,55 @@
+{
+  "id": "adguard-clients",
+  "name": "AdGuard Home clients",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads what AdGuard Home knows about your devices: the DHCP leases and static leases (MAC address, IP address, host name) and the clients you named in AdGuard (with a MAC address among their identifiers), including the device type and operating system from AdGuard's tags (device_tv, os_android ...). Netlens matches them by MAC address and uses the names and types. Read-only. (To register names in AdGuard Home, use the AdGuard Home DNS plugin.)",
+  "timeout": 60,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "AdGuard Home servers",
+      "required": true,
+      "help": "One line per AdGuard Home.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "http://192.168.0.2:3000",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/adguard-clients"
+}

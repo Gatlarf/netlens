@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.23 — 2026-10-16
+
+### Added
+- ★ **Seven more plugins**, each tried against the real software on a lab machine (install them from *Plugin store*): **Kea DHCP** (leases and reservations give devices their names), **LibreNMS** (devices, LLDP/CDP links and switch tables as the hierarchy, with the port every device sits on), **Envoy** and **Apache APISIX** (the sites a gateway publishes; APISIX also reports certificate expiry), **HashiCorp Consul** (nodes and service instances with their health), **Pi-hole clients** (the network table: names and manufacturers) and **AdGuard Home clients** (DHCP leases and named clients with their device type).
+
 ## 0.4.21 — 2026-10-16
 
 ### Changed

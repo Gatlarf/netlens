@@ -1,0 +1,46 @@
+{
+  "id": "apisix",
+  "name": "Apache APISIX",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "proxy",
+  "author": "Netlens",
+  "description": "Shows the routes an Apache APISIX gateway publishes: host names, the upstream (also through a shared upstream or a service), redirects, whether a route is switched off, and the TLS certificates with their expiry date. Read-only: it only sends GET requests, with the key of the built-in viewer role.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Use the viewer key",
+    "text": "APISIX's Admin API (port 9180) can change everything with the admin key. Netlens only needs the 'viewer' role, which can read but not change: in config.yaml under deployment.admin.admin_key keep one entry with role viewer and use its key here. Let the Admin API listen on a private address only (deployment.admin.admin_listen, allow_admin).",
+    "code": "deployment:\n  admin:\n    allow_admin: [192.168.0.0/24]\n    admin_key:\n      - name: viewer\n        key: <a long random key>\n        role: viewer"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "APISIX Admin APIs",
+      "required": true,
+      "help": "One line per APISIX.",
+      "columns": [
+        {"key": "host", "label": "Admin API address", "placeholder": "http://192.168.0.4:9180", "required": true},
+        {"key": "key", "label": "Viewer key", "type": "password", "required": true},
+        {"key": "lan", "label": "APISIX host's own address", "placeholder": "192.168.0.4", "help": "The address of the machine APISIX runs on, when the Admin API is reached by name or as 127.0.0.1. Site checks are sent to it.", "optional": true}
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/apisix"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "librenms",
+  "name": "LibreNMS",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Imports the network that LibreNMS has discovered over SNMP: devices of type network, firewall and wireless become network nodes, the LLDP/CDP links between them decide who hangs below whom, every other device is a client, and the switches' forwarding tables (FDB) tell which switch port every other MAC address was learned on. Netlens matches them to what it finds on the network by MAC address, so the hierarchy shows what your switches see. Read-only: it only sends GET requests with an API token.",
+  "timeout": 120,
+  "diagnose": true,
+  "info": {
+    "title": "Make an API token",
+    "text": "In LibreNMS: click your user, 'API Settings', 'Create API access token' (a global read-only user is enough: Admin > Users > Add user with the role 'global-read'; 26.x: `lnms api:token-create <user>`). Paste the whole token. The hierarchy needs LLDP or CDP discovery to be on and the devices' ports polled; the client list needs the FDB tables, which LibreNMS collects from switches that answer the BRIDGE-MIB or Q-BRIDGE-MIB."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "LibreNMS servers",
+      "required": true,
+      "help": "One line per LibreNMS.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "https://librenms.example.com", "required": true},
+        {"key": "token", "label": "API token", "type": "password", "required": true}
+      ]
+    },
+    {
+      "key": "network_types",
+      "type": "text",
+      "label": "Device types that are network equipment",
+      "default": "network, firewall, wireless",
+      "help": "Comma separated LibreNMS device types (Device > Edit > Type) that count as nodes. A 'firewall' becomes the gateway, 'wireless' an access point, 'network' a switch. Every other device is a client."
+    },
+    {
+      "key": "fdb_clients",
+      "type": "bool",
+      "label": "Also report the MAC addresses in the switches' forwarding tables",
+      "default": true,
+      "help": "Devices that LibreNMS does not manage but a switch has learned, with the switch port they are on."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/librenms"
+}

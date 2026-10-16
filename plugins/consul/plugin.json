@@ -1,0 +1,52 @@
+{
+  "id": "consul",
+  "name": "HashiCorp Consul",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Lists what is registered in a Consul service catalog: the nodes become hosts (with their address and whether the agent is alive) and every registered service instance becomes a guest of its node, with its health (passing, warning or critical), tags and port. Netlens ties the nodes and services to the devices it found by address. Read-only: it only sends GET requests.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Make a read-only ACL token (only when ACLs are on)",
+    "text": "With ACLs enabled, make a policy that can read the catalog and give Netlens a token with it. Without ACLs leave the token empty.",
+    "code": "node_prefix \"\" { policy = \"read\" }\nservice_prefix \"\" { policy = \"read\" }"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Consul agents",
+      "required": true,
+      "help": "One line per Consul datacenter (a server or any agent of it).",
+      "columns": [
+        {"key": "host", "label": "HTTP address", "placeholder": "http://192.168.0.4:8500", "required": true},
+        {"key": "token", "label": "ACL token", "type": "password", "help": "Only when ACLs are enabled (sent as X-Consul-Token).", "optional": true}
+      ]
+    },
+    {
+      "key": "hide_consul",
+      "type": "bool",
+      "label": "Hide the 'consul' service",
+      "default": true,
+      "help": "Every server registers itself as the service 'consul'; it only repeats the node."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Only relevant for https addresses."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/consul"
+}
