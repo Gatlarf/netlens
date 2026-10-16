@@ -5,6 +5,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ## 0.4.21 — 2026-10-16
 
 ### Changed
+- **Containers & guests card**: the dashboard card now counts containers and virtual machines / LXCs separately (the big number is the running containers, a line below gives the VMs and LXCs) instead of one combined total.
 - **Windows monitoring guide**: new `WINDOWS-MONITORING.md` explains how to monitor Windows with a low-privilege `netlens` account: WinRM over HTTPS, the groups *Remote Management Users* and *Performance Monitor Users*, the WMI rights on `Root\CIMV2`, and what each Test message means.
 
 ## 0.4.20 — 2026-10-16

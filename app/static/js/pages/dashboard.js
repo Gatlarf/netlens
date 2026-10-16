@@ -52,11 +52,18 @@ const CARDS = [
   { id: "services", title: "Services", href: "#/services", size: "s", def: true, about: "Your HTTP, port and DNS checks.",
     show: (d) => d.summary.services.total > 0, tone: (d) => (d.summary.services.down ? "bad" : "ok"),
     build: ({ summary: s, services_down: down }) => big(`${s.services.up} / ${s.services.up + s.services.down}`, s.services.down ? `down: ${down.slice(0, 2).join(", ")}${down.length > 2 ? "…" : ""}` : "all up") },
-  { id: "containers", title: "Containers & guests", href: "#/devices", size: "s", def: true, about: "Docker containers and virtual machines on your hosts.",
+  { id: "containers", title: "Containers & guests", href: "#/devices", size: "s", def: true, about: "Containers, and separately the virtual machines and LXCs, on your hosts.",
     show: (d) => d.summary.containers.total + d.summary.guests.total > 0,
     tone: (d) => (d.summary.containers.unhealthy || d.summary.containers.restarting ? "warn" : "ok"),
-    build: ({ summary: s }) => big(`${s.guests.running} / ${s.guests.total}`, `running on ${plural(s.guests.hosts, "host")}`, {
-      extra: s.containers.unhealthy || s.containers.restarting ? h("div", { class: "d-mini d-warn" }, `${s.containers.unhealthy} unhealthy · ${s.containers.restarting} restarting`) : null }) },
+    build: ({ summary: s }) => {
+      const bk = s.guests.by_kind || {};
+      const sum = (kinds) => kinds.reduce((a, k) => ({ running: a.running + ((bk[k] || {}).running || 0), total: a.total + ((bk[k] || {}).total || 0) }), { running: 0, total: 0 });
+      const ctr = sum(["container", "app"]);
+      const vms = { running: s.guests.running - ctr.running, total: s.guests.total - ctr.total };
+      const warn = s.containers.unhealthy || s.containers.restarting ? h("div", { class: "d-mini d-warn" }, `${s.containers.unhealthy} unhealthy · ${s.containers.restarting} restarting`) : null;
+      return big(`${ctr.running} / ${ctr.total}`, `containers running on ${plural(s.guests.hosts, "host")}`, {
+        extra: [h("div", { class: "d-mini" }, `${vms.running} / ${vms.total} virtual machines and LXCs running`), warn] });
+    } },
   { id: "sites", title: "Sites & certificates", href: "#/stats", size: "s", def: true, about: "Reverse-proxy sites and when their certificates end.",
     show: (d) => d.summary.sites.total > 0,
     tone: (d) => (d.summary.sites.down || d.summary.sites.certificates_expired ? "bad" : d.summary.sites.certificates_expiring ? "warn" : "ok"),
