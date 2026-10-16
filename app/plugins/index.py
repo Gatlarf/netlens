@@ -100,7 +100,7 @@ def _release(raw: Any, official: bool) -> dict | None:
     level = review.get("level") if review.get("level") in LEVELS else "community"
     return {
         "version": version, "download_url": url, "sha256": sha.lower(), "api_version": api,
-        "min_netlens": _text(raw.get("min_netlens"), 20), "released": _text(raw.get("released"), 20), "changelog": _text(raw.get("changelog"), 600),
+        "min_netlens": _text(raw.get("min_netlens"), 20), "max_netlens": _text(raw.get("max_netlens"), 20), "released": _text(raw.get("released"), 20), "changelog": _text(raw.get("changelog"), 600),
         "review": {
             "level": level,
             "reviewer": _text(review.get("reviewer"), 60) if level != "community" else "",
@@ -220,6 +220,8 @@ def incompatible_reason(release: dict, netlens_version: str) -> str | None:
         return f"needs plugin API version {release['api_version']} (this Netlens supports {API_VERSION})"
     if release["min_netlens"] and is_newer(release["min_netlens"], netlens_version) and version_tuple(netlens_version) != (0,):
         return f"needs Netlens {release['min_netlens']} or newer (you have {netlens_version})"
+    if release.get("max_netlens") and is_newer(netlens_version, release["max_netlens"]) and version_tuple(netlens_version) != (0,):
+        return f"is only known to work up to Netlens {release['max_netlens']} (you have {netlens_version})"
     return None
 
 

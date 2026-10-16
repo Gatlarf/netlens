@@ -64,6 +64,9 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
         add("warn", f"{login_failed} burst{'s' if login_failed != 1 else ''} of failed sign-ins in the last 24 hours", "#/scans")
     if s["update"]["available"]:
         add("info", f"Netlens {s['update']['latest']} is available", "#/settings/about")
+    if s["update"].get("plugin_problems"):
+        n = s["update"]["plugin_problems"]
+        add("warn", f"{n} plugin{'s' if n != 1 else ''} may not work with this Netlens version", "#/settings/plugins")
     if s["update"]["plugin_updates"]:
         add("info", f"{s['update']['plugin_updates']} plugin update{'s' if s['update']['plugin_updates'] != 1 else ''} available", "#/settings/plugin-browse")
     order = {"bad": 0, "warn": 1, "info": 2}

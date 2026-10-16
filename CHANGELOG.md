@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.30 — 2026-10-16
+
+### Added
+- ★ **Auto-update for plugins**: a tick box *Auto-update* per plugin in the *Plugin manager* (off by default). Once an hour Netlens installs a newer version of that plugin by itself, but only when the release is *Reviewed* or *Verified*, never a *Community* one, never a version you rolled back from, and never over a plugin you uploaded by hand. Settings and the on/off state are kept; each update, refusal or failure is an event (*Plugin updated*, *Plugin update held back*, *Plugin update failed*).
+- ★ **Warning when a Netlens update may have broken plugins**: after Netlens is upgraded, the *Plugin manager* (and the dashboard) list plugins that cannot be loaded, that the index says only support an older Netlens, or that started failing after the upgrade. Each has an *Update* button when a newer version supports this Netlens, and the text says how to go back to the earlier Netlens image. Plugin releases in the index may now name `max_netlens`, the last Netlens version they are known to work with.
+
 ## 0.4.26 — 2026-10-16
 
 ### Fixed

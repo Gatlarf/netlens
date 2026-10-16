@@ -322,7 +322,7 @@ def _line(e: dict) -> str:
         "container_unhealthy": f"Container unhealthy: {detail}",
         "container_restarting": f"Container restarting: {detail}",
         "container_stopped": f"Container stopped: {detail}",
-        "guest_stopped": detail, "guest_started": detail, "guest_update_available": detail, "cert_expiring": detail, "login_failed": f"Login attack? {detail}",
+        "plugin_updated": detail, "plugin_update_failed": f"Plugin update FAILED: {detail}", "plugin_update_skipped": detail, "guest_stopped": detail, "guest_started": detail, "guest_update_available": detail, "cert_expiring": detail, "login_failed": f"Login attack? {detail}",
     }.get(kind, detail or kind)
 
 

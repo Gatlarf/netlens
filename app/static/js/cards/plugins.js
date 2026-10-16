@@ -25,12 +25,67 @@ function runCell(p) {
   return h("td", { class: `run run-${state[1]}` }, state[0]);
 }
 
+// after a Netlens upgrade: the plugins that may no longer work, with the way out (update them, or go back to the earlier Netlens)
+function fillCompat(box, card, compat) {
+  clear(box);
+  if (!compat || compat.dismissed || !compat.problems.length) return;
+  const up = compat.upgrade;
+  box.appendChild(h("h3", {}, "Some plugins may not work with this Netlens"));
+  box.appendChild(h("p", {}, up ? `Netlens was updated from ${up.from} to ${up.to}. ` : `This is Netlens ${compat.netlens_version}. `,
+    "These plugins have a problem that looks related. Update them, or go back to the Netlens version you had before; your data and settings stay."));
+  const list = h("ul", {});
+  for (const item of compat.problems) {
+    const row = h("li", {}, h("strong", {}, `${item.name} ${item.version || ""}`), `: ${item.reason} `);
+    if (item.fix) {
+      const btn = h("button", { type: "button", class: "btn admin-only" }, `Update to ${item.fix.version}`);
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          let result;
+          try {
+            result = await post(`/api/plugin-index/${item.id}/install`, { version: item.fix.version });
+          } catch (err) {
+            if (err.status !== 409 || !window.confirm(`${err.message}\n\nInstall it anyway?`)) throw err;
+            result = await post(`/api/plugin-index/${item.id}/install`, { version: item.fix.version, accept_risk: true });
+          }
+          toast(`${item.name} updated to ${result.version}`, "success");
+          document.dispatchEvent(new CustomEvent("netlens:plugins-changed"));
+          fillPluginsCard(card, await get("/api/plugins"));
+        } catch (err) {
+          toast(err.message || "Could not update the plugin", "error");
+          btn.disabled = false;
+        }
+      });
+      row.appendChild(btn);
+    } else {
+      row.appendChild(h("span", { class: "hint" }, "No newer version in the Plugin store yet."));
+    }
+    list.appendChild(row);
+  }
+  box.appendChild(list);
+  if (up) box.appendChild(h("p", { class: "hint" }, `To go back: run the Netlens image with the tag ${up.from} (for example gatlarf/netlens:${up.from}) instead of ${up.to}. Plugins you update here keep working with the older Netlens as well when the Plugin store says so.`));
+  const dismiss = h("button", { type: "button", class: "btn linklike admin-only" }, "Dismiss");
+  dismiss.addEventListener("click", async () => {
+    try {
+      await post("/api/plugin-compat/dismiss", {});
+      document.dispatchEvent(new CustomEvent("netlens:plugins-changed"));
+    } catch (err) {
+      toast(err.message || "Could not dismiss", "error");
+    }
+    clear(box);
+  });
+  box.appendChild(dismiss);
+}
+
 function fillPluginsCard(card, data, notice = null) {
   clear(card);
   card.appendChild(h("h2", {}, "Plugin manager"));
   card.appendChild(h("p", { class: "hint" },
     "Plugins connect Netlens to routers and hypervisors. Each one reports what is connected to what, and Netlens shows it on the map and in the hierarchy. " +
-    "Turn a plugin on or off here; its own settings are on its page in the menu."));
+    "Turn a plugin on or off here; its own settings are on its page in the menu. Tick Auto-update to let Netlens install new reviewed versions of a plugin by itself."));
+  const compatBox = h("div", { class: "baseline-box compat-box" });
+  card.appendChild(compatBox);
+  get("/api/plugin-compat").then((compat) => fillCompat(compatBox, card, compat)).catch(() => {});
 
   if ((data.missing || []).length) {
     // settings that came back with a restore, for plugins whose files are not here (a new data folder): installing keeps them
@@ -108,11 +163,27 @@ function fillPluginsCard(card, data, notice = null) {
           toast(err.message || "Could not refresh the list", "error");
         }
       });
+      let auto = h("td", {});
+      if (p.auto_update_possible) {                      // only plugins installed from the Plugin store can update themselves
+        const box = h("input", { type: "checkbox", class: "admin-only" });
+        box.checked = !!p.auto_update;
+        box.addEventListener("change", async () => {
+          try {
+            await put(`/api/plugin-index/${p.id}/auto-update`, { enabled: box.checked });
+            toast(box.checked ? `${p.name} will update itself` : `${p.name} no longer updates itself`, "success");
+          } catch (err) {
+            box.checked = !box.checked;
+            toast(err.message || "Could not change it", "error");
+          }
+        });
+        auto = h("td", { title: "Install new reviewed or verified versions of this plugin automatically" }, h("label", { class: "inline" }, box, " Auto-update"));
+      }
       body.appendChild(h("tr", {},
         h("td", {}, h("a", { href: `#/settings/plugin-${p.id}` }, p.name)),
         h("td", {}, p.version || ""),
         statusCell(p),
         runCell(p),
+        auto,
         h("td", {}, toggle)));
     }
     table.appendChild(body);

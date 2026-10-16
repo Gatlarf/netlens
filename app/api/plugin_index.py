@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.db import connect
 from app.plugins import index as idx
+from app.plugins import autoupdate
 from app.plugins import index_install as inst
 from app.plugins.categories import listing as category_listing
 from app.plugins.registry import InstallError, discover
@@ -24,6 +25,10 @@ def _build(request: Request, force: bool = False, offline: bool = False) -> dict
         index = idx.get_index(conn, force=force, getter=_getter(request), offline=offline)
         installed = inst.installed_map(conn, discover(data_dir), data_dir)
         plugins = idx.view(index["entries"], installed, VERSION)
+        auto = autoupdate.enabled_map(conn)
+        for p in plugins:
+            p["auto_update"] = bool(auto.get(p["id"]))
+            p["auto_update_possible"] = bool(p["installed"] and not p["builtin"] and p["installed_source"] in ("index", "rollback"))
         return {
             "index": {k: index[k] for k in ("enabled", "url", "fetched", "stale", "error", "skipped")},
             "plugins": plugins,
@@ -106,8 +111,50 @@ def rollback_plugin(request: Request, plugin_id: str) -> dict:
     conn = connect(request.app.state.db_path)
     try:
         try:
-            return inst.rollback(conn, request.app.state.settings.data_dir, plugin_id)
+            result = inst.rollback(conn, request.app.state.settings.data_dir, plugin_id)
+            autoupdate.skip_version(conn, plugin_id, result["from"])        # the user went back on purpose: no automatic update to that version again
+            return result
         except InstallError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
+    finally:
+        conn.close()
+
+
+class AutoUpdateBody(BaseModel):
+    enabled: bool
+
+
+@router.put("/plugin-index/{plugin_id}/auto-update")
+def put_auto_update(request: Request, plugin_id: str, body: AutoUpdateBody) -> dict:
+    """Switch automatic updating of one plugin on or off (only plugins installed from the index can be updated automatically)."""
+    conn = connect(request.app.state.db_path)
+    try:
+        data_dir = request.app.state.settings.data_dir
+        plugin = discover(data_dir).get(plugin_id)
+        if plugin is None or plugin.builtin:
+            raise HTTPException(status_code=404, detail="only installed plugins that are not built in can be updated automatically")
+        if body.enabled and (inst.provenance(conn, plugin_id) or {}).get("source") not in ("index", "rollback"):
+            raise HTTPException(status_code=422, detail="this plugin was uploaded by hand: install it from the Plugin store to let Netlens update it")
+        return autoupdate.set_enabled(conn, plugin_id, body.enabled)
+    finally:
+        conn.close()
+
+
+@router.get("/plugin-compat")
+def plugin_compat(request: Request) -> dict:
+    """After a Netlens upgrade: which installed plugins may no longer work, and what fixes it."""
+    conn = connect(request.app.state.db_path)
+    try:
+        return autoupdate.check(conn, request.app.state.settings.data_dir)
+    finally:
+        conn.close()
+
+
+@router.post("/plugin-compat/dismiss")
+def plugin_compat_dismiss(request: Request) -> dict:
+    conn = connect(request.app.state.db_path)
+    try:
+        autoupdate.dismiss(conn)
+        return {"dismissed": True}
     finally:
         conn.close()

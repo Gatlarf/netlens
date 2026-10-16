@@ -585,9 +585,18 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
             plugin_updates = sum(1 for v in plugin_index.view(entries, installed_map(conn, discover(data_dir), data_dir or ""), VERSION) if v["update_available"])
         except Exception:  # noqa: BLE001 - a broken cache must not break the summary
             plugin_updates = 0
+    plugin_problems = 0
+    if data_dir:
+        try:
+            from app.plugins import autoupdate
+
+            found = autoupdate.check(conn, data_dir)
+            plugin_problems = 0 if found["dismissed"] else len(found["problems"])
+        except Exception:  # noqa: BLE001
+            plugin_problems = 0
     return {
         "api": SUMMARY_API,
-        "update": {"current": upd["current"], "latest": upd["latest"], "available": upd["available"], "plugin_updates": plugin_updates},
+        "update": {"current": upd["current"], "latest": upd["latest"], "available": upd["available"], "plugin_updates": plugin_updates, "plugin_problems": plugin_problems},
         "version": VERSION,
         "generated": now,
         "devices": {**{k: overview[k] for k in ("total", "online", "offline", "new_24h", "new_7d", "stale_30d", "unknown")}, "flapping": flapping_devices(conn, now), "always_on": conn.execute("SELECT COUNT(*) FROM devices WHERE always_on = 1").fetchone()[0]},

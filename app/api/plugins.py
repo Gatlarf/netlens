@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 import json
 
 from app.db import connect, set_setting, utcnow
+from app.plugins import autoupdate
 from app.plugins import index_install as inst
 from app.plugins import registry
 from app.plugins.categories import category_of, listing as category_listing
@@ -45,7 +46,7 @@ def _plugin(service: PluginService, plugin_id: str):
     return plugin
 
 
-def _summary(conn, plugin, categories: dict | None = None) -> dict:
+def _summary(conn, plugin, categories: dict | None = None, auto: dict | None = None) -> dict:
     full = public_state(conn, plugin)
     manifest = full["manifest"] or {}
     return {
@@ -61,6 +62,8 @@ def _summary(conn, plugin, categories: dict | None = None) -> dict:
         "enabled": full["enabled"],
         "configured": full["configured"],
         "status": full["status"],
+        "auto_update": bool(auto.get(plugin.id)) if auto is not None else False,
+        "auto_update_possible": (not plugin.builtin) and ((inst.provenance(conn, plugin.id) or {}).get("source") in ("index", "rollback")),
     }
 
 
@@ -71,7 +74,8 @@ def list_plugins(request: Request) -> dict:
     try:
         plugins = service.plugins()
         categories = category_map(conn)
-        items = [_summary(conn, p, categories) for p in plugins.values()]
+        auto = autoupdate.enabled_map(conn)
+        items = [_summary(conn, p, categories, auto) for p in plugins.values()]
         missing = missing_plugins(conn, plugins)
     finally:
         conn.close()

@@ -463,9 +463,11 @@ def prune_results(conn, now: str | None = None) -> None:
     conn.commit()
 
 
-def _housekeeping_checks(conn) -> None:
-    """Once an hour: look for a newer Netlens and newer plugins (each answers from its own cache for a day / six hours)."""
+def _housekeeping_checks(conn, data_dir=None) -> None:
+    """Once an hour: look for a newer Netlens and newer plugins (each answers from its own cache for a day / six hours), install the plugin
+    updates that were switched on for automatic updating, and note whether Netlens itself was upgraded since the last look."""
     from app import updates
+    from app.plugins import autoupdate
     from app.plugins import index as plugin_index
 
     try:
@@ -473,13 +475,19 @@ def _housekeeping_checks(conn) -> None:
         plugin_index.get_index(conn)
     except Exception:  # noqa: BLE001 - offline is normal
         log.debug("update check failed", exc_info=True)
+    try:
+        autoupdate.note_version(conn)
+        if data_dir is not None:
+            autoupdate.run(conn, data_dir)
+    except Exception:  # noqa: BLE001 - a broken plugin folder must not stop the other checks
+        log.warning("automatic plugin update failed", exc_info=True)
 
 
 def _startup_checks(db_path: str) -> None:
     """Right after a start: look for a newer Netlens and newer plugins, so the About page is not showing a day-old answer."""
     conn = connect(db_path)
     try:
-        _housekeeping_checks(conn)
+        _housekeeping_checks(conn, Path(db_path).resolve().parent)
     finally:
         conn.close()
 
@@ -591,7 +599,7 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                             from app.notify.channels import process_channels
 
                             await process_channels(db_path)
-                    await asyncio.to_thread(_housekeeping_checks, conn)
+                    await asyncio.to_thread(_housekeeping_checks, conn, Path(db_path).resolve().parent)
                     from app import speedtest
 
                     if speedtest.due(conn) and speedtest.PROGRESS.start("internet", "Cloudflare"):  # about 20 seconds: in its own thread, the checks go on

@@ -624,3 +624,7 @@ table.plist td:nth-child(5) { width: 110px; text-align: right; }
 table.plist td:nth-child(3) { overflow: hidden; text-overflow: ellipsis; }
 table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 @media (max-width: 640px) { table.plist td:nth-child(1) { width: 36%; } table.plist td:nth-child(2), table.plist td:nth-child(3) { display: none; } table.plist td:nth-child(4) { width: 64px; } table.plist td:nth-child(5) { width: 84px; } }
+.plist label.inline { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+.compat-box { border-left: 4px solid var(--warn, #d9a400); }
+.compat-box ul { margin: 6px 0 10px 18px; }
+.compat-box { padding: 6px 12px; } .plist td { padding-right: 10px; }
