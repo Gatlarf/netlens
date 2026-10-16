@@ -112,6 +112,6 @@ export async function render(container) {
   }
 
   await load();
-  const timer = setInterval(() => { if (!destroyed && !formSlot.firstChild) load(); }, 15000);
+  const timer = setInterval(() => { if (!destroyed && !document.hidden && !formSlot.firstChild) load(); }, 15000);
   return () => { destroyed = true; clearInterval(timer); };
 }

@@ -12,6 +12,8 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from starlette.requests import HTTPConnection
 from fastapi.staticfiles import StaticFiles
 
+from starlette.middleware.gzip import GZipMiddleware
+
 from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api, probes as probes_api, central as central_api, reports as reports_api, preferences as preferences_api, snoozes as snoozes_api, audit as audit_api, changes as changes_api
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
@@ -143,6 +145,7 @@ def create_app(
     app = FastAPI(title="Netlens", lifespan=lifespan, docs_url="/docs" if docs else None, redoc_url="/redoc" if docs else None,
                   openapi_url="/openapi.json" if docs else None)
 
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)     # the JSON lists and the script files shrink to a quarter; streams and images are left alone
     app.add_middleware(SecurityHeadersMiddleware)
 
     @app.middleware("http")

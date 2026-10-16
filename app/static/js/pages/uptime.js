@@ -182,7 +182,7 @@ export async function render(container) {
   list.append(h("p", { class: "hint" }, "Loading…"));
 
   load();
-  timer = setInterval(load, 30000);
+  timer = setInterval(() => { if (!document.hidden) load(); }, 30000);
 
   return function cleanup() {
     disposed = true;

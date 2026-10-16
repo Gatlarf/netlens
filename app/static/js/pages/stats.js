@@ -297,7 +297,7 @@ export async function render(container) {
   }
 
   load();
-  const timer = setInterval(() => { if (!destroyed) load(); }, 60000);
+  const timer = setInterval(() => { if (!destroyed && !document.hidden) load(); }, 60000);
   return () => {
     destroyed = true;
     clearInterval(timer);

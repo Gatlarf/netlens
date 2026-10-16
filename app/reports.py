@@ -77,11 +77,12 @@ def _outages(rows, start: datetime, end: datetime) -> tuple[list[dict], float]:
     """Down periods from (ts, up) rows in time order: [{start, end, seconds, ongoing}] and the total seconds."""
     out: list[dict] = []
     down_since: datetime | None = None
-    for r in rows:
-        t = _parse(r["ts"])
-        if not r["up"] and down_since is None:
-            down_since = t
-        elif r["up"] and down_since is not None:
+    for r in rows:                                   # a timestamp is only parsed where the device goes down or comes back (not for every check)
+        up = r["up"]
+        if not up and down_since is None:
+            down_since = _parse(r["ts"])
+        elif up and down_since is not None:
+            t = _parse(r["ts"])
             out.append({"start": _fmt(down_since), "end": _fmt(t), "seconds": (t - down_since).total_seconds(), "ongoing": False})
             down_since = None
     if down_since is not None:

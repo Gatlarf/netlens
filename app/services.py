@@ -476,6 +476,10 @@ def _housekeeping_checks(conn, data_dir=None) -> None:
     except Exception:  # noqa: BLE001 - offline is normal
         log.debug("update check failed", exc_info=True)
     try:
+        conn.execute("PRAGMA optimize")        # lets SQLite refresh its query statistics when a table has changed a lot (cheap when nothing changed)
+    except Exception:  # noqa: BLE001
+        log.debug("PRAGMA optimize failed", exc_info=True)
+    try:
         autoupdate.note_version(conn)
         if data_dir is not None:
             autoupdate.run(conn, data_dir)

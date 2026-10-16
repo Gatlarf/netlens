@@ -242,7 +242,7 @@ export async function render(container, params) {
 
   refresh();
 
-  intervalId = setInterval(refresh, 10000);
+  intervalId = setInterval(() => { if (!document.hidden) refresh(); }, 10000);
 
   const onScanFinished = () => {
     refresh();

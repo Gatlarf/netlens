@@ -152,6 +152,6 @@ export async function render(container) {
   tiles, problems, list, limitsSlot);
   list.append(h("p", { class: "hint" }, "Loading…"));
   await load();
-  timer = setInterval(load, REFRESH_MS);
+  timer = setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);   // a tab nobody looks at does not poll
   return () => { disposed = true; if (timer) clearInterval(timer); document.removeEventListener("netlens:snoozed", onSnoozed); };
 }

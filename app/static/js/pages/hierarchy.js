@@ -211,7 +211,7 @@ export async function render(container, params) {
 
   await load();
 
-  const interval = setInterval(load, 30000);
+  const interval = setInterval(() => { if (!document.hidden) load(); }, 30000);
   const onScanFinished = () => load();
   document.addEventListener("netlens:scan-finished", onScanFinished);
 

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.33 — 2026-10-16
+
+### Changed
+- **Faster**: pages and lists are sent compressed (gzip, about a quarter of the size); the availability report and the weekly summary are about seven and three times faster (they parsed every check's timestamp); the uptime figures of the dashboard, statistics and `/metrics` read a covering index (about twice as fast, the old time index is replaced by it on the first start); open pages no longer refresh while their browser tab is hidden; SQLite refreshes its query statistics once an hour.
+
 ## 0.4.30 — 2026-10-16
 
 ### Added

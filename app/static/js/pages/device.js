@@ -913,6 +913,7 @@ export async function render(container, params) {
   await load();
 
   const interval = setInterval(() => {
+    if (document.hidden) return;
     if (terminalSlot && isTerminalActive(terminalSlot)) return;
     if (isStabilityOpen()) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;

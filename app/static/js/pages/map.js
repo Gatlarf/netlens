@@ -922,7 +922,7 @@ export async function render(container, params) {
   }
 
   const interval = setInterval(() => {
-    if (!destroyed) reload();
+    if (!destroyed && !document.hidden) reload();
   }, 30000);
 
   function onScanFinished() {
