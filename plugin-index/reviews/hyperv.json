@@ -2,6 +2,17 @@
   "id": "hyperv",
   "reviews": [
     {
+      "version": "1.2.0",
+      "sha256": "c09ca1079d9bb5c700b14fc6574ff5e2ae39eddb00065964d1cd57e35b907aec",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-17",
+      "level": "reviewed",
+      "tested_on": [
+        "Simulated API only (tests/test_plugin_power.py); the power action has not been tried on a real Hyper-V host yet. The reading part of the plugin is unchanged."
+      ],
+      "notes": "Adds power() only. Made with the assistant Claude; the code was read, not run against the real product."
+    },
+    {
       "version": "1.1.1",
       "sha256": "88c9c4fa27c6d74c06942a0987ee3f43a1cc768b36265536935d847769c25bf1",
       "level": "reviewed",

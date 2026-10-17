@@ -2,6 +2,17 @@
   "id": "portainer",
   "reviews": [
     {
+      "version": "1.1.0",
+      "sha256": "fa21346afa65f92487321e047728235b1a440a5e251a33df37775ae513fa0edf",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-17",
+      "level": "reviewed",
+      "tested_on": [
+        "Simulated API only (tests/test_plugin_power.py); the power action has not been tried on a real Portainer yet. The reading part of the plugin is unchanged."
+      ],
+      "notes": "Adds power() only. Made with the assistant Claude; the code was read, not run against the real product."
+    },
+    {
       "version": "1.0.1",
       "sha256": "60af2c6a4daf8c6656703664ab4a6dec650045106a52cec7ea70a7965fc5eea5",
       "level": "reviewed",

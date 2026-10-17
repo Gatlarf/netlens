@@ -2,6 +2,17 @@
   "id": "proxmox",
   "reviews": [
     {
+      "version": "1.5.0",
+      "sha256": "cb238c6c826d34e7c3e0fb5ce14576e16cfc33197ae2f470a67f8d523a13397f",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-17",
+      "level": "verified",
+      "tested_on": [
+        "Proxmox VE (the maintainer's cluster): the reset of a frozen Windows VM through a remediation rule was run for real and the VM restarted (qmreset task OK)."
+      ],
+      "notes": "Adds power(): reset, reboot, shutdown, start. Made with the assistant Claude and confirmed by the maintainer's own use on 2026-10-17."
+    },
+    {
       "version": "1.4.0",
       "sha256": "a7bb851c0f83e7262e3139fecd15c98b0253a5f4e1fa8f4a4d7989b3c2e7e842",
       "level": "verified",

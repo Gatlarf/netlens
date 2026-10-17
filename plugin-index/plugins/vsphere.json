@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.1.0/vsphere.zip",
+      "sha256": "356047798bef7ad845976a122424397c4cfbaf65ac9227311d43661d380c911a",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-17",
+      "changelog": "Adds the power actions (hard reset, restart, shut down, start) that Netlens 0.4.50 can use for auto-remediation: a rule can restart a frozen guest. Nothing else changed; older Netlens versions ignore the new function."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.0.1/vsphere.zip",
       "sha256": "a19878c0cc5f59e05406f9bb98da9ea6d1199af1acfcf16ef0e387ed19c03abb",

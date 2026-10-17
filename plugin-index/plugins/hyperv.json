@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.2.0/hyperv.zip",
+      "sha256": "c09ca1079d9bb5c700b14fc6574ff5e2ae39eddb00065964d1cd57e35b907aec",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-17",
+      "changelog": "Adds the power actions (hard reset, restart, shut down, start) that Netlens 0.4.50 can use for auto-remediation: a rule can restart a frozen guest. Nothing else changed; older Netlens versions ignore the new function."
+    },
+    {
       "version": "1.1.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.1.1/hyperv.zip",
       "sha256": "88c9c4fa27c6d74c06942a0987ee3f43a1cc768b36265536935d847769c25bf1",

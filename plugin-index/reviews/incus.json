@@ -2,6 +2,17 @@
   "id": "incus",
   "reviews": [
     {
+      "version": "1.1.0",
+      "sha256": "b3a8eb2aeb0e871d9d4e1e11f540b210a2ffc7adaee98b117869203fd0e3a776",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-17",
+      "level": "reviewed",
+      "tested_on": [
+        "Simulated API only (tests/test_plugin_power.py); the power action has not been tried on a real Incus server yet. The reading part of the plugin is unchanged."
+      ],
+      "notes": "Adds power() only. Made with the assistant Claude; the code was read, not run against the real product."
+    },
+    {
       "version": "1.0.1",
       "sha256": "f266e0a82cb959d8bab4361e26d9f8b77f91ae2d4ba8f29c76b7c54f20d1b5a3",
       "level": "reviewed",

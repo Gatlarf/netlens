@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-incus-v1.1.0/incus.zip",
+      "sha256": "b3a8eb2aeb0e871d9d4e1e11f540b210a2ffc7adaee98b117869203fd0e3a776",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-17",
+      "changelog": "Adds the power actions (hard reset, restart, shut down, start) that Netlens 0.4.50 can use for auto-remediation: a rule can restart a frozen guest. Nothing else changed; older Netlens versions ignore the new function."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-incus-v1.0.1/incus.zip",
       "sha256": "f266e0a82cb959d8bab4361e26d9f8b77f91ae2d4ba8f29c76b7c54f20d1b5a3",

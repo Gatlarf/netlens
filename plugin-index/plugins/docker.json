@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.6.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.6.0/docker.zip",
+      "sha256": "76a498e75235e753ca36a821f28731a553a7b03721cc514c288c15dca9b8d427",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-17",
+      "changelog": "Adds the power actions (hard reset, restart, shut down, start) that Netlens 0.4.50 can use for auto-remediation: a rule can restart a frozen guest. Nothing else changed; older Netlens versions ignore the new function."
+    },
+    {
       "version": "1.5.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.5.1/docker.zip",
       "sha256": "cbfe498ea32d67952ef86022e83ce9010c841285a183a4d3cede2a9af1af063a",

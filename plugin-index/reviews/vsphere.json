@@ -2,6 +2,17 @@
   "id": "vsphere",
   "reviews": [
     {
+      "version": "1.1.0",
+      "sha256": "356047798bef7ad845976a122424397c4cfbaf65ac9227311d43661d380c911a",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-17",
+      "level": "reviewed",
+      "tested_on": [
+        "Simulated API only (tests/test_plugin_power.py); the power action has not been tried on a real ESXi or vCenter yet. The reading part of the plugin is unchanged."
+      ],
+      "notes": "Adds power() only. Made with the assistant Claude; the code was read, not run against the real product."
+    },
+    {
       "version": "1.0.1",
       "sha256": "a19878c0cc5f59e05406f9bb98da9ea6d1199af1acfcf16ef0e387ed19c03abb",
       "level": "reviewed",

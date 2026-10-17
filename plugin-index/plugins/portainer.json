@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-portainer-v1.1.0/portainer.zip",
+      "sha256": "fa21346afa65f92487321e047728235b1a440a5e251a33df37775ae513fa0edf",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-17",
+      "changelog": "Adds the power actions (hard reset, restart, shut down, start) that Netlens 0.4.50 can use for auto-remediation: a rule can restart a frozen guest. Nothing else changed; older Netlens versions ignore the new function."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-portainer-v1.0.1/portainer.zip",
       "sha256": "60af2c6a4daf8c6656703664ab4a6dec650045106a52cec7ea70a7965fc5eea5",

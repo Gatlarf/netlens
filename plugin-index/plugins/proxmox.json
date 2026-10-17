@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.5.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-proxmox-v1.5.0/proxmox.zip",
+      "sha256": "cb238c6c826d34e7c3e0fb5ce14576e16cfc33197ae2f470a67f8d523a13397f",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-17",
+      "changelog": "Adds the power actions (hard reset, restart, shut down, start) that Netlens 0.4.50 can use for auto-remediation: a rule can restart a frozen guest. Nothing else changed; older Netlens versions ignore the new function."
+    },
+    {
       "version": "1.4.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-proxmox-v1.4.0/proxmox.zip",
       "sha256": "a7bb851c0f83e7262e3139fecd15c98b0253a5f4e1fa8f4a4d7989b3c2e7e842",
