@@ -9,6 +9,7 @@ import { buildPluginGuideCard } from "../cards/plugin_guide.js";
 import { buildMapCard } from "../cards/map_settings.js";
 import { buildChannelsCard } from "../cards/channels.js";
 import { buildCentralCard } from "../cards/central.js";
+import { buildLicenceCard } from "../cards/licence.js";
 import { buildUpdateCard } from "../update.js";
 import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
@@ -250,6 +251,7 @@ const STATIC_GROUPS = [
     items: [
       { key: "wizard", label: "Setup guide", build: buildWizardCard },
       { key: "audit", label: "Audit log", build: buildAuditCard },
+      { key: "licence", label: "Licence", build: buildLicenceCard },
       { key: "about", label: "About", build: buildAboutCard },
       { key: "session", label: "Account", build: buildAccountCard },
     ],

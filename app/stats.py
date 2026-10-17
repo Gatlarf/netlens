@@ -524,7 +524,7 @@ def _health(conn: sqlite3.Connection) -> tuple[dict, dict[int, dict]]:
 def _remote_sites(conn: sqlite3.Connection) -> dict:
     from app import probes
 
-    sites = [probes.present(conn, r) for r in conn.execute("SELECT * FROM probes WHERE enabled = 1")]
+    sites = [site for site in (probes.present(conn, r) for r in conn.execute("SELECT * FROM probes WHERE enabled = 1")) if not site["locked"]]
     return {"total": len(sites), "silent": sum(1 for s in sites if s["state"] == "silent"), "problems": sum(s["problems"]["count"] for s in sites),
             "devices_down": sum(s["devices"]["total"] - s["devices"]["online"] for s in sites), "services_down": sum(s["services"]["down"] for s in sites)}
 

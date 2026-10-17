@@ -36,6 +36,10 @@ ALLOWED_METRICS = frozenset({"up", "rtt_ms", "response_ms", "cert_days", "cpu_pc
                              "net_tx_bps", "if_util_pct", "if_err_ps", "if_up", "storage_status", "temp_c", "uptime_s", "supply_pct", "battery_pct", "battery_minutes", "on_battery", "service_stopped"})
 
 
+class LicenceLimit(ValueError):
+    """More remote sites than the licence allows (the API answers 402)."""
+
+
 class ProbeError(ValueError):
     pass
 
@@ -56,9 +60,24 @@ def clean_name(value: Any) -> str:
     return name
 
 
+def locked_ids(conn: sqlite3.Connection) -> set[int]:
+    """The remote sites beyond what the licence allows (the oldest ones come first): they are frozen, not removed."""
+    from app import licence
+
+    limit = licence.site_limit(conn)
+    if limit is None:
+        return set()
+    return {r[0] for r in conn.execute("SELECT id FROM probes ORDER BY id").fetchall()[limit:]}
+
+
 def create(conn: sqlite3.Connection, name: str) -> tuple[dict, str]:
     """Make a probe record; returns it with the token (shown once, only its hash is kept)."""
+    from app import licence
+
     name = clean_name(name)
+    limit = licence.site_limit(conn)
+    if limit is not None and conn.execute("SELECT COUNT(*) FROM probes").fetchone()[0] >= limit:
+        raise LicenceLimit(f"The {licence.status(conn)['name']} edition takes in {limit} remote site{'s' if limit != 1 else ''}. Add a licence key (Settings → Licence) or start the free 30-day trial for more.")
     if conn.execute("SELECT 1 FROM probes WHERE name = ? COLLATE NOCASE", (name,)).fetchone():
         raise ProbeError("there is already a remote site with that name")
     if conn.execute("SELECT COUNT(*) FROM probes").fetchone()[0] >= 50:
@@ -113,7 +132,7 @@ def present(conn: sqlite3.Connection, row: sqlite3.Row, now: float | None = None
         state = "connected"
     problems = summary.get("problems") or []
     return {
-        "id": row["id"], "name": row["name"], "enabled": bool(row["enabled"]), "created": row["created"], "last_seen": row["last_seen"],
+        "id": row["id"], "name": row["name"], "enabled": bool(row["enabled"]), "locked": row["id"] in locked_ids(conn), "created": row["created"], "last_seen": row["last_seen"],
         "last_ip": row["last_ip"], "version": row["version"], "interval_s": row["interval_s"], "state": state,
         "devices": {"total": counts["total"], "online": counts["online"], "core_down": counts["core_down"]},
         "services": {"total": services["total"], "down": services["down"]},
@@ -336,7 +355,10 @@ def check_silent(conn: sqlite3.Connection, now: float | None = None) -> list[str
     """One `probe_offline` event for every probe that has stopped reporting (and stays quiet until it reports again)."""
     now = now if now is not None else time.time()
     raised = []
+    frozen = locked_ids(conn)
     for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 AND last_seen IS NOT NULL AND offline_notified = 0"):
+        if row["id"] in frozen:
+            continue
         seen = _parse(row["last_seen"])
         if seen is not None and now - seen > max(SILENT_AFTER_S, row["interval_s"] * 4):
             conn.execute("UPDATE probes SET offline_notified = 1 WHERE id = ?", (row["id"],))

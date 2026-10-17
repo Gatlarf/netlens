@@ -40,6 +40,8 @@ def list_probes(conn=Depends(get_conn)) -> list[dict]:
 def create_probe(body: NameBody, conn=Depends(get_conn)) -> dict:
     try:
         probe, token = probes_mod.create(conn, body.name or "")
+    except probes_mod.LicenceLimit as exc:
+        raise HTTPException(status_code=402, detail=str(exc))
     except probes_mod.ProbeError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {"probe": probe, "token": token}
@@ -135,6 +137,8 @@ async def push(request: Request) -> dict:
         if probe is None or not probe["enabled"]:
             limiter.record_failure(host)
             raise HTTPException(status_code=401, detail="this token is not valid (the remote site may have been removed or its token replaced)")
+        if probe["id"] in probes_mod.locked_ids(conn):
+            raise HTTPException(status_code=402, detail="the central Netlens has no licence for this many remote sites: this site is frozen until a licence key is added there")
         if len(body) > MAX_BODY:
             raise HTTPException(status_code=413, detail="the report is too large")
         if request.headers.get("content-encoding", "").lower() == "gzip":

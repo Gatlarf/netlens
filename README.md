@@ -106,7 +106,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
 - A **setup guide** that walks a new install through the settings that matter (networks, names, always-on devices, alerts, checks, plugins, backups); reopen it any time under Settings → System → Setup guide
 - **Performance graphs** (response time and availability for up to a year) and **health monitoring** of switches, NAS boxes, printers, UPS units, Windows (SNMP) and Linux (SSH): processor, memory, disks, traffic, temperature, supplies and battery, with limits that raise warnings
-- **Remote sites**: several locations in one overview; a Netlens at each location reports to a central one (outgoing connection only), with devices, checks, health, graphs and alerts per site
+- **Remote sites**: several locations in one overview (the first remote site is free, more need a [licence key](#editions-and-licence-keys)); a Netlens at each location reports to a central one (outgoing connection only), with devices, checks, health, graphs and alerts per site
 - Uptime history like Uptime Kuma: heartbeat bars with a response-time line, 24 h / 7 d / 30 d, hover details, and **always-on (core) devices** whose availability is shown apart from phones and tablets
 - Alerts by e-mail, ntfy, Telegram, Discord, Pushover or webhook, each channel with its own events and an on/off switch per device
 - Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: Proxmox VE and ASUS AiMesh come built in (which VM runs on which host, which device is connected to which mesh node); TP-Link Omada and Ubiquiti UniFi are available from the plugin index (community, not yet tested on hardware)
@@ -945,10 +945,34 @@ Versions **0.3.142 and earlier** were published under the MIT License and stay a
 plugins in the plugin index are separate works with their own licenses (the index shows each one). Third-party components keep
 their own licenses, see below.
 
+### Editions and licence keys
+
+| Edition | Remote sites on the central Netlens | For |
+|---|---|---|
+| **Community** (free) | 1 | home and other noncommercial use |
+| **Supporter** (a coffee, for life) | any number | home and other noncommercial use |
+| **Small business** (yearly) | 10 | commercial use |
+| **Enterprise** (yearly) | any number | commercial use |
+
+Everything else (monitoring, alerts, plugins, reports, the web terminal ...) is the same in every edition. A key is entered in
+**Settings → Licence**. It is checked offline with a public key, so Netlens never contacts anyone about it. The **free 30-day
+trial** of the full version is started on the same page (once per installation; the start is kept in the database and in a marker
+file next to it, and the clock cannot be turned back, so restoring a backup does not renew it).
+
+When a yearly licence ends there is a 30-day grace period (with reminders 30, 14 and 7 days before the end, also as an alert event
+`licence_expiring`). After that the remote sites beyond the first one are **frozen**: they keep their data, but are not updated
+and raise no alerts. Nothing is deleted; adding a key brings them back. The sites that report are never limited, only the central
+Netlens that receives them.
+
+The source is readable and the check can be edited out by anybody who builds their own copy; the licence key is how a business
+buys the right to use Netlens commercially, with a supported, signed release. The commercial terms are in the commercial license
+mentioned above.
+
 ## Support
 
-Netlens is free for noncommercial use and is made in spare time. If it saved you some work, you can
-[buy me a coffee](https://buymeacoffee.com/Gatlarf). It is a thank-you, not a license: commercial use still needs the license above.
+Netlens is made in spare time. If it saved you some work, you can [buy me a coffee](https://buymeacoffee.com/Gatlarf): a coffee
+gets you a **Supporter key**, the full version for life for your own noncommercial use (leave your e-mail address with the coffee).
+Commercial use still needs a business licence.
 
 ## Third-party
 

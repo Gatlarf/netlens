@@ -58,6 +58,9 @@ def get_dashboard(request: Request) -> dict:
             for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
                 site = probes_mod.present(conn, row)
                 href = f"#/remote-sites?id={site['id']}"
+                if site["locked"]:
+                    doc["attention"].append({"level": "warn", "text": f"{site['name']} is frozen: the licence takes in fewer remote sites", "href": "#/settings/licence", "snooze": None})
+                    continue
                 if site["state"] == "silent":
                     doc["attention"].append({"level": "bad", "text": f"{site['name']} has stopped reporting", "href": href, "snooze": f"site:{site['id']}"})
                     continue

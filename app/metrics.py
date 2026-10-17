@@ -215,6 +215,8 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
 
     for row in conn.execute("SELECT * FROM probes ORDER BY name COLLATE NOCASE"):
         site = probes_mod.present(conn, row)
+        if site["locked"]:
+            continue
         out.sample("netlens_remote_site_up", 1 if site["state"] == "connected" else 0, "1 while a remote site is reporting", site=site["name"])
         out.sample("netlens_remote_site_devices", site["devices"]["online"], "Devices of a remote site, by state", site=site["name"], state="online")
         out.sample("netlens_remote_site_devices", site["devices"]["total"] - site["devices"]["online"], "Devices of a remote site, by state", site=site["name"], state="offline")

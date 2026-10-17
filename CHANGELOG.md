@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.39 — 2026-10-17
+
+### Added
+- ★ **Editions and licence keys**: the central Netlens now takes in one remote site for free; more remote sites need a licence key (Small business: 10, Enterprise and Supporter: any number), entered in Settings → Licence. A free 30-day trial of the full version can be started once per installation. Monitoring itself is never limited. When a licence ends there is a 30-day grace period, reminders 30, 14 and 7 days before, and then the extra sites are frozen (kept, but not updated and without alerts), never deleted. Keys are checked offline.
+
 ## 0.4.38 — 2026-10-17
 
 ### Fixed

@@ -150,6 +150,13 @@ export async function render(container) {
     }
     const grid = h("div", { class: "rs-grid" });
     for (const p of probes) {
+      if (p.locked) {
+        grid.appendChild(h("a", { class: "rs-card tone-off", href: `#/remote-sites?id=${p.id}` },
+          h("div", { class: "rs-name" }, h("strong", {}, p.name), h("span", { class: "hl-badge warn" }, "Frozen")),
+          h("div", { class: "hint" }, "Your licence takes in fewer remote sites. This one keeps its data but is not updated and raises no alerts."),
+          isAdmin() ? h("div", { class: "hint" }, h("a", { href: "#/settings/licence" }, "Get more sites")) : null));
+        continue;
+      }
       const tone = !p.enabled ? "off" : p.problems.critical || p.state === "silent" || p.devices.core_down ? "bad" : p.problems.count || p.services.down || p.state === "waiting" ? "warn" : "ok";
       grid.appendChild(h("a", { class: `rs-card tone-${tone}`, href: `#/remote-sites?id=${p.id}` },
         h("div", { class: "rs-name" }, h("strong", {}, p.name), h("span", { class: `hl-badge ${STATE_TONE[p.state] === "ok" ? "" : STATE_TONE[p.state]}` }, p.enabled ? STATE_TEXT[p.state] : "Paused")),
@@ -176,6 +183,7 @@ export async function render(container) {
         showList();
       } catch (err) {
         toast(err.message || "Could not add the site", "error");
+        if (err.status === 402) { clear(form); form.appendChild(h("div", { class: "card" }, h("h2", {}, "More sites need a licence"), h("p", {}, err.message), h("p", {}, h("a", { class: "btn primary", href: "#/settings/licence" }, "Open the licence page")))); }
         go.disabled = false;
       }
     } }, h("h2", {}, "Add a remote site"), h("div", { class: "field" }, h("label", {}, "Name of the location"), name),

@@ -480,6 +480,12 @@ def _housekeeping_checks(conn, data_dir=None) -> None:
     except Exception:  # noqa: BLE001
         log.debug("PRAGMA optimize failed", exc_info=True)
     try:
+        from app import licence
+
+        licence.notify(conn)
+    except Exception:  # noqa: BLE001
+        log.debug("licence check failed", exc_info=True)
+    try:
         autoupdate.note_version(conn)
         if data_dir is not None:
             autoupdate.run(conn, data_dir)
