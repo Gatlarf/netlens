@@ -109,6 +109,30 @@ def t_disks(conn, args, now=None) -> dict:
             "memory_rising": [{"device": m["device"], "used_pct": m["current"], "out_of_memory_in_days": m["days_to_full"]} for m in leaks]}
 
 
+HEALTH_METRICS = {"memory": "mem_pct", "ram": "mem_pct", "cpu": "cpu_pct", "processor": "cpu_pct", "disk": "disk_pct", "storage": "disk_pct", "temperature": "temp_c", "temp": "temp_c",
+                  "battery": "battery_pct", "ups": "battery_pct"}
+LOW_IS_BAD = {"battery_pct"}
+
+
+def t_health(conn, args, now=None) -> dict:
+    """The newest reading of one kind from every monitored host (Settings → Host monitoring), the most worrying first."""
+    from app import tsdb
+    from app.hostmetrics import service as hm
+
+    metric = HEALTH_METRICS.get(str(args.get("metric") or "memory").lower(), "mem_pct")
+    store = tsdb.for_conn(conn)
+    t = (now or datetime.now(timezone.utc)).timestamp()
+    rows = []
+    monitored = conn.execute("SELECT m.device_id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1").fetchall()
+    for r in monitored:
+        for s in (store.metrics_of("device", r["device_id"]) if store else []):
+            if s["metric"] == metric and s["last"] is not None and s["last_ts"] is not None and t - s["last_ts"] < 3 * 3600:
+                rows.append({"device": r["name"], "label": s["label"], "value": round(s["last"], 1), "unit": s["unit"]})
+    rows.sort(key=lambda x: x["value"], reverse=metric not in LOW_IS_BAD)
+    limits = [{"device": p["device"], "reading": p["title"], "value": p["value"], "level": p["level"]} for p in hm.problems(conn) if p["metric"] == metric]
+    return {"metric": metric, "monitored_hosts": len(monitored), "readings": rows[:12], "past_their_limit": limits[:12]}
+
+
 def t_fixes(conn, args, now=None) -> dict:
     from app import remediation
 
@@ -166,7 +190,8 @@ TOOLS: dict[str, tuple[Callable, str]] = {
     "new_devices": (t_new_devices, "devices first seen in a period. args: days (1-30)"),
     "incidents": (t_incidents, "incidents (grouped problems with a probable cause) of a period. args: days (1-30)"),
     "anomalies": (t_anomalies, "readings that are unusual right now for the time of day. args: none"),
-    "disks": (t_disks, "disks on course to fill up and memory use that keeps rising, with the number of days left. args: none"),
+    "health": (t_health, "CURRENT readings of the monitored hosts: memory (RAM), cpu (processor), disk (usage), temperature, battery. Most worrying first. args: metric (memory, cpu, disk, temperature or battery)"),
+    "disks": (t_disks, "FORECAST only, not current usage: disks that will fill up and memory use that keeps rising, with the days left. For current usage use health. args: none"),
     "fixes": (t_fixes, "recent automatic fixes (auto-remediation) and whether they worked. args: none"),
     "services": (t_services, "all service checks (websites, ports, DNS) with their state and response time. args: none"),
     "device": (t_device, "details of one device, or of every device of a kind. args: name (a device name, host name or address, or a kind: printer, switch, nas, camera, router, tv, phone, server, pc ...)"),
@@ -183,7 +208,9 @@ PRESETS = [
     {"id": "fixes", "text": "What did the automatic fixes do?", "tool": "fixes", "args": {}},
 ]
 KEYWORDS = [
-    ("response_times", r"response|latenc|\bping|\bslow|\bfast|\brtt\b|\blag"), ("services", r"\bservices?\b|website|\bsites?\b|checks? (is|are)"), ("anomalies", r"unusual|anomal|strange|weird|odd|abnormal"), ("disks", r"\bdisks?\b|storage|space|capacity|\bfull\b|filling"), ("fixes", r"\bfix|remediat|restart|reset|repair"),
+    ("disks", r"fill up|filling|run out|will be full|when will|predict|forecast|leak"),
+    ("health", r"\bram\b|memory|\bcpu\b|processor|temperature|\bhot\b|\bbusy\b|battery|\bups\b|\bdisks?\b|storage|disk space|\bfull\b|\bload\b"),
+    ("response_times", r"response|latenc|\bping|\bslow|\bfast|\brtt\b|\blag"), ("services", r"\bservices?\b|website|\bsites?\b|checks? (is|are)"), ("anomalies", r"unusual|anomal|strange|weird|odd|abnormal"), ("fixes", r"\bfix|remediat|restart|reset|repair"),
     ("new_devices", r"\bnew\b|unknown|appeared|joined|stranger|first seen"), ("availability", r"uptime|availab|reliab|worst|least|outage|stable|flaky"),
     ("incidents", r"happen|changed|incident|yesterday|last night|summar|recap|what.?s new"), ("offline_now", r"\boffline|\bdown\b|not working|unreachable|dead"),
     ("overview", r"wrong|problem|issue|status|health|\bok\b|\bfine\b|right now|going on"),
@@ -205,6 +232,9 @@ def route(question: str, known_names: list[str]) -> tuple[str, dict]:
     for tool, pattern in KEYWORDS:
         if re.search(pattern, q):
             args = {"days": days} if tool in ("availability", "new_devices", "incidents", "events", "response_times") else {}
+            if tool == "health":
+                args = {"metric": next((m for w, m in (("ram", "memory"), ("memory", "memory"), ("cpu", "cpu"), ("processor", "cpu"), ("temp", "temperature"), ("hot", "temperature"), ("battery", "battery"), ("ups", "battery"),
+                                                      ("busy", "cpu"), ("load", "cpu")) if re.search(rf"\b{w}", q)), "disk")}
             if tool == "response_times" and re.search(r"fastest|lowest|best|quickest|least", q):
                 args["order"] = "fastest"
             return tool, args
@@ -244,6 +274,15 @@ def render(tool: str, r: dict) -> str:
         return "\n".join(lines) or f"No disk is on course to fill up ({r['checked']} checked) and no memory use keeps rising."
     if tool == "fixes":
         return "\n".join(f"{x['at'][:16].replace('T', ' ')} {x['rule']} on {x['device']}: {x['state']}" + (" (the problem went away)" if x["recovered"] else "") for x in r["runs"][:8]) or "No automatic fixes have run."
+    if tool == "health":
+        names = {"mem_pct": "Memory in use", "cpu_pct": "Processor busy", "disk_pct": "Disk usage", "temp_c": "Temperature", "battery_pct": "Battery"}
+        if not r["readings"]:
+            return f"No recent {names.get(r['metric'], r['metric']).lower()} readings: {r['monitored_hosts']} host(s) are monitored (Settings → Host monitoring)." if r["monitored_hosts"] else "No host is monitored yet, so there are no memory, processor, disk or temperature readings (device page → Monitor)."
+        lines = [f"{names.get(r['metric'], r['metric'])}, most worrying first:"]
+        lines += [f"{x['device']}{' ' + x['label'] if x['label'] else ''}: {x['value']:g}{x['unit'] or ''}" for x in r["readings"][:8]]
+        if r["past_their_limit"]:
+            lines.append("Past their limit: " + "; ".join(f"{p['device']} ({p['level']})" for p in r["past_their_limit"][:6]) + ".")
+        return "\n".join(lines)
     if tool == "services":
         if not r["total"]:
             return "There are no service checks."
@@ -279,6 +318,7 @@ SYSTEM = ("You answer questions about the user's own computer network using tool
           "Examples:\n"
           'Question: Which device responds slowest? -> {"tool": "response_times", "args": {"days": 7, "order": "slowest"}}\n'
           'Question: Is the printer up? -> {"tool": "device", "args": {"name": "printer"}}\n'
+          'Question: Which machines are low on RAM? -> {"tool": "health", "args": {"metric": "memory"}}\n'
           'Question: What happened yesterday? -> {"tool": "incidents", "args": {"days": 1}}\n'
           "Tools:\n" + "\n".join(f"- {n}: {d}" for n, (_f, d) in TOOLS.items()))
 

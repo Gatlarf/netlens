@@ -2,10 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.58 — 2026-10-17
+
+### Added
+- **Current readings as a question**: "which machines are low on RAM?", the busiest processors, the fullest disks, temperatures and UPS batteries are answered from the newest readings of the monitored hosts. The language model had no tool for them and used the forecast of disks instead; the instructions now keep the two apart and the model check has an exam for it.
+
 ## 0.4.56 — 2026-10-17
 
 ### Added
-- **Check the model** (Monitoring → Insights): five small exams with made-up data show whether the connected language model follows the instructions, copies names and numbers exactly, leaves nothing out of a list and does not invent what the data cannot tell. "What a trustworthy model needs" is listed in Settings → Digital engineer.
+- **Check the model** (Monitoring → Insights): six small exams with made-up data show whether the connected language model follows the instructions, copies names and numbers exactly, leaves nothing out of a list and does not invent what the data cannot tell. "What a trustworthy model needs" is listed in Settings → Digital engineer.
 - **More ready-made questions**: service checks, and a kind of device ("how reliable are the printers?").
 
 ### Changed

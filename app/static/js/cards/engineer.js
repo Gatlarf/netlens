@@ -38,7 +38,7 @@ export async function buildEngineerCard() {
         h("li", {}, "It must reply with one JSON object and nothing else, copy names and numbers exactly, and not leave items out of a list. Answers that look right and are wrong are the danger."),
         h("li", {}, "In practice: a model of about 14 billion parameters or more, lightly compressed (4-bit or better), or a current hosted model. Very small or 2-bit models fail these tests."),
         h("li", {}, "“Thinking” models work but take longer. A slow model only makes answers slower, never wrong."),
-        h("li", {}, "Run “Check the model” on the Monitoring → Insights page: five small exams with made-up data show how yours does."))),
+        h("li", {}, "Run “Check the model” on the Monitoring → Insights page: six small exams with made-up data show how yours does."))),
       h("p", { class: "hint" }, "The commands of your rules are never sent, only their names and the kind of action. With a hosted model the incident still leaves your network: leave the anonymising on, or use a local model."),
       h("div", { class: "form-actions" }, save, test));
   }

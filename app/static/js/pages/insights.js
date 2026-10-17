@@ -121,9 +121,9 @@ export async function render(container) {
     const save = async () => { try { await put("/api/insights/settings", { llm: llm.checked, report_summary: rep.checked }); toast("Saved", "success"); await load(); } catch (err) { toast(err.message || "Failed", "error"); } };
     llm.addEventListener("change", save); rep.addEventListener("change", save);
     const result = h("div", {});
-    const check = h("button", { class: "btn", type: "button", title: "Five small exams with made-up data" }, "Check the model");
+    const check = h("button", { class: "btn", type: "button", title: "Six small exams with made-up data" }, "Check the model");
     check.addEventListener("click", async () => {
-      check.disabled = true; clear(result); result.appendChild(h("p", { class: "hint" }, "Running five exams, this can take a minute..."));
+      check.disabled = true; clear(result); result.appendChild(h("p", { class: "hint" }, "Running six exams, this can take a minute..."));
       try {
         const r = await post("/api/insights/model-check", {});
         clear(result);

@@ -1,4 +1,4 @@
-"""Is this language model good enough for Insights and the digital engineer? Five small exams with made-up data (a paid feature, see app/insights.py).
+"""Is this language model good enough for Insights and the digital engineer? Six small exams with made-up data (a paid feature, see app/insights.py).
 
 A model that cannot follow a one-line protocol, copies numbers wrongly or leaves items out gives answers that look right and are not. The exams run
 the same instructions the real questions use, against invented devices, and say plainly which ones failed.
@@ -51,6 +51,8 @@ def run(conn, ask_fn=None) -> dict[str, Any]:
 
     exam("protocol", "Follows the reply format and picks a fitting tool", [{"role": "system", "content": ask.SYSTEM}, {"role": "user", "content": "Which devices are offline right now?"}], picks("offline_now", "overview"))
     exam("choice", "Chooses the right tool for a less obvious question", [{"role": "system", "content": ask.SYSTEM}, {"role": "user", "content": "Which of my devices answers the slowest?"}], picks("response_times"))
+
+    exam("readings", "Looks at current readings, not at forecasts, for “low on RAM”", [{"role": "system", "content": ask.SYSTEM}, {"role": "user", "content": "Which machines are low on RAM?"}], picks("health"))
 
     def copies(reply):
         text = _answer_of(reply)

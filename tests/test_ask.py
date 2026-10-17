@@ -129,6 +129,8 @@ def test_the_model_check_tells_a_careful_model_from_a_sloppy_one(conn):
             return json.dumps({"answer": "<device1> is slowest with 147.2 ms, then <device2> with 91.3 ms."})
         if last.startswith("Result of offline_now"):
             return json.dumps({"answer": "Offline: <device1>, <device2>, <device3>, <device4>, <device5>."})
+        if "RAM" in last:
+            return json.dumps({"tool": "health", "args": {"metric": "memory"}})
         if "slowest" in last:
             return json.dumps({"tool": "response_times", "args": {}})
         if "offline" in last:
@@ -136,7 +138,7 @@ def test_the_model_check_tells_a_careful_model_from_a_sloppy_one(conn):
         return json.dumps({"answer": "The data does not tell."})
 
     good = modelcheck.run(conn, careful)
-    assert good["verdict"] == "good" and good["passed"] == good["total"] == 5
+    assert good["verdict"] == "good" and good["passed"] == good["total"] == 6
 
     def sloppy(messages):
         last = messages[-1]["content"]
@@ -146,3 +148,22 @@ def test_the_model_check_tells_a_careful_model_from_a_sloppy_one(conn):
 
     bad = modelcheck.run(conn, sloppy)
     assert bad["verdict"] == "poor" and bad["passed"] == 0 and all(c["detail"] for c in bad["checks"])
+
+
+def test_current_memory_is_a_question_of_its_own_and_forecasts_are_not(conn):
+    import time
+
+    from app import tsdb
+
+    tsdb.forget_all()
+    conn.execute("INSERT INTO host_monitors (device_id, method, address, port, credential, interval_s, groups, alerts, enabled, created) VALUES (1,'snmp','192.168.1.20',161,'',60,'[]',1,1,'x')")
+    conn.execute("INSERT INTO host_monitors (device_id, method, address, port, credential, interval_s, groups, alerts, enabled, created) VALUES (3,'snmp','192.168.1.31',161,'',60,'[]',1,1,'x')")
+    conn.commit()
+    now = datetime.now(timezone.utc)
+    store = tsdb.for_conn(conn)
+    store.record([("device", 1, "mem_pct", 62.0, "", "%"), ("device", 3, "mem_pct", 93.5, "", "%"), ("device", 1, "disk_pct", 40.0, "/", "%")], ts=int(now.timestamp()))
+    a = ask.answer(conn, "Which machines are low on RAM?", now)
+    assert a["tools"] == ["health"] and a["answer"].splitlines()[1] == "cam1: 93.5%" and "nas: 62%" in a["answer"]
+    assert ask.answer(conn, "which disk is the fullest?", now)["answer"].splitlines()[1] == "nas /: 40%"
+    assert ask.answer(conn, "when will a disk run out of space?", now)["tools"] == ["disks"]
+    tsdb.forget_all()
