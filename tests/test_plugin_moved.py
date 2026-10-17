@@ -57,3 +57,13 @@ def test_when_the_store_cannot_help_it_says_so_once_and_keeps_the_settings(world
     moved.run(conn, tmp, getter=server)
     assert conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'plugin_update_failed'").fetchone()[0] == 1
     assert json.loads(get_setting(conn, "plugin.asus"))["config"]["url"] == "https://r"
+
+
+def test_an_old_cached_index_is_refreshed_once(world):
+    conn, tmp, server = world
+    set_setting(conn, "plugin.proxmox", json.dumps({"enabled": True, "config": {"host": "x"}}))
+    server.put_index(index_doc(entry("proxmox", kind="hypervisor", builtin=True)), etag='"old"')      # how the index looked before the move
+    get_index(conn, force=True, getter=server)
+    rel = publish(server, "1.4.0", level="verified", plugin_id="proxmox", kind="hypervisor")
+    server.put_index(index_doc(entry("proxmox", kind="hypervisor", releases=[rel])), etag='"new"')
+    assert moved.run(conn, tmp, getter=server) == [{"id": "proxmox", "version": "1.4.0"}]

@@ -39,8 +39,12 @@ def run(conn, data_dir: Path | str, *, getter=None, netlens_version: str = VERSI
     todo = pending(conn, data_dir)
     if not todo:
         return []
-    index = idx.get_index(conn, **({"getter": getter} if getter else {}))
+    kwargs = {"getter": getter} if getter else {}
+    index = idx.get_index(conn, **kwargs)
     entries = {e["id"]: e for e in index["entries"]}
+    if any(entries.get(pid) is None or not entries[pid]["releases"] for pid in todo):      # a cached index from before the move lists them as built in: ask again
+        index = idx.get_index(conn, force=True, **kwargs)
+        entries = {e["id"]: e for e in index["entries"]}
     done = []
     for pid in todo:
         entry = entries.get(pid)
