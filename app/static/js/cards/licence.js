@@ -15,7 +15,7 @@ export async function buildLicenceCard() {
     clear(card);
     card.appendChild(h("h2", {}, "Licence"));
     card.appendChild(h("p", { class: "hint" },
-      "Netlens is free for home and noncommercial use, with one remote site. A licence key adds more remote sites to the central overview: Small business takes in 10, Enterprise any number. Everybody who bought the author a coffee gets the full version for life (Supporter key). Monitoring itself is never limited, and nothing is removed when a licence ends: extra sites are only frozen."));
+      "Netlens is free for home and noncommercial use, with one remote site. A licence key adds more remote sites to the central overview: Small business takes in 10, Enterprise any number. Monitoring itself is never limited, and nothing is removed when a licence ends: extra sites are only frozen."));
     card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Edition"), h("span", {}, h("strong", {}, info.name), " ", h("span", { class: "hl-badge" }, STATE_TEXT[info.state] || info.state))));
     card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Takes in"), h("span", {}, `${SITES(info.sites)} (${info.sites_used} added)`)));
     if (info.holder) card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Licensed to"), h("span", {}, info.holder)));
