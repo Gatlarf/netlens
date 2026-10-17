@@ -1,0 +1,49 @@
+import { get, put, post } from "../api.js";
+import { h, clear, toast, timeAgo } from "../util.js";
+
+// Settings page: escalate alerts that nobody acknowledges.
+export async function buildEscalationCard() {
+  const card = h("div", { class: "card" });
+  function draw(info) {
+    clear(card);
+    card.appendChild(h("h2", {}, "Escalation"));
+    card.appendChild(h("p", { class: "hint" },
+      "An alert that nobody acknowledges is sent on to other channels after a while: after 15 minutes tell the first person, after 45 minutes the team. It follows the serious events (the ones that break through quiet hours, or the ones you choose). It stops when someone acknowledges the alert here or when the problem has gone. Make a channel per person or per team under Alert channels. Part of every licence and the free trial."));
+    if (!info.allowed) card.appendChild(h("p", { class: "warn-text" }, "Needs a licence or the free trial (Settings → Licence)."));
+    const enabled = h("input", { type: "checkbox" });
+    enabled.checked = info.policy.enabled;
+    const levels = h("div", {});
+    const rows = [];
+    function addLevel(level) {
+      const after = h("input", { type: "number", min: "1", max: "1440", value: String(level.after_min), style: "width:6em" });
+      const chans = h("select", { multiple: true, size: String(Math.min(4, Math.max(2, info.channels.length))) }, ...info.channels.map((c) => h("option", { value: c.id, selected: level.channels.includes(c.id) }, c.name)));
+      const row = h("div", { class: "field" }, h("label", {}, `After (minutes)`), after, h("label", {}, "Tell"), chans);
+      rows.push({ after, chans, row });
+      levels.appendChild(row);
+    }
+    info.policy.levels.forEach(addLevel);
+    const more = h("button", { class: "btn", type: "button" }, "Add a level");
+    more.addEventListener("click", () => { const last = rows.length ? Number(rows[rows.length - 1].after.value) : 0; addLevel({ after_min: Math.min(1440, last + 30), channels: [] }); });
+    const kinds = h("select", { multiple: true, size: "6" }, ...info.kinds.map((k) => h("option", { value: k.id, selected: info.policy.kinds.includes(k.id), title: k.label }, `${k.id} · ${k.label}`.slice(0, 90))));
+    const save = h("button", { class: "btn primary", type: "button" }, "Save");
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      try {
+        draw(await put("/api/escalation", { enabled: enabled.checked, kinds: [...kinds.selectedOptions].map((o) => o.value),
+          levels: rows.map((r) => ({ after_min: Number(r.after.value), channels: [...r.chans.selectedOptions].map((o) => o.value) })) }));
+        toast("Saved", "success");
+      } catch (err) { toast(err.message || "Could not save", "error"); save.disabled = false; }
+    });
+    card.append(h("label", { class: "check" }, enabled, " Escalate alerts that nobody acknowledges"), levels, more,
+      h("div", { class: "field" }, h("label", {}, "Which events"), kinds, h("p", { class: "hint" }, "Hold Ctrl (or Cmd) to choose several.")), h("div", { class: "form-actions" }, save));
+    card.appendChild(h("h3", {}, `Waiting for someone (${info.open.length})`));
+    if (!info.open.length) card.appendChild(h("p", { class: "hint" }, "Nothing is waiting."));
+    for (const item of info.open) {
+      const ack = h("button", { class: "btn", type: "button" }, "I'm on it");
+      ack.addEventListener("click", async () => { ack.disabled = true; try { draw(await post(`/api/escalation/${item.id}/ack`, {})); } catch (err) { toast(err.message || "Failed", "error"); ack.disabled = false; } });
+      card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, h("strong", {}, item.device || "network"), ` · ${item.kind} ${timeAgo(item.ts)}`), h("span", {}, item.detail || "", " ", item.level ? h("span", { class: "warn-text" }, `level ${item.level} sent `) : "", ack)));
+    }
+  }
+  draw(await get("/api/escalation"));
+  return card;
+}

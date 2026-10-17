@@ -187,6 +187,16 @@ def status(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, A
     return out
 
 
+PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem")      # beyond the free Community edition (trial and every licence include them)
+
+
+def allows(conn: sqlite3.Connection, feature: str, now: datetime | None = None) -> bool:
+    """Whether a feature that needs a licence may be used. Everything that was free stays free; only new business features are asked about."""
+    if feature not in PAID_FEATURES:
+        return True
+    return status(conn, now)["edition"] != "free"
+
+
 def site_limit(conn: sqlite3.Connection) -> int | None:
     """How many remote sites this installation takes in (None = no limit)."""
     return status(conn)["sites"]

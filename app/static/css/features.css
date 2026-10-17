@@ -663,3 +663,8 @@ table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 .tier-tile.lit { outline: 2px solid var(--accent, #2563eb); z-index: 3; }
 .tier-tile.dim { opacity: 0.35; }
 @media (prefers-reduced-motion: no-preference) { .tier-tile { transition: opacity 0.12s; } }
+
+/* remediation */
+.rem-run { padding: 10px 0; border-top: 1px solid var(--border, #d0d7e2); }
+.rem-run:first-of-type { border-top: 0; }
+.rem-analysis { margin-top: 4px; }

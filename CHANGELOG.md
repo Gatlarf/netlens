@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.48 — 2026-10-17
+
+### Added
+- ★ **Auto-remediation** (Monitoring → Remediation): rules say "when this event happens, do that": wake a device, call a web address (a Home Assistant webhook, n8n ...) or run one command over the device's SSH monitor login. Each rule can only suggest, ask for approval (it shows as an alert and on the dashboard), act at once, or leave the decision to the digital engineer. A cooldown, a daily and an hourly limit, maintenance windows and snoozes, and a pause switch keep it safe; every run, its result and whether the problem went away afterwards are listed.
+- ★ **Digital engineer** (Settings → Digital engineer): connect any OpenAI-compatible language model (a local one or a hosted one). It reads an incident and recommends which of your rules would fix it; it never runs anything itself and never sees the commands. What is sent can be made anonymous.
+- ★ **Single sign-on** (Settings → Single sign-on): sign in with your company account through any OpenID Connect provider (Entra ID, Keycloak, Authentik, Google, Okta ...). People are recognised by the provider's own id, never by their name; the first sign-in creates the Netlens user and the role follows the provider's groups at every sign-in.
+- ★ **Log forwarding** (Settings → Log forwarding): events and the audit log are sent to a syslog server or SIEM (Graylog, Splunk, Wazuh, Elastic ...) as RFC 5424 over UDP or TCP; Netlens remembers what it has sent, so a server that is down only delays delivery.
+- ★ **Escalation** (Settings → Escalation): an alert that nobody acknowledges is sent on to other channels after the time you set, in up to four levels, until somebody acknowledges it or the problem has gone.
+
 ## 0.4.47 — 2026-10-17
 
 ### Fixed

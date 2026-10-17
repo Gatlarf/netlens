@@ -11,6 +11,10 @@ import { buildChannelsCard } from "../cards/channels.js";
 import { buildCentralCard } from "../cards/central.js";
 import { buildLicenceCard } from "../cards/licence.js";
 import { buildIpv6Card } from "../cards/ipv6.js";
+import { buildEngineerCard } from "../cards/engineer.js";
+import { buildEscalationCard } from "../cards/escalation.js";
+import { buildSsoCard } from "../cards/sso.js";
+import { buildSiemCard } from "../cards/siem.js";
 import { buildUpdateCard } from "../update.js";
 import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
@@ -229,6 +233,7 @@ const STATIC_GROUPS = [
       { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
       { key: "central", label: "Report to a central Netlens", build: buildCentralCard },
       { key: "users", label: "Users & tokens", build: buildUsersCard },
+      { key: "sso", label: "Single sign-on", build: buildSsoCard },
       { key: "terminal", label: "Web terminal", build: buildTerminalCard },
     ],
   },
@@ -237,6 +242,8 @@ const STATIC_GROUPS = [
     items: [
       { key: "channels", label: "Alert channels & quiet hours", build: buildChannelsCard },
       { key: "maintenance", label: "Maintenance windows", build: buildMaintenanceCard },
+      { key: "escalation", label: "Escalation", build: buildEscalationCard },
+      { key: "siem", label: "Log forwarding", build: buildSiemCard },
     ],
   },
   "integrations",
@@ -253,6 +260,7 @@ const STATIC_GROUPS = [
     items: [
       { key: "wizard", label: "Setup guide", build: buildWizardCard },
       { key: "audit", label: "Audit log", build: buildAuditCard },
+      { key: "engineer", label: "Digital engineer", build: buildEngineerCard },
       { key: "licence", label: "Licence", build: buildLicenceCard },
       { key: "about", label: "About", build: buildAboutCard },
       { key: "session", label: "Account", build: buildAccountCard },

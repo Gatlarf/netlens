@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 27
+SCHEMA_VERSION = 30
 
 
 def utcnow() -> str:
@@ -173,6 +173,29 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_inventory_devices_device ON inventory_devices(device_id)")
+
+    # escalation of unacknowledged alerts (paid, see app/escalation.py)
+    cur.execute("CREATE TABLE IF NOT EXISTS escalation_state (event_id INTEGER PRIMARY KEY, level INTEGER NOT NULL DEFAULT 0, sent_at TEXT, acked_by TEXT, acked_at TEXT)")
+
+    # auto-remediation (paid, see app/remediation.py)
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS remediation_rules (
+            id INTEGER PRIMARY KEY, name TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, kinds TEXT NOT NULL DEFAULT '[]', device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
+            match_text TEXT NOT NULL DEFAULT '', action TEXT NOT NULL, secret TEXT NOT NULL DEFAULT '', mode TEXT NOT NULL DEFAULT 'ask', cooldown_min INTEGER NOT NULL DEFAULT 30,
+            max_per_day INTEGER NOT NULL DEFAULT 3, created TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS remediation_runs (
+            id INTEGER PRIMARY KEY, rule_id INTEGER, rule_name TEXT NOT NULL, action_type TEXT NOT NULL, event_id INTEGER, device_id INTEGER, kind TEXT, detail TEXT,
+            state TEXT NOT NULL, result TEXT, analysis TEXT, created TEXT NOT NULL, decided_by TEXT, decided_at TEXT, finished TEXT, recovered TEXT
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_remediation_runs_rule ON remediation_runs(rule_id, device_id, created)")
 
     # IPv6 addresses of the devices (optional feature, see app/scanner/ipv6.py)
     cur.execute(
@@ -476,6 +499,10 @@ def init_db(conn: sqlite3.Connection) -> None:
     # --- schema v16: DNS registration (see app/dns) -------------------------------------------
     _add_column_if_missing(conn, "devices", "dns_mode", "TEXT NOT NULL DEFAULT 'auto'")   # auto | always | never
     _add_column_if_missing(conn, "devices", "dns_name", "TEXT")                           # the user's own DNS name
+    # --- schema v30: users that sign in through an identity provider are recognised by its stable subject id -----
+    _add_column_if_missing(conn, "users", "oidc_sub", "TEXT")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oidc_sub ON users(oidc_sub) WHERE oidc_sub IS NOT NULL")
+
     # --- schema v18: events held back by a maintenance window carry the window's name ----------------------
     _add_column_if_missing(conn, "events", "maintenance", "TEXT")
 

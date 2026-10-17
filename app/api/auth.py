@@ -155,6 +155,18 @@ def _audit(request: Request, user: str, role: str, action: str, status: int) -> 
         pass
 
 
+def _oidc_public(request: Request) -> dict:
+    from app import oidc
+
+    db = connect(request.app.state.db_path)
+    try:
+        return oidc.public(db)
+    except Exception:  # noqa: BLE001 - the sign-in page must load whatever happens here
+        return {"enabled": False, "label": ""}
+    finally:
+        db.close()
+
+
 @router.get("/session")
 async def session(request: Request) -> JSONResponse:
     principal = identify(request)
@@ -170,6 +182,7 @@ async def session(request: Request) -> JSONResponse:
             "authenticated": False,
             "setup_required": needs_setup,
             "token_login": bool(request.app.state.settings.token),  # False: only user name and password sign in
+            "oidc": _oidc_public(request),
             **_demo_info(request),
         })
     from app import preferences

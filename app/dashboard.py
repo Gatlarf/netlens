@@ -73,6 +73,9 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
         add("warn", f"{gb['stores_at_risk']} backup store{'s' if gb['stores_at_risk'] != 1 else ''} filling up", "#/backups")
     if gb.get("unprotected"):
         add("info", f"{gb['unprotected']} guest{'s' if gb['unprotected'] != 1 else ''} without a backup", "#/backups")
+    rm = s.get("remediation") or {}
+    if rm.get("pending"):
+        add("warn", f"{rm['pending']} automatic fix{'es' if rm['pending'] != 1 else ''} waiting for your approval", "#/remediation")
     sh = s.get("smarthome") or {}
     if sh.get("unavailable"):
         add("warn", f"{sh['unavailable']} smart-home device{'s' if sh['unavailable'] != 1 else ''} unavailable", "#/smarthome")

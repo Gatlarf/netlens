@@ -21,6 +21,7 @@ const ROUTES = {
   "#/services": "services",
   "#/backups": "backups",
   "#/smarthome": "smarthome",
+  "#/remediation": "remediation",
   "#/health": "health",
   "#/remote-sites": "remote_sites",
   "#/reports": "reports",
@@ -449,6 +450,8 @@ async function init() {
     startSetup();
   } else if (!session.authenticated) {
     if (session.token_login === false) hideTokenLogin();
+    const sso = el("#login-sso");
+    if (sso && session.oidc && session.oidc.enabled) { sso.hidden = false; sso.textContent = session.oidc.label || "Single sign-on"; }
     openLoginDialog();
   } else {
     goToStartPage(session);

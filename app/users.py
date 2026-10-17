@@ -152,14 +152,19 @@ def login(conn: sqlite3.Connection, username: str, password: str) -> str | None:
     ok = verify_password(password or "", row["password_hash"] if row else _DUMMY)
     if not row or not ok or row["disabled"]:
         return None
+    return start_session(conn, row["id"])
+
+
+def start_session(conn: sqlite3.Connection, user_id: int) -> str:
+    """A new session for a user who has proved who they are (a password, or the identity provider); returns the cookie value."""
     secret = secrets.token_urlsafe(32)
     now = _now()
     conn.execute("DELETE FROM sessions WHERE expires < ?", (_iso(now),))
     conn.execute(
         "INSERT INTO sessions (token_hash, user_id, created, expires) VALUES (?, ?, ?, ?)",
-        (_digest(secret), row["id"], _iso(now), _iso(now + timedelta(days=SESSION_DAYS))),
+        (_digest(secret), user_id, _iso(now), _iso(now + timedelta(days=SESSION_DAYS))),
     )
-    conn.execute("UPDATE users SET last_login = ? WHERE id = ?", (_iso(now), row["id"]))
+    conn.execute("UPDATE users SET last_login = ? WHERE id = ?", (_iso(now), user_id))
     conn.commit()
     return SESSION_PREFIX + secret
 
