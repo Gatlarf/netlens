@@ -23,12 +23,6 @@
     @media (prefers-reduced-motion: reduce) { #boot .boot-spin { animation-duration: 3s; } }
   </style>
   <script src="js/theme-init.js"></script>
-  <link rel="stylesheet" href="css/app.css">
-  <link rel="stylesheet" href="css/pages.css">
-  <link rel="stylesheet" href="css/map.css">
-  <link rel="stylesheet" href="css/terminal.css">
-  <link rel="stylesheet" href="css/features.css">
-  <link rel="stylesheet" href="css/phone.css">
 </head>
 <body>
   <div id="boot" role="status" aria-live="polite">
@@ -37,6 +31,13 @@
     <div class="boot-slow">This is taking longer than usual. After an update the browser has to fetch the new version first; it only happens once.</div>
     <noscript>Netlens needs JavaScript.</noscript>
   </div>
+  <!-- Below the spinner on purpose: a stylesheet in the head blocks the first paint until all of them have been fetched -->
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="stylesheet" href="css/map.css">
+  <link rel="stylesheet" href="css/terminal.css">
+  <link rel="stylesheet" href="css/features.css">
+  <link rel="stylesheet" href="css/phone.css">
   <div id="demo-banner" class="demo-banner" role="note" hidden></div>
   <header class="topbar" id="topbar">
     <a class="brand" href="#/"><img class="brand-icon" src="img/favicon.svg" alt="" width="24" height="24">Netlens</a>

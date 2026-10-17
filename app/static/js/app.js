@@ -425,6 +425,15 @@ function hideTokenLogin() {
   if (switchBtn) switchBtn.hidden = true;
 }
 
+// The stylesheets are linked below the spinner (so it paints first); keep it up until they are in, or the page would flash unstyled.
+function stylesheetsReady() {
+  const pending = [...document.querySelectorAll('link[rel="stylesheet"]')].filter((l) => !l.sheet);
+  return Promise.all(pending.map((l) => new Promise((done) => {
+    l.addEventListener("load", done, { once: true });
+    l.addEventListener("error", done, { once: true });
+  })));
+}
+
 function hideBoot() {
   const boot = document.getElementById("boot");      // the spinner of index.html, shown until the scripts are here and the session is known
   if (boot) boot.remove();
@@ -432,6 +441,7 @@ function hideBoot() {
 
 async function init() {
   const session = await applySession();
+  await stylesheetsReady();
   hideBoot();
 
   if (!session.authenticated && session.setup_required) {

@@ -106,3 +106,10 @@ def test_the_page_shows_a_spinner_until_the_scripts_are_there(client):
 def test_a_page_script_loading_state_is_removed_again():
     js = (assets.STATIC / "js" / "app.js").read_text()
     assert js.count("waiting.remove()") >= 2                                                       # after a successful render and after an error
+
+
+def test_stylesheets_do_not_block_the_first_paint():
+    html = (ROOT / "app/static/index.html").read_text() if "ROOT" in globals() else open("app/static/index.html").read()
+    head = html[: html.index("</head>")]
+    assert 'rel="stylesheet"' not in head                       # a stylesheet in the head holds back the spinner
+    assert html.index('id="boot"') < html.index('rel="stylesheet"')
