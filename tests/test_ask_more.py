@@ -139,3 +139,11 @@ def test_loosely_worded_questions_still_find_the_device_or_the_kind(conn):
     assert "vm-old" in stopped and "old-job" in stopped
     assert a("Which devices are not trusted?")["answer"].splitlines()[1].startswith("desktop-1")
     assert a("Which smart home batteries are low?")["answer"].startswith("Low batteries: Hall sensor (8%)")
+
+
+def test_a_word_that_is_not_a_kind_is_looked_for_in_the_names(conn):
+    from app import ask_more
+
+    found = ask_more.t_search_devices(conn, {"type": "iphone"}, NOW)
+    assert found["count"] == 1 and found["devices"][0]["name"] == "iphone-bert"
+    assert ask_more.t_search_devices(conn, {"type": "printers"}, NOW)["count"] == 1               # a plural kind still works

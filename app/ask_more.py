@@ -40,10 +40,13 @@ def _short(row) -> dict:
 # ----------------------------------------------------------------------------- tools
 def t_search_devices(conn, args, now=None) -> dict:
     where, params, shown = ["1 = 1"], [], {}
-    if args.get("type"):
+    kind = ask._type_word(str(args.get("type") or "").strip().lower()) if args.get("type") else None
+    if args.get("type") and not kind:                  # not one of the kinds ("iphone", "raspberry"): look for the word in the names instead
+        args = {**args, "text": args.get("text") or args["type"], "type": None}
+    if kind:
         where.append(f"{ETYPE} = ?")
-        params.append(str(args["type"]).lower().rstrip("s") if str(args["type"]).lower() not in ("ups", "iot", "tv") else str(args["type"]).lower())
-        shown["type"] = args["type"]
+        params.append(kind)
+        shown["type"] = kind
     if args.get("vendor"):
         where.append("LOWER(COALESCE(d.vendor, '')) LIKE ? ESCAPE '\\'")
         params.append(_like(args["vendor"]))
@@ -366,6 +369,8 @@ def r_backups(r: dict) -> str:
         lines.append("Needs a look: " + "; ".join(f"{b['name']} ({'failed' if b['state'] == 'failed' else 'late'})" for b in r["failing_or_late"]) + ".")
     if r["unprotected_guests"]:
         lines.append("Without a backup: " + ", ".join(r["unprotected_guests"]) + ".")
+    if s["problems"]:
+        lines.append(f"The backup server has recorded {s['problems']} problem(s) (failed or warning tasks); see the Backups page.")
     if r["newest_backup"]:
         lines.append(f"Newest backup: {r['newest_backup'][:16].replace('T', ' ')} UTC.")
     return "\n".join(lines)
@@ -595,7 +600,7 @@ RENDERERS = {"search_devices": r_search_devices, "counts": r_counts, "ports": r_
              "wifi": r_wifi, "maintenance": r_maintenance, "system": r_system, "updates": r_updates, "changes": r_changes, "ipv6": r_ipv6}
 
 TOOLS = {
-    "search_devices": (t_search_devices, "find devices by a property and count them. args (all optional): type (printer, camera, nas, switch ...), vendor (manufacturer word), os (windows, linux, android ...), online (true/false), port (number), service (name), group, tag, text (part of the name or address), new_days, untrusted (true)"),
+    "search_devices": (t_search_devices, "find devices by a property and count them. args (all optional): type (printer, camera, nas, switch ...), vendor (manufacturer word), os (windows, linux, android ...), online (true/false), port (number), service (name), group, tag, text (part of the name or address, for anything that is not a kind: iphone, raspberry ...), new_days, untrusted (true)"),
     "counts": (t_counts, "how many devices there are, split by type, vendor, os or group. args: by (type, vendor, os or group)"),
     "ports": (t_ports, "open network ports: which devices have a port or service open (args: port or service such as ssh, rdp, smb, http), or which ports one device has open (args: device)"),
     "guests": (t_guests, "virtual machines and containers of the hypervisor plugins (Proxmox, Docker, Hyper-V ...) with their state, restarts and health. args (optional): status (running, stopped, restarting, unhealthy), kind (qemu, lxc, container), text"),
