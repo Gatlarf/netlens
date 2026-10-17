@@ -4,11 +4,12 @@ import json
 
 import pytest
 
-from app.plugins.builtin import diag
-from app.plugins.builtin.asus import plugin as asus_plugin
-from app.plugins.builtin.asus.client import AsusAuthError, AsusClient
-from app.plugins.builtin.proxmox import plugin as proxmox_plugin
-from app.plugins.builtin.proxmox.client import ProxmoxClient
+from tests.plugin_modules import load
+
+asus_plugin = load("asus")
+proxmox_plugin = load("proxmox")
+diag = proxmox_plugin            # the diagnostic helpers are part of each plugin now
+AsusAuthError, AsusClient, ProxmoxClient = asus_plugin.AsusAuthError, asus_plugin.AsusClient, proxmox_plugin.ProxmoxClient
 from app.plugins.contract import validate_manifest
 from tests import test_asus, test_proxmox_client
 from tests.test_asus import FakeTransport as AsusTransport
@@ -89,12 +90,12 @@ def test_asus_diagnose_refused_login_is_auth_failed(monkeypatch, asus):
 
 def test_both_manifests_announce_the_diagnostic():
     for pid in ("proxmox", "asus"):
-        path = __import__("pathlib").Path(__file__).resolve().parents[1] / "app" / "plugins" / "builtin" / pid / "plugin.json"
+        path = __import__("pathlib").Path(__file__).resolve().parents[1] / "plugins" / pid / "plugin.json"
         assert validate_manifest(json.loads(path.read_text()))["diagnose"] is True
 
 
 def test_proxmox_reads_every_server_in_the_list_and_keeps_clashing_vm_numbers_apart(monkeypatch):
-    from app.plugins.builtin.proxmox import plugin as px
+    px = proxmox_plugin
 
     class Client:
         def __init__(self, cfg):

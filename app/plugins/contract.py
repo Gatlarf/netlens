@@ -11,7 +11,7 @@ import re
 from typing import Any
 
 API_VERSION = 1
-KINDS = ("hypervisor", "topology", "dns", "proxy", "backup")
+KINDS = ("hypervisor", "topology", "dns", "proxy", "backup", "inventory")
 DNS_CAPABILITIES = ("marker", "delete")   # what a DNS plugin can do besides adding and updating records
 DNS_TYPES = ("A", "AAAA", "PTR", "CNAME")
 MAX_DNS_RECORDS = 50000
@@ -438,6 +438,8 @@ def validate_output(kind: str, data: Any) -> dict:
         return _proxy(data)
     if kind == "backup":
         return _backup(data)
+    if kind == "inventory":
+        return _inventory(data)
     raise ContractError(f"unknown plugin kind {kind!r}")
 
 
@@ -770,6 +772,50 @@ def _backup(data: Any) -> dict:
                          "state": _choice(raw.get("state"), f"{path}.state", ("warning", "failed"), "failed"), "at": _stamp(raw.get("at"), f"{path}.at"),
                          "text": _text(raw.get("text"), f"{path}.text", max_len=300), "target_id": _id(target_id, f"{path}.target_id") if target_id not in (None, "") else None})
     return {"servers": servers, "stores": stores, "targets": targets, "problems": problems}
+
+
+def _inventory(data: Any) -> dict:
+    """An inventory plugin's snapshot of a smart-home hub (Home Assistant ...): the devices it knows, with the details Netlens does not see on the network
+    (manufacturer, model, area, firmware, protocol), whether each is available, its battery and the device it is paired through."""
+    data = _dict(data, "output")
+    servers, server_ids = [], set()
+    for i, raw in enumerate(_list(data.get("servers"), "servers")):
+        path = f"servers[{i}]"
+        raw = _dict(raw, path)
+        server_id = _id(raw.get("id"), f"{path}.id")
+        if server_id in server_ids:
+            _fail(f"{path}.id", f"{server_id!r} is used twice")
+        server_ids.add(server_id)
+        servers.append({"id": server_id, "name": _text(raw.get("name"), f"{path}.name", default=server_id), "ip": _ipv4(raw.get("ip"), f"{path}.ip"),
+                        "version": _text(raw.get("version"), f"{path}.version", max_len=40), "online": bool(raw.get("online", True)),
+                        "warnings": [_text(w, f"{path}.warnings[{j}]", required=True, max_len=300) for j, w in enumerate(_list(raw.get("warnings"), f"{path}.warnings")[:10])]})
+    devices, ids = [], set()
+    raw_devices = _list(data.get("devices"), "devices")
+    if len(raw_devices) > MAX_ITEMS:
+        _fail("devices", f"at most {MAX_ITEMS} devices")
+    for i, raw in enumerate(raw_devices):
+        path = f"devices[{i}]"
+        raw = _dict(raw, path)
+        dev_id = _id(raw.get("id"), f"{path}.id")
+        if dev_id in ids:
+            _fail(f"{path}.id", f"{dev_id!r} is used twice")
+        ids.add(dev_id)
+        server_id = _id(raw.get("server_id"), f"{path}.server_id")
+        if server_id not in server_ids:
+            _fail(f"{path}.server_id", f"{server_id!r} is not the id of any entry in servers")
+        via = raw.get("via_id")
+        battery = _optional_number(raw.get("battery"), f"{path}.battery", 0, 100, integer=True)
+        devices.append({"id": dev_id, "server_id": server_id, "name": _text(raw.get("name"), f"{path}.name", default=dev_id, max_len=120),
+                        "manufacturer": _text(raw.get("manufacturer"), f"{path}.manufacturer", max_len=80) or None, "model": _text(raw.get("model"), f"{path}.model", max_len=120) or None,
+                        "area": _text(raw.get("area"), f"{path}.area", max_len=80) or None, "sw": _text(raw.get("sw"), f"{path}.sw", max_len=60) or None,
+                        "protocol": _text(raw.get("protocol"), f"{path}.protocol", max_len=40) or None, "mac": _mac(raw.get("mac"), f"{path}.mac"), "ip": _ipv4(raw.get("ip"), f"{path}.ip"),
+                        "via_id": _id(via, f"{path}.via_id") if via not in (None, "") else None, "available": bool(raw.get("available", True)), "battery": battery,
+                        "battery_low": bool(raw.get("battery_low", False)), "update": bool(raw.get("update", False)), "url": _text(raw.get("url"), f"{path}.url", max_len=300) or None,
+                        "entities": _byte_count(raw.get("entities"), f"{path}.entities")})
+    for d in devices:
+        if d["via_id"] is not None and d["via_id"] not in ids:
+            d["via_id"] = None
+    return {"servers": servers, "devices": devices}
 
 
 def _topology(data: Any) -> dict:

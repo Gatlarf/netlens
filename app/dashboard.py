@@ -73,6 +73,11 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
         add("warn", f"{gb['stores_at_risk']} backup store{'s' if gb['stores_at_risk'] != 1 else ''} filling up", "#/backups")
     if gb.get("unprotected"):
         add("info", f"{gb['unprotected']} guest{'s' if gb['unprotected'] != 1 else ''} without a backup", "#/backups")
+    sh = s.get("smarthome") or {}
+    if sh.get("unavailable"):
+        add("warn", f"{sh['unavailable']} smart-home device{'s' if sh['unavailable'] != 1 else ''} unavailable", "#/smarthome")
+    if sh.get("battery_low"):
+        add("warn", f"{sh['battery_low']} smart-home device{'s' if sh['battery_low'] != 1 else ''} with a low battery", "#/smarthome")
     if s["update"].get("plugin_problems"):
         n = s["update"]["plugin_problems"]
         add("warn", f"{n} plugin{'s' if n != 1 else ''} may not work with this Netlens version", "#/settings/plugins")

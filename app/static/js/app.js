@@ -20,6 +20,7 @@ const ROUTES = {
   "#/stats": "stats",
   "#/services": "services",
   "#/backups": "backups",
+  "#/smarthome": "smarthome",
   "#/health": "health",
   "#/remote-sites": "remote_sites",
   "#/reports": "reports",

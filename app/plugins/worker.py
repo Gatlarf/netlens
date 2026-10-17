@@ -13,12 +13,10 @@ from pathlib import Path
 
 
 def _load(plugin_dir: Path, builtin: bool):
-    if builtin:
-        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-        return importlib.import_module(f"app.plugins.builtin.{plugin_dir.name}.plugin")
-    sys.path.insert(0, str(plugin_dir))
+    sys.path.insert(0, str(plugin_dir))        # nothing is built in any more: every plugin is loaded from its own folder
     spec = importlib.util.spec_from_file_location("netlens_user_plugin", plugin_dir / "plugin.py")
     module = importlib.util.module_from_spec(spec)
+    sys.modules["netlens_user_plugin"] = module      # a @dataclass in the plugin looks its own module up here
     spec.loader.exec_module(module)
     return module
 

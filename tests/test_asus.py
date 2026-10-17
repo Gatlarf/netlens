@@ -2,9 +2,11 @@ import json
 
 import pytest
 
-from app.plugins.builtin.asus.client import AsusAuthError, AsusClient, AsusError, build_snapshot, parse_onboarding
-from app.plugins.builtin.asus.config import AsusConfig, normalize_url
-from app.plugins.builtin.asus.plugin import to_topology
+from tests.plugin_modules import load
+
+_asus = load("asus")
+AsusAuthError, AsusClient, AsusError, build_snapshot, parse_onboarding = _asus.AsusAuthError, _asus.AsusClient, _asus.AsusError, _asus.build_snapshot, _asus.parse_onboarding
+AsusConfig, normalize_url, to_topology = _asus.AsusConfig, _asus.normalize_url, _asus.to_topology
 
 AUTH = {"Authorization": "Bearer secret"}
 MAIN, N1, N2 = "aa:00:00:00:00:10", "aa:00:00:00:00:20", "aa:00:00:00:00:30"

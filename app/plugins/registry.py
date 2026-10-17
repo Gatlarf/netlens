@@ -62,9 +62,10 @@ def _read_plugin(path: Path, builtin: bool) -> Plugin:
 def discover(data_dir: Path | str | None) -> dict[str, Plugin]:
     """All plugins by id (built-ins first; an uploaded plugin can never replace a built-in one)."""
     found: dict[str, Plugin] = {}
-    for path in sorted(BUILTIN_DIR.iterdir()):
-        if path.is_dir() and (path / "plugin.json").exists():
-            found[path.name] = _read_plugin(path, True)
+    if BUILTIN_DIR.is_dir():      # nothing is built in any more: every plugin comes from the Plugin store (or an upload)
+        for path in sorted(BUILTIN_DIR.iterdir()):
+            if path.is_dir() and (path / "plugin.json").exists():
+                found[path.name] = _read_plugin(path, True)
     user_dir = Path(data_dir) / "plugins" if data_dir else None
     if user_dir and user_dir.is_dir():
         for path in sorted(user_dir.iterdir()):

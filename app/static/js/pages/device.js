@@ -467,6 +467,22 @@ function buildBackupCard(device) {
   return card;
 }
 
+function buildSmartHomeCard(device) {
+  const d = device.smarthome;
+  if (!d) return null;
+  const card = h("div", { class: "card" }, h("h2", {}, "Smart home"));
+  card.appendChild(kvRow("State", d.available ? h("span", { class: "run-ok" }, "available") : h("span", { class: "error" }, "unavailable")));
+  if (d.manufacturer || d.model) card.appendChild(kvRow("Model", h("span", {}, [d.manufacturer, d.model].filter(Boolean).join(" "))));
+  if (d.area) card.appendChild(kvRow("Area", h("span", {}, d.area)));
+  if (d.sw) card.appendChild(kvRow("Firmware", h("span", {}, d.sw)));
+  if (d.protocol) card.appendChild(kvRow("Protocol", h("span", {}, d.protocol)));
+  if (d.battery !== null && d.battery !== undefined) card.appendChild(kvRow("Battery", h("span", { class: d.battery_low ? "warn-text" : "" }, `${d.battery}%`)));
+  if (d.update) card.appendChild(kvRow("Update", h("span", { class: "warn-text" }, "available")));
+  if (d.via) card.appendChild(kvRow("Paired through", h("span", {}, d.via)));
+  card.appendChild(h("p", { class: "hint" }, `Reported by ${d.plugin_id}. `, h("a", { href: "#/smarthome" }, "All smart-home devices")));
+  return card;
+}
+
 function buildVirtualizationCard(device) {
   const info = device.virtualization;
   if (!info) return null;
@@ -821,6 +837,8 @@ export async function render(container, params) {
     if (virtualizationCard) nRight.appendChild(virtualizationCard);
     const backupCard = buildBackupCard(device);
     if (backupCard) nRight.appendChild(backupCard);
+    const smartCard = buildSmartHomeCard(device);
+    if (smartCard) nRight.appendChild(smartCard);
     for (const siteCard of buildDeviceSitesCards(device)) nRight.appendChild(siteCard);
     nRight.appendChild(buildNamesCard(device));
     panels.network = twoColumns(nLeft, nRight);

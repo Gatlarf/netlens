@@ -6,7 +6,9 @@ import sqlite3
 from pathlib import Path
 
 from app import containers
-from app.plugins.builtin.proxmox import plugin as proxmox_plugin
+from tests.plugin_modules import load
+
+proxmox_plugin = load("proxmox")
 from app.plugins.contract import validate_output
 
 spec = importlib.util.spec_from_file_location("truenas_plugin", Path(__file__).resolve().parents[1] / "plugins" / "truenas" / "plugin.py")

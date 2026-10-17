@@ -197,6 +197,9 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
     from app.scanner import ipv6
 
     result["ipv6"] = ipv6.for_device(conn, device_id)
+    from app import inventory
+
+    result["smarthome"] = inventory.for_device(conn, device_id)
 
     names = conn.execute(
         "SELECT name, source, first_seen, last_seen FROM device_names WHERE device_id = ?",

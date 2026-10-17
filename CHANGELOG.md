@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.44 — 2026-10-17
+
+### Added
+- ★ **Home Assistant plugin and a new plugin type, "inventory"**: the plugin reads the device registry of Home Assistant (manufacturer, model, area, firmware, protocol, battery, available or not, and for Zigbee the device it is paired through). Devices with a MAC address are matched to the devices Netlens found, and get a Smart home card on their page; all devices are listed on the new Smart home page (Monitoring menu), with events for devices that become unavailable and for low batteries, and a line in the dashboard's attention list.
+
+### Changed
+- ★ **Proxmox VE and the ASUS router are ordinary plugins now**: nothing is built into Netlens any more. If you used one of them, Netlens installs it from the Plugin store by itself after the upgrade, with your settings, and keeps it switched on (an event tells you; when the store cannot be reached it tries again every hour). New installations install them from the Plugin store like every other plugin.
+
 ## 0.4.43 — 2026-10-17
 
 ### Added

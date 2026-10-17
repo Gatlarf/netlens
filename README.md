@@ -110,7 +110,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - **Remote sites**: several locations in one overview; a Netlens at each location reports to a central one (outgoing connection only), with devices, checks, health, graphs and alerts per site
 - Uptime history like Uptime Kuma: heartbeat bars with a response-time line, 24 h / 7 d / 30 d, hover details, and **always-on (core) devices** whose availability is shown apart from phones and tablets
 - Alerts by e-mail, ntfy, Telegram, Discord, Pushover or webhook, each channel with its own events and an on/off switch per device
-- Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: Proxmox VE and ASUS AiMesh come built in (which VM runs on which host, which device is connected to which mesh node); TP-Link Omada and Ubiquiti UniFi are available from the plugin index (community, not yet tested on hardware)
+- Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: nothing is built in: Proxmox VE, ASUS AiMesh, Home Assistant, TP-Link Omada, UniFi and many more are installed from the plugin store (which VM runs on which host, which device is connected to which mesh node, which smart-home devices exist)
 - Known and unknown devices, better device identification (router names, mDNS and UPnP details, name hints), Wi-Fi signal history and roaming, service checks (HTTP, TCP, DNS), more notification channels (ntfy, Telegram, Discord, Pushover, webhook) with quiet hours, and Prometheus metrics with a Grafana dashboard
 - Statistics page: devices by type/vendor/OS, uptime and reliability, flapping devices, ports and services, scan performance, event history, hierarchy and plugin health, with 24 h to 90 day periods; a compact `/api/stats/summary` for integrations such as Home Assistant
 - Network hierarchy: which device depends on which (gateway, then Proxmox host, then its guests), as a tree page, a tree layout on the map, and a parent you can set per device
@@ -598,7 +598,7 @@ Netlens learns about your network from other systems through **plugins**. Four k
 
 Under **Settings → Integrations** you find:
 
-- **Plugins**: every installed plugin with its type, version, source (built in or uploaded) and last sync, a **Turn on / Turn off** button for each, and an **Upload plugin** box for a `.zip` of your own. A new plugin stays off until you turn it on. Turning one off removes its links from the map and keeps its settings.
+- **Plugins**: every installed plugin with its type, version, source (plugin store or uploaded) and last sync, a **Turn on / Turn off** button for each, and an **Upload plugin** box for a `.zip` of your own. A new plugin stays off until you turn it on. Turning one off removes its links from the map and keeps its settings.
 - **One page per plugin** with a settings form that Netlens builds from the plugin's manifest, *Test connection* (saves nothing), *Save* and *Sync now*. A plugin syncs when you turn it on and after every scan. A failing plugin never disturbs the others or the scan, and keeps its last good links; a refused login pauses that plugin until you save or sync it again, so a wrong password cannot get an account locked.
 - **Plugin guide**: how to write a plugin (package format, `plugin.json`, the two functions, the exact data a plugin must return, security notes). The same text is in the repository at [`app/plugins/PLUGINS.md`](app/plugins/PLUGINS.md), and **Download example plugin** gives a working template.
 
@@ -883,7 +883,7 @@ NETLENS_DATA_DIR=./data python -m app.main   # open http://localhost:8080 and cr
 ```
 app/scanner      nmap runner, parsing, scheduling, relations
 app/notify       notification channels (e-mail/SMTP, ntfy, Telegram, ...), quiet hours
-app/plugins      plugin system: manifest and output contract, runner, registry, service; builtin/ has the Proxmox and ASUS plugins; PLUGINS.md is the plugin guide
+app/plugins      plugin system: manifest and output contract, runner, registry, service; PLUGINS.md is the plugin guide
 app/terminal     SSH/Telnet backends
 app/api          REST API routers
 app/uptime.py    uptime history, app/backup.py  backup and restore

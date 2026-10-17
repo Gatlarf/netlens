@@ -1,23 +1,105 @@
-"""Minimal read-only client for an ASUS router's web interface (stock ASUSWRT / AiMesh; standard library only; blocking).
-
-One fetch = one login, two reads, one logout (always, even after an error), so the router never keeps a session open.
-It never retries a failed login: repeated wrong passwords make the router show a captcha or lock the login.
-"""
+"""ASUS router / AiMesh plugin: which client is connected to which mesh node (stock ASUSWRT, read-only)."""
 
 from __future__ import annotations
 
 import base64
+from dataclasses import dataclass
 import json
 import re
 import socket
 import ssl
+from typing import Any, Callable
 import urllib.error
+from urllib.parse import urlparse
 import urllib.parse
 import urllib.request
-from typing import Any, Callable
 
-from .config import AsusConfig, normalize_url
 
+# ----------------------------------------------------------------------------- diagnostic helpers
+KEEP_WORDS = {"type", "status", "state", "online", "template", "kind", "version", "release", "role", "model"}
+MAC_RE = re.compile(r"(?i)^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$")
+IPV4_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
+SAMPLES = 3
+
+
+def describe(value: Any, key: str = "") -> Any:
+    """The shape of a value: types and sizes, never the content (except a few harmless enumerations)."""
+    if isinstance(value, dict):
+        macs = [k for k in value if isinstance(k, str) and MAC_RE.match(k)]
+        out = {k: describe(v, k) for k, v in value.items() if k not in macs}
+        if macs:  # rows keyed by MAC address: the addresses are not written down, one example row is described
+            out[f"<mac> x {len(macs)}"] = describe(value[macs[0]])
+        return out
+    if isinstance(value, list):
+        return [describe(v, key) for v in value[:2]] + ([f"... {len(value)} items"] if len(value) > 2 else [])
+    if isinstance(value, bool) or value is None:
+        return value
+    if key in KEEP_WORDS and not isinstance(value, (dict, list)):
+        return value
+    if isinstance(value, (int, float)):
+        return f"<number {'negative' if value < 0 else 'positive' if value > 0 else 'zero'}, {len(str(abs(value)))} digits>"
+    if isinstance(value, str):
+        if MAC_RE.match(value):
+            return "<mac " + ("dashes" if "-" in value else "colons") + (", UPPER" if value.upper() == value and re.search("[A-F]", value) else "") + ">"
+        if IPV4_RE.match(value):
+            return "<ipv4>"
+        return f"<text {len(value)} chars>"
+    return f"<{type(value).__name__}>"
+
+
+def mask(text: str) -> str:
+    """A configuration string with its structure kept and MAC / IPv4 addresses hidden (for example `virtio=<mac>,bridge=vmbr0`)."""
+    text = re.sub(r"(?i)\b([0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b", "<mac>", text)
+    return re.sub(r"\b\d{1,3}(\.\d{1,3}){3}(/\d+)?\b", "<ipv4>", text)
+
+
+def problem(exc: Exception) -> str:
+    return type(exc).__name__ + ": " + re.sub(r"https?://\S+", "<url>", str(exc))[:300]
+
+
+def make_step(report: dict) -> Callable[[str, Callable[[], Any]], Any]:
+    """step(name, call): run one read, record its shape or its failure, return the raw value (or None)."""
+
+    def step(name: str, call: Callable[[], Any], shape: Callable[[Any], Any] = describe) -> Any:
+        try:
+            raw = call()
+        except Exception as exc:  # noqa: BLE001 - the point is to record what failed
+            report["steps"][name] = {"ok": False, "error": problem(exc)}
+            return None
+        report["steps"][name] = {"ok": True, "shape": shape(raw)}
+        return raw
+
+    return step
+
+
+# ----------------------------------------------------------------------------- configuration
+@dataclass
+class AsusConfig:
+    enabled: bool = False
+    url: str = ""
+    verify_tls: bool = False  # ASUS routers ship a self-signed certificate
+    username: str = ""
+    password: str = ""
+
+
+def normalize_url(url: str) -> str:
+    """'192.168.0.1' -> 'https://192.168.0.1:8443' (the stock HTTPS port); 'http://host' keeps port 80."""
+    url = url.strip().rstrip("/")
+    if not url:
+        return ""
+    if "://" not in url:
+        url = "https://" + url
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ValueError("invalid router address")
+    if parsed.path not in ("", "/") or parsed.query:
+        raise ValueError("enter only the router address, without a path")
+    if parsed.port is None and parsed.scheme == "https":
+        url += ":8443"
+    return url
+
+
+# ----------------------------------------------------------------------------- client
 USER_AGENT = "asusrouter-Android-DUTUtil-1.0.0.245"
 MAC_RE = re.compile(r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
 # error_status values of login.cgi that mean "stop trying" rather than "wrong password"
@@ -209,3 +291,103 @@ class AsusClient:
             return build_snapshot(clientlist, parse_onboarding(text))
         finally:
             self.logout()
+
+
+# ----------------------------------------------------------------------------- plugin entry points
+CLIENT_FACTORY = AsusClient  # replaced by tests
+
+
+def _client(config: dict):
+
+    cfg = AsusConfig(
+        url=config.get("url", ""),
+        verify_tls=bool(config.get("verify_tls", False)),
+        username=config.get("username", ""),
+        password=config.get("password", ""),
+    )
+    if not (cfg.url and cfg.username and cfg.password):
+        raise ValueError("enter the router address, username and password")
+    return CLIENT_FACTORY(cfg)
+
+
+def to_topology(snapshot: dict) -> dict:
+    """Turn the router's raw view into the plugin contract (kind 'topology')."""
+    nodes = snapshot["nodes"]
+    main = next((n for n in nodes if n["main"]), None)
+    out_nodes = []
+    for n in nodes:
+        parent = None
+        if main is not None and n is not main:
+            holder = next((p for p in nodes if p is not n and n["mac"] in p["wired_macs"]), None)  # the node it is wired to
+            parent = (holder or main)["mac"]
+        out_nodes.append({
+            "mac": n["mac"], "macs": n["macs"], "ip": n["ip"], "name": n["name"], "model": n["model"],
+            "role": "gateway" if n is main else "node", "parent_mac": parent,
+        })
+    known = {m for n in nodes for m in n["macs"]}
+    clients = []
+    for c in snapshot["clients"]:
+        node = c["node_mac"] if c["node_mac"] in known else (main["mac"] if main else None)
+        clients.append({
+            "mac": c["mac"], "ip": c["ip"], "name": c["name"], "node_mac": node,
+            "medium": "wired" if c["wired"] else "wifi", "band": c["band"],
+            "rssi": c.get("rssi"), "tx_mbps": c.get("tx_mbps"), "rx_mbps": c.get("rx_mbps"),
+            "vendor": c.get("vendor"), "device_type": "printer" if c.get("printer") else None,
+        })
+    return {"nodes": out_nodes, "clients": clients}
+
+
+def test(config: dict) -> dict:
+    snapshot = _client(config).snapshot()
+    return {"message": f"Connected: {len(snapshot['nodes'])} mesh node(s), {len(snapshot['clients'])} online client(s)"}
+
+
+def fetch(config: dict) -> dict:
+    return to_topology(_client(config).snapshot())
+
+
+def diagnose(config: dict) -> dict:
+    """What this router answers, described by field names and types (no names, addresses or MACs), for the plugin's author."""
+
+
+
+    client = _client(config)
+    report: dict = {"steps": {}}
+    step = make_step(report)
+    client.login()  # a refused login is reported as such (and stops automatic syncing), like test()
+    clientlist = onboarding = None
+    try:
+        def read_clientlist():
+            status, text = client._send("/appGet.cgi?hook=get_clientlist()")
+            if status != 200:
+                raise AsusError(f"HTTP {status}")
+            return json.loads(text)
+
+        def read_onboarding():
+            status, text = client._send("/ajax_onboarding.asp")
+            if status != 200:
+                raise AsusError(f"HTTP {status}")
+            return text
+
+        clientlist = step("clientlist", read_clientlist)
+        raw = step("onboarding", read_onboarding, lambda t: {"length": len(t), "lines": t.count("\n") + 1})
+        if raw is not None:
+            nodes = parse_onboarding(raw)
+            onboarding = nodes
+            report["steps"]["onboarding"]["nodes_parsed"] = len(nodes)
+            report["steps"]["onboarding"]["first_node"] = [describe(n) for n in nodes[:SAMPLES]]
+        if clientlist is not None and onboarding is not None:
+            snapshot = build_snapshot(clientlist, onboarding)
+            report["result"] = {
+                "nodes": len(snapshot["nodes"]), "main_nodes": sum(1 for n in snapshot["nodes"] if n["main"]),
+                "clients": len(snapshot["clients"]), "wired": sum(1 for c in snapshot["clients"] if c["wired"]),
+                "with_rssi": sum(1 for c in snapshot["clients"] if c.get("rssi") is not None), "with_rates": sum(1 for c in snapshot["clients"] if c.get("tx_mbps") is not None),
+                "with_node": sum(1 for c in snapshot["clients"] if c["node_mac"]),
+            }
+    except AsusAuthError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        report["error"] = problem(exc)
+    finally:
+        client.logout()
+    return report

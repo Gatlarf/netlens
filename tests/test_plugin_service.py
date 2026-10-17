@@ -344,8 +344,6 @@ def test_v4_database_is_migrated_to_plugins(tmp_path):
     assert state["enabled"] is True and state["config"]["servers"][0]["token_id"] == "t" and state["config"]["verify_tls"] is False
     assert get_status(conn, "proxmox")["guests"] == 1
     assert get_state(conn, discover(None)["asus"])["config"]["username"] == "u"
-    data = json.loads(get_setting(conn, "plugin.asus.data"))
-    assert data["nodes"][0]["role"] == "gateway" and data["clients"][0]["node_mac"] == MAIN
     for old in ("proxmox", "proxmox_status", "asus", "asus_status", "asus_snapshot"):
         assert get_setting(conn, old) is None
     assert {r["source"] for r in conn.execute("SELECT source FROM relations")} == {"plugin:proxmox", "plugin:asus"}

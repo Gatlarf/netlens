@@ -1,6 +1,9 @@
 import pytest
 
-from app.plugins.builtin.proxmox.config import ProxmoxConfig, has_credentials, normalize_url, uses_token
+from tests.plugin_modules import load
+
+_px = load("proxmox")
+ProxmoxConfig, has_credentials, normalize_url, uses_token = _px.ProxmoxConfig, _px.has_credentials, _px.normalize_url, _px.uses_token
 from app.plugins.matching import match_hypervisor, norm_mac, topology_links
 
 

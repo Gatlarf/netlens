@@ -285,24 +285,22 @@ def _install_plugins(conn, data_dir: Path, ids, now) -> None:
     ts = fmt(now)
 
     def state(plugin_id: str, path: Path, overrides: dict, status: dict, source: str = "index", version: str | None = None) -> None:
-        plugin = _read_plugin(path, path.parent.name == "builtin")
+        plugin = _read_plugin(path, False)
         config = default_config(plugin.manifest)
         config.update({k: v for k, v in overrides.items() if k in config})
         set_setting(conn, f"plugin.{plugin_id}", json.dumps({"enabled": True, "config": config}))
         set_setting(conn, f"plugin.{plugin_id}.status", json.dumps({"ts": ts, "ok": True, **status}))
-        if path.parent.name != "builtin":
-            set_setting(conn, f"plugin.{plugin_id}.install", json.dumps({"source": source, "version": plugin.manifest["version"], "sha256": "0" * 64, "level": None, "installed": fmt(now - timedelta(days=21))}))
+        set_setting(conn, f"plugin.{plugin_id}.install", json.dumps({"source": source, "version": plugin.manifest["version"], "sha256": "0" * 64, "level": None, "installed": fmt(now - timedelta(days=21))}))
 
     dest = data_dir / "plugins"
-    for plugin_id in ("docker", "hyperv", "npm", "snmp", "technitium", "truenas"):
+    for plugin_id in ("docker", "hyperv", "npm", "snmp", "technitium", "truenas", "proxmox", "asus"):
         target = dest / plugin_id
         if target.exists():
             shutil.rmtree(target)
         shutil.copytree(PLUGIN_DIR / plugin_id, target)
-    builtin = Path(__file__).resolve().parent.parent / "plugins" / "builtin"
-    state("proxmox", builtin / "proxmox", {"servers": [{"id": "s1", "host": f"https://{net.SUBNET}.30:8006", "token_id": "netlens@pve!demo", "token_secret": "demo-secret", "username": "", "password": ""}], "verify_tls": False},
+    state("proxmox", dest / "proxmox", {"servers": [{"id": "s1", "host": f"https://{net.SUBNET}.30:8006", "token_id": "netlens@pve!demo", "token_secret": "demo-secret", "username": "", "password": ""}], "verify_tls": False},
           {"hosts": 1, "hosts_matched": 1, "guests": 7, "guests_matched": 7, "links": 7})
-    state("asus", builtin / "asus", {"url": f"https://{net.SUBNET}.1:8443", "username": "netlens", "password": "demo-password", "verify_tls": False}, {"nodes": 4, "clients": 17, "links": 17, "samples": 10, "roams": 4})
+    state("asus", dest / "asus", {"url": f"https://{net.SUBNET}.1:8443", "username": "netlens", "password": "demo-password", "verify_tls": False}, {"nodes": 4, "clients": 17, "links": 17, "samples": 10, "roams": 4})
     state("docker", dest / "docker", {"servers": [{"id": "s1", "host": f"http://{net.SUBNET}.33:2375", "lan": ""}, {"id": "s2", "host": f"http://{net.SUBNET}.71:2375", "lan": ""}], "check_image_updates": True},
           {"hosts": 2, "hosts_matched": 2, "guests": 22, "guests_matched": 0, "links": 0})
     state("truenas", dest / "truenas", {"servers": [{"id": "s1", "host": f"https://{net.SUBNET}.31", "api_key": "demo-key"}]}, {"hosts": 1, "hosts_matched": 1, "guests": 3, "guests_matched": 0, "links": 0})

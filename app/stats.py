@@ -15,7 +15,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app import containers, guestbackups, sites, speedtest
+from app import containers, guestbackups, inventory, sites, speedtest
 from app.db import get_setting, utcnow
 from app.hierarchy import children_map, load_hierarchy
 from app.version import VERSION
@@ -608,6 +608,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "guests": {k: guest_numbers[k] for k in ("total", "running", "stopped", "hosts", "by_kind", "update_available", "image_updates", "old_images")},
         "sites": sites.summary(conn),
         "guest_backups": guestbackups.summary(conn),
+        "smarthome": inventory.summary(conn),
         "health": health,
         "remote_sites": _remote_sites(conn),
         "speed": speedtest.summary(conn, now),

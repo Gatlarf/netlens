@@ -3,8 +3,10 @@ import urllib.parse
 
 import pytest
 
-from app.plugins.builtin.proxmox.client import ProxmoxClient, ProxmoxError, parse_net
-from app.plugins.builtin.proxmox.config import ProxmoxConfig
+from tests.plugin_modules import load
+
+_px = load("proxmox")
+ProxmoxClient, ProxmoxError, parse_net, ProxmoxConfig = _px.ProxmoxClient, _px.ProxmoxError, _px.parse_net, _px.ProxmoxConfig
 
 # Synthetic data shaped like real Proxmox VE 9 responses (documentation addresses only).
 DATA = {

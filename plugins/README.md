@@ -5,6 +5,9 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 
 | Folder | Plugin | Reads | Status |
 |---|---|---|---|
+| [`proxmox/`](proxmox/README.md) | Proxmox VE | VMs and containers and the host each runs on (a `hypervisor` plugin; was built into Netlens before 0.4.44) | in daily use on the maintainer's cluster |
+| [`asus/`](asus/README.md) | ASUS router (AiMesh) | which device is connected to which AiMesh node, with Wi-Fi signal and roaming (a `topology` plugin; was built in before 0.4.44) | tested on an ASUS RT-AX92U |
+| [`homeassistant/`](homeassistant/README.md) | Home Assistant | the device registry: area, model, battery, availability (an `inventory` plugin) | tested on a real Home Assistant 2026.7.1 |
 | [`omada/`](omada/README.md) | TP-Link Omada | Omada controller 5.1 or newer: gateway, switches, access points, clients | written from the public API, **testing started** (1.0.1 fixes a first controller error) |
 | [`unifi/`](unifi/README.md) | Ubiquiti UniFi | UniFi Network on a UniFi OS console or a classic controller | written from the public API, **not yet tested on hardware** |
 | [`snmp/`](snmp/README.md) | SNMP switches | managed switches over SNMP v1/v2c: the MAC address table (which device is on which port) and LLDP (how the switches are connected) | verified against a real device |

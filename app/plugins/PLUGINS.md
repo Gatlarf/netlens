@@ -5,9 +5,9 @@ Netlens can learn about your network from other systems through **plugins**. A p
 
 | Kind | Reports | Examples |
 | :--- | :--- | :--- |
-| `hypervisor` | hosts, and the VMs/containers that run on them | Proxmox VE (built in), ESXi, Hyper-V, libvirt |
+| `hypervisor` | hosts, and the VMs/containers that run on them | Proxmox VE, ESXi, Hyper-V, libvirt |
 | `dns` | a DNS server that Netlens writes device names and addresses to | Technitium DNS (more welcome: BIND with RFC 2136, Pi-hole, AdGuard Home, dnsmasq) |
-| `topology` | network nodes (router, switch, access point, mesh node) and the clients connected to them | ASUS AiMesh (built in), Omada, UniFi, Fritz!Box, MikroTik |
+| `topology` | network nodes (router, switch, access point, mesh node) and the clients connected to them | ASUS AiMesh, Omada, UniFi, Fritz!Box, MikroTik |
 | `proxy` | a reverse proxy and the sites it publishes (domain → upstream host and port, certificate) | Nginx Proxy Manager (more welcome: Traefik, Caddy, HAProxy) |
 | `backup` | a backup server: what is backed up (per guest), how old, whether it worked, and how full its stores are | Proxmox Backup Server |
 
@@ -44,9 +44,8 @@ my-router/            (the folder is optional)
 - Limits: zip at most 2 MB, 8 MB unpacked, 200 files.
 - File names: letters, digits, `_`, `-`, `.` and spaces. No hidden files, links or paths containing `..`.
 - Uploading **never runs** the code. `plugin.py` is only checked for syntax and for the two required functions.
-- The `id` must not be the id of a built-in plugin (`proxmox`, `asus`).
 - Uploaded plugins are stored in the data volume (`<data dir>/plugins/<id>/`) and survive container updates.
-- Built-in plugins cannot be removed, only switched off. An uploaded plugin can be removed (this deletes its files and settings).
+- Any plugin can be removed (this deletes its files and settings).
 
 ## plugin.json reference
 
@@ -464,7 +463,7 @@ user and could read the data volume, which holds the database with saved credent
 
 | Message | What to do |
 | :--- | :--- |
-| `plugin.json: ...` / `... is the id of a built-in plugin` | Fix the manifest as the message says; choose another id. |
+| `plugin.json: ...` / `...` | Fix the manifest as the message says; choose another id. |
 | `plugin.py must define a top-level function test(config)` | Define both `test(config)` and `fetch(config)`, not `async`. |
 | `the plugin did not answer within N seconds` | Make the plugin faster, or raise `timeout` (max 600). |
 | `the plugin crashed (...)` | Run the code outside Netlens and look at the traceback; remember only the standard library is available. |

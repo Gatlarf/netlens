@@ -117,6 +117,11 @@ def resolve(conn: sqlite3.Connection, manifest: dict, status: dict | None) -> li
         if total:
             base += [{"label": "Backed up", "value": total, "format": "number", "tone": None},
                      {"label": "Failed or late", "value": _count(conn, plugin_id, "targets", {"last_state": ["failed"]}) + _count(conn, plugin_id, "targets", {"stale": [1]}), "format": "number", "tone": "warn"}]
+    if manifest["kind"] == "inventory":
+        total = conn.execute("SELECT COUNT(*) FROM inventory_devices WHERE plugin_id = ?", (plugin_id,)).fetchone()[0]
+        if total:
+            gone = conn.execute("SELECT COUNT(*) FROM inventory_devices WHERE plugin_id = ? AND available = 0", (plugin_id,)).fetchone()[0]
+            base += [{"label": "Devices", "value": total, "format": "number", "tone": None}, {"label": "Unavailable", "value": gone, "format": "number", "tone": "warn" if gone else None}]
     if manifest["kind"] == "proxy":
         total = _count(conn, plugin_id, "sites", {})
         if total:

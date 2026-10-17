@@ -486,6 +486,13 @@ def _housekeeping_checks(conn, data_dir=None) -> None:
     except Exception:  # noqa: BLE001
         log.debug("licence check failed", exc_info=True)
     try:
+        from app.plugins import moved
+
+        if data_dir is not None:
+            moved.run(conn, data_dir)
+    except Exception:  # noqa: BLE001 - offline is normal; it is tried again in an hour
+        log.debug("installing the plugins that moved out of Netlens failed", exc_info=True)
+    try:
         autoupdate.note_version(conn)
         if data_dir is not None:
             autoupdate.run(conn, data_dir)

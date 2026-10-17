@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 26
+SCHEMA_VERSION = 27
 
 
 def utcnow() -> str:
@@ -105,14 +105,6 @@ def _migrate_to_plugins(conn: sqlite3.Connection) -> None:
         status = load("asus_status")
         if status is not None:
             put("plugin.asus.status", status)
-        snapshot = load("asus_snapshot")
-        if snapshot is not None:
-            try:
-                from app.plugins.builtin.asus.plugin import to_topology
-
-                put("plugin.asus.data", to_topology(snapshot))
-            except Exception:  # noqa: BLE001 - the next sync rebuilds it
-                pass
     for key in ("asus", "asus_status", "asus_snapshot"):
         conn.execute("DELETE FROM settings WHERE key = ?", (key,))
 
@@ -168,6 +160,19 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+
+    # smart-home hubs (kind "inventory", see app/inventory.py)
+    cur.execute("CREATE TABLE IF NOT EXISTS inventory_servers (plugin_id TEXT NOT NULL, server_id TEXT NOT NULL, name TEXT NOT NULL, ip TEXT, version TEXT, online INTEGER NOT NULL DEFAULT 1, warnings TEXT NOT NULL DEFAULT '[]', PRIMARY KEY (plugin_id, server_id))")
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS inventory_devices (
+            plugin_id TEXT NOT NULL, dev_id TEXT NOT NULL, server_id TEXT NOT NULL, name TEXT NOT NULL, manufacturer TEXT, model TEXT, area TEXT, sw TEXT, protocol TEXT,
+            mac TEXT, ip TEXT, via_id TEXT, available INTEGER NOT NULL DEFAULT 1, battery INTEGER, battery_low INTEGER NOT NULL DEFAULT 0, update_available INTEGER NOT NULL DEFAULT 0,
+            url TEXT, entities INTEGER, device_id INTEGER, unavailable_since TEXT, PRIMARY KEY (plugin_id, dev_id)
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_inventory_devices_device ON inventory_devices(device_id)")
 
     # IPv6 addresses of the devices (optional feature, see app/scanner/ipv6.py)
     cur.execute(
