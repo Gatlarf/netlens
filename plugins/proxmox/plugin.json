@@ -1,12 +1,12 @@
 {
   "id": "proxmox",
   "name": "Proxmox VE",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "api_version": 1,
   "diagnose": true,
   "kind": "hypervisor",
   "author": "Netlens",
-  "description": "Reads your Proxmox VMs and containers so the map and device pages show which devices run on which Proxmox host. Read-only.",
+  "description": "Reads your Proxmox VMs and containers so the map and device pages show which devices run on which Proxmox host. Read-only, unless you let auto-remediation restart a guest (then the token also needs the VM.PowerMgmt privilege).",
   "timeout": 120,
   "config": [
     {
@@ -103,5 +103,11 @@
         }
       ]
     }
+  ],
+  "power": [
+    "reset",
+    "reboot",
+    "shutdown",
+    "start"
   ]
 }

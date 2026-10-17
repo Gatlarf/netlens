@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.50 — 2026-10-17
+
+### Added
+- ★ **Restart a virtual machine** (Monitoring → Remediation, "Do this"): a rule can hard-reset, restart, shut down or start the virtual machine a device is, through the hypervisor plugin that reported it (Proxmox first; the plugin's token needs the VM.PowerMgmt privilege). Meant for a guest that freezes while it still answers ping: a service check notices, the rule resets it, with the usual cooldown and daily limit.
+
 ## 0.4.49 — 2026-10-17
 
 ### Fixed

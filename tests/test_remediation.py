@@ -353,3 +353,46 @@ def test_the_ssh_action_runs_the_command_with_the_login_of_the_host_monitor(conn
         loop.call_soon_threadsafe(server.close)
         loop.call_soon_threadsafe(loop.stop)
         thread.join(timeout=5)
+
+
+# ----------------------------------------------------------------------------- restarting a virtual machine
+def _vm_setup(conn, monkeypatch, power=("reset", "reboot")):
+    from pathlib import Path
+
+    from app.plugins import registry
+
+    plugin = registry.Plugin("proxmox", Path("."), False, {"name": "Proxmox VE", "power": list(power), "config": []})
+    monkeypatch.setattr(registry, "discover", lambda data_dir: {"proxmox": plugin})
+    conn.execute("INSERT INTO hypervisor_guests (plugin_id, guest_id, name, kind, host_name, status, device_id, updated) VALUES ('proxmox', '104', 'blueiris', 'qemu', 'pve1', 'running', 1, '2026-10-01T00:00:00Z')")
+    conn.commit()
+    calls = []
+    monkeypatch.setattr(remediation, "POWER_RUNNER", lambda plugin, action, config, payload=None: calls.append((action, payload)) or {"message": "reset sent to blueiris"})
+    return calls
+
+
+def test_a_vm_rule_resets_the_guest_through_the_plugin(conn, monkeypatch):
+    calls = _vm_setup(conn, monkeypatch)
+    r = rule(conn, action={"type": "vm", "power": "reset"}, kinds=["service_down"])
+    assert r["action"]["type"] == "vm" and r["action"]["power"] == "reset"
+    event(conn)
+    for run_id in remediation.plan(conn, NOW):
+        remediation.execute(conn, run_id, now=NOW)
+    run = [x for x in remediation.recent_runs(conn) if x["rule_id"] == r["id"]][0]
+    assert run["state"] == "ok" and run["result"] == "reset sent to blueiris"
+    assert calls == [("power", {"guest_id": "104", "host": "pve1", "name": "blueiris", "kind": "qemu", "action": "reset"})]
+
+
+def test_a_vm_rule_explains_why_it_cannot_run(conn, monkeypatch):
+    with pytest.raises(remediation.RuleError):
+        rule(conn, action={"type": "vm", "power": "format"})
+    _vm_setup(conn, monkeypatch, power=("reboot",))
+    r = rule(conn, action={"type": "vm", "power": "reset"}, mode="ask")
+    event(conn)
+    remediation.plan(conn, NOW)
+    run = [x for x in remediation.recent_runs(conn) if x["rule_id"] == r["id"]][0]
+    remediation.decide(conn, run["id"], True, "me", NOW)
+    assert "cannot do a hard reset" in remediation._run(conn, run["id"])["result"]
+    conn.execute("DELETE FROM hypervisor_guests")
+    conn.commit()
+    remediation.execute(conn, run["id"], now=NOW)
+    assert "no hypervisor plugin" in remediation._run(conn, run["id"])["result"]

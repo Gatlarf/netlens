@@ -50,6 +50,8 @@ class FakeTransport:
         self.calls.append((method, path, dict(headers), body))
         if path == "/access/ticket":
             return 200, json.dumps({"data": {"ticket": "PVE:ticket", "CSRFPreventionToken": "x"}}).encode()
+        if method == "POST" and "/status/" in path and path not in self.status_for:
+            return 200, b'{"data":"UPID:pve1:0001"}'
         if path in self.status_for:
             return self.status_for[path], b'{"data":null}'
         if path in self.data:
@@ -136,3 +138,49 @@ def test_per_guest_failures_do_not_break_the_inventory():
     t = FakeTransport(status_for={"/nodes/pve1/lxc/102/interfaces": 500, "/nodes/pve1/qemu/101/config": 403})
     inv = ProxmoxClient(_token_cfg(), transport=t).inventory()
     assert len(inv["guests"]) == 4
+
+
+# ----------------------------------------------------------------------------- power (auto-remediation)
+def _power_with(monkeypatch, status_for=None, config=None):
+    fake = FakeTransport(status_for=status_for)
+    monkeypatch.setattr(_px, "CLIENT_FACTORY", lambda cfg: ProxmoxClient(cfg, transport=fake))
+    cfg = config or {"servers": [{"host": "https://pve.test:8006", "token_id": "u@pam!nl", "token_secret": "S"}]}
+    return fake, cfg
+
+
+def test_power_reset_posts_to_the_guest(monkeypatch):
+    fake, cfg = _power_with(monkeypatch)
+    out = _px.power(cfg, {"guest_id": "100", "host": "pve1", "action": "reset"})
+    assert "reset sent to winvm" in out["message"]
+    method, path, headers, body = fake.calls[-1]
+    assert (method, path) == ("POST", "/nodes/pve1/qemu/100/status/reset") and headers["Authorization"].startswith("PVEAPIToken=u@pam!nl=") and body == b""
+
+
+def test_power_container_reset_becomes_reboot_and_shutdown_is_forced_later(monkeypatch):
+    fake, cfg = _power_with(monkeypatch)
+    _px.power(cfg, {"guest_id": "102", "host": "pve1", "action": "reset"})
+    assert fake.calls[-1][1] == "/nodes/pve1/lxc/102/status/reboot"
+    _px.power(cfg, {"guest_id": "100", "host": "pve1", "action": "shutdown"})
+    assert fake.calls[-1][1] == "/nodes/pve1/qemu/100/status/shutdown" and b"forceStop=1" in fake.calls[-1][3]
+
+
+def test_power_start_of_a_running_guest_does_nothing(monkeypatch):
+    fake, cfg = _power_with(monkeypatch)
+    assert "already running" in _px.power(cfg, {"guest_id": "100", "host": "pve1", "action": "start"})["message"]
+    assert not [c for c in fake.calls if c[0] == "POST"]
+
+
+def test_power_reports_missing_rights_and_unknown_guests(monkeypatch):
+    fake, cfg = _power_with(monkeypatch, status_for={"/nodes/pve1/qemu/100/status/reset": 403})
+    with pytest.raises(ProxmoxError, match="VM.PowerMgmt"):
+        _px.power(cfg, {"guest_id": "100", "host": "pve1", "action": "reset"})
+    with pytest.raises(ProxmoxError, match="not found"):
+        _px.power(cfg, {"guest_id": "555", "host": "pve1", "action": "reset"})
+    with pytest.raises(ValueError):
+        _px.power(cfg, {"guest_id": "100", "host": "pve1", "action": "format"})
+
+
+def test_power_with_a_password_login_sends_the_csrf_token(monkeypatch):
+    fake, cfg = _power_with(monkeypatch, config={"servers": [{"host": "https://pve.test:8006", "username": "root@pam", "password": "p"}]})
+    _px.power(cfg, {"guest_id": "100", "host": "pve1", "action": "reboot"})
+    assert fake.calls[-1][2]["CSRFPreventionToken"] == "x" and "PVEAuthCookie" in fake.calls[-1][2]["Cookie"]

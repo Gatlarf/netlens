@@ -102,7 +102,7 @@ def build_context(conn: sqlite3.Connection, run_id: int) -> dict[str, Any]:
                            for r in conn.execute("SELECT name, kind, last_up, last_detail FROM service_checks WHERE enabled = 1 AND device_id = ? LIMIT 15", (device["id"],))]
         ctx["earlier_fixes"] = [{"rule": r["rule_name"], "at": r["created"], "result": r["state"], "recovered": bool(r["recovered"])}
                                 for r in conn.execute("SELECT * FROM remediation_runs WHERE device_id = ? AND id != ? AND state IN ('ok', 'failed') ORDER BY id DESC LIMIT 8", (device["id"], run_id))]
-    ctx["rules"] = [{"id": r["id"], "name": r["name"], "does": {"wake": "wake the device (Wake-on-LAN)", "webhook": "call a web address (an automation)", "ssh": "run a fixed command on the device over SSH"}[r["action"]["type"]],
+    ctx["rules"] = [{"id": r["id"], "name": r["name"], "does": {"wake": "wake the device (Wake-on-LAN)", "webhook": "call a web address (an automation)", "ssh": "run a fixed command on the device over SSH", "vm": "restart the virtual machine through its hypervisor"}[r["action"]["type"]],
                      "for_events": r["kinds"]} for r in remediation.list_rules(conn) if r["enabled"]]
     return ctx
 

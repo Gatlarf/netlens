@@ -160,6 +160,7 @@ class ProxmoxClient:
         self.timeout = timeout
         self._transport = transport or self._urllib_transport
         self._ticket: str | None = None
+        self._csrf = ""
 
     # -- transport ---------------------------------------------------------
     def _urllib_transport(self, method: str, url: str, headers: dict, data: bytes | None) -> tuple[int, bytes]:
@@ -203,7 +204,8 @@ class ProxmoxClient:
             if not isinstance(data, dict) or not data.get("ticket"):
                 raise ProxmoxError("authentication failed (no ticket returned)")
             self._ticket = data["ticket"]
-        return {"Cookie": f"PVEAuthCookie={self._ticket}"}
+            self._csrf = data.get("CSRFPreventionToken") or ""
+        return {"Cookie": f"PVEAuthCookie={self._ticket}", "CSRFPreventionToken": self._csrf}
 
     @staticmethod
     def _decode(status: int, raw: bytes) -> Any:
@@ -220,6 +222,15 @@ class ProxmoxClient:
             raise ProxmoxError("authentication failed (check the credentials or API token)")
         if status == 403:
             raise ProxmoxError("permission denied (the account needs at least the PVEAuditor role)")
+        return self._decode(status, raw)
+
+    def post(self, path: str, fields: dict) -> Any:
+        headers = {**self._auth_headers(), "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"}
+        status, raw = self._transport("POST", self.base + path, headers, urllib.parse.urlencode(fields).encode())
+        if status == 401:
+            raise ProxmoxError("authentication failed (check the credentials or API token)")
+        if status == 403:
+            raise ProxmoxError("permission denied (the token needs the VM.PowerMgmt privilege, for example the PVEVMAdmin role on the guest, and 'Privilege Separation' off or the role given to the token too)")
         return self._decode(status, raw)
 
     def _try(self, path: str) -> Any:
@@ -453,3 +464,32 @@ def diagnose(config: dict) -> dict:
     except Exception as exc:  # noqa: BLE001
         report["error"] = problem(exc)
     return report
+
+
+def power(config: dict, payload: dict) -> dict:
+    """Reset, reboot, shut down or start one guest. payload: {"guest_id": "101", "host": "pve1", "action": "reset"}. Does not wait for the task to end."""
+    action = payload.get("action")
+    if action not in ("reset", "reboot", "shutdown", "start"):
+        raise ValueError(f"unknown action {action!r}")
+    vmid = str(payload.get("guest_id") or "").split("/")[-1]
+    node = payload.get("host") or ""
+    if not vmid.isdigit():
+        raise ValueError("this guest has no Proxmox number")
+    problems = []
+    for one in _servers(config):
+        client = _client(one)
+        try:
+            found = [g for g in client.get("/cluster/resources?type=vm") if str(g.get("vmid")) == vmid and g.get("type") in ("qemu", "lxc") and (not node or g.get("node") == node)]
+        except ProxmoxError as exc:
+            problems.append(str(exc))
+            continue
+        if not found:
+            continue
+        guest = found[0]
+        if action == "start" and guest.get("status") == "running":
+            return {"message": f"{guest.get('name') or vmid} is already running"}
+        verb = "reboot" if action == "reset" and guest["type"] == "lxc" else action      # a container has no reset button
+        fields = {"timeout": "60", "forceStop": "1"} if verb == "shutdown" else {}
+        client.post(f"/nodes/{guest['node']}/{guest['type']}/{int(guest['vmid'])}/status/{verb}", fields)
+        return {"message": f"{verb} sent to {guest.get('name') or vmid} on {guest['node']}"}
+    raise ProxmoxError(problems[0] if problems else f"guest {vmid} was not found on any configured Proxmox server")

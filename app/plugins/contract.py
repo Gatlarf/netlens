@@ -111,6 +111,23 @@ def _id(value: Any, path: str) -> str:
     return text
 
 
+POWER_ACTIONS = ("reset", "reboot", "shutdown", "start")
+
+
+def _power(value: Any, kind: str) -> list[str]:
+    """A hypervisor plugin that has power(config, {"guest": ..., "action": ...}) lists what it can do to a guest: `reset` (the hard
+    reset button), `reboot` (a clean restart), `shutdown` (a clean power off) and `start`."""
+    if value is None:
+        return []
+    if kind != "hypervisor":
+        _fail("power", "only a hypervisor plugin has power actions")
+    items = _list(value, "power")
+    for item in items:
+        if item not in POWER_ACTIONS:
+            _fail("power", f"{item!r} is not one of {', '.join(POWER_ACTIONS)}")
+    return [a for a in POWER_ACTIONS if a in items]
+
+
 def _capabilities(value: Any, kind: str) -> list[str]:
     """DNS plugins say what the server can do: `marker` (a comment on each record, so Netlens can tell its own records
     from others) and `delete` (it can remove records)."""
@@ -337,6 +354,7 @@ def validate_manifest(data: Any) -> dict:
         "timeout": timeout,
         "diagnose": bool(data.get("diagnose", False)),  # the plugin has diagnose(config): a report for its author
         "capabilities": _capabilities(data.get("capabilities"), kind),
+        "power": _power(data.get("power"), kind),
         "info": _info(data.get("info")),
         "dashboard": _dashboard(data.get("dashboard")),
         "config": fields,

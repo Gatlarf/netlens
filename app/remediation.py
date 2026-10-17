@@ -33,7 +33,8 @@ from app.db import add_event, get_setting, set_setting, utcnow
 
 log = logging.getLogger(__name__)
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
-ACTIONS = ("wake", "webhook", "ssh")
+ACTIONS = ("wake", "webhook", "ssh", "vm")
+POWER = {"reset": "hard reset", "reboot": "clean restart", "shutdown": "clean shutdown", "start": "start"}
 MODES = ("suggest", "ask", "auto", "engineer")
 CURSOR = "remediation.cursor"
 PAUSED = "remediation.paused"
@@ -116,6 +117,11 @@ def clean_rule(conn: sqlite3.Connection, data: dict, current: dict | None = None
             secret["header_value"] = _text(action["header_value"], "the header value", 500)
         elif not out["header_name"]:
             secret.pop("header_value", None)
+    elif kind == "vm":
+        power = str(action.get("power") or "reset")
+        if power not in POWER:
+            raise RuleError("the power action is " + ", ".join(POWER))
+        out = {"type": "vm", "power": power}
     else:
         command = _text(action.get("command"), "the command", 500, True)
         if "\n" in command or "\r" in command:
@@ -243,7 +249,34 @@ def run_ssh(conn: sqlite3.Connection, rule: dict, run: dict) -> str:
     return "done" + (f": {text}" if text else "")
 
 
-RUNNERS: dict[str, Callable[[sqlite3.Connection, dict, dict], str]] = {"wake": run_wake, "webhook": run_webhook, "ssh": run_ssh}
+POWER_RUNNER = None        # replaced by tests: (plugin, "power", config, payload=...)
+
+
+def run_vm(conn: sqlite3.Connection, rule: dict, run: dict) -> str:
+    """Reset, restart, shut down or start the virtual machine this device is, through the hypervisor plugin that reported it."""
+    from pathlib import Path
+
+    from app.plugins.registry import discover
+    from app.plugins.runner import run_subprocess
+    from app.plugins.service import get_state
+
+    device_id = rule.get("device_id") or run.get("device_id")
+    guest = conn.execute("SELECT * FROM hypervisor_guests WHERE device_id = ? ORDER BY updated DESC LIMIT 1", (device_id,)).fetchone() if device_id else None
+    if guest is None:
+        raise RuntimeError("no hypervisor plugin has reported this device as a virtual machine (install the plugin of its hypervisor and let it sync)")
+    plugin = discover(Path(conn.execute("PRAGMA database_list").fetchone()[2]).parent).get(guest["plugin_id"])
+    power = rule["action"]["power"]
+    if plugin is None or plugin.manifest is None:
+        raise RuntimeError(f"the plugin {guest['plugin_id']} is not available")
+    if power not in plugin.manifest.get("power", []):
+        raise RuntimeError(f"the plugin {plugin.name} cannot do a {POWER[power]} (update it to a newer version)")
+    payload = {"guest_id": guest["guest_id"], "host": guest["host_name"], "name": guest["name"], "kind": guest["kind"], "action": power}
+    out = (POWER_RUNNER or run_subprocess)(plugin, "power", get_state(conn, plugin)["config"], payload=payload)
+    message = out.get("message") if isinstance(out, dict) else None
+    return str(message or f"{POWER[power]} sent to {guest['name']}")[:300]
+
+
+RUNNERS: dict[str, Callable[[sqlite3.Connection, dict, dict], str]] = {"wake": run_wake, "webhook": run_webhook, "ssh": run_ssh, "vm": run_vm}
 
 
 def execute(conn: sqlite3.Connection, run_id: int, runners: dict | None = None, now: datetime | None = None) -> dict:

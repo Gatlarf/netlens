@@ -7,7 +7,8 @@ const MODE_TEXT = {
   auto: "Automatic: do it at once",
   engineer: "Engineer: do it when the digital engineer is sure, otherwise ask me",
 };
-const ACTION_TEXT = { wake: "Wake the device (Wake-on-LAN)", webhook: "Call a web address (an automation)", ssh: "Run one command on the device over SSH" };
+const ACTION_TEXT = { wake: "Wake the device (Wake-on-LAN)", webhook: "Call a web address (an automation)", ssh: "Run one command on the device over SSH", vm: "Restart the virtual machine (through its hypervisor)" };
+const POWER_TEXT = { reset: "Hard reset (the reset button)", reboot: "Clean restart (the guest is asked)", shutdown: "Clean shutdown", start: "Start it" };
 const PRESETS = [
   ["", "Choose a ready-made command…"],
   ["sudo systemctl restart SERVICE", "Restart a Linux service"],
@@ -63,14 +64,16 @@ export async function render(container) {
     const hookBox = h("div", {}, h("div", { class: "field" }, h("label", {}, "Web address"), url), h("div", { class: "field" }, h("label", {}, "Method"), method),
       h("div", { class: "field" }, h("label", {}, "Body"), bodyText, h("p", { class: "hint" }, "You can use {device}, {ip}, {event} and {detail}.")), h("div", { class: "field" }, h("label", {}, "Header"), headerName, headerValue));
     const wakeBox = h("p", { class: "hint" }, "Sends a Wake-on-LAN packet to the device the event is about (it needs a MAC address).");
-    function showType() { sshBox.hidden = type.value !== "ssh"; hookBox.hidden = type.value !== "webhook"; wakeBox.hidden = type.value !== "wake"; }
+    const power = h("select", {}, ...Object.entries(POWER_TEXT).map(([v, l]) => h("option", { value: v, selected: (r.action.power || "reset") === v }, l)));
+    const vmBox = h("div", { class: "field" }, h("label", {}, "Power action"), power, h("p", { class: "hint" }, "For a device that is a virtual machine reported by a hypervisor plugin (Proxmox, Hyper-V, ...). Netlens finds the machine itself. The plugin's token needs the right to power guests on and off; the plugin's page says which."));
+    function showType() { vmBox.hidden = type.value !== "vm"; sshBox.hidden = type.value !== "ssh"; hookBox.hidden = type.value !== "webhook"; wakeBox.hidden = type.value !== "wake"; }
     type.addEventListener("change", showType);
     showType();
     const save = h("button", { class: "btn primary", type: "submit" }, "Save the rule");
     return h("form", { class: "card edit-form", onsubmit: async (e) => {
       e.preventDefault();
       const action = type.value === "ssh" ? { type: "ssh", command: command.value } : type.value === "webhook"
-        ? { type: "webhook", url: url.value, method: method.value, body: bodyText.value, header_name: headerName.value, ...(headerValue.value ? { header_value: headerValue.value } : {}) } : { type: "wake" };
+        ? { type: "webhook", url: url.value, method: method.value, body: bodyText.value, header_name: headerName.value, ...(headerValue.value ? { header_value: headerValue.value } : {}) } : type.value === "vm" ? { type: "vm", power: power.value } : { type: "wake" };
       const payload = { name: name.value, kinds: [...kinds.selectedOptions].map((o) => o.value), device_id: device.value ? Number(device.value) : null, match_text: match.value, action, mode: mode.value,
         cooldown_min: Number(cooldown.value), max_per_day: Number(perDay.value), enabled: enabled.checked };
       save.disabled = true;
@@ -82,7 +85,7 @@ export async function render(container) {
     h("div", { class: "field" }, h("label", {}, "Name"), name),
     h("div", { class: "field" }, h("label", {}, "When this happens"), kinds, h("p", { class: "hint" }, "Hold Ctrl (or Cmd) to choose several.")),
     h("div", { class: "field" }, h("label", {}, "On"), device), h("div", { class: "field" }, h("label", {}, "Message contains"), match),
-    h("div", { class: "field" }, h("label", {}, "Do this"), type), sshBox, hookBox, wakeBox,
+    h("div", { class: "field" }, h("label", {}, "Do this"), type), sshBox, hookBox, wakeBox, vmBox,
     h("div", { class: "field" }, h("label", {}, "How"), mode), h("div", { class: "field" }, h("label", {}, "At most once every (minutes)"), cooldown), h("div", { class: "field" }, h("label", {}, "At most per day"), perDay),
     h("label", { class: "check" }, enabled, " Rule is on"),
     h("div", { class: "form-actions" }, save, h("button", { class: "btn", type: "button", onclick: () => { formOpen = false; editing = null; draw(); } }, "Cancel")));
