@@ -111,7 +111,7 @@ def chat(conn: sqlite3.Connection, messages: list[dict], timeout: float = 90.0) 
     cfg = settings(conn)
     if not cfg["url"] or not cfg["model"]:
         raise EngineerError("set the address and the model of the language model first (Settings → Digital engineer)")
-    body = json.dumps({"model": cfg["model"], "messages": messages, "temperature": 0.1, "max_tokens": 900}).encode()
+    body = json.dumps({"model": cfg["model"], "messages": messages, "temperature": 0.1, "max_tokens": 6000}).encode()
     request = urllib.request.Request(cfg["url"] + "/chat/completions", data=body, method="POST", headers={"Content-Type": "application/json", "User-Agent": "Netlens-engineer"})
     key = get_setting(conn, "engineer.api_key")
     if key:
@@ -119,7 +119,10 @@ def chat(conn: sqlite3.Connection, messages: list[dict], timeout: float = 90.0) 
     try:
         with urllib.request.urlopen(request, timeout=timeout) as resp:        # noqa: S310 - the address is the administrator's own setting
             doc = json.loads(resp.read(2_000_000).decode("utf-8", "replace"))
-        return str(doc["choices"][0]["message"]["content"])
+        text = str(doc["choices"][0]["message"].get("content") or "")
+        if not text.strip():                  # a model that thinks first can use up its allowance before it answers
+            raise EngineerError("the language model gave no answer (it may have run out of room while thinking)")
+        return text
     except urllib.error.HTTPError as exc:
         raise EngineerError(f"the language model answered HTTP {exc.code}") from None
     except (urllib.error.URLError, OSError) as exc:
