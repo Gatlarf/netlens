@@ -52,7 +52,7 @@ class ScanManager:
     ) -> None:
         # Async callables f(db_path) run after every successful scan; failures never fail the scan.
         self.plugin_runner = None  # tests replace the subprocess runner of the plugins
-        self.after_scan = [self._plugins_after_scan, self._stats_after_scan, self._netchecks_after_scan, process_channels] if after_scan is None else list(after_scan)
+        self.after_scan = [self._plugins_after_scan, self._ipv6_after_scan, self._stats_after_scan, self._netchecks_after_scan, process_channels] if after_scan is None else list(after_scan)
         self.db_path = db_path
         self.settings = settings
         self.runner = runner
@@ -195,6 +195,11 @@ class ScanManager:
 
     async def _plugins_after_scan(self, db_path: str) -> None:
         await PluginService(db_path, self.settings.data_dir, self.plugin_runner).after_scan()
+
+    async def _ipv6_after_scan(self, db_path: str) -> None:
+        from app.scanner import ipv6
+
+        await ipv6.after_scan(db_path)
 
     async def _netchecks_after_scan(self, db_path: str) -> None:
         from app import netchecks

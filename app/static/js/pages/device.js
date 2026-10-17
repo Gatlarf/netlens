@@ -548,6 +548,17 @@ function buildNamesCard(device) {
     card.appendChild(h("p", {}, "No IP history"));
   }
 
+  const v6 = device.ipv6 || [];
+  if (v6.length > 0) {
+    card.appendChild(h("h3", {}, "IPv6 addresses"));
+    const SCOPE = { global: "global", ula: "private (ULA)", link: "link-local" };
+    const list = h("ul", { class: "ip-list" });
+    for (const a of v6) {
+      list.appendChild(h("li", {}, h("span", { class: "mono" }, a.ip), h("span", { class: "hint" }, ` ${SCOPE[a.scope] || a.scope}`), h("span", { class: "ip-seen" }, fmtTime(a.last_seen))));
+    }
+    card.appendChild(list);
+  }
+
   return card;
 }
 

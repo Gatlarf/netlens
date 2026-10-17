@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 25
+SCHEMA_VERSION = 26
 
 
 def utcnow() -> str:
@@ -165,6 +165,20 @@ def init_db(conn: sqlite3.Connection) -> None:
             pos_x REAL,
             pos_y REAL,
             raw_xml TEXT
+        )
+        """
+    )
+
+    # IPv6 addresses of the devices (optional feature, see app/scanner/ipv6.py)
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS device_ipv6 (
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            ip TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            first_seen TEXT NOT NULL,
+            last_seen TEXT NOT NULL,
+            UNIQUE(device_id, ip)
         )
         """
     )

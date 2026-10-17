@@ -1,3 +1,4 @@
+from app.db import utcnow
 """The DNS feature through Netlens' API, with the real Technitium plugin (its own process) talking to a simulated server."""
 
 import json
@@ -35,7 +36,7 @@ def env(tmp_path):
                 ("printer", "192.168.0.30", "printer", {}), ("stranger", "192.168.0.99", "evil", {"trusted": 0}),
             ):
                 d = get_or_create_device(conn, f"02:00:00:00:00:{len(ids) + 1:02x}", ip)
-                conn.execute("UPDATE devices SET hostname = ?, trusted = ?, os_name = ?, last_seen = ? WHERE id = ?", (host, extra.get("trusted", 1), extra.get("os_name"), "2026-10-10T11:00:00Z", d))
+                conn.execute("UPDATE devices SET hostname = ?, trusted = ?, os_name = ?, last_seen = ? WHERE id = ?", (host, extra.get("trusted", 1), extra.get("os_name"), utcnow(), d))
                 ids[key] = d
             conn.commit()
             conn.close()
