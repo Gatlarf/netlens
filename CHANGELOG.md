@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.55 — 2026-10-17
+
+### Fixed
+- **Insights without a language model**: a question the ready-made answers do not cover (for example "which device has the highest average response time?") got the status overview as its answer. Response times are now a ready-made question, and an unrecognised question says that it cannot be answered without a model instead of answering something else.
+
 ## 0.4.54 — 2026-10-17
 
 ### Added

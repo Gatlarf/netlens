@@ -75,6 +75,18 @@ def t_availability(conn, args, now=None) -> dict:
             "services_with_outages": [{"name": s["name"], "availability_pct": s["availability"], "down": s["down_text"]} for s in rep["services"] if s["outages"]][:LIMIT]}
 
 
+def t_response_times(conn, args, now=None) -> dict:
+    days = _days(args.get("days"), 7)
+    fastest = str(args.get("order") or "").lower() in ("fastest", "lowest", "asc")
+    since = _since(days, now)
+    direction = "ASC" if fastest else "DESC"
+    devices = conn.execute(f"SELECT COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, ROUND(AVG(c.rtt_ms), 1) AS avg_ms, ROUND(MAX(c.rtt_ms), 1) AS max_ms, COUNT(*) AS n "
+                           f"FROM checks c JOIN devices d ON d.id = c.device_id WHERE c.ts >= ? AND c.up = 1 AND c.rtt_ms IS NOT NULL GROUP BY c.device_id HAVING n >= 3 ORDER BY avg_ms {direction} LIMIT ?", (since, 10)).fetchall()
+    services = conn.execute(f"SELECT s.name AS name, ROUND(AVG(r.ms), 1) AS avg_ms, ROUND(MAX(r.ms), 1) AS max_ms, COUNT(*) AS n FROM service_results r JOIN service_checks s ON s.id = r.check_id "
+                            f"WHERE r.ts >= ? AND r.up = 1 AND r.ms IS NOT NULL GROUP BY r.check_id HAVING n >= 3 ORDER BY avg_ms {direction} LIMIT ?", (since, 5)).fetchall()
+    return {"days": days, "order": "fastest" if fastest else "slowest", "devices": [dict(r) for r in devices], "services": [dict(r) for r in services]}
+
+
 def t_new_devices(conn, args, now=None) -> dict:
     days = _days(args.get("days"), 7)
     rows = conn.execute("SELECT id, custom_name, hostname, primary_ip, vendor, first_seen, online FROM devices WHERE first_seen >= ? ORDER BY first_seen DESC LIMIT ?", (_since(days, now), LIMIT)).fetchall()
@@ -127,6 +139,7 @@ TOOLS: dict[str, tuple[Callable, str]] = {
     "offline_now": (t_offline_now, "the devices that are offline now with the time they were last seen. args: none"),
     "events": (t_events, "recent events (devices going offline or online, services, alerts). args: days (1-30), kind (optional event kind such as device_offline), device (optional name text)"),
     "availability": (t_availability, "availability percentages and outages of devices and services over a period. args: days (1-30)"),
+    "response_times": (t_response_times, "average response time (ping for devices, answer time for services) over a period, slowest first. args: days (1-30), order (slowest or fastest)"),
     "new_devices": (t_new_devices, "devices first seen in a period. args: days (1-30)"),
     "incidents": (t_incidents, "incidents (grouped problems with a probable cause) of a period. args: days (1-30)"),
     "anomalies": (t_anomalies, "readings that are unusual right now for the time of day. args: none"),
@@ -146,10 +159,10 @@ PRESETS = [
     {"id": "fixes", "text": "What did the automatic fixes do?", "tool": "fixes", "args": {}},
 ]
 KEYWORDS = [
-    ("anomalies", r"unusual|anomal|strange|weird|odd|abnormal"), ("disks", r"\bdisks?\b|storage|space|capacity|\bfull\b|filling"), ("fixes", r"\bfix|remediat|restart|reset|repair"),
+    ("response_times", r"response|latenc|\bping|\bslow|\bfast|\brtt\b|\blag"), ("anomalies", r"unusual|anomal|strange|weird|odd|abnormal"), ("disks", r"\bdisks?\b|storage|space|capacity|\bfull\b|filling"), ("fixes", r"\bfix|remediat|restart|reset|repair"),
     ("new_devices", r"\bnew\b|unknown|appeared|joined|stranger|first seen"), ("availability", r"uptime|availab|reliab|worst|least|outage|stable|flaky"),
     ("incidents", r"happen|changed|incident|yesterday|last night|summar|recap|what.?s new"), ("offline_now", r"\boffline|\bdown\b|not working|unreachable|dead"),
-    ("overview", r"wrong|problem|issue|status|health|ok\b|fine|now"),
+    ("overview", r"wrong|problem|issue|status|health|\bok\b|\bfine\b|right now|going on"),
 ]
 
 
@@ -162,8 +175,11 @@ def route(question: str, known_names: list[str]) -> tuple[str, dict]:
             return "device", {"name": name}
     for tool, pattern in KEYWORDS:
         if re.search(pattern, q):
-            return tool, ({"days": days} if tool in ("availability", "new_devices", "incidents", "events") else {})
-    return "overview", {}
+            args = {"days": days} if tool in ("availability", "new_devices", "incidents", "events", "response_times") else {}
+            if tool == "response_times" and re.search(r"fastest|lowest|best|quickest|least", q):
+                args["order"] = "fastest"
+            return tool, args
+    return "", {}
 
 
 def render(tool: str, r: dict) -> str:
@@ -180,6 +196,13 @@ def render(tool: str, r: dict) -> str:
         rows = r["least_available"]
         head = f"Over the last {r['days']} days the devices were up {r['summary']['devices_availability']}% of the time."
         return head + (" Least available: " + "; ".join(f"{d['name']} {d['availability_pct']}% ({d['outages']} outage{'s' if d['outages'] != 1 else ''}, down {d['down']})" for d in rows[:6]) + "." if rows else " No device had an outage.")
+    if tool == "response_times":
+        if not r["devices"] and not r["services"]:
+            return f"There are not enough response time measurements from the last {r['days']} days yet."
+        lines = [f"{'Fastest' if r['order'] == 'fastest' else 'Slowest'} average response over the last {r['days']} days:"]
+        lines += [f"{d['name']}: {d['avg_ms']} ms on average (worst {d['max_ms']} ms)" for d in r["devices"][:6]]
+        lines += [f"{s['name']} (service): {s['avg_ms']} ms on average (worst {s['max_ms']} ms)" for s in r["services"][:3]]
+        return "\n".join(lines)
     if tool == "new_devices":
         return (f"{len(r['new_devices'])} new device(s) in the last {r['days']} days: " + "; ".join(f"{d['name']}" + (f" ({d['vendor']})" if d["vendor"] else "") for d in r["new_devices"]) + ".") if r["new_devices"] else f"No new devices in the last {r['days']} days."
     if tool == "incidents":
@@ -260,5 +283,8 @@ def answer(conn: sqlite3.Connection, question: str, now: datetime | None = None,
         if got:
             return got
     tool, args = route(question, [n for n in names if n])
+    if not tool:
+        return {"answer": "I cannot answer that without a language model: the questions I understand on my own are about what is wrong now, what happened, availability, response times, new devices, unusual readings, disks and automatic fixes, or about one device by name. Pick one of the questions below, or connect a language model (Settings → Digital engineer).",
+                "source": "rules", "tools": [], "understood": False}
     result = TOOLS[tool][0](conn, args, now)
     return {"answer": render(tool, result), "source": "rules", "tools": [tool]}

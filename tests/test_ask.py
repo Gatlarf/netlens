@@ -30,6 +30,21 @@ def test_without_a_model_questions_are_matched_by_their_words(conn):
     assert ask.answer(conn, "", NOW)["tools"] == []
 
 
+def test_a_question_it_does_not_understand_is_not_answered_with_something_else(conn):
+    a = ask.answer(conn, "Which colour is the sky above the garden?", NOW)
+    assert a["understood"] is False and a["tools"] == [] and "language model" in a["answer"] and "online" not in a["answer"]
+
+
+def test_response_times_come_from_the_checks(conn):
+    for i, (dev, ms) in enumerate([(1, 2.0), (1, 4.0), (1, 3.0), (3, 40.0), (3, 60.0), (3, 50.0), (2, 1.0)]):
+        conn.execute("INSERT INTO checks (device_id, ts, up, rtt_ms) VALUES (?, ?, 1, ?)", (dev, f"2026-10-31T10:0{i}:00Z", ms))
+    conn.commit()
+    a = ask.answer(conn, "Which device has the highest average response time?", NOW)
+    assert a["tools"] == ["response_times"] and a["answer"].splitlines()[1].startswith("cam1: 50.0 ms") and "printer" not in a["answer"]       # three measurements are needed
+    b = ask.answer(conn, "which device is the fastest to respond?", NOW)
+    assert b["answer"].splitlines()[1].startswith("nas: 3.0 ms")
+
+
 def test_a_device_name_wins_over_keywords(conn):
     a = ask.answer(conn, "is the printer down?", NOW)
     assert a["tools"] == ["device"] and a["answer"].startswith("printer is offline")
