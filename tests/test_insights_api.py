@@ -49,3 +49,11 @@ def test_overview_ask_identify_and_settings(client, monkeypatch):
     words = c.post(f"/api/insights/incidents/{first}/words", headers=AUTH).json()
     assert words["source"] == "rules" and words["text"]
     assert c.put("/api/insights/settings", json={"llm": False, "report_summary": False}, headers=AUTH).json()["llm_wanted"] is False
+
+
+def test_the_mode_of_a_question_is_chosen_by_the_caller(client, monkeypatch):
+    c, _ = client
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: True)
+    assert c.post("/api/insights/ask", json={"question": "how many devices per type?", "mode": "rules"}, headers=AUTH).json()["source"] == "rules"
+    assert "No language model" in c.post("/api/insights/ask", json={"question": "how many devices?", "mode": "model"}, headers=AUTH).json()["answer"]
+    assert c.post("/api/insights/ask", json={"question": "x", "mode": "nonsense"}, headers=AUTH).status_code == 422

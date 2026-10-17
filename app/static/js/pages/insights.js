@@ -23,21 +23,33 @@ export async function render(container) {
   function askCard() {
     const input = h("input", { type: "text", maxlength: "500", placeholder: "Ask about your network, for example: what happened last night?" });
     const out = h("div", { class: "ins-answer" });
+    let mode = "auto";
+    try { mode = localStorage.getItem("netlens.ask.mode") || "auto"; } catch (e) { /* private window */ }
+    if (!data.status.llm_configured) mode = "rules";
+    const switcher = h("div", { class: "ins-mode" }, h("span", { class: "hint" }, "Answer with: "), ...[["auto", "Automatic"], ["rules", "Built-in logic"], ["model", "Language model"]].map(([v, label]) => {
+      const radio = h("input", { type: "radio", name: "ask-mode", value: v });
+      radio.checked = mode === v;
+      radio.addEventListener("change", () => { mode = v; try { localStorage.setItem("netlens.ask.mode", v); } catch (e) { /* ignore */ } });
+      return h("label", { class: "check", title: v === "auto" ? "The language model when one is connected, otherwise the built-in logic" : v === "rules" ? "Only Netlens's own logic: fast, private, limited to the ready-made kinds of question" : "The language model, which can also handle free-form questions" }, radio, " " + label);
+    }));
     const go = h("button", { class: "btn primary", type: "submit" }, "Ask");
     async function ask(question) {
       input.value = question;
       go.disabled = true; clear(out); out.appendChild(h("p", { class: "hint" }, "Looking..."));
       try {
-        const res = await post("/api/insights/ask", { question });
+        const res = await post("/api/insights/ask", { question, mode });
         clear(out);
         out.appendChild(h("p", { class: "ins-text" }, res.answer));
-        out.appendChild(h("p", { class: "hint" }, res.source === "model" ? `Answered by the language model from: ${res.tools.join(", ") || "its own knowledge of the question"}.` : "Answered from the numbers (no language model)."));
+        out.appendChild(h("p", { class: "hint" }, res.source === "model" ? `Answered by the language model from: ${res.tools.join(", ") || "its own knowledge of the question"}.`
+          : res.fell_back ? "The language model could not answer this one; the built-in logic answered." : "Answered by the built-in logic, from the numbers."));
       } catch (err) { clear(out); out.appendChild(h("p", { class: "error" }, err.message || "Could not answer.")); }
       go.disabled = false;
     }
     const form = h("form", { class: "ins-ask", onsubmit: (e) => { e.preventDefault(); if (input.value.trim()) ask(input.value.trim()); } }, input, go);
-    const presets = h("div", { class: "ins-presets" }, ...data.presets.map((p) => h("button", { class: "btn ghost", type: "button", onclick: () => ask(p.text) }, p.text)));
-    return h("div", { class: "card" }, h("h2", {}, "Ask your network"), form, presets, out);
+    const button = (p) => h("button", { class: "btn ghost", type: "button", onclick: () => ask(p.text) }, p.text);
+    const presets = h("div", { class: "ins-presets" }, ...data.presets.slice(0, 7).map(button));
+    const more = data.presets.length > 7 ? h("details", {}, h("summary", { class: "hint" }, `More questions you can ask (${data.presets.length - 7})`), h("div", { class: "ins-presets" }, ...data.presets.slice(7).map(button))) : null;
+    return h("div", { class: "card" }, h("h2", {}, "Ask your network"), form, data.status.llm_configured ? switcher : null, presets, more, out);
   }
 
   function incidentsCard() {

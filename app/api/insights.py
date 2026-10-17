@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -53,12 +53,13 @@ def get_insights(conn=Depends(get_conn)) -> dict[str, Any]:
 
 class Question(BaseModel):
     question: str = Field(max_length=500)
+    mode: Literal["auto", "rules", "model"] = "auto"
 
 
 @router.post("/insights/ask")
 async def ask_question(body: Question, conn=Depends(get_conn)) -> dict:
     _allowed(conn)
-    return await asyncio.to_thread(ask.answer, conn, body.question)
+    return await asyncio.to_thread(lambda: ask.answer(conn, body.question, mode=body.mode))
 
 
 @router.post("/insights/incidents/{incident_id}/words")

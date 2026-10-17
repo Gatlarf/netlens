@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.59 — 2026-10-17
+
+### Added
+- **Many more questions** on the Insights page, answered by the built-in logic and by a language model alike: devices by kind, manufacturer, operating system, group, tag or open port ("which devices have SSH open?", "which Apple devices are offline?", "how many devices per type?"), virtual machines and containers ("which are stopped?"), backups, certificates, speed tests, remote sites, smart home (batteries, unavailable devices), security (rogue DHCP, failed logins, unexpected ports), who changed which settings, what a device is connected to and what depends on it, Wi-Fi signal, maintenance windows, versions and updates, IPv6.
+- **Choose how a question is answered**: Automatic, Built-in logic or Language model (a switch on the Ask card). The instructions to the language model were extended with an example for each kind of question.
+
 ## 0.4.58 — 2026-10-17
 
 ### Added

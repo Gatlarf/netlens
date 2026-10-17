@@ -217,9 +217,13 @@ KEYWORDS = [
 ]
 
 
-def route(question: str, known_names: list[str]) -> tuple[str, dict]:
+def route(question: str, known_names: list[str], conn=None) -> tuple[str, dict]:
     """(tool, args) for a question, by its words: a device name wins, then the first keyword group that matches."""
     q = question.lower()
+    if conn is not None:
+        more = ask_more.route(conn, q, known_names)
+        if more:
+            return more
     days = 1 if re.search(r"today|24 ?h|yesterday|last night|day\b", q) else 30 if "month" in q else 7
     for name in sorted(known_names, key=len, reverse=True):
         if len(name) > 2 and re.search(r"(?<![\w.-])" + re.escape(name.lower()) + r"(?![\w-])", q):
@@ -241,9 +245,14 @@ def route(question: str, known_names: list[str]) -> tuple[str, dict]:
     return "", {}
 
 
+RENDERERS: dict[str, Callable[[dict], str]] = {}
+
+
 def render(tool: str, r: dict) -> str:
     if r.get("error"):
         return r["error"]
+    if tool in RENDERERS:
+        return RENDERERS[tool](r)
     if tool == "overview":
         lines = [f"{r['online']} of {r['devices']} devices are online."]
         lines.append("Offline: " + ", ".join(r["offline_devices"]) + "." if r["offline_devices"] else "No device is offline.")
@@ -304,23 +313,32 @@ def render(tool: str, r: dict) -> str:
 
 
 # ----------------------------------------------------------------------------- with a model
-SYSTEM = ("You answer questions about the user's own computer network using tools that read Netlens's data.\n"
-          "Reply with ONE JSON object and nothing else (no markdown, no text around it).\n"
-          'To look at data: {"tool": "<name>", "args": {...}}\n'
-          'To answer: {"answer": "<a few plain sentences>"}\n'
-          "Rules:\n"
-          "- Always look at the data with a tool first. Never answer about the network from memory.\n"
-          "- Use at most four tool calls. Pick the tool that fits the question. For a kind of device (printer, switch, nas, camera ...) call device with that word as the name.\n"
-          "- Copy names and numbers exactly as they appear in the results. If a result is a list, mention every item that matters; say \"only\" only when the list has one item.\n"
-          "- Answer in the language of the question.\n"
-          '- If the data does not contain the answer, answer exactly: {"answer": "The data does not tell."}\n'
-          "- Names such as <device1> or <ip2> are placeholders: write them exactly as they are.\n"
-          "Examples:\n"
-          'Question: Which device responds slowest? -> {"tool": "response_times", "args": {"days": 7, "order": "slowest"}}\n'
-          'Question: Is the printer up? -> {"tool": "device", "args": {"name": "printer"}}\n'
-          'Question: Which machines are low on RAM? -> {"tool": "health", "args": {"metric": "memory"}}\n'
-          'Question: What happened yesterday? -> {"tool": "incidents", "args": {"days": 1}}\n'
-          "Tools:\n" + "\n".join(f"- {n}: {d}" for n, (_f, d) in TOOLS.items()))
+EXAMPLES = [
+    ("Which device responds slowest?", "response_times", {"days": 7, "order": "slowest"}), ("Is the printer up?", "device", {"name": "printer"}), ("What happened yesterday?", "incidents", {"days": 1}),
+    ("Which machines are low on RAM?", "health", {"metric": "memory"}), ("How many printers do I have?", "search_devices", {"type": "printer"}), ("Which Apple devices are offline?", "search_devices", {"vendor": "apple", "online": False}),
+    ("Which devices have SSH open?", "ports", {"port": 22, "service": "ssh"}), ("Which virtual machines are stopped?", "guests", {"status": "stopped"}), ("Are my backups healthy?", "backups", {}),
+    ("When does my certificate expire?", "certificates", {}), ("How fast is my internet?", "speedtest", {"days": 30}), ("What is the NAS connected to?", "connections", {"device": "nas"}),
+    ("Who changed settings this week?", "audit", {"days": 7}), ("Is anything suspicious going on?", "security", {"days": 7}), ("Which smart-home batteries are low?", "smart_home", {}),
+    ("How many devices are there per type?", "counts", {"by": "type"}), ("Which version of Netlens is this?", "system", {}),
+]
+
+
+def system_prompt() -> str:
+    return ("You answer questions about the user's own computer network using tools that read Netlens's data.\n"
+            "Reply with ONE JSON object and nothing else (no markdown, no text around it).\n"
+            'To look at data: {"tool": "<name>", "args": {...}}\n'
+            'To answer: {"answer": "<a few plain sentences>"}\n'
+            "Rules:\n"
+            "- Always look at the data with a tool first. Never answer about the network from memory.\n"
+            "- Use at most four tool calls. Pick the tool that fits the question. If the first result does not help, you may try one other tool that fits.\n"
+            "- For a list or a count of devices with some property (a kind, a manufacturer, an operating system, online or offline, an open port) use search_devices or ports. For one named device use device. For a kind of device (printer, switch, nas, camera ...) use search_devices with type, or device with that word.\n"
+            "- Current readings (memory, processor, disk, temperature, battery) are in health. Forecasts (a disk that will fill up) are in disks.\n"
+            "- Copy names and numbers exactly as they appear in the results. If a result is a list, mention every item that matters; say \"only\" only when the list has one item. Round long numbers to one decimal.\n"
+            "- Answer in the language of the question, in a few plain sentences.\n"
+            '- If the data does not contain the answer, answer exactly: {"answer": "The data does not tell."}\n'
+            "- Names such as <device1> or <ip2> are placeholders: write them exactly as they are.\n"
+            "Examples:\n" + "\n".join(f"Question: {q} -> {json.dumps({'tool': t, 'args': a})}" for q, t, a in EXAMPLES) + "\n"
+            "Tools:\n" + "\n".join(f"- {n}: {d}" for n, (_f, d) in TOOLS.items()))
 
 
 def _restore_args(args: Any, redact: engineer.Redactor | None) -> dict:
@@ -343,7 +361,7 @@ def _ask_model(conn, question: str, names: list[str], now, ask) -> dict | None:
     A model that does not reply in JSON, or answers without looking at the data, is told once; after that the plain version takes over."""
     redact = engineer.Redactor(names) if engineer.settings(conn)["redact"] else None
     hide = redact or (lambda t: t)
-    messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": hide(question)}]
+    messages = [{"role": "system", "content": system_prompt()}, {"role": "user", "content": hide(question)}]
     used: list[str] = []
     nudged = {"json": False, "tool": False}
     for _ in range(MAX_STEPS + 3):
@@ -375,18 +393,30 @@ def _ask_model(conn, question: str, names: list[str], now, ask) -> dict | None:
     return None
 
 
-def answer(conn: sqlite3.Connection, question: str, now: datetime | None = None, ask=None) -> dict[str, Any]:
+def answer(conn: sqlite3.Connection, question: str, now: datetime | None = None, ask=None, mode: str = "auto") -> dict[str, Any]:
+    """`mode`: "auto" (the language model when one is connected, else the built-in logic), "rules" (the built-in logic only) or "model" (the language model, with the built-in logic as the fallback)."""
     question = (question or "").strip()[:500]
     if not question:
         return {"answer": "Ask a question, or pick one of the ready-made ones.", "source": "rules", "tools": []}
     names = [_name(r) for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices")] + [r["name"] for r in conn.execute("SELECT name FROM service_checks")]
-    if ask is not None or insights.llm_ready(conn):
+    fell_back = False
+    if mode == "model" and ask is None and not insights.llm_ready(conn):
+        return {"answer": "No language model is connected or it is switched off for insights (Settings → Digital engineer, and the switch below). Switch to the built-in logic or connect a model.", "source": "rules", "tools": [], "understood": False}
+    if ask is not None or (mode != "rules" and insights.llm_ready(conn)):
         got = _ask_model(conn, question, names, now, ask)
         if got:
             return got
-    tool, args = route(question, [n for n in names if n])
+        fell_back = True
+    tool, args = route(question, [n for n in names if n], conn)
     if not tool:
-        return {"answer": "I cannot answer that without a language model: the questions I understand on my own are about what is wrong now, what happened, availability, response times, new devices, unusual readings, disks and automatic fixes, or about one device by name. Pick one of the questions below, or connect a language model (Settings → Digital engineer).",
-                "source": "rules", "tools": [], "understood": False}
+        return {"answer": "The built-in logic cannot answer that: it understands questions about what is wrong now, what happened, availability, response times, current readings (memory, processor, disks, temperature), "
+                          "devices by kind, manufacturer, operating system or open port, virtual machines and containers, backups, certificates, speed tests, remote sites, smart home, security, Wi-Fi, "
+                          "who changed what, what is connected to what, maintenance, versions and updates, or one device by name. Pick one below, or connect a language model for free-form questions.",
+                "source": "rules", "tools": [], "understood": False, "fell_back": fell_back}
     result = TOOLS[tool][0](conn, args, now)
-    return {"answer": render(tool, result), "source": "rules", "tools": [tool]}
+    return {"answer": render(tool, result), "source": "rules", "tools": [tool], "fell_back": fell_back}
+
+
+from app import ask_more  # noqa: E402 - the other questions register themselves into the tables above
+
+ask_more.register()

@@ -20,7 +20,7 @@ def _step(conn, ask_fn, messages: list[dict]) -> str:
 
 
 def _result(question: str, tool: str, args: dict, result: dict) -> list[dict]:
-    return [{"role": "system", "content": ask.SYSTEM}, {"role": "user", "content": question},
+    return [{"role": "system", "content": ask.system_prompt()}, {"role": "user", "content": question},
             {"role": "assistant", "content": json.dumps({"tool": tool, "args": args})}, {"role": "user", "content": f"Result of {tool}:\n{json.dumps(result)}"}]
 
 
@@ -49,10 +49,10 @@ def run(conn, ask_fn=None) -> dict[str, Any]:
             return (doc.get("tool") in tools, f"chose {doc.get('tool')!r}" if doc.get("tool") in tools else f"chose {doc.get('tool') or 'no tool'!r} instead of {' or '.join(tools)}")
         return judge
 
-    exam("protocol", "Follows the reply format and picks a fitting tool", [{"role": "system", "content": ask.SYSTEM}, {"role": "user", "content": "Which devices are offline right now?"}], picks("offline_now", "overview"))
-    exam("choice", "Chooses the right tool for a less obvious question", [{"role": "system", "content": ask.SYSTEM}, {"role": "user", "content": "Which of my devices answers the slowest?"}], picks("response_times"))
+    exam("protocol", "Follows the reply format and picks a fitting tool", [{"role": "system", "content": ask.system_prompt()}, {"role": "user", "content": "Which devices are offline right now?"}], picks("offline_now", "overview"))
+    exam("choice", "Chooses the right tool for a less obvious question", [{"role": "system", "content": ask.system_prompt()}, {"role": "user", "content": "Which of my devices answers the slowest?"}], picks("response_times"))
 
-    exam("readings", "Looks at current readings, not at forecasts, for “low on RAM”", [{"role": "system", "content": ask.SYSTEM}, {"role": "user", "content": "Which machines are low on RAM?"}], picks("health"))
+    exam("readings", "Looks at current readings, not at forecasts, for “low on RAM”", [{"role": "system", "content": ask.system_prompt()}, {"role": "user", "content": "Which machines are low on RAM?"}], picks("health"))
 
     def copies(reply):
         text = _answer_of(reply)
@@ -80,7 +80,7 @@ def run(conn, ask_fn=None) -> dict[str, Any]:
             return True, "looked at the data instead of guessing"
         text = _answer_of(reply) or ""
         return not any(ch.isdigit() for ch in text), "admitted the data does not tell" if not any(ch.isdigit() for ch in text) else "invented a number that is not in the data"
-    exam("honesty", "Does not invent what the data cannot tell", [{"role": "system", "content": ask.SYSTEM}, {"role": "user", "content": "What was the temperature in my server room yesterday at noon?"}], honest)
+    exam("honesty", "Does not invent what the data cannot tell", [{"role": "system", "content": ask.system_prompt()}, {"role": "user", "content": "What was the temperature in my server room yesterday at noon?"}], honest)
 
     passed = sum(1 for c in checks if c["ok"])
     verdict = "good" if passed == len(checks) else "usable" if passed >= len(checks) - 1 else "poor"
