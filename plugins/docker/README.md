@@ -58,3 +58,7 @@ rootless user's socket. Containers of a rootless Podman appear for that user onl
 A container's inspect data contains its environment variables, which often hold passwords. The plugin reads that data to get the
 health and restart count, but **only keeps** image, compose labels, network, ports, health, restarts and start time; nothing else is
 stored or sent anywhere. The diagnostic report contains counts only.
+
+## Restarting a guest (auto-remediation)
+
+Netlens can reset, restart, shut down or start a guest from a remediation rule (Monitoring → Remediation, action "Restart the virtual machine"). Reading needs only read access; **doing** needs the right to change power state. With a socket proxy set `POST=1`, `ALLOW_RESTARTS=1`, `ALLOW_START=1` and `ALLOW_STOP=1` (reading needs `CONTAINERS=1`, `NETWORKS=1`, `INFO=1`). *Reset* restarts the container and kills it after 5 seconds, *restart* waits 10, *shutdown* stops it (20 s). If the action is refused, Netlens shows why in the run's result.

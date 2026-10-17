@@ -5,7 +5,10 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ## 0.4.50 — 2026-10-17
 
 ### Added
-- ★ **Restart a virtual machine** (Monitoring → Remediation, "Do this"): a rule can hard-reset, restart, shut down or start the virtual machine a device is, through the hypervisor plugin that reported it (Proxmox first; the plugin's token needs the VM.PowerMgmt privilege). Meant for a guest that freezes while it still answers ping: a service check notices, the rule resets it, with the usual cooldown and daily limit.
+- ★ **Restart a virtual machine** (Monitoring → Remediation, "Do this"): a rule can hard-reset, restart, shut down or start the virtual machine a device is, through the hypervisor plugin that reported it (Proxmox first; the plugin's token needs the VM.PowerMgmt privilege). Meant for a guest that freezes while it still answers ping: a service check notices, the rule resets it, with the usual cooldown and daily limit. Works with the Proxmox, Docker, Portainer, Incus, vSphere and Hyper-V plugins (update them in the Plugin store).
+
+### Fixed
+- **Proxmox and the ASUS router after the move to plugins**: an installation that had used the built-in version of Proxmox (a single address and login) lost those settings when the plugin was installed again. They are kept now. If you were affected, enter the server again under Settings → Integrations → Proxmox VE.
 
 ## 0.4.49 — 2026-10-17
 

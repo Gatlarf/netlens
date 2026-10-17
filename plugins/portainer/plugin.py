@@ -78,6 +78,24 @@ class Server:
         except (OSError, ValueError) as exc:
             raise PortainerError(f"{self.id} did not answer properly: {exc}")
 
+    def post(self, path):
+        request = urllib.request.Request(f"{self.url}{path}", data=b"", headers={"X-API-Key": self.api_key}, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
+                return response.status
+        except urllib.error.HTTPError as exc:
+            if exc.code == 304:
+                return 304
+            if exc.code in (401, 403):
+                raise PortainerError(f"{self.id} refused the action: the token's user may not start or stop containers in that environment")
+            if exc.code == 404:
+                raise PortainerError(f"{self.id} has no such container")
+            raise PortainerError(f"{self.id} answered HTTP {exc.code} for {path}")
+        except urllib.error.URLError as exc:
+            raise PortainerError(f"cannot reach {self.id}: {exc.reason}")
+        except OSError as exc:
+            raise PortainerError(f"{self.id} did not answer properly: {exc}")
+
     def environments(self):
         rows = self.get("/api/endpoints")
         if not isinstance(rows, list):
@@ -297,3 +315,20 @@ def diagnose(config):
                 except PortainerError as exc:
                     item["steps"][step] = {"ok": False, "error": _problem(exc)}
     return report
+
+
+POWER = {"reset": ("restart", "t=5"), "reboot": ("restart", "t=10"), "shutdown": ("stop", "t=20"), "start": ("start", "")}
+
+
+def power(config, payload):
+    """Restart, stop or start one container. payload: {"guest_id": "<portainer>/<environment>/<container>", "action": "reset"}."""
+    action = payload.get("action")
+    if action not in POWER:
+        raise ValueError(f"unknown action {action!r}")
+    parts = str(payload.get("guest_id") or "").split("/", 2)
+    server = next((s for s in parse_servers(config) if len(parts) == 3 and s.id == parts[0]), None)
+    if server is None or not parts[1].isdigit() or not parts[2]:
+        raise PortainerError("this container's Portainer is not in the plugin's settings")
+    verb, query = POWER[action]
+    status = server.post(f"/api/endpoints/{parts[1]}/docker/containers/{urllib.parse.quote(parts[2], safe='')}/{verb}" + (f"?{query}" if query else ""))
+    return {"message": f"{parts[2]} is already " + ("running" if verb == "start" else "stopped") if status == 304 else f"{verb} sent to {parts[2]}"}

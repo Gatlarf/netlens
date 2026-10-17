@@ -61,7 +61,7 @@ def run(conn, data_dir: Path | str, *, getter=None, netlens_version: str = VERSI
 
                 manifest = registry.discover(data_dir)[pid].manifest
                 config = default_config(manifest)
-                config.update({k: v for k, v in saved["config"].items() if k in config})
+                config.update(saved["config"])      # all of it, also the single url and login of the built-in version: get_state turns those into the server list
                 service.save_state(conn, pid, True, config)
         except (idx.PluginIndexError, registry.InstallError) as exc:
             _failed(conn, pid, str(exc))

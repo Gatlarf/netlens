@@ -16,3 +16,7 @@ Shows **VMware ESXi hosts and vCenter inventories**: every host (connection stat
 - IP addresses and the Tools state come from VMware Tools; without Tools only the MAC addresses of the virtual network cards are known.
 - For a vCenter list the vCenter only; it already knows all its hosts.
 - Templates are left out. Every request is a read (`RetrieveServiceContent`, `CreateContainerView`, `RetrievePropertiesEx`); the session is logged out at the end.
+
+## Restarting a guest (auto-remediation)
+
+Netlens can reset, restart, shut down or start a guest from a remediation rule (Monitoring → Remediation, action "Restart the virtual machine"). Reading needs only read access; **doing** needs the right to change power state. The vSphere user needs the privilege *Virtual machine → Interaction → Power on/Power off/Reset* on the machine. *Restart* and *shutdown* need VMware Tools in the guest; *reset* is the hard reset button. If the action is refused, Netlens shows why in the run's result.

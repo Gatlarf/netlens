@@ -110,6 +110,25 @@ class Server:
         return data.get("metadata") if isinstance(data, dict) else None
 
 
+    def put(self, path, body, **params):
+        query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
+        request = urllib.request.Request(f"{self.url}{path}" + (f"?{query}" if query else ""), data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}, method="PUT")
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
+                data = json.loads(response.read().decode("utf-8", "replace") or "{}")
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403):
+                raise AuthRefused(f"{self.id} refused the client certificate for this action (it must be a full, unrestricted client of the project)")
+            raise IncusError(f"{self.id} answered HTTP {exc.code} for {path}")
+        except urllib.error.URLError as exc:
+            raise IncusError(f"cannot reach {self.id}: {exc.reason}")
+        except (OSError, ValueError) as exc:
+            raise IncusError(f"{self.id} did not answer properly: {exc}")
+        if isinstance(data, dict) and data.get("type") == "error":
+            raise IncusError(f"{self.id} reported an error: {str(data.get('error'))[:200]}")
+        return data
+
+
 def parse_servers(config):
     rows = config.get("servers")
     items = [r for r in rows if isinstance(r, dict) and any(str(r.get(k) or "").strip() for k in ("host", "cert", "key"))] if isinstance(rows, list) else []
@@ -278,3 +297,20 @@ def diagnose(config):
         except IncusError as exc:
             entry["steps"]["error"] = {"ok": False, "error": _problem(exc)}
     return report
+
+
+POWER = {"reset": {"action": "restart", "force": True, "timeout": 10}, "reboot": {"action": "restart", "force": False, "timeout": 60},
+         "shutdown": {"action": "stop", "force": False, "timeout": 60}, "start": {"action": "start", "timeout": 30}}
+
+
+def power(config, payload):
+    """Restart, stop or start one instance. payload: {"guest_id": "<server>/<project>/<name>", "action": "reset"}. Reset is a forced restart."""
+    action = payload.get("action")
+    if action not in POWER:
+        raise ValueError(f"unknown action {action!r}")
+    parts = str(payload.get("guest_id") or "").split("/", 2)
+    server = next((s for s in parse_servers(config) if len(parts) == 3 and s.id == parts[0]), None)
+    if server is None or not parts[1] or not parts[2]:
+        raise IncusError("this instance's Incus server is not in the plugin's settings")
+    server.put(f"/1.0/instances/{urllib.parse.quote(parts[2], safe='')}/state", POWER[action], project=parts[1])
+    return {"message": f"{POWER[action]['action']} sent to {parts[2]}"}

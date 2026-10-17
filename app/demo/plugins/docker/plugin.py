@@ -1,5 +1,353 @@
-"""Demo stand-in: the real plugin is not installed here, so nothing in the demo ever talks to a host."""
+"""Docker plugin (kind "hypervisor"): Docker hosts as hosts and their containers as guests.
+
+Talks to the Docker Engine API, read-only (it only sends GET requests):
+
+    GET /info                  host name and version
+    GET /networks              which network is a bridge, macvlan, ipvlan ...
+    GET /containers/json?all=1 every container with its published ports and addresses
+    GET /containers/<id>/json  health, restart count, start time
+    GET /images/json           (optional, needs IMAGES=1 on the proxy) when each image was built
+
+Docker's API controls the whole host, so it should be reached through a read-only socket proxy
+(tecnativa/docker-socket-proxy with CONTAINERS=1, NETWORKS=1, INFO=1 and POST=0), see the README.
+
+A container on a bridge network only has an address inside the host, so it is shown as a guest of its host (with the
+ports it publishes). A container on a macvlan or ipvlan network has its own address on the LAN: the plugin reports that
+address (and the MAC of a macvlan), so Netlens matches the container to the device its scans found. Standard library only.
+"""
+
+import ipaddress
+import json
+import re
+import socket
+import ssl
+import urllib.error
+import urllib.parse
+import urllib.request
+
+MAX_CONTAINERS = 1000
+LAN_DRIVERS = ("macvlan", "ipvlan")
+ALL_INTERFACES = ("", "0.0.0.0", "::", "[::]")
 
 
-def run(config, context=None):
-    raise RuntimeError("This is a demo: plugins do not run here.")
+class DockerError(Exception):
+    pass
+
+
+def _clean_url(text):
+    url = text.strip().rstrip("/")
+    if "://" not in url:
+        url = "http://" + url
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise DockerError(f"{text!r} is not an address like http://192.168.0.2:2375")
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+class Host:
+    def __init__(self, url, verify_tls=True, timeout=15):
+        url, _, lan = url.partition("=")       # "http://127.0.0.1:2375=192.168.0.189": the proxy is local, the host's LAN address is after "="
+        self.lan_ip = _ipv4(lan) if lan else None
+        if lan and not self.lan_ip:
+            raise DockerError(f"{lan!r} after '=' is not an IPv4 address")
+        self.url = _clean_url(url)
+        self.timeout = float(timeout)
+        self.context = None
+        if self.url.startswith("https://") and not verify_tls:
+            self.context = ssl.create_default_context()
+            self.context.check_hostname = False
+            self.context.verify_mode = ssl.CERT_NONE
+        self.id = urllib.parse.urlsplit(self.url).netloc
+        self.address = urllib.parse.urlsplit(self.url).hostname
+
+    def get(self, path, **params):
+        query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
+        request = urllib.request.Request(f"{self.url}{path}" + (f"?{query}" if query else ""), headers={"Accept": "application/json"}, method="GET")
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
+                return json.loads(response.read().decode("utf-8", "replace"))
+        except urllib.error.HTTPError as exc:
+            if exc.code == 403:
+                raise DockerError(f"{self.id} refused {path}: the socket proxy does not allow it (set CONTAINERS=1, NETWORKS=1 and INFO=1 on the proxy)")
+            raise DockerError(f"{self.id} answered HTTP {exc.code} for {path}")
+        except urllib.error.URLError as exc:
+            raise DockerError(f"cannot reach {self.id}: {exc.reason}")
+        except (OSError, ValueError) as exc:
+            raise DockerError(f"{self.id} did not answer properly: {exc}")
+
+
+    def post(self, path, **params):
+        query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
+        request = urllib.request.Request(f"{self.url}{path}" + (f"?{query}" if query else ""), data=b"", method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
+                return response.status
+        except urllib.error.HTTPError as exc:
+            if exc.code == 304:           # it is already in that state
+                return 304
+            if exc.code == 403:
+                raise DockerError(f"{self.id} refused {path}: the socket proxy does not allow it (set POST=1 and ALLOW_RESTARTS=1, ALLOW_START=1, ALLOW_STOP=1 on the proxy)")
+            if exc.code == 404:
+                raise DockerError(f"{self.id} has no such container")
+            raise DockerError(f"{self.id} answered HTTP {exc.code} for {path}")
+        except urllib.error.URLError as exc:
+            raise DockerError(f"cannot reach {self.id}: {exc.reason}")
+        except OSError as exc:
+            raise DockerError(f"{self.id} did not answer properly: {exc}")
+
+
+def parse_hosts(config):
+    rows = config.get("servers")
+    if isinstance(rows, list):            # one row per host: {"host": the proxy address, "lan": the host's LAN address (optional)}
+        urls = []
+        for row in rows:
+            if isinstance(row, dict) and str(row.get("host") or "").strip():
+                lan = str(row.get("lan") or "").strip()
+                urls.append(str(row["host"]).strip() + (f"={lan}" if lan else ""))
+    else:                                 # older Netlens: one list of addresses
+        urls = [u for u in re.split(r"[,;\s]+", str(config.get("hosts") or "").strip()) if u]
+    if not urls:
+        raise ValueError("enter the address of at least one Docker host (its socket proxy)")
+    return [Host(u, config.get("verify_tls", True), config.get("timeout") or 15) for u in urls]
+
+
+def _ipv4(value):
+    try:
+        addr = ipaddress.ip_address(str(value or "").strip())
+    except ValueError:
+        return None
+    return str(addr) if addr.version == 4 else None
+
+
+def _host_ip(host):
+    if host.lan_ip:
+        return host.lan_ip
+    ip = _ipv4(host.address)
+    if ip and ip.startswith("127."):
+        return None          # a proxy on the host itself: Netlens cannot tell which address the host has on the network
+    if ip:
+        return ip
+    try:
+        return _ipv4(socket.gethostbyname(host.address))
+    except OSError:
+        return None
+
+
+def _name(container):
+    names = container.get("Names") or []
+    return (names[0] if names else container.get("Id", "")[:12]).lstrip("/")
+
+
+def _ports(container):
+    out, exposed = [], False
+    for p in container.get("Ports") or []:
+        ip = str(p.get("IP") or "")
+        entry = {"container_port": p.get("PrivatePort"), "host_port": p.get("PublicPort"), "proto": p.get("Type") or "tcp", "bind": ip}
+        out.append(entry)
+        if p.get("PublicPort") and ip in ALL_INTERFACES:
+            exposed = True
+    seen, unique = set(), []
+    for e in out:     # Docker lists a published port once for IPv4 and once for IPv6
+        key = (e["container_port"], e["host_port"], e["proto"], e["bind"] if e["bind"] not in ("0.0.0.0", "::") else "all")
+        if key not in seen:
+            seen.add(key)
+            unique.append(e)
+    return unique, exposed
+
+
+def _iso(epoch):
+    from datetime import datetime, timezone
+    try:
+        return datetime.fromtimestamp(int(epoch), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (TypeError, ValueError, OverflowError, OSError):
+        return ""
+
+
+def _repo_of(ref):
+    """'ghcr.io/x/y:1' -> 'ghcr.io/x/y'; 'nginx:1' -> 'nginx' (the repository part of an image reference)."""
+    ref = str(ref or "").split("@")[0]
+    head, _, tail = ref.rpartition("/")
+    return (head + "/" if head else "") + tail.split(":")[0]
+
+
+def _digest_for(ref, repo_digests):
+    """The sha256 the image was pulled as, from its RepoDigests ('repo@sha256:...'): the one for the repository the container's
+    image reference names, else the only one there is."""
+    found = [str(d) for d in repo_digests or [] if "@sha256:" in str(d)]
+    if not found:
+        return ""
+    wanted = _repo_of(ref)
+    plain = lambda r: re.sub(r"^(docker\.io|index\.docker\.io|registry-1\.docker\.io)/", "", r).removeprefix("library/")
+    for d in found:
+        if plain(d.split("@")[0]) == plain(wanted):
+            return d.split("@")[1]
+    return found[0].split("@")[1] if len(found) == 1 else ""
+
+
+def to_guest(host, container, inspect, drivers, images=None, digests=None):
+    """One container as a Netlens guest (see the hypervisor contract)."""
+    state = str(container.get("State") or "unknown").lower()
+    networks = (container.get("NetworkSettings") or {}).get("Networks") or {}
+    mode = (container.get("HostConfig") or {}).get("NetworkMode") or ""
+    ips, macs, names, driver = [], [], [], ""
+    for net_name, net in networks.items():
+        names.append(net_name)
+        kind = drivers.get(net.get("NetworkID")) or drivers.get(net_name) or ""
+        driver = driver or kind
+        if kind in LAN_DRIVERS:
+            ip = _ipv4(net.get("IPAddress"))
+            if ip:
+                ips.append(ip)
+            if kind == "macvlan" and net.get("MacAddress"):
+                macs.append(net["MacAddress"])
+    if mode == "host":
+        driver, names = "host", ["host"]
+    labels = container.get("Labels") or {}
+    ports, exposed = _ports(container)
+    inspected_state = (inspect or {}).get("State") or {}
+    created = (images or {}).get(container.get("ImageID")) or ""
+    details = {
+        "image": container.get("Image") or "",
+        "image_created": created,
+        "image_digest": _digest_for(container.get("Image"), (digests or {}).get(container.get("ImageID"))),
+        "project": labels.get("com.docker.compose.project") or "",
+        "service": labels.get("com.docker.compose.service") or "",
+        "network": ", ".join(names),
+        "network_driver": driver,
+        "health": (inspected_state.get("Health") or {}).get("Status") or "",
+        "restarts": (inspect or {}).get("RestartCount"),
+        "restarting": bool(inspected_state.get("Restarting")),
+        "started": inspected_state.get("StartedAt") if state == "running" else "",
+        "exposed": exposed,
+    }
+    if state == "exited" and inspected_state.get("ExitCode") is not None:
+        details["exit_code"] = inspected_state["ExitCode"]
+    if ports:
+        details["ports"] = ports
+    status = "restarting" if details["restarting"] else state
+    return {
+        "id": f"{host.id}/{_name(container)}",
+        "name": _name(container),
+        "kind": "container",
+        "host_id": host.id,
+        "status": status[:30],
+        "macs": macs,
+        "ips": ips,
+        "details": {k: v for k, v in details.items() if v not in ("", None)},
+    }
+
+
+def read_host(host):
+    info = host.get("/info")
+    drivers = {}
+    for net in host.get("/networks") or []:
+        drivers[net.get("Id")] = net.get("Driver") or ""
+        drivers[net.get("Name")] = net.get("Driver") or ""
+    images, digests = {}, {}
+    try:      # optional (the proxy needs IMAGES=1): when it answers, every container learns how old its image is and what it was pulled as
+        for image in host.get("/images/json") or []:
+            images[image.get("Id")] = _iso(image.get("Created"))
+            digests[image.get("Id")] = image.get("RepoDigests")
+    except DockerError:
+        pass
+    containers = host.get("/containers/json", all="1") or []
+    guests = []
+    for c in containers[:MAX_CONTAINERS]:
+        try:
+            inspect = host.get(f"/containers/{c['Id']}/json")
+        except DockerError:
+            inspect = None      # the list is still useful without health and restart count
+        guests.append(to_guest(host, c, inspect, drivers, images, digests))
+    entry = {"id": host.id, "name": str(info.get("Name") or host.id)[:100], "ip": _host_ip(host), "online": True}
+    return entry, guests, info
+
+
+def connect(config):
+    hosts, guests, problems = [], [], []
+    for host in parse_hosts(config):
+        try:
+            entry, found, _ = read_host(host)
+        except DockerError as exc:
+            problems.append(str(exc))
+            continue
+        hosts.append(entry)
+        guests.extend(found)
+    if not hosts:
+        raise DockerError("; ".join(problems) or "no Docker host answered")
+    return hosts, guests, problems
+
+
+# ----------------------------------------------------------------------------- plugin entry points
+def test(config):
+    hosts, guests, problems = connect(config)
+    running = sum(1 for g in guests if g["status"] == "running")
+    message = f"Connected to {len(hosts)} Docker host(s): {len(guests)} container(s), {running} running"
+    own = sum(1 for g in guests if g["ips"])
+    if own:
+        message += f", {own} with their own network address"
+    if any(h["ip"] is None for h in hosts):
+        message += ". A host reached through 127.0.0.1 or localhost needs its network address so Netlens can find its device: fill in 'Host\'s own address' on its line"
+    if problems:
+        message += ". Not reachable: " + "; ".join(problems)
+    return {"message": message}
+
+
+def fetch(config):
+    hosts, guests, _ = connect(config)
+    return {"hosts": hosts, "guests": guests}
+
+
+def _problem(exc):
+    """The error text for a diagnostic report, without any server address (URL, IP address, host:port or host name)."""
+    text = re.sub(r"https?://\S+", "<host>", str(exc))
+    text = re.sub(r"\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b", "<host>", text)
+    text = re.sub(r"\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*:\d{2,5}\b", "<host>", text)
+    text = re.sub(r"\b(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}\b", "<host>", text)
+    return type(exc).__name__ + ": " + text[:300]
+
+
+def diagnose(config):
+    """What the hosts answer, as counts and yes/no (no names, addresses or labels)."""
+    try:
+        hosts = parse_hosts(config)
+    except (ValueError, DockerError) as exc:
+        return {"error": str(exc)}
+    report = {"hosts": []}
+    for host in hosts:
+        entry = {"steps": {}}
+        report["hosts"].append(entry)
+        for step, path, params in (("info", "/info", {}), ("networks", "/networks", {}), ("containers", "/containers/json", {"all": "1"})):
+            try:
+                data = host.get(path, **params)
+                if step == "info":
+                    entry["steps"][step] = {"ok": True, "server_version": str(data.get("ServerVersion") or ""), "containers": data.get("Containers"), "running": data.get("ContainersRunning")}
+                elif step == "networks":
+                    drivers = {}
+                    for n in data:
+                        drivers[n.get("Driver") or "?"] = drivers.get(n.get("Driver") or "?", 0) + 1
+                    entry["steps"][step] = {"ok": True, "count": len(data), "drivers": drivers}
+                else:
+                    states = {}
+                    for c in data:
+                        states[c.get("State") or "?"] = states.get(c.get("State") or "?", 0) + 1
+                    entry["steps"][step] = {"ok": True, "count": len(data), "states": states, "with_ports": sum(1 for c in data if c.get("Ports"))}
+            except DockerError as exc:
+                entry["steps"][step] = {"ok": False, "error": _problem(exc)}
+    return report
+
+
+POWER = {"reset": ("restart", {"t": 5}), "reboot": ("restart", {"t": 10}), "shutdown": ("stop", {"t": 20}), "start": ("start", {})}
+
+
+def power(config, payload):
+    """Restart, stop or start one container. payload: {"guest_id": "<host>/<container>", "action": "reset"}. Reset kills the container after 5 seconds, reboot waits 10."""
+    action = payload.get("action")
+    if action not in POWER:
+        raise ValueError(f"unknown action {action!r}")
+    host_id, _, name = str(payload.get("guest_id") or "").partition("/")
+    host = next((h for h in parse_hosts(config) if h.id == host_id), None)
+    if host is None or not name:
+        raise DockerError("this container's Docker host is not in the plugin's settings")
+    verb, params = POWER[action]
+    status = host.post(f"/containers/{urllib.parse.quote(name, safe='')}/{verb}", **params)
+    return {"message": f"{name} is already " + ("running" if verb == "start" else "stopped") if status == 304 else f"{verb} sent to {name}"}

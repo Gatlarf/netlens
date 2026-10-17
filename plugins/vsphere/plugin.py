@@ -326,3 +326,23 @@ def diagnose(config):
         finally:
             session.logout()
     return report
+
+
+POWER_CALLS = {"reset": "ResetVM_Task", "reboot": "RebootGuest", "shutdown": "ShutdownGuest", "start": "PowerOnVM_Task"}
+
+
+def power(config, payload):
+    """Reset, restart (needs VMware Tools), shut down (needs VMware Tools) or start one virtual machine. payload: {"guest_id": "<server>/<vm-id>", "action": "reset"}."""
+    action = payload.get("action")
+    if action not in POWER_CALLS:
+        raise ValueError(f"unknown action {action!r}")
+    server_id, _, oid = str(payload.get("guest_id") or "").rpartition("/")
+    session = next((s for s in parse_sessions(config) if s.id == server_id), None)
+    if session is None or not re.fullmatch(r"[A-Za-z0-9_-]+", oid):
+        raise VsphereError("this virtual machine's vSphere server is not in the plugin's settings")
+    session.login()
+    try:
+        session.call(POWER_CALLS[action], f'<_this type="VirtualMachine">{oid}</_this>')
+    finally:
+        session.logout()
+    return {"message": f"{POWER_CALLS[action].split('_')[0]} sent to {payload.get('name') or oid}"}

@@ -18,3 +18,7 @@ Shows every **Docker environment a Portainer manages** (local socket, Portainer 
 - `/api/system/status` answers without a login, so the test uses `/api/endpoints`, which refuses a wrong token.
 - A stopped environment (Status 2) is shown as an offline host. An Edge agent's address is unknown to Portainer, so Netlens may not find its device on the map.
 - If you already use the Docker plugin for the same hosts, use one or the other: the two would list the same containers.
+
+## Restarting a guest (auto-remediation)
+
+Netlens can reset, restart, shut down or start a guest from a remediation rule (Monitoring → Remediation, action "Restart the virtual machine"). Reading needs only read access; **doing** needs the right to change power state. The user behind the access token must be allowed to start, stop and restart containers in that environment (a standard user with access to it is enough). Reset and restart are a restart (kill after 5 / 10 seconds). If the action is refused, Netlens shows why in the run's result.

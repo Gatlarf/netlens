@@ -1,7 +1,7 @@
 {
   "id": "hyperv",
   "name": "Microsoft Hyper-V",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
@@ -118,5 +118,10 @@
         }
       ]
     }
+  ],
+  "power": [
+    "reset",
+    "shutdown",
+    "start"
   ]
 }

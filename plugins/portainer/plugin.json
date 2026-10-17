@@ -1,7 +1,7 @@
 {
   "id": "portainer",
   "name": "Portainer",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
@@ -14,7 +14,7 @@
       "type": "servers",
       "label": "Portainer servers",
       "required": true,
-      "help": "In Portainer: your account (top right) → My account → Access tokens → Add access token. For a read-only view create a separate user, give it the Standard user or Read-only role on the environments, and make the token for that user.",
+      "help": "In Portainer: your account (top right) \u2192 My account \u2192 Access tokens \u2192 Add access token. For a read-only view create a separate user, give it the Standard user or Read-only role on the environments, and make the token for that user.",
       "columns": [
         {
           "key": "host",
@@ -53,5 +53,11 @@
       "max": 120
     }
   ],
-  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/portainer"
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/portainer",
+  "power": [
+    "reset",
+    "reboot",
+    "shutdown",
+    "start"
+  ]
 }

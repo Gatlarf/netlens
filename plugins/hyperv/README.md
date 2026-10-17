@@ -73,3 +73,7 @@ sealing every message, which this client does not implement, so it refuses (and 
 | `does not offer NTLM login` | WinRM's *Negotiate* authentication is off: `Set-Item WSMan:\localhost\Service\Auth\Negotiate $true`. |
 
 The **Run diagnostic** button reports how far the connection gets, as yes/no and counts (no names, addresses or accounts).
+
+## Restarting a guest (auto-remediation)
+
+Netlens can reset, restart, shut down or start a guest from a remediation rule (Monitoring → Remediation, action "Restart the virtual machine"). Reading needs only read access; **doing** needs the right to change power state. The Windows user already has to be in *Hyper-V Administrators*, which is enough. *Reset* is the hard reset, *shutdown* asks the guest through its integration services, *start* powers it on. There is no clean restart. (Written from the Hyper-V WMI documentation; not yet tried on a real host.) If the action is refused, Netlens shows why in the run's result.

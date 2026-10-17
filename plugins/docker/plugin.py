@@ -76,6 +76,26 @@ class Host:
             raise DockerError(f"{self.id} did not answer properly: {exc}")
 
 
+    def post(self, path, **params):
+        query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
+        request = urllib.request.Request(f"{self.url}{path}" + (f"?{query}" if query else ""), data=b"", method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
+                return response.status
+        except urllib.error.HTTPError as exc:
+            if exc.code == 304:           # it is already in that state
+                return 304
+            if exc.code == 403:
+                raise DockerError(f"{self.id} refused {path}: the socket proxy does not allow it (set POST=1 and ALLOW_RESTARTS=1, ALLOW_START=1, ALLOW_STOP=1 on the proxy)")
+            if exc.code == 404:
+                raise DockerError(f"{self.id} has no such container")
+            raise DockerError(f"{self.id} answered HTTP {exc.code} for {path}")
+        except urllib.error.URLError as exc:
+            raise DockerError(f"cannot reach {self.id}: {exc.reason}")
+        except OSError as exc:
+            raise DockerError(f"{self.id} did not answer properly: {exc}")
+
+
 def parse_hosts(config):
     rows = config.get("servers")
     if isinstance(rows, list):            # one row per host: {"host": the proxy address, "lan": the host's LAN address (optional)}
@@ -314,3 +334,20 @@ def diagnose(config):
             except DockerError as exc:
                 entry["steps"][step] = {"ok": False, "error": _problem(exc)}
     return report
+
+
+POWER = {"reset": ("restart", {"t": 5}), "reboot": ("restart", {"t": 10}), "shutdown": ("stop", {"t": 20}), "start": ("start", {})}
+
+
+def power(config, payload):
+    """Restart, stop or start one container. payload: {"guest_id": "<host>/<container>", "action": "reset"}. Reset kills the container after 5 seconds, reboot waits 10."""
+    action = payload.get("action")
+    if action not in POWER:
+        raise ValueError(f"unknown action {action!r}")
+    host_id, _, name = str(payload.get("guest_id") or "").partition("/")
+    host = next((h for h in parse_hosts(config) if h.id == host_id), None)
+    if host is None or not name:
+        raise DockerError("this container's Docker host is not in the plugin's settings")
+    verb, params = POWER[action]
+    status = host.post(f"/containers/{urllib.parse.quote(name, safe='')}/{verb}", **params)
+    return {"message": f"{name} is already " + ("running" if verb == "start" else "stopped") if status == 304 else f"{verb} sent to {name}"}

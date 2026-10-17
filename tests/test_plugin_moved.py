@@ -67,3 +67,12 @@ def test_an_old_cached_index_is_refreshed_once(world):
     rel = publish(server, "1.4.0", level="verified", plugin_id="proxmox", kind="hypervisor")
     server.put_index(index_doc(entry("proxmox", kind="hypervisor", releases=[rel])), etag='"new"')
     assert moved.run(conn, tmp, getter=server) == [{"id": "proxmox", "version": "1.4.0"}]
+
+
+def test_the_old_single_server_settings_are_kept_so_the_server_list_can_be_built_from_them(world):
+    conn, tmp, server = world
+    set_setting(conn, "plugin.proxmox", json.dumps({"enabled": True, "config": {"url": "https://pve:8006", "username": "root@pam", "password": "pw"}}))
+    offer(server, conn)
+    moved.run(conn, tmp, getter=server)
+    saved = json.loads(get_setting(conn, "plugin.proxmox"))["config"]
+    assert saved["url"] == "https://pve:8006" and saved["password"] == "pw"

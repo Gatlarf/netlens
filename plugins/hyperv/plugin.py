@@ -527,3 +527,33 @@ def diagnose(config):
         except HyperVError as exc:
             entry["steps"]["get_vm"] = {"ok": False, "error": _problem(exc)}
     return report
+
+
+POWER_SCRIPTS = {
+    "reset": "$r=Invoke-CimMethod -InputObject $v -MethodName RequestStateChange -Arguments @{RequestedState=[uint16]11}",
+    "start": "$r=Invoke-CimMethod -InputObject $v -MethodName RequestStateChange -Arguments @{RequestedState=[uint16]2}",
+    "shutdown": "$c=Get-CimAssociatedInstance -InputObject $v -ResultClassName Msvm_ShutdownComponent|Select-Object -First 1;if(-not $c){throw 'the guest has no integration services (cannot shut down cleanly)'};$r=Invoke-CimMethod -InputObject $c -MethodName InitiateShutdown -Arguments @{Force=$false;Reason='Netlens'}",
+}
+
+
+def power(config, payload):
+    """Hard reset, start or cleanly shut down one virtual machine through the Hyper-V WMI provider. payload: {"guest_id": "<host:port>/<vm guid>", "action": "reset"}."""
+    action = payload.get("action")
+    if action not in POWER_SCRIPTS:
+        raise ValueError(f"unknown action {action!r}")
+    server_id, _, guid = str(payload.get("guest_id") or "").rpartition("/")
+    if not re.fullmatch(r"[0-9A-Fa-f-]{36}", guid):
+        raise HyperVError("this virtual machine has no Hyper-V id")
+    session = next((s for s in parse_servers(config) if s.id == server_id), None)
+    if session is None:
+        raise HyperVError("this virtual machine's Hyper-V host is not in the plugin's settings")
+    script = ("$ErrorActionPreference='Stop';$ns='root\\virtualization\\v2';"
+              f"$v=Get-CimInstance -Namespace $ns -ClassName Msvm_ComputerSystem -Filter \"Name='{guid}'\";if(-not $v){{throw 'no such virtual machine'}};{POWER_SCRIPTS[action]};"
+              "if($r.ReturnValue -ne 0 -and $r.ReturnValue -ne 4096){throw ('Hyper-V returned '+$r.ReturnValue)};'ok'")
+    try:
+        out, err, code = session.run_powershell(script)
+    finally:
+        session.close()
+    if code != 0 or "ok" not in out:
+        raise HyperVError(f"{session.id}: " + (powershell_error(err) or f"the action failed (exit code {code})"))
+    return {"message": f"{action} sent to {payload.get('name') or guid}"}
