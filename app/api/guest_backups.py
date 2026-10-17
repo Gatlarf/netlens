@@ -12,4 +12,23 @@ router = APIRouter(prefix="/api", tags=["backups"])
 
 @router.get("/guest-backups")
 def get_guest_backups(conn=Depends(get_conn)) -> dict:
-    return guestbackups.overview(conn)
+    doc = guestbackups.overview(conn)
+    doc["sites"] = sites(conn)
+    return doc
+
+
+def sites(conn) -> list[dict]:
+    """The backups of the remote sites that report some (the roll-up of all locations)."""
+    import json
+
+    from app import probes
+
+    frozen = probes.locked_ids(conn)
+    out = []
+    for row in conn.execute("SELECT id, name, enabled, last_seen, summary FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
+        if row["id"] in frozen:
+            continue
+        backups = json.loads(row["summary"] or "{}").get("backups") or {}
+        if backups.get("configured"):
+            out.append({"id": row["id"], "name": row["name"], "last_seen": row["last_seen"], **backups})
+    return out

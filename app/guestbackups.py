@@ -221,3 +221,29 @@ def for_device(conn: sqlite3.Connection, device_id: int, now: datetime | None = 
     r = rows[0]
     return {"plugin_id": r["plugin_id"], "type": r["type"], "backup_id": r["backup_id"], "count": r["count"], "last_backup": r["last_backup"], "age_s": _age(r["last_backup"], now),
             "last_state": r["last_state"], "last_size": r["last_size"], "verify_state": r["verify_state"], "late": bool(r["stale"]), "interval": r["interval"]}
+
+
+def report(conn: sqlite3.Connection) -> dict[str, Any]:
+    """What this Netlens tells a central Netlens about its backups (counts, filling stores, the few that need attention)."""
+    summ = summary(conn)
+    if not summ["configured"]:
+        return {"configured": False}
+    stores = [{"name": r["name"], "percent": round(r["used"] / r["total"] * 100, 1) if r["total"] and r["used"] is not None else None, "level": r["level"]}
+              for r in conn.execute("SELECT name, used, total, level FROM backup_stores ORDER BY name COLLATE NOCASE LIMIT 20")]
+    attention = [{"name": r["name"] or f"{r['type']} {r['backup_id']}", "state": "failed" if r["last_state"] == "failed" else "late"}
+                 for r in conn.execute("SELECT * FROM backup_targets WHERE last_state = 'failed' OR stale = 1 ORDER BY name COLLATE NOCASE LIMIT 30")]
+    return {**summ, "stores": stores, "attention": attention}
+
+
+def clean_report(raw: Any) -> dict[str, Any]:
+    """The backups of a remote site as the central Netlens stores them: only numbers and short texts."""
+    if not isinstance(raw, dict) or not raw.get("configured"):
+        return {"configured": False}
+    num = lambda v: v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 10**7 else 0    # noqa: E731
+    out: dict[str, Any] = {"configured": True, **{k: num(raw.get(k)) for k in ("targets", "failed", "late", "unprotected", "guests", "protected", "stores_at_risk", "problems")}}
+    newest = raw.get("newest")
+    out["newest"] = newest[:20] if isinstance(newest, str) else None
+    out["stores"] = [{"name": str(x.get("name") or "")[:80], "percent": x["percent"] if isinstance(x.get("percent"), (int, float)) and not isinstance(x.get("percent"), bool) else None,
+                      "level": x.get("level") if x.get("level") in ("ok", "warning", "critical") else "ok"} for x in (raw.get("stores") or [])[:20] if isinstance(x, dict)]
+    out["attention"] = [{"name": str(x.get("name") or "")[:80], "state": "failed" if x.get("state") == "failed" else "late"} for x in (raw.get("attention") or [])[:30] if isinstance(x, dict)]
+    return out

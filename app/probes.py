@@ -137,7 +137,7 @@ def present(conn: sqlite3.Connection, row: sqlite3.Row, now: float | None = None
         "devices": {"total": counts["total"], "online": counts["online"], "core_down": counts["core_down"]},
         "services": {"total": services["total"], "down": services["down"]},
         "problems": {"count": len(problems), "critical": sum(1 for p in problems if p.get("level") == "critical")},
-        "scan": summary.get("scan"),
+        "scan": summary.get("scan"), "backups": summary.get("backups") or {"configured": False},
     }
 
 
@@ -309,7 +309,9 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
 
     interval = payload.get("interval_s")
     interval = int(interval) if isinstance(interval, int) and not isinstance(interval, bool) and 15 <= interval <= 3600 else probe["interval_s"]
-    summary = {"problems": problems, "monitors": _monitors(payload.get("monitors")), "scan": _scan(payload.get("scan")),
+    from app import guestbackups
+
+    summary = {"problems": problems, "monitors": _monitors(payload.get("monitors")), "scan": _scan(payload.get("scan")), "backups": guestbackups.clean_report(payload.get("backups")),
                "counts": {"devices": len(devices), "services": len(services), "samples": recorded},
                "accepts_config": bool(payload.get("accepts_config")),
                "config_rev": payload.get("config_rev") if isinstance(payload.get("config_rev"), int) and not isinstance(payload.get("config_rev"), bool) else 0}

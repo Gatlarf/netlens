@@ -149,9 +149,11 @@ def snapshot(conn, since_ts: int, now_ts: float | None = None) -> dict[str, Any]
             ref = keys.get(ident) if entity == "device" else svc_keys.get(ident)
             if ref:
                 samples.append({"ts": ts, "entity": entity, "ref": ref, "metric": metric, "label": label, "value": value, "unit": unit})
+    from app import guestbackups
+
     scan = conn.execute("SELECT finished, hosts_found FROM scans WHERE status = 'done' ORDER BY id DESC LIMIT 1").fetchone()
     running = conn.execute("SELECT 1 FROM scans WHERE status = 'running' LIMIT 1").fetchone()
-    return {"version": VERSION, "sent": utcnow(), "devices": devices, "services": services, "problems": problems, "monitors": monitors, "samples": samples,
+    return {"version": VERSION, "sent": utcnow(), "devices": devices, "services": services, "problems": problems, "monitors": monitors, "samples": samples, "backups": guestbackups.report(conn),
             "scan": {"finished": scan["finished"] if scan else None, "hosts": scan["hosts_found"] if scan else None, "running": bool(running)}}
 
 

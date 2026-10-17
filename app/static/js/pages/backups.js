@@ -46,6 +46,27 @@ function storeCard(s, server) {
   return card;
 }
 
+// The backups of all remote sites in one table (the roll-up of the locations that run a backup plugin).
+function siteRollup(sites) {
+  const card = h("div", { class: "card" }, h("h3", {}, `Remote sites (${sites.length})`),
+    h("p", { class: "hint" }, "The backups of every remote site that has a backup plugin, in one place. Open a site for its devices and checks."));
+  const table = h("table", { class: "data" });
+  table.appendChild(h("thead", {}, h("tr", {}, ...["Site", "Guests with a backup", "Failed", "Late", "Stores filling up", "Newest backup", "Needs attention"].map((c) => h("th", {}, c)))));
+  const tbody = h("tbody");
+  const rank = (x) => (x.failed ? 0 : x.late || x.unprotected || x.stores_at_risk ? 1 : 2);
+  for (const x of [...sites].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))) {
+    const names = x.attention.slice(0, 4).map((a) => `${a.name} (${a.state})`).join(", ") + (x.attention.length > 4 ? `, +${x.attention.length - 4} more` : "");
+    tbody.appendChild(h("tr", {}, h("td", {}, h("a", { href: `#/remote-sites?id=${x.id}` }, x.name)),
+      h("td", {}, `${x.protected} / ${x.guests}`, x.unprotected ? h("span", { class: "warn-text" }, ` · ${x.unprotected} without`) : ""),
+      h("td", {}, x.failed ? h("span", { class: "error" }, String(x.failed)) : "0"), h("td", {}, x.late ? h("span", { class: "warn-text" }, String(x.late)) : "0"),
+      h("td", {}, x.stores_at_risk ? h("span", { class: "warn-text" }, String(x.stores_at_risk)) : "0"),
+      h("td", { title: x.newest || "" }, x.newest ? timeAgo(x.newest) : "never"), h("td", { class: "hint" }, names || "–")));
+  }
+  table.appendChild(tbody);
+  card.appendChild(h("div", { class: "table-wrap" }, table));
+  return card;
+}
+
 export async function render(container) {
   let destroyed = false;
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
@@ -61,11 +82,17 @@ export async function render(container) {
     }
     if (destroyed) return;
     clear(body);
+    const sitesCard = (data.sites || []).length ? siteRollup(data.sites) : null;
+    if (!data.servers.length && sitesCard) {
+      body.appendChild(sitesCard);
+      return;
+    }
     if (!data.servers.length) {
       body.appendChild(h("div", { class: "card" }, h("p", {}, "No backup server is connected yet."),
         h("p", { class: "hint" }, "Install the ", h("a", { href: "#/settings/plugin-browse" }, "Proxmox Backup Server plugin"), " from the Plugin store and turn it on. Netlens then shows the newest backup of every guest, warns when one fails or is late, and lists the guests that have no backup.")));
       return;
     }
+    if (sitesCard) body.appendChild(sitesCard);
     const s = data.summary;
     const servers = Object.fromEntries(data.servers.map((x) => [x.id, x]));
     const tiles = h("div", { class: "card-row" });

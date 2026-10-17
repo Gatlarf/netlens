@@ -64,6 +64,9 @@ def get_dashboard(request: Request) -> dict:
                 if site["state"] == "silent":
                     doc["attention"].append({"level": "bad", "text": f"{site['name']} has stopped reporting", "href": href, "snooze": f"site:{site['id']}"})
                     continue
+                bk = site.get("backups") or {}
+                if bk.get("failed") or bk.get("late"):
+                    doc["attention"].append({"level": "bad" if bk.get("failed") else "warn", "text": f"{site['name']}: {bk.get('failed', 0)} backup(s) failed, {bk.get('late', 0)} late", "href": "#/backups", "snooze": None})
                 down = site["devices"]["core_down"]
                 if down:
                     doc["attention"].append({"level": "bad", "text": f"{site['name']}: {down} always-on device{'s' if down != 1 else ''} offline", "href": href})

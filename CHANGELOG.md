@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.42 — 2026-10-17
+
+### Added
+- ★ **Backups of all remote sites in one table**: a remote site that has a backup plugin now reports its backup state (counts, filling stores, the backups that failed or are late), and the Backups page of the central Netlens lists every site with a link to it. A failed or late backup at a site also shows on the dashboard.
+- The backup events (backup failed, late, recovered) can now be chosen as alert channel events.
+
 ## 0.4.38 — 2026-10-17
 
 ### Fixed

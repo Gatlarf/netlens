@@ -164,3 +164,26 @@ def test_api_dashboard_metrics_and_device(client):
     text = client.get("/metrics").text
     assert "netlens_backup_targets_late 1" in text and 'netlens_backup_age_seconds{' in text and 'netlens_backup_store_used_bytes{store="main"} 400' in text
     assert client.get(f"/api/devices/{dev}").json()["guest_backup"]["late"] is True
+
+
+def test_backups_of_remote_sites_roll_up(tmp_path):
+    from app import guestbackups, probes
+    from app.api.guest_backups import sites
+    from app.db import connect, init_db
+
+    conn = connect(tmp_path / "r.db")
+    init_db(conn)
+    probe, _ = probes.create(conn, "Branch")
+    row = conn.execute("SELECT * FROM probes WHERE id = ?", (probe["id"],)).fetchone()
+    report = {"configured": True, "targets": 5, "failed": 1, "late": 2, "unprotected": 1, "guests": 6, "protected": 5, "stores_at_risk": 1, "problems": 0, "newest": "2026-10-17T01:00:00Z",
+              "stores": [{"name": "main", "percent": 91.5, "level": "warning"}, {"name": "x" * 500, "percent": "bad", "level": "evil"}],
+              "attention": [{"name": "web", "state": "failed"}, {"name": "db", "state": "whatever"}], "junk": "<script>"}
+    probes.ingest(conn, row, {"devices": [], "services": [], "backups": report}, remote_ip="1.2.3.4")
+    out = sites(conn)
+    assert len(out) == 1 and out[0]["name"] == "Branch" and out[0]["failed"] == 1 and out[0]["protected"] == 5
+    assert "junk" not in out[0] and len(out[0]["stores"][1]["name"]) == 80 and out[0]["stores"][1]["percent"] is None and out[0]["stores"][1]["level"] == "ok"
+    assert [a["state"] for a in out[0]["attention"]] == ["failed", "late"]
+    assert probes.present(conn, conn.execute("SELECT * FROM probes").fetchone())["backups"]["configured"]
+    probes.ingest(conn, row, {"devices": [], "services": [], "backups": {"configured": False}}, remote_ip="1.2.3.4")
+    assert sites(conn) == []
+    assert guestbackups.report(conn) == {"configured": False}
