@@ -209,13 +209,12 @@ function fillPluginCard(card, plugin, onChange) {
   }
 
   const testBtn = h("button", { type: "button", class: "btn" }, serversField ? "Test all connections" : "Test connection");
-  const saveBtn = h("button", { type: "submit", class: "btn" }, "Save");
+  const saveBtn = h("button", { type: "submit", class: "btn primary" }, "Save");
   const syncBtn = h("button", { type: "button", class: "btn" }, "Sync now");
   syncBtn.disabled = !plugin.configured;
-  form.appendChild(testBtn);
-  form.appendChild(saveBtn);
-  form.appendChild(syncBtn);
-  if (!plugin.builtin) form.appendChild(removeButton(plugin, onChange));
+  const actions = h("div", { class: "form-actions" }, saveBtn, testBtn, syncBtn);
+  form.appendChild(actions);
+  if (!plugin.builtin) { const rm = removeButton(plugin, onChange); rm.classList.add("push-right"); actions.appendChild(rm); }
   const resultEl = h("p", { class: "hint" }, "");
   form.appendChild(resultEl);
 
@@ -223,7 +222,7 @@ function fillPluginCard(card, plugin, onChange) {
   const diagnoseBox = h("div", { class: "diagnose-box", id: "diagnose-box" });
   if (manifest.diagnose) {
     const diagBtn = h("button", { type: "button", class: "btn", id: "diagnose-run" }, "Run diagnostic");
-    form.insertBefore(diagBtn, resultEl);
+    actions.insertBefore(diagBtn, actions.querySelector(".push-right"));
     diagBtn.addEventListener("click", async () => {
       diagBtn.disabled = true;
       diagBtn.textContent = "Running…";

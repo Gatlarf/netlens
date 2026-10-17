@@ -1,5 +1,6 @@
 import { get, patch, post, del, ApiError } from "../api.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
+import { eventLabel } from "../event_labels.js";
 import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildPerformanceCard } from "../cards/performance.js";
@@ -84,8 +85,9 @@ function buildDetailsCard(device) {
 function buildWhyCard(device) {
   const info = device.identification;
   if (!info) return null;
-  const card = h("div", { class: "card", id: "why-card" });
-  card.appendChild(h("h2", {}, "Why this type?"));
+  const top = info.evidence && info.evidence[0];
+  const card = h("details", { class: "card", id: "why-card", open: !top });       // folded while Netlens has a clear answer
+  card.appendChild(h("summary", {}, h("h2", { class: "inline-h2" }, "Why this type?"), top ? h("span", { class: "hint" }, ` ${TYPE_LABELS[top.type] || top.type}: ${top.why}`) : null));
   if (device.type_override) {
     card.appendChild(h("p", { class: "hint" }, `You set this device to ${TYPE_LABELS[device.type_override] || device.type_override}; that choice wins. Netlens' own guess was ${TYPE_LABELS[device.device_type] || device.device_type || "unknown"}.`));
   }
@@ -650,7 +652,7 @@ function buildEventsCard(device) {
   for (const ev of events) {
     const li = h("li", { class: "event" });
     li.appendChild(h("span", { class: "event-time" }, timeAgo(ev.ts)));
-    li.appendChild(h("span", { class: "event-kind" }, ev.kind));
+    li.appendChild(h("span", { class: "event-kind" }, eventLabel(ev.kind)));
     if (ev.maintenance) li.appendChild(h("span", { class: "badge maint", title: "Held back by a maintenance window" }, `maintenance: ${ev.maintenance}`));
     li.appendChild(h("span", { class: "event-detail" }, ev.detail || ""));
     list.appendChild(li);

@@ -51,7 +51,7 @@ async function namesStep() {
   if (dns && dns.plugins.length) {
     const active = dns.plugins.find((p) => p.id === dns.plugin);
     dnsText = active && active.enabled
-      ? `Your DNS server (${active.name}) is connected. Netlens only changes it after you approve each change in Settings → DNS registration.`
+      ? `Your DNS server (${active.name}) is connected. Netlens only changes it after you approve each change in Network → DNSation.`
       : "A DNS plugin is installed but switched off. You can turn it on later under Settings → Plugins.";
   }
   return {
@@ -262,7 +262,7 @@ export const STEPS = [
   { title: "Your network", intro: "Which network should Netlens look at?", build: networkStep,
     more: [["#/settings/ranges", "Scan ranges"], ["#/settings/schedule", "How often to scan"]] },
   { title: "Device names", intro: "So you see names instead of numbers.", build: namesStep,
-    more: [["#/settings/nmap", "Scan performance and listening"], ["#/settings/dns", "DNS registration"]] },
+    more: [["#/settings/nmap", "Scan performance and listening"], ["#/dns", "DNS registration"]] },
   { title: "Always-on devices", intro: "Which devices should never be offline?", build: alwaysOnStep,
     more: [["#/uptime", "All devices on the Uptime page"]] },
   { title: "Alerts", intro: "How should Netlens reach you?", build: alertsStep,

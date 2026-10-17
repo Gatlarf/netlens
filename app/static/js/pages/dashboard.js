@@ -1,6 +1,7 @@
 // The start page: a grid of cards. Which cards, in what order and the cards a user made are a per-user choice kept on the server.
 import { get, put, del } from "../api.js";
 import { h, clear, timeAgo, shortName, isAdmin, sessionInfo, toast } from "../util.js";
+import { eventLabel } from "../event_labels.js";
 import { barList, columnChart, emptyNote, fmtPct, lineChart } from "../charts.js";
 import { cssVar } from "../theme.js";
 import { big, customCard, linkList, pluginCard, plural, rows, sparkline, toneUp } from "../dashboard_cards.js";
@@ -18,7 +19,7 @@ const KINDS = {
   metric_warning: "Health warning", metric_critical: "Health critical", metric_ok: "Health normal", capacity_warning: "Disk filling up", capacity_critical: "Disk almost full", anomaly: "Unusual reading",
   remote_new: "Remote: new device", remote_offline: "Remote: offline", remote_online: "Remote: online", remote_service_down: "Remote: service down", remote_service_up: "Remote: service up", remote_metric_warning: "Remote: health warning", remote_metric_critical: "Remote: health critical", remote_metric_ok: "Remote: health normal", probe_offline: "Remote site silent", probe_online: "Remote site reporting",
 };
-const kindText = (k) => KINDS[k] || k.replace(/_/g, " ");
+const kindText = (k) => KINDS[k] || eventLabel(k);
 // ---------- the cards ----------
 // size: s = one column, w = two, f = the whole row. show(d): has this installation anything for the card? `def` = on the default dashboard.
 
@@ -41,7 +42,7 @@ const CARDS = [
     } },
   { id: "speed", title: "Internet speed", href: "#/speedtest", size: "s", def: true, about: "The latest internet speed test: download, upload and delay.", show: (d) => !!d.speed,
     build: ({ speed: s }) => big(s.down_mbps >= 1000 ? `${(s.down_mbps / 1000).toFixed(2)} Gbps` : `${Math.round(s.down_mbps)} Mbps`, `down · up ${Math.round(s.up_mbps)} Mbps · ping ${Math.round(s.latency_ms)} ms`, { extra: h("div", { class: "d-mini" }, timeAgo(s.ts)) }) },
-  { id: "flapping", title: "Unstable devices", href: "#/uptime", size: "s", def: true, about: "Devices that keep going up and down: the always-on ones and the others apart, and the least reliable ones.",
+  { id: "flapping", title: "Unstable devices", href: "#/uptime", size: "s", about: "Devices that keep going up and down: the always-on ones and the others apart, and the least reliable ones.",
     tone: (d) => ((d.summary.core && d.summary.core.devices ? d.summary.core.flapping : d.summary.devices.flapping) ? "warn" : "ok"),
     build: ({ summary: s, worst }) => {
       const core = s.core && s.core.devices ? s.core : null, others = s.devices.flapping - (core ? core.flapping : 0);
@@ -53,7 +54,7 @@ const CARDS = [
   { id: "services", title: "Services", href: "#/services", size: "s", def: true, about: "Your HTTP, port and DNS checks.",
     show: (d) => d.summary.services.total > 0, tone: (d) => (d.summary.services.down ? "bad" : "ok"),
     build: ({ summary: s, services_down: down }) => big(`${s.services.up} / ${s.services.up + s.services.down}`, s.services.down ? `down: ${down.slice(0, 2).join(", ")}${down.length > 2 ? "…" : ""}` : "all up") },
-  { id: "containers", title: "Containers & guests", href: "#/devices", size: "s", def: true, about: "Containers, and separately the virtual machines and LXCs, on your hosts.",
+  { id: "containers", title: "Containers & guests", href: "#/devices", size: "s", about: "Containers, and separately the virtual machines and LXCs, on your hosts.",
     show: (d) => d.summary.containers.total + d.summary.guests.total > 0,
     tone: (d) => (d.summary.containers.unhealthy || d.summary.containers.restarting ? "warn" : "ok"),
     build: ({ summary: s }) => {
@@ -65,18 +66,18 @@ const CARDS = [
       return big(`${ctr.running} / ${ctr.total}`, `containers running on ${plural(s.guests.hosts, "host")}`, {
         extra: [h("div", { class: "d-mini" }, `${vms.running} / ${vms.total} virtual machines and LXCs running`), warn] });
     } },
-  { id: "guestbackups", title: "Guest backups", href: "#/backups", size: "s", def: true, about: "Which guests have a backup, and whether the newest ones worked (needs a backup plugin).",
+  { id: "guestbackups", title: "Guest backups", href: "#/backups", size: "s", about: "Which guests have a backup, and whether the newest ones worked (needs a backup plugin).",
     show: (d) => !!(d.summary.guest_backups && d.summary.guest_backups.configured),
     tone: (d) => { const g = d.summary.guest_backups; return g.failed ? "bad" : g.late || g.unprotected || g.stores_at_risk ? "warn" : "ok"; },
     build: ({ summary: s }) => { const g = s.guest_backups;
       const notes = [g.failed ? `${g.failed} failed` : null, g.late ? `${g.late} late` : null, g.unprotected ? `${g.unprotected} without a backup` : null, g.stores_at_risk ? `${g.stores_at_risk} store filling up` : null].filter(Boolean);
       return big(`${g.protected} / ${g.guests}`, "guests have a backup", { extra: [h("div", { class: `d-mini${notes.length ? " d-warn" : ""}` }, notes.length ? notes.join(" · ") : "all up to date"),
         g.newest ? h("div", { class: "d-mini" }, `newest backup ${timeAgo(g.newest)}`) : null] }); } },
-  { id: "sites", title: "Sites & certificates", href: "#/stats", size: "s", def: true, about: "Reverse-proxy sites and when their certificates end.",
+  { id: "sites", title: "Sites & certificates", href: "#/stats", size: "s", about: "Reverse-proxy sites and when their certificates end.",
     show: (d) => d.summary.sites.total > 0,
     tone: (d) => (d.summary.sites.down || d.summary.sites.certificates_expired ? "bad" : d.summary.sites.certificates_expiring ? "warn" : "ok"),
     build: ({ summary: s }) => big(s.sites.total, s.sites.next_expiry_days === null ? "sites" : `sites · next certificate ends in ${plural(s.sites.next_expiry_days, "day")}`) },
-  { id: "plugins", title: "Plugins", href: "#/settings/plugins", size: "s", def: true, about: "Plugins that are switched on, and whether they work.",
+  { id: "plugins", title: "Plugins", href: "#/settings/plugins", size: "s", about: "Plugins that are switched on, and whether they work.",
     show: (d) => d.summary.plugins.some((p) => p.enabled),
     tone: (d) => (d.summary.plugins.some((p) => p.enabled && p.ok === false) ? "bad" : "ok"),
     build: ({ summary: s }) => {
@@ -84,7 +85,7 @@ const CARDS = [
       return big(`${on.length - failing.length} / ${on.length}`, failing.length ? `failing: ${failing.map((p) => p.id).join(", ")}` : "working", {
         extra: s.update.plugin_updates ? h("div", { class: "d-mini" }, plural(s.update.plugin_updates, "update"), " available") : null });
     } },
-  { id: "backup", title: "Backup & scans", href: "#/scans", size: "s", def: true, about: "When the last backup and the last scan finished.",
+  { id: "backup", title: "Backup & scans", href: "#/scans", size: "s", about: "When the last backup and the last scan finished.",
     tone: (d) => (d.summary.backup.last_ok === false || d.summary.scans.last?.status === "failed" ? "bad" : "ok"),
     build: ({ summary: s }) => {
       const last = s.scans.last;
@@ -94,19 +95,38 @@ const CARDS = [
         ["Found", last ? plural(last.hosts_found, "host") : "–"],
       ]);
     } },
-  { id: "dns", title: "DNS & network checks", href: "#/settings/dns", size: "s", def: true, about: "Names registered in your DNS server and the DHCP server check.",
+  { id: "dns", title: "DNS & network checks", href: "#/dns", size: "s", about: "Names registered in your DNS server and the DHCP server check.",
     show: (d) => d.summary.dns.registered + d.summary.dns.pending + d.summary.dns.conflicts > 0 || d.summary.netchecks.enabled,
     tone: (d) => (d.summary.dns.conflicts || d.summary.netchecks.untrusted ? "warn" : "ok"),
     build: ({ summary: s }) => rows([
       ["Registered", s.dns.registered], ["Waiting to register", s.dns.pending, s.dns.pending ? "warn" : ""], ["Conflicts", s.dns.conflicts, s.dns.conflicts ? "warn" : ""],
       ["DHCP servers", !s.netchecks.enabled ? "check is off" : !s.netchecks.last_run ? "not checked yet" : `${s.netchecks.dhcp_servers}${s.netchecks.untrusted ? ` (${s.netchecks.untrusted} untrusted)` : ""}`, s.netchecks.untrusted ? "bad" : ""],
     ]) },
-  { id: "security", title: "Security", href: "#/scans", size: "s", def: true, about: "Failed sign-ins, devices you have not approved and new versions.",
+  { id: "security", title: "Security", href: "#/scans", size: "s", about: "Failed sign-ins, devices you have not approved and new versions.",
     tone: (d) => (d.login_failed_24h ? "warn" : "ok"),
     build: ({ summary: s, login_failed_24h: lf }) => rows([
       ["Failed sign-in bursts (24 h)", lf, lf ? "warn" : ""], ["Unknown devices", s.devices.unknown, s.devices.unknown ? "warn" : ""],
       ["New devices (7 days)", s.devices.new_7d], ["Update", s.update.available ? s.update.latest : "up to date", s.update.available ? "warn" : ""],
     ]) },
+  { id: "infra", title: "Infrastructure", href: "#/devices", size: "s", def: true, about: "Containers, virtual machines, proxy sites and certificates, plugins and backups in one card.",
+    show: (d) => d.summary.containers.total + d.summary.guests.total + d.summary.sites.total > 0 || d.summary.plugins.some((p) => p.enabled),
+    tone: (d) => { const s = d.summary, g = s.guest_backups, on = s.plugins.filter((p) => p.enabled);
+      return s.sites.down || s.sites.certificates_expired || on.some((p) => p.ok === false) || (g && g.failed) || s.backup.last_ok === false ? "bad"
+        : s.containers.unhealthy || s.containers.restarting || s.sites.certificates_expiring || (g && (g.late || g.unprotected)) ? "warn" : "ok"; },
+    build: ({ summary: s }) => {
+      const bk = s.guests.by_kind || {};
+      const sum = (kinds) => kinds.reduce((a, k) => ({ running: a.running + ((bk[k] || {}).running || 0), total: a.total + ((bk[k] || {}).total || 0) }), { running: 0, total: 0 });
+      const ctr = sum(["container", "app"]), vms = { running: s.guests.running - ctr.running, total: s.guests.total - ctr.total };
+      const on = s.plugins.filter((p) => p.enabled), failing = on.filter((p) => p.ok === false), g = s.guest_backups;
+      const list = [];
+      if (ctr.total) list.push(["Containers", `${ctr.running} / ${ctr.total} running${s.containers.unhealthy || s.containers.restarting ? ` · ${s.containers.unhealthy + s.containers.restarting} to check` : ""}`, s.containers.unhealthy || s.containers.restarting ? "warn" : ""]);
+      if (vms.total) list.push(["Virtual machines", `${vms.running} / ${vms.total} running`]);
+      if (s.sites.total) list.push(["Sites", s.sites.next_expiry_days === null ? String(s.sites.total) : `${s.sites.total} · next certificate ${s.sites.next_expiry_days} d`, s.sites.down || s.sites.certificates_expired ? "bad" : s.sites.certificates_expiring ? "warn" : ""]);
+      if (g && g.configured) list.push(["Guest backups", `${g.protected} / ${g.guests} protected${g.failed ? ` · ${g.failed} failed` : g.late ? ` · ${g.late} late` : ""}`, g.failed ? "bad" : g.late || g.unprotected ? "warn" : ""]);
+      list.push(["Netlens backup", s.backup.last_at ? timeAgo(s.backup.last_at) : s.backup.enabled ? "not yet" : "off", s.backup.last_ok === false ? "bad" : ""]);
+      if (on.length) list.push(["Plugins", failing.length ? `${failing.length} of ${on.length} failing: ${failing.map((p) => p.id).join(", ")}` : `${on.length} working`, failing.length ? "bad" : ""]);
+      return rows(list);
+    } },
   { id: "attention", title: "Needs attention", size: "w", def: true, about: "Everything that is wrong or worth a look, worst first.",
     tone: (d) => (d.attention.some((a) => a.level === "bad") ? "bad" : d.attention.some((a) => a.level === "warn") ? "warn" : "ok"),
     build: ({ attention, snoozed }) => h("div", {},
@@ -117,14 +137,14 @@ const CARDS = [
   { id: "health", title: "Health", href: "#/health", size: "w", def: true, about: "A heat-map of the devices whose health is monitored (processor, memory, disk), with what is past a limit.",
     show: (d) => !!d.health && d.health.monitors.some((m) => m.enabled), tone: (d) => healthTone(d.health.monitors, d.health.problems),
     build: ({ health }) => buildHealthCard(health) },
-  { id: "capacity", title: "Running out soon", href: "#/health", size: "w", def: true, about: "Disks that are filling up, with the day they will be full, worked out from how fast they have grown.",
+  { id: "capacity", title: "Running out soon", href: "#/health", size: "s", def: true, about: "Disks that are filling up, with the day they will be full, worked out from how fast they have grown.",
     show: (d) => !!d.capacity && d.capacity.items.length > 0, tone: (d) => capacityTone(d.capacity),
     build: ({ capacity }) => buildCapacityCard(capacity) },
   { id: "events", title: "Recent events", href: "#/scans", size: "w", def: true, about: "The latest things that happened on the network.",
     build: ({ events }) => (events.length ? h("ul", { class: "d-events" }, events.slice(0, 8).map((e) => h("li", {},
       h("span", { class: "d-time" }, timeAgo(e.ts)), h("span", { class: "d-kind" }, kindText(e.kind)),
       e.device_id ? h("a", { href: `#/device/${e.device_id}` }, shortName(e.device) || `device ${e.device_id}`) : null))) : emptyNote("No events yet.")) },
-  { id: "minimap", title: "Map", href: "#/map", size: "w", def: true, about: "A small picture of your network. Click it to open the full map.", tall: true, build: null },
+  { id: "minimap", title: "Map", href: "#/map", size: "f", def: true, about: "A small picture of your network. Click it to open the full map.", tall: true, build: null },
 
   // not on the default dashboard, added by the user
   { id: "worst", title: "Least reliable devices", href: "#/uptime", size: "s", about: "The five devices that were down most in the last 7 days.",
@@ -162,7 +182,8 @@ const CARDS = [
       h("button", { class: "btn", type: "button", onclick: () => document.getElementById("scan-deep")?.click() }, "Deep scan")) },
 ];
 const TYPE_ABOUT = { value: "A value from your data", device: "A device", group: "A group of devices", service: "A service check", notes: "Notes and links" };
-const DEFAULT_ORDER = CARDS.filter((c) => c.def).map((c) => c.id);
+const FIRST_VIEW = ["devices", "uptime", "services", "speed", "attention", "health", "infra", "capacity", "events", "minimap"];   // the order a new installation starts with
+const DEFAULT_ORDER = [...FIRST_VIEW.filter((id) => CARDS.some((c) => c.id === id && c.def)), ...CARDS.filter((c) => c.def && !FIRST_VIEW.includes(c.id)).map((c) => c.id)];
 
 // ---------- the chosen layout (per user, kept on the server so every browser and device shows the same dashboard) ----------
 // The browser's own storage is only the fallback (and where an older version kept the layout): it is moved to the server once.
@@ -449,11 +470,23 @@ export async function render(container) {
   }
 
   function drawHeader() {
-    const a = data.attention, bad = a.filter((x) => x.level !== "info").length;
-    const status = bad ? `${plural(bad, "thing")} need${bad === 1 ? "s" : ""} attention` : "Everything looks fine";
+    const a = data.attention, s = data.summary;
+    const crit = a.filter((x) => x.level === "bad").length, bad = a.filter((x) => x.level !== "info").length;
+    const tone = crit ? "bad" : bad ? "warn" : "ok";
+    const verdict = crit ? `${plural(crit, "critical problem")}${bad > crit ? ` and ${plural(bad - crit, "warning")}` : ""}` : bad ? `${plural(bad, "thing")} need${bad === 1 ? "s" : ""} attention` : "Everything is running normally";
+    const core = s.core && s.core.devices ? s.core.uptime["24h"] : s.uptime["24h"];
+    const fact = (href, value, label, cls) => h("a", { href, class: "dash-fact" }, h("strong", { class: cls || "" }, value), ` ${label}`);
+    const last = s.scans.last;
     clear(header);
+    header.className = `dash-hero tone-${tone}`;
     header.append(
-      h("div", {}, h("h1", {}, "Dashboard"), h("p", { class: `dash-status ${bad ? "d-warn" : "d-ok"}` }, status, h("span", { class: "hint" }, ` · updated ${timeAgo(data.summary.generated)}`)),
+      h("div", { class: "dash-hero-main" }, h("h1", {}, "Dashboard"), h("p", { class: "dash-verdict" }, verdict),
+        h("div", { class: "dash-facts" },
+          fact("#/devices", `${s.devices.online} / ${s.devices.total}`, "devices online", s.devices.offline ? "d-warn" : ""),
+          s.services.up + s.services.down > 0 ? fact("#/services", `${s.services.up} / ${s.services.up + s.services.down}`, "services up", s.services.down ? "d-bad" : "") : null,
+          core === null || core === undefined ? null : fact("#/uptime", fmtPct(core), "uptime, 24 hours", `d-${toneUp(core) || "ok"}`),
+          last ? fact("#/scans", timeAgo(last.finished), `last ${last.kind} scan`, last.status === "failed" ? "d-bad" : "") : null,
+          h("span", { class: "dash-fact hint" }, `updated ${timeAgo(s.generated)}`)),
         shared && !own ? h("p", { class: "hint" }, "This is the starting dashboard set by your administrator. Press Customize to make it your own.") : null),
       h("div", { class: "dash-tools" },
         editing && isAdmin() ? h("button", { class: "btn", type: "button", title: "Everybody who has not arranged their own dashboard will see this one", onclick: setForEveryone }, "Use as default for everyone") : null,

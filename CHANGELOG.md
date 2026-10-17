@@ -2,6 +2,16 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.63 — 2026-10-17
+
+### Changed
+- ★ **A new look, the same everywhere**: every page now starts the same way (a title, one line of help, the page's actions on the right), cards, summary tiles, tables and empty states share one style, and event names read the same on every page ("Went offline", not `device_offline`).
+- ★ **A new dashboard first view**: one line says whether everything is running normally or what needs attention, with the numbers that matter beside it (devices online, services up, uptime, last scan). The default cards are fewer and sharper: the four key figures, what needs attention, health, a new **Infrastructure** card (containers, virtual machines, sites and certificates, plugins, backups), disks running out, recent events and the map. The cards that left the default are still there under Customize. Dashboards you arranged yourself stay as they are.
+- **New menus**: Network (Map, Devices, Hierarchy, DNS, Remote sites, Remote access), Monitoring (Uptime, Health, Services, Backups, Smart home), Analysis (Statistics, Reports, What changed, Speed tests, Scans & events) and Automation (Insights, Remediation, administrators only). Settings is grouped as Scanning, Display, Access, Notifications, Integrations, Connections, Data and System.
+- **DNS has its own page** (Network → DNS): what Netlens would register, with what is already right out of the way and the settings folded away. The old address still works.
+- **Statistics in tabs** (Overview, Network, Services & infrastructure, Scans & events, System) instead of one page with forty cards; rows of zeros are left out.
+- **Scans & events** shows events first, with the device name and readable event names, and the scans on a second tab. **Speed tests** has tabs for the internet, your own network and all results. **Insights** puts the question box first and folds the long incident list and the settings. **Health** folds the warning limits. **Uptime** shows one compact line per device, least reliable first (response-time graphs are a tick box). **Services** keeps Run now and Graph on each row and moves Edit, Pause and Delete into a menu. A device page folds "Why this type?" while the answer is clear.
+
 ## 0.4.62 — 2026-10-17
 
 ### Fixed

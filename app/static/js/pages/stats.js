@@ -1,13 +1,10 @@
 import { get } from "../api.js";
 import { h, clear, toast, timeAgo, fmtTime, TYPE_LABELS } from "../util.js";
+import { eventLabel } from "../event_labels.js";
+import { pageHead } from "../ui.js";
 import { barList, columnChart, donut, emptyNote, fmtBytes, fmtDuration, fmtNumber, fmtPct, lineChart, tile } from "../charts.js";
 
 const RANGES = [["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["90d", "90 days"]];
-const EVENT_LABELS = {
-  device_new: "New device", device_offline: "Went offline", device_online: "Came online", ip_changed: "IP changed",
-  os_changed: "OS changed", port_opened: "Port opened", wake_sent: "Wake-on-LAN sent", port_closed: "Port closed", port_unexpected: "Unexpected port", port_missing: "Baseline port gone", host_timeout: "Host timeout", device_deleted: "Deleted",
-  service_down: "Service down", service_up: "Service up", metric_warning: "Health warning", metric_critical: "Health critical", metric_ok: "Health normal", capacity_warning: "Disk filling up", capacity_critical: "Disk almost full", anomaly: "Unusual reading", remote_new: "Remote: new device", remote_offline: "Remote: offline", remote_online: "Remote: online", remote_service_down: "Remote: service down", remote_service_up: "Remote: service up", remote_metric_warning: "Remote: health warning", remote_metric_critical: "Remote: health critical", remote_metric_ok: "Remote: health normal", probe_offline: "Remote site silent", licence_expiring: "Licence ending", remediation_pending: "Fix waiting for approval", remediation_ran: "Automatic fix done", remediation_failed: "Automatic fix failed", remediation_recovered: "Fix worked", inventory_unavailable: "Smart home: unavailable", inventory_available: "Smart home: available", inventory_battery_low: "Smart home: battery low", guest_backup_failed: "Backup failed", guest_backup_late: "Backup late", guest_backup_recovered: "Backup recovered", probe_online: "Remote site reporting", wifi_roamed: "Wi-Fi move", ip_reused: "IP reused", backup_failed: "Backup failed", dhcp_rogue: "Rogue DHCP?", gateway_changed: "Gateway changed", dns_registered: "Registered in DNS", dns_updated: "DNS updated", plugin_updated: "Plugin updated", plugin_update_failed: "Plugin update failed", plugin_update_skipped: "Plugin update held back", dns_removed: "DNS record removed", dns_failed: "DNS write failed", container_unhealthy: "Container unhealthy", container_restarting: "Container restarting", container_stopped: "Container stopped", guest_stopped: "Guest stopped", guest_started: "Guest started", guest_update_available: "Update available", cert_expiring: "Certificate expiring", login_failed: "Failed logins",
-};
 
 const dev = (item) => ({ ...item, href: `#/device/${item.id}` });
 
@@ -83,10 +80,11 @@ function build(s) {
   const idn = s.identification;
   const pa = sys.passive;
   root.appendChild(section("identification", "How well Netlens knows its devices",
-    h("div", { class: "tiles inline" },
-      tile(fmtNumber(idn.unknown_type), "type unknown", { tone: idn.unknown_type ? "warn" : "" }), tile(fmtNumber(idn.private_mac), "private (randomized) address"),
-      tile(fmtNumber(idn.no_vendor), "manufacturer unknown", { tone: idn.no_vendor ? "warn" : "" }), tile(fmtNumber(idn.nameless), "without a name"),
-      tile(fmtNumber(idn.no_os), "operating system unknown"), tile(fmtNumber(idn.manual_type), "type set by hand"), tile(fmtNumber(idn.gentle), "scanned gently")),
+    (() => {   // only what is left to fix or worth knowing: a row of zeros says nothing
+      const shown = [[idn.unknown_type, "type unknown", "warn"], [idn.no_vendor, "manufacturer unknown", "warn"], [idn.nameless, "without a name", ""], [idn.no_os, "operating system unknown", ""],
+        [idn.private_mac, "private (randomized) address", ""], [idn.manual_type, "type set by hand", ""], [idn.gentle, "scanned gently", ""]].filter(([n]) => n).map(([n, label, tone]) => tile(fmtNumber(n), label, { tone }));
+      return shown.length ? h("div", { class: "tiles inline" }, ...shown) : emptyNote("Every device has a type, a manufacturer, a name and an operating system.");
+    })(),
     card("Passive listening", pa ? table(["", ""], [["State", !pa.enabled ? "off" : pa.running ? "listening" : `not running${pa.error ? `: ${pa.error}` : ""}`], ["Announcements heard", fmtNumber(pa.frames)], ["Devices updated", fmtNumber(pa.applied)], ["Waiting for a scan to find their device", fmtNumber(pa.pending)]]) : emptyNote("Not available here."),
       h("p", { class: "hint" }, "Names and operating systems that devices announce in DHCP, mDNS and UPnP (Settings → Scan performance)."))));
 
@@ -179,9 +177,9 @@ function build(s) {
 
   // ------------------------------------------------------------------ events
   root.appendChild(section("events", "Events",
-    card("By kind", barList(ev.by_kind.map((r) => ({ label: EVENT_LABELS[r.label] || r.label, count: r.count })))),
+    card("By kind", barList(ev.by_kind.map((r) => ({ label: eventLabel(r.label), count: r.count })))),
     card("Most active devices", barList(ev.most_active.map((r) => dev({ id: r.id, label: r.name, count: r.count })))),
-    card("Latest events", table(["When", "What", "Device"], ev.recent.map((r) => [timeAgo(r.ts), `${EVENT_LABELS[r.kind] || r.kind}${r.detail ? `: ${r.detail}` : ""}`, r.device_id ? h("a", { href: `#/device/${r.device_id}` }, r.device || `device ${r.device_id}`) : ""])))));
+    card("Latest events", table(["When", "What", "Device"], ev.recent.map((r) => [timeAgo(r.ts), `${eventLabel(r.kind)}${r.detail ? `: ${r.detail}` : ""}`, r.device_id ? h("a", { href: `#/device/${r.device_id}` }, r.device || `device ${r.device_id}`) : ""])))));
 
   // ------------------------------------------------------------------ system
   root.appendChild(section("system", "System",
@@ -196,16 +194,23 @@ function build(s) {
   return root;
 }
 
+// The sections are grouped under tabs so one view holds a handful of cards, not forty.
+const TABS = [["overview", "Overview"], ["network", "Network"], ["infra", "Services & infrastructure"], ["activity", "Scans & events"], ["system", "System"]];
+const TAB_OF = { overview: "overview", history: "overview", availability: "overview", network: "network", wifi: "network", identification: "network", ports: "network", structure: "network",
+  guests: "infra", sites: "infra", services: "infra", speed: "infra", scans: "activity", events: "activity", system: "system" };
+
 export async function render(container) {
   let destroyed = false;
-  let range = "7d";
+  let range = "7d", tab = "overview";
   try {
     range = RANGES.map((r) => r[0]).includes(localStorage.getItem("netlens.stats.range")) ? localStorage.getItem("netlens.stats.range") : "7d";
+    const saved = localStorage.getItem("netlens.stats.tab");
+    if (TABS.some((x) => x[0] === saved)) tab = saved;
   } catch (e) {
-    // storage unavailable: use the default
+    // storage unavailable: use the defaults
   }
-  const bar = h("div", { class: "toolbar" }, h("strong", {}, "Statistics"), h("span", { class: "hint" }, "Period for the history, scan and event groups:"));
   const buttons = {};
+  const picker = h("div", { class: "seg", role: "group", "aria-label": "Period for the history, scan and event groups" });
   for (const [key, label] of RANGES) {
     buttons[key] = h("button", { class: "btn", type: "button", "data-range": key }, label);
     buttons[key].addEventListener("click", () => {
@@ -217,65 +222,39 @@ export async function render(container) {
       }
       load();
     });
-    bar.appendChild(buttons[key]);
+    picker.appendChild(buttons[key]);
   }
   const stamp = h("span", { class: "hint stats-stamp" }, "");
-  bar.appendChild(stamp);
-  // the sticky bar with a button per section (buttons, not #links: the address bar holds the page route)
-  const nav = h("nav", { class: "stats-nav", "aria-label": "Sections of this page" });
+  const head = pageHead("Statistics", "Numbers about your network, grouped by what you want to know. The period applies to the history, scan and event groups.", picker, stamp);
+  const nav = h("nav", { class: "dev-tabs", role: "tablist", "aria-label": "Groups of statistics" });
   const body = h("div", { class: "stats-body" }, h("p", { class: "hint" }, "Loading..."));
-  container.appendChild(bar);
+  container.appendChild(head);
   container.appendChild(nav);
   container.appendChild(body);
 
-  const topbar = document.querySelector(".topbar");
-  const setOffsets = () => {
-    container.style.setProperty("--statsnav-h", `${nav.offsetHeight}px`);
-  };
   const sections = () => [...body.querySelectorAll("section.stat-section")];
-  const offset = () => (topbar ? topbar.offsetHeight : 0) + nav.offsetHeight + 12;
-  let active = null;
-  const markActive = () => {
-    const y = offset();
-    let current = null;
-    for (const sec of sections()) {
-      if (sec.getBoundingClientRect().top <= y) current = sec.id;
+  function showTab() {
+    for (const sec of sections()) sec.hidden = sec.dataset.tab !== tab;
+    for (const chip of nav.querySelectorAll("button")) {
+      chip.classList.toggle("active", chip.dataset.tab === tab);
+      chip.setAttribute("aria-selected", String(chip.dataset.tab === tab));
     }
-    if (current === null && sections().length) current = sections()[0].id;
-    // at the very bottom the last sections can never reach the top of the screen: highlight the last one
-    if (sections().length && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 3) current = sections()[sections().length - 1].id;
-    if (current === active) return;
-    active = current;
-    for (const chip of nav.querySelectorAll("button")) chip.classList.toggle("active", chip.dataset.target === current);
-    const chip = nav.querySelector("button.active");
-    if (chip && nav.scrollWidth > nav.clientWidth) chip.scrollIntoView({ block: "nearest", inline: "center" });
-  };
-  let ticking = false;
-  const onScroll = () => {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(() => { ticking = false; markActive(); });
-  };
-  const onResize = () => { setOffsets(); markActive(); };
-  window.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", onResize);
-
+  }
   function buildNav() {
     clear(nav);
-    for (const sec of sections()) {
-      const chip = h("button", { type: "button", class: "stat-chip", "data-target": sec.id }, sec.dataset.title);
+    const present = new Set(sections().map((sec) => sec.dataset.tab));
+    if (!present.has(tab)) tab = "overview";
+    for (const [key, label] of TABS) {
+      if (!present.has(key)) continue;
+      const chip = h("button", { type: "button", role: "tab", class: "dev-tab", "data-tab": key }, label);
       chip.addEventListener("click", () => {
-        // scrolling down hides the bar on a phone, so leave no room for it then
-        const target = sec.getBoundingClientRect().top + window.scrollY;
-        const barHidesOnTheWay = window.matchMedia("(max-width: 700px)").matches && target > window.scrollY;
-        const bar = barHidesOnTheWay ? 0 : (topbar ? topbar.offsetHeight : 0);
-        window.scrollTo({ top: Math.max(0, target - bar - nav.offsetHeight - 8), behavior: "smooth" });
+        tab = key;
+        try { localStorage.setItem("netlens.stats.tab", key); } catch (e) { /* not remembered */ }
+        showTab();
       });
       nav.appendChild(chip);
     }
-    active = null;
-    setOffsets();
-    markActive();
+    showTab();
   }
 
   async function load() {
@@ -284,7 +263,9 @@ export async function render(container) {
       const data = await get(`/api/stats?range=${range}`);
       if (destroyed) return;
       const keepAt = window.scrollY;   // a refresh must not throw you back to the top
-      body.replaceChildren(build(data));
+      const built = build(data);
+      for (const sec of built.querySelectorAll("section.stat-section")) sec.dataset.tab = TAB_OF[sec.id.replace(/^stat-/, "")] || "system";
+      body.replaceChildren(built);
       buildNav();
       if (Math.abs(window.scrollY - keepAt) > 2) window.scrollTo(0, keepAt);
       stamp.textContent = `Updated ${timeAgo(data.generated)}`;
@@ -301,7 +282,5 @@ export async function render(container) {
   return () => {
     destroyed = true;
     clearInterval(timer);
-    window.removeEventListener("scroll", onScroll);
-    window.removeEventListener("resize", onResize);
   };
 }

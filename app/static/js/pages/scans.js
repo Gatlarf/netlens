@@ -1,48 +1,7 @@
 import { get } from "../api.js";
 import { h, clear, fmtTime, timeAgo } from "../util.js";
-
-const KIND_LABELS = {
-  device_new: "New device",
-  device_online: "Device online",
-  device_offline: "Device offline",
-  ip_changed: "IP changed",
-  port_opened: "Port opened",
-  wake_sent: "Wake-on-LAN sent",
-  port_closed: "Port closed",
-  port_unexpected: "Unexpected port",
-  port_missing: "Baseline port gone",
-  os_changed: "OS changed",
-  host_timeout: "Host timeout",
-  device_deleted: "Device deleted",
-  ip_reused: "IP reused",
-  wifi_roamed: "Wi-Fi move",
-  service_down: "Service down",
-  service_up: "Service up",
-  metric_warning: "Health warning",
-  metric_critical: "Health critical",
-  metric_ok: "Health normal",
-  capacity_warning: "Disk filling up",
-  anomaly: "Unusual reading",
-  plugin_updated: "Plugin updated",
-  plugin_update_failed: "Plugin update failed",
-  plugin_update_skipped: "Plugin update held back",
-  capacity_critical: "Disk almost full",
-  remote_new: "Remote: new device",
-  remote_offline: "Remote: offline",
-  remote_online: "Remote: online",
-  remote_service_down: "Remote: service down",
-  remote_service_up: "Remote: service up",
-  remote_metric_warning: "Remote: health warning",
-  remote_metric_critical: "Remote: health critical",
-  remote_metric_ok: "Remote: health normal",
-  probe_offline: "Remote site silent",
-  probe_online: "Remote site reporting",
-  backup_failed: "Backup failed",
-  dhcp_rogue: "Rogue DHCP?",
-  gateway_changed: "Gateway changed",
-  login_failed: "Failed logins",
-  cert_expiring: "Certificate expiring"
-};
+import { pageHead } from "../ui.js";
+import { EVENT_LABELS as KIND_LABELS, eventLabel } from "../event_labels.js";
 
 const KIND_ORDER = [
   "device_new",
@@ -116,11 +75,15 @@ function truncate(text, max = 40) {
 export async function render(container, params) {
   clear(container);
 
-  const grid = h("div", { class: "grid-2" });
+  let tab = "events";
+  try { if (localStorage.getItem("netlens.scans.tab") === "scans") tab = "scans"; } catch (e) { /* default */ }
+  const tabs = h("nav", { class: "dev-tabs", role: "tablist", "aria-label": "Events or scans" });
+  const grid = h("div", { class: "scan-panels" });
 
   // Left card: Scans
   const scansCard = h("div", { class: "card" });
   const scansTitle = h("h2", { class: "card-title" }, "Scans");
+  scansTitle.hidden = true;
   const scansBody = h("div", { class: "card-body" });
   scansCard.appendChild(scansTitle);
   scansCard.appendChild(scansBody);
@@ -128,6 +91,7 @@ export async function render(container, params) {
   // Right card: Events
   const eventsCard = h("div", { class: "card" });
   const eventsTitle = h("h2", { class: "card-title" }, "Events");
+  eventsTitle.hidden = true;
   const filterRow = h("div", { class: "filter-row" });
   const select = h("select", { class: "kind-filter" });
   const allOption = h("option", { value: "" }, "All");
@@ -142,8 +106,19 @@ export async function render(container, params) {
   eventsCard.appendChild(filterRow);
   eventsCard.appendChild(eventsBody);
 
-  grid.appendChild(scansCard);
   grid.appendChild(eventsCard);
+  grid.appendChild(scansCard);
+  const showTab = () => {
+    eventsCard.hidden = tab !== "events";
+    scansCard.hidden = tab !== "scans";
+    for (const b of tabs.querySelectorAll("button")) { b.classList.toggle("active", b.dataset.tab === tab); b.setAttribute("aria-selected", String(b.dataset.tab === tab)); }
+  };
+  for (const [key, label] of [["events", "Events"], ["scans", "Scans"]]) {
+    tabs.appendChild(h("button", { type: "button", role: "tab", class: "dev-tab", "data-tab": key, onclick: () => { tab = key; try { localStorage.setItem("netlens.scans.tab", key); } catch (e) { /* not remembered */ } showTab(); } }, label));
+  }
+  showTab();
+  container.appendChild(pageHead("Scans & events", "What happened on the network (events) and the scans that look for it. Both refresh by themselves."));
+  container.appendChild(tabs);
   container.appendChild(grid);
 
   let intervalId = null;
@@ -213,7 +188,7 @@ export async function render(container, params) {
         timeEl.title = fmtTime(ev.ts);
         li.appendChild(timeEl);
 
-        const label = h("span", { class: `event-kind ${ev.kind}` }, KIND_LABELS[ev.kind] || ev.kind);
+        const label = h("span", { class: `event-kind ${ev.kind}` }, eventLabel(ev.kind));
         li.appendChild(label);
         if (ev.maintenance) li.appendChild(h("span", { class: "badge maint", title: "Held back by a maintenance window: not sent to e-mail or channels" }, `maintenance: ${ev.maintenance}`));
 
@@ -221,7 +196,7 @@ export async function render(container, params) {
         li.appendChild(detail);
 
         if (ev.device_id != null) {
-          const link = h("a", { href: `#/device/${ev.device_id}`, class: "event-link" }, `Device ${ev.device_id}`);
+          const link = h("a", { href: `#/device/${ev.device_id}`, class: "event-link" }, ev.device || `Device ${ev.device_id}`);
           li.appendChild(link);
         }
 

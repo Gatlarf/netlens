@@ -1,5 +1,6 @@
 import { get } from "../api.js";
 import { h, clear, timeAgo } from "../util.js";
+import { pageHead, tile as uiTile, tileRow, emptyState } from "../ui.js";
 
 const UNITS = ["B", "KB", "MB", "GB", "TB", "PB"];
 export function bytes(n) {
@@ -70,7 +71,7 @@ function siteRollup(sites) {
 export async function render(container) {
   let destroyed = false;
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
-  container.append(h("div", { class: "toolbar" }, h("strong", {}, "Backups"), h("span", { class: "hint" }, "What your backup server holds for each guest. It comes from a backup plugin (Plugin store).")), body);
+  container.append(pageHead("Backups", "What your backup server holds for each guest. It comes from a backup plugin (Plugin store)."), body);
 
   async function load() {
     let data;
@@ -88,15 +89,14 @@ export async function render(container) {
       return;
     }
     if (!data.servers.length) {
-      body.appendChild(h("div", { class: "card" }, h("p", {}, "No backup server is connected yet."),
-        h("p", { class: "hint" }, "Install the ", h("a", { href: "#/settings/plugin-browse" }, "Proxmox Backup Server plugin"), " from the Plugin store and turn it on. Netlens then shows the newest backup of every guest, warns when one fails or is late, and lists the guests that have no backup.")));
+      body.appendChild(emptyState("No backup server is connected yet", "Install a backup plugin (for example Proxmox Backup Server) from the Plugin store and turn it on. Netlens then shows the newest backup of every guest, warns when one fails or is late, and lists the guests that have no backup.", h("a", { class: "btn primary", href: "#/settings/plugin-browse" }, "Open the Plugin store")));
       return;
     }
     if (sitesCard) body.appendChild(sitesCard);
     const s = data.summary;
     const servers = Object.fromEntries(data.servers.map((x) => [x.id, x]));
-    const tiles = h("div", { class: "card-row" });
-    const tile = (label, value, tone) => h("div", { class: `card tile ${tone || ""}` }, h("div", { class: "tile-value" }, String(value)), h("div", { class: "hint" }, label));
+    const tiles = tileRow();
+    const tile = (label, value, tone) => uiTile(label, value, "", tone);
     tiles.append(tile("guests with a backup", `${s.protected} / ${s.guests}`, s.unprotected ? "warn" : ""), tile("last backup failed", s.failed, s.failed ? "bad" : ""),
       tile("not backed up on time", s.late, s.late ? "warn" : ""), tile("stores filling up", s.stores_at_risk, s.stores_at_risk ? "warn" : ""));
     body.appendChild(tiles);

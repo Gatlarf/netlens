@@ -78,9 +78,10 @@ def test_start_page_and_menu_groups_are_wired():
     index = (STATIC / "index.html").read_text(encoding="utf-8")
     app_js = (STATIC / "js" / "app.js").read_text(encoding="utf-8")
     assert '"#/": "dashboard"' in app_js
-    for route in ("dashboard", "map", "devices", "hierarchy", "uptime", "services", "stats", "scans", "settings"):
+    for route in ("dashboard", "map", "devices", "hierarchy", "uptime", "services", "stats", "scans", "insights", "remediation", "settings"):
         assert f'data-route="{route}"' in index, route
-    assert index.count('class="menu-wrap topnav-group"') == 2
+    assert index.count('class="menu-wrap topnav-group') == 4          # Network, Monitoring, Analysis, Automation
+    assert 'class="menu-wrap topnav-group admin-only"' in index       # Automation is for administrators
     # the coffee link stays reachable on a small screen: it is in the account menu
     assert index.count("buymeacoffee.com") == 2
 

@@ -26,7 +26,6 @@ import { buildNetchecksCard } from "../cards/netchecks.js";
 import { buildGroupsCard } from "../cards/groups.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 import { buildPassiveCard } from "../cards/passive.js";
-import { buildDnsCard } from "../cards/dns.js";
 import { buildChangelogCard } from "../changelog.js";
 import { revealFound, openSearch } from "../search.js";
 
@@ -220,18 +219,26 @@ function buildExportCard() {
 // that are installed: one page per plugin, plus the Plugins list and the guide.
 const STATIC_GROUPS = [
   {
-    title: "General",
+    title: "Scanning",
     items: [
       { key: "ranges", label: "Scan ranges", build: buildRangesCard },
       { key: "nmap", label: "Scan performance", build: buildScanPage },
       { key: "schedule", label: "Scan schedule", build: buildScheduleCard },
-      { key: "map", label: "Map", build: buildMapCard },
-      { key: "groups", label: "Groups", build: buildGroupsCard },
       { key: "netchecks", label: "Network checks", build: buildNetchecksCard },
       { key: "ipv6", label: "IPv6", build: buildIpv6Card },
-      { key: "dns", label: "DNS registration", build: buildDnsCard },
       { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
-      { key: "central", label: "Report to a central Netlens", build: buildCentralCard },
+    ],
+  },
+  {
+    title: "Display",
+    items: [
+      { key: "map", label: "Map", build: buildMapCard },
+      { key: "groups", label: "Groups", build: buildGroupsCard },
+    ],
+  },
+  {
+    title: "Access",
+    items: [
       { key: "users", label: "Users & tokens", build: buildUsersCard },
       { key: "sso", label: "Single sign-on", build: buildSsoCard },
       { key: "terminal", label: "Web terminal", build: buildTerminalCard },
@@ -248,6 +255,13 @@ const STATIC_GROUPS = [
   },
   "integrations",
   {
+    title: "Connections",
+    items: [
+      { key: "central", label: "Report to a central Netlens", build: buildCentralCard },
+      { key: "engineer", label: "Digital engineer", build: buildEngineerCard },
+    ],
+  },
+  {
     title: "Data",
     items: [
       { key: "backup", label: "Backup & restore", build: buildBackupCard },
@@ -260,7 +274,6 @@ const STATIC_GROUPS = [
     items: [
       { key: "wizard", label: "Setup guide", build: buildWizardCard },
       { key: "audit", label: "Audit log", build: buildAuditCard },
-      { key: "engineer", label: "Digital engineer", build: buildEngineerCard },
       { key: "licence", label: "Licence", build: buildLicenceCard },
       { key: "about", label: "About", build: buildAboutCard },
       { key: "session", label: "Account", build: buildAccountCard },
@@ -325,6 +338,7 @@ export async function render(container, params) {
   clear(container);
   let groups = await loadGroups();
   const items = () => groups.flatMap((g) => g.items);
+  if (params && params.section === "dns") { location.replace("#/dns"); return; }     // DNS has its own page now
   const requested = params && (ALIASES[params.section] || params.section);
   const item = items().find((i) => i.key === requested) || items().find((i) => i.key === DEFAULT_PAGE) || items().find((i) => i.key === VIEWER_PAGE);
   if (params && params.section && item.key !== params.section) {

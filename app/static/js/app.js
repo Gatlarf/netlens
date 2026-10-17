@@ -15,6 +15,7 @@ const ROUTES = {
   "#/map": "map",
   "#/devices": "devices",
   "#/hierarchy": "hierarchy",
+  "#/dns": "dns",
   "#/speedtest": "speedtest",
   "#/uptime": "uptime",
   "#/stats": "stats",
@@ -329,6 +330,8 @@ function showDemo(demo) {
 async function applySession() {
   const session = await get("/api/session");
   setSessionUser(session.authenticated ? session.user : null);
+  // the coffee button in the top bar is for free and open-source use; a licensed install keeps it in the account menu only
+  get("/api/licence").then((lic) => document.body.classList.toggle("licensed", lic.state === "active" || lic.state === "grace")).catch(() => {});
   const out = el("#logout");
   if (out && session.user) out.title = `Signed in as ${session.user.username} (${session.user.role})`;
   const name = session.user ? session.user.username : "Account";

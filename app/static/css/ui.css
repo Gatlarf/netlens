@@ -1,0 +1,55 @@
+/* One look for every page: type scale, page header, cards, tiles and empty states (see js/ui.js). */
+.view h1 { font-size: 1.4rem; line-height: 1.25; margin: 0 0 4px; }
+.view h2 { font-size: 1.05rem; line-height: 1.3; margin: 0 0 10px; }
+.view h2.d-title { font-size: 0.78rem; line-height: 1.2; margin: 0; }
+.view h3 { font-size: 0.95rem; margin: 14px 0 6px; }
+.settings-content > .card > h2:first-child, .settings-content > .card > .card-head h2 { font-size: 1.25rem; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.page-head h1 { margin: 0 0 2px; }
+.page-head .hint { margin: 0; max-width: 78ch; }
+.page-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card-head { margin-bottom: 10px; }
+.card-head h2 { margin: 0; }
+.card-head .hint { margin: 2px 0 0; }
+.empty-state { max-width: 60ch; }
+.empty-state h2 { margin-bottom: 6px; }
+.empty-state .page-actions { margin-top: 10px; }
+.view > .card, .view > .dcard { margin-bottom: 14px; }
+.up-tiles { margin-bottom: 14px; }
+@media (max-width: 760px) { .up-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .page-head { align-items: flex-start; } }
+.licensed .topbar-actions > .coffee-btn { display: none; }
+
+/* the dashboard's first view: one verdict, the numbers that matter, then the cards */
+.dash-hero { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 18px; margin-bottom: 14px; background: var(--surface); border: 1px solid var(--border); border-left: 6px solid var(--ok); border-radius: var(--radius); }
+.dash-hero.tone-warn { border-left-color: var(--warn); }
+.dash-hero.tone-bad { border-left-color: var(--bad); }
+.dash-hero h1 { margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.dash-verdict { margin: 2px 0 8px; font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
+.dash-hero.tone-warn .dash-verdict { color: var(--warn); }
+.dash-hero.tone-bad .dash-verdict { color: var(--bad); }
+.dash-facts { display: flex; flex-wrap: wrap; gap: 4px 20px; color: var(--muted); font-size: 0.92rem; }
+.dash-fact { color: inherit; text-decoration: none; white-space: nowrap; }
+a.dash-fact:hover { text-decoration: underline; }
+.dash-fact strong { color: var(--text); font-size: 1.05rem; }
+.dash-fact strong.d-warn { color: var(--warn); } .dash-fact strong.d-bad { color: var(--bad); } .dash-fact strong.d-ok { color: var(--ok); }
+.stat-section[hidden] { display: none; }
+.seg { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.row-menu { position: relative; display: inline-block; }
+.row-menu > summary { list-style: none; cursor: pointer; padding: 2px 10px; }
+.row-menu > summary::-webkit-details-marker { display: none; }
+.row-menu-list { position: absolute; right: 0; z-index: 20; min-width: 140px; margin-top: 4px; padding: 4px; display: grid; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15); }
+.row-menu-list .menu-item { text-align: left; padding: 6px 10px; background: none; border: 0; color: var(--text); font: inherit; cursor: pointer; border-radius: 4px; }
+.row-menu-list .menu-item:hover { background: var(--bg); }
+.row-menu-list .danger-text { color: var(--bad); }
+.up-list.up-compact .up-row { grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 236px; padding: 6px 12px; }
+.up-list.up-compact .up-resp { display: none; }
+@media (max-width: 760px) { .up-list.up-compact .up-row { grid-template-columns: minmax(0, 1fr) auto; } }
+.ins-grid { align-items: start; } .col-left { display: flex; flex-direction: column; gap: 16px; }
+.ins-settings > summary { cursor: pointer; } .ins-settings > .card { border: 0; padding: 8px 0 0; }
+.health-limits > summary { cursor: pointer; } .health-limits > .card { border: 0; padding: 8px 0 0; }
+td.actions { white-space: nowrap; min-width: 0; }
+summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { cursor: pointer; }
+.form-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; }
+.form-actions .btn, .form-actions button { width: auto; }
+.form-actions .push-right { margin-left: auto; }
+.tab-panel[hidden] { display: none; } .tab-panel { display: flex; flex-direction: column; gap: 14px; }

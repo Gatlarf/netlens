@@ -1,5 +1,6 @@
 import { get, post } from "../api.js";
 import { h, clear, toast, foldToolbarOnPhone, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS, shortName, vendorText, vendorTitle } from "../util.js";
+import { pageHead } from "../ui.js";
 
 const REFRESH_MS = 15000;
 
@@ -393,6 +394,7 @@ export async function render(container, params) {
   const wrap = h("div", { class: "table-wrap" });
   wrap.appendChild(table);
 
+  container.appendChild(pageHead("Devices", "Everything Netlens has found on your network. Click a device for its page; use the filters to narrow the list."));
   container.appendChild(toolbar);
   container.appendChild(wrap);
 

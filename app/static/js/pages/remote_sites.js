@@ -1,5 +1,6 @@
 import { get, post, patch, put, del } from "../api.js";
 import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin, fmtTime } from "../util.js";
+import { pageHead } from "../ui.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 
 const REFRESH_MS = 30000;
@@ -140,8 +141,7 @@ export async function render(container) {
     clear(top); clear(body);
     const add = h("button", { class: "btn primary admin-only", type: "button" }, "Add a remote site");
     add.addEventListener("click", () => newSiteForm());
-    top.append(h("div", { class: "up-head" }, h("div", {}, h("h1", {}, "Remote sites"),
-      h("p", { class: "hint" }, "Other locations that run Netlens and report here: devices, service checks, health and alerts of each in one place.")), add));
+    top.append(pageHead("Remote sites", "Other locations that run Netlens and report here: devices, service checks, health and alerts of each in one place.", add));
     if (!probes.length) {
       body.appendChild(h("div", { class: "card" }, h("h2", {}, "No remote sites yet"),
         h("p", {}, "Run Netlens at the other location (a branch office, a second home, a customer), then add it here to get a token. It reports to this Netlens every minute and always connects out, so nothing at that location has to be reachable from the internet."),

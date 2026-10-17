@@ -1,6 +1,7 @@
 import { get, put } from "../api.js";
 import { snoozeMenu, wakeButton, untilText } from "../snooze.js";
 import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin } from "../util.js";
+import { pageHead } from "../ui.js";
 
 const REFRESH_MS = 30000;
 const METRIC_ORDER = ["cpu_pct", "mem_pct", "disk_pct", "temp_c", "battery_pct", "supply_pct", "on_battery", "storage_status", "service_stopped"];
@@ -30,6 +31,7 @@ export async function render(container) {
   const problems = h("div", {});
   const list = h("div", {});
   const limitsSlot = h("div", {});
+  let limitsOpen = false;      // kept when the page refreshes
   let filter = "";
 
   const tile = (title, value, sub, kind) => h("section", { class: `dcard ${kind ? `tone-${kind}` : ""}` }, h("h2", { class: "d-title" }, title),
@@ -127,7 +129,12 @@ export async function render(container) {
       save.disabled = false;
     });
     card.append(h("div", { class: "table-wrap" }, table), save);
-    limitsSlot.appendChild(card);
+    const heading = card.querySelector("h2");
+    const folded = h("details", { class: "card health-limits", open: limitsOpen }, h("summary", {}, h("strong", {}, "When to warn"), h("span", { class: "hint" }, " the limits that raise a warning (admins can change them)")));
+    folded.addEventListener("toggle", () => { limitsOpen = folded.open; });
+    if (heading) heading.remove();
+    folded.appendChild(card);
+    limitsSlot.appendChild(folded);
   }
 
   const onSnoozed = () => { if (!disposed) load(); };
@@ -147,8 +154,7 @@ export async function render(container) {
   }
 
   clear(container);
-  container.append(h("div", { class: "up-head" }, h("div", {}, h("h1", {}, "Health"),
-    h("p", { class: "hint" }, "Processor, memory, disks, temperature and network traffic of the devices Netlens reads over SNMP or SSH. Set a device up on its own page; click a name for the graphs."))),
+  container.append(pageHead("Health", "Processor, memory, disks, temperature and network traffic of the devices Netlens reads over SNMP or SSH. Set a device up on its own page; click a name for the graphs."),
   tiles, problems, list, limitsSlot);
   list.append(h("p", { class: "hint" }, "Loading…"));
   await load();

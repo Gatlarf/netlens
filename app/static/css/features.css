@@ -486,7 +486,8 @@ dialog.whats-new h2 { margin: 0; }
 .hm-toggle { align-self: flex-start; }
 .cap { display: flex; flex-direction: column; gap: 8px; }
 .cap-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.cap-row { display: grid; grid-template-columns: minmax(120px, 1.2fr) minmax(60px, 1fr) minmax(0, 2fr); gap: 10px; align-items: center; font-size: 0.9rem; }
+.cap-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name when" "bar bar"; gap: 3px 10px; align-items: baseline; font-size: 0.9rem; }
+.cap-name { grid-area: name; } .cap-when { grid-area: when; white-space: nowrap; } .cap-bar { grid-area: bar; }
 .cap-name a { color: var(--text); }
 .cap-bar { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
 .cap-fill { display: block; height: 100%; background: var(--ok); }

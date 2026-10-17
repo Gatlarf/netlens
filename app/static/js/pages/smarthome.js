@@ -1,5 +1,6 @@
 import { get } from "../api.js";
 import { h, clear, timeAgo } from "../util.js";
+import { pageHead, tile as uiTile, tileRow, emptyState } from "../ui.js";
 
 function battery(d) {
   if (d.battery === null || d.battery === undefined) return d.battery_low ? h("span", { class: "warn-text" }, "low") : h("span", { class: "hint" }, "");
@@ -9,7 +10,7 @@ function battery(d) {
 export async function render(container) {
   let destroyed = false;
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
-  container.append(h("div", { class: "toolbar" }, h("strong", {}, "Smart home"), h("span", { class: "hint" }, "The devices of your smart-home hub, with what Netlens cannot see on the network. It comes from a plugin (Home Assistant).")), body);
+  container.append(pageHead("Smart home", "The devices of your smart-home hub, with what Netlens cannot see on the network. It comes from a plugin (Home Assistant)."), body);
   let filter = "", area = "", only = "";
 
   async function load() {
@@ -23,13 +24,12 @@ export async function render(container) {
     if (destroyed) return;
     clear(body);
     if (!data.servers.length) {
-      body.appendChild(h("div", { class: "card" }, h("p", {}, "No smart-home hub is connected yet."),
-        h("p", { class: "hint" }, "Install the ", h("a", { href: "#/settings/plugin-browse" }, "Home Assistant plugin"), " from the Plugin store and turn it on. Netlens then lists your devices with manufacturer, model, area and battery, ties the ones that are on the network to their device page, and warns when a device becomes unavailable or a battery runs low.")));
+      body.appendChild(emptyState("No smart-home hub is connected yet", "Install the Home Assistant plugin from the Plugin store and turn it on. Netlens then lists your devices with manufacturer, model, area and battery, and ties the ones that are on the network to their device page.", h("a", { class: "btn primary", href: "#/settings/plugin-browse" }, "Open the Plugin store")));
       return;
     }
     const s = data.summary;
-    const tiles = h("div", { class: "card-row" });
-    const tile = (label, value, tone) => h("div", { class: `card tile ${tone || ""}` }, h("div", { class: "tile-value" }, String(value)), h("div", { class: "hint" }, label));
+    const tiles = tileRow();
+    const tile = (label, value, tone) => uiTile(label, value, "", tone);
     tiles.append(tile("devices", s.devices), tile("unavailable", s.unavailable, s.unavailable ? "warn" : ""), tile("low batteries", s.battery_low, s.battery_low ? "warn" : ""),
       tile("seen on the network", s.matched), tile("updates waiting", s.updates, s.updates ? "warn" : ""));
     body.appendChild(tiles);

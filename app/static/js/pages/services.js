@@ -1,5 +1,6 @@
 import { get, post, patch, del } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
+import { pageHead, rowMenu } from "../ui.js";
 import { heartbeatBar, uptimeText, uptimeClass } from "../heartbeat.js";
 import { buildServiceForm } from "../cards/service_form.js";
 import { buildPerformanceCard } from "../cards/performance.js";
@@ -23,9 +24,8 @@ async function heartbeats(check) {
 export async function render(container) {
   let destroyed = false;
   const openGraphs = new Set();      // checks whose graph is open (kept when the table is redrawn)
-  const top = h("div", { class: "toolbar" }, h("strong", {}, "Service checks"), h("span", { class: "hint" }, "HTTP pages, TCP ports, DNS lookups, certificates and processes, checked at the interval you choose."));
-  const addBtn = h("button", { class: "btn admin-only", type: "button" }, "Add check");
-  top.appendChild(addBtn);
+  const addBtn = h("button", { class: "btn primary admin-only", type: "button" }, "Add check");
+  const top = pageHead("Services", "HTTP pages, TCP ports, DNS lookups, certificates and processes, checked at the interval you choose.", addBtn);
   const formSlot = h("div", {});
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
   container.append(top, formSlot, body);
@@ -60,9 +60,6 @@ export async function render(container) {
       const hb = h("td", {});
       heartbeats(c).then((bar) => { if (!destroyed) hb.appendChild(bar); });
       const run = h("button", { class: "btn admin-only", type: "button" }, "Run now");
-      const edit = h("button", { class: "btn admin-only", type: "button" }, "Edit");
-      const pause = h("button", { class: "btn admin-only", type: "button" }, c.enabled ? "Pause" : "Resume");
-      const remove = h("button", { class: "btn danger admin-only", type: "button" }, "Delete");
       run.addEventListener("click", async () => {
         run.disabled = true;
         try {
@@ -73,9 +70,9 @@ export async function render(container) {
         }
         load();
       });
-      edit.addEventListener("click", () => showForm(c));
-      pause.addEventListener("click", async () => { await patch(`/api/service-checks/${c.id}`, { enabled: !c.enabled }); load(); });
-      remove.addEventListener("click", async () => {
+      const doEdit = () => showForm(c);
+      const doPause = async () => { await patch(`/api/service-checks/${c.id}`, { enabled: !c.enabled }); load(); };
+      const doRemove = async () => {
         if (!window.confirm(`Delete the check "${c.name}" and its history?`)) return;
         try {
           await del(`/api/service-checks/${c.id}`);
@@ -84,7 +81,8 @@ export async function render(container) {
           toast(err.message || "Could not delete", "error");
         }
         load();
-      });
+      };
+      const more = rowMenu([{ label: "Edit", onclick: doEdit }, { label: c.enabled ? "Pause" : "Resume", onclick: doPause }, { label: "Delete", onclick: doRemove, danger: true }], { cls: "admin-only" });
       const graphBtn = h("button", { class: "btn", type: "button", "aria-expanded": String(openGraphs.has(c.id)) }, "Graph");
       const graphRow = h("tr", { class: "svc-graph-row", hidden: !openGraphs.has(c.id) }, h("td", { colspan: 9 }));
       const showGraph = async () => {
@@ -104,7 +102,7 @@ export async function render(container) {
         h("td", {}, stateDot(c)), h("td", {}, c.name, c.state === "down" && c.last_detail ? h("div", { class: "hint" }, c.last_detail) : null),
         h("td", { class: "mono" }, c.target), h("td", {}, c.device_id ? h("a", { href: `#/device/${c.device_id}` }, c.device_name || `device ${c.device_id}`) : ""),
         hb, h("td", { class: uptimeClass(c.uptime_24h) }, uptimeText(c.uptime_24h)), h("td", {}, c.last_ms === null ? "–" : `${Math.round(c.last_ms)} ms`),
-        h("td", {}, c.last_ts ? timeAgo(c.last_ts) : "never"), h("td", { class: "actions" }, run, graphBtn, edit, pause, remove)));
+        h("td", {}, c.last_ts ? timeAgo(c.last_ts) : "never"), h("td", { class: "actions" }, run, graphBtn, more)));
       tbody.appendChild(graphRow);
     }
     table.appendChild(tbody);

@@ -1,5 +1,6 @@
 import { get, post, put, del } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
+import { pageHead, tile as uiTile, tileRow } from "../ui.js";
 
 const MODE_TEXT = {
   suggest: "Suggest: only show it here",
@@ -43,7 +44,7 @@ function lookBack(run) {
 export async function render(container) {
   let destroyed = false, editing = null, formOpen = false;
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
-  container.append(h("div", { class: "toolbar" }, h("strong", {}, "Remediation"), h("span", { class: "hint" }, "Let Netlens fix known problems itself, or propose the fix and wait for you.")), body);
+  container.append(pageHead("Remediation", "Let Netlens fix known problems itself, or propose the fix and wait for you."), body);
   let data;
 
   async function load() {
@@ -116,8 +117,8 @@ export async function render(container) {
     }
     const pause = h("button", { class: `btn ${data.paused ? "danger" : ""}`, type: "button" }, data.paused ? "Paused: resume" : "Pause everything");
     pause.addEventListener("click", async () => { await put("/api/remediation/paused", { paused: !data.paused }); await load(); });
-    const tile = (label, value, tone) => h("div", { class: `card tile ${tone || ""}` }, h("div", { class: "tile-value" }, String(value)), h("div", { class: "hint" }, label));
-    body.appendChild(h("div", { class: "card-row" }, tile("rules on", s.rules), tile("waiting for you", s.pending, s.pending ? "warn" : ""), tile("failed today", s.failed_today, s.failed_today ? "bad" : ""), h("div", { class: "card tile" }, pause)));
+    const tile = (label, value, tone) => uiTile(label, value, "", tone);
+    body.appendChild(tileRow(tile("rules on", s.rules), tile("waiting for you", s.pending, s.pending ? "warn" : ""), tile("failed today", s.failed_today, s.failed_today ? "bad" : ""), h("section", { class: "dcard" }, pause)));
     if (data.paused) body.appendChild(h("p", { class: "warn-text" }, "Everything is paused: no rule does anything until you resume."));
 
     const waiting = data.runs.filter((r) => r.state === "pending" || r.state === "suggested");

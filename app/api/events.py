@@ -17,6 +17,7 @@ class EventDict(BaseModel):
     kind: str
     detail: str | None
     maintenance: str | None = None      # the maintenance window that held this event back
+    device: str | None = None           # the name of the device (its custom name, host name or address)
 
 
 @router.get("/events", response_model=list[EventDict])
@@ -31,21 +32,22 @@ def list_events(
     params: list[Any] = []
 
     if kind is not None:
-        conditions.append("kind = ?")
+        conditions.append("e.kind = ?")
         params.append(kind)
 
     if device_id is not None:
-        conditions.append("device_id = ?")
+        conditions.append("e.device_id = ?")
         params.append(device_id)
 
     if since_id is not None:
-        conditions.append("id > ?")
+        conditions.append("e.id > ?")
         params.append(since_id)
 
-    query = "SELECT id, ts, device_id, kind, detail, maintenance FROM events"
+    query = ("SELECT e.id, e.ts, e.device_id, e.kind, e.detail, e.maintenance, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS device "
+             "FROM events e LEFT JOIN devices d ON d.id = e.device_id")
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
-    query += " ORDER BY id DESC LIMIT ?"
+    query += " ORDER BY e.id DESC LIMIT ?"
     params.append(limit)
 
     rows = conn.execute(query, params).fetchall()

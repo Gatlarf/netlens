@@ -1,5 +1,6 @@
 import { get, put, post } from "../api.js";
 import { h, clear, toast, isAdmin } from "../util.js";
+import { pageHead } from "../ui.js";
 
 // Reports: the weekly summary (text, as it is sent) and the monthly availability of devices and services.
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -98,7 +99,7 @@ export async function render(container) {
   const weeklySlot = h("div", {});
   const monthSlot = h("div", {});
   container.appendChild(h("div", { class: "rep-page" },
-    h("div", { class: "heading-row" }, h("h1", {}, "Reports")),
+    pageHead("Reports", "The weekly report and the monthly availability figures, ready to send or print."),
     weeklySlot, monthSlot));
 
   async function drawWeekly() {

@@ -1,12 +1,13 @@
 import { get, post, put, patch } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
+import { pageHead } from "../ui.js";
 
 const TYPES = ["router", "switch", "ap", "server", "pc", "phone", "tablet", "tv", "speaker", "console", "appliance", "printer", "iot", "camera", "nas", "vm"];
 
 export async function render(container) {
   let destroyed = false, data;
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
-  container.append(h("div", { class: "toolbar" }, h("strong", {}, "Insights"), h("span", { class: "hint" }, "Questions, incidents, unusual readings and predictions, worked out from your own data.")), body);
+  container.append(pageHead("Insights", "Questions, incidents, unusual readings and predictions, worked out from your own data."), body);
 
   async function load() {
     try { data = await get("/api/insights"); } catch (err) { if (!destroyed) { clear(body); body.appendChild(h("p", { class: "error" }, err.message || "Could not load.")); } return; }
@@ -55,7 +56,9 @@ export async function render(container) {
   function incidentsCard() {
     const card = h("div", { class: "card" }, h("h2", {}, `Incidents, last 7 days (${data.incidents.length})`));
     if (!data.incidents.length) card.appendChild(h("p", { class: "hint" }, "No incidents. When several alerts belong together they are shown here as one story."));
-    for (const i of data.incidents) {
+    const SHOWN = 6;
+    const more = [];
+    data.incidents.forEach((i, n) => {
       const text = h("div", { class: "ins-text" }, i.summary);
       const row = h("div", { class: "rem-run" }, h("div", {}, h("strong", {}, i.title), " ", h("span", { class: `badge ${i.resolved ? "" : "warn"}` }, i.resolved ? "over" : i.ongoing ? "going on" : "open"), " ",
         h("span", { class: "hint", title: i.start }, timeAgo(i.start))), text);
@@ -68,7 +71,13 @@ export async function render(container) {
         });
         row.appendChild(words);
       }
+      if (n >= SHOWN) { row.hidden = true; more.push(row); }
       card.appendChild(row);
+    });
+    if (more.length) {
+      const btn = h("button", { class: "btn", type: "button" }, `Show all ${data.incidents.length}`);
+      btn.addEventListener("click", () => { for (const r of more) r.hidden = false; btn.remove(); });
+      card.appendChild(btn);
     }
     return card;
   }
@@ -157,7 +166,9 @@ export async function render(container) {
         h("p", {}, h("a", { class: "btn primary", href: "#/settings/licence" }, "Open the licence page"))));
       return;
     }
-    body.append(askCard(), incidentsCard(), unusualCard(), predictionsCard(), unknownCard(), settingsCard());
+    const side = h("div", { class: "col-left" }, unusualCard(), predictionsCard(), unknownCard());
+    const settings = h("details", { class: "card ins-settings" }, h("summary", {}, h("strong", {}, "Settings")), settingsCard());
+    body.append(askCard(), h("div", { class: "grid-2 ins-grid" }, incidentsCard(), side), settings);
   }
 
   await load();

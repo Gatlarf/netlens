@@ -36,7 +36,6 @@ function describeChange(c) {
 
 export async function buildDnsCard() {
   const card = h("div", { class: "card", id: "dns-card" });
-  card.appendChild(h("h2", {}, "DNS registration"));
   const state = await get("/api/dns");
   render(card, state);
   return card;
@@ -44,7 +43,6 @@ export async function buildDnsCard() {
 
 function render(card, state) {
   clear(card);
-  card.appendChild(h("h2", {}, "DNS registration"));
   card.appendChild(h("p", { class: "hint" },
     "Netlens can register the devices it knows in your DNS server, and keep the address right when a device gets a new one from DHCP. " +
     "It only ever changes records it created itself (marked with a comment) and never touches records that something else made, such as a Windows machine that registers itself. " +
@@ -102,7 +100,7 @@ function render(card, state) {
       save.disabled = false;
     }
   });
-  card.appendChild(form);
+  card.appendChild(h("details", { class: "dns-settings", open: !!state.needs_setup }, h("summary", {}, h("strong", {}, "Settings"), h("span", { class: "hint" }, " networks, zones and rules for registering")), form));
 
   // ---- the server and the preview
   card.appendChild(h("h3", {}, "What Netlens would do"));
@@ -166,6 +164,15 @@ function renderPlan(card, state) {
       h("td", {}, h("span", { class: `dns-chip ${item.state}`, title: STATE_HELP[item.state] }, STATE_LABEL[item.state])), h("td", {}, why)));
   }
   table.appendChild(body);
+  // what is already right is out of the way until asked for: the list then shows what needs a look
+  const settled = [...body.querySelectorAll("tr.dns-row.ok, tr.dns-row.self")];
+  if (settled.length && settled.length < plan.items.length) {
+    const toggle = h("input", { type: "checkbox", id: "dns-show-ok" });
+    const apply = () => { for (const r of settled) r.hidden = !toggle.checked; };
+    toggle.addEventListener("change", apply);
+    apply();
+    card.appendChild(h("label", { class: "check dns-show-ok" }, toggle, ` Also show the ${settled.length} that are already right`));
+  }
   card.appendChild(h("div", { class: "table-wrap" }, table));
 
   const actionable = boxes.filter((b) => !b.disabled);

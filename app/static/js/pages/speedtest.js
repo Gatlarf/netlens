@@ -1,6 +1,7 @@
 // Speed tests: the internet (Cloudflare), iperf3 (a server inside Netlens and a client) and a test from this browser.
 import { get, post, put, del, ApiError } from "../api.js";
 import { h, clear, toast, timeAgo, isAdmin } from "../util.js";
+import { pageHead, tabbed } from "../ui.js";
 import { emptyNote, lineChart, tile } from "../charts.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -101,7 +102,7 @@ export async function render(container) {
   container.append(page);
 
   const sections = { internet: h("div", { class: "card" }), browser: h("div", { class: "card" }), iperf: h("div", { class: "card" }), history: h("div", { class: "card" }) };
-  page.append(h("div", { class: "toolbar" }, h("h1", { class: "speed-title" }, "Speed tests")), sections.internet, sections.browser, sections.iperf, sections.history);
+  page.append(pageHead("Speed tests", "How fast the internet connection and your own network are: a test against Cloudflare, tests between machines with iperf3, and the history."), tabbed("netlens.speed.tab", [["internet", "Internet", sections.internet], ["local", "Your network", [sections.browser, sections.iperf]], ["results", "All results", sections.history]]));
 
   const busy = () => !!(data && data.current);
 

@@ -1,5 +1,6 @@
 import { get } from "../api.js";
 import { h, clear, timeAgo } from "../util.js";
+import { pageHead } from "../ui.js";
 
 const PERIODS = [["6h", "6 hours"], ["24h", "24 hours"], ["3d", "3 days"], ["7d", "7 days"], ["30d", "30 days"]];
 const SEEN_KEY = "netlens.changes.seen";
@@ -94,9 +95,8 @@ export async function render(container) {
 
   clear(container);
   container.append(
-    h("div", { class: "up-head" }, h("div", {}, h("h1", {}, "What changed"),
-      h("p", { class: "hint" }, "New and missing devices, alerts, address and port changes and the changes people made, on one timeline. ",
-        lastSeen ? `Entries marked new happened after your last visit ${timeAgo(lastSeen)}.` : "")), periodBar),
+    pageHead("What changed", "New and missing devices, alerts, address and port changes and the changes people made, on one timeline. " +
+      (lastSeen ? `Entries marked new happened after your last visit ${timeAgo(lastSeen)}.` : ""), periodBar),
     chips, summary, list);
   drawPeriods();
   await load();

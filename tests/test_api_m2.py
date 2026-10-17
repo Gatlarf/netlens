@@ -131,7 +131,7 @@ def test_get_events_returns_newest_first_with_expected_keys(
         events = resp.json()
         assert len(events) == 3
         for ev in events:
-            assert set(ev.keys()) == {"id", "ts", "device_id", "kind", "detail", "maintenance"}
+            assert set(ev.keys()) == {"id", "ts", "device_id", "kind", "detail", "maintenance", "device"}
         # newest first: ids should be descending
         ids = [ev["id"] for ev in events]
         assert ids == sorted(ids, reverse=True)

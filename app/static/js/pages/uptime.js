@@ -1,10 +1,13 @@
 import { get, put } from "../api.js";
 import { h, clear, toast, statusDot, shortName } from "../util.js";
+import { pageHead } from "../ui.js";
 import { heartbeatBar, responseLine, rangeTabs, savedRange, RANGES, uptimeText, uptimeClass } from "../heartbeat.js";
 
 const PCT = { "24h": "up_24h", "7d": "up_7d", "30d": "up_30d" };
 const SCOPE_KEY = "netlens.uptime.scope";
 const savedScope = () => { try { return localStorage.getItem(SCOPE_KEY) === "core" ? "core" : "all"; } catch (e) { return "all"; } };
+const DENSE_KEY = "netlens.uptime.graphs";
+const savedGraphs = () => { try { return localStorage.getItem(DENSE_KEY) === "on"; } catch (e) { return false; } };
 const SORTS = [["name", "Name"], ["worst", "Least reliable first"], ["slow", "Slowest first"]];
 
 const mean = (list) => (list.length ? list.reduce((a, b) => a + b, 0) / list.length : null);
@@ -14,7 +17,7 @@ const tone = (pct) => (pct === null || pct === undefined ? "off" : pct >= 99 ? "
 
 export async function render(container) {
   let disposed = false, inFlight = false, timer = null;
-  let range = savedRange(), scope = savedScope(), sort = "name", filterText = "", onlyProblems = false, data = null;
+  let range = savedRange(), scope = savedScope(), sort = "worst", filterText = "", onlyProblems = false, data = null;
 
   const phone = () => window.matchMedia("(max-width: 700px)").matches;
   const slots = () => (phone() ? 30 : 60);
@@ -23,7 +26,8 @@ export async function render(container) {
   const chooser = h("div", {});
   const pool = () => (data ? (scope === "core" ? data.filter((d) => d.always_on) : data) : []);
   const scopeLabel = () => (scope === "core" ? "core devices" : "all devices");
-  const list = h("div", { class: "up-list" });
+  let graphs = savedGraphs();      // the response-time line of every device: off by default, one line per device is enough to scan
+  const list = h("div", { class: `up-list${graphs ? "" : " up-compact"}` });
   const periodLabel = () => RANGES.find(([k]) => k === range)[1];
 
   function drawTiles() {
@@ -165,9 +169,7 @@ export async function render(container) {
 
   clear(container);
   container.append(
-    h("div", { class: "up-head" },
-      h("div", {}, h("h1", {}, "Uptime"),
-        h("p", { class: "hint" }, "Every scan records whether each device answered and how fast. Green = up, red = down. Point at a bar or the line for the time and the response time; the newest is on the right.")),
+    pageHead("Uptime", "Every scan records whether each device answered and how fast. Green = up, red = down. Point at a bar or the line for the time and the response time; the newest is on the right.",
       h("div", { class: "up-pickers" },
         scopeTabs(),
         rangeTabs(range, (key) => { range = key; data = null; clear(list); list.append(h("p", { class: "hint" }, "Loading…")); load(); }))),
@@ -175,8 +177,9 @@ export async function render(container) {
     tiles,
     h("div", { class: "up-tools" },
       h("input", { type: "text", placeholder: "Filter by name or IP", "aria-label": "Filter by name or IP", oninput: (e) => { filterText = e.target.value; drawList(); } }),
-      h("select", { "aria-label": "Sort", onchange: (e) => { sort = e.target.value; drawList(); } }, SORTS.map(([k, label]) => h("option", { value: k }, label))),
+      h("select", { "aria-label": "Sort", onchange: (e) => { sort = e.target.value; drawList(); } }, SORTS.map(([k, label]) => h("option", { value: k, selected: k === sort }, label))),
       h("label", {}, h("input", { type: "checkbox", onchange: (e) => { onlyProblems = e.target.checked; drawList(); } }), "Only devices with a problem"),
+      h("label", {}, h("input", { type: "checkbox", checked: graphs, onchange: (e) => { graphs = e.target.checked; list.classList.toggle("up-compact", !graphs); try { localStorage.setItem(DENSE_KEY, graphs ? "on" : "off"); } catch (err) { /* only this page remembers it */ } } }), "Response-time graphs"),
       h("button", { class: "btn admin-only", type: "button", onclick: openChooser }, "Choose always-on devices")),
     list);
   list.append(h("p", { class: "hint" }, "Loading…"));

@@ -4,19 +4,19 @@ import { h, shortName } from "../util.js";
 // below as steady, so the card is never empty while there are monitored disks.
 const SHOW = 5;
 
-const daysText = (d) => (d < 1 ? "less than a day" : d < 2 ? "about a day" : d < 60 ? `about ${Math.round(d)} days` : `about ${Math.round(d / 30)} months`);
+const daysText = (d) => (d < 1 ? "less than a day" : d < 2 ? "about a day" : d < 60 ? `${Math.round(d)} days` : `${Math.round(d / 30)} months`);
 
 function row(item, urgent) {
   const lvl = item.days_to_full == null ? "" : item.days_to_full <= 3 ? "d-bad" : item.days_to_full <= 14 ? "d-warn" : "";
   const link = h("a", { href: `#/device/${item.device_id}`, onclick: () => { try { sessionStorage.setItem("netlens.devicetab", "health"); } catch (e) { /* ignore */ } } },
     `${shortName(item.device)}${item.label ? ` · ${item.label}` : ""}`);
-  const when = item.days_to_full != null ? `full in ${daysText(item.days_to_full)} (${item.full_on})`
+  const when = item.days_to_full != null ? `full in ${daysText(item.days_to_full)}`
     : item.trend === "shrinking" ? "getting emptier"
       : item.trend === "steady" ? "steady" : `not enough history yet (${item.days_of_data} days)`;
   return h("li", { class: `cap-row ${lvl}` },
     h("span", { class: "cap-name" }, link),
     h("span", { class: "cap-bar", title: `${item.current}% used` }, h("span", { class: `cap-fill ${lvl}`, style: `width:${Math.min(100, item.current)}%` })),
-    h("span", { class: "cap-when" }, `${Math.round(item.current)}% · ${when}`));
+    h("span", { class: "cap-when", title: item.full_on ? `expected full on ${item.full_on}` : "" }, `${Math.round(item.current)}% · ${when}`));
 }
 
 export function buildCapacityCard({ items }) {
