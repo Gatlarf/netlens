@@ -122,3 +122,20 @@ def test_the_switch_between_the_model_and_the_built_in_logic(conn, monkeypatch):
     off = ask.answer(conn, "How many devices?", NOW, mode="model")
     assert off["source"] == "rules" and "No language model" in off["answer"]
     assert ask.answer(conn, "How many devices do I have per type?", NOW, mode="auto")["source"] == "rules"
+
+
+def test_loosely_worded_questions_still_find_the_device_or_the_kind(conn):
+    conn.execute("INSERT INTO devices (id, mac, primary_ip, hostname, vendor, device_type, online, trusted, first_seen, last_seen) VALUES (8, 'aa:bb:cc:dd:ee:08', '192.168.1.21', 'truenas.home.example.com', 'iXsystems', 'nas', 1, 1, 'x', 'x')")
+    conn.execute("INSERT INTO ports (device_id, proto, port, state, service, updated) VALUES (8, 'tcp', 2049, 'open', 'nfs', 'x')")
+    conn.execute("INSERT INTO hypervisor_guests (plugin_id, guest_id, name, kind, host_name, status, updated) VALUES ('docker', 'x1', 'old-job', 'container', 'h', 'exited', 'x')")
+    conn.commit()
+    a = lambda q: ask.answer(conn, q, NOW, mode="rules")   # noqa: E731
+    assert "2049/tcp (nfs)" in a("Which ports does the storage box truenas have open?")["answer"]
+    assert "2049/tcp (nfs)" in a("what ports does the truenas have open")["answer"]
+    cams = a("Which cameras are online?")
+    assert cams["tools"] == ["search_devices"] and "voordeur" in cams["answer"] and "hp-laserjet" not in cams["answer"]
+    assert a("How many iphones are there?")["answer"].startswith("1 device")
+    stopped = a("Which virtual machines or containers are stopped?")["answer"]
+    assert "vm-old" in stopped and "old-job" in stopped
+    assert a("Which devices are not trusted?")["answer"].splitlines()[1].startswith("desktop-1")
+    assert a("Which smart home batteries are low?")["answer"].startswith("Low batteries: Hall sensor (8%)")

@@ -120,8 +120,11 @@ def t_guests(conn, args, now=None) -> dict:
     where, params = ["1 = 1"], []
     status = str(args.get("status") or "").lower()
     if status and status != "unhealthy":
-        where.append("LOWER(status) LIKE ?")
-        params.append(status + "%")
+        if status == "stopped":
+            where.append("LOWER(status) IN ('stopped', 'exited', 'dead', 'shut off', 'off')")
+        else:
+            where.append("LOWER(status) LIKE ?")
+            params.append(status + "%")
     if args.get("kind"):
         where.append("LOWER(kind) = ?")
         params.append(str(args["kind"]).lower())
@@ -203,10 +206,11 @@ def t_remote_sites(conn, args, now=None) -> dict:
 
 
 def t_smart_home(conn, args, now=None) -> dict:
+    focus = args.get("focus")
     rows = conn.execute("SELECT name, area, available, battery, battery_low, update_available, unavailable_since FROM inventory_devices ORDER BY name COLLATE NOCASE").fetchall()
     if not rows:
         return {"configured": False}
-    return {"configured": True, "devices": len(rows), "unavailable": [{"name": r["name"], "area": r["area"], "since": r["unavailable_since"]} for r in rows if not r["available"]][:LIMIT],
+    return {"configured": True, "focus": focus, "devices": len(rows), "unavailable": [{"name": r["name"], "area": r["area"], "since": r["unavailable_since"]} for r in rows if not r["available"]][:LIMIT],
             "low_battery": [{"name": r["name"], "area": r["area"], "battery_pct": r["battery"]} for r in rows if r["battery_low"]][:LIMIT],
             "lowest_batteries": sorted([{"name": r["name"], "battery_pct": r["battery"]} for r in rows if r["battery"] is not None], key=lambda x: x["battery_pct"])[:6],
             "updates_available": [r["name"] for r in rows if r["update_available"]][:LIMIT]}
@@ -229,7 +233,7 @@ def t_security(conn, args, now=None) -> dict:
 
 def t_audit(conn, args, now=None) -> dict:
     days = _days(args.get("days"), 7)
-    rows = conn.execute("SELECT ts, user, action FROM audit_log WHERE ts >= ? AND status < 400 AND method != 'GET' AND path NOT LIKE '/api/login%' AND path NOT LIKE '/api/logout%' ORDER BY id DESC LIMIT 25", (_since(days, now),)).fetchall()
+    rows = conn.execute("SELECT ts, user, action FROM audit_log WHERE ts >= ? AND status < 400 AND method != 'GET' AND path NOT LIKE '/api/login%' AND path NOT LIKE '/api/logout%' AND path NOT LIKE '/api/insights/ask%' AND path NOT LIKE '/api/insights/model-check%' ORDER BY id DESC LIMIT 25", (_since(days, now),)).fetchall()
     return {"days": days, "changes": [{"at": r["ts"], "who": r["user"] or "unknown", "what": (r["action"] or "")[:120]} for r in rows]}
 
 
@@ -396,8 +400,9 @@ def r_remote_sites(r: dict) -> str:
 def r_smart_home(r: dict) -> str:
     if not r["configured"]:
         return "No smart-home hub is connected (install the Home Assistant plugin)."
-    lines = [f"{r['devices']} smart-home devices. " + (f"{len(r['unavailable'])} unavailable: " + ", ".join(d["name"] for d in r["unavailable"]) + "." if r["unavailable"] else "All are available.")]
-    lines.append("Low batteries: " + ", ".join(f"{d['name']} ({d['battery_pct']}%)" for d in r["low_battery"]) + "." if r["low_battery"] else "No battery is low." + (" Lowest: " + ", ".join(f"{d['name']} {d['battery_pct']}%" for d in r["lowest_batteries"][:3]) + "." if r["lowest_batteries"] else ""))
+    avail = f"{len(r['unavailable'])} of {r['devices']} smart-home devices are unavailable: " + ", ".join(d["name"] for d in r["unavailable"]) + "." if r["unavailable"] else f"All {r['devices']} smart-home devices are available."
+    battery = "Low batteries: " + ", ".join(f"{d['name']} ({d['battery_pct']}%)" for d in r["low_battery"]) + "." if r["low_battery"] else "No battery is low." + (" Lowest: " + ", ".join(f"{d['name']} {d['battery_pct']}%" for d in r["lowest_batteries"][:3]) + "." if r["lowest_batteries"] else "")
+    lines = [battery, avail] if r.get("focus") == "battery" else [avail, battery]
     if r["updates_available"]:
         lines.append("Updates available for: " + ", ".join(r["updates_available"]) + ".")
     return "\n".join(lines)
@@ -471,6 +476,31 @@ def r_ipv6(r: dict) -> str:
     return f"{r['devices_with_ipv6']} device(s) have an IPv6 address on record." + (" Most: " + ", ".join(f"{e['name']} ({e['addresses']})" for e in r["examples"][:5]) + "." if r["examples"] else " (IPv6 discovery is optional: Settings → IPv6.)")
 
 
+STOP = set("which what whats who whom how does did the this that these those have has had are was were not with from for and any all can could would will about into over under open ports port "
+           "connected plugged behind depends depend upstream downstream uplink attached device devices machine machines show list tell give many much more most least there their they them "
+           "online offline down running used uses use using wifi network netlens".split())
+
+
+def find_named(q: str, names: list[str]) -> str | None:
+    """The device a question is about: its full name in the question, or a word of the question that is (part of) the first part of a name ("nas" for truenas.home.example)."""
+    low = q.lower()
+    for name in sorted(names, key=len, reverse=True):
+        if len(name) > 2 and re.search(r"(?<![\w.-])" + re.escape(name.lower()) + r"(?![\w-])", low):
+            return name
+    words = [w for w in re.findall(r"[a-z0-9][a-z0-9_-]{2,}", low) if w not in STOP]
+    labels = {n: re.split(r"[.]", n.lower())[0] for n in names if len(n) > 2}
+    for w in words:                                   # an exact label first, then a label that contains the word
+        for name, label in labels.items():
+            if w == label or w == label.rstrip("0123456789"):
+                return name
+    for w in words:
+        w = w.rstrip("s") if len(w) > 4 else w
+        hits = [n for n, label in labels.items() if w in label]
+        if len(hits) == 1:
+            return hits[0]
+    return None
+
+
 # ----------------------------------------------------------------------------- the words that pick a tool
 def _vendors(conn) -> list[str]:
     return [v for v in {(r[0] or "").split(" ")[0].lower().strip(",") for r in conn.execute("SELECT DISTINCT vendor FROM devices WHERE vendor IS NOT NULL")} if len(v) > 2]
@@ -487,10 +517,10 @@ def route(conn, q: str, names: list[str]) -> tuple[str, dict] | None:
     """(tool, args) for the new kinds of question, or None when the question is not one of them."""
     online = False if re.search(r"offline|\bdown\b|unreachable|not responding", q) else True if re.search(r"\bonline\b|\bup\b|reachable|responding", q) else None
     # one device and what it is connected to
-    if re.search(r"connected to|plugged|behind|depends? on|upstream|downstream|uplink|which switch|which router|what is on|attached", q):
-        for name in sorted(names, key=len, reverse=True):
-            if len(name) > 2 and name.lower() in q:
-                return "connections", {"device": name}
+    if re.search(r"connected to|plugged|behind|depends? on|upstream|downstream|uplink|attached|what is on", q):
+        name = find_named(q, names)
+        if name:
+            return "connections", {"device": name}
     # ports and services on devices
     m = re.search(r"\bport (\d{1,5})\b", q)
     if m:
@@ -499,10 +529,19 @@ def route(conn, q: str, names: list[str]) -> tuple[str, dict] | None:
         for word, port in SERVICE_PORTS.items():
             if re.search(rf"\b{word}\b", q) and re.search(r"which|what|who|list|how many|any|devices|machines", q):
                 return "ports", {"port": port, "service": word}
-    if re.search(r"which ports|what ports|open ports", q):
-        for name in sorted(names, key=len, reverse=True):
-            if len(name) > 2 and name.lower() in q:
-                return "ports", {"device": name}
+    if re.search(r"which ports|what ports|open ports|listening", q):
+        name = find_named(q, names)
+        if name:
+            return "ports", {"device": name}
+    if re.search(r"untrusted|not trusted|unknown devices?|strangers?|not (yet )?marked", q) and re.search(r"which|list|show|what|who", q):
+        return "search_devices", {"untrusted": True}
+    q_types = re.sub(r"\b(dhcp|dns|ntp|proxy|web|mail|name|backup|syslog|rogue)\s+servers?\b", " ", q)       # "a DHCP server" is not a device of the kind "server"
+    typed = next((t for t in ask.TYPE_WORDS if re.search(rf"\b{t}(e?s)?\b", q_types)), None)
+    own = find_named(q, names)
+    if typed and own and own.lower().split(".")[0] == typed:        # a device that is called "printer": the question is about it
+        typed = None
+    if typed and re.search(r"online|offline|\bdown\b|\bup\b|which|list|show|how many|any |are there|do i have", q) and not re.search(r"slowest|fastest|highest|lowest|most |least |worst|best|reliab|unreliab|response|latency|availab", q):
+        return "search_devices", {"type": typed, "online": online}
     rules = [
         ("backups", r"backup|back-up"), ("certificates", r"certificat|\bcerts?\b|\bssl\b|\btls\b|expir"), ("speedtest", r"speed ?test|internet speed|bandwidth|mbit|mbps|download speed|upload speed|how fast is (my|the) internet"),
         ("remote_sites", r"remote sites?|branch|other (site|location)|probe"), ("wifi", r"wi-?fi|wireless|\bsignal\b|rssi"), ("maintenance", r"maintenance|snooze|planned (downtime|work)|scheduled downtime"),
@@ -517,13 +556,20 @@ def route(conn, q: str, names: list[str]) -> tuple[str, dict] | None:
         status = next((s for s, p in (("stopped", r"stopped|not running|down|off"), ("running", r"running|started|up\b"), ("restarting", r"restart"), ("paused", r"paused")) if re.search(p, q)), "")
         if re.search(r"unhealthy", q):
             return "guests", {"status": "unhealthy"}
-        return "guests", {"status": status, "kind": next((k for k, p in (("lxc", r"\blxc\b"), ("container", r"container|docker"), ("qemu", r"\bvm|virtual machine")) if re.search(p, q)), "")}
+        families = [k for k, p in (("lxc", r"\blxc\b"), ("container", r"container|docker"), ("qemu", r"\bvms?\b|virtual machine")) if re.search(p, q)]
+        return "guests", {"status": status, "kind": families[0] if len(families) == 1 else ""}
     for tool, pattern in rules:
         if re.search(pattern, q):
             if tool in ("speedtest", "security", "audit", "changes"):
                 return tool, {"days": _days_in(q, 7 if tool != "speedtest" else 30)}
-            return tool, {}
+            return tool, ({"focus": "battery"} if tool == "smart_home" and re.search(r"batter", q) else {})
     # counting and listing devices by a property
+    trigger = re.search(r"(?:how many|which|list|show|any|are there)\s+(.*)", q)
+    if trigger and re.search(r"how many|which|list|show|are there", q):
+        noun = next((w for w in re.findall(r"[a-z][a-z0-9_-]{2,}", trigger.group(1)) if w not in STOP and w not in ("devices", "machines", "hosts", "computers", "things")), None)
+        word = noun.rstrip("s") if noun and len(noun) > 4 else noun
+        if word and any(word in n.lower() for n in names) and not re.search(r"per (type|vendor)|by (type|vendor|os|group)", q):
+            return "search_devices", {"text": word, "online": online}
     if re.search(r"how many|number of|count|breakdown|distribution|per (type|vendor|manufacturer)|by (type|vendor|manufacturer|os|group)|what kinds? of", q):
         by = "vendor" if re.search(r"vendor|manufacturer|brand", q) else "os" if re.search(r"\bos\b|operating system|windows|linux|android|ios", q) else "group" if "group" in q else "type"
         if not re.search(r"windows|linux|android|ios\b|macos|openwrt", q) or by != "os" or re.search(r"operating system|\bos\b|by os", q):

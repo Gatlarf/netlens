@@ -16,7 +16,7 @@ from app.db import utcnow
 RETENTION_DAYS = 365
 MAX_ROWS = 50000
 # what is not worth a line: personal preferences, probes reporting with their token, the browser's own speed test, the terminal protocol
-SKIP = re.compile(r"^/api/(login|logout|me/preferences|dashboard/layout|probe/push|speedtest/(up|down|ping|browser)|devices/\d+/(ping|trace))")
+SKIP = re.compile(r"^/api/(login|logout|me/preferences|dashboard/layout|probe/push|speedtest/(up|down|ping|browser)|devices/\d+/(ping|trace)|insights/(ask|identify|model-check|incidents/\d+/words))")
 
 # (method, path regex, sentence). {0}, {1}... are the groups; a device id becomes the device's name.
 PATTERNS: list[tuple[str, str, str]] = [
