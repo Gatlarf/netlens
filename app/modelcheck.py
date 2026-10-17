@@ -58,7 +58,7 @@ def run(conn, ask_fn=None) -> dict[str, Any]:
             return False, "did not answer in the JSON format"
         good = "147.2" in text and "<device1>" in text and "<device3>" not in text and "91.3" in text
         return good, "copied the names and numbers exactly" if good else "changed or left out a name or a number"
-    exam("fidelity", "Copies names and numbers exactly", _result("Which device responds slowest?", "response_times", {"days": 7},
+    exam("fidelity", "Copies names and numbers exactly", _result("List the average response time of every device.", "response_times", {"days": 7},
          {"order": "slowest", "devices": [{"name": "<device1>", "avg_ms": 147.2}, {"name": "<device2>", "avg_ms": 91.3}], "services": []}), copies)
 
     def complete(reply):
