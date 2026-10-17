@@ -2,13 +2,23 @@
   "id": "asus",
   "name": "ASUS router (AiMesh)",
   "kind": "topology",
-  "builtin": true,
-  "description": "Built into Netlens: which device is connected to which AiMesh node, with Wi-Fi signal and roaming (stock ASUSWRT, read-only, no SSH).",
+  "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) so the hierarchy and the map show every client's real network position. Read-only: one login, two reads and a logout per sync, never SSH, so no sessions are left open on the router. A refused login pauses automatic syncing so the router does not lock the account.",
   "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/asus",
   "license": "PolyForm-Noncommercial-1.0.0",
-  "homepage": "https://github.com/Gatlarf/netlens",
   "supports": [
     "ASUS RT-AX92U (tested)",
     "other stock ASUSWRT/AiMesh routers"
+  ],
+  "releases": [
+    {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.1.0/asus.zip",
+      "sha256": "388407480eb782ad907fe5937f2ac026a42ec3d7652f38f249e7ae755c1e7cd3",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-17",
+      "changelog": "Now an ordinary plugin (it was built into Netlens before 0.4.44). Same code as the built-in version 1.1.0; Netlens installs it again by itself for existing setups."
+    }
   ]
 }

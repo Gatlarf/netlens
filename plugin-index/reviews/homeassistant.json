@@ -1,0 +1,16 @@
+{
+  "id": "homeassistant",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "7fca69fde32e9316a1d6f0d9894f0f07af6a3f02b7f93e51f8feea28c15869ea",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-17",
+      "tested_on": [
+        "Home Assistant 2026.7.1 (the maintainer's installation, 129 registry entries): sign-in with a user name and password, the device registry through the template API, availability, battery, Zigbee devices and their coordinator, MAC addresses of Wi-Fi devices"
+      ],
+      "notes": "Written and tested on 2026-10-17 with the assistant Claude against the maintainer's real Home Assistant. Read-only. Long-lived token authentication follows the documented API and was not run (the sign-in flow was)."
+    }
+  ]
+}

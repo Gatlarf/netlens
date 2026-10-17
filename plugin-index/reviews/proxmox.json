@@ -1,0 +1,16 @@
+{
+  "id": "proxmox",
+  "reviews": [
+    {
+      "version": "1.4.0",
+      "sha256": "a7bb851c0f83e7262e3139fecd15c98b0253a5f4e1fa8f4a4d7989b3c2e7e842",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-17",
+      "tested_on": [
+        "Proxmox VE (the maintainer's cluster, in daily use on the live Netlens: VMs and containers matched to their devices, token authentication)"
+      ],
+      "notes": "This is the code that was built into Netlens and has run on the maintainer's own installation; moved unchanged into a plugin on 2026-10-17 (assistant Claude, confirmed by the maintainer)."
+    }
+  ]
+}

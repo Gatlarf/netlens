@@ -1,0 +1,23 @@
+{
+  "id": "homeassistant",
+  "name": "Home Assistant",
+  "kind": "inventory",
+  "description": "Brings the device registry of Home Assistant into Netlens: manufacturer, model, area, firmware, protocol (Zigbee, Bluetooth, Wi-Fi), battery level and whether a device has gone unavailable. Devices with a MAC address are matched to the devices Netlens found; the others are listed on the Smart home page with the device they are paired through. Events for devices that go unavailable and for low batteries. Read-only.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/homeassistant",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Home Assistant 2026.7 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-homeassistant-v1.0.0/homeassistant.zip",
+      "sha256": "7fca69fde32e9316a1d6f0d9894f0f07af6a3f02b7f93e51f8feea28c15869ea",
+      "api_version": 1,
+      "min_netlens": "0.4.44",
+      "released": "2026-10-17",
+      "changelog": "First release. Needs Netlens 0.4.44 or newer (the inventory plugin type and the Smart home page)."
+    }
+  ]
+}

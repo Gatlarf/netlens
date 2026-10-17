@@ -2,12 +2,22 @@
   "id": "proxmox",
   "name": "Proxmox VE",
   "kind": "hypervisor",
-  "builtin": true,
-  "description": "Built into Netlens: shows which VMs and containers run on which Proxmox host (read-only, API token or password).",
+  "description": "Reads your Proxmox VMs and containers so the map and device pages show which devices run on which Proxmox host. Read-only.",
   "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/proxmox",
   "license": "PolyForm-Noncommercial-1.0.0",
-  "homepage": "https://github.com/Gatlarf/netlens",
   "supports": [
-    "Proxmox VE 8 and 9"
+    "Proxmox VE 8 and 9 (in daily use)"
+  ],
+  "releases": [
+    {
+      "version": "1.4.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-proxmox-v1.4.0/proxmox.zip",
+      "sha256": "a7bb851c0f83e7262e3139fecd15c98b0253a5f4e1fa8f4a4d7989b3c2e7e842",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-17",
+      "changelog": "Now an ordinary plugin (it was built into Netlens before 0.4.44). Same code as the built-in version 1.4.0; Netlens installs it again by itself for existing setups."
+    }
   ]
 }

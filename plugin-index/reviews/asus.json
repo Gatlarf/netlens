@@ -1,0 +1,14 @@
+{
+  "id": "asus",
+  "reviews": [
+    {
+      "version": "1.1.0",
+      "sha256": "388407480eb782ad907fe5937f2ac026a42ec3d7652f38f249e7ae755c1e7cd3",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-17",
+      "tested_on": [],
+      "notes": "This is the code that was built into Netlens; moved unchanged into a plugin on 2026-10-17 (assistant Claude, confirmed by the maintainer). Not re-tested on the router in this release, so reviewed rather than verified."
+    }
+  ]
+}
