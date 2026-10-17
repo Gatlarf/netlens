@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.62 — 2026-10-17
+
+### Fixed
+- **Insights and the version question**: when "check for updates" is switched off (or has not worked for days), the answer no longer says "no update available" from an old cached answer; it says that checking is off or out of date and when the last answer was.
+
 ## 0.4.59 — 2026-10-17
 
 ### Added

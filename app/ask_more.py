@@ -279,6 +279,22 @@ def t_maintenance(conn, args, now=None) -> dict:
     return {"windows": out[:12], "snoozed_alerts": len(snooze.active(conn, t))}
 
 
+def _update_info(conn, now=None) -> dict:
+    """What Netlens knows about newer versions, and how far that can be trusted: the check can be switched off, and an old answer says nothing about today."""
+    from app import updates
+
+    up = updates.status(conn)
+    t = now or datetime.now(timezone.utc)
+    checked = None
+    try:
+        checked = datetime.strptime(up["checked"], STAMP).replace(tzinfo=timezone.utc) if up.get("checked") else None
+    except ValueError:
+        pass
+    fresh = bool(up["enabled"] and checked and (t - checked) < timedelta(days=3))
+    return {"update_checking_is_on": up["enabled"], "last_checked": up.get("checked"), "latest_known": up.get("latest"), "current": up["current"],
+            "update_available": (bool(up["available"]) if fresh else None), "answer_is_current": fresh}
+
+
 def t_system(conn, args, now=None) -> dict:
     from app import licence, updates
     from app.plugins.registry import discover
@@ -297,8 +313,7 @@ def t_system(conn, args, now=None) -> dict:
                 plugins.append({"name": p.name, "enabled": st["enabled"], "version": p.manifest["version"]})
     except Exception:  # noqa: BLE001 - plugins are optional
         pass
-    up = updates.status(conn)
-    return {"netlens_version": VERSION, "update": {k: up.get(k) for k in ("latest", "available") if k in up}, "edition": licence.status(conn)["name"], "last_scans": [dict(s) for s in scans],
+    return {"netlens_version": VERSION, "update": _update_info(conn, now), "edition": licence.status(conn)["name"], "last_scans": [dict(s) for s in scans],
             "plugins": plugins[:30], "monitored_hosts": conn.execute("SELECT COUNT(*) FROM host_monitors WHERE enabled = 1").fetchone()[0], "service_checks": conn.execute("SELECT COUNT(*) FROM service_checks WHERE enabled = 1").fetchone()[0]}
 
 
@@ -307,8 +322,7 @@ def t_updates(conn, args, now=None) -> dict:
 
     rows = conn.execute("SELECT DISTINCT detail FROM events WHERE kind = 'guest_update_available' AND ts >= ? ORDER BY id DESC LIMIT 15", (_since(30, now),)).fetchall()
     smart = [r["name"] for r in conn.execute("SELECT name FROM inventory_devices WHERE update_available = 1 LIMIT 15")]
-    up = updates.status(conn)
-    return {"guest_updates": [r["detail"] for r in rows], "smart_home_updates": smart, "netlens_update": {k: up.get(k) for k in ("latest", "available") if k in up}}
+    return {"guest_updates": [r["detail"] for r in rows], "smart_home_updates": smart, "netlens_update": _update_info(conn, now)}
 
 
 def t_changes(conn, args, now=None) -> dict:
@@ -450,9 +464,18 @@ def r_maintenance(r: dict) -> str:
     return "\n".join(lines or ["No maintenance windows are set."]) + f"\n{r['snoozed_alerts']} alert(s) are snoozed."
 
 
+def _update_sentence(up: dict) -> str:
+    if not up["update_checking_is_on"]:
+        return ("Checking for updates is switched off (Settings → About), so Netlens cannot say whether a newer version exists"
+                + (f"; the last check, on {up['last_checked'][:10]}, found {up['latest_known']}." if up.get("last_checked") else "."))
+    if not up["answer_is_current"]:
+        return "Netlens has not been able to check for a newer version recently" + (f" (last answer {up['last_checked'][:10]}: {up['latest_known']})." if up.get("last_checked") else ".")
+    return f"A newer version, {up['latest_known']}, is available." if up["update_available"] else f"This is the newest published version (checked {up['last_checked'][:10]})."
+
+
 def r_system(r: dict) -> str:
     up = r["update"]
-    lines = [f"Netlens {r['netlens_version']} ({r['edition']}). " + (f"A newer version, {up['latest']}, is available." if up.get("available") else "No newer version is known.")]
+    lines = [f"Netlens {r['netlens_version']} ({r['edition']}). " + _update_sentence(up)]
     if r["last_scans"]:
         s = r["last_scans"][0]
         lines.append(f"Last scan: {s['kind']} {s['status']} at {s['started'][:16].replace('T', ' ')} UTC, {s['hosts_found']} hosts.")
@@ -467,9 +490,8 @@ def r_updates(r: dict) -> str:
         lines.append("Updates available for guests:\n" + "\n".join(r["guest_updates"][:8]))
     if r["smart_home_updates"]:
         lines.append("Smart-home updates: " + ", ".join(r["smart_home_updates"]) + ".")
-    if r["netlens_update"].get("available"):
-        lines.append(f"A newer Netlens, {r['netlens_update'].get('latest')}, is available.")
-    return "\n".join(lines) or "No updates are waiting (as far as Netlens can see)."
+    lines.append("Netlens itself: " + _update_sentence(r["netlens_update"]))
+    return "\n".join(lines)
 
 
 def r_changes(r: dict) -> str:
@@ -615,7 +637,7 @@ TOOLS = {
     "connections": (t_connections, "what one device is plugged into and which devices depend on it (the network hierarchy). args: device (name)"),
     "wifi": (t_wifi, "Wi-Fi signal strength of clients, weakest first. args: none"),
     "maintenance": (t_maintenance, "planned maintenance windows and snoozed alerts. args: none"),
-    "system": (t_system, "Netlens itself: version, update available, last scans, installed plugins, number of monitors. args: none"),
+    "system": (t_system, "Netlens itself: version, whether a newer version exists (only trust it when update.answer_is_current is true), last scans, installed plugins, number of monitors. args: none"),
     "updates": (t_updates, "software updates that are waiting: containers and guests, smart-home devices, Netlens. args: none"),
     "changes": (t_changes, "what changed on the network and in the settings in a period, by category. args: days (1, 7 or 30)"),
     "ipv6": (t_ipv6, "devices that have IPv6 addresses. args: none"),

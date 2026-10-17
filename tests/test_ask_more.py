@@ -147,3 +147,20 @@ def test_a_word_that_is_not_a_kind_is_looked_for_in_the_names(conn):
     found = ask_more.t_search_devices(conn, {"type": "iphone"}, NOW)
     assert found["count"] == 1 and found["devices"][0]["name"] == "iphone-bert"
     assert ask_more.t_search_devices(conn, {"type": "printers"}, NOW)["count"] == 1               # a plural kind still works
+
+
+def test_the_version_answer_does_not_claim_an_update_status_it_does_not_have(conn):
+    from app import updates
+    from app.db import set_setting
+
+    sentence = lambda: ask.answer(conn, "Which version of Netlens is this and is there an update?", NOW, mode="rules")["answer"]   # noqa: E731
+    set_setting(conn, updates.SETTINGS_KEY, json.dumps({"enabled": False}))
+    set_setting(conn, updates.CACHE_KEY, json.dumps({"latest": "0.4.2", "checked": "2026-10-15T08:16:59Z", "current": "0.4.2"}))
+    off = sentence()
+    assert "switched off" in off and "0.4.2" in off and "newest published" not in off
+    set_setting(conn, updates.SETTINGS_KEY, json.dumps({"enabled": True}))
+    assert "not been able to check" in sentence()                                       # on, but the last answer is old
+    set_setting(conn, updates.CACHE_KEY, json.dumps({"latest": "9.9.9", "checked": "2026-11-01T08:00:00Z", "current": "0.4.2"}))
+    assert "A newer version, 9.9.9, is available" in sentence()
+    set_setting(conn, updates.CACHE_KEY, json.dumps({"latest": "0.0.1", "checked": "2026-11-01T08:00:00Z", "current": "0.0.1"}))
+    assert "newest published version" in sentence()
