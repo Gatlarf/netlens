@@ -951,8 +951,8 @@ their own licenses, see below.
 |---|---|---|
 | **Community** (free) | 1 | home and other noncommercial use |
 | **Supporter** (a coffee, for life) | any number | home and other noncommercial use |
-| **Small business** (yearly) | 10 | commercial use |
-| **Enterprise** (yearly) | any number | commercial use |
+| **Small business** (yearly, planned EUR 149) | 10 | commercial use |
+| **Enterprise** (yearly, planned EUR 449) | any number | commercial use |
 
 Everything else (monitoring, alerts, plugins, reports, the web terminal ...) is the same in every edition. A key is entered in
 **Settings → Licence**. It is checked offline with a public key, so Netlens never contacts anyone about it. The **free 30-day
@@ -965,13 +965,13 @@ and raise no alerts. Nothing is deleted; adding a key brings them back. The site
 Netlens that receives them.
 
 The source is readable and the check can be edited out by anybody who builds their own copy; the licence key is how a business
-buys the right to use Netlens commercially, with a supported, signed release. The commercial terms are in the commercial license
-mentioned above.
+buys the right to use Netlens commercially, with a supported, signed release. The terms are being drafted (see [`legal/`](legal/), not yet
+reviewed by a lawyer and not in force).
 
 ## Support
 
-Netlens is made in spare time. If it saved you some work, you can [buy me a coffee](https://buymeacoffee.com/Gatlarf): a coffee
-gets you a **Supporter key**, the full version for life for your own noncommercial use (leave your e-mail address with the coffee).
+Netlens is made in spare time. If it saved you some work, you can [buy me a coffee](https://buymeacoffee.com/Gatlarf): a coffee of at
+least EUR 5 gets you a **Supporter key**, the full version for life for your own noncommercial use (leave your e-mail address with the coffee).
 Commercial use still needs a business licence.
 
 ## Third-party
