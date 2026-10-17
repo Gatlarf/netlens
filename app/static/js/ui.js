@@ -59,3 +59,22 @@ export function tabbed(storageKey, defs) {
   show();
   return h("div", { class: "tabbed" }, nav, ...panels);
 }
+
+// Buttons that follow each other in a form (Save, Reset, Test ...) are put on one row instead of a column of wide bars.
+export function groupButtons(root) {
+  for (const form of root.querySelectorAll(".edit-form, form")) {
+    let run = [];
+    const flush = () => {
+      if (run.length > 1) {
+        const row = h("div", { class: "form-actions" });
+        run[0].before(row);
+        row.append(...run);
+      }
+      run = [];
+    };
+    for (const child of [...form.children]) {
+      if (child.matches("button, a.btn") && !child.hidden) run.push(child); else flush();
+    }
+    flush();
+  }
+}

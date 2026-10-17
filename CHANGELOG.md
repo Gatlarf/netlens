@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.64 — 2026-10-17
+
+### Changed
+- **What changed** shows a device that kept going up and down as one line a day ("went offline 3 times, back online now") and says in words what happened when no detail was kept.
+- Forms and plugin pages put their buttons side by side (Save, Test, Sync now) instead of one wide bar each; the weekly report text scrolls instead of filling the page.
+
 ## 0.4.63 — 2026-10-17
 
 ### Changed

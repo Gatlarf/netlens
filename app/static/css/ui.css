@@ -53,3 +53,5 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 .form-actions .btn, .form-actions button { width: auto; }
 .form-actions .push-right { margin-left: auto; }
 .tab-panel[hidden] { display: none; } .tab-panel { display: flex; flex-direction: column; gap: 14px; }
+.edit-form > button, .edit-form > .btn, .edit-form > a.btn { justify-self: start; }
+.rep-text { max-height: 18rem; overflow: auto; }

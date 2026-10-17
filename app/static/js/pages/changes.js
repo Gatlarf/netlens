@@ -1,6 +1,7 @@
 import { get } from "../api.js";
 import { h, clear, timeAgo } from "../util.js";
 import { pageHead } from "../ui.js";
+import { eventLabel } from "../event_labels.js";
 
 const PERIODS = [["6h", "6 hours"], ["24h", "24 hours"], ["3d", "3 days"], ["7d", "7 days"], ["30d", "30 days"]];
 const SEEN_KEY = "netlens.changes.seen";
@@ -62,9 +63,30 @@ export async function render(container) {
       list.append(h("div", { class: "card" }, h("p", {}, "Nothing changed in this period. ", h("span", { class: "hint" }, "A quiet network is a good network."))));
       return;
     }
+    // a device that kept going up and down is one line a day ("went offline 3 times"), not six
+    const merged = [], bucket = new Map();
+    for (const it of data.items) {
+      if ((it.kind === "device_offline" || it.kind === "device_online") && it.device_id) {
+        const key = `${dayHeading(it.ts)}|${it.device_id}`;
+        const seen = bucket.get(key);
+        if (seen) { seen.events.push(it); continue; }
+        const group = { ...it, events: [it] };
+        bucket.set(key, group);
+        merged.push(group);
+      } else merged.push(it);
+    }
+    for (const g of merged) {
+      if (!g.events || g.events.length < 2) continue;
+      const off = g.events.filter((e) => e.kind === "device_offline").length;
+      const stillOff = g.events[0].kind === "device_offline";
+      g.text = off === 1 && !stillOff ? `${g.device || "A device"} went offline and came back`
+        : `${g.device || "A device"} went offline ${off} times${stillOff ? " and is offline now" : ", back online now"}`;
+      g.category = "availability";
+      g.merged = true;
+    }
     let day = "";
     let card = null;
-    for (const it of data.items) {
+    for (const it of merged) {
       const heading = dayHeading(it.ts);
       if (heading !== day || !card) {
         day = heading;
@@ -72,13 +94,14 @@ export async function render(container) {
         card = h("div", { class: "card chg-card" });
         list.append(card);
       }
+      if (it.kind && it.text === it.kind.replace(/_/g, " ")) it.text = eventLabel(it.kind);      // no detail was kept: say it in words
       const fresh = lastSeen && it.ts > lastSeen;
       const time = new Date(it.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
       card.append(h("div", { class: `chg-row${fresh ? " fresh" : ""}` },
         h("span", { class: "chg-time", title: it.ts }, time),
         h("span", { class: `chg-badge chg-${it.category}` }, names[it.category] || it.category),
-        h("span", { class: "chg-text" }, it.who ? h("strong", {}, `${it.who}: `) : null, it.text,
-          it.device_id ? [" ", h("a", { class: "chg-link", href: `#/device/${it.device_id}` }, `${it.device || "device"} →`)] : null),
+        h("span", { class: "chg-text" }, it.who ? h("strong", {}, `${it.who}: `) : null, it.merged ? h("a", { class: "chg-link", href: `#/device/${it.device_id}` }, it.text) : it.text,
+          it.device_id && !it.merged ? [" ", h("a", { class: "chg-link", href: `#/device/${it.device_id}` }, `${it.device || "device"} →`)] : null),
         fresh ? h("span", { class: "chg-new", title: "Happened since you last looked" }, "new") : null));
     }
     if (data.total > data.items.length) list.append(h("p", { class: "hint" }, `The newest ${data.items.length} of ${data.total} are shown. Choose a group or a shorter period to see the rest.`));
