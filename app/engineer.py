@@ -74,10 +74,19 @@ class Redactor:
 
     def __init__(self, names: list[str]):
         self.map: dict[str, str] = {}
+        self.back: dict[str, str] = {}
         self.names = sorted({n for n in names if n and len(n) > 2}, key=len, reverse=True)
 
     def token(self, value: str, prefix: str) -> str:
-        return self.map.setdefault(value.lower(), f"<{prefix}{sum(1 for v in self.map.values() if v.startswith('<' + prefix)) + 1}>")
+        token = self.map.setdefault(value.lower(), f"<{prefix}{sum(1 for v in self.map.values() if v.startswith('<' + prefix)) + 1}>")
+        self.back.setdefault(token, value)
+        return token
+
+    def restore(self, text: str) -> str:
+        """The real names and addresses back in a model's answer."""
+        for token, value in sorted(self.back.items(), key=lambda kv: -len(kv[0])):
+            text = text.replace(token, value)
+        return text
 
     def __call__(self, text: str) -> str:
         for name in self.names:

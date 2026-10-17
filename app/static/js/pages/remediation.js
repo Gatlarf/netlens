@@ -25,6 +25,21 @@ function analysisBlock(a) {
     a.next_steps && a.next_steps.length ? h("ul", {}, ...a.next_steps.map((s) => h("li", {}, s))) : null);
 }
 
+function lookBack(run) {
+  if (run.state === "suggested" || run.state === "denied" || run.state === "skipped") return null;
+  const slot = h("div", { class: "hint rem-analysis" });
+  const btn = h("button", { class: "btn ghost", type: "button", title: "Did it work, and does this keep coming back?" }, "Look back");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true; clear(slot);
+    try {
+      const res = await get(`/api/insights/postmortem/${run.id}?words=true`);
+      slot.appendChild(h("div", {}, res.words || res.summary));
+    } catch (err) { slot.appendChild(h("span", { class: "error" }, err.message || "Failed")); }
+    btn.disabled = false;
+  });
+  return h("div", {}, btn, slot);
+}
+
 export async function render(container) {
   let destroyed = false, editing = null, formOpen = false;
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
@@ -164,7 +179,7 @@ export async function render(container) {
         const [cls, label] = STATE[r.state] || ["", r.state];
         b.appendChild(h("tr", {}, h("td", { title: r.created }, timeAgo(r.created)), h("td", {}, r.rule_name, r.decided_by ? h("span", { class: "hint" }, ` · ${r.decided_by}`) : ""), h("td", {}, r.device || ""),
           h("td", { class: "hint" }, r.kind || "test"), h("td", {}, h("span", { class: cls }, label), r.result ? h("div", { class: "hint" }, r.result) : null, analysisBlock(r.analysis)),
-          h("td", {}, r.recovered ? h("span", { class: "run-ok" }, `yes, ${timeAgo(r.recovered)}`) : r.state === "ok" ? h("span", { class: "hint" }, "not yet") : "")));
+          h("td", {}, r.recovered ? h("span", { class: "run-ok" }, `yes, ${timeAgo(r.recovered)}`) : r.state === "ok" ? h("span", { class: "hint" }, "not yet") : "", lookBack(r))));
       }
       t.appendChild(b);
       hc.appendChild(h("div", { class: "table-wrap" }, t));

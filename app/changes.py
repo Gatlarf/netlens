@@ -23,7 +23,7 @@ KIND_CATEGORY = {
     "wake_sent": "devices",
     "device_offline": "availability", "device_online": "availability", "service_up": "availability", "service_down": "availability",
     "probe_offline": "availability", "probe_online": "availability",
-    "metric_warning": "health", "metric_critical": "health", "metric_ok": "health", "capacity_warning": "health", "capacity_critical": "health",
+    "metric_warning": "health", "metric_critical": "health", "metric_ok": "health", "capacity_warning": "health", "capacity_critical": "health", "anomaly": "health",
     "cert_expiring": "health", "backup_failed": "health",
     "gateway_changed": "network", "dns_failed": "network", "dhcp_rogue": "network",
     "port_unexpected": "security", "login_failed": "security",

@@ -15,7 +15,7 @@ const KINDS = {
   device_new: "New device", device_online: "Came online", device_offline: "Went offline", device_changed: "Changed", port_opened: "Port opened",
   port_closed: "Port closed", wifi_roamed: "Roamed", login_failed: "Failed sign-ins", cert_expiring: "Certificate", service_down: "Service down", service_up: "Service up",
   plugin_updated: "Plugin updated", plugin_update_failed: "Plugin update failed", plugin_update_skipped: "Plugin update held back",
-  metric_warning: "Health warning", metric_critical: "Health critical", metric_ok: "Health normal", capacity_warning: "Disk filling up", capacity_critical: "Disk almost full",
+  metric_warning: "Health warning", metric_critical: "Health critical", metric_ok: "Health normal", capacity_warning: "Disk filling up", capacity_critical: "Disk almost full", anomaly: "Unusual reading",
   remote_new: "Remote: new device", remote_offline: "Remote: offline", remote_online: "Remote: online", remote_service_down: "Remote: service down", remote_service_up: "Remote: service up", remote_metric_warning: "Remote: health warning", remote_metric_critical: "Remote: health critical", remote_metric_ok: "Remote: health normal", probe_offline: "Remote site silent", probe_online: "Remote site reporting",
 };
 const kindText = (k) => KINDS[k] || k.replace(/_/g, " ");

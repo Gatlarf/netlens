@@ -88,6 +88,26 @@ def forecasts(conn, now: float | None = None) -> list[dict[str, Any]]:
     return out
 
 
+def memory_trends(conn, now: float | None = None) -> list[dict[str, Any]]:
+    """Monitored hosts whose memory use keeps rising (a leak): the same straight-line estimate, for the hosts whose memory will run out within a year.
+    Only listed, never announced: a cache that grows is normal until the trend is clear for weeks."""
+    now = now if now is not None else time.time()
+    store = tsdb.for_conn(conn)
+    if store is None:
+        return []
+    out = []
+    for r in conn.execute("SELECT m.device_id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1"):
+        for s in store.metrics_of("device", r["device_id"]):
+            if s["metric"] != "mem_pct" or s["last"] is None or s["last_ts"] is None or now - s["last_ts"] > FRESH:
+                continue
+            data = store.query("device", r["device_id"], "mem_pct", s["label"], span=SPAN, end=int(now), points=300)
+            est = estimate(data["points"], s["last"], now)
+            if est.get("days_to_full") is not None:
+                out.append({"device_id": r["device_id"], "device": r["name"], "current": round(s["last"], 1), **est})
+    out.sort(key=lambda i: i["days_to_full"])
+    return out
+
+
 _CACHE: dict[str, tuple[float, list]] = {}
 
 

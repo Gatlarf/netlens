@@ -668,3 +668,11 @@ table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 .rem-run { padding: 10px 0; border-top: 1px solid var(--border, #d0d7e2); }
 .rem-run:first-of-type { border-top: 0; }
 .rem-analysis { margin-top: 4px; }
+
+/* insights */
+.ins-ask { display: flex; gap: 8px; margin: 8px 0; }
+.ins-ask input { flex: 1; min-width: 0; }
+.ins-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.ins-text { white-space: pre-line; margin: 4px 0; }
+.ins-suggest { margin-top: 6px; padding: 8px 10px; border-left: 3px solid var(--accent, #2563eb); }
+@media (max-width: 640px) { .ins-ask { flex-direction: column; } }

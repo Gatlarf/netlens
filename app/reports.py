@@ -425,7 +425,15 @@ async def send_weekly(db_path: str, force: bool = False, poster=None, mailer=Non
         if not force and not due(conn):
             return {"sent": 0, "failed": 0, "errors": [], "skipped": True}
         wanted = [c for c in ch.load_channels(conn) if c["enabled"] and "report_weekly" in c["events"]]
-        title, body = weekly_text(weekly(conn))
+        report = weekly(conn)
+        title, body = weekly_text(report)
+        try:
+            from app import reportsummary
+
+            if reportsummary.enabled(conn):
+                body = "In short: " + await asyncio.to_thread(reportsummary.summary, conn, report) + "\n\n" + body
+        except Exception:  # noqa: BLE001 - the summary is a nicety; the report goes out without it
+            log.debug("the report summary could not be written", exc_info=True)
         result = {"sent": 0, "failed": 0, "errors": [], "channels": len(wanted), "title": title}
         for c in wanted:
             try:

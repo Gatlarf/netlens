@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from starlette.middleware.gzip import GZipMiddleware
 
-from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, guest_backups as guest_backups_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api, probes as probes_api, central as central_api, licence as licence_api, ipv6 as ipv6_api, inventory as inventory_api, remediation as remediation_api, escalation as escalation_api, sso as sso_api, siem as siem_api, reports as reports_api, preferences as preferences_api, snoozes as snoozes_api, audit as audit_api, changes as changes_api
+from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, guest_backups as guest_backups_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api, probes as probes_api, central as central_api, licence as licence_api, ipv6 as ipv6_api, inventory as inventory_api, remediation as remediation_api, escalation as escalation_api, sso as sso_api, siem as siem_api, reports as reports_api, preferences as preferences_api, snoozes as snoozes_api, audit as audit_api, changes as changes_api, insights as insights_api
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, identify, require_auth
@@ -110,6 +110,9 @@ async def lifespan(app: FastAPI):
         from app import siem
 
         tasks.append(asyncio.create_task(siem.loop(app.state.db_path)))
+        from app import anomaly
+
+        tasks.append(asyncio.create_task(anomaly.loop(app.state.db_path)))
         from app.scanner.passive import Control
 
         app.state.passive = Control(app.state.db_path)
@@ -242,6 +245,7 @@ def create_app(
     app.include_router(snoozes_api.router, dependencies=auth_deps)
     app.include_router(audit_api.router, dependencies=auth_deps)
     app.include_router(changes_api.router, dependencies=auth_deps)
+    app.include_router(insights_api.router, dependencies=auth_deps)
     app.include_router(probes_api.push_router)       # a probe signs in with its own token (checked there), not with a user session
     app.include_router(speedtest_api.router, dependencies=auth_deps)
     app.include_router(wifi.router, dependencies=auth_deps)

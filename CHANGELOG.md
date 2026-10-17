@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.54 — 2026-10-17
+
+### Added
+- ★ **Insights** (Monitoring → Insights): ask your network a question ("what happened last night?", "which devices were least available?"), see grouped alerts as one **incident** with a probable cause, see readings that are **unusual** for that device at that time of day (processor, memory, response times; raises an "Unusual reading" alert after two rounds), **predictions** (disks and memory use that keeps rising), and a **suggestion for devices without a type** with the reasons. Everything works from Netlens's own numbers; a language model (Settings → Digital engineer) is optional and only words the answers, chooses among read-only questions, or adds its opinion on a device. Names and addresses are anonymised before they reach it.
+- **Weekly report summary**: the weekly report can start with two or three sentences about the week (switch off on the Insights page).
+- **Look back** (Monitoring → Remediation, on every run): did the automatic fix work, and does the same problem keep coming back?
+
 ## 0.4.50 — 2026-10-17
 
 ### Added

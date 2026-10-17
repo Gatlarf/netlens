@@ -179,3 +179,14 @@ def test_the_summary_for_home_assistant_has_health_and_remote_sites(conn):
     nas = next(d for d in s["device_list"] if d["id"] == 1)
     assert nas["health"]["level"] == "warning" and nas["health"]["disk"] is not None
     assert s["remote_sites"] == {"total": 0, "silent": 0, "problems": 0, "devices_down": 0, "services_down": 0}
+
+
+def test_a_rising_memory_is_listed_but_never_announced_as_a_disk(conn):
+    now = int(time.time())
+    store = tsdb.for_conn(conn)
+    for t in range(now - 10 * DAY, now + 1, 3600):
+        store.record([("device", 1, "mem_pct", 50 + 2.0 * ((t - (now - 10 * DAY)) / DAY), "", "%")], ts=t)
+    store.rollup(now)
+    leaks = forecast.memory_trends(conn, now)
+    assert len(leaks) == 1 and leaks[0]["device"] == "nas" and 10 < leaks[0]["days_to_full"] < 20
+    assert forecast.forecasts(conn, now) == [] and forecast.check(conn, now) == []
