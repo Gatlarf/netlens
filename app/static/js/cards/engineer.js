@@ -33,6 +33,12 @@ export async function buildEngineerCard() {
     card.append(h("label", { class: "check" }, enabled, " Digital engineer is on"),
       h("div", { class: "field" }, h("label", {}, "Address (ends in /v1)"), url), h("div", { class: "field" }, h("label", {}, "Model"), model), h("div", { class: "field" }, h("label", {}, "API key"), key),
       h("label", { class: "check" }, redact, " Make it anonymous: replace IP addresses, MAC addresses and device names by placeholders before anything is sent"),
+      h("details", {}, h("summary", { class: "hint" }, "What a trustworthy model needs"), h("ul", { class: "hint" },
+        h("li", {}, "An OpenAI-compatible chat API (llama.cpp, Ollama, LM Studio, OpenRouter, OpenAI ...) with a context of at least 8,000 tokens."),
+        h("li", {}, "It must reply with one JSON object and nothing else, copy names and numbers exactly, and not leave items out of a list. Answers that look right and are wrong are the danger."),
+        h("li", {}, "In practice: a model of about 14 billion parameters or more, lightly compressed (4-bit or better), or a current hosted model. Very small or 2-bit models fail these tests."),
+        h("li", {}, "“Thinking” models work but take longer. A slow model only makes answers slower, never wrong."),
+        h("li", {}, "Run “Check the model” on the Monitoring → Insights page: five small exams with made-up data show how yours does."))),
       h("p", { class: "hint" }, "The commands of your rules are never sent, only their names and the kind of action. With a hosted model the incident still leaves your network: leave the anonymising on, or use a local model."),
       h("div", { class: "form-actions" }, save, test));
   }

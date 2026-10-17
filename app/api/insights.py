@@ -9,7 +9,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app import anomaly, ask, forecast, identify, incidents, insights, postmortem, reportsummary
+from app import anomaly, ask, forecast, identify, incidents, insights, modelcheck, postmortem, reportsummary
+from app import engineer
 from app.api.devices import get_conn
 
 router = APIRouter(prefix="/api", tags=["insights"])
@@ -105,3 +106,12 @@ def put_settings(body: SettingsBody, conn=Depends(get_conn)) -> dict:
     if body.report_summary is not None:
         reportsummary.set_enabled(conn, body.report_summary)
     return _overview(conn)["status"]
+
+
+@router.post("/insights/model-check")
+async def model_check(conn=Depends(get_conn)) -> dict:
+    """Five small exams that show whether the connected language model is reliable enough (takes a minute with a slow model)."""
+    _allowed(conn)
+    if not insights.llm_ready(conn) and not engineer.settings(conn)["url"]:
+        raise HTTPException(status_code=409, detail="connect a language model first (Settings → Digital engineer)")
+    return await asyncio.to_thread(modelcheck.run, conn)

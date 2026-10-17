@@ -116,10 +116,31 @@ def t_fixes(conn, args, now=None) -> dict:
                      for r in remediation.recent_runs(conn, 30)[:LIMIT]]}
 
 
+def t_services(conn, args, now=None) -> dict:
+    rows = conn.execute("SELECT name, kind, last_up, last_ms, last_detail FROM service_checks WHERE enabled = 1 ORDER BY last_up IS NULL, last_up, name COLLATE NOCASE LIMIT 60").fetchall()
+    items = [{"name": r["name"], "kind": r["kind"], "state": "unknown" if r["last_up"] is None else "up" if r["last_up"] else "down", "response_ms": r["last_ms"], "detail": (r["last_detail"] or "")[:80] if r["last_up"] == 0 else ""} for r in rows]
+    return {"total": len(items), "down": [i["name"] for i in items if i["state"] == "down"], "services": items[:30]}
+
+
+def _type_word(needle: str) -> str | None:
+    for word in (needle, needle.rstrip("s"), needle.rstrip("es")):
+        if word in TYPE_WORDS:
+            return word
+    return None
+
+
 def t_device(conn, args, now=None) -> dict:
     needle = str(args.get("name") or "").strip().lower()
     if not needle:
         return {"error": "give a name or address"}
+    kind = _type_word(needle)
+    if kind:                                           # "the printers", "the switch": every device of that type
+        end = now or datetime.now(timezone.utc)
+        rep = {d["id"]: d for d in reports.availability(conn, end - timedelta(days=7), end, with_services=False)["devices"]}
+        rows = conn.execute("SELECT * FROM devices WHERE COALESCE(type_override, device_type) = ? ORDER BY online, last_seen DESC LIMIT ?", (kind, LIMIT)).fetchall()
+        if rows:
+            return {"type": kind, "devices": [{"name": _name(r), "online": bool(r["online"]), "last_seen": r["last_seen"], "availability_7d_pct": rep[r["id"]]["availability"] if r["id"] in rep else None,
+                                               "outages_7d": rep[r["id"]]["outages"] if r["id"] in rep else None} for r in rows]}
     rows = [r for r in conn.execute("SELECT * FROM devices") if needle in (_name(r) or "").lower() or needle == (r["primary_ip"] or "")]
     if not rows:
         return {"error": f"no device matches {needle!r}"}
@@ -134,6 +155,8 @@ def t_device(conn, args, now=None) -> dict:
             "recent_events": [{"at": e["ts"], "kind": e["kind"], "detail": (e["detail"] or "")[:120]} for e in events], "other_matches": len(rows) - 1}
 
 
+TYPE_WORDS = ("router", "switch", "tablet", "tv", "speaker", "console", "appliance", "printer", "iot", "camera", "nas", "phone", "server", "pc")
+
 TOOLS: dict[str, tuple[Callable, str]] = {
     "overview": (t_overview, "how many devices are online, which are offline and which services are down right now. args: none"),
     "offline_now": (t_offline_now, "the devices that are offline now with the time they were last seen. args: none"),
@@ -145,7 +168,8 @@ TOOLS: dict[str, tuple[Callable, str]] = {
     "anomalies": (t_anomalies, "readings that are unusual right now for the time of day. args: none"),
     "disks": (t_disks, "disks on course to fill up and memory use that keeps rising, with the number of days left. args: none"),
     "fixes": (t_fixes, "recent automatic fixes (auto-remediation) and whether they worked. args: none"),
-    "device": (t_device, "details of one device: type, state, availability, services and recent events. args: name (name, host name or address)"),
+    "services": (t_services, "all service checks (websites, ports, DNS) with their state and response time. args: none"),
+    "device": (t_device, "details of one device, or of every device of a kind. args: name (a device name, host name or address, or a kind: printer, switch, nas, camera, router, tv, phone, server, pc ...)"),
 }
 
 # ----------------------------------------------------------------------------- without a model
@@ -159,7 +183,7 @@ PRESETS = [
     {"id": "fixes", "text": "What did the automatic fixes do?", "tool": "fixes", "args": {}},
 ]
 KEYWORDS = [
-    ("response_times", r"response|latenc|\bping|\bslow|\bfast|\brtt\b|\blag"), ("anomalies", r"unusual|anomal|strange|weird|odd|abnormal"), ("disks", r"\bdisks?\b|storage|space|capacity|\bfull\b|filling"), ("fixes", r"\bfix|remediat|restart|reset|repair"),
+    ("response_times", r"response|latenc|\bping|\bslow|\bfast|\brtt\b|\blag"), ("services", r"\bservices?\b|website|\bsites?\b|checks? (is|are)"), ("anomalies", r"unusual|anomal|strange|weird|odd|abnormal"), ("disks", r"\bdisks?\b|storage|space|capacity|\bfull\b|filling"), ("fixes", r"\bfix|remediat|restart|reset|repair"),
     ("new_devices", r"\bnew\b|unknown|appeared|joined|stranger|first seen"), ("availability", r"uptime|availab|reliab|worst|least|outage|stable|flaky"),
     ("incidents", r"happen|changed|incident|yesterday|last night|summar|recap|what.?s new"), ("offline_now", r"\boffline|\bdown\b|not working|unreachable|dead"),
     ("overview", r"wrong|problem|issue|status|health|\bok\b|\bfine\b|right now|going on"),
@@ -173,6 +197,11 @@ def route(question: str, known_names: list[str]) -> tuple[str, dict]:
     for name in sorted(known_names, key=len, reverse=True):
         if len(name) > 2 and re.search(r"(?<![\w.-])" + re.escape(name.lower()) + r"(?![\w-])", q):
             return "device", {"name": name}
+    comparative = re.search(r"\bwhich\b|\bmost\b|\bleast\b|worst|highest|lowest|slowest|fastest|\bbest\b", q)
+    if not comparative:
+        for word in TYPE_WORDS:
+            if re.search(rf"\b{word}(e?s)?\b", q):
+                return "device", {"name": word}
     for tool, pattern in KEYWORDS:
         if re.search(pattern, q):
             args = {"days": days} if tool in ("availability", "new_devices", "incidents", "events", "response_times") else {}
@@ -215,6 +244,12 @@ def render(tool: str, r: dict) -> str:
         return "\n".join(lines) or f"No disk is on course to fill up ({r['checked']} checked) and no memory use keeps rising."
     if tool == "fixes":
         return "\n".join(f"{x['at'][:16].replace('T', ' ')} {x['rule']} on {x['device']}: {x['state']}" + (" (the problem went away)" if x["recovered"] else "") for x in r["runs"][:8]) or "No automatic fixes have run."
+    if tool == "services":
+        if not r["total"]:
+            return "There are no service checks."
+        return f"{r['total']} service checks. " + ("Down: " + ", ".join(r["down"]) + "." if r["down"] else "All of them are up.")
+    if tool == "device" and r.get("type"):
+        return "\n".join(f"{d['name']}: {'online' if d['online'] else 'offline (last seen ' + d['last_seen'] + ')'}" + (f", up {d['availability_7d_pct']}% over 7 days with {d['outages_7d']} outage(s)" if d["availability_7d_pct"] is not None else "") for d in r["devices"])
     if tool == "device":
         parts = [f"{r['name']} is {'online' if r['online'] else 'offline'} (last seen {r['last_seen']})."]
         if r.get("availability_7d_pct") is not None:
@@ -230,9 +265,21 @@ def render(tool: str, r: dict) -> str:
 
 
 # ----------------------------------------------------------------------------- with a model
-SYSTEM = ("You answer questions about the user's own computer network using tools that read Netlens's data. Reply with ONE JSON object and nothing else.\n"
-          'To use a tool: {"tool": "<name>", "args": {...}}. When you can answer: {"answer": "<plain text, a few sentences, only facts from the tool results>"}.\n'
-          "Use at most four tool calls. If the data does not tell, say so. Never invent devices, times or numbers. Names such as <device1> are placeholders: use them as they are.\n"
+SYSTEM = ("You answer questions about the user's own computer network using tools that read Netlens's data.\n"
+          "Reply with ONE JSON object and nothing else (no markdown, no text around it).\n"
+          'To look at data: {"tool": "<name>", "args": {...}}\n'
+          'To answer: {"answer": "<a few plain sentences>"}\n'
+          "Rules:\n"
+          "- Always look at the data with a tool first. Never answer about the network from memory.\n"
+          "- Use at most four tool calls. Pick the tool that fits the question. For a kind of device (printer, switch, nas, camera ...) call device with that word as the name.\n"
+          "- Copy names and numbers exactly as they appear in the results. If a result is a list, mention every item that matters; say \"only\" only when the list has one item.\n"
+          "- Answer in the language of the question.\n"
+          '- If the data does not contain the answer, answer exactly: {"answer": "The data does not tell."}\n'
+          "- Names such as <device1> or <ip2> are placeholders: write them exactly as they are.\n"
+          "Examples:\n"
+          'Question: Which device responds slowest? -> {"tool": "response_times", "args": {"days": 7, "order": "slowest"}}\n'
+          'Question: Is the printer up? -> {"tool": "device", "args": {"name": "printer"}}\n'
+          'Question: What happened yesterday? -> {"tool": "incidents", "args": {"days": 1}}\n'
           "Tools:\n" + "\n".join(f"- {n}: {d}" for n, (_f, d) in TOOLS.items()))
 
 
@@ -242,25 +289,40 @@ def _restore_args(args: Any, redact: engineer.Redactor | None) -> dict:
     return {k: (redact.restore(v) if redact and isinstance(v, str) else v) for k, v in list(args.items())[:6]}
 
 
+def _parse_reply(reply: str) -> dict | None:
+    match = re.search(r"\{.*\}", reply or "", re.S)
+    try:
+        doc = json.loads(match.group(0)) if match else None
+    except ValueError:
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
 def _ask_model(conn, question: str, names: list[str], now, ask) -> dict | None:
-    """The model's answer through the tools, or None when it cannot be used (then the plain version answers)."""
+    """The model's answer through the tools, or None when it cannot be used (then the plain version answers).
+    A model that does not reply in JSON, or answers without looking at the data, is told once; after that the plain version takes over."""
     redact = engineer.Redactor(names) if engineer.settings(conn)["redact"] else None
     hide = redact or (lambda t: t)
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": hide(question)}]
     used: list[str] = []
-    for _ in range(MAX_STEPS + 1):
+    nudged = {"json": False, "tool": False}
+    for _ in range(MAX_STEPS + 3):
         try:
             reply = (ask or (lambda m: engineer.chat(conn, m)))(messages)
         except Exception:  # noqa: BLE001
             return None
-        match = re.search(r"\{.*\}", reply or "", re.S)
-        try:
-            doc = json.loads(match.group(0)) if match else None
-        except ValueError:
-            doc = None
-        if not isinstance(doc, dict):
-            return None
+        doc = _parse_reply(reply)
+        if doc is None:
+            if nudged["json"]:
+                return None
+            nudged["json"] = True
+            messages += [{"role": "assistant", "content": (reply or "")[:500]}, {"role": "user", "content": 'Reply with one JSON object only: {"tool": ..., "args": ...} or {"answer": ...}.'}]
+            continue
         if isinstance(doc.get("answer"), str) and doc["answer"].strip():
+            if not used and not nudged["tool"]:
+                nudged["tool"] = True
+                messages += [{"role": "assistant", "content": json.dumps(doc)}, {"role": "user", "content": 'Look at the data first: call one of the tools. If none of them can tell, answer {"answer": "The data does not tell."}.'}]
+                continue
             text = doc["answer"].strip()[:2000]
             return {"answer": redact.restore(text) if redact else text, "source": "model", "tools": used}
         tool = doc.get("tool")

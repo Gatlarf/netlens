@@ -120,7 +120,19 @@ export async function render(container) {
     const rep = h("input", { type: "checkbox" }); rep.checked = s.report_summary;
     const save = async () => { try { await put("/api/insights/settings", { llm: llm.checked, report_summary: rep.checked }); toast("Saved", "success"); await load(); } catch (err) { toast(err.message || "Failed", "error"); } };
     llm.addEventListener("change", save); rep.addEventListener("change", save);
-    return h("div", { class: "card" }, h("h2", {}, "Settings"), h("p", { class: "hint" }, modelNote()),
+    const result = h("div", {});
+    const check = h("button", { class: "btn", type: "button", title: "Five small exams with made-up data" }, "Check the model");
+    check.addEventListener("click", async () => {
+      check.disabled = true; clear(result); result.appendChild(h("p", { class: "hint" }, "Running five exams, this can take a minute..."));
+      try {
+        const r = await post("/api/insights/model-check", {});
+        clear(result);
+        result.appendChild(h("p", { class: r.verdict === "good" ? "run-ok" : r.verdict === "usable" ? "warn-text" : "error" }, `${r.passed} of ${r.total} passed (${r.model}): ${r.advice}`));
+        result.appendChild(h("ul", {}, ...r.checks.map((c) => h("li", {}, `${c.ok ? "✓" : "✗"} ${c.name}: ${c.detail} (${c.seconds}s)`))));
+      } catch (err) { clear(result); result.appendChild(h("p", { class: "error" }, err.message || "The check failed.")); }
+      check.disabled = false;
+    });
+    return h("div", { class: "card" }, h("h2", {}, "Settings"), h("p", { class: "hint" }, modelNote()), s.llm_configured ? h("div", { class: "form-actions" }, check) : null, result,
       h("label", { class: "check" }, llm, " Let the language model word the answers and summaries"),
       h("label", { class: "check" }, rep, " Start the weekly report with a short summary"));
   }

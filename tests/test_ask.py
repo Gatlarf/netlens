@@ -84,3 +84,65 @@ def test_the_model_cannot_loop_forever(conn):
 
     assert ask.answer(conn, "what is wrong?", NOW, ask=endless)["source"] == "rules"
     assert len(calls) <= ask.MAX_STEPS + 1
+
+
+def test_a_kind_of_device_lists_every_device_of_that_kind(conn):
+    conn.execute("UPDATE devices SET device_type = 'printer' WHERE id = 2")
+    conn.commit()
+    a = ask.answer(conn, "How reliable are the printers?", NOW)
+    assert a["tools"] == ["device"] and a["answer"].startswith("printer: offline")
+    assert ask.answer(conn, "which camera is the slowest?", NOW)["tools"] == ["response_times"]     # a comparison is not about one kind
+
+
+def test_services_have_their_own_question(conn):
+    conn.execute("INSERT INTO service_checks (name, kind, host, port, enabled, last_up, created) VALUES ('Website', 'http', 'example.org', 443, 1, 0, '2026-10-01T00:00:00Z')")
+    conn.commit()
+    a = ask.answer(conn, "Which services are failing?", NOW)
+    assert a["tools"] == ["services"] and "Down: Website" in a["answer"]
+
+
+def test_a_model_that_does_not_use_json_or_skips_the_data_is_told_once(conn):
+    seen = []
+
+    def model(messages):
+        seen.append(messages[-1]["content"])
+        if len(seen) == 1:
+            return "Sure, everything is fine!"                                     # not JSON
+        if len(seen) == 2:
+            return json.dumps({"answer": "Everything is fine."})                   # an answer without looking
+        if len(seen) == 3:
+            return json.dumps({"tool": "overview", "args": {}})
+        return json.dumps({"answer": "Two devices are offline."})
+
+    a = ask.answer(conn, "what is wrong?", NOW, ask=model)
+    assert a["source"] == "model" and a["tools"] == ["overview"] and a["answer"] == "Two devices are offline."
+    assert "JSON object only" in seen[1] and "Look at the data first" in seen[2]
+    assert ask.answer(conn, "what is wrong?", NOW, ask=lambda m: "no json ever")["source"] == "rules"
+
+
+def test_the_model_check_tells_a_careful_model_from_a_sloppy_one(conn):
+    from app import modelcheck
+
+    def careful(messages):
+        last = messages[-1]["content"]
+        if last.startswith("Result of response_times"):
+            return json.dumps({"answer": "<device1> is slowest with 147.2 ms, then <device2> with 91.3 ms."})
+        if last.startswith("Result of offline_now"):
+            return json.dumps({"answer": "Offline: <device1>, <device2>, <device3>, <device4>, <device5>."})
+        if "slowest" in last:
+            return json.dumps({"tool": "response_times", "args": {}})
+        if "offline" in last:
+            return json.dumps({"tool": "offline_now", "args": {}})
+        return json.dumps({"answer": "The data does not tell."})
+
+    good = modelcheck.run(conn, careful)
+    assert good["verdict"] == "good" and good["passed"] == good["total"] == 5
+
+    def sloppy(messages):
+        last = messages[-1]["content"]
+        if last.startswith("Result of"):
+            return json.dumps({"answer": "<device1> is slowest at 150 ms."})          # rounded, and the rest left out
+        return "Sure! The temperature was 21 degrees."                                # no JSON
+
+    bad = modelcheck.run(conn, sloppy)
+    assert bad["verdict"] == "poor" and bad["passed"] == 0 and all(c["detail"] for c in bad["checks"])
