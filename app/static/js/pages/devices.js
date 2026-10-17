@@ -296,7 +296,9 @@ function renderRows() {
     }
     tr.appendChild(nameCell);
 
-    tr.appendChild(h("td", {}, d.primary_ip || "—"));
+    const ipCell = h("td", {}, d.primary_ip || "—");
+    if (Array.isArray(d.ipv6) && d.ipv6.length) ipCell.appendChild(h("div", { class: "ipv6-list mono hint", title: d.ipv6.join("\n") }, d.ipv6[0] + (d.ipv6.length > 1 ? " …" : "")));
+    tr.appendChild(ipCell);
     tr.appendChild(h("td", { class: "mono" }, d.mac || "—"));
     tr.appendChild(h("td", { title: vendorTitle(d) }, vendorText(d)));
     tr.appendChild(h("td", {}, typeBadge(d.type)));

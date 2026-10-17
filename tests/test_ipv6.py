@@ -61,3 +61,29 @@ def test_api_and_device_detail(tmp_path):
         assert client.get(f"/api/devices/{did}", headers=h).json()["ipv6"][0]["ip"] == "fd00::5"
         assert client.get("/api/ipv6", headers=h).json()["addresses"] == 1
     tsdb.forget_all()
+
+
+def test_show_toggle_hides_addresses_in_list_and_detail(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app.config import load_settings
+    from app.main import create_app
+
+    tsdb.forget_all()
+    settings = load_settings({"NETLENS_DATA_DIR": str(tmp_path), "NETLENS_TOKEN": "secret", "NETLENS_RANGES": "192.168.250.0/30"})
+    with TestClient(create_app(settings)) as client:
+        h = {"Authorization": "Bearer secret"}
+        conn = connect(tmp_path / "netlens.db")
+        conn.execute("INSERT INTO devices (mac, primary_ip, hostname, first_seen, last_seen) VALUES ('aa:bb:cc:dd:ee:01', '192.168.1.9', 'nas', '2026-10-17T00:00:00Z', '2026-10-17T00:00:00Z')")
+        conn.commit()
+        did = conn.execute("SELECT id FROM devices").fetchone()["id"]
+        ipv6.apply(conn, ipv6.parse_neigh(NEIGH))
+        conn.close()
+        assert client.get("/api/ipv6", headers=h).json()["show"] is True
+        assert client.get("/api/devices", headers=h).json()[0]["ipv6"] == ["fd00::5"]
+        assert [d["id"] for d in client.get("/api/devices?q=fd00", headers=h).json()] == [did]
+        assert client.put("/api/ipv6", json={"show": False}, headers=h).json()["show"] is False
+        assert "ipv6" not in client.get("/api/devices", headers=h).json()[0]
+        assert client.get(f"/api/devices/{did}", headers=h).json()["ipv6"] == []
+        assert client.put("/api/ipv6", json={"show": True}, headers=h).json()["show"] is True
+    tsdb.forget_all()

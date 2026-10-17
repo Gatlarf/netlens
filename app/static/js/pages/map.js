@@ -1,9 +1,11 @@
 import { cssVar, isDark } from "../theme.js";
 import { get, post, patch, del, ApiError } from "../api.js";
 import { h, clear, toast, foldToolbarOnPhone, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
+import { renderTiers } from "./map_tiers.js";
 import { buildTree, defaultCollapsed, layoutHorizontal, layoutVertical, leafIds } from "../layout_horizontal.js";
 
 const LAYOUTS = ["free", "tree", "horizontal", "vertical", "compact"];
+const LAYOUT_OPTIONS = [["free", "Free layout"], ["tree", "Tree layout"], ["horizontal", "Horizontal layout"], ["vertical", "Vertical layout"], ["compact", "Compact layout"], ["tiers", "Tiers view"]];
 // the compact layout is the dashboard's mini-map at full size: small dots in columns, flattened, with curved links
 const compactPos = (p) => (p ? { x: p.x * 1.1, y: p.y * 0.6 } : undefined);
 const cardMode = (mode) => mode === "horizontal" || mode === "vertical";   // the layouts that draw a card per device
@@ -290,6 +292,9 @@ function applyFilters(nodesDS, edgesDS, nodes, edges, search, typeFilter, status
 }
 
 export async function render(container, params) {
+  if (readPref("netlens.map.layout", ["tiers"], "") === "tiers") {       // the Tiers view is drawn without the graph library
+    return renderTiers(container, { layouts: LAYOUT_OPTIONS, current: "tiers", onLayout: (value) => { savePref("netlens.map.layout", value); window.dispatchEvent(new Event("hashchange")); } });
+  }
   await loadVis();
   let serverLayout = "free";
   let serverGuests = false;
@@ -352,6 +357,7 @@ export async function render(container, params) {
   layoutSelect.appendChild(h("option", { value: "horizontal" }, "Horizontal layout"));
   layoutSelect.appendChild(h("option", { value: "vertical" }, "Vertical layout"));
   layoutSelect.appendChild(h("option", { value: "compact" }, "Compact layout"));
+  layoutSelect.appendChild(h("option", { value: "tiers" }, "Tiers view"));
   layoutSelect.value = layoutMode;
   layoutSelect.addEventListener("change", () => {
     savePref("netlens.map.layout", layoutSelect.value);

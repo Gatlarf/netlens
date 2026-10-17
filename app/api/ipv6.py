@@ -16,7 +16,8 @@ router = APIRouter(prefix="/api", tags=["ipv6"])
 
 
 class Body(BaseModel):
-    enabled: bool
+    enabled: bool | None = None
+    show: bool | None = None
 
 
 def _doc(conn) -> dict[str, Any]:
@@ -25,7 +26,7 @@ def _doc(conn) -> dict[str, Any]:
         status = json.loads(get_setting(conn, "ipv6.status") or "{}")
     except ValueError:
         pass
-    return {"enabled": ipv6.enabled(conn), "status": status, "addresses": conn.execute("SELECT COUNT(*) FROM device_ipv6").fetchone()[0],
+    return {"enabled": ipv6.enabled(conn), "show": ipv6.showing(conn), "status": status, "addresses": conn.execute("SELECT COUNT(*) FROM device_ipv6").fetchone()[0],
             "devices": conn.execute("SELECT COUNT(DISTINCT device_id) FROM device_ipv6").fetchone()[0]}
 
 
@@ -36,7 +37,10 @@ def get_ipv6(conn=Depends(get_conn)) -> dict[str, Any]:
 
 @router.put("/ipv6")
 def put_ipv6(body: Body, conn=Depends(get_conn)) -> dict[str, Any]:
-    set_setting(conn, ipv6.SETTING, "1" if body.enabled else "0")
+    if body.enabled is not None:
+        set_setting(conn, ipv6.SETTING, "1" if body.enabled else "0")
+    if body.show is not None:
+        set_setting(conn, ipv6.SHOW_SETTING, "1" if body.show else "0")
     return _doc(conn)
 
 

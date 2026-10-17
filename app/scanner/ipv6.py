@@ -21,6 +21,7 @@ from app.scanner.netinfo import run_ip
 
 log = logging.getLogger(__name__)
 SETTING = "ipv6.enabled"
+SHOW_SETTING = "ipv6.show"
 KEEP_DAYS = 30
 SKIP_IFACES = ("lo", "veth", "docker", "br-", "virbr", "tun", "tap", "wg", "tailscale", "zt")
 MAC_RE = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
@@ -28,6 +29,21 @@ MAC_RE = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
 
 def enabled(conn: sqlite3.Connection) -> bool:
     return get_setting(conn, SETTING) == "1"
+
+
+def showing(conn: sqlite3.Connection) -> bool:
+    """Whether the IPv6 addresses are shown (on unless switched off); they are kept and found either way."""
+    return get_setting(conn, SHOW_SETTING) != "0"
+
+
+def best_per_device(conn: sqlite3.Connection) -> dict[int, list[str]]:
+    """The addresses worth a column in the device list: global and private ones first, a link-local one only when there is nothing else."""
+    out: dict[int, list[str]] = {}
+    order = {"global": 0, "ula": 1, "link": 2}
+    rows = sorted(conn.execute("SELECT device_id, ip, scope FROM device_ipv6").fetchall(), key=lambda r: (order.get(r["scope"], 3), r["ip"]))
+    for r in rows:
+        out.setdefault(r["device_id"], []).append(r["ip"])
+    return {k: v[:2] for k, v in out.items()}
 
 
 def scope_of(address: str) -> str | None:

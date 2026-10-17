@@ -196,7 +196,7 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
 
     from app.scanner import ipv6
 
-    result["ipv6"] = ipv6.for_device(conn, device_id)
+    result["ipv6"] = ipv6.for_device(conn, device_id) if ipv6.showing(conn) else []
     from app import inventory
 
     result["smarthome"] = inventory.for_device(conn, device_id)
@@ -300,10 +300,11 @@ def list_devices(
 
     if q:
         conditions.append(
-            "(hostname LIKE ? OR custom_name LIKE ? OR primary_ip LIKE ? OR mac LIKE ? OR vendor LIKE ?)"
+            "(hostname LIKE ? OR custom_name LIKE ? OR primary_ip LIKE ? OR mac LIKE ? OR vendor LIKE ? "
+            "OR id IN (SELECT device_id FROM device_ipv6 WHERE ip LIKE ?))"
         )
         like = f"%{q}%"
-        params.extend([like, like, like, like, like])
+        params.extend([like, like, like, like, like, like])
 
     if conditions:
         sql += " WHERE " + " AND ".join(conditions)
@@ -320,6 +321,12 @@ def list_devices(
         d["ports_drift"] = None if counts is None else counts["unexpected"] + counts["missing"]
         result.append(d)
     _add_group(conn, result)
+    from app.scanner import ipv6
+
+    if ipv6.showing(conn):
+        best = ipv6.best_per_device(conn)
+        for d in result:
+            d["ipv6"] = best.get(d["id"], [])
     return result
 
 
