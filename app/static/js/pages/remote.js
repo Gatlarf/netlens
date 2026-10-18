@@ -344,7 +344,6 @@ export async function render(container) {
       h("section", { class: "remote-main" }, tabs, panes, emptyNote)));
   drawHelper();
   drawList();
-  if (needsHelper() && !data.helper.reachable && data.available) showSetup();
 
   // arriving from a device page: #/remote?device=ID&proto=rdp
   const wanted = new URLSearchParams((location.hash.split("?")[1] || ""));

@@ -1,5 +1,6 @@
 import { cssVar, isDark } from "../theme.js";
 import { get, post, patch, del, ApiError } from "../api.js";
+import { popMenu } from "../ui.js";
 import { h, clear, toast, foldToolbarOnPhone, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { renderTiers } from "./map_tiers.js";
 import { buildTree, defaultCollapsed, layoutHorizontal, layoutVertical, leafIds } from "../layout_horizontal.js";
@@ -443,15 +444,10 @@ export async function render(container, params) {
   toolbar.appendChild(searchInput);
   toolbar.appendChild(typeSelect);
   toolbar.appendChild(statusSelect);
-  toolbar.appendChild(linksSelect);
-  toolbar.appendChild(layoutSelect);
-  toolbar.appendChild(labelSelect);
-  toolbar.appendChild(colorSelect);
-  toolbar.appendChild(guestSelect);
   toolbar.appendChild(groupSelect);
-  toolbar.appendChild(addLinkBtn);
-  toolbar.appendChild(deleteLinkBtn);
-  toolbar.appendChild(resetBtn);
+  toolbar.appendChild(layoutSelect);
+  toolbar.appendChild(popMenu("View", [linksSelect, labelSelect, colorSelect, guestSelect], { title: "Which links, labels and colours to show" }));
+  toolbar.appendChild(popMenu("Edit", [addLinkBtn, deleteLinkBtn, resetBtn], { cls: "admin-only", title: "Draw or remove links, reset the layout" }));
   if (horizontal) {
     toolbar.appendChild(collapseAllBtn);
     toolbar.appendChild(expandAllBtn);

@@ -1,7 +1,7 @@
 import { get, put } from "../api.js";
 import { snoozeMenu, wakeButton, untilText } from "../snooze.js";
 import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin } from "../util.js";
-import { pageHead } from "../ui.js";
+import { pageHead, emptyState } from "../ui.js";
 
 const REFRESH_MS = 30000;
 const METRIC_ORDER = ["cpu_pct", "mem_pct", "disk_pct", "temp_c", "battery_pct", "supply_pct", "on_battery", "storage_status", "service_stopped"];
@@ -49,9 +49,7 @@ export async function render(container) {
       tile("Need attention", String(critical + warning), critical ? `${critical} critical, ${warning} warning` : warning ? `${warning} warning` : "everything within its limits", critical ? "bad" : warning ? "warn" : "ok"),
       tile("Cannot be read", String(failing), failing ? "check the login or the address" : "all readings work", failing ? "warn" : "ok"));
     if (!rows.length) {
-      list.appendChild(h("div", { class: "card" }, h("h2", {}, "Nothing is monitored yet"),
-        h("p", {}, "Open a device and choose “Set up health monitoring”. Switches, NAS boxes, printers and UPS units are read over SNMP; Linux servers over SSH."),
-        h("p", { class: "hint" }, "Netlens then draws processor, memory, disk and traffic graphs and warns when a disk fills up, a server runs hot or a UPS runs on battery. Nothing is installed on the devices.")));
+      list.appendChild(emptyState("Nothing is monitored yet", "Open a device and choose “Set up health monitoring”. Switches, NAS boxes, printers and UPS units are read over SNMP; Linux servers over SSH. Netlens then draws processor, memory, disk and traffic graphs and warns when a disk fills up, a server runs hot or a UPS runs on battery. Nothing is installed on the devices.", h("a", { class: "btn primary", href: "#/devices" }, "Choose a device")));
       return;
     }
     if (data.problems.length) {

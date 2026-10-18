@@ -1,6 +1,6 @@
 import { get, put, post } from "../api.js";
 import { h, clear, toast, isAdmin } from "../util.js";
-import { pageHead } from "../ui.js";
+import { pageHead, tabbed } from "../ui.js";
 
 // Reports: the weekly summary (text, as it is sent) and the monthly availability of devices and services.
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -12,6 +12,19 @@ function table(head, rows) {
   return h("div", { class: "rep-scroll" }, h("table", { class: "rep-table" },
     h("thead", {}, h("tr", {}, ...head.map((t) => h("th", {}, t)))),
     h("tbody", {}, ...rows.map((r) => h("tr", {}, ...r.map((c) => (c instanceof Node ? h("td", {}, c) : h("td", {}, c === null || c === undefined ? "" : String(c)))))))));
+}
+
+// the worst rows first; the rest sit behind a button so a long month stays readable
+function shortTable(head, rows, limit = 10) {
+  if (rows.length <= limit + 2) return table(head, rows);
+  const box = h("div", {});
+  let all = false;
+  const draw = () => {
+    clear(box);
+    box.append(table(head, all ? rows : rows.slice(0, limit)), h("button", { type: "button", class: "btn", onclick: () => { all = !all; draw(); } }, all ? "Show fewer" : `Show all ${rows.length}`));
+  };
+  draw();
+  return box;
 }
 
 // what the monthly report covers, remembered in this browser
@@ -99,8 +112,8 @@ export async function render(container) {
   const weeklySlot = h("div", {});
   const monthSlot = h("div", {});
   container.appendChild(h("div", { class: "rep-page" },
-    pageHead("Reports", "The weekly report and the monthly availability figures, ready to send or print."),
-    weeklySlot, monthSlot));
+    pageHead("Reports", "The monthly availability figures and the weekly summary, ready to send or print."),
+    tabbed("netlens.reports.tab", [["month", "Monthly availability", monthSlot], ["week", "Weekly report", weeklySlot]])));
 
   async function drawWeekly() {
     let w;
@@ -216,14 +229,14 @@ export async function render(container) {
         s.services ? ` · Services: ${pct(s.services_availability)}` : "", ` · ${s.with_outages} with an outage`, s.target !== null && s.target !== undefined ? ` · ${s.below_target} below the ${s.target}% target` : ""));
       if (r.devices.length) {
         card.appendChild(h("h3", {}, "Devices"));
-        card.appendChild(table(["Device", "Availability", "Outages", "Longest", "Time down"],
+        card.appendChild(shortTable(["Device", "Availability", "Outages", "Longest", "Time down"],
           [...r.devices].sort((a, b) => a.availability - b.availability || a.name.localeCompare(b.name)).map((d) => [
             h("a", { href: `#/device/${d.id}` }, d.name), h("span", { class: `d-${tone(d.availability) || "ok"}`, title: d.below_target ? "Below the target" : "" }, pct(d.availability), d.below_target ? " ⚠" : ""),
             d.outages, d.outages ? d.longest : "", d.down_seconds ? d.down_text : ""])));
       }
       if (r.services.length) {
         card.appendChild(h("h3", {}, "Services"));
-        card.appendChild(table(["Service", "Availability", "Outages", "Longest", "Time down", "Average"],
+        card.appendChild(shortTable(["Service", "Availability", "Outages", "Longest", "Time down", "Average"],
           [...r.services].sort((a, b) => a.availability - b.availability || a.name.localeCompare(b.name)).map((x) => [
             x.name, h("span", { class: `d-${tone(x.availability) || "ok"}`, title: x.below_target ? "Below the target" : "" }, pct(x.availability), x.below_target ? " ⚠" : ""),
             x.outages, x.outages ? x.longest : "", x.down_seconds ? x.down_text : "", x.avg_ms === null ? "" : `${x.avg_ms} ms`])));

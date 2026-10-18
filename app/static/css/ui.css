@@ -55,3 +55,8 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 .tab-panel[hidden] { display: none; } .tab-panel { display: flex; flex-direction: column; gap: 14px; }
 .edit-form > button, .edit-form > .btn, .edit-form > a.btn { justify-self: start; }
 .rep-text { max-height: 18rem; overflow: auto; }
+
+/* a toolbar menu holding several controls */
+.pop-menu > summary { padding: 7px 12px; }
+.pop-menu-list { right: auto; left: 0; min-width: 220px; gap: 8px; padding: 10px; }
+.pop-menu-list select, .pop-menu-list .btn { width: 100%; }

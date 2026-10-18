@@ -37,6 +37,10 @@ export function rowMenu(items, { label = "More actions", cls = "" } = {}) {
       onclick: (e) => { menu.open = false; it.onclick(e); } }, it.label))));
   return menu;
 }
+// A button that opens a small panel holding any controls (selects, buttons), for a toolbar that would otherwise be a wall of controls.
+export function popMenu(label, controls, { cls = "", title = "" } = {}) {
+  return h("details", { class: `row-menu pop-menu ${cls}` }, h("summary", { class: "btn", title }, `${label} ▾`), h("div", { class: "row-menu-list pop-menu-list" }, controls));
+}
 document.addEventListener("click", (e) => { for (const d of document.querySelectorAll("details.row-menu[open]")) if (!d.contains(e.target)) d.open = false; });
 
 // Tabs for a page with several parts: only the chosen part is shown, and the choice is remembered. defs: [[key, label, element or [elements]]]

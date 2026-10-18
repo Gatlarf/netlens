@@ -76,7 +76,7 @@ const CARDS = [
   { id: "sites", title: "Sites & certificates", href: "#/stats", size: "s", about: "Reverse-proxy sites and when their certificates end.",
     show: (d) => d.summary.sites.total > 0,
     tone: (d) => (d.summary.sites.down || d.summary.sites.certificates_expired ? "bad" : d.summary.sites.certificates_expiring ? "warn" : "ok"),
-    build: ({ summary: s }) => big(s.sites.total, s.sites.next_expiry_days === null ? "sites" : `sites · next certificate ends in ${plural(s.sites.next_expiry_days, "day")}`) },
+    build: ({ summary: s }) => big(s.sites.total, `sites${s.sites.down ? ` · ${s.sites.down} down` : ""}${s.sites.next_expiry_days === null ? "" : ` · next certificate ends in ${plural(s.sites.next_expiry_days, "day")}`}`) },
   { id: "plugins", title: "Plugins", href: "#/settings/plugins", size: "s", about: "Plugins that are switched on, and whether they work.",
     show: (d) => d.summary.plugins.some((p) => p.enabled),
     tone: (d) => (d.summary.plugins.some((p) => p.enabled && p.ok === false) ? "bad" : "ok"),
@@ -121,7 +121,8 @@ const CARDS = [
       const list = [];
       if (ctr.total) list.push(["Containers", `${ctr.running} / ${ctr.total} running${s.containers.unhealthy || s.containers.restarting ? ` · ${s.containers.unhealthy + s.containers.restarting} to check` : ""}`, s.containers.unhealthy || s.containers.restarting ? "warn" : ""]);
       if (vms.total) list.push(["Virtual machines", `${vms.running} / ${vms.total} running`]);
-      if (s.sites.total) list.push(["Sites", s.sites.next_expiry_days === null ? String(s.sites.total) : `${s.sites.total} · next certificate ${s.sites.next_expiry_days} d`, s.sites.down || s.sites.certificates_expired ? "bad" : s.sites.certificates_expiring ? "warn" : ""]);
+      if (s.sites.total) list.push(["Sites", s.sites.down ? `${s.sites.total} · ${s.sites.down} down` : String(s.sites.total), s.sites.down ? "bad" : ""]);
+      if (s.sites.next_expiry_days !== null) list.push(["Next certificate", s.sites.next_expiry_days < 0 ? "expired" : `ends in ${plural(s.sites.next_expiry_days, "day")}`, s.sites.certificates_expired ? "bad" : s.sites.certificates_expiring ? "warn" : ""]);
       if (g && g.configured) list.push(["Guest backups", `${g.protected} / ${g.guests} protected${g.failed ? ` · ${g.failed} failed` : g.late ? ` · ${g.late} late` : ""}`, g.failed ? "bad" : g.late || g.unprotected ? "warn" : ""]);
       list.push(["Netlens backup", s.backup.last_at ? timeAgo(s.backup.last_at) : s.backup.enabled ? "not yet" : "off", s.backup.last_ok === false ? "bad" : ""]);
       if (on.length) list.push(["Plugins", failing.length ? `${failing.length} of ${on.length} failing: ${failing.map((p) => p.id).join(", ")}` : `${on.length} working`, failing.length ? "bad" : ""]);

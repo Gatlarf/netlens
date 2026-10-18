@@ -2,6 +2,16 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.65 — 2026-10-18
+
+### Changed
+- **Map toolbar**: search, type, status, group and layout stay in the bar; links, labels, colours and containers are in a **View** menu and Add link, Delete link and Reset layout in an **Edit** menu.
+- **Reports** has two tabs (monthly availability first, weekly report second), and a long month shows the ten worst devices and services with "Show all".
+- Services, Health and Remote sites explain what to do when empty, with a button, like Backups and Smart home. Remote access no longer opens the long RDP/VNC setup guide by itself.
+
+### Fixed
+- The Infrastructure card showed the Sites line in red because a site was down, next to a certificate that still had weeks left. Sites and the next certificate are now separate lines, each coloured for its own reason.
+
 ## 0.4.64 — 2026-10-17
 
 ### Changed

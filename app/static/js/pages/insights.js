@@ -153,7 +153,7 @@ export async function render(container) {
       } catch (err) { clear(result); result.appendChild(h("p", { class: "error" }, err.message || "The check failed.")); }
       check.disabled = false;
     });
-    return h("div", { class: "card" }, h("h2", {}, "Settings"), h("p", { class: "hint" }, modelNote()), s.llm_configured ? h("div", { class: "form-actions" }, check) : null, result,
+    return h("div", {}, h("p", { class: "hint" }, modelNote()), s.llm_configured ? h("div", { class: "form-actions" }, check) : null, result,
       h("label", { class: "check" }, llm, " Let the language model word the answers and summaries"),
       h("label", { class: "check" }, rep, " Start the weekly report with a short summary"));
   }

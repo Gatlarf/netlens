@@ -1,6 +1,6 @@
 import { get, post, patch, del } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
-import { pageHead, rowMenu } from "../ui.js";
+import { pageHead, rowMenu, emptyState } from "../ui.js";
 import { heartbeatBar, uptimeText, uptimeClass } from "../heartbeat.js";
 import { buildServiceForm } from "../cards/service_form.js";
 import { buildPerformanceCard } from "../cards/performance.js";
@@ -49,8 +49,7 @@ export async function render(container) {
     }
     if (destroyed) return;
     if (!checks.length) {
-      body.replaceChildren(h("div", { class: "card" }, h("p", {}, "No checks yet. Add one to watch a web page, a port or a DNS server."),
-        h("p", { class: "hint" }, "Typical examples: your router's web page (HTTP), your NAS on port 445 (TCP), your DNS server resolving example.com (DNS).")));
+      body.replaceChildren(emptyState("No checks yet", "Add one to watch a web page, a port or a DNS server. Typical examples: your router's web page (HTTP), your NAS on port 445 (TCP), your DNS server resolving example.com (DNS).", h("button", { class: "btn primary admin-only", type: "button", onclick: () => addBtn.click() }, "Add check")));
       return;
     }
     const table = h("table", { class: "data" });
