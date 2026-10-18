@@ -1,0 +1,16 @@
+{
+  "id": "insightvm",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "1a8cd4c0ad7a33f267e59a118681ea0f788bd72b8659dc837e98c0b74246d349",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-18",
+      "tested_on": [
+        "A simulated server that follows the vendor's API documentation (no real Rapid7 InsightVM)"
+      ],
+      "notes": "Written on 2026-10-18 with the assistant Claude from the vendor's API documentation and confirmed by the maintainer to be released. Read-only (GET) and never starts a scan. Not tested against the real product: the field names, paging and severity mapping follow the documentation, so please use Run diagnostic and report what a real installation answers."
+    }
+  ]
+}

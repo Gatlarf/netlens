@@ -1,0 +1,24 @@
+{
+  "id": "nessus",
+  "name": "Tenable Nessus",
+  "kind": "vulnerability",
+  "category": "security",
+  "description": "Shows what a Tenable Nessus scanner (Nessus Professional, Expert or Essentials) found on your devices: every finding with its severity, CVE numbers, score, whether it is known to be exploited, the port and the solution. Netlens matches each finding to a device by MAC or address, warns about new critical vulnerabilities and lists the devices at risk. Read-only: it only reads scan results, it never starts a scan.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/nessus",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Tenable Nessus API (from the documentation, not tested on a real Nessus)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nessus-v1.0.0/nessus.zip",
+      "sha256": "d8c922d38f8cf03b7a71e2a0a99576428f0d9b7d6494b822fab5aec87cb386aa",
+      "api_version": 1,
+      "min_netlens": "0.4.73",
+      "released": "2026-10-18",
+      "changelog": "First release. Needs Netlens 0.4.73 or newer (the Vulnerabilities page). Written from the Nessus API documentation and tested against a simulated server only."
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "insightvm",
+  "name": "Rapid7 InsightVM",
+  "kind": "vulnerability",
+  "category": "security",
+  "description": "Shows what a Rapid7 InsightVM (Nexpose) security console found on your devices: every vulnerability with its severity, CVE numbers, score, whether exploits exist, the port and the solution. Netlens matches each finding to a device by MAC or address, warns about new critical vulnerabilities and lists the devices at risk. Read-only: it only reads, it never starts a scan.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/insightvm",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Rapid7 InsightVM API v3 (from the documentation, not tested on a real console)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-insightvm-v1.0.0/insightvm.zip",
+      "sha256": "1a8cd4c0ad7a33f267e59a118681ea0f788bd72b8659dc837e98c0b74246d349",
+      "api_version": 1,
+      "min_netlens": "0.4.73",
+      "released": "2026-10-18",
+      "changelog": "First release. Needs Netlens 0.4.73 or newer (the Vulnerabilities page). Written from the InsightVM API v3 documentation and tested against a simulated server only."
+    }
+  ]
+}

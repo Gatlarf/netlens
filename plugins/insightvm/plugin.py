@@ -12,7 +12,7 @@ Severity: Critical, Severe (high) and Moderate (medium) are what the console has
 knows exploits or malware kits for it. The asset ids are not kept: a finding id is made from the address, the vulnerability and the port. Standard library only.
 """
 
-import base64
+import binascii
 import hashlib
 import http.client
 import json
@@ -45,7 +45,7 @@ class Console:
             raise VmError(f"{url!r} is not an address like https://192.168.0.60:3780")
         self.host, self.port = parts.hostname, parts.port or 3780
         self.id = f"{self.host}:{self.port}"
-        self.auth = "Basic " + base64.b64encode(f"{username.strip()}:{password}".encode()).decode()
+        self.auth = "Basic " + binascii.b2a_base64(f"{username.strip()}:{password}".encode(), newline=False).decode()
         self.timeout = float(timeout)
         self.fingerprint = re.sub(r"[^0-9a-f]", "", fingerprint.lower()) if fingerprint else ""
         if fingerprint and len(self.fingerprint) != 64:

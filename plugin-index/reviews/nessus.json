@@ -1,0 +1,16 @@
+{
+  "id": "nessus",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "d8c922d38f8cf03b7a71e2a0a99576428f0d9b7d6494b822fab5aec87cb386aa",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-18",
+      "tested_on": [
+        "A simulated server that follows the vendor's API documentation (no real Tenable Nessus)"
+      ],
+      "notes": "Written on 2026-10-18 with the assistant Claude from the vendor's API documentation and confirmed by the maintainer to be released. Read-only (GET) and never starts a scan. Not tested against the real product: the field names, paging and severity mapping follow the documentation, so please use Run diagnostic and report what a real installation answers."
+    }
+  ]
+}

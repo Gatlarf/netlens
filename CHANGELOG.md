@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.78 — 2026-10-18
+
+### Added
+- **Vulnerability scanner plugins in the Plugin store**: **Tenable Nessus** and **Rapid7 InsightVM** show what the scanner found on your devices (needs Netlens 0.4.73 or newer). Both were written from the vendors' API documentation and tested against a simulated server only, so they are listed as *reviewed*, not *verified*: use *Run diagnostic* on the plugin's page and send the report if a real installation answers differently.
+
 ## 0.4.77 — 2026-10-18
 
 ### Added
