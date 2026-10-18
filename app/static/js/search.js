@@ -139,7 +139,7 @@ function search(query, devs, plugs = []) {
     const s = score(q, `${d.name} ${d.ip}`, `${d.mac} ${d.vendor} ${d.type}`);
     if (s) out.push({ group: "Devices", title: shortName(d.name) || d.ip, hint: [d.ip, d.vendor].filter(Boolean).join(" · "), href: `#/device/${d.id}`, s });
   }
-  const order = { Pages: 0, Settings: 1, Devices: 2 };
+  const order = { Pages: 0, Settings: 1, Devices: 2, "Remote sites": 3 };
   out.sort((a, b) => order[a.group] - order[b.group] || b.s - a.s || a.title.localeCompare(b.title));
   return out.slice(0, 40);
 }
@@ -203,7 +203,17 @@ export async function openSearch(initial = "") {
     const active = list.querySelector(".search-item.active");
     if (active) active.scrollIntoView({ block: "nearest" });
   };
-  const update = () => { results = search(input.value, devs, plugs); index = 0; draw(); };
+  let remote = [];
+  let remoteFor = "";
+  const update = () => {
+    results = [...search(input.value, devs, plugs), ...remote.map((r) => ({ group: "Remote sites", title: shortName(r.name) || r.ip, hint: [r.site, r.ip, r.vendor].filter(Boolean).join(" · "), href: `#/remote-sites?id=${r.probe_id}`, s: 1 }))];
+    index = 0; draw();
+    const q = input.value.trim();
+    if (q.length >= 2 && q !== remoteFor && isAdmin()) {
+      remoteFor = q;
+      get(`/api/probes-search?q=${encodeURIComponent(q)}`).then((rows) => { if (dialog && input.value.trim() === q) { remote = rows; update(); } }).catch(() => {});
+    } else if (q.length < 2) { remote = []; remoteFor = ""; }
+  };
   input.addEventListener("input", update);
   input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown") { e.preventDefault(); index = Math.min(results.length - 1, index + 1); draw(); }

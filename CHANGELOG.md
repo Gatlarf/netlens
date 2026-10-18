@@ -2,6 +2,17 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.69 — 2026-10-18
+
+### Added
+- **Search** finds the devices of your remote sites too (by name, address, MAC or vendor) and opens the page of that site.
+
+### Changed
+- **Remote site page**: "Managed from here" is folded away until something is set up in it, so the devices come first, and the health tile says "1 warning" instead of "0 critical".
+
+### Fixed
+- A service check at a remote site that is already **down when it first appears** (for example one you just set up from the central Netlens) now raises the "service down" alert. Before, only a change from up to down did.
+
 ## 0.4.68 — 2026-10-18
 
 ### Fixed

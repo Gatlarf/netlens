@@ -45,7 +45,7 @@ const KIND_TITLE = { http: "Website (HTTP/HTTPS)", tcp: "Port (TCP)", dns: "DNS 
 
 // "Managed from here": the checks and monitors this Netlens sets up at the remote site (the site must accept configuration).
 async function buildManagedCard(probe, devices, state) {
-  const card = h("div", { class: "card admin-only" });
+  const card = h("div", { class: "card" });
   let cfg = await get(`/api/probes/${probe.id}/config`);
   let draft = JSON.parse(JSON.stringify(cfg));
   let dirty = false;
@@ -60,7 +60,6 @@ async function buildManagedCard(probe, devices, state) {
   function draw() {
     managedDirty = dirty;
     clear(card);
-    card.appendChild(h("h2", {}, "Managed from here"));
     card.appendChild(h("p", { class: "hint" }, "Service checks and health monitors that this Netlens sets up at the remote site. They run there, on its own network, and show on its devices. Logins are stored encrypted."));
     card.appendChild(status());
     card.appendChild(h("h3", {}, "Service checks"));
@@ -226,7 +225,7 @@ export async function render(container) {
     body.appendChild(h("div", { class: "up-tiles" },
       tile("Devices online", `${p.devices.online} / ${p.devices.total}`, p.devices.core_down ? `${p.devices.core_down} always-on device${p.devices.core_down === 1 ? "" : "s"} offline` : "all always-on devices answer", p.devices.core_down ? "bad" : p.devices.online === p.devices.total ? "ok" : "warn"),
       tile("Service checks", `${p.services.total - p.services.down} / ${p.services.total}`, p.services.down ? `${p.services.down} down` : "all up", p.services.down ? "bad" : "ok"),
-      tile("Health", String(p.problems.count), p.problems.count ? `${p.problems.critical} critical` : "within limits", p.problems.critical ? "bad" : p.problems.count ? "warn" : "ok")));
+      tile("Health", String(p.problems.count), p.problems.count ? (p.problems.critical ? `${p.problems.critical} critical` : `${p.problems.count} warning${p.problems.count === 1 ? "" : "s"}`) : "within limits", p.problems.critical ? "bad" : p.problems.count ? "warn" : "ok")));
     if (data.problems.length) {
       const card = h("div", { class: "card" }, h("h2", {}, "Needs attention"));
       for (const q of data.problems) {
@@ -264,7 +263,11 @@ export async function render(container) {
     let filter = "";
     if (admin) {
       try {
-        body.appendChild(await buildManagedCard(p, data.devices, data.config_state || { accepts: false, site_rev: 0 }));
+        const managed = await buildManagedCard(p, data.devices, data.config_state || { accepts: false, site_rev: 0 });
+        const count = managed.querySelectorAll(".kv").length;
+        const fold = h("details", { class: "card admin-only managed-fold" }, h("summary", {}, h("strong", {}, "Managed from here"), h("span", { class: "hint" }, count ? ` · ${count} check${count === 1 ? "" : "s and monitors"} set up` : " · nothing set up yet")), managed);
+        fold.open = count > 0 || managedDirty;
+        body.appendChild(fold);
       } catch (err) {
         /* an older server: nothing to manage */
       }

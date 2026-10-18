@@ -303,3 +303,26 @@ def test_a_gzip_bomb_is_refused(client):
     anon = TestClient(client.app)
     r = anon.post("/api/probe/push", content=bomb, headers={"Authorization": f"Bearer {token}", "Content-Encoding": "gzip"})
     assert r.status_code == 413
+
+
+def test_search_finds_remote_devices_by_name_address_and_vendor(client):
+    r = client.post("/api/probes", json={"name": "Holiday house"}).json()
+    anon = TestClient(client.app)
+    devs = [device("aa:00:00:00:00:01", "Living room TV", ip="10.9.0.5", vendor="Samsung"), device("aa:00:00:00:00:02", "nas", ip="10.9.0.6", vendor="Synology")]
+    anon.post("/api/probe/push", json={"devices": devs, "services": []}, headers={"Authorization": f"Bearer {r['token']}"})
+    found = client.get("/api/probes-search", params={"q": "tv"}).json()
+    assert [(d["name"], d["site"], d["probe_id"]) for d in found] == [("Living room TV", "Holiday house", r["probe"]["id"])]
+    assert [d["name"] for d in client.get("/api/probes-search", params={"q": "synology"}).json()] == ["nas"]
+    assert [d["name"] for d in client.get("/api/probes-search", params={"q": "10.9.0"}).json()] == ["Living room TV", "nas"]
+    assert client.get("/api/probes-search", params={"q": "t"}).json() == [] and client.get("/api/probes-search", params={"q": "%%"}).json() == []
+    assert TestClient(client.app).get("/api/probes-search", params={"q": "tv"}).status_code == 401
+
+
+def test_a_check_that_is_down_when_it_first_appears_raises_an_alert(conn):
+    row, _ = make(conn)
+    probes.ingest(conn, row, {"devices": [], "services": [service("svc:1", "Web", "down")]}, now=NOW)
+    assert kinds(conn) == []                                              # the first report of a site is the baseline
+    row = conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone()
+    probes.ingest(conn, row, {"devices": [], "services": [service("svc:1", "Web", "down"), service("central:new", "Set up from here", "down"), service("central:ok", "Fine")]}, now=LATER)
+    details = [r["detail"] for r in conn.execute("SELECT detail FROM events WHERE kind = 'remote_service_down'")]
+    assert len(details) == 1 and "Set up from here" in details[0]

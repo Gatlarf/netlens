@@ -244,6 +244,8 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
         if before is None:
             conn.execute("INSERT INTO remote_services (probe_id, key, name, kind, target, state, ms, detail, since, checked) VALUES (?,?,?,?,?,?,?,?,?,?)",
                          (probe_id, s["key"], s["name"], s["kind"], s["target"], s["state"], s["ms"], s["detail"], s["since"], s["checked"]))
+            if not baseline and s["state"] == "down":          # a check that is broken from the start (for example one set up from here) is not a quiet one
+                events.append(("remote_service_down", f"{site}: {s['name']} ({s['target']}) is down" + (f": {s['detail']}" if s["detail"] else "")))
         else:
             if not baseline and before["state"] != s["state"] and s["state"] is not None and before["state"] is not None:
                 text = f"{site}: {s['name']} ({s['target']}) is {s['state']}" + (f": {s['detail']}" if s["state"] == "down" and s["detail"] else "")

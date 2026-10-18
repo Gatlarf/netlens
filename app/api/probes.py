@@ -36,6 +36,19 @@ def list_probes(conn=Depends(get_conn)) -> list[dict]:
     return [probes_mod.present(conn, r) for r in conn.execute("SELECT * FROM probes ORDER BY name COLLATE NOCASE")]
 
 
+@router.get("/probes-search")
+def search_remote_devices(q: str = "", conn=Depends(get_conn)) -> list[dict]:
+    """Devices of the remote sites that match a search text (name, address, MAC or vendor), for the search box. Frozen sites are left out."""
+    q = q.strip().lower()[:60]
+    if len(q) < 2:
+        return []
+    like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    locked = probes_mod.locked_ids(conn)
+    rows = conn.execute("SELECT d.id, d.probe_id, d.name, d.ip, d.vendor, p.name AS site FROM remote_devices d JOIN probes p ON p.id = d.probe_id "
+                        "WHERE lower(d.name || ' ' || COALESCE(d.ip, '') || ' ' || COALESCE(d.mac, '') || ' ' || COALESCE(d.vendor, '')) LIKE ? ESCAPE '\\' ORDER BY d.name COLLATE NOCASE LIMIT 30", (like,)).fetchall()
+    return [{"id": r["id"], "probe_id": r["probe_id"], "name": r["name"], "ip": r["ip"], "vendor": r["vendor"], "site": r["site"]} for r in rows if r["probe_id"] not in locked][:10]
+
+
 @router.post("/probes", status_code=201)
 def create_probe(body: NameBody, conn=Depends(get_conn)) -> dict:
     try:
