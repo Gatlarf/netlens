@@ -86,3 +86,26 @@ def test_the_api(client):
     assert client.get("/api/documentation/export", params={"download": "true"}).headers["content-disposition"] == 'attachment; filename="bakery-network-documentation.html"'
     anon = TestClient(client.app)
     assert anon.get("/api/documentation").status_code == 401 and anon.get("/api/documentation/export").status_code == 401
+
+
+def test_a_remote_site_gets_its_own_documentation_and_a_customer(client):
+    import gzip as _gzip
+    import json as _json
+
+    made = client.post("/api/probes", json={"name": "Bakery shop"}).json()
+    pid, token = made["probe"]["id"], made["token"]
+    assert made["probe"]["customer"] == ""
+    assert client.patch(f"/api/probes/{pid}", json={"customer": "  Bakery   Janssens "}).json()["customer"] == "Bakery Janssens"
+    assert client.patch(f"/api/probes/{pid}", json={"customer": "x" * 70}).status_code == 422
+    assert client.get("/api/probes").json()[0]["customer"] == "Bakery Janssens"
+    anon = TestClient(client.app)
+    body = {"devices": [{"key": "aa:00:00:00:00:09", "mac": "aa:00:00:00:00:09", "ip": "10.1.0.5", "name": "till <b>1</b>", "vendor": "Acme", "type": "pc", "online": True, "always_on": False, "ports": [],
+                         "first_seen": "2026-03-10T12:00:00Z", "last_seen": "2026-03-10T12:00:00Z"}],
+            "services": [{"key": "s1", "name": "Shop web", "kind": "http", "target": "http://10.1.0.5/", "state": "down", "ms": None, "detail": "timed out", "since": "2026-03-10T12:00:00Z", "checked": "2026-03-10T12:00:00Z"}],
+            "problems": [{"device_key": "k", "device": "nas", "metric": "disk_pct", "label": "/", "level": "critical", "value": 97, "title": "Disk", "unit": "%", "since": "2026-03-10T12:00:00Z"}]}
+    assert anon.post("/api/probe/push", content=_gzip.compress(_json.dumps(body).encode()), headers={"Authorization": f"Bearer {token}", "Content-Encoding": "gzip", "Content-Type": "application/json"}).status_code == 200
+    page = client.get(f"/api/documentation/site/{pid}")
+    assert page.status_code == 200 and "Bakery Janssens · Network documentation" in page.text and "till &lt;b&gt;1&lt;/b&gt;" in page.text and "Shop web" in page.text
+    assert "nas: disk is past its limit." in page.text and "<h2>Certificates</h2>" not in page.text and "<h2>Network</h2>" not in page.text
+    assert 'filename="shop' not in client.get(f"/api/documentation/site/{pid}").headers.get("content-disposition", "") and client.get(f"/api/documentation/site/{pid}", params={"download": "true"}).headers["content-disposition"].startswith('attachment; filename="bakery-shop')
+    assert client.get("/api/documentation/site/999").status_code == 404 and anon.get(f"/api/documentation/site/{pid}").status_code == 401

@@ -86,3 +86,7 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 
 /* network documentation */
 .doc-logo { max-height: 56px; max-width: 200px; display: block; margin-bottom: 8px; }
+
+/* remote sites grouped by customer */
+.rs-customer { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: 22px 0 8px; }
+.rs-customer h2 { margin: 0; }

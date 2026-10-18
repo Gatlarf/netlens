@@ -326,3 +326,14 @@ def test_a_check_that_is_down_when_it_first_appears_raises_an_alert(conn):
     probes.ingest(conn, row, {"devices": [], "services": [service("svc:1", "Web", "down"), service("central:new", "Set up from here", "down"), service("central:ok", "Fine")]}, now=LATER)
     details = [r["detail"] for r in conn.execute("SELECT detail FROM events WHERE kind = 'remote_service_down'")]
     assert len(details) == 1 and "Set up from here" in details[0]
+
+
+def test_alerts_name_the_customer_when_the_site_has_one(conn):
+    row, _ = make(conn, "Shop")
+    conn.execute("UPDATE probes SET customer = 'Bakery Janssens' WHERE id = ?", (row["id"],))
+    conn.commit()
+    row = conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone()
+    probes.ingest(conn, row, {"devices": [device("aa:00:00:00:00:01", "printer")], "services": []}, now=NOW)
+    row = conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone()
+    probes.ingest(conn, row, {"devices": [device("aa:00:00:00:00:01", "printer", online=False)], "services": []}, now=LATER)
+    assert [r["detail"] for r in conn.execute("SELECT detail FROM events")] == ["Bakery Janssens / Shop: printer (192.168.1.10) went offline"]

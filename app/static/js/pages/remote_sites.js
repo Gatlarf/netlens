@@ -145,36 +145,52 @@ export async function render(container) {
       body.appendChild(emptyState("No remote sites yet", "Run Netlens at the other location (a branch office, a second home, a customer), then add it here to get a token. It reports to this Netlens every minute and always connects out, so nothing at that location has to be reachable from the internet. Each site keeps working on its own if the connection drops, and this page tells you when a site stops reporting.", h("button", { class: "btn primary admin-only", type: "button", onclick: () => newSiteForm() }, "Add a remote site")));
       return;
     }
-    const grid = h("div", { class: "rs-grid" });
-    for (const p of probes) {
+    const card = (p) => {
       if (p.locked) {
-        grid.appendChild(h("a", { class: "rs-card tone-off", href: `#/remote-sites?id=${p.id}` },
+        return h("a", { class: "rs-card tone-off", href: `#/remote-sites?id=${p.id}` },
           h("div", { class: "rs-name" }, h("strong", {}, p.name), h("span", { class: "hl-badge warn" }, "Frozen")),
           h("div", { class: "hint" }, "Your licence takes in fewer remote sites. This one keeps its data but is not updated and raises no alerts."),
-          isAdmin() ? h("div", { class: "hint" }, h("a", { href: "#/settings/licence" }, "Get more sites")) : null));
-        continue;
+          isAdmin() ? h("div", { class: "hint" }, h("a", { href: "#/settings/licence" }, "Get more sites")) : null);
       }
       const tone = !p.enabled ? "off" : p.problems.critical || p.state === "silent" || p.devices.core_down ? "bad" : p.problems.count || p.services.down || p.state === "waiting" ? "warn" : "ok";
-      grid.appendChild(h("a", { class: `rs-card tone-${tone}`, href: `#/remote-sites?id=${p.id}` },
+      return h("a", { class: `rs-card tone-${tone}`, href: `#/remote-sites?id=${p.id}` },
         h("div", { class: "rs-name" }, h("strong", {}, p.name), h("span", { class: `hl-badge ${STATE_TONE[p.state] === "ok" ? "" : STATE_TONE[p.state]}` }, p.enabled ? STATE_TEXT[p.state] : "Paused")),
         h("div", { class: "rs-stats" },
           h("span", {}, h("strong", {}, `${p.devices.online}/${p.devices.total}`), " devices online"),
           h("span", {}, h("strong", {}, String(p.services.down)), ` of ${p.services.total} checks down`),
           h("span", {}, h("strong", {}, String(p.problems.count)), " health problems")),
-        h("div", { class: "hint" }, p.last_seen ? `Last report ${timeAgo(p.last_seen)}${p.version ? ` · Netlens ${p.version}` : ""}` : "Has not reported yet")));
+        h("div", { class: "hint" }, p.last_seen ? `Last report ${timeAgo(p.last_seen)}${p.version ? ` · Netlens ${p.version}` : ""}` : "Has not reported yet"));
+    };
+    const byCustomer = new Map();
+    for (const p of probes) { const key = p.customer || ""; if (!byCustomer.has(key)) byCustomer.set(key, []); byCustomer.get(key).push(p); }
+    const named = [...byCustomer.keys()].filter(Boolean).sort((a, b) => a.localeCompare(b));
+    for (const key of byCustomer.has("") && !named.length ? [""] : [...named, ...(byCustomer.has("") ? [""] : [])]) {
+      const sites = byCustomer.get(key), live = sites.filter((p) => !p.locked);
+      if (named.length) {
+        const down = live.filter((p) => p.state === "silent" || p.problems.critical || p.devices.core_down).length;
+        const look = live.filter((p) => p.problems.count || p.services.down).length;
+        body.appendChild(h("div", { class: "rs-customer" }, h("h2", {}, key || "Other sites"),
+          h("span", { class: `hint rs-roll ${down ? "d-bad" : look ? "d-warn" : ""}` }, `${plural(sites.length, "site")} · ${live.reduce((a, p) => a + p.devices.online, 0)} / ${live.reduce((a, p) => a + p.devices.total, 0)} devices online · ${live.reduce((a, p) => a + p.services.down, 0)} checks down · ${live.reduce((a, p) => a + p.problems.count, 0)} health problems${down ? ` · ${down} need attention` : ""}`)));
+      }
+      body.appendChild(h("div", { class: "rs-grid" }, sites.map(card)));
     }
-    body.appendChild(grid);
   }
+
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
   function newSiteForm() {
     clear(form);
     const name = h("input", { type: "text", placeholder: "Branch office", maxlength: "60", required: true });
+    const customer = h("input", { type: "text", placeholder: "Bakery Janssens", maxlength: "60", list: "rs-customers" });
+    const known = h("datalist", { id: "rs-customers" });
+    get("/api/probes").then((all) => { for (const c of [...new Set(all.map((x) => x.customer).filter(Boolean))]) known.appendChild(h("option", { value: c })); }).catch(() => {});
     const go = h("button", { class: "btn primary", type: "submit" }, "Create");
     form.appendChild(h("form", { class: "card edit-form", onsubmit: async (e) => {
       e.preventDefault();
       go.disabled = true;
       try {
         const r = await post("/api/probes", { name: name.value.trim() });
+        if (customer.value.trim()) await patch(`/api/probes/${r.probe.id}`, { customer: customer.value.trim() });
         clear(form);
         form.appendChild(setupSteps(r.probe.name, r.token));
         showList();
@@ -184,6 +200,7 @@ export async function render(container) {
         go.disabled = false;
       }
     } }, h("h2", {}, "Add a remote site"), h("div", { class: "field" }, h("label", {}, "Name of the location"), name),
+    h("div", { class: "field" }, h("label", {}, "Customer (optional)"), customer, known, h("p", { class: "hint" }, "Sites of the same customer are shown together, with one line of totals.")),
     h("div", { class: "form-actions" }, go, h("button", { class: "btn", type: "button", onclick: () => clear(form) }, "Cancel"))));
     name.focus();
   }
@@ -207,6 +224,12 @@ export async function render(container) {
         if (!name || name.trim() === p.name) return;
         try { await patch(`/api/probes/${id}`, { name }); toast("Renamed", "success"); showList(); } catch (err) { toast(err.message || "Could not rename", "error"); }
       } }, "Rename"),
+      h("button", { class: "btn", type: "button", onclick: async () => {
+        const customer = window.prompt("Customer (leave empty for none)", p.customer || "");
+        if (customer === null || customer.trim() === (p.customer || "")) return;
+        try { await patch(`/api/probes/${id}`, { customer }); toast("Saved", "success"); showList(); } catch (err) { toast(err.message || "Could not save", "error"); }
+      } }, p.customer ? `Customer: ${p.customer}` : "Set customer"),
+      h("a", { class: "btn", href: `/api/documentation/site/${id}`, target: "_blank", rel: "noopener", title: "A page about this site for the customer (devices, checks, open points)" }, "Documentation"),
       h("button", { class: "btn", type: "button", onclick: async () => {
         try { await patch(`/api/probes/${id}`, { enabled: !p.enabled }); toast(p.enabled ? "Paused: reports are refused" : "Resumed", "success"); showList(); } catch (err) { toast(err.message || "Could not change", "error"); }
       } }, p.enabled ? "Pause" : "Resume"),

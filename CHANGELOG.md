@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.76 — 2026-10-18
+
+### Added
+- ★ **Customers for remote sites**: give a remote site a customer (when you add it, or with *Set customer* on its page). The Remote sites page then groups the sites by customer, with one line of totals per customer (sites, devices online, checks down, health problems), and alerts name the customer ("Bakery Janssens / Shop: printer went offline"). Useful when you look after the networks of several customers.
+- **Documentation per remote site**: the page of a remote site has a *Documentation* button that makes the network documentation of that site (devices, monitored services and open points) from what the site reports, under its customer's name and with your logo.
+
 ## 0.4.75 — 2026-10-18
 
 ### Added

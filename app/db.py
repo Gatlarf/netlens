@@ -787,6 +787,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    _add_column_if_missing(conn, "probes", "customer", "TEXT NOT NULL DEFAULT ''")             # who the site belongs to (an IT-support person looks after several customers)
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS remote_devices (

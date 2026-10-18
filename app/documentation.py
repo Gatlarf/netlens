@@ -96,6 +96,26 @@ def collect(conn: sqlite3.Connection, ranges: list[str], now: datetime | None = 
             "vulns": ({"summary": vulns.summary(conn), "top": vulns.top_devices(conn, 10), "critical": vulns.findings(conn, severity="critical", limit=25)} if allowed and vulns.summary(conn)["configured"] else None)}
 
 
+def collect_site(conn: sqlite3.Connection, probe_id: int, now: datetime | None = None) -> dict[str, Any] | None:
+    """The same document for a remote site, from what the site reports (devices, service checks, health problems)."""
+    now = now or datetime.now(timezone.utc)
+    probe = conn.execute("SELECT * FROM probes WHERE id = ?", (probe_id,)).fetchone()
+    if probe is None:
+        return None
+    devices = [{"name": r["name"], "ip": r["ip"] or "", "mac": r["mac"] or "", "vendor": r["vendor"] or "", "os": r["os"] or "", "type": r["type"] or "unknown", "group": "", "notes": "",
+                "online": bool(r["online"]), "last_seen": r["last_seen"]} for r in conn.execute("SELECT * FROM remote_devices WHERE probe_id = ?", (probe_id,))]
+    devices.sort(key=lambda d: _ip_key(d["ip"]))
+    checks = [{"name": r["name"], "kind": r["kind"], "target": r["target"] or "", "up": 1 if r["state"] == "up" else 0 if r["state"] == "down" else None}
+              for r in conn.execute("SELECT name, kind, target, state FROM remote_services WHERE probe_id = ? ORDER BY name COLLATE NOCASE", (probe_id,))]
+    try:
+        problems = json.loads(probe["summary"] or "{}").get("problems") or []
+    except ValueError:
+        problems = []
+    health = [("bad" if p.get("level") == "critical" else "warn", f"{p.get('device') or 'A device'}: {str(p.get('title') or 'a health reading').lower()} is past its limit.") for p in problems if isinstance(p, dict)]
+    return {"generated": now.strftime("%Y-%m-%d %H:%M UTC"), "devices": devices, "ranges": [], "v4": None, "v6": None, "services": checks, "certificates": [], "backups": None, "vulns": None,
+            "health": health, "site": {"name": probe["name"], "customer": probe["customer"] or ""}}
+
+
 # ----------------------------------------------------------------------------- rendering
 def esc(value: Any) -> str:
     return html.escape("" if value is None else str(value), quote=True)
@@ -130,6 +150,7 @@ def _points(doc: dict) -> list[tuple[str, str, str]]:
         c = doc["vulns"]["summary"]["counts"]
         if c.get("critical"):
             out.append(("bad", "Security", f"{c['critical']} critical vulnerabilit{'ies' if c['critical'] != 1 else 'y'} found by the scanner."))
+    out.extend((lvl, "Health", text) for lvl, text in doc.get("health", []))
     for cert in doc["certificates"]:
         if cert["days"] <= 14:
             out.append(("bad" if cert["days"] < 0 else "warn", "Certificates", f"The certificate {cert['name']} " + ("has expired." if cert["days"] < 0 else f"ends in {cert['days']} days.")))

@@ -22,6 +22,7 @@ MAX_BODY = 12 * 1024 * 1024
 class NameBody(BaseModel):
     name: str | None = None
     enabled: bool | None = None
+    customer: str | None = None
 
 
 def _row(conn, probe_id: int):
@@ -86,6 +87,11 @@ def update_probe(probe_id: int, body: NameBody, conn=Depends(get_conn)) -> dict:
         if conn.execute("SELECT 1 FROM probes WHERE name = ? COLLATE NOCASE AND id != ?", (name, probe_id)).fetchone():
             raise HTTPException(status_code=422, detail="there is already a remote site with that name")
         conn.execute("UPDATE probes SET name = ? WHERE id = ?", (name, probe_id))
+    if body.customer is not None:
+        customer = " ".join(body.customer.split())
+        if len(customer) > 60:
+            raise HTTPException(status_code=422, detail="the customer name is too long (60 characters at most)")
+        conn.execute("UPDATE probes SET customer = ? WHERE id = ?", (customer, probe_id))
     if body.enabled is not None:
         conn.execute("UPDATE probes SET enabled = ? WHERE id = ?", (int(body.enabled), probe_id))
     conn.commit()

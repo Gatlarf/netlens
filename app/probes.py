@@ -132,7 +132,7 @@ def present(conn: sqlite3.Connection, row: sqlite3.Row, now: float | None = None
         state = "connected"
     problems = summary.get("problems") or []
     return {
-        "id": row["id"], "name": row["name"], "enabled": bool(row["enabled"]), "locked": row["id"] in locked_ids(conn), "created": row["created"], "last_seen": row["last_seen"],
+        "id": row["id"], "name": row["name"], "customer": row["customer"] or "", "enabled": bool(row["enabled"]), "locked": row["id"] in locked_ids(conn), "created": row["created"], "last_seen": row["last_seen"],
         "last_ip": row["last_ip"], "version": row["version"], "interval_s": row["interval_s"], "state": state,
         "devices": {"total": counts["total"], "online": counts["online"], "core_down": counts["core_down"]},
         "services": {"total": services["total"], "down": services["down"]},
@@ -198,7 +198,7 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
     if not isinstance(payload, dict):
         raise ProbeError("the report must be a JSON object")
     now = now or utcnow()
-    site = probe["name"]
+    site = f"{probe['customer']} / {probe['name']}" if probe["customer"] else probe["name"]          # an alert names the customer too
     probe_id = probe["id"]
     baseline = probe["snapshot_ts"] is None            # the first report only sets the starting point; nothing is "new" yet
     events: list[tuple[str, str]] = []
@@ -367,7 +367,7 @@ def check_silent(conn: sqlite3.Connection, now: float | None = None) -> list[str
         if seen is not None and now - seen > max(SILENT_AFTER_S, row["interval_s"] * 4):
             conn.execute("UPDATE probes SET offline_notified = 1 WHERE id = ?", (row["id"],))
             conn.commit()
-            add_event(conn, "probe_offline", f"{row['name']} has not reported since {row['last_seen']}: its devices are not being watched", now=datetime.fromtimestamp(now, timezone.utc).strftime(STAMP),
+            add_event(conn, "probe_offline", f"{row['customer'] + ' / ' if row['customer'] else ''}{row['name']} has not reported since {row['last_seen']}: its devices are not being watched", now=datetime.fromtimestamp(now, timezone.utc).strftime(STAMP),
                       subject=f"site:{row['id']}")
             raised.append(row["name"])
     return raised
