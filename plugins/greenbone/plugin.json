@@ -1,7 +1,7 @@
 {
   "id": "greenbone",
   "name": "Greenbone (OpenVAS)",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api_version": 1,
   "kind": "vulnerability",
   "author": "Netlens",
@@ -10,7 +10,7 @@
   "diagnose": true,
   "info": {
     "title": "Give Netlens a read-only user and reach the scanner",
-    "text": "Netlens talks to the Greenbone Management Protocol (GMP) over TLS, normally on port 9390 of the gvmd service. In the Greenbone Community Containers gvmd only listens on a Unix socket: add a TLS listener (gvmd --listen=0.0.0.0 --port=9390) or put a small TLS proxy in front, and keep that port reachable from Netlens only. In Greenbone (Administration > Users) make a user with the role 'Observer' (it can read results but not change anything) and give it permission to see the scan tasks. For the certificate of gvmd fill in its SHA-256 fingerprint: Netlens then trusts exactly that certificate."
+    "text": "Netlens talks to the Greenbone Management Protocol (GMP) over TLS, normally on port 9390 of the gvmd service. In the Greenbone Community Containers gvmd only listens on a Unix socket: add a TLS listener (gvmd --listen=0.0.0.0 --port=9390) or put a small TLS proxy in front, and keep that port reachable from Netlens only. In Greenbone (Administration > Users) make a user with the role 'Observer' (it can read results but not change anything), and in every scan task put that user under Observers (Edit task): a user only sees the tasks that are shared with it. For the certificate of gvmd fill in its SHA-256 fingerprint: Netlens then trusts exactly that certificate."
   },
   "config": [
     {

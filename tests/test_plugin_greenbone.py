@@ -105,3 +105,9 @@ def test_diagnose_has_no_names_or_addresses(gvmd):
     steps = report["servers"][0]["steps"]
     assert steps["login"]["ok"] and steps["results"]["usable"] == 5 and steps["results"]["levels"] == {"critical": 1, "low": 3, "medium": 1} and "nvt" in steps["results"]["child_tags"]
     assert "<server>" in plugin._problem(plugin.GvmError("cannot reach 10.0.0.5:9390: refused"))
+
+
+def test_a_user_that_sees_no_tasks_is_told_how_to_fix_it(tmp_path):
+    with FakeGvmd(tmp_path, tasks=False, results=[]) as s:
+        r = plugin.fetch(config(s))
+        assert r["findings"] == [] and "observer" in r["servers"][0]["warnings"][0]

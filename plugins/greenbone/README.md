@@ -14,7 +14,8 @@ Shows what your **Greenbone / OpenVAS** scanner (the free Community Edition or t
 
 1. Greenbone's Community Containers only let gvmd listen on a Unix socket by default. Make it listen with TLS too: give the `gvmd` service `GVMD_ARGS: "-f --listen-mode=666 --listen=0.0.0.0 --port=9390"` and `GVM_CERTS: "true"` and publish port 9390 **to the machine that runs Netlens only** (the port has full GMP access for any user that can log in).
 2. In Greenbone open *Administration → Users* and make a user for Netlens with the role **Observer** (it reads results and cannot change anything).
-3. In Netlens install **Greenbone (OpenVAS)**, add a line with the address (`192.168.0.190:9390`), the user and the password and, because gvmd makes its own certificate, its **SHA-256 fingerprint**. **Test**, enable.
+3. A user only sees the tasks of other users when they are shared with it. In every task (*Scans → Tasks → Edit task*) put the Netlens user under **Observers** (or create the task with it as observer). Without this Netlens connects fine but sees no results, and the plugin's test says so.
+4. In Netlens install **Greenbone (OpenVAS)**, add a line with the address (`192.168.0.190:9390`), the user and the password and, because gvmd makes its own certificate, its **SHA-256 fingerprint**. **Test**, enable.
 
 ## Good to know
 

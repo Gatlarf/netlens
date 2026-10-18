@@ -2,6 +2,18 @@
   "id": "greenbone",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "57f8415d6c2e9a1bbc250a911dfad0cf9b1062fc821ddac2eb0d71d2d1fea213",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-18",
+      "tested_on": [
+        "Greenbone Community Containers 22.7 (the maintainer's playground and docker host): GMP over TLS, login as an Observer user, a 'Full and fast' scan of one host, 5 real findings read (critical, medium, low) with port, score, solution and time; the filter syntax that gvmd accepts; paging and duplicate handling against a fake gvmd replaying the recorded answers",
+        "Greenbone Community 22.7 on the maintainer's docker host: an Observer user that is (and is not) an observer of the scan tasks; findings read through that user"
+      ],
+      "notes": "Written and lab-tested on 2026-10-18 with the assistant Claude against a real Greenbone and confirmed by the maintainer. Read-only (get_version, get_tasks, get_results): it never starts or changes a scan. Not seen on the real scanner: results with CVE references (they follow the protocol documentation), several tasks scanning one host and very large result sets."
+    },
+    {
       "version": "1.0.0",
       "sha256": "c7db3c92ce4da7911ec9f6ac61e9c596fce0ea6ea4b48f65bbbdf3c0f411dddb",
       "level": "verified",

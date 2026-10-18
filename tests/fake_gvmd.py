@@ -25,10 +25,11 @@ def results_from_fixture(scan_time: datetime) -> list[ET.Element]:
 
 
 class FakeGvmd:
-    def __init__(self, folder: Path, user="netlens", password="secret", results=None, last_report=True, version_text=None):
+    def __init__(self, folder: Path, user="netlens", password="secret", results=None, last_report=True, version_text=None, tasks=True):
         self.user, self.password, self.seen = user, password, []
         self.results = results if results is not None else results_from_fixture(datetime.now(timezone.utc) - timedelta(hours=2))
         self.last_report = last_report
+        self.tasks = tasks
         self.version_text = version_text
         outer = self
         cert, key, self.fingerprint = make_certificate(folder)
@@ -69,6 +70,8 @@ class FakeGvmd:
         if not authed:
             return f'<{el.tag}_response status="401" status_text="Authentication required"/>', authed
         if el.tag == "get_tasks":
+            if not self.tasks:
+                return '<get_tasks_response status="200" status_text="OK"><apply_overrides>0</apply_overrides></get_tasks_response>', authed
             text = fixture("get_tasks")
             if self.last_report:
                 when = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")

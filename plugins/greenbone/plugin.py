@@ -228,20 +228,22 @@ def read_results(gmp, min_qod, min_severity, max_age_days):
 
 
 def last_scan(gmp):
-    stamps = []
-    for task in gmp.command('<get_tasks filter="rows=-1"/>').findall("task"):
+    """-> (time of the newest finished report or None, number of tasks this user can see)."""
+    stamps, tasks = [], gmp.command('<get_tasks filter="rows=-1"/>').findall("task")
+    for task in tasks:
         report = task.find("last_report/report")
         if report is not None:
             stamps.append(_stamp(report.findtext("timestamp") or report.findtext("scan_end")))
     stamps = [s for s in stamps if s]
-    return max(stamps) if stamps else None
+    return (max(stamps) if stamps else None), len(tasks)
 
 
 def read(gmp, config):
     version = (gmp.command("<get_version/>").findtext("version") or "").strip()
     gmp.login()
     findings = read_results(gmp, config.get("min_qod") or 70, config.get("min_severity") or "0.1", config.get("max_age_days") or 30)
-    return version, findings, last_scan(gmp)
+    scanned, tasks = last_scan(gmp)
+    return version, findings, scanned, tasks
 
 
 def connect(config):
@@ -249,7 +251,7 @@ def connect(config):
     for gmp in parse_servers(config):
         try:
             gmp.open()
-            version, rows, scanned = read(gmp, config)
+            version, rows, scanned, tasks = read(gmp, config)
         except AuthRefused:
             raise
         except GvmError as exc:
@@ -258,7 +260,9 @@ def connect(config):
         finally:
             gmp.close()
         warnings = []
-        if scanned is None:
+        if not tasks:
+            warnings.append("this user sees no scan tasks: in Greenbone add it as an observer of the tasks (Edit task > Observers), or create the tasks with it as observer")
+        elif scanned is None:
             warnings.append("no scan has finished yet: start a task in Greenbone")
         servers.append({"id": gmp.id, "name": "Greenbone", "version": version, "online": True, "last_scan": scanned, "warnings": warnings})
         for f in rows:
