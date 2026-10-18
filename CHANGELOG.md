@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.70 — 2026-10-18
+
+### Added
+- ★ **IPv6 health** (Network → IPv6 health): says in plain words whether IPv6 on your network works as it should. It shows where the addresses come from (your provider's range handed out by the router), the subnets in use, which devices announce themselves as routers, whether the internet and name lookups work over IPv6, and, with IPv6 discovery on, which devices have an address, which are in another subnet than this computer and which do not answer a ping. Every finding explains what it means, and a short guide explains the words (prefix, router advertisement, link-local, unique-local, global).
+
 ## 0.4.69 — 2026-10-18
 
 ### Added

@@ -16,6 +16,7 @@ const ROUTES = {
   "#/devices": "devices",
   "#/hierarchy": "hierarchy",
   "#/dns": "dns",
+  "#/ipv6": "ipv6",
   "#/speedtest": "speedtest",
   "#/uptime": "uptime",
   "#/stats": "stats",

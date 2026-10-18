@@ -65,3 +65,12 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 .filter-devices { max-height: 11rem; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 8px; margin-top: 6px; }
 .managed-fold > summary { cursor: pointer; } .managed-fold > .card { border: 0; padding: 8px 0 0; }
 .kv-label .hl-badge { margin-right: 4px; }
+
+/* IPv6 health */
+.dash-hero.tone-info { border-left-color: var(--muted); }
+.ipv6-findings { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ipv6-findings li { display: flex; gap: 10px; align-items: flex-start; }
+.ipv6-findings p { margin: 2px 0 0; }
+.ipv6-mark { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; font-weight: 700; color: #fff; background: var(--muted); }
+.ipv6-good .ipv6-mark { background: var(--ok); } .ipv6-warn .ipv6-mark { background: var(--warn); } .ipv6-bad .ipv6-mark { background: var(--bad); }
+.ipv6-primer > summary { cursor: pointer; } .ipv6-primer dt { font-weight: 600; margin-top: 8px; } .ipv6-primer dd { margin: 2px 0 0; color: var(--muted); }

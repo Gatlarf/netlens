@@ -53,3 +53,19 @@ async def discover(conn=Depends(get_conn)) -> dict[str, Any]:
     result = ipv6.apply(conn, entries)
     ipv6.set_status(conn, {"ts": utcnow(), "seen": len(entries), **result})
     return _doc(conn)
+
+
+@router.get("/ipv6/health")
+def get_health(conn=Depends(get_conn)) -> dict[str, Any]:
+    """The last IPv6 health result (null before the first run)."""
+    from app import ipv6health
+
+    return {"result": ipv6health.last(conn), "discovery": ipv6.enabled(conn)}
+
+
+@router.post("/ipv6/health/run")
+async def run_health(conn=Depends(get_conn)) -> dict[str, Any]:
+    """Look at the IPv6 side of the network now."""
+    from app import ipv6health
+
+    return {"result": await ipv6health.run(conn), "discovery": ipv6.enabled(conn)}

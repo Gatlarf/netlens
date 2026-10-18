@@ -106,7 +106,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
 - A **setup guide** that walks a new install through the settings that matter (networks, names, always-on devices, alerts, checks, plugins, backups); reopen it any time under Settings → System → Setup guide
 - **Performance graphs** (response time and availability for up to a year) and **health monitoring** of switches, NAS boxes, printers, UPS units, Windows (SNMP) and Linux (SSH): processor, memory, disks, traffic, temperature, supplies and battery, with limits that raise warnings
-- **IPv6 (optional)**: the IPv6 addresses of your devices, found without sweeping, shown on the device page
+- **IPv6 (optional)**: the IPv6 addresses of your devices, found without sweeping, shown on the device page; **IPv6 health** says whether IPv6 on the network works (prefixes, router, internet, which devices answer)
 - **Remote sites**: several locations in one overview; a Netlens at each location reports to a central one (outgoing connection only), with devices, checks, health, graphs and alerts per site
 - Uptime history like Uptime Kuma: heartbeat bars with a response-time line, 24 h / 7 d / 30 d, hover details, and **always-on (core) devices** whose availability is shown apart from phones and tablets
 - Alerts by e-mail, ntfy, Telegram, Discord, Pushover or webhook, each channel with its own events and an on/off switch per device
@@ -851,7 +851,7 @@ and names are fictional (`192.168.42.0/24`, `home.example.net`).
 
 - CDP neighbour discovery (planned); SNMP switches and LLDP are covered by the SNMP plugin
 - Switch-to-device links come only from traceroute/heuristics/manual
-- IPv6 is optional and limited: addresses of devices that the IPv4 scan found are shown (Settings → IPv6); devices that only have IPv6, IPv6 ranges and IPv6 in the map are not covered yet
+- IPv6 health (Network → IPv6 health) checks the IPv6 side of the network; IPv6 discovery is optional and limited: addresses of devices that the IPv4 scan found are shown (Settings → IPv6); devices that only have IPv6, IPv6 ranges and IPv6 in the map are not covered yet
 - No vulnerability scanning
 - No embedded proxying of device web UIs
 - VNC/RDP only as links
