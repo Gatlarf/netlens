@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.72 — 2026-10-18
+
+### Added
+- ★ **Alerts from Network health**: every half hour Netlens repeats the IPv4 and IPv6 checks and raises an event when a problem is still there on the next round (one blip of the internet is not an alert): *Network problem* (no gateway, the gateway does not answer, two devices with one address, an unapproved DHCP server, a range nearly full, the internet or names not working, ...), *Network warning* (a second router, a range filling up, devices in another subnet, ...) and *Network problem resolved* when it is gone. Each is announced once, and a warning that becomes a problem is announced again. Choose them under Settings → Alert channels → Tell me when (the problem is on by default); problems also show under Needs attention on the dashboard and go to log forwarding with the right severity.
+
 ## 0.4.71 — 2026-10-18
 
 ### Added

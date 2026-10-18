@@ -72,7 +72,7 @@ export async function render(container) {
   const slots = { v4: h("div", {}, h("p", { class: "hint" }, "Looking at the network…")), v6: h("div", {}, h("p", { class: "hint" }, "Looking at the network…")) };
   const docs = {};
   const button = h("button", { class: "btn primary admin-only", type: "button" }, "Check now");
-  container.append(pageHead("Network health", "Is the network in good order? Addresses, gateway, DNS, DHCP and IPv6, checked from this computer and explained in plain words.", button),
+  container.append(pageHead("Network health", "Is the network in good order? Addresses, gateway, DNS, DHCP and IPv6, checked from this computer and explained in plain words. Netlens repeats the check every half hour and alerts you when a problem stays (choose how in Settings → Alert channels).", button),
     tabbed("netlens.nethealth.tab", [["v4", "IPv4", slots.v4], ["v6", "IPv6", slots.v6]]));
   const paint = () => { if (docs.v4) drawV4(slots.v4, docs.v4); if (docs.v6) drawV6(slots.v6, docs.v6); };
   const run = async () => {

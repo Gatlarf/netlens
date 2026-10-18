@@ -8,6 +8,13 @@ from app.stats import _ago, _pct, utcnow
 from app import sites as sites_mod, speedtest
 
 
+def _network_attention(conn: sqlite3.Connection) -> list[dict]:
+    """The problems the network health checks announced (and that are still there)."""
+    from app import nethealth
+
+    return [{"level": i["level"], "text": i["text"], "href": "#/network-health"} for i in nethealth.attention(conn)]
+
+
 def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], core_down: list[dict] | None = None, down_checks: list[dict] | None = None) -> list[dict]:
     items: list[dict] = []
 
@@ -122,7 +129,7 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "summary": s,
         "devices_uptime": uptime,
         "service_checks": _services(conn, now)["checks"],
-        "attention": _attention(s, certs, login_failed, down, core_down, down_checks),
+        "attention": _attention(s, certs, login_failed, down, core_down, down_checks) + _network_attention(conn),
         "events": events,
         "services_down": down,
         "login_failed_24h": login_failed,

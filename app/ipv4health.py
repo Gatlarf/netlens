@@ -18,7 +18,7 @@ import sqlite3
 from typing import Any
 
 from app.db import set_setting, get_setting, utcnow
-from app.ipv6health import _tcp
+from app.ipv6health import _tcp, finding_key
 from app.scanner.ipv6 import SKIP_IFACES
 from app.scanner.netinfo import run_ip
 
@@ -129,7 +129,7 @@ def analyse(raw: dict[str, Any], facts: dict[str, Any]) -> dict[str, Any]:
     findings: list[dict[str, str]] = []
 
     def add(level: str, title: str, text: str) -> None:
-        findings.append({"level": level, "title": title, "text": text})
+        findings.append({"level": level, "key": finding_key(title), "title": title, "text": text})
 
     devices = facts["devices"]
     by_ip = {d["ip"]: d["name"] for d in devices}

@@ -110,6 +110,9 @@ async def lifespan(app: FastAPI):
         from app import siem
 
         tasks.append(asyncio.create_task(siem.loop(app.state.db_path)))
+        from app import nethealth
+
+        tasks.append(asyncio.create_task(nethealth.loop(app.state.db_path, lambda: list(app.state.settings.ranges))))
         from app import anomaly
 
         tasks.append(asyncio.create_task(anomaly.loop(app.state.db_path)))

@@ -131,9 +131,12 @@ EVENT_LABELS = {
     "guest_started": "A virtual machine, container or app starts",
     "guest_update_available": "An update becomes available for an app or a container image",
     "cert_expiring": "A certificate used by a published site is about to expire",
+    "net_critical": "The network health check finds a problem (IPv4 or IPv6: no gateway, two devices with one address, an unapproved DHCP server ...)",
+    "net_warning": "The network health check finds something to look at (a range filling up, a second router, devices in another subnet ...)",
+    "net_ok": "A network health problem or warning is gone",
     "login_failed": "Someone keeps entering a wrong password or token (a possible attack)",
 }
-DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "metric_critical", "remote_offline", "remote_service_down", "remote_metric_critical", "probe_offline", "probe_online", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "login_failed"]
+DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "metric_critical", "remote_offline", "remote_service_down", "remote_metric_critical", "probe_offline", "probe_online", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "net_critical", "login_failed"]
 
 
 class ChannelError(Exception):
@@ -382,6 +385,7 @@ def _line(e: dict) -> str:
         "metric_warning": f"Warning: {detail}",
         "metric_critical": f"CRITICAL: {detail}",
         "metric_ok": f"Normal again: {detail}",
+        "net_critical": f"NETWORK PROBLEM: {detail}", "net_warning": f"Network warning: {detail}", "net_ok": detail,
         "capacity_warning": f"Disk filling up: {detail}",
         "capacity_critical": f"DISK ALMOST FULL: {detail}",
         "anomaly": f"Unusual: {detail}",
@@ -407,7 +411,7 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
         "remote_new": "remote device new", "remote_offline": "remote offline", "remote_online": "remote online", "remote_service_down": "remote service down",
         "remote_service_up": "remote service up", "remote_metric_warning": "remote health warning", "remote_metric_critical": "remote health critical",
         "remote_metric_ok": "remote health normal", "probe_offline": "site silent", "probe_online": "site reporting",
-        "metric_warning": "health warning", "metric_critical": "health critical", "metric_ok": "health normal", "capacity_warning": "disk filling up", "capacity_critical": "disk almost full", "anomaly": "unusual reading", "remediation_pending": "approval needed", "remediation_ran": "fix done", "remediation_failed": "fix failed", "remediation_recovered": "fix worked", "inventory_unavailable": "device unavailable", "inventory_available": "device available", "inventory_battery_low": "battery low", "guest_backup_failed": "backup failed", "guest_backup_late": "backup late", "guest_backup_recovered": "backup recovered", "unreachable": "behind an offline device",
+        "metric_warning": "health warning", "metric_critical": "health critical", "metric_ok": "health normal", "capacity_warning": "disk filling up", "capacity_critical": "disk almost full", "anomaly": "unusual reading", "remediation_pending": "approval needed", "remediation_ran": "fix done", "remediation_failed": "fix failed", "remediation_recovered": "fix worked", "inventory_unavailable": "device unavailable", "inventory_available": "device available", "inventory_battery_low": "battery low", "guest_backup_failed": "backup failed", "guest_backup_late": "backup late", "guest_backup_recovered": "backup recovered", "net_critical": "network problem", "net_warning": "network warning", "net_ok": "network ok", "unreachable": "behind an offline device",
         "container_unhealthy": "container unhealthy", "container_restarting": "container restarting", "container_stopped": "container stopped",
         "guest_stopped": "guest stopped", "guest_started": "guest started", "guest_update_available": "update available", "cert_expiring": "certificate expiring", "login_failed": "failed logins",
     }

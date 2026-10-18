@@ -66,7 +66,7 @@ def status(conn: sqlite3.Connection) -> dict[str, Any]:
 def severity(kind: str) -> int:
     from app.notify.channels import CRITICAL
 
-    if kind in CRITICAL or kind.endswith("_failed") or kind in ("remediation_failed", "capacity_critical"):
+    if kind in CRITICAL or kind.endswith(("_failed", "_critical")) or kind == "remediation_failed":
         return 2
     if kind.endswith(("_warning", "_offline", "_late", "_unhealthy", "_unavailable", "_pending")) or kind in ("login_failed", "licence_expiring"):
         return 4

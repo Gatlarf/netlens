@@ -85,6 +85,11 @@ def parse_routers(text: str) -> list[dict[str, str]]:
     return out
 
 
+def finding_key(title: str) -> str:
+    """A finding is the same one next time when its title is the same apart from the numbers in it ("2 routers" and "3 routers")."""
+    return re.sub(r"\d+", "#", title).lower()
+
+
 def prefix64(address: str) -> str:
     return str(ipaddress.IPv6Network((int(ipaddress.IPv6Address(address)) >> 64 << 64, 64)))
 
@@ -154,7 +159,7 @@ def analyse(raw: dict[str, Any], facts: dict[str, Any], answered: set[str] | Non
     findings: list[dict[str, str]] = []
 
     def add(level: str, title: str, text: str) -> None:
-        findings.append({"level": level, "title": title, "text": text})
+        findings.append({"level": level, "key": finding_key(title), "title": title, "text": text})
 
     by_mac = {d["mac"]: d["name"] for d in facts["devices"] if d["mac"]}
     mine = [a for a in raw["addresses"] if a["scope"] in ("global", "ula") and not a["dadfailed"]]
