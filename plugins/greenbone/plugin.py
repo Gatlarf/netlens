@@ -207,7 +207,8 @@ def finding_id(parsed):
 
 def read_results(gmp, min_qod, min_severity, max_age_days):
     """All results above the thresholds, newest per (host, test, port), as a list of parsed findings."""
-    flt = f"apply_overrides=1 min_qod={int(min_qod)} severity>={min_severity} sort-reverse=severity"
+    above = max(0.0, float(min_severity) - 0.1)          # Greenbone's filter has ">" but no ">=": "severity>0.0" is "above zero"
+    flt = f"apply_overrides=1 min_qod={int(min_qod)} severity>{above:.1f} sort-reverse=severity"
     newest, first = {}, 1
     cutoff = (datetime.now(timezone.utc) - timedelta(days=int(max_age_days))).strftime("%Y-%m-%dT%H:%M:%SZ")
     while True:
@@ -316,7 +317,7 @@ def diagnose(config):
             entry["steps"]["login"] = {"ok": True}
             tasks = gmp.command('<get_tasks filter="rows=-1"/>').findall("task")
             entry["steps"]["tasks"] = {"ok": True, "count": len(tasks), "statuses": sorted({(t.findtext("status") or "?") for t in tasks})[:10], "with_report": sum(1 for t in tasks if t.find("last_report/report") is not None)}
-            response = gmp.command(f'<get_results filter="apply_overrides=1 min_qod=70 severity>=0.1 rows=100 first=1" details="1"/>')
+            response = gmp.command(f'<get_results filter="apply_overrides=1 min_qod=70 severity>0.0 rows=100 first=1" details="1"/>')
             rows = response.findall("result")
             parsed = [p for p in (parse_result(r) for r in rows) if p]
             entry["steps"]["results"] = {"ok": True, "sample": len(rows), "usable": len(parsed), "levels": {s: sum(1 for p in parsed if p["severity"] == s) for s in sorted({p["severity"] for p in parsed})},

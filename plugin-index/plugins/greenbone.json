@@ -1,0 +1,24 @@
+{
+  "id": "greenbone",
+  "name": "Greenbone (OpenVAS)",
+  "kind": "vulnerability",
+  "category": "security",
+  "description": "Shows what a Greenbone / OpenVAS vulnerability scanner found on your devices: every finding with its severity, CVE numbers, score, the port and the advice of the scanner. Netlens matches each finding to a device by address, warns about new critical vulnerabilities and lists the devices at risk. Read-only: it only asks for results, it never starts a scan.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/greenbone",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Greenbone Community Edition 22.7 (tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-greenbone-v1.0.0/greenbone.zip",
+      "sha256": "c7db3c92ce4da7911ec9f6ac61e9c596fce0ea6ea4b48f65bbbdf3c0f411dddb",
+      "api_version": 1,
+      "min_netlens": "0.4.73",
+      "released": "2026-10-18",
+      "changelog": "First release. Needs Netlens 0.4.73 or newer (the Vulnerabilities page). gvmd must listen with TLS (see the README)."
+    }
+  ]
+}

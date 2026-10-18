@@ -41,7 +41,7 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 | [`consul/`](consul/README.md) | HashiCorp Consul | catalog nodes as hosts and service instances with their health as guests (a `hypervisor` plugin) | tested on a real Consul 1.20.6 (Docker, dev mode) |
 | [`pihole-clients/`](pihole-clients/README.md) | Pi-hole clients | the devices Pi-hole has seen, with names and manufacturers (a `topology` plugin) | tested on a real Pi-hole 6.4.3 (Docker); only one client in the lab |
 | [`adguard-clients/`](adguard-clients/README.md) | AdGuard Home clients | DHCP leases and named clients with device types (a `topology` plugin) | tested on a real AdGuard Home v0.107.79 (Docker); static leases only |
-| [`greenbone/`](greenbone/README.md) | Greenbone (OpenVAS) | the findings of the scanner per host: severity, CVE numbers, score, port, advice (a `vulnerability` plugin) | being tested on a real Greenbone Community 22.7 (GMP over TLS) |
+| [`greenbone/`](greenbone/README.md) | Greenbone (OpenVAS) | the findings of the scanner per host: severity, CVE numbers, score, port, advice (a `vulnerability` plugin) | tested on a real Greenbone Community 22.7 (GMP over TLS; one host scanned, no CVE references in that scan) |
 | [`nessus/`](nessus/README.md) | Tenable Nessus | the findings of the latest completed scans per host (a `vulnerability` plugin) | written from the API documentation, **not yet tested on a real Nessus** |
 | [`insightvm/`](insightvm/README.md) | Rapid7 InsightVM | the vulnerabilities of the assets per host (a `vulnerability` plugin) | written from the API documentation, **not yet tested on a real console** |
 

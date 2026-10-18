@@ -8,7 +8,7 @@ Shows what your **Greenbone / OpenVAS** scanner (the free Community Edition or t
 - an event (**New vulnerability**) when a critical vulnerability, or a high one that is known to be exploited, shows up on a device. What was already there when you connect the scanner is not announced;
 - critical findings under *Needs attention* on the dashboard.
 
-> **Status: being tested against the real software in a lab** (Greenbone Community Containers, gvmd with GMP 22.7 over TLS). The connection and login work; the reading of results is being checked against a real scan. *Run diagnostic* on the plugin's page makes an anonymised report (counts and field names only).
+> **Status: tested against the real software in a lab** (Greenbone Community Containers 22.7, gvmd over TLS, a "Full and fast" scan of one host: 5 real findings read correctly, with severity, score, port, solution and time). Not seen in that scan: results with CVE references (they follow the protocol documentation), several tasks scanning the same host, and very large result sets (paging is tested against a fake server). *Run diagnostic* on the plugin's page makes an anonymised report (counts and field names only).
 
 ## Set-up
 
