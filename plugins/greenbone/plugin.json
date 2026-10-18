@@ -1,0 +1,75 @@
+{
+  "id": "greenbone",
+  "name": "Greenbone (OpenVAS)",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "vulnerability",
+  "author": "Netlens",
+  "description": "Shows what a Greenbone / OpenVAS vulnerability scanner found on your devices: every finding with its severity, CVE numbers, score, the port and the advice of the scanner. Netlens matches each finding to a device by address, warns about new critical vulnerabilities and lists the devices at risk. Read-only: it only asks for results, it never starts a scan.",
+  "timeout": 120,
+  "diagnose": true,
+  "info": {
+    "title": "Give Netlens a read-only user and reach the scanner",
+    "text": "Netlens talks to the Greenbone Management Protocol (GMP) over TLS, normally on port 9390 of the gvmd service. In the Greenbone Community Containers gvmd only listens on a Unix socket: add a TLS listener (gvmd --listen=0.0.0.0 --port=9390) or put a small TLS proxy in front, and keep that port reachable from Netlens only. In Greenbone (Administration > Users) make a user with the role 'Observer' (it can read results but not change anything) and give it permission to see the scan tasks. For the certificate of gvmd fill in its SHA-256 fingerprint: Netlens then trusts exactly that certificate."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Greenbone servers",
+      "required": true,
+      "help": "One line per Greenbone (gvmd).",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "192.168.0.190:9390", "required": true},
+        {"key": "username", "label": "User", "placeholder": "netlens", "required": true},
+        {"key": "password", "label": "Password", "type": "password", "required": true},
+        {"key": "fingerprint", "label": "Certificate fingerprint", "placeholder": "B7:5B:65:5B:...", "help": "SHA-256 fingerprint of gvmd's certificate. When filled in, exactly that certificate is trusted (gvmd makes its own); when empty the certificate is checked the normal way (see 'Verify TLS certificate').", "optional": true}
+      ]
+    },
+    {
+      "key": "min_severity",
+      "type": "select",
+      "label": "Report",
+      "default": "0.1",
+      "options": [
+        {"value": "0.1", "label": "Everything with a severity above 0 (low and up)"},
+        {"value": "4", "label": "Medium and up (4.0 and higher)"},
+        {"value": "7", "label": "High and up (7.0 and higher)"}
+      ]
+    },
+    {
+      "key": "min_qod",
+      "type": "number",
+      "label": "Minimum quality of detection (%)",
+      "default": 70,
+      "min": 1,
+      "max": 100,
+      "help": "How sure the scanner is about a finding. 70 is what Greenbone itself shows by default; lower values add more guesses."
+    },
+    {
+      "key": "max_age_days",
+      "type": "number",
+      "label": "Ignore findings older than (days)",
+      "default": 30,
+      "min": 1,
+      "max": 365,
+      "help": "Findings from a scan that is older than this are left out, so a host that was fixed and not scanned again does not stay red for ever."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Only used for a server without a fingerprint. gvmd uses a certificate of its own CA by default, so this is off by default."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 60,
+      "min": 5,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/greenbone"
+}

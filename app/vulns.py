@@ -13,6 +13,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
+from app import kev
 from app.db import add_event, get_setting, set_setting
 
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
@@ -44,9 +45,11 @@ def apply_vulns(conn: sqlite3.Connection, plugin_id: str, data: dict, config: di
     for s in data["servers"]:
         conn.execute("INSERT INTO vuln_servers (plugin_id, server_id, name, version, online, last_scan, warnings, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                      (plugin_id, s["id"], s["name"], s["version"], int(s["online"]), s["last_scan"], json.dumps(s["warnings"]), stamp))
+    listed = kev.known(conn)                            # the CISA list of exploited vulnerabilities, when it has been fetched
     matched = 0
     fresh: dict[int | None, list[dict]] = {}
     for f in data["findings"]:
+        f = {**f, "exploited": bool(f["exploited"]) or any(c in listed for c in f["cve"])}
         device_id = by_mac.get(f["host_mac"]) if f["host_mac"] else None
         if device_id is None and f["host_ip"]:
             device_id = by_ip.get(f["host_ip"])

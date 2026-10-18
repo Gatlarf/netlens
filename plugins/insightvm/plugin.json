@@ -1,0 +1,74 @@
+{
+  "id": "insightvm",
+  "name": "Rapid7 InsightVM",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "vulnerability",
+  "author": "Netlens",
+  "description": "Shows what a Rapid7 InsightVM (Nexpose) security console found on your devices: every vulnerability with its severity, CVE numbers, score, whether exploits exist, the port and the solution. Netlens matches each finding to a device by MAC or address, warns about new critical vulnerabilities and lists the devices at risk. Read-only: it only reads, it never starts a scan.",
+  "timeout": 300,
+  "diagnose": true,
+  "info": {
+    "title": "Make a read-only user for Netlens",
+    "text": "In the InsightVM console (port 3780) open Administration > Users > Manage > Create. Give the user a role that can read assets and vulnerabilities (for example 'Security Manager' with a limited site access, or a custom role with only 'View Site Asset Data'), and a password. Fill in the console address, for example https://192.168.0.60:3780, and the user. The console uses a certificate of its own: fill in its SHA-256 fingerprint and Netlens trusts exactly that certificate. Written from the InsightVM API v3 documentation and not yet tested against a real console: please use Run diagnostic on the plugin's page and send the report if something looks wrong."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "InsightVM consoles",
+      "required": true,
+      "help": "One line per security console.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "https://192.168.0.60:3780", "required": true},
+        {"key": "username", "label": "User", "required": true},
+        {"key": "password", "label": "Password", "type": "password", "required": true},
+        {"key": "fingerprint", "label": "Certificate fingerprint", "placeholder": "B7:5B:65:5B:...", "help": "SHA-256 fingerprint of the console's certificate. When filled in, exactly that certificate is trusted; when empty the certificate is checked the normal way (see 'Verify TLS certificate').", "optional": true}
+      ]
+    },
+    {
+      "key": "min_severity",
+      "type": "select",
+      "label": "Report",
+      "default": "moderate",
+      "options": [
+        {"value": "moderate", "label": "Moderate and up (medium, high, critical)"},
+        {"value": "severe", "label": "Severe and up (high, critical)"},
+        {"value": "critical", "label": "Critical only"}
+      ]
+    },
+    {
+      "key": "max_age_days",
+      "type": "number",
+      "label": "Ignore assets not scanned for (days)",
+      "default": 30,
+      "min": 1,
+      "max": 365
+    },
+    {
+      "key": "detail_lookups",
+      "type": "number",
+      "label": "Looks at the details of this many vulnerabilities",
+      "default": 300,
+      "min": 0,
+      "max": 3000,
+      "help": "The console lists a vulnerability by id; title, severity, CVE numbers, exploits and the solution come from extra requests, once per vulnerability, the most widespread first."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Only used for a console without a fingerprint. The console uses a self-signed certificate by default."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/insightvm"
+}

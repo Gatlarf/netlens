@@ -1,0 +1,75 @@
+{
+  "id": "nessus",
+  "name": "Tenable Nessus",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "vulnerability",
+  "author": "Netlens",
+  "description": "Shows what a Tenable Nessus scanner (Nessus Professional, Expert or Essentials) found on your devices: every finding with its severity, CVE numbers, score, whether it is known to be exploited, the port and the solution. Netlens matches each finding to a device by MAC or address, warns about new critical vulnerabilities and lists the devices at risk. Read-only: it only reads scan results, it never starts a scan.",
+  "timeout": 180,
+  "diagnose": true,
+  "info": {
+    "title": "Make an API key for Netlens",
+    "text": "In Nessus open your user (top right) > My Account > API Keys > Generate. Copy the access key and the secret key (the secret is shown once). The keys act as that user, so use a user that can see the scans you want Netlens to read. Nessus runs on port 8834 with a certificate of its own: fill in its SHA-256 fingerprint (the browser shows it under the certificate details) and Netlens trusts exactly that certificate. Written from the Nessus API documentation and not yet tested against a real Nessus: please use Run diagnostic on the plugin's page and send the report if something looks wrong."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Nessus servers",
+      "required": true,
+      "help": "One line per Nessus scanner.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "https://192.168.0.50:8834", "required": true},
+        {"key": "access_key", "label": "Access key", "required": true},
+        {"key": "secret_key", "label": "Secret key", "type": "password", "required": true},
+        {"key": "fingerprint", "label": "Certificate fingerprint", "placeholder": "B7:5B:65:5B:...", "help": "SHA-256 fingerprint of Nessus' certificate. When filled in, exactly that certificate is trusted; when empty the certificate is checked the normal way (see 'Verify TLS certificate').", "optional": true}
+      ]
+    },
+    {
+      "key": "min_severity",
+      "type": "select",
+      "label": "Report",
+      "default": "1",
+      "options": [
+        {"value": "1", "label": "Everything above info (low and up)"},
+        {"value": "2", "label": "Medium and up"},
+        {"value": "3", "label": "High and up"}
+      ]
+    },
+    {
+      "key": "max_age_days",
+      "type": "number",
+      "label": "Ignore scans older than (days)",
+      "default": 30,
+      "min": 1,
+      "max": 365,
+      "help": "Findings from a scan that ended longer ago are left out, so a host that was fixed and not scanned again does not stay red for ever."
+    },
+    {
+      "key": "detail_lookups",
+      "type": "number",
+      "label": "Looks at the details of this many vulnerabilities",
+      "default": 300,
+      "min": 0,
+      "max": 2000,
+      "help": "The scan lists a vulnerability by name and severity; CVE numbers, the score, 'known to be exploited' and the solution come from one extra request per vulnerability. The most serious are looked up first."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Only used for a server without a fingerprint. Nessus uses a self-signed certificate by default, so this is off by default."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 3,
+      "max": 300
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/nessus"
+}

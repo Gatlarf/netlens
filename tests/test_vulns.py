@@ -113,3 +113,27 @@ def test_the_api_lists_findings_and_is_a_paid_feature(client, monkeypatch):
 
     assert vulns_summary(connect(client.app.state.db_path))["allowed"] is False
     assert TestClient(client.app).get("/api/vulns").status_code == 401
+
+
+# ------------------------------------------------------------------ the CISA list
+def test_the_cisa_list_marks_findings_and_is_only_fetched_when_wanted(conn, monkeypatch):
+    import json as _json
+    from datetime import datetime, timezone
+
+    from app import kev
+
+    catalogue = _json.dumps({"vulnerabilities": [{"cveID": f"CVE-2024-{1000 + i}"} for i in range(150)] + [{"cveID": "CVE-2024-6387"}, {"cveID": "bogus"}]})
+    assert kev.parse(catalogue) >= {"CVE-2024-6387", "CVE-2024-1000"} and "BOGUS" not in kev.parse(catalogue) and kev.parse("not json") == set() and kev.parse("[]") == set()
+    apply(conn, finding(), finding("f2", cve=["CVE-2020-0001"]))
+    assert [f["exploited"] for f in vulns.findings(conn)] == [False, False]
+    assert kev.due(conn) and kev.wanted(conn) is False                                        # the free edition: nothing is fetched
+    monkeypatch.setattr(licence, "allows", lambda c, feature, now=None: True)
+    assert kev.wanted(conn) is True
+    now = datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc)
+    assert kev.refresh(conn, lambda: catalogue, now) == {"cves": 151, "marked": 1}
+    assert {f["id"]: f["exploited"] for f in vulns.findings(conn)} == {"f1": True, "f2": False} and not kev.due(conn, now) and kev.due(conn, now.replace(day=12))
+    with pytest.raises(ValueError):
+        kev.refresh(conn, lambda: '{"vulnerabilities": []}', now)                             # an odd answer keeps the list we have
+    assert len(kev.known(conn)) == 151
+    apply(conn, finding("f3", cve=["CVE-2024-1001"], severity="critical"))                      # a new finding is marked while it is stored
+    assert vulns.findings(conn, severity="critical")[0]["exploited"] is True
