@@ -66,6 +66,9 @@ TYPES: dict[str, dict[str, Any]] = {
         {"key": "url", "label": "URL", "required": True, "help": "Netlens POSTs JSON to this address. Works with n8n, OpenClaw, Home Assistant webhooks, Node-RED and similar."},
         {"key": "mode", "label": "Send", "kind": "select", "default": "batch", "options": [["batch", "One message with all new events"], ["each", "One message per event (for automations)"]],
          "help": "One message per event suits n8n and similar tools: each event starts one run, in the shape {source, event: {...}}. It ignores quiet hours and is not grouped by cause."},
+        {"key": "format", "label": "Format", "kind": "select", "default": "json", "options": [["json", "Netlens JSON"], ["openclaw_wake", "OpenClaw: wake (/hooks/wake)"], ["openclaw_agent", "OpenClaw: agent turn (/hooks/agent)"]],
+         "help": "OpenClaw: use its hook address (for example http://host:18789/hooks/wake) and the hook token below. Wake sends {text, mode: now, agentId}; agent sends {message, name, agentId, deliver}."},
+        {"key": "agent_id", "label": "OpenClaw agent", "default": "main", "help": "The agentId OpenClaw should use (only for the OpenClaw formats)."},
         {"key": "secret", "label": "Bearer token", "secret": True, "help": "Sent as 'Authorization: Bearer ...' when set."},
         {"key": "header", "label": "Extra header", "secret": True, "help": "For a tool that wants its own header, for example 'X-API-Key: abc123'."},
     ]},
@@ -222,6 +225,11 @@ def clean_settings(channel_type: str, values: dict, current: dict | None = None)
     if channel_type == "webhook":
         if out["mode"] not in ("batch", "each"):
             raise ValueError("send must be one message with all events, or one per event")
+        if out["format"] not in ("json", "openclaw_wake", "openclaw_agent"):
+            raise ValueError("choose Netlens JSON or an OpenClaw format")
+        if not re.fullmatch(r"[A-Za-z0-9._-]{1,60}", out["agent_id"] or "main"):
+            raise ValueError("the OpenClaw agent is a short name such as main")
+        out["agent_id"] = out["agent_id"] or "main"
         if out["header"] and not re.fullmatch(r"[A-Za-z0-9-]{1,60}: ?[^\r\n]{1,400}", out["header"]):
             raise ValueError("the extra header looks like 'Name: value'")
     if channel_type == "email":
@@ -468,6 +476,12 @@ def send_channel(channel: dict, title: str, body: str, events: list[dict], *, po
         shaped = [{**{k: e.get(k) for k in ("id", "ts", "kind", "name", "ip", "mac", "detail", "device_id")}, "severity": severity_of(e["kind"]), "label": EVENT_LABELS.get(e["kind"], e["kind"]),
                    "group": e.get("group_name")} for e in events]
         payload = {"source": "netlens", "event": shaped[0]} if s.get("mode") == "each" and len(shaped) == 1 else {"source": "netlens", "title": title, "message": body, "text": f"{title}\n{body}", "events": shaped}
+        fmt = s.get("format") or "json"
+        if fmt != "json":
+            say = f"{title}\n{body}".strip()
+            agent = s.get("agent_id") or "main"
+            payload = ({"text": say[:4000], "mode": "now", "agentId": agent} if fmt == "openclaw_wake"
+                       else {"message": say[:4000], "name": "Netlens", "agentId": agent, "deliver": True})
         status, text = poster(s["url"], json.dumps(payload).encode(), headers, 15.0)
     if not 200 <= status < 300:
         hint = {401: " (check the token)", 403: " (not allowed)", 404: " (check the address or topic)", 429: " (rate limited)"}.get(status, "")

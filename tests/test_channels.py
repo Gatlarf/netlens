@@ -478,3 +478,17 @@ def test_api_saves_filters_and_rejects_bad_ones(client):
     assert client.put(f"/api/notify-channels/{cid}", json={"filters": {"min_severity": "critical"}}).json()["filters"] == {"min_severity": "critical", "devices": [], "groups": []}
     assert client.put(f"/api/notify-channels/{cid}", json={"filters": {"min_severity": "nope"}}).status_code == 422
     assert client.post("/api/notify-channels", json={"type": "ntfy", "settings": {"topic": "t"}}).json()["filters"]["min_severity"] == "info"
+
+
+def test_openclaw_formats():
+    s = clean_settings("webhook", {"url": "http://claw.lan:18789/hooks/wake", "format": "openclaw_wake"})
+    assert s["format"] == "openclaw_wake" and s["agent_id"] == "main"
+    for bad in ({"format": "xml"}, {"agent_id": "bad agent!"}):
+        with pytest.raises(ValueError):
+            clean_settings("webhook", {"url": "http://x.example", **bad})
+    p = Poster()
+    ev = [{"id": 1, "kind": "service_down", "name": "NAS", "detail": "NAS web is down"}]
+    send_channel(channel("webhook", url="http://c/hooks/wake", format="openclaw_wake", agent_id="main", secret="T"), "[Netlens] Service down", "NAS web is down", ev, poster=p)
+    assert json.loads(p.calls[-1][1]) == {"text": "[Netlens] Service down\nNAS web is down", "mode": "now", "agentId": "main"} and p.calls[-1][2]["Authorization"] == "Bearer T"
+    send_channel(channel("webhook", url="http://c/hooks/agent", format="openclaw_agent", agent_id="ops"), "T", "B", ev, poster=p)
+    assert json.loads(p.calls[-1][1]) == {"message": "T\nB", "name": "Netlens", "agentId": "ops", "deliver": True}
