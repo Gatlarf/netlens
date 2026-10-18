@@ -1,6 +1,7 @@
 // The network documentation: who it is for, what it shows, and the buttons to preview and download it (a page without anything external, ready to print to PDF).
 import { get, put } from "../api.js";
 import { h, toast } from "../util.js";
+import { previewHtml } from "../ui.js";
 
 const MAX_LOGO = 150 * 1024;
 
@@ -38,7 +39,7 @@ export async function buildDocumentationCard() {
   const open = (download) => async () => {
     try { await put("/api/documentation", body()); } catch (err) { toast(err.message || "Could not save", "error"); return; }
     if (download) location.href = "/api/documentation/export?download=true";
-    else window.open("/api/documentation/export", "_blank", "noopener");
+    else previewHtml(s.customer || "Network documentation", "/api/documentation/export", "/api/documentation/export?download=true").catch((err) => toast(err.message || "Could not show the preview", "error"));
   };
   return h("div", { class: "card" }, h("h2", {}, "Network documentation"),
     h("p", { class: "hint" }, "One page about this network for a customer or for your own records: devices, subnets, gateway and DNS, monitored services, certificates, backups, security and the open points. It is made from what Netlens knows right now, contains no scripts and no external files, and prints to PDF from the browser."),

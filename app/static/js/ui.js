@@ -82,3 +82,36 @@ export function groupButtons(root) {
     flush();
   }
 }
+
+// A full-screen preview of a generated page (the network documentation) inside the app, with its own Back, Print and Download buttons:
+// an installed app has no browser buttons, so a page opened in a new tab or window cannot be left again. The phone's back gesture and Esc close it too.
+export async function previewHtml(title, url, downloadUrl) {
+  const res = await fetch(url, { credentials: "same-origin" });
+  if (!res.ok) throw new Error(res.status === 403 ? "this needs an administrator" : `could not load the preview (${res.status})`);
+  const html = await res.text();
+  const frame = h("iframe", { class: "preview-frame", title, sandbox: "allow-same-origin allow-modals" });
+  frame.srcdoc = html;
+  let pushed = false, closed = false;
+  const close = (fromHistory = false) => {
+    if (closed) return;
+    closed = true;
+    document.removeEventListener("keydown", onKey);
+    window.removeEventListener("popstate", onPop);
+    overlay.remove();
+    document.body.classList.remove("preview-open");
+    if (pushed && !fromHistory) history.back();
+  };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  const onPop = () => close(true);
+  const overlay = h("div", { class: "preview-overlay", role: "dialog", "aria-label": title },
+    h("div", { class: "preview-bar" }, h("button", { class: "btn", type: "button", onclick: () => close() }, "← Back"), h("strong", { class: "preview-title" }, title),
+      h("span", { class: "preview-actions" }, h("button", { class: "btn", type: "button", onclick: () => frame.contentWindow.print() }, "Print"),
+        downloadUrl ? h("a", { class: "btn", href: downloadUrl, download: "" }, "Download") : null)),
+    frame);
+  document.body.append(overlay);
+  document.body.classList.add("preview-open");
+  try { history.pushState({ preview: true }, "", location.href); pushed = true; } catch (e) { /* the buttons still work */ }
+  document.addEventListener("keydown", onKey);
+  window.addEventListener("popstate", onPop);
+  overlay.querySelector("button").focus();
+}

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.81 — 2026-10-18
+
+### Fixed
+- **Preview of a report in the installed app**: the network documentation preview opened in a new window, and an installed app (PWA) has no browser buttons to leave it again. The preview now opens full screen inside Netlens with its own **Back**, **Print** and **Download** buttons; the phone's back gesture and the Esc key close it too. The same goes for the documentation of a remote site.
+
 ## 0.4.80 — 2026-10-18
 
 ### Fixed

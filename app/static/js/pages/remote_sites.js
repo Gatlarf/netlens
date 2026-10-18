@@ -1,6 +1,6 @@
 import { get, post, patch, put, del } from "../api.js";
 import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin, fmtTime } from "../util.js";
-import { pageHead, emptyState } from "../ui.js";
+import { pageHead, emptyState, previewHtml } from "../ui.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 
 const REFRESH_MS = 30000;
@@ -230,7 +230,8 @@ export async function render(container) {
         if (customer === null || customer.trim() === (p.customer || "")) return;
         try { await patch(`/api/probes/${id}`, { customer }); toast("Saved", "success"); showList(); } catch (err) { toast(err.message || "Could not save", "error"); }
       } }, p.customer ? `Customer: ${p.customer}` : "Set customer"),
-      h("a", { class: "btn", href: `/api/documentation/site/${id}`, target: "_blank", rel: "noopener", title: "A page about this site for the customer (devices, checks, open points)" }, "Documentation"),
+      h("button", { class: "btn", type: "button", title: "A page about this site for the customer (devices, checks, open points)",
+        onclick: () => previewHtml(`${p.customer ? p.customer + " / " : ""}${p.name}`, `/api/documentation/site/${id}`, `/api/documentation/site/${id}?download=true`).catch((err) => toast(err.message || "Could not show the preview", "error")) }, "Documentation"),
       h("button", { class: "btn", type: "button", onclick: async () => {
         try { await patch(`/api/probes/${id}`, { enabled: !p.enabled }); toast(p.enabled ? "Paused: reports are refused" : "Resumed", "success"); showList(); } catch (err) { toast(err.message || "Could not change", "error"); }
       } }, p.enabled ? "Pause" : "Resume"),
