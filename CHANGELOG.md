@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.68 — 2026-10-18
+
+### Fixed
+- **Search** finds the places added or moved lately: n8n, OpenClaw, webhook and "forward events" lead to the alert channels, and IPv6, single sign-on, escalation, log forwarding, Digital engineer, Licence, the setup guide and the Settings page are searchable. Every installed plugin is found by its name and opens its own settings.
+
 ## 0.4.67 — 2026-10-18
 
 ### Added

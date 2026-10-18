@@ -24,6 +24,7 @@ const PAGES = [
   ["What changed", "#/changes", "timeline new devices alerts history last night changes"],
   ["Scans & events", "#/scans", "events log scan history"],
   ["Setup guide", "#/wizard", "wizard getting started tour"],
+  ["Settings", "#/settings", "preferences configuration options admin", true],
 ];
 
 // [title, settings page, extra words, text to scroll to on that page]
@@ -44,14 +45,23 @@ const SETTINGS = [
   ["Network checks", "netchecks", "dhcp servers rogue gateway", ""],
   ["DHCP servers", "netchecks", "rogue dhcp look for", "DHCP servers"],
   ["Ignored devices", "ignored", "hide exclude ignore list", ""],
+  ["IPv6", "ipv6", "neighbours addresses scan ipv6 discovery", ""],
+  ["Single sign-on", "sso", "sso oidc openid login azure entra google keycloak authentik", ""],
+  ["Escalation", "escalation", "on call oncall escalate unacknowledged alerts rota", ""],
+  ["Log forwarding", "siem", "syslog siem graylog splunk wazuh elastic rsyslog audit events forward logs", ""],
+  ["Digital engineer", "engineer", "llm language model ollama openai openrouter ai insights model anonymise", ""],
+  ["Licence", "licence", "license key edition paid activate community trial", ""],
+  ["Setup guide", "wizard", "wizard getting started tour first run", ""],
   ["Report to a central Netlens", "central", "probe remote site central accept configuration push", ""],
   ["Users & tokens", "users", "accounts passwords roles viewer administrator api token", ""],
   ["Add a user", "users", "new account password role", "Add a user"],
   ["Web terminal", "terminal", "ssh telnet console enable disable", ""],
   ["Alert channels", "channels", "notifications email smtp telegram ntfy pushover webhook discord slack gotify", ""],
+  ["Forward events to n8n, OpenClaw or another tool", "channels", "n8n openclaw webhook automation workflow forward send events node-red zapier make home assistant json one message per event bearer token api key header", "Add channel"],
+  ["Only send some alerts (severity, devices, groups)", "channels", "filter filters severity critical warning devices groups narrow channel only when", "Add channel"],
   ["Quiet hours", "channels", "night silence do not disturb notifications schedule", "Quiet hours"],
   ["Group alerts by cause", "channels", "root cause noise bundle", "Group alerts by cause"],
-  ["Tell me when", "channels", "events which alerts notifications kinds", "Tell me when"],
+  ["Tell me when", "channels", "events which alerts notifications kinds", "Add channel"],
   ["Maintenance windows", "maintenance", "planned downtime reboot silence hold back schedule recurring", ""],
   ["Backup and restore", "backup", "export import restore copy database", ""],
   ["Scheduled backups", "backup", "automatic backup keep retention", "Scheduled backups"],
@@ -67,6 +77,7 @@ const SETTINGS = [
   ["Plugin store", "plugin-browse", "plugins browse index catalogue download install new", ""],
 ];
 
+let plugins = null;
 let devices = null;
 let devicesAt = 0;
 
@@ -84,6 +95,12 @@ async function loadDevices() {
   return devices;
 }
 
+async function loadPlugins() {
+  if (plugins) return plugins;
+  try { plugins = ((await get("/api/plugins")).plugins || []).map((p) => ({ id: p.id, name: p.name || p.id })); } catch (e) { plugins = []; }
+  return plugins;
+}
+
 function score(query, text, extra = "") {
   const t = text.toLowerCase();
   const words = query.split(/\s+/).filter(Boolean);
@@ -98,7 +115,7 @@ function score(query, text, extra = "") {
   return total;
 }
 
-function search(query, devs) {
+function search(query, devs, plugs = []) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const out = [];
@@ -112,6 +129,12 @@ function search(query, devs) {
     const s = score(q, title, words);
     if (s) out.push({ group: "Settings", title, hint: `Settings · ${sectionName(section)}`, href: `#/settings/${section}`, find, s });
   }
+  if (isAdmin()) {
+    for (const p of plugs) {
+      const s = score(q, p.name, `${p.id} plugin integration`);
+      if (s) out.push({ group: "Settings", title: p.name, hint: "Settings · Plugin", href: `#/settings/plugin-${p.id}`, s });
+    }
+  }
   for (const d of devs) {
     const s = score(q, `${d.name} ${d.ip}`, `${d.mac} ${d.vendor} ${d.type}`);
     if (s) out.push({ group: "Devices", title: shortName(d.name) || d.ip, hint: [d.ip, d.vendor].filter(Boolean).join(" · "), href: `#/device/${d.id}`, s });
@@ -123,7 +146,7 @@ function search(query, devs) {
 
 function sectionName(key) {
   const names = { ranges: "Scan ranges", nmap: "Scan performance", schedule: "Scan schedule", map: "Map", groups: "Groups", netchecks: "Network checks", dns: "DNS registration",
-    ignored: "Ignored devices", central: "Central Netlens", users: "Users & tokens", terminal: "Web terminal", channels: "Alert channels", maintenance: "Maintenance windows",
+    ignored: "Ignored devices", ipv6: "IPv6", sso: "Single sign-on", escalation: "Escalation", siem: "Log forwarding", engineer: "Digital engineer", licence: "Licence", wizard: "Setup guide", central: "Central Netlens", users: "Users & tokens", terminal: "Web terminal", channels: "Alert channels & quiet hours", maintenance: "Maintenance windows",
     backup: "Backup & restore", export: "Export", shares: "Share links", audit: "Audit log", about: "About", session: "Account", plugins: "Plugin manager", "plugin-browse": "Plugin store" };
   return names[key] || key;
 }
@@ -157,6 +180,7 @@ export async function openSearch(initial = "") {
   let results = [];
   let index = 0;
   let devs = [];
+  let plugs = [];
 
   const go = (r) => {
     if (!r) return;
@@ -167,7 +191,7 @@ export async function openSearch(initial = "") {
   };
   const draw = () => {
     clear(list);
-    if (!input.value.trim()) { list.append(h("p", { class: "hint search-empty" }, "Type a name: “snooze”, “backup”, “smtp”, “winrm”, a device name or an address.")); return; }
+    if (!input.value.trim()) { list.append(h("p", { class: "hint search-empty" }, "Type a name: “n8n”, “backup”, “smtp”, “winrm”, a device name or an address.")); return; }
     if (!results.length) { list.append(h("p", { class: "hint search-empty" }, "Nothing found.")); return; }
     let group = "";
     results.forEach((r, i) => {
@@ -179,7 +203,7 @@ export async function openSearch(initial = "") {
     const active = list.querySelector(".search-item.active");
     if (active) active.scrollIntoView({ block: "nearest" });
   };
-  const update = () => { results = search(input.value, devs); index = 0; draw(); };
+  const update = () => { results = search(input.value, devs, plugs); index = 0; draw(); };
   input.addEventListener("input", update);
   input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown") { e.preventDefault(); index = Math.min(results.length - 1, index + 1); draw(); }
@@ -192,7 +216,7 @@ export async function openSearch(initial = "") {
   input.value = initial;
   input.focus();
   draw();
-  devs = await loadDevices();
+  [devs, plugs] = await Promise.all([loadDevices(), loadPlugins()]);
   if (dialog) update();
 }
 
