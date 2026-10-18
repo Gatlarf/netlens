@@ -71,7 +71,9 @@ def test_each_service_gets_the_right_request():
     events = [{"id": 5, "ts": "t", "kind": "device_new", "name": "N", "ip": "10.0.0.1", "mac": "m", "detail": "d", "device_id": 3, "secretish": "x"}]
     send_channel(channel("webhook", url="https://hook.example/x", secret="S"), "T", "B", events, poster=p)
     body = json.loads(p.calls[-1][1])
-    assert body["source"] == "netlens" and body["events"][0] == {"id": 5, "ts": "t", "kind": "device_new", "name": "N", "ip": "10.0.0.1", "mac": "m", "detail": "d", "device_id": 3}
+    assert body["source"] == "netlens" and body["events"][0] == {"id": 5, "ts": "t", "kind": "device_new", "name": "N", "ip": "10.0.0.1", "mac": "m", "detail": "d", "device_id": 3,
+                                                                  "severity": "info", "label": ch.EVENT_LABELS["device_new"], "group": None}
+    assert body["text"] == "T\nB"
     assert p.calls[-1][2]["Authorization"] == "Bearer S"
 
 
@@ -399,3 +401,80 @@ def test_per_device_offline_switch_via_api(client):
     assert client.get(f"/api/devices/{d}").json()["notify_offline"] is True
     assert client.patch(f"/api/devices/{d}", json={"notify_offline": False}).json()["notify_offline"] is False
     assert next(x for x in client.get("/api/devices").json() if x["id"] == d)["notify_offline"] is False
+
+
+# ------------------------------------------------------------------ filters and one message per event
+def test_filters_are_validated_and_applied():
+    assert ch.clean_filters(None) == {"min_severity": "info", "devices": [], "groups": []}
+    assert ch.clean_filters({"min_severity": "warning", "devices": [3, 1, 3], "groups": [2]}) == {"min_severity": "warning", "devices": [1, 3], "groups": [2]}
+    for bad in ({"min_severity": "loud"}, {"devices": "1"}, {"groups": ["a"]}, {"devices": [True]}):
+        with pytest.raises(ValueError):
+            ch.clean_filters(bad)
+    down, new = {"kind": "service_down", "device_id": 1, "group_id": 7}, {"kind": "device_new", "device_id": 2, "group_id": None}
+    assert ch.severity_of("service_down") == "critical" and ch.severity_of("device_offline") == "warning" and ch.severity_of("device_new") == "info"
+    assert ch.passes_filters(down, None) and ch.passes_filters(new, {"min_severity": "info"})
+    assert ch.passes_filters(down, {"min_severity": "critical"}) and not ch.passes_filters(new, {"min_severity": "warning"})
+    assert ch.passes_filters(down, {"devices": [1]}) and not ch.passes_filters(new, {"devices": [1]})
+    assert ch.passes_filters(down, {"groups": [7]}) and not ch.passes_filters(new, {"groups": [7]})
+    assert ch.passes_filters(new, {"devices": [1], "groups": [7]}) is False and ch.passes_filters(down, {"devices": [9], "groups": [7]})   # a device or a group
+
+
+def test_webhook_settings_mode_and_header():
+    s = clean_settings("webhook", {"url": "https://n8n.example/hook", "mode": "each", "header": "X-API-Key: abc"})
+    assert s["mode"] == "each" and s["header"] == "X-API-Key: abc"
+    assert clean_settings("webhook", {"url": "https://x.example"})["mode"] == "batch"
+    for bad in ({"mode": "all"}, {"header": "no colon here"}, {"header": "X: a\nInjected: b"}):
+        with pytest.raises(ValueError):
+            clean_settings("webhook", {"url": "https://x.example", **bad})
+    p = Poster()
+    send_channel(channel("webhook", url="https://x.example", header="X-API-Key: abc", mode="each"), "T", "B", [{"id": 1, "kind": "service_down", "name": "N", "detail": "d"}], poster=p)
+    sent = json.loads(p.calls[-1][1])
+    assert p.calls[-1][2]["X-API-Key"] == "abc" and sent["event"]["severity"] == "critical" and "events" not in sent
+
+
+async def test_a_channel_filters_by_severity_and_device(db):
+    path, conn = db
+    add_channels(conn, chan("crit", events=["service_down", "device_offline"], filters={"min_severity": "critical"}),
+                 chan("dev2", events=["service_down", "device_offline"], filters={"devices": [2]}))
+    add_event(conn, "device_offline", "10.0.0.1", device_id=1)
+    add_event(conn, "service_down", "web", device_id=1)
+    conn.commit()
+    p = Poster()
+    await process_channels(str(path), poster=p)
+    by_url = {c[0]: json.loads(c[1])["content"] for c in p.calls}
+    assert list(by_url) == ["https://crit.example/hook"] and "Offline" not in by_url["https://crit.example/hook"]   # dev2 heard nothing: both events are about device 1
+
+
+async def test_each_mode_sends_one_message_per_event_and_resumes_after_a_failure(db):
+    path, conn = db
+    hook = {"url": "https://n8n.example/hook", "mode": "each"}
+    add_channels(conn, {"id": "n", "type": "webhook", "name": "n8n", "enabled": True, "events": ["device_new", "service_down"], "settings": hook, "last_event_id": 0})
+    for ip in ("10.0.0.1", "10.0.0.2", "10.0.0.3"):
+        add_event(conn, "device_new", ip, device_id=1)
+    conn.commit()
+
+    class Fails(Poster):
+        failed = False
+
+        def __call__(self, url, data, headers, timeout):
+            if len(self.calls) == 1 and not self.failed:
+                self.failed = True
+                raise ChannelError("down")
+            return super().__call__(url, data, headers, timeout)
+
+    p = Fails()
+    r = await process_channels(str(path), poster=p)
+    assert r == {"sent": 1, "failed": 1} and ch.load_channels(connect(path))[0]["last_event_id"] == 1   # the second event is where it resumes
+    r = await process_channels(str(path), poster=p)
+    assert r == {"sent": 2, "failed": 0} and ch.load_channels(connect(path))[0]["last_event_id"] == 3
+    assert [json.loads(c[1])["event"]["detail"] for c in p.calls] == ["10.0.0.1", "10.0.0.2", "10.0.0.3"]
+
+
+def test_api_saves_filters_and_rejects_bad_ones(client):
+    made = client.post("/api/notify-channels", json={"type": "webhook", "settings": {"url": "https://n8n.example/hook", "mode": "each"},
+                                                     "filters": {"min_severity": "warning", "devices": [4], "groups": [1]}})
+    assert made.status_code == 201 and made.json()["filters"] == {"min_severity": "warning", "devices": [4], "groups": [1]}
+    cid = made.json()["id"]
+    assert client.put(f"/api/notify-channels/{cid}", json={"filters": {"min_severity": "critical"}}).json()["filters"] == {"min_severity": "critical", "devices": [], "groups": []}
+    assert client.put(f"/api/notify-channels/{cid}", json={"filters": {"min_severity": "nope"}}).status_code == 422
+    assert client.post("/api/notify-channels", json={"type": "ntfy", "settings": {"topic": "t"}}).json()["filters"]["min_severity"] == "info"

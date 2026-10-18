@@ -63,8 +63,11 @@ TYPES: dict[str, dict[str, Any]] = {
         {"key": "user_key", "label": "User key", "secret": True, "required": True},
     ]},
     "webhook": {"label": "Webhook (JSON)", "fields": [
-        {"key": "url", "label": "URL", "required": True, "help": "Netlens POSTs {title, message, events[]} as JSON. Works with Home Assistant webhooks, n8n, Node-RED and similar."},
+        {"key": "url", "label": "URL", "required": True, "help": "Netlens POSTs JSON to this address. Works with n8n, OpenClaw, Home Assistant webhooks, Node-RED and similar."},
+        {"key": "mode", "label": "Send", "kind": "select", "default": "batch", "options": [["batch", "One message with all new events"], ["each", "One message per event (for automations)"]],
+         "help": "One message per event suits n8n and similar tools: each event starts one run, in the shape {source, event: {...}}. It ignores quiet hours and is not grouped by cause."},
         {"key": "secret", "label": "Bearer token", "secret": True, "help": "Sent as 'Authorization: Bearer ...' when set."},
+        {"key": "header", "label": "Extra header", "secret": True, "help": "For a tool that wants its own header, for example 'X-API-Key: abc123'."},
     ]},
 }
 
@@ -184,7 +187,7 @@ def public_channel(ch: dict) -> dict:
     spec = TYPES[ch["type"]]
     secret_keys = {f["key"] for f in spec["fields"] if f.get("secret")}
     return {
-        "id": ch["id"], "type": ch["type"], "name": ch["name"], "enabled": ch["enabled"], "events": ch["events"],
+        "id": ch["id"], "type": ch["type"], "name": ch["name"], "enabled": ch["enabled"], "events": ch["events"], "filters": clean_filters(ch.get("filters")),
         "settings": {k: v for k, v in ch["settings"].items() if k not in secret_keys},
         "secrets_set": {k: bool(ch["settings"].get(k)) for k in secret_keys},
         "status": ch.get("status"),
@@ -216,6 +219,11 @@ def clean_settings(channel_type: str, values: dict, current: dict | None = None)
             parsed = urllib.parse.urlparse(out[key])
             if parsed.scheme not in ("http", "https") or not parsed.hostname:
                 raise ValueError("the address must start with http:// or https://")
+    if channel_type == "webhook":
+        if out["mode"] not in ("batch", "each"):
+            raise ValueError("send must be one message with all events, or one per event")
+        if out["header"] and not re.fullmatch(r"[A-Za-z0-9-]{1,60}: ?[^\r\n]{1,400}", out["header"]):
+            raise ValueError("the extra header looks like 'Name: value'")
     if channel_type == "email":
         if out["security"] not in ALLOWED_SECURITY:
             raise ValueError("security must be STARTTLS, SSL/TLS or none")
@@ -244,6 +252,42 @@ def clean_events(events: Any) -> list[str]:
     if unknown:
         raise ValueError(f"unknown event: {unknown[0]}")
     return [e for e in EVENT_LABELS if e in events]
+
+
+SEVERITIES = ("info", "warning", "critical")
+
+
+def severity_of(kind: str) -> str:
+    """How serious an event kind is: critical, warning or info (the same ranking as the log forwarding)."""
+    from app import siem
+
+    n = siem.severity(kind)
+    return "critical" if n <= 2 else "warning" if n <= 4 else "info"
+
+
+def clean_filters(data: Any) -> dict:
+    """What a channel narrows its events down to: a minimum severity, and optionally only some devices and groups (empty = all)."""
+    data = data if isinstance(data, dict) else {}
+    level = data.get("min_severity") or "info"
+    if level not in SEVERITIES:
+        raise ValueError("the minimum severity is info, warning or critical")
+    out: dict = {"min_severity": level}
+    for key in ("devices", "groups"):
+        ids = data.get(key) or []
+        if not isinstance(ids, list) or len(ids) > 500 or not all(isinstance(i, int) and not isinstance(i, bool) for i in ids):
+            raise ValueError(f"{key} must be a list of ids")
+        out[key] = sorted(set(ids))
+    return out
+
+
+def passes_filters(e: dict, filters: dict | None) -> bool:
+    f = filters or {}
+    if f.get("min_severity", "info") != "info" and SEVERITIES.index(severity_of(e["kind"])) < SEVERITIES.index(f["min_severity"]):
+        return False
+    devices, groups = f.get("devices") or [], f.get("groups") or []
+    if devices or groups:
+        return e.get("device_id") in devices or (e.get("group_id") is not None and e.get("group_id") in groups)
+    return True
 
 
 def new_channel_id() -> str:
@@ -418,7 +462,12 @@ def send_channel(channel: dict, title: str, body: str, events: list[dict], *, po
         headers = dict(json_headers)
         if s.get("secret"):
             headers["Authorization"] = f"Bearer {s['secret']}"
-        payload = {"source": "netlens", "title": title, "message": body, "events": [{k: e.get(k) for k in ("id", "ts", "kind", "name", "ip", "mac", "detail", "device_id")} for e in events]}
+        if s.get("header"):
+            name, _, value = s["header"].partition(":")
+            headers[name.strip()] = value.strip()
+        shaped = [{**{k: e.get(k) for k in ("id", "ts", "kind", "name", "ip", "mac", "detail", "device_id")}, "severity": severity_of(e["kind"]), "label": EVENT_LABELS.get(e["kind"], e["kind"]),
+                   "group": e.get("group_name")} for e in events]
+        payload = {"source": "netlens", "event": shaped[0]} if s.get("mode") == "each" and len(shaped) == 1 else {"source": "netlens", "title": title, "message": body, "text": f"{title}\n{body}", "events": shaped}
         status, text = poster(s["url"], json.dumps(payload).encode(), headers, 15.0)
     if not 200 <= status < 300:
         hint = {401: " (check the token)", 403: " (not allowed)", 404: " (check the address or topic)", 429: " (rate limited)"}.get(status, "")
@@ -430,8 +479,8 @@ def _pending_events(conn: sqlite3.Connection, after_id: int) -> list[dict]:
     rows = conn.execute(
         """
         SELECT e.id, e.ts, e.kind, e.device_id, e.detail, e.maintenance,
-               COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.mac, d.vendor, d.trusted, d.notify_offline
-        FROM events e LEFT JOIN devices d ON d.id = e.device_id
+               COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.mac, d.vendor, d.trusted, d.notify_offline, d.group_id, g.name AS group_name
+        FROM events e LEFT JOIN devices d ON d.id = e.device_id LEFT JOIN device_groups g ON g.id = d.group_id
         WHERE e.id > ? ORDER BY e.id LIMIT 500
         """,
         (after_id,),
@@ -469,9 +518,27 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
                 if not pending:
                     continue
                 top = pending[-1]["id"]
-                wanted = [e for e in pending if e["kind"] in ch["events"] and not e["maintenance"] and not (e["kind"] == "device_offline" and e["device_id"] is not None and e["notify_offline"] == 0)]
+                wanted = [e for e in pending if e["kind"] in ch["events"] and not e["maintenance"] and not (e["kind"] == "device_offline" and e["device_id"] is not None and e["notify_offline"] == 0)
+                          and passes_filters(e, ch.get("filters"))]
                 if not wanted:
                     ch["last_event_id"] = top
+                    changed = True
+                    continue
+                if ch["type"] == "webhook" and ch["settings"].get("mode") == "each":
+                    # one message per event, for automations: no quiet hours, no grouping, and a failure resumes at the event that failed
+                    for e in wanted[:MAX_EVENTS_PER_MESSAGE]:
+                        try:
+                            await asyncio.to_thread(send_channel, ch, "[Netlens] " + EVENT_LABELS.get(e["kind"], e["kind"]), e.get("detail") or e["name"], [e], poster=poster, mailer=mailer)
+                        except ChannelError as exc:
+                            ch["status"] = {"ts": utcnow(), "ok": False, "error": str(exc), "pending": len(wanted)}
+                            result["failed"] += 1
+                            break
+                        ch["last_event_id"] = e["id"]
+                        ch["status"] = {"ts": utcnow(), "ok": True, "sent": 1, "title": EVENT_LABELS.get(e["kind"], e["kind"])}
+                        result["sent"] += 1
+                    else:
+                        if len(wanted) <= MAX_EVENTS_PER_MESSAGE:
+                            ch["last_event_id"] = top
                     changed = True
                     continue
                 if quiet_now and not (quiet["bypass_critical"] and any(e["kind"] in CRITICAL for e in wanted)):

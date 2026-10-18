@@ -60,3 +60,6 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 .pop-menu > summary { padding: 7px 12px; }
 .pop-menu-list { right: auto; left: 0; min-width: 220px; gap: 8px; padding: 10px; }
 .pop-menu-list select, .pop-menu-list .btn { width: 100%; }
+
+/* the "Only when" part of a notification channel */
+.filter-devices { max-height: 11rem; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 8px; margin-top: 6px; }

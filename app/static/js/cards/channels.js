@@ -16,7 +16,33 @@ function eventBoxes(overview, selected) {
   return box;
 }
 
-function channelForm(overview, channel, onDone, defaultType) {
+// "Only when": a minimum severity, and optionally only some groups and devices (none ticked = all of them)
+function filterBox(filters, groups, devices) {
+  const f = filters || { min_severity: "info", devices: [], groups: [] };
+  const level = h("select", { name: "min_severity" }, [["info", "Everything selected above"], ["warning", "Warnings and serious problems"], ["critical", "Serious problems only"]].map(([v, label]) => h("option", { value: v }, label)));
+  level.value = f.min_severity;
+  const groupBoxes = groups.map((g) => h("label", { class: "check-row" }, h("input", { type: "checkbox", "data-group": g.id, checked: f.groups.includes(g.id) }), " ", g.name));
+  const picked = new Set(f.devices);
+  const search = h("input", { type: "search", placeholder: "Find a device", autocomplete: "off" });
+  const list = h("div", { class: "filter-devices" });
+  const draw = () => {
+    clear(list);
+    const q = search.value.trim().toLowerCase();
+    for (const d of devices.filter((x) => picked.has(x.id) || !q || x.name.toLowerCase().includes(q) || (x.ip || "").includes(q)).slice(0, 60)) {
+      list.appendChild(h("label", { class: "check-row" }, h("input", { type: "checkbox", checked: picked.has(d.id), onchange: (e) => { if (e.target.checked) picked.add(d.id); else picked.delete(d.id); } }), " ", d.name, h("span", { class: "hint" }, ` ${d.ip || ""}`)));
+    }
+  };
+  search.addEventListener("input", draw);
+  draw();
+  const box = h("div", { class: "filter-box" },
+    h("div", { class: "field" }, h("label", {}, "How serious"), level),
+    groups.length ? h("div", { class: "field" }, h("label", {}, "Only these groups"), h("div", { class: "event-boxes" }, groupBoxes)) : null,
+    devices.length ? h("div", { class: "field" }, h("label", {}, "Only these devices"), search, list, h("p", { class: "hint" }, "Leave all unticked to hear about every device. With groups and devices both ticked, an event counts when it is about one of them.")) : null);
+  box.read = () => ({ min_severity: level.value, groups: groupBoxes.map((l) => l.firstChild).filter((i) => i.checked).map((i) => Number(i.dataset.group)), devices: [...picked] });
+  return box;
+}
+
+function channelForm(overview, channel, onDone, defaultType, extra = { groups: [], devices: [] }) {
   const form = h("form", { class: "edit-form" });
   const typeSel = h("select", { name: "type" });
   for (const [key, spec] of Object.entries(overview.types)) typeSel.appendChild(h("option", { value: key }, spec.label));
@@ -50,6 +76,9 @@ function channelForm(overview, channel, onDone, defaultType) {
   form.appendChild(h("h3", {}, "Tell me when"));
   const events = eventBoxes(overview, channel ? channel.events : overview.default_events);
   form.appendChild(events);
+  form.appendChild(h("h3", {}, "Only when"));
+  const filters = filterBox(channel && channel.filters, extra.groups, extra.devices);
+  form.appendChild(filters);
   const error = h("p", { class: "error" }, "");
   const save = h("button", { type: "submit", class: "btn" }, channel ? "Save" : "Add channel");
   const cancel = h("button", { type: "button", class: "btn" }, "Cancel");
@@ -62,7 +91,7 @@ function channelForm(overview, channel, onDone, defaultType) {
     const settings = {};
     for (const f of overview.types[typeSel.value].fields) settings[f.key] = form.querySelector(`[name="setting-${f.key}"]`).value;
     const body = {
-      name: nameInput.value, settings,
+      name: nameInput.value, settings, filters: filters.read(),
       events: [...events.querySelectorAll("input[data-event]")].filter((i) => i.checked).map((i) => i.dataset.event),
     };
     save.disabled = true;
@@ -115,6 +144,11 @@ function quietCard(overview, reload) {
   return card;
 }
 
+async function lookups() {
+  const [g, d] = await Promise.all([get("/api/groups").catch(() => ({ groups: [] })), get("/api/devices").catch(() => [])]);
+  return { groups: g.groups || [], devices: d.map((x) => ({ id: x.id, name: x.custom_name || x.hostname || x.primary_ip || `device ${x.id}`, ip: x.primary_ip })).sort((a, b) => a.name.localeCompare(b.name)) };
+}
+
 export async function buildChannelsCard() {
   const wrap = h("div", {});
   async function load() {
@@ -122,12 +156,13 @@ export async function buildChannelsCard() {
     clear(wrap);
     const card = h("div", { class: "card" }, h("h2", {}, "Notification channels"));
     card.appendChild(h("p", { class: "hint" },
-      "Send alerts by e-mail, to your phone or to a chat: e-mail (SMTP), ntfy, Telegram, Discord, Pushover or any webhook (for example Home Assistant). Each channel picks the events it wants."));
+      "Send alerts by e-mail, to your phone or to a chat: e-mail (SMTP), ntfy, Telegram, Discord, Pushover or any webhook (n8n, OpenClaw, Home Assistant). Each channel picks the events it wants, how serious they are and which devices or groups they are about."));
     const slot = h("div", {});
     const add = h("button", { class: "btn", type: "button" }, "Add channel");
-    add.addEventListener("click", () => {
+    add.addEventListener("click", async () => {
+      const extra = await lookups();
       clear(slot);
-      slot.appendChild(channelForm(overview, null, (changed) => { if (changed) load(); else clear(slot); }));
+      slot.appendChild(channelForm(overview, null, (changed) => { if (changed) load(); else clear(slot); }, undefined, extra));
     });
     if (!overview.channels.length) card.appendChild(h("p", {}, "No channels yet."));
     for (const c of overview.channels) {
@@ -153,9 +188,10 @@ export async function buildChannelsCard() {
         test.disabled = false;
       });
       const edit = h("button", { class: "btn", type: "button" }, "Edit");
-      edit.addEventListener("click", () => {
+      edit.addEventListener("click", async () => {
+        const extra = await lookups();
         clear(slot);
-        slot.appendChild(channelForm(overview, c, (changed) => { if (changed) load(); else clear(slot); }));
+        slot.appendChild(channelForm(overview, c, (changed) => { if (changed) load(); else clear(slot); }, undefined, extra));
       });
       const remove = h("button", { class: "btn danger", type: "button" }, "Delete");
       remove.addEventListener("click", async () => {

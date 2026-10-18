@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.66 — 2026-10-18
+
+### Added
+- ★ **Forward events to n8n, OpenClaw and other automation tools**: a webhook channel can now send **one message per event** (`{source, event: {kind, severity, label, name, ip, detail, group, ...}}`), which starts one run per event, and every webhook message carries a `severity`, a readable `label` and a `text`. Besides a bearer token it accepts an **extra header** (for example `X-API-Key: ...`). A failed delivery is retried from the event that failed, so nothing is lost or repeated.
+- **Only when**: every notification channel can be narrowed to a **minimum severity** (everything, warnings and up, serious only) and to **chosen groups and devices**, on top of the events it asked for.
+
 ## 0.4.65 — 2026-10-18
 
 ### Changed

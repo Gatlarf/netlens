@@ -26,6 +26,7 @@ class ChannelBody(BaseModel):
     name: str | None = None
     enabled: bool | None = None
     events: list[str] | None = None
+    filters: dict | None = None
     settings: dict[str, str | int | float | bool | None] | None = None
 
 
@@ -58,9 +59,10 @@ def create_channel(request: Request, body: ChannelBody) -> dict:
         try:
             settings = ch.clean_settings(body.type, body.settings or {})
             events = ch.clean_events(body.events if body.events is not None else ch.DEFAULT_EVENTS)
+            filters = ch.clean_filters(body.filters)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
-        channel = {"id": ch.new_channel_id(), "type": body.type, "name": name, "enabled": body.enabled is not False, "events": events,
+        channel = {"id": ch.new_channel_id(), "type": body.type, "name": name, "enabled": body.enabled is not False, "events": events, "filters": filters,
                    "settings": settings, "last_event_id": ch.current_max_event_id(conn)}  # only report what happens from now on
         channels.append(channel)
         ch.save_channels(conn, channels)
@@ -80,6 +82,8 @@ def update_channel(request: Request, channel_id: str, body: ChannelBody) -> dict
                 channel["settings"] = ch.clean_settings(channel["type"], body.settings, channel["settings"])
             if body.events is not None:
                 channel["events"] = ch.clean_events(body.events)
+            if body.filters is not None:
+                channel["filters"] = ch.clean_filters(body.filters)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         if body.name is not None and body.name.strip():
