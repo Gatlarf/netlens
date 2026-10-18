@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.75 — 2026-10-18
+
+### Added
+- ★ **Network documentation** (Analysis → Reports → Network documentation): one page about the network, ready to hand to a customer or to keep for yourself. It lists the devices (address, MAC, vendor, type, system, group, notes), the subnets, the monitored services, the certificates, the backups, the vulnerabilities and the open points of the network health checks, with your own logo, colour, company, contact and footer. Preview it, or download it as one file without scripts or external files; it prints to PDF from the browser. Made from what Netlens knows at that moment, and left out for devices marked *Leave out of reports*.
+
 ## 0.4.74 — 2026-10-18
 
 ### Added

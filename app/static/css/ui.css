@@ -83,3 +83,6 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 .vuln-detail > summary { cursor: pointer; } .vuln-body { padding: 6px 0 2px 14px; } .vuln-body p { margin: 4px 0; }
 .vuln-servers { margin: 0 0 12px; }
 .vuln-table td { vertical-align: top; }
+
+/* network documentation */
+.doc-logo { max-height: 56px; max-width: 200px; display: block; margin-bottom: 8px; }

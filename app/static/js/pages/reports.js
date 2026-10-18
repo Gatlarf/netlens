@@ -1,6 +1,7 @@
 import { get, put, post } from "../api.js";
 import { h, clear, toast, isAdmin } from "../util.js";
 import { pageHead, tabbed } from "../ui.js";
+import { buildDocumentationCard } from "../cards/documentation.js";
 
 // Reports: the weekly summary (text, as it is sent) and the monthly availability of devices and services.
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -111,9 +112,11 @@ export async function render(container) {
   const filter = loadFilter();
   const weeklySlot = h("div", {});
   const monthSlot = h("div", {});
+  const docsSlot = h("div", {});
   container.appendChild(h("div", { class: "rep-page" },
-    pageHead("Reports", "The monthly availability figures and the weekly summary, ready to send or print."),
-    tabbed("netlens.reports.tab", [["month", "Monthly availability", monthSlot], ["week", "Weekly report", weeklySlot]])));
+    pageHead("Reports", "The monthly availability figures, the weekly summary and the network documentation, ready to send or print."),
+    tabbed("netlens.reports.tab", [["month", "Monthly availability", monthSlot], ["week", "Weekly report", weeklySlot], ...(isAdmin() ? [["docs", "Network documentation", docsSlot]] : [])])));
+  if (isAdmin()) buildDocumentationCard().then((c) => { if (!disposed) docsSlot.appendChild(c); }).catch((err) => docsSlot.appendChild(h("p", { class: "error" }, err.message || "Could not load")));
 
   async function drawWeekly() {
     let w;
