@@ -26,7 +26,7 @@ KIND_CATEGORY = {
     "metric_warning": "health", "metric_critical": "health", "metric_ok": "health", "capacity_warning": "health", "capacity_critical": "health", "anomaly": "health",
     "cert_expiring": "health", "backup_failed": "health",
     "gateway_changed": "network", "dns_failed": "network", "dhcp_rogue": "network",
-    "port_unexpected": "security", "login_failed": "security",
+    "port_unexpected": "security", "login_failed": "security", "vuln_critical": "security",
 }
 # routine noise a person asking "what changed" does not want between the real changes
 QUIET = {"wake_sent"}

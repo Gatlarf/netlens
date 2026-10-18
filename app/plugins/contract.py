@@ -11,7 +11,7 @@ import re
 from typing import Any
 
 API_VERSION = 1
-KINDS = ("hypervisor", "topology", "dns", "proxy", "backup", "inventory")
+KINDS = ("hypervisor", "topology", "dns", "proxy", "backup", "inventory", "vulnerability")
 DNS_CAPABILITIES = ("marker", "delete")   # what a DNS plugin can do besides adding and updating records
 DNS_TYPES = ("A", "AAAA", "PTR", "CNAME")
 MAX_DNS_RECORDS = 50000
@@ -458,6 +458,8 @@ def validate_output(kind: str, data: Any) -> dict:
         return _backup(data)
     if kind == "inventory":
         return _inventory(data)
+    if kind == "vulnerability":
+        return _vulnerability(data)
     raise ContractError(f"unknown plugin kind {kind!r}")
 
 
@@ -790,6 +792,64 @@ def _backup(data: Any) -> dict:
                          "state": _choice(raw.get("state"), f"{path}.state", ("warning", "failed"), "failed"), "at": _stamp(raw.get("at"), f"{path}.at"),
                          "text": _text(raw.get("text"), f"{path}.text", max_len=300), "target_id": _id(target_id, f"{path}.target_id") if target_id not in (None, "") else None})
     return {"servers": servers, "stores": stores, "targets": targets, "problems": problems}
+
+
+SEVERITIES = ("critical", "high", "medium", "low", "info")
+CVE_RE = re.compile(r"^CVE-\d{4}-\d{4,9}$", re.IGNORECASE)
+MAX_FINDINGS = 20000
+
+
+def _vulnerability(data: Any) -> dict:
+    """A vulnerability plugin's snapshot of a scanner (Greenbone, Tenable, Rapid7 ...): the scanners, and the findings: what is wrong on which host.
+
+    A finding names its host by address and/or MAC address (Netlens matches it to a device), a title, a severity (critical, high, medium, low, info),
+    optionally CVE numbers, a score (0-10), the port, whether the vulnerability is known to be exploited, and a solution. Only open findings should be sent."""
+    data = _dict(data, "output")
+    servers, server_ids = [], set()
+    for i, raw in enumerate(_list(data.get("servers"), "servers")):
+        path = f"servers[{i}]"
+        raw = _dict(raw, path)
+        server_id = _id(raw.get("id"), f"{path}.id")
+        if server_id in server_ids:
+            _fail(f"{path}.id", f"{server_id!r} is used twice")
+        server_ids.add(server_id)
+        servers.append({"id": server_id, "name": _text(raw.get("name"), f"{path}.name", default=server_id), "version": _text(raw.get("version"), f"{path}.version", max_len=40),
+                        "online": bool(raw.get("online", True)), "last_scan": _stamp(raw.get("last_scan"), f"{path}.last_scan"),
+                        "warnings": [_text(w, f"{path}.warnings[{j}]", required=True, max_len=300) for j, w in enumerate(_list(raw.get("warnings"), f"{path}.warnings")[:10])]})
+    raw_findings = data.get("findings")
+    if raw_findings is not None and (not isinstance(raw_findings, list)):
+        _fail("findings", "must be a list")
+    if len(raw_findings or []) > MAX_FINDINGS:
+        _fail("findings", f"at most {MAX_FINDINGS} findings (send the most serious ones)")
+    findings, seen = [], set()
+    for i, raw in enumerate(raw_findings or []):
+        path = f"findings[{i}]"
+        raw = _dict(raw, path)
+        fid = _id(raw.get("id"), f"{path}.id")
+        if fid in seen:
+            continue
+        seen.add(fid)
+        server_id = _id(raw.get("server_id"), f"{path}.server_id")
+        if server_id not in server_ids:
+            _fail(f"{path}.server_id", f"{server_id!r} is not the id of any entry in servers")
+        ip, mac = _ipv4(raw.get("host_ip"), f"{path}.host_ip"), _mac(raw.get("host_mac"), f"{path}.host_mac")
+        if not ip and not mac:
+            _fail(path, "needs host_ip or host_mac, so Netlens can tell which device it is about")
+        cves = []
+        for j, c in enumerate(_list(raw.get("cve"), f"{path}.cve")[:20]):
+            c = _text(c, f"{path}.cve[{j}]", required=True, max_len=20).upper()
+            if not CVE_RE.match(c):
+                _fail(f"{path}.cve[{j}]", f"is not a CVE number like CVE-2024-12345, got {c!r}")
+            cves.append(c)
+        port = _optional_number(raw.get("port"), f"{path}.port", 0, 65535, integer=True)
+        findings.append({
+            "id": fid, "server_id": server_id, "host_ip": ip, "host_mac": mac, "host_name": _text(raw.get("host_name"), f"{path}.host_name", max_len=100),
+            "title": _text(raw.get("title"), f"{path}.title", required=True, max_len=200), "cve": cves, "severity": _choice(raw.get("severity"), f"{path}.severity", SEVERITIES, "info"),
+            "score": _optional_number(raw.get("score"), f"{path}.score", 0, 10), "port": None if port is None else int(port),
+            "proto": _choice(raw.get("proto"), f"{path}.proto", ("tcp", "udp"), "tcp"), "first_seen": _stamp(raw.get("first_seen"), f"{path}.first_seen"),
+            "last_seen": _stamp(raw.get("last_seen"), f"{path}.last_seen"), "exploited": bool(raw.get("exploited", False)),
+            "solution": _text(raw.get("solution"), f"{path}.solution", max_len=500), "url": _text(raw.get("url"), f"{path}.url", max_len=300)})
+    return {"servers": servers, "findings": findings}
 
 
 def _inventory(data: Any) -> dict:

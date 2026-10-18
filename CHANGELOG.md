@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.73 — 2026-10-18
+
+### Added
+- ★ **Vulnerabilities** (Analysis → Vulnerabilities): a new kind of plugin for vulnerability scanners. A scanner plugin reports what it found per host; Netlens matches each finding to a device and shows them worst first, with the CVE numbers, a score, whether the vulnerability is known to be exploited, and what to do about it. A device page shows its own findings, the dashboard has a Vulnerabilities card, critical findings (and high ones that are known to be exploited) appear under Needs attention, and a **New vulnerability** event can be sent through your alert channels, grouped per device so a fresh scan does not flood anyone. What was already there when a scanner is first connected is not announced. The scanner plugins follow.
+
 ## 0.4.72 — 2026-10-18
 
 ### Added

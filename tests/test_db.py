@@ -9,7 +9,7 @@ def test_init_db_creates_tables():
     init_db(conn)
     cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
     tables = {row[0] for row in cursor.fetchall()}
-    expected = {"devices", "device_ips", "device_names", "ports", "scans", "events", "relations", "settings", "host_keys", "schema_version", "checks", "hypervisor_guests", "ignored_devices", "stats_daily", "wifi_samples", "service_checks", "service_results", "port_baselines", "dhcp_servers", "device_groups", "users", "sessions", "api_tokens", "share_links", "client_links", "dns_state", "dns_records", "proxy_sites", "backup_servers", "backup_stores", "backup_targets", "backup_problems", "speedtests", "host_monitors", "metric_state", "probes", "remote_devices", "remote_services", "audit_log", "device_ipv6", "inventory_servers", "inventory_devices", "remediation_rules", "remediation_runs", "escalation_state"}
+    expected = {"devices", "device_ips", "device_names", "ports", "scans", "events", "relations", "settings", "host_keys", "schema_version", "checks", "hypervisor_guests", "ignored_devices", "stats_daily", "wifi_samples", "service_checks", "service_results", "port_baselines", "dhcp_servers", "device_groups", "users", "sessions", "api_tokens", "share_links", "client_links", "dns_state", "dns_records", "proxy_sites", "backup_servers", "backup_stores", "backup_targets", "backup_problems", "speedtests", "host_monitors", "metric_state", "probes", "remote_devices", "remote_services", "audit_log", "device_ipv6", "inventory_servers", "inventory_devices", "remediation_rules", "remediation_runs", "escalation_state", "vuln_servers", "vuln_findings"}
     assert expected == tables
 
 
@@ -19,7 +19,7 @@ def test_init_db_idempotent():
     init_db(conn)
     cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
     tables = {row[0] for row in cursor.fetchall()}
-    expected = {"devices", "device_ips", "device_names", "ports", "scans", "events", "relations", "settings", "host_keys", "schema_version", "checks", "hypervisor_guests", "ignored_devices", "stats_daily", "wifi_samples", "service_checks", "service_results", "port_baselines", "dhcp_servers", "device_groups", "users", "sessions", "api_tokens", "share_links", "client_links", "dns_state", "dns_records", "proxy_sites", "backup_servers", "backup_stores", "backup_targets", "backup_problems", "speedtests", "host_monitors", "metric_state", "probes", "remote_devices", "remote_services", "audit_log", "device_ipv6", "inventory_servers", "inventory_devices", "remediation_rules", "remediation_runs", "escalation_state"}
+    expected = {"devices", "device_ips", "device_names", "ports", "scans", "events", "relations", "settings", "host_keys", "schema_version", "checks", "hypervisor_guests", "ignored_devices", "stats_daily", "wifi_samples", "service_checks", "service_results", "port_baselines", "dhcp_servers", "device_groups", "users", "sessions", "api_tokens", "share_links", "client_links", "dns_state", "dns_records", "proxy_sites", "backup_servers", "backup_stores", "backup_targets", "backup_problems", "speedtests", "host_monitors", "metric_state", "probes", "remote_devices", "remote_services", "audit_log", "device_ipv6", "inventory_servers", "inventory_devices", "remediation_rules", "remediation_runs", "escalation_state", "vuln_servers", "vuln_findings"}
     assert expected == tables
 
 

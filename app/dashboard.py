@@ -80,6 +80,13 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
         add("warn", f"{gb['stores_at_risk']} backup store{'s' if gb['stores_at_risk'] != 1 else ''} filling up", "#/backups")
     if gb.get("unprotected"):
         add("info", f"{gb['unprotected']} guest{'s' if gb['unprotected'] != 1 else ''} without a backup", "#/backups")
+    vu = s.get("vulns") or {}
+    if vu.get("allowed") and vu.get("configured"):
+        crit = (vu.get("counts") or {}).get("critical", 0)
+        if crit:
+            add("bad", f"{crit} critical vulnerabilit{'ies' if crit != 1 else 'y'}" + (f", {vu['exploited']} known to be exploited" if vu.get("exploited") else ""), "#/vulnerabilities")
+        elif vu.get("exploited"):
+            add("warn", f"{vu['exploited']} vulnerabilit{'ies' if vu['exploited'] != 1 else 'y'} known to be exploited", "#/vulnerabilities")
     rm = s.get("remediation") or {}
     if rm.get("pending"):
         add("warn", f"{rm['pending']} automatic fix{'es' if rm['pending'] != 1 else ''} waiting for your approval", "#/remediation")

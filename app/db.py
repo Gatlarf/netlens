@@ -535,6 +535,28 @@ def init_db(conn: sqlite3.Connection) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_proxy_sites_target ON proxy_sites(target_device_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_proxy_sites_proxy ON proxy_sites(proxy_device_id)")
 
+    # --- schema v26: what a vulnerability plugin (Greenbone, Tenable, Rapid7 ...) reports: the scanners and the open findings per host ---------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vuln_servers (
+            plugin_id TEXT NOT NULL, server_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '', online INTEGER NOT NULL DEFAULT 1,
+            last_scan TEXT, warnings TEXT NOT NULL DEFAULT '[]', updated TEXT NOT NULL,
+            PRIMARY KEY (plugin_id, server_id)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vuln_findings (
+            plugin_id TEXT NOT NULL, finding_id TEXT NOT NULL, server_id TEXT NOT NULL, device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
+            host_ip TEXT, host_mac TEXT, host_name TEXT NOT NULL DEFAULT '', title TEXT NOT NULL, cves TEXT NOT NULL DEFAULT '[]', severity TEXT NOT NULL,
+            score REAL, port INTEGER, proto TEXT NOT NULL DEFAULT 'tcp', first_seen TEXT, last_seen TEXT, exploited INTEGER NOT NULL DEFAULT 0,
+            solution TEXT NOT NULL DEFAULT '', url TEXT NOT NULL DEFAULT '', updated TEXT NOT NULL,
+            PRIMARY KEY (plugin_id, finding_id)
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_vuln_device ON vuln_findings (device_id)")
     # --- schema v22: what a backup plugin (Proxmox Backup Server ...) reports: servers, stores, what is backed up, recent problems ---------------
     cur.execute(
         """

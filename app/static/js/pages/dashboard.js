@@ -128,6 +128,11 @@ const CARDS = [
       if (on.length) list.push(["Plugins", failing.length ? `${failing.length} of ${on.length} failing: ${failing.map((p) => p.id).join(", ")}` : `${on.length} working`, failing.length ? "bad" : ""]);
       return rows(list);
     } },
+  { id: "vulns", title: "Vulnerabilities", href: "#/vulnerabilities", size: "s", def: true, about: "What the vulnerability scanner found, worst first.",
+    show: (d) => !!(d.summary.vulns && d.summary.vulns.allowed && d.summary.vulns.configured),
+    tone: (d) => { const c = d.summary.vulns.counts; return c.critical ? "bad" : c.high || d.summary.vulns.exploited ? "warn" : "ok"; },
+    build: ({ summary: s }) => { const c = s.vulns.counts;
+      return rows([["Critical", c.critical, c.critical ? "bad" : ""], ["High", c.high, c.high ? "warn" : ""], ["Medium", c.medium], ["Known to be exploited", s.vulns.exploited, s.vulns.exploited ? "bad" : ""], ["Devices at risk", s.vulns.devices]]); } },
   { id: "attention", title: "Needs attention", size: "w", def: true, about: "Everything that is wrong or worth a look, worst first.",
     tone: (d) => (d.attention.some((a) => a.level === "bad") ? "bad" : d.attention.some((a) => a.level === "warn") ? "warn" : "ok"),
     build: ({ attention, snoozed }) => h("div", {},
@@ -183,7 +188,7 @@ const CARDS = [
       h("button", { class: "btn", type: "button", onclick: () => document.getElementById("scan-deep")?.click() }, "Deep scan")) },
 ];
 const TYPE_ABOUT = { value: "A value from your data", device: "A device", group: "A group of devices", service: "A service check", notes: "Notes and links" };
-const FIRST_VIEW = ["devices", "uptime", "services", "speed", "attention", "health", "infra", "capacity", "events", "minimap"];   // the order a new installation starts with
+const FIRST_VIEW = ["devices", "uptime", "services", "speed", "attention", "health", "infra", "vulns", "capacity", "events", "minimap"];   // the order a new installation starts with
 const DEFAULT_ORDER = [...FIRST_VIEW.filter((id) => CARDS.some((c) => c.id === id && c.def)), ...CARDS.filter((c) => c.def && !FIRST_VIEW.includes(c.id)).map((c) => c.id)];
 
 // ---------- the chosen layout (per user, kept on the server so every browser and device shows the same dashboard) ----------

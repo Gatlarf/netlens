@@ -74,3 +74,12 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 .ipv6-mark { flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; font-weight: 700; color: #fff; background: var(--muted); }
 .ipv6-good .ipv6-mark { background: var(--ok); } .ipv6-warn .ipv6-mark { background: var(--warn); } .ipv6-bad .ipv6-mark { background: var(--bad); }
 .ipv6-primer > summary { cursor: pointer; } .ipv6-primer dt { font-weight: 600; margin-top: 8px; } .ipv6-primer dd { margin: 2px 0 0; color: var(--muted); }
+
+/* vulnerabilities */
+.vuln-sev { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; color: #fff; background: var(--muted); }
+.vuln-critical { background: var(--bad); } .vuln-high { background: #d9480f; } .vuln-medium { background: var(--warn); } .vuln-low { background: #3b82c4; }
+.vuln-exploited { margin-left: 6px; font-size: 0.72rem; font-weight: 700; color: var(--bad); text-transform: uppercase; }
+.vuln-count { margin-right: 12px; white-space: nowrap; }
+.vuln-detail > summary { cursor: pointer; } .vuln-body { padding: 6px 0 2px 14px; } .vuln-body p { margin: 4px 0; }
+.vuln-servers { margin: 0 0 12px; }
+.vuln-table td { vertical-align: top; }

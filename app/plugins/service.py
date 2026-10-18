@@ -19,7 +19,7 @@ from app.plugins.registry import Plugin, discover
 from app.plugins.runner import PluginRunError, run_subprocess
 
 log = logging.getLogger(__name__)
-KIND_ORDER = {"hypervisor": 0, "topology": 1, "proxy": 2, "dns": 3, "backup": 4, "inventory": 5}   # a backup plugin is matched against the guests, so it runs after the hypervisors  # hypervisor links first: they rank higher in the hierarchy anyway
+KIND_ORDER = {"hypervisor": 0, "topology": 1, "proxy": 2, "dns": 3, "backup": 4, "inventory": 5, "vulnerability": 6}   # a backup plugin is matched against the guests, so it runs after the hypervisors  # hypervisor links first: they rank higher in the hierarchy anyway
 
 
 def source_of(plugin_id: str) -> str:
@@ -185,8 +185,9 @@ def clear_plugin_links(conn: sqlite3.Connection, plugin_id: str) -> None:
 
 def clear_plugin_data(conn: sqlite3.Connection, plugin_id: str) -> None:
     conn.execute("DELETE FROM hypervisor_guests WHERE plugin_id = ?", (plugin_id,))
-    from app import guestbackups, inventory, sites
+    from app import guestbackups, inventory, sites, vulns
 
+    vulns.remove_plugin(conn, plugin_id)
     inventory.remove_plugin(conn, plugin_id)
     sites.remove_plugin(conn, plugin_id)
     guestbackups.remove_plugin(conn, plugin_id)
@@ -226,6 +227,10 @@ def apply_plugin(conn: sqlite3.Connection, plugin: Plugin) -> dict:
         from app import guestbackups
 
         return guestbackups.apply_backup(conn, plugin.id, data, get_state(conn, plugin)["config"])
+    if kind == "vulnerability":   # a vulnerability plugin makes no links: it reports what is wrong on which device
+        from app import vulns
+
+        return vulns.apply_vulns(conn, plugin.id, data, get_state(conn, plugin)["config"])
     if kind == "inventory":   # an inventory plugin makes no links: it describes devices (matched to the ones on the network) and what a hub knows
         from app import inventory
 

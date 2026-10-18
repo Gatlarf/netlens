@@ -40,6 +40,7 @@ export const EVENT_LABELS = {
   gateway_changed: "Gateway changed",
   login_failed: "Failed logins",
   cert_expiring: "Certificate expiring",
+  vuln_critical: "New vulnerability",
   net_critical: "Network problem",
   net_warning: "Network warning",
   net_ok: "Network problem resolved",

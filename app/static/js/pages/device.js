@@ -12,6 +12,7 @@ import { buildDeviceServicesCard } from "../cards/device_services.js";
 import { stateDot } from "./services.js";
 import { buildParentCard } from "../cards/device_parent.js";
 import { buildDeviceSitesCards } from "../cards/proxy_sites.js";
+import { buildDeviceVulnCard } from "../cards/vulns.js";
 import { buildStabilitySection, isStabilityOpen } from "../cards/stability.js";
 
 const WEB_PORTS = new Set([80, 443, 8080, 8443, 8006, 5000, 5001, 9000]);
@@ -801,6 +802,9 @@ export async function render(container, params) {
       }
       uptimeSlot.appendChild(c);
     }).catch(() => {});
+    const vulnSlot = slot();
+    ovRight.appendChild(vulnSlot);
+    buildDeviceVulnCard(device).then((c) => { if (c && !disposed) vulnSlot.appendChild(c); }).catch(() => {});
     ovRight.appendChild(buildEventsCard(device));
     panels.overview = twoColumns(ovLeft, ovRight);
 

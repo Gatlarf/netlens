@@ -18,6 +18,7 @@ const ROUTES = {
   "#/dns": "dns",
   "#/ipv6": "network_health",
   "#/network-health": "network_health",
+  "#/vulnerabilities": "vulnerabilities",
   "#/speedtest": "speedtest",
   "#/uptime": "uptime",
   "#/stats": "stats",

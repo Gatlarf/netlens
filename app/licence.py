@@ -187,7 +187,7 @@ def status(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, A
     return out
 
 
-PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights")      # beyond the free Community edition (trial and every licence include them)
+PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights", "vulnerabilities")      # beyond the free Community edition (trial and every licence include them)
 
 
 def allows(conn: sqlite3.Connection, feature: str, now: datetime | None = None) -> bool:
