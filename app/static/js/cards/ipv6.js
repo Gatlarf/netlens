@@ -24,7 +24,7 @@ export async function buildIpv6Card() {
     const st = info.status || {};
     card.appendChild(h("p", {}, st.ts ? `Last look ${timeAgo(st.ts)}: ${st.seen} neighbour${st.seen === 1 ? "" : "s"} answered, ${st.attached} address${st.attached === 1 ? "" : "es"} attached to known devices${st.unknown ? `, ${st.unknown} belong to devices that are not known` : ""}.` : "Not run yet."));
     card.appendChild(h("p", { class: "hint" }, `${info.addresses} address${info.addresses === 1 ? "" : "es"} on ${info.devices} device${info.devices === 1 ? "" : "s"} are stored (kept for 30 days after they were last seen).`));
-    card.appendChild(h("p", {}, h("a", { href: "#/ipv6" }, "Is IPv6 working on my network? Open IPv6 health")));
+    card.appendChild(h("p", {}, h("a", { href: "#/ipv6" }, "Is IPv6 working on my network? Open Network health")));
     const now = h("button", { class: "btn", type: "button" }, "Look now");
     now.addEventListener("click", async () => {
       now.disabled = true;

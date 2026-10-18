@@ -9,7 +9,7 @@ const PAGES = [
   ["Devices", "#/devices", "list hosts computers inventory table"],
   ["Hierarchy", "#/hierarchy", "tree parents switches uplinks"],
   ["DNS", "#/dns", "register names hostnames dns server records technitium zone"],
-  ["IPv6 health", "#/ipv6", "ipv6 addresses prefix subnet router advertisement slaac routable global link-local dhcpv6 working check"],
+  ["Network health", "#/network-health", "ipv4 ipv6 gateway dns dhcp duplicate ip address subnet full range internet working check diagnose ipv6 addresses prefix subnet router advertisement slaac routable global link-local dhcpv6 working check"],
   ["Insights", "#/insights", "ask question incidents anomalies unusual predictions llm", true],
   ["Remediation", "#/remediation", "automatic fix rules restart wake webhook", true],
   ["Smart home", "#/smarthome", "home assistant battery devices"],

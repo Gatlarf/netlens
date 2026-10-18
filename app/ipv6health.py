@@ -268,6 +268,7 @@ def analyse(raw: dict[str, Any], facts: dict[str, Any], answered: set[str] | Non
         else:
             add("good", "Every device with an IPv6 address answers", f"{len(have)} device{'s' if len(have) != 1 else ''} replied to an ICMPv6 echo from this computer.")
 
+    findings.sort(key=lambda f: ("bad", "warn", "info", "good").index(f["level"]))      # the problems first (the sort keeps the order within a level)
     levels = {f["level"] for f in findings}
     if "bad" in levels:
         verdict, headline = "bad", "IPv6 has a problem"

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from app.api.devices import get_conn
@@ -69,3 +69,18 @@ async def run_health(conn=Depends(get_conn)) -> dict[str, Any]:
     from app import ipv6health
 
     return {"result": await ipv6health.run(conn), "discovery": ipv6.enabled(conn)}
+
+
+@router.get("/ipv4/health")
+def get_health4(conn=Depends(get_conn)) -> dict[str, Any]:
+    from app import ipv4health
+
+    return {"result": ipv4health.last(conn)}
+
+
+@router.post("/ipv4/health/run")
+async def run_health4(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
+    """Look at the IPv4 side of the network now."""
+    from app import ipv4health
+
+    return {"result": await ipv4health.run(conn, list(request.app.state.settings.ranges))}
