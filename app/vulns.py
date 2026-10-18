@@ -142,3 +142,32 @@ def top_devices(conn: sqlite3.Connection, limit: int = 8) -> list[dict[str, Any]
 def servers(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return [{"plugin_id": r["plugin_id"], "id": r["server_id"], "name": r["name"], "version": r["version"], "online": bool(r["online"]), "last_scan": r["last_scan"],
              "warnings": json.loads(r["warnings"] or "[]")} for r in conn.execute("SELECT * FROM vuln_servers ORDER BY name")]
+
+
+# ----------------------------------------------------------------------------- reporting to a central Netlens
+def report(conn: sqlite3.Connection) -> dict[str, Any]:
+    """What this Netlens tells a central Netlens about its vulnerabilities: the counts, the devices at risk and the few critical findings (no addresses)."""
+    from app import licence
+
+    if not licence.allows(conn, "vulnerabilities"):
+        return {"configured": False}
+    s = summary(conn)
+    if not s["configured"]:
+        return {"configured": False}
+    return {"configured": True, "counts": s["counts"], "exploited": s["exploited"], "devices": s["devices"], "last_scan": s["last_scan"],
+            "top": [{"device": d["device"], "critical": d["critical"], "high": d["high"], "exploited": d["exploited"]} for d in top_devices(conn, 5)],
+            "critical": [{"device": f["device"], "title": f["title"], "cve": f["cve"][:3], "exploited": f["exploited"]} for f in findings(conn, severity="critical", limit=10)]}
+
+
+def clean_report(raw: Any) -> dict[str, Any]:
+    """The vulnerabilities of a remote site as the central Netlens stores them: only numbers and short texts."""
+    if not isinstance(raw, dict) or not raw.get("configured"):
+        return {"configured": False}
+    num = lambda v: v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < 10**7 else 0      # noqa: E731
+    text = lambda v, n: str(v or "")[:n]                                                                 # noqa: E731
+    counts = raw.get("counts") if isinstance(raw.get("counts"), dict) else {}
+    return {"configured": True, "counts": {s: num(counts.get(s)) for s in SEVERITIES}, "exploited": num(raw.get("exploited")), "devices": num(raw.get("devices")),
+            "last_scan": text(raw.get("last_scan"), 20) or None,
+            "top": [{"device": text(x.get("device"), 100), "critical": num(x.get("critical")), "high": num(x.get("high")), "exploited": num(x.get("exploited"))} for x in (raw.get("top") or [])[:5] if isinstance(x, dict)],
+            "critical": [{"device": text(x.get("device"), 100), "title": text(x.get("title"), 200), "cve": [text(c, 20) for c in (x.get("cve") or [])[:3] if isinstance(c, str)], "exploited": bool(x.get("exploited"))}
+                         for x in (raw.get("critical") or [])[:10] if isinstance(x, dict)]}

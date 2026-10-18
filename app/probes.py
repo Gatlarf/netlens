@@ -115,6 +115,14 @@ def _parse(ts: str | None) -> float | None:
         return None
 
 
+def _vulns_view(conn: sqlite3.Connection, summary: dict) -> dict:
+    """What a site reported about vulnerabilities, shown only where the licence allows vulnerabilities."""
+    from app import licence
+
+    v = summary.get("vulns") or {"configured": False}
+    return v if v.get("configured") and licence.allows(conn, "vulnerabilities") else {"configured": False}
+
+
 def present(conn: sqlite3.Connection, row: sqlite3.Row, now: float | None = None) -> dict:
     now = now if now is not None else time.time()
     seen = _parse(row["last_seen"])
@@ -137,7 +145,7 @@ def present(conn: sqlite3.Connection, row: sqlite3.Row, now: float | None = None
         "devices": {"total": counts["total"], "online": counts["online"], "core_down": counts["core_down"]},
         "services": {"total": services["total"], "down": services["down"]},
         "problems": {"count": len(problems), "critical": sum(1 for p in problems if p.get("level") == "critical")},
-        "scan": summary.get("scan"), "backups": summary.get("backups") or {"configured": False},
+        "scan": summary.get("scan"), "backups": summary.get("backups") or {"configured": False}, "vulns": _vulns_view(conn, summary),
     }
 
 
@@ -311,9 +319,18 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
 
     interval = payload.get("interval_s")
     interval = int(interval) if isinstance(interval, int) and not isinstance(interval, bool) and 15 <= interval <= 3600 else probe["interval_s"]
-    from app import guestbackups
+    from app import guestbackups, vulns
 
-    summary = {"problems": problems, "monitors": _monitors(payload.get("monitors")), "scan": _scan(payload.get("scan")), "backups": guestbackups.clean_report(payload.get("backups")),
+    new_vulns = vulns.clean_report(payload.get("vulns"))
+    try:
+        old_vulns = json.loads(probe["summary"] or "{}").get("vulns") or {}
+    except ValueError:
+        old_vulns = {}
+    if not baseline and new_vulns["configured"] and old_vulns.get("configured"):
+        more = new_vulns["counts"]["critical"] - (old_vulns.get("counts") or {}).get("critical", 0)
+        if more > 0:
+            events.append(("vuln_critical", f"{site}: {more} new critical vulnerabilit{'ies' if more != 1 else 'y'}" + (", at least one known to be exploited" if new_vulns["exploited"] > (old_vulns.get("exploited") or 0) else "")))
+    summary = {"vulns": new_vulns, "problems": problems, "monitors": _monitors(payload.get("monitors")), "scan": _scan(payload.get("scan")), "backups": guestbackups.clean_report(payload.get("backups")),
                "counts": {"devices": len(devices), "services": len(services), "samples": recorded},
                "accepts_config": bool(payload.get("accepts_config")),
                "config_rev": payload.get("config_rev") if isinstance(payload.get("config_rev"), int) and not isinstance(payload.get("config_rev"), bool) else 0}

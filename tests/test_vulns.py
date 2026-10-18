@@ -137,3 +137,19 @@ def test_the_cisa_list_marks_findings_and_is_only_fetched_when_wanted(conn, monk
     assert len(kev.known(conn)) == 151
     apply(conn, finding("f3", cve=["CVE-2024-1001"], severity="critical"))                      # a new finding is marked while it is stored
     assert vulns.findings(conn, severity="critical")[0]["exploited"] is True
+
+
+# ------------------------------------------------------------------ reporting to a central Netlens
+def test_report_and_clean_report(conn, monkeypatch):
+    assert vulns.report(conn) == {"configured": False}                                       # the free edition tells nothing
+    monkeypatch.setattr(licence, "allows", lambda c, feature, now=None: True)
+    assert vulns.report(conn) == {"configured": False}                                       # no scanner yet
+    apply(conn, finding(severity="critical", exploited=True), finding("f2", host_ip="192.168.1.30", severity="high"))
+    rep = vulns.report(conn)
+    assert rep["counts"]["critical"] == 1 and rep["exploited"] == 1 and rep["devices"] == 2 and rep["top"][0]["device"] == "nas" and rep["critical"][0]["cve"] == ["CVE-2024-6387"]
+    assert "192.168.1" not in str(rep["critical"]) and "host_ip" not in str(rep)
+    assert vulns.clean_report(rep) == rep
+    dirty = vulns.clean_report({"configured": True, "counts": {"critical": "9", "high": -1, "medium": True, "low": 3}, "exploited": 10**9, "top": [{"device": "x" * 500, "critical": 2}, "junk"], "critical": [{"title": "t" * 900, "cve": [1, "CVE-1"]}]})
+    assert dirty["counts"] == {"critical": 0, "high": 0, "medium": 0, "low": 3, "info": 0} and dirty["exploited"] == 0 and len(dirty["top"]) == 1 and len(dirty["top"][0]["device"]) == 100
+    assert len(dirty["critical"][0]["title"]) == 200 and dirty["critical"][0]["cve"] == ["CVE-1"]
+    assert vulns.clean_report("nope") == {"configured": False} and vulns.clean_report({"configured": False}) == {"configured": False}

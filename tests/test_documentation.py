@@ -109,3 +109,23 @@ def test_a_remote_site_gets_its_own_documentation_and_a_customer(client):
     assert "nas: disk is past its limit." in page.text and "<h2>Certificates</h2>" not in page.text and "<h2>Network</h2>" not in page.text
     assert 'filename="shop' not in client.get(f"/api/documentation/site/{pid}").headers.get("content-disposition", "") and client.get(f"/api/documentation/site/{pid}", params={"download": "true"}).headers["content-disposition"].startswith('attachment; filename="bakery-shop')
     assert client.get("/api/documentation/site/999").status_code == 404 and anon.get(f"/api/documentation/site/{pid}").status_code == 401
+
+
+def test_a_site_document_has_the_reported_security_section(client, monkeypatch):
+    import gzip as _gzip
+    import json as _json
+
+    from app import licence
+
+    monkeypatch.setattr(licence, "allows", lambda c, feature, now=None: True)
+    made = client.post("/api/probes", json={"name": "Clinic"}).json()
+    vul = {"configured": True, "counts": {"critical": 1, "high": 0, "medium": 0, "low": 0, "info": 0}, "exploited": 1, "devices": 1, "top": [{"device": "xray-pc", "critical": 1, "high": 0, "exploited": 1}],
+           "critical": [{"device": "xray-pc", "title": "SMB <RCE>", "cve": ["CVE-2025-1111"], "exploited": True}]}
+    TestClient(client.app).post("/api/probe/push", content=_gzip.compress(_json.dumps({"devices": [], "services": [], "vulns": vul}).encode()),
+                                headers={"Authorization": f"Bearer {made['token']}", "Content-Encoding": "gzip", "Content-Type": "application/json"})
+    page = client.get(f"/api/documentation/site/{made['probe']['id']}").text
+    assert "<h2>Security</h2>" in page and "xray-pc" in page and "SMB &lt;RCE&gt;" in page and "CVE-2025-1111" in page
+    assert "1 critical vulnerability found by the scanner." in page
+    assert client.get("/api/dashboard").json()["attention"][-1] == {"level": "bad", "text": "Clinic: 1 critical vulnerability", "href": f"#/remote-sites?id={made['probe']['id']}"}
+    monkeypatch.setattr(licence, "allows", lambda c, feature, now=None: False)
+    assert "<h2>Security</h2>" not in client.get(f"/api/documentation/site/{made['probe']['id']}").text or "No vulnerability scanner" in client.get(f"/api/documentation/site/{made['probe']['id']}").text

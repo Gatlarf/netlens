@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.77 — 2026-10-18
+
+### Added
+- ★ **Vulnerabilities of remote sites**: a remote Netlens with a vulnerability scanner now tells the central Netlens the counts, the devices at risk and its few critical findings (no addresses). The central shows them on the site card and the site page, adds the number of critical vulnerabilities to the totals of a customer, puts them under Needs attention on the dashboard, announces a site whose critical count grows as a *New vulnerability* event, and includes them in the documentation of that site.
+
 ## 0.4.76 — 2026-10-18
 
 ### Added

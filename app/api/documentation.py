@@ -57,7 +57,7 @@ def export_site(probe_id: int, download: bool = False, conn=Depends(get_conn)) -
     if doc is None:
         raise HTTPException(status_code=404, detail="remote site not found")
     settings = documentation.get_settings(conn)
-    settings = {**settings, "customer": doc["site"]["customer"] or doc["site"]["name"], "sections": [s for s in settings["sections"] if s in ("summary", "devices", "services", "points")]}
+    settings = {**settings, "customer": doc["site"]["customer"] or doc["site"]["name"], "sections": [s for s in settings["sections"] if s in ("summary", "devices", "services", "security", "points")]}
     page = documentation.render(doc, settings)
     name = "".join(c if c.isalnum() else "-" for c in doc["site"]["name"]).strip("-").lower() or "site"
     headers = {"Content-Disposition": f'attachment; filename="{name}-network-documentation.html"'} if download else {}

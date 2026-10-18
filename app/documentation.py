@@ -111,8 +111,17 @@ def collect_site(conn: sqlite3.Connection, probe_id: int, now: datetime | None =
         problems = json.loads(probe["summary"] or "{}").get("problems") or []
     except ValueError:
         problems = []
+    from app import licence
+
+    try:
+        reported = json.loads(probe["summary"] or "{}").get("vulns") or {}
+    except ValueError:
+        reported = {}
+    vul = None
+    if reported.get("configured") and licence.allows(conn, "vulnerabilities"):
+        vul = {"summary": {"counts": reported["counts"], "exploited": reported["exploited"]}, "top": reported["top"], "critical": [{**f, "port": None} for f in reported["critical"]]}
     health = [("bad" if p.get("level") == "critical" else "warn", f"{p.get('device') or 'A device'}: {str(p.get('title') or 'a health reading').lower()} is past its limit.") for p in problems if isinstance(p, dict)]
-    return {"generated": now.strftime("%Y-%m-%d %H:%M UTC"), "devices": devices, "ranges": [], "v4": None, "v6": None, "services": checks, "certificates": [], "backups": None, "vulns": None,
+    return {"generated": now.strftime("%Y-%m-%d %H:%M UTC"), "devices": devices, "ranges": [], "v4": None, "v6": None, "services": checks, "certificates": [], "backups": None, "vulns": vul,
             "health": health, "site": {"name": probe["name"], "customer": probe["customer"] or ""}}
 
 
@@ -207,8 +216,8 @@ def render(doc: dict[str, Any], settings: dict[str, Any]) -> str:
         v = doc["vulns"]
         if v:
             c = v["summary"]["counts"]
-            rows = [[d["device"], d["critical"], d["high"], d["medium"], d["low"]] for d in v["top"]]
-            body = _facts([("critical", c["critical"]), ("high", c["high"]), ("medium", c["medium"]), ("known exploited", v["summary"]["exploited"])]) + _table(["Device", "Critical", "High", "Medium", "Low"], rows, "")
+            rows = [[d["device"], d["critical"], d["high"], d.get("medium", ""), d.get("low", "")] for d in v["top"]]
+            body = _facts([("critical", c["critical"]), ("high", c["high"]), ("medium", c.get("medium", 0)), ("known exploited", v["summary"]["exploited"])]) + _table(["Device", "Critical", "High", "Medium", "Low"], rows, "")
             crit = [[f["device"], f["title"], ", ".join(f["cve"]), f["port"] or ""] for f in v["critical"]]
             if crit:
                 body += "<h3>Critical findings</h3>" + _table(["Device", "Finding", "CVE", "Port"], crit)

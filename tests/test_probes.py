@@ -337,3 +337,27 @@ def test_alerts_name_the_customer_when_the_site_has_one(conn):
     row = conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone()
     probes.ingest(conn, row, {"devices": [device("aa:00:00:00:00:01", "printer", online=False)], "services": []}, now=LATER)
     assert [r["detail"] for r in conn.execute("SELECT detail FROM events")] == ["Bakery Janssens / Shop: printer (192.168.1.10) went offline"]
+
+
+def test_a_site_reports_vulnerabilities_and_a_growing_critical_count_is_announced(conn, monkeypatch):
+    from app import licence
+
+    monkeypatch.setattr(licence, "allows", lambda c, feature, now=None: True)
+    row, _ = make(conn, "Shop")
+
+    def vul(critical, exploited=0):
+        return {"configured": True, "counts": {"critical": critical, "high": 2, "medium": 0, "low": 0, "info": 0}, "exploited": exploited, "devices": 1, "top": [{"device": "nas", "critical": critical, "high": 2, "exploited": exploited}],
+                "critical": [{"device": "nas", "title": "Samba RCE", "cve": ["CVE-2025-1111"], "exploited": bool(exploited)}] if critical else []}
+
+    probes.ingest(conn, row, {"devices": [], "services": [], "vulns": vul(1)}, now=NOW)
+    assert kinds(conn) == [] and probes.get(conn, row["id"])["vulns"]["counts"]["critical"] == 1                 # the first report is the baseline
+    row = conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone()
+    probes.ingest(conn, row, {"devices": [], "services": [], "vulns": vul(3, 1)}, now=LATER)
+    assert kinds(conn) == ["vuln_critical"]
+    assert conn.execute("SELECT detail FROM events").fetchone()[0] == "Shop: 2 new critical vulnerabilities, at least one known to be exploited"
+    row = conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone()
+    probes.ingest(conn, row, {"devices": [], "services": [], "vulns": vul(2, 1)}, now="2026-03-10T12:02:00Z")
+    assert kinds(conn) == ["vuln_critical"]                                                                       # fewer is not an alert
+    row = conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone()
+    probes.ingest(conn, row, {"devices": [], "services": []}, now="2026-03-10T12:03:00Z")
+    assert probes.get(conn, row["id"])["vulns"] == {"configured": False}

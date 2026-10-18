@@ -158,7 +158,8 @@ export async function render(container) {
         h("div", { class: "rs-stats" },
           h("span", {}, h("strong", {}, `${p.devices.online}/${p.devices.total}`), " devices online"),
           h("span", {}, h("strong", {}, String(p.services.down)), ` of ${p.services.total} checks down`),
-          h("span", {}, h("strong", {}, String(p.problems.count)), " health problems")),
+          h("span", {}, h("strong", {}, String(p.problems.count)), " health problems"),
+          p.vulns && p.vulns.configured ? h("span", { class: p.vulns.counts.critical ? "d-bad" : p.vulns.counts.high ? "d-warn" : "" }, h("strong", {}, String(p.vulns.counts.critical)), ` critical, ${p.vulns.counts.high} high vulnerabilities`) : null),
         h("div", { class: "hint" }, p.last_seen ? `Last report ${timeAgo(p.last_seen)}${p.version ? ` · Netlens ${p.version}` : ""}` : "Has not reported yet"));
     };
     const byCustomer = new Map();
@@ -170,7 +171,7 @@ export async function render(container) {
         const down = live.filter((p) => p.state === "silent" || p.problems.critical || p.devices.core_down).length;
         const look = live.filter((p) => p.problems.count || p.services.down).length;
         body.appendChild(h("div", { class: "rs-customer" }, h("h2", {}, key || "Other sites"),
-          h("span", { class: `hint rs-roll ${down ? "d-bad" : look ? "d-warn" : ""}` }, `${plural(sites.length, "site")} · ${live.reduce((a, p) => a + p.devices.online, 0)} / ${live.reduce((a, p) => a + p.devices.total, 0)} devices online · ${live.reduce((a, p) => a + p.services.down, 0)} checks down · ${live.reduce((a, p) => a + p.problems.count, 0)} health problems${down ? ` · ${down} need attention` : ""}`)));
+          h("span", { class: `hint rs-roll ${down ? "d-bad" : look ? "d-warn" : ""}` }, `${plural(sites.length, "site")} · ${live.reduce((a, p) => a + p.devices.online, 0)} / ${live.reduce((a, p) => a + p.devices.total, 0)} devices online · ${live.reduce((a, p) => a + p.services.down, 0)} checks down · ${live.reduce((a, p) => a + p.problems.count, 0)} health problems${live.some((p) => p.vulns && p.vulns.configured) ? ` · ${live.reduce((a, p) => a + (p.vulns && p.vulns.configured ? p.vulns.counts.critical : 0), 0)} critical vulnerabilities` : ""}${down ? ` · ${down} need attention` : ""}`)));
       }
       body.appendChild(h("div", { class: "rs-grid" }, sites.map(card)));
     }
@@ -249,6 +250,15 @@ export async function render(container) {
       tile("Devices online", `${p.devices.online} / ${p.devices.total}`, p.devices.core_down ? `${p.devices.core_down} always-on device${p.devices.core_down === 1 ? "" : "s"} offline` : "all always-on devices answer", p.devices.core_down ? "bad" : p.devices.online === p.devices.total ? "ok" : "warn"),
       tile("Service checks", `${p.services.total - p.services.down} / ${p.services.total}`, p.services.down ? `${p.services.down} down` : "all up", p.services.down ? "bad" : "ok"),
       tile("Health", String(p.problems.count), p.problems.count ? (p.problems.critical ? `${p.problems.critical} critical` : `${p.problems.count} warning${p.problems.count === 1 ? "" : "s"}`) : "within limits", p.problems.critical ? "bad" : p.problems.count ? "warn" : "ok")));
+    if (p.vulns && p.vulns.configured) {
+      const v = p.vulns, c = v.counts;
+      body.appendChild(h("div", { class: "card" }, h("h2", {}, "Vulnerabilities"),
+        h("p", {}, ["critical", "high", "medium", "low"].filter((s) => c[s]).map((s) => h("span", { class: "vuln-count" }, h("span", { class: `vuln-sev vuln-${s}` }, s[0].toUpperCase() + s.slice(1)), ` ${c[s]}`)),
+          v.exploited ? h("span", { class: "vuln-exploited" }, `${v.exploited} known to be exploited`) : null),
+        v.top.length ? h("table", { class: "data" }, h("thead", {}, h("tr", {}, ["Device", "Critical", "High"].map((x) => h("th", {}, x)))), h("tbody", {}, v.top.map((d) => h("tr", {}, h("td", {}, d.device), h("td", {}, String(d.critical || "")), h("td", {}, String(d.high || "")))))) : null,
+        v.critical.length ? h("ul", { class: "d-list" }, v.critical.map((f) => h("li", {}, f.device, h("span", { class: "d-note" }, f.title + (f.cve.length ? ` (${f.cve.join(", ")})` : ""))))) : null,
+        h("p", { class: "hint" }, `The scanner at the site reports this${v.last_scan ? `; last scan ${timeAgo(v.last_scan)}` : ""}. Only counts and the most serious findings are sent here.`)));
+    }
     if (data.problems.length) {
       const card = h("div", { class: "card" }, h("h2", {}, "Needs attention"));
       for (const q of data.problems) {

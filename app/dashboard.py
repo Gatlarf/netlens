@@ -8,6 +8,19 @@ from app.stats import _ago, _pct, utcnow
 from app import sites as sites_mod, speedtest
 
 
+def _site_vuln_attention(conn: sqlite3.Connection) -> list[dict]:
+    """Remote sites whose scanner reports critical vulnerabilities."""
+    from app import probes
+
+    out = []
+    for r in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
+        p = probes.present(conn, r)
+        crit = (p["vulns"].get("counts") or {}).get("critical", 0) if p["vulns"].get("configured") and not p["locked"] else 0
+        if crit:
+            out.append({"level": "bad", "text": f"{p['customer'] + ' / ' if p['customer'] else ''}{p['name']}: {crit} critical vulnerabilit{'ies' if crit != 1 else 'y'}", "href": f"#/remote-sites?id={p['id']}"})
+    return out
+
+
 def _network_attention(conn: sqlite3.Connection) -> list[dict]:
     """The problems the network health checks announced (and that are still there)."""
     from app import nethealth
@@ -136,7 +149,7 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "summary": s,
         "devices_uptime": uptime,
         "service_checks": _services(conn, now)["checks"],
-        "attention": _attention(s, certs, login_failed, down, core_down, down_checks) + _network_attention(conn),
+        "attention": _attention(s, certs, login_failed, down, core_down, down_checks) + _network_attention(conn) + _site_vuln_attention(conn),
         "events": events,
         "services_down": down,
         "login_failed_24h": login_failed,
