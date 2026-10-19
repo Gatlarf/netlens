@@ -35,7 +35,7 @@ def llm_ready(conn: sqlite3.Connection) -> bool:
     return bool(cfg["enabled"] and cfg["url"] and cfg["model"] and llm_wanted(conn) and licence.allows(conn, "engineer"))
 
 
-def complete(conn: sqlite3.Connection, system: str, user: str, names: list[str] | None = None, ask=None) -> str | None:
+def complete(conn: sqlite3.Connection, system: str, user: str, names: list[str] | None = None, ask=None, timeout: float | None = None) -> str | None:
     """The model's answer (addresses and names anonymised on the way out and put back on the way in), or None when there is no model or it fails.
     `ask(messages)` replaces the call in tests."""
     if ask is None and not llm_ready(conn):
@@ -44,7 +44,7 @@ def complete(conn: sqlite3.Connection, system: str, user: str, names: list[str] 
     text = redact(user) if redact else user
     messages = [{"role": "system", "content": system}, {"role": "user", "content": text}]
     try:
-        answer = (ask or (lambda m: engineer.chat(conn, m)))(messages)
+        answer = (ask or (lambda m: engineer.chat(conn, m, **({"timeout": timeout} if timeout else {}))))(messages)
     except Exception:  # noqa: BLE001 - an unreachable or confused model only means the plain version is shown
         log.debug("the language model could not be used", exc_info=True)
         return None

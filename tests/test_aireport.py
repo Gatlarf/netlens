@@ -65,6 +65,7 @@ def test_a_parent_that_failed_first_is_a_strong_finding(conn, monkeypatch):
 def test_a_change_shortly_before_a_problem_is_possible_and_an_old_one_is_not_mentioned(conn):
     conn.execute("INSERT INTO audit_log (ts, user, method, path, status, action) VALUES ('2026-11-01T09:45:00Z', 'admin', 'PUT', '/api/x', 200, 'changed the scan ranges')")
     conn.execute("INSERT INTO audit_log (ts, user, method, path, status, action) VALUES ('2026-11-01T05:00:00Z', 'admin', 'PUT', '/api/x', 200, 'changed the map')")
+    conn.execute("UPDATE devices SET always_on = 1 WHERE id = 4")       # a server, not a phone: its outage is worth a closer look
     conn.commit()
     ev(conn, "device_offline", "10:00", 4)
     facts = aireport.collect(conn, "24h", NOW)
@@ -153,3 +154,27 @@ def test_the_api(tmp_path, monkeypatch):
         assert c.get("/api/insights/report?period=1y", headers=admin).status_code == 422
         monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: False)
         assert c.get("/api/insights/report", headers=admin).status_code == 402
+
+
+def test_minor_outages_rank_last_and_recurring_ones_are_told_once(conn):
+    for hh, back in (("02:00", "02:20"), ("05:00", "05:20"), ("08:00", "08:20")):
+        ev(conn, "device_offline", hh, 5)                                    # the router, three times: recurring
+        ev(conn, "device_online", back, 5)
+    ev(conn, "device_offline", "10:00", 4)                                   # a phone-like device, once: minor
+    conn.execute("UPDATE devices SET always_on = 1 WHERE id = 5")
+    conn.commit()
+    found = aireport.collect(conn, "24h", NOW)["findings"]
+    types = [(f["type"], f["strength"]) for f in found]
+    assert types[0][0] == "recurring" and ("incident", "info") in types and types.index(("incident", "info")) > 0
+    assert sum(1 for f in found if "router" in f["text"]) == 1               # not again as three separate single events
+
+
+def test_the_same_parent_is_one_finding_with_all_the_names(conn, monkeypatch):
+    with_hierarchy(conn, monkeypatch, {2: 1, 3: 1})
+    for start, back in (("08:00", "08:30"), ("11:00", "11:30")):
+        ev(conn, "device_offline", start, 2)
+        ev(conn, "device_offline", start[:-1] + "1", 3)
+        ev(conn, "device_online", back, 2)
+        ev(conn, "device_online", back[:-1] + "1", 3)
+    shared = [f for f in aireport.collect(conn, "24h", NOW)["findings"] if f["type"] == "shared_parent"]
+    assert len(shared) == 1 and "2 problems" in shared[0]["text"] and "cam1" in shared[0]["text"] and "cam2" in shared[0]["text"] and "behind sw-core" in shared[0]["text"]

@@ -30,7 +30,7 @@ SYSTEM = (
     "You write a short report for the administrator of a home or small-business network. You get numbered FINDINGS found by a monitoring program, each with a strength "
     "(strong, likely, possible, info). Write 3 to 6 lines. Each line is ONE plain sentence that ends with the numbers of the findings it is based on, in square brackets, "
     "for example [F2] or [F1,F4]. Use only facts from the findings: no other devices, causes, times or numbers. Say 'possibly' for findings marked possible. "
-    "Put the most important first. Finish with at most two lines that start with CHECK: and say what to look at next, also ending with finding numbers. No greeting, no headings.\n"
+    "Findings marked info are minor: leave them out unless nothing else happened, or cover them in one line. Put the most important first. Finish with at most two lines that start with CHECK: and say what to look at next, also ending with finding numbers. No greeting, no headings.\n"
     "Example:\nThe switch Core-1 went wrong at 03:10 and 4 devices behind it were unreachable [F1].\n"
     "A settings change by admin shortly before may be related [F2].\nCHECK: look at the power and cable of Core-1 [F1]."
 )
@@ -64,25 +64,42 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
     made = changes.timeline(conn, period, include_audit=True, limit=400, now=now)["items"]
     made = [c for c in made if c["category"] == "settings" or c["kind"] in CHANGE_KINDS]
 
-    for inc in incs[:8]:
-        strength = "strong" if inc["cause"] else "likely"
-        raw.append({"type": "incident", "strength": strength, "ts": inc["start"], "devices": inc["devices"][:6], "text": f"{inc['title']}. {inc['summary']}"})
-        start = _ts(inc["start"])
-        for c in sorted(made, key=lambda c: c["ts"], reverse=True):       # the nearest changes before it began
-            gap = start - _ts(c["ts"])
-            if timedelta(0) <= gap <= CHANGE_WINDOW:
-                who = f" by {c['who']}" if c.get("who") else ""
-                raw.append({"type": "change", "strength": "possible", "ts": c["ts"], "devices": [],
-                            "text": f"{_age(gap.total_seconds() / 60)} before “{inc['title']}” began, this changed{who}: {c['text']}"})
-                if sum(1 for r in raw if r["type"] == "change" and inc["title"] in r["text"]) >= 2:
-                    break
+    always_on = {r["id"] for r in conn.execute("SELECT id FROM devices WHERE always_on = 1")}
+    shared: dict[int, dict[str, Any]] = {}
+    pending: list[dict[str, Any]] = []
+    for inc in incs[:40]:
         ids = inc.get("device_ids") or []
+        kinds = inc["facts"]["kinds"]
+        names = inc["devices"]
+        who = ", ".join(names[:5]) + (f" and {len(names) - 5} more" if len(names) > 5 else "")
+        when = _ts(inc["start"]).strftime("%H:%M" if hours <= 24 else "%m-%d %H:%M")
+        minor = not inc["cause"] and len(ids) < 3 and not (set(ids) & always_on) and set(kinds) <= {"went offline"}
+        strength = "strong" if inc["cause"] else "info" if minor else "likely"
+        group = {"inc": {"type": "incident", "strength": strength, "ts": inc["start"], "devices": names[:6],
+                         "text": f"{who}: {', '.join(kinds)} at {when} UTC. {inc['summary']}"}, "ids": ids, "changes": []}
+        pending.append(group)
+        start = _ts(inc["start"])
+        if strength != "info":
+            for c in sorted(made, key=lambda c: c["ts"], reverse=True):       # the nearest changes before it began
+                gap = start - _ts(c["ts"])
+                if timedelta(0) <= gap <= CHANGE_WINDOW and len(group["changes"]) < 2:
+                    by = f" by {c['who']}" if c.get("who") else ""
+                    group["changes"].append({"type": "change", "strength": "possible", "ts": c["ts"], "devices": [],
+                                             "text": f"{_age(gap.total_seconds() / 60)} before the problem with {who} began, this changed{by}: {c['text']}"})
         if len(ids) >= 2 and not inc["cause"]:
             chains = [ancestors(hierarchy, i) for i in ids]
-            shared = next((a for a in chains[0] if all(a in chain for chain in chains[1:]) and a not in ids), None)
-            if shared is not None and shared in devices:
-                raw.append({"type": "shared_parent", "strength": "likely", "ts": inc["start"], "devices": [device_name(devices[shared])],
-                            "text": f"The {len(ids)} devices in “{inc['title']}” all sit behind {device_name(devices[shared])}, which did not report a problem itself: it, or the link to it, is a possible cause."})
+            parent = next((a for a in chains[0] if all(a in chain for chain in chains[1:]) and a not in ids), None)
+            if parent is not None and parent in devices:
+                grp = shared.setdefault(parent, {"names": [], "count": 0, "ts": inc["start"]})
+                grp["count"] += 1
+                grp["names"] += [n for n in names if n not in grp["names"]]
+                grp["ts"] = max(grp["ts"], inc["start"])
+    for parent, grp in shared.items():
+        pname = device_name(devices[parent])
+        listed = ", ".join(grp["names"][:6]) + (f" and {len(grp['names']) - 6} more" if len(grp["names"]) > 6 else "")
+        raw.append({"type": "shared_parent", "strength": "likely", "ts": grp["ts"], "devices": [pname],
+                    "text": f"In {grp['count']} problem{'s' if grp['count'] != 1 else ''} the devices {listed} were all behind {pname}, which did not report a problem itself: "
+                            f"{pname}, or the link to it, is a possible cause."})
 
     kinds = incidents.PROBLEMS - {"cert_expiring"}
     by_key: dict[tuple, list[str]] = defaultdict(list)
@@ -102,6 +119,18 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
             text += f" Most of them were {when}, so something may be scheduled then."
         raw.append({"type": "recurring", "strength": "likely" if near >= REPEATS else "possible", "ts": stamps[-1], "devices": [name], "text": text})
 
+    recurring = {dev for (dev, _kind), stamps in by_key.items() if len(stamps) >= REPEATS}
+    shown = 0
+    for group in sorted(pending, key=lambda g: g["inc"]["ts"], reverse=True):
+        f = group["inc"]
+        if len(group["ids"]) == 1 and group["ids"][0] in recurring:        # told once, as "kept happening", not again as single events
+            continue
+        if f["strength"] != "info":
+            if shown >= 6:
+                continue
+            shown += 1
+        raw.append(f)
+        raw += group["changes"]
     if not raw:
         raw.append({"type": "quiet", "strength": "info", "ts": utcnow(), "devices": [], "text": f"No problems were recorded in {PERIODS[period]}."})
     raw.sort(key=lambda f: f["ts"], reverse=True)
@@ -171,7 +200,7 @@ def write(conn: sqlite3.Connection, period: str = "24h", ask=None, now: datetime
     names += [d for f in facts["findings"] for d in f["devices"]]
     lines, dropped, source = [], 0, "plain"
     if use_model and (ask is not None or insights.llm_ready(conn)):
-        answer = insights.complete(conn, SYSTEM, _prompt(facts), names=names, ask=ask)
+        answer = insights.complete(conn, SYSTEM, _prompt(facts), names=names, ask=ask, timeout=300.0)       # the first request may have to wait for the model to load
         if answer:
             lines, dropped = validate(answer, facts)
             if any(k["kind"] == "line" for k in lines):
