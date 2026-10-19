@@ -184,3 +184,17 @@ def test_a_problem_without_a_device_has_no_empty_name(conn):
     add_event(conn, "service_down", "web check failed", device_id=None, now="2026-11-01T10:00:00Z")
     texts = [f["text"] for f in aireport.collect(conn, "24h", NOW)["findings"]]
     assert texts and all(not t.startswith(":") for t in texts) and any(t.startswith("A service went down at 10:00 UTC") for t in texts)
+
+
+def test_the_report_counts_only_always_on_devices_unless_asked(conn):
+    conn.execute("UPDATE devices SET always_on = 1 WHERE id IN (1, 4)")          # sw-core and nas; cam1 is a camera that comes and goes
+    for hour in ("09", "10", "11"):                                              # cam1 keeps going offline, the nas does once
+        ev(conn, "device_offline", f"{hour}:00", 2)
+        ev(conn, "device_online", f"{hour}:30", 2)
+    ev(conn, "device_offline", "08:00", 4)
+    ev(conn, "device_online", "08:20", 4)
+    texts = lambda scope: " ".join(f["text"] for f in aireport.collect(conn, "24h", NOW, scope)["findings"])   # noqa: E731
+    assert "cam1" in texts("all") and "nas" in texts("all")
+    assert "cam1" not in texts("important") and "nas" in texts("important")
+    aireport.write(conn, "24h", now=NOW, scope="important")
+    assert aireport.latest(conn, "24h", "important")["scope"] == "important" and aireport.latest(conn, "24h", "all") is None

@@ -16,7 +16,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app import changes, engineer, incidents, insights
+from app import changes, engineer, incidents, insights, relevance
 from app.db import get_setting, set_setting, utcnow
 from app.hierarchy import ancestors, device_name, load_hierarchy
 
@@ -49,8 +49,10 @@ def _age(minutes: float) -> str:
     return f"{minutes} minute{'s' if minutes != 1 else ''}" if minutes < 90 else f"{minutes / 60:.1f} hours"
 
 
-def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None = None) -> dict[str, Any]:
-    """The findings of a period, strongest first, each with an id F1, F2 ... (the model and the reader refer to them by that id)."""
+def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None = None, scope: str = "all") -> dict[str, Any]:
+    """The findings of a period, strongest first, each with an id F1, F2 ... (the model and the reader refer to them by that id).
+    `scope` "important": only what happened to the devices marked always-on counts (see app/relevance.py); "all": every device."""
+    only = relevance.important_ids(conn) if scope == "important" else None
     period = period if period in PERIODS else "24h"
     now = now or datetime.now(timezone.utc)
     hours = hours_of(period)
@@ -60,7 +62,7 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
         devices, hierarchy = load_hierarchy(conn)
     except sqlite3.Error:
         devices, hierarchy = {}, {}
-    incs = [i for i in incidents.incidents(conn, days=max(1, -(-hours // 24)), now=now) if i["start"] >= since]
+    incs = [i for i in incidents.incidents(conn, days=max(1, -(-hours // 24)), now=now, only=only) if i["start"] >= since]
     made = changes.timeline(conn, period, include_audit=True, limit=400, now=now)["items"]
     made = [c for c in made if c["category"] == "settings" or c["kind"] in CHANGE_KINDS]
 
@@ -107,7 +109,7 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
         if r["kind"] in kinds and r["device_id"] is not None:
             by_key[(r["device_id"], r["kind"])].append(r["ts"])
     for (dev, kind), stamps in by_key.items():
-        if len(stamps) < REPEATS or dev not in devices:
+        if len(stamps) < REPEATS or dev not in devices or (only is not None and dev not in only):
             continue
         name, word = device_name(devices[dev]), incidents.WORDS.get(kind, kind.replace("_", " "))
         text = f"{name}: {word}, {len(stamps)} times in {PERIODS[period]}."
@@ -136,7 +138,7 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
     raw.sort(key=lambda f: f["ts"], reverse=True)
     raw.sort(key=lambda f: STRENGTH[f["strength"]])           # stable: strongest first, newest first within a strength
     found = [{"id": f"F{n}", **f} for n, f in enumerate(raw[:MAX_FINDINGS], 1)]
-    return {"period": period, "label": PERIODS[period], "since": since, "until": now.strftime(changes.STAMP), "findings": found,
+    return {"period": period, "scope": "important" if only is not None else "all", "label": PERIODS[period], "since": since, "until": now.strftime(changes.STAMP), "findings": found,
             "counts": {"incidents": len(incs), "changes": len(made), "findings": len(found)}}
 
 
@@ -193,9 +195,13 @@ def validate(raw: str, facts: dict[str, Any]) -> tuple[list[dict[str, Any]], int
     return lines + checks, dropped
 
 
-def write(conn: sqlite3.Connection, period: str = "24h", ask=None, now: datetime | None = None, use_model: bool = True) -> dict[str, Any]:
+def _key(period: str, scope: str) -> str:
+    return f"aireport.{period if period in PERIODS else '24h'}" + (".core" if scope == "important" else "")
+
+
+def write(conn: sqlite3.Connection, period: str = "24h", ask=None, now: datetime | None = None, use_model: bool = True, scope: str = "all") -> dict[str, Any]:
     """Build the report, have the model word it when there is one, store it as the latest of its period and return it."""
-    facts = collect(conn, period, now)
+    facts = collect(conn, period, now, scope)
     names = [r[0] for r in conn.execute("SELECT COALESCE(custom_name, hostname, primary_ip) FROM devices") if r[0]] + [r["name"] for r in conn.execute("SELECT name FROM service_checks")]
     names += [d for f in facts["findings"] for d in f["devices"]]
     lines, dropped, source = [], 0, "plain"
@@ -210,13 +216,13 @@ def write(conn: sqlite3.Connection, period: str = "24h", ask=None, now: datetime
     if not lines:
         lines = plain_lines(facts)
     report = {**facts, "lines": lines, "source": source, "model": engineer.settings(conn)["model"] if source == "model" else None, "dropped": dropped, "generated": utcnow()}
-    set_setting(conn, f"aireport.{facts['period']}", json.dumps(report))
+    set_setting(conn, _key(facts["period"], scope), json.dumps(report))
     return report
 
 
-def latest(conn: sqlite3.Connection, period: str) -> dict[str, Any] | None:
+def latest(conn: sqlite3.Connection, period: str, scope: str = "all") -> dict[str, Any] | None:
     try:
-        stored = json.loads(get_setting(conn, f"aireport.{period if period in PERIODS else '24h'}") or "null")
+        stored = json.loads(get_setting(conn, _key(period, scope)) or "null")
     except ValueError:
         return None
     return stored if isinstance(stored, dict) else None
