@@ -144,3 +144,35 @@ def test_openrouter_404_and_429_have_plain_messages(monkeypatch):
         monkeypatch.setattr("urllib.request.urlopen", boom(code))
         with pytest.raises(engineer.EngineerError, match=word):
             engineer.chat_with(openrouter.URL, "m", "k", [{"role": "user", "content": "x"}])
+
+
+def test_busy_server_makes_the_exam_inconclusive_and_stores_nothing(conn, monkeypatch):
+    from app import modelcheck
+
+    monkeypatch.setattr(modelcheck, "_sleep", lambda s: None)
+
+    def busy(messages):
+        raise engineer.EngineerError("the language model is busy or its free allowance for today is used up (HTTP 429): try again later")
+
+    with pytest.raises(openrouter.OpenRouterError, match="could not be tested"):
+        openrouter.run_test(conn, "a/big:free", "k", fetch_of(CATALOGUE), ask=busy)
+    assert openrouter.tests(conn) == {}
+
+
+def test_a_busy_server_is_waited_for_and_a_plain_text_reply_gets_one_reminder(monkeypatch):
+    from app import modelcheck
+
+    waits = []
+    monkeypatch.setattr(modelcheck, "_sleep", waits.append)
+    calls = []
+
+    def flaky(messages):
+        calls.append(messages[-1]["content"])
+        if len(calls) == 1:
+            raise engineer.EngineerError("busy (HTTP 429)")
+        if modelcheck.NUDGE not in messages[-1]["content"]:
+            return "The offline devices are all of them."          # plain text first
+        return '{"answer": "ok"}'
+
+    reply, reminded = modelcheck._step(None, flaky, [{"role": "user", "content": "q"}])
+    assert reply == '{"answer": "ok"}' and reminded is True and waits == [4.0] and len(calls) == 3

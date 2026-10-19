@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.95 — 2026-10-19
+
+### Fixed
+- **The model exams were too harsh on free models**: a model that first answers in plain text now gets the same one-time reminder to answer in JSON that the real questions give, and a busy OpenRouter (HTTP 429, free allowance used up) is waited for. If it is still busy, the model is reported as "could not be tested" and nothing is saved, instead of being marked poor.
+
 ## 0.4.94 — 2026-10-19
 
 ### Added

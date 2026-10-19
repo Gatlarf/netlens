@@ -94,6 +94,8 @@ def run_test(conn: sqlite3.Connection, model: str, key: str | None, fetch: Calla
     ask = ask or (lambda messages: engineer.chat_with(URL, model, key, messages, timeout=120.0))
     result = modelcheck.run(conn, ask)
     result["model"] = model
+    if result["inconclusive"]:
+        raise OpenRouterError("OpenRouter was busy or its free allowance for today is used up, so this model could not be tested. Nothing was saved; try again later.")
     stored = tests(conn)
     stored[model] = {"verdict": result["verdict"], "passed": result["passed"], "total": result["total"], "at": utcnow()}
     for gone in [m for m in stored if m not in known]:      # forget exams of models that no longer exist

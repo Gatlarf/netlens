@@ -15,8 +15,30 @@ from app import ask, engineer
 QUESTION_TOOLS = ("offline_now", "overview")
 
 
-def _step(conn, ask_fn, messages: list[dict]) -> str:
-    return (ask_fn or (lambda m: engineer.chat(conn, m, timeout=120.0)))(messages)
+NUDGE = 'Reply with one JSON object only: {"tool": ..., "args": ...} or {"answer": ...}.'      # the same reminder the real question loop gives (app/ask.py)
+BUSY = ("busy", "HTTP 429", "HTTP 5", "cannot reach", "timed out")       # the server, not the model, failed: the exam says nothing about the model
+RETRY_WAITS = (4.0, 12.0)
+_sleep = time.sleep
+
+
+def _step(conn, ask_fn, messages: list[dict]) -> tuple[str, bool]:
+    """The model's reply, and whether it needed the reminder to answer in JSON. A busy server is waited for twice before it counts as a failure."""
+    call = ask_fn or (lambda m: engineer.chat(conn, m, timeout=120.0))
+
+    def once(msgs: list[dict]) -> str:
+        for wait in (*RETRY_WAITS, None):
+            try:
+                return call(msgs)
+            except Exception as exc:  # noqa: BLE001
+                if wait is None or not any(w in str(exc) for w in BUSY):
+                    raise
+                _sleep(wait)
+        raise RuntimeError("unreachable")
+
+    reply = once(messages)
+    if ask._parse_reply(reply) is None:
+        return once(messages + [{"role": "assistant", "content": (reply or "")[:500]}, {"role": "user", "content": NUDGE}]), True
+    return reply, False
 
 
 def _result(question: str, tool: str, args: dict, result: dict) -> list[dict]:
@@ -35,11 +57,15 @@ def run(conn, ask_fn=None) -> dict[str, Any]:
 
     def exam(name: str, what: str, messages: list[dict], judge: Callable[[str], tuple[bool, str]]) -> None:
         started = time.monotonic()
+        failed = False
         try:
-            ok, detail = judge(_step(conn, ask_fn, messages))
+            reply, reminded = _step(conn, ask_fn, messages)
+            ok, detail = judge(reply)
+            if ok and reminded:
+                detail += " (after one reminder to answer in JSON)"
         except Exception as exc:  # noqa: BLE001 - an unreachable model fails every exam, and says why
-            ok, detail = False, f"no answer ({str(exc)[:120]})"
-        checks.append({"name": what, "ok": ok, "detail": detail, "seconds": round(time.monotonic() - started, 1), "id": name})
+            ok, detail, failed = False, f"no answer ({str(exc)[:120]})", any(w in str(exc) for w in BUSY)
+        checks.append({"name": what, "ok": ok, "detail": detail, "seconds": round(time.monotonic() - started, 1), "id": name, "server_failed": failed})
 
     def picks(*tools):
         def judge(reply):
@@ -83,8 +109,9 @@ def run(conn, ask_fn=None) -> dict[str, Any]:
     exam("honesty", "Does not invent what the data cannot tell", [{"role": "system", "content": ask.system_prompt()}, {"role": "user", "content": "What was the temperature in my server room yesterday at noon?"}], honest)
 
     passed = sum(1 for c in checks if c["ok"])
+    inconclusive = any(c["server_failed"] for c in checks)      # the server was busy or unreachable: nothing was learned about the model
     verdict = "good" if passed == len(checks) else "usable" if passed >= len(checks) - 1 else "poor"
     advice = {"good": "This model follows the instructions well enough for Insights and the digital engineer.",
               "usable": "This model mostly works. Check important answers yourself and keep remediation rules on “ask first”.",
               "poor": "This model is not reliable enough: answers can look right and be wrong. Use a larger or less compressed model. Insights still work without any model."}[verdict]
-    return {"passed": passed, "total": len(checks), "verdict": verdict, "advice": advice, "checks": checks, "model": engineer.settings(conn)["model"]}
+    return {"passed": passed, "total": len(checks), "verdict": verdict, "advice": advice, "inconclusive": inconclusive, "checks": checks, "model": engineer.settings(conn)["model"]}
