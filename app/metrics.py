@@ -6,7 +6,7 @@ import sqlite3
 
 from app import sites
 from app.db import utcnow
-from app.stats import _ago, _parse, compute_stats, summary
+from app.stats import _ago, _parse, _shared, compute_stats, summary
 from app.version import VERSION
 
 
@@ -40,6 +40,7 @@ class _Out:
         self.lines.append(f"{name}{label_text} {value:g}" if isinstance(value, float) else f"{name}{label_text} {value}")
 
 
+@_shared
 def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_running: bool = False, data_dir=None, passive: dict | None = None) -> str:
     now = now or utcnow()
     doc = summary(conn, now, scan_running=scan_running, data_dir=data_dir, passive=passive)

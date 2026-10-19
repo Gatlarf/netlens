@@ -5,7 +5,7 @@ import sqlite3
 
 from app.maintenance import covered
 from app.stats import _ago, _pct, utcnow
-from app import sites as sites_mod, speedtest
+from app import checkstats, sites as sites_mod, speedtest
 
 
 def _site_vuln_attention(conn: sqlite3.Connection) -> list[dict]:
@@ -129,10 +129,10 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
     certs = sites_mod.certificates(conn)
     down_checks = [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM service_checks WHERE enabled = 1 AND last_up = 0 ORDER BY name COLLATE NOCASE")]
     down = [c["name"] for c in down_checks]
+    week = checkstats.totals(conn, _ago(now, days=7))
     worst = [
-        {"id": r["device_id"], "name": names.get(r["device_id"]), "pct": _pct(r["u"], r["n"])}
-        for r in conn.execute("SELECT device_id, SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ? GROUP BY device_id HAVING SUM(up) < COUNT(*) ORDER BY CAST(SUM(up) AS REAL) / COUNT(*) LIMIT 5", (_ago(now, days=7),))
-        if r["device_id"] in names
+        {"id": d, "name": names.get(d), "pct": _pct(u, n)}
+        for d, (u, n, _rs, _rn) in sorted(((d, v) for d, v in week.items() if v[0] < v[1] and d in names), key=lambda kv: (kv[1][0] / kv[1][1], kv[0]))[:5]
     ]
     core_down = [{"id": r["id"], "name": names.get(r["id"])} for r in conn.execute("SELECT id FROM devices WHERE always_on = 1 AND online = 0 ORDER BY id")]
     since = _ago(now, days=14)[:10]
@@ -140,9 +140,9 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
              for r in conn.execute("SELECT day, devices, online, events FROM stats_daily WHERE day >= ? ORDER BY day", (since,))]
     new_devices = [{"id": r["id"], "name": names.get(r["id"]), "first_seen": r["first_seen"]}
                    for r in conn.execute("SELECT id, first_seen FROM devices WHERE first_seen >= ? ORDER BY first_seen DESC LIMIT 6", (_ago(now, days=7),))]
-    uptime = {r["device_id"]: [_pct(r["u1"], r["n1"]), _pct(r["u7"], r["n7"])] for r in conn.execute(
-        "SELECT device_id, SUM(CASE WHEN ts >= ? THEN up ELSE 0 END) AS u1, SUM(CASE WHEN ts >= ? THEN 1 ELSE 0 END) AS n1, SUM(up) AS u7, COUNT(*) AS n7 FROM checks WHERE ts >= ? GROUP BY device_id",
-        (_ago(now, hours=24), _ago(now, hours=24), _ago(now, days=7)))}
+    day = checkstats.totals(conn, _ago(now, hours=24))
+    uptime = {d: [_pct(day[d][0], day[d][1]) if d in day else _pct(0, 0), _pct(v[0], v[1])] for d, v in week.items()}
+    uptime.update({d: [_pct(v[0], v[1]), _pct(0, 0)] for d, v in day.items() if d not in uptime})
     from app.stats import _services
 
     return {

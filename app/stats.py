@@ -10,12 +10,14 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import functools
 import statistics
+import threading
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app import containers, guestbackups, inventory, remediation, sites, speedtest
+from app import checkstats, containers, guestbackups, inventory, remediation, sites, speedtest
 from app import licence as _licence, vulns as _vulns
 from app.db import get_setting, utcnow
 from app.hierarchy import children_map, load_hierarchy
@@ -163,26 +165,83 @@ def _composition(conn, devs: dict, hierarchy: dict) -> dict:
     }
 
 
+_local = threading.local()
+
+
+class memo_scope:
+    """While it is open, the same expensive question asked twice (who flapped in the last 24 hours) is answered once. A page and the numbers
+    for Prometheus ask it several times: for everybody, for the always-on devices, for the lists."""
+
+    def __enter__(self):
+        self.outer = getattr(_local, "memo", None)
+        if self.outer is None:
+            _local.memo = {}
+        return self
+
+    def __exit__(self, *exc):
+        if self.outer is None:
+            _local.memo = None
+
+
+def _flaps(conn, since: str, core: bool | None = None) -> dict[int, int]:
+    """Per device the changes between up and down among its checks since `since` (only devices that changed at all)."""
+    memo = getattr(_local, "memo", None)
+    key = (id(conn), since)
+    if memo is None or key not in memo:
+        found = {r[0]: r[1] for r in conn.execute(
+            "WITH s AS (SELECT device_id AS d, up, LAG(up) OVER (PARTITION BY device_id ORDER BY ts, id) AS prev FROM checks WHERE ts >= ?) "
+            "SELECT d, SUM(prev IS NOT NULL AND prev != up) AS n FROM s GROUP BY d HAVING n > 0", (since,))}
+        if memo is not None:
+            memo[key] = found
+    else:
+        found = memo[key]
+    if core is None or not found:
+        return found
+    wanted = {r[0] for r in conn.execute("SELECT id FROM devices WHERE always_on = ?", (1 if core else 0,))}
+    return {d: n for d, n in found.items() if d in wanted}
+
+
+def _sequences(conn, ids: list[int], since: str) -> dict[int, tuple[int, int]]:
+    """(outages, transitions) of the given devices since `since`: an outage is a check that is down after one that was up (or a first check that is down)."""
+    out: dict[int, tuple[int, int]] = {}
+    for i in range(0, len(ids), 400):
+        part = ids[i:i + 400]
+        marks = ",".join("?" * len(part))
+        rows = conn.execute(
+            "WITH s AS (SELECT device_id AS d, up, LAG(up) OVER (PARTITION BY device_id ORDER BY ts, id) AS prev, ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY ts, id) AS rn "
+            f"FROM checks WHERE ts >= ? AND device_id IN ({marks})) "
+            "SELECT d, SUM(prev IS NOT NULL AND prev != up), SUM(prev = 1 AND up = 0) + SUM(rn = 1 AND up = 0) FROM s GROUP BY d", [since, *part])
+        for d, transitions, outages in rows:
+            out[d] = (outages or 0, transitions or 0)
+    return out
+
+
 def _availability(conn, now: str) -> dict:
     def network(days: float) -> float | None:
-        r = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ?", (_ago(now, days=days),)).fetchone()
-        return _pct(r["u"] or 0, r["n"])
+        u, n = checkstats.network(conn, _ago(now, days=days))
+        return _pct(u, n)
 
     since = _ago(now, days=7)
     since_day = _ago(now, hours=24)
-    per_device: dict[int, list[tuple[str, int]]] = defaultdict(list)
-    for r in conn.execute("SELECT device_id, ts, up FROM checks WHERE ts >= ? ORDER BY device_id, ts, id", (since,)):
-        per_device[r["device_id"]].append((r["ts"], r["up"]))
     names = {r["id"]: r["n"] for r in conn.execute(f"SELECT d.id, {NAME} AS n FROM devices d")}
-    rows = []
-    for dev_id, checks in per_device.items():
-        if dev_id not in names:
-            continue
-        ups = sum(u for _, u in checks)
-        transitions = sum(1 for a, b in zip(checks, checks[1:]) if a[1] != b[1])
-        outages = sum(1 for a, b in zip(checks, checks[1:]) if a[1] == 1 and b[1] == 0) + (1 if checks and checks[0][1] == 0 else 0)
-        flaps = sum(1 for a, b in zip(checks, checks[1:]) if a[1] != b[1] and b[0] >= since_day)
-        rows.append({"id": dev_id, "name": names[dev_id], "checks": len(checks), "uptime": _pct(ups, len(checks)), "outages": outages, "flaps_24h": flaps, "transitions": transitions})
+    sums = {d: v for d, v in checkstats.totals(conn, since).items() if d in names}
+    flaps = _flaps(conn, since_day)
+
+    def row_of(dev_id: int, outages: int = 0, transitions: int = 0) -> dict:
+        ups, n = sums[dev_id][0], sums[dev_id][1]
+        return {"id": dev_id, "name": names[dev_id], "checks": n, "uptime": _pct(ups, n), "outages": outages, "flaps_24h": flaps.get(dev_id, 0), "transitions": transitions}
+
+    # Only the devices that can end up in a list need their outage and transition counts, which need the checks in order. A device that was never down has
+    # none, so on a healthy network that is almost every device. Devices past the fifth place on uptime cannot appear (ties are broken by the outage count).
+    quick = {d: row_of(d) for d in sums}
+    wanted: set[int] = set(sorted(flaps, key=lambda d: -flaps[d])[:5])
+    ranked_ids = [d for d in quick if quick[d]["checks"] >= MIN_CHECKS]
+    if ranked_ids:
+        ups = sorted(quick[d]["uptime"] for d in ranked_ids)
+        low_edge, high_edge = ups[min(4, len(ups) - 1)], ups[max(0, len(ups) - 5)]
+        wanted |= {d for d in ranked_ids if quick[d]["uptime"] <= low_edge or quick[d]["uptime"] >= high_edge}
+    seq = _sequences(conn, [d for d in wanted if sums[d][0] < sums[d][1]], since)
+    rows = [row_of(d, *seq[d]) if d in seq else quick[d] for d in quick]
     ranked = [r for r in rows if r["checks"] >= MIN_CHECKS]
     least = sorted(ranked, key=lambda r: (r["uptime"], -r["outages"], r["name"]))[:5]
     most = sorted(ranked, key=lambda r: (-r["uptime"], r["outages"], r["name"]))[:5]
@@ -273,16 +332,7 @@ def _dns(conn) -> dict:
 
 def flapping_devices(conn, now: str, core: bool | None = None) -> int:
     """Devices with FLAP_TRANSITIONS or more up/down changes in the last 24 hours. core=True: only the always-on devices, False: only the others."""
-    since = _ago(now, hours=24)
-    per_device: dict[int, list[int]] = defaultdict(list)
-    sql = "SELECT c.device_id, c.up FROM checks c"
-    args: list = [since]
-    if core is not None:
-        sql += " JOIN devices d ON d.id = c.device_id AND d.always_on = ?"
-        args.insert(0, 1 if core else 0)
-    for r in conn.execute(sql + " WHERE c.ts >= ? ORDER BY c.device_id, c.ts, c.id", args):
-        per_device[r["device_id"]].append(r["up"])
-    return sum(1 for ups in per_device.values() if sum(1 for a, b in zip(ups, ups[1:]) if a != b) >= FLAP_TRANSITIONS)
+    return sum(1 for n in _flaps(conn, _ago(now, hours=24), core).values() if n >= FLAP_TRANSITIONS)
 
 
 def core_numbers(conn, now: str) -> dict:
@@ -291,8 +341,8 @@ def core_numbers(conn, now: str) -> dict:
     row = conn.execute("SELECT COUNT(*) AS n, COALESCE(SUM(online), 0) AS o FROM devices WHERE always_on = 1").fetchone()
 
     def pct(days: float) -> float | None:
-        r = conn.execute("SELECT SUM(c.up) AS u, COUNT(*) AS n FROM checks c JOIN devices d ON d.id = c.device_id AND d.always_on = 1 WHERE c.ts >= ?", (_ago(now, days=days),)).fetchone()
-        return _pct(r["u"] or 0, r["n"])
+        u, n = checkstats.network(conn, _ago(now, days=days), core=True)
+        return _pct(u, n)
 
     return {"devices": row["n"], "online": row["o"], "uptime": {"24h": pct(1), "7d": pct(7), "30d": pct(30)}, "flapping": flapping_devices(conn, now, True) if row["n"] else 0}
 
@@ -466,6 +516,16 @@ def _system(conn, db_path: str | None, passive: dict | None = None) -> dict:
 
 
 # ----------------------------------------------------------------------------- public API
+def _shared(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        with memo_scope():
+            return fn(*args, **kwargs)
+
+    return wrapper
+
+
+@_shared
 def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | None = None, db_path: str | None = None, passive: dict | None = None) -> dict:
     """Everything the Statistics page shows. `range_key` (24h, 7d, 30d, 90d) sets the window of the history groups."""
     if range_key not in RANGES:
@@ -530,6 +590,7 @@ def _remote_sites(conn: sqlite3.Connection) -> dict:
             "devices_down": sum(s["devices"]["total"] - s["devices"]["online"] for s in sites), "services_down": sum(s["services"]["down"] for s in sites)}
 
 
+@_shared
 def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool = False, stale_after_s: int = 3 * 3600, data_dir=None, passive: dict | None = None) -> dict:
     """The small, versioned document Home Assistant polls (see SUMMARY_API). Keys never disappear within one API version."""
     now = now or utcnow()
@@ -551,9 +612,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     for d in devices:
         if d["id"] in health_by_device:
             d["health"] = health_by_device[d["id"]]
-    day = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ?", (_ago(now, hours=24),)).fetchone()
-    week = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ?", (_ago(now, days=7),)).fetchone()
-    month = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ?", (_ago(now, days=30),)).fetchone()
+    day, week, month = (dict(zip(("u", "n"), checkstats.network(conn, since))) for since in (_ago(now, hours=24), _ago(now, days=7), _ago(now, days=30)))
     last = conn.execute("SELECT kind, status, started, finished, hosts_found FROM scans WHERE status != 'running' ORDER BY id DESC LIMIT 1").fetchone()
     last_done = conn.execute("SELECT kind, started, finished, hosts_found FROM scans WHERE status = 'done' AND finished IS NOT NULL ORDER BY id DESC LIMIT 1").fetchone()
     last_info = None

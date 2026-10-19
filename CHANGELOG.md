@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.87 — 2026-10-19
+
+### Changed
+- ★ **Much quicker on big networks**: the statistics, dashboard, uptime page, summary, Prometheus numbers and the weekly and monthly reports no longer add up every check ever made. An hourly roll-up of the uptime history gives the same numbers from thousands of rows instead of millions (it is built in the background after this update; until then everything works the slower way). With 2,000 devices and a week of history the dashboard opens in 0.8 s instead of 3.2 s and the statistics in 1.2 s instead of 3.1 s; with 10,000 devices the hierarchy page opens in 0.2 s instead of 11 s and saving a scan takes 6 s instead of 17 s. Measured numbers for 500, 2,000 and 10,000 devices are in the README.
+- A page that is a little out of date (under two minutes) is shown at once while a fresh one is made in the background.
+- Saving a scan commits every 250 devices instead of for every device (about four times faster on a big network; progress is still saved in steps).
+- The flapping count looks at the changes inside the last 24 hours (a change between the last check before that window and the first one in it is no longer counted).
+
 ## 0.4.86 — 2026-10-19
 
 ### Added

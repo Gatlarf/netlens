@@ -1,3 +1,5 @@
+import logging
+import threading
 import time
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -7,7 +9,9 @@ from app.scanner.scans import running_scan
 from app.stats import RANGES, compute_stats, summary
 
 router = APIRouter(prefix="/api", tags=["stats"])
-CACHE_SECONDS = 30  # the page and Home Assistant both poll; computing is cheap but not free
+CACHE_SECONDS = 30   # the page and Home Assistant both poll; computing is cheap but not free
+STALE_SECONDS = 120  # a little older than that is still shown at once, while a fresh answer is made in the background (a big network takes seconds to compute)
+log = logging.getLogger(__name__)
 
 
 def _cached(request: Request, key: tuple, build):
@@ -15,6 +19,21 @@ def _cached(request: Request, key: tuple, build):
     hit = cache.get(key)
     now = time.monotonic()
     if hit and now - hit[0] < CACHE_SECONDS:
+        return hit[1]
+    if hit and now - hit[0] < STALE_SECONDS:
+        running = request.app.state.__dict__.setdefault("stats_refreshing", set())
+        if key not in running:
+            running.add(key)
+
+            def refresh() -> None:
+                try:
+                    cache[key] = (time.monotonic(), build())
+                except Exception:  # noqa: BLE001 - the next request tries again, and the stale answer is still there
+                    log.exception("could not refresh %s", key[0])
+                finally:
+                    running.discard(key)
+
+            threading.Thread(target=refresh, name=f"refresh-{key[0]}", daemon=True).start()
         return hit[1]
     value = build()
     cache[key] = (now, value)

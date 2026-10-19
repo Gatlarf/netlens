@@ -14,6 +14,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from app import checkstats
 from app.db import get_setting, set_setting
 
 log = logging.getLogger(__name__)
@@ -173,18 +174,35 @@ def availability(conn, start: datetime, end: datetime, scope: str = "all", with_
     if group_id is not None:
         where.append("group_id = ?")
         args.append(group_id)
+    totals = checkstats.range_totals(conn, a, b)
+    down = checkstats.down_hours(conn, a, b) if totals is not None else {}
     for d in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip AS ip, COALESCE(type_override, device_type) AS type, always_on FROM devices "
                           f"WHERE {' AND '.join(where)} ORDER BY name COLLATE NOCASE", args):
-        rows = conn.execute("SELECT ts, up FROM checks WHERE device_id = ? AND ts >= ? AND ts < ? ORDER BY ts, id", (d["id"], a, b)).fetchall()
-        if inside is not None or d["id"] in quiet:
-            skip = quiet.get(d["id"])
-            rows = [r for r in rows if (inside is None or inside.contains(r["ts"])) and (skip is None or not skip.contains(r["ts"]))]
-        if not rows:
-            continue
-        up = sum(1 for r in rows if r["up"])
+        count = ups = None
+        if inside is None and d["id"] not in quiet and totals is not None:
+            u, n = totals.get(d["id"], (0, 0, 0, 0))[:2]
+            if n == 0:
+                continue
+            if u == n:                                   # never down this period: there is nothing to look up (the usual device on a healthy network)
+                devices.append({"id": d["id"], "name": d["name"] or d["ip"], "ip": d["ip"], "type": d["type"], "always_on": bool(d["always_on"]), "checks": n,
+                                "availability": 100.0, "down_seconds": 0, "down_text": duration(0), "outages": 0, "longest": duration(0), "ongoing": False})
+                continue
+            # only the hours with a failed check (and the one after) can hold a down period: read just those, the counts come from the roll-up
+            rows = []
+            for w0, w1 in checkstats.change_windows(down.get(d["id"], []), a, b):
+                rows += conn.execute("SELECT ts, up FROM checks WHERE device_id = ? AND ts >= ? AND ts < ? ORDER BY ts, id", (d["id"], w0, w1)).fetchall()
+            count, ups = n, u
+        else:
+            rows = conn.execute("SELECT ts, up FROM checks WHERE device_id = ? AND ts >= ? AND ts < ? ORDER BY ts, id", (d["id"], a, b)).fetchall()
+            if inside is not None or d["id"] in quiet:
+                skip = quiet.get(d["id"])
+                rows = [r for r in rows if (inside is None or inside.contains(r["ts"])) and (skip is None or not skip.contains(r["ts"]))]
+            if not rows:
+                continue
+            count, ups = len(rows), sum(1 for r in rows if r["up"])
         outs, down_s = _outages(rows, start, end)
-        devices.append({"id": d["id"], "name": d["name"] or d["ip"], "ip": d["ip"], "type": d["type"], "always_on": bool(d["always_on"]), "checks": len(rows),
-                        "availability": round(up / len(rows) * 100, 2), "down_seconds": round(down_s), "down_text": duration(down_s),
+        devices.append({"id": d["id"], "name": d["name"] or d["ip"], "ip": d["ip"], "type": d["type"], "always_on": bool(d["always_on"]), "checks": count,
+                        "availability": round(ups / count * 100, 2), "down_seconds": round(down_s), "down_text": duration(down_s),
                         "outages": len(outs), "longest": duration(max([o["seconds"] for o in outs], default=0)), "ongoing": any(o["ongoing"] for o in outs)})
     services = []
     for s in conn.execute("SELECT id, name, kind, host, port FROM service_checks WHERE enabled = 1 ORDER BY name COLLATE NOCASE") if with_services else []:
@@ -250,7 +268,11 @@ def weekly(conn, now: datetime | None = None, options: dict[str, Any] | None = N
     limit = int(opts["max_items"])
     now = now or datetime.now(timezone.utc)
     start = now - timedelta(days=7)
-    av = availability(conn, start, now + timedelta(seconds=1), scope=opts["scope"], with_services=opts["services"], hours=opts["hours"], business=opts,
+    # whole hours, so the hourly roll-up can answer (see app/checkstats.py): from the hour in which the week began to the end of the current hour
+    hour = timedelta(hours=1)
+    first = start.replace(minute=0, second=0, microsecond=0)
+    last = now.replace(minute=0, second=0, microsecond=0) + hour
+    av = availability(conn, first, last, scope=opts["scope"], with_services=opts["services"], hours=opts["hours"], business=opts,
                       ignore_maintenance=opts["ignore_maintenance"])
     a = _fmt(start)
     counts = {r["kind"]: r["n"] for r in conn.execute("SELECT kind, COUNT(*) AS n FROM events WHERE ts >= ? GROUP BY kind", (a,))}

@@ -1,7 +1,7 @@
 import sqlite3
 import ipaddress
 from datetime import datetime, timedelta, timezone
-from app import tsdb
+from app import checkstats, tsdb
 from app.db import utcnow
 
 
@@ -80,7 +80,9 @@ def record_checks(
 
     cutoff = _cutoff(now, keep_days)
     conn.execute("DELETE FROM checks WHERE ts < ?", (cutoff,))
+    checkstats.prune(conn, now)
     conn.commit()
+    checkstats.fold(conn)                         # count the new checks into the hourly roll-up
     return inserted
 
 
@@ -199,27 +201,13 @@ def uptime_overview(
     cutoff_24h = _cutoff(now, 1)
     cutoff_7d = _cutoff(now, 7)
 
-    # Aggregate queries for 24h and 7d percentages
-    agg_24h = {}
-    for row in conn.execute(
-        "SELECT device_id, SUM(up) AS total_up, COUNT(*) AS total FROM checks WHERE ts >= ? GROUP BY device_id",
-        (cutoff_24h,),
-    ).fetchall():
-        agg_24h[row["device_id"]] = round(row["total_up"] / row["total"] * 100, 2) if row["total"] else None
+    # percentages over 24 hours, 7 and 30 days (from the hourly roll-up, see app/checkstats.py)
+    def pct(u: int, n: int):
+        return round(u / n * 100, 2) if n else None
 
-    agg_7d = {}
-    for row in conn.execute(
-        "SELECT device_id, SUM(up) AS total_up, COUNT(*) AS total FROM checks WHERE ts >= ? GROUP BY device_id",
-        (cutoff_7d,),
-    ).fetchall():
-        agg_7d[row["device_id"]] = round(row["total_up"] / row["total"] * 100, 2) if row["total"] else None
-
-    agg_30d = {}
-    for row in conn.execute(
-        "SELECT device_id, SUM(up) AS total_up, COUNT(*) AS total, AVG(rtt_ms) AS rtt FROM checks WHERE ts >= ? GROUP BY device_id",
-        (_cutoff(now, 30),),
-    ).fetchall():
-        agg_30d[row["device_id"]] = round(row["total_up"] / row["total"] * 100, 2) if row["total"] else None
+    agg_24h = {d: pct(u, n) for d, (u, n, _a, _b) in checkstats.totals(conn, cutoff_24h).items()}
+    agg_7d = {d: pct(u, n) for d, (u, n, _a, _b) in checkstats.totals(conn, cutoff_7d).items()}
+    agg_30d = {d: pct(u, n) for d, (u, n, _a, _b) in checkstats.totals(conn, _cutoff(now, 30)).items()}
 
     # Window function query for bars
     bars_map: dict[int, list] = {}
@@ -319,7 +307,7 @@ def core_choices(conn: sqlite3.Connection, now: str | None = None) -> list[dict]
     """Every device with whether it is marked always-on, its 30-day uptime and whether Netlens suggests marking it: it has been up
     nearly all the time (so it is probably meant to be) and is the kind of device that runs all day."""
     now = now or utcnow()
-    stats = {r["device_id"]: (r["u"], r["n"]) for r in conn.execute("SELECT device_id, SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ? GROUP BY device_id", (_cutoff(now, 30),))}
+    stats = {d: (u, n) for d, (u, n, _rs, _rn) in checkstats.totals(conn, _cutoff(now, 30)).items()}
     out = []
     for r in conn.execute("SELECT id, primary_ip, custom_name, hostname, always_on, COALESCE(type_override, device_type, 'unknown') AS type FROM devices"):
         u, n = stats.get(r["id"], (0, 0))

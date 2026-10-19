@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 32
+SCHEMA_VERSION = 33
 
 
 def utcnow() -> str:
@@ -40,6 +40,23 @@ def connect(path: str | os.PathLike) -> sqlite3.Connection:
 
     return conn
 
+
+
+class BatchedCommits:
+    """A connection that only really commits every `every` times it is asked to. A scan saves hundreds or thousands of devices, and every helper commits
+    for itself (a commit is a write to disk: about a millisecond each, so 17,000 of them are 17 seconds for 10,000 devices). Progress is still saved in
+    steps, and the caller commits for real at the end."""
+
+    def __init__(self, conn: sqlite3.Connection, every: int = 250) -> None:
+        self._conn, self._every, self._asked = conn, every, 0
+
+    def commit(self) -> None:
+        self._asked += 1
+        if self._asked % self._every == 0:
+            self._conn.commit()
+
+    def __getattr__(self, name: str):
+        return getattr(self._conn, name)
 
 
 def _allow_operator_role(conn: sqlite3.Connection) -> None:
@@ -529,6 +546,12 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     # --- schema v30: users that sign in through an identity provider are recognised by its stable subject id -----
     _add_column_if_missing(conn, "users", "oidc_sub", "TEXT")
+    # --- schema v33: hourly roll-up of the checks, so availability over weeks stays quick on a big network (see app/checkstats.py) --------
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS checks_hourly (device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE, hour TEXT NOT NULL, n INTEGER NOT NULL, up INTEGER NOT NULL, "
+        "rtt_sum REAL NOT NULL DEFAULT 0, rtt_n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (device_id, hour)) WITHOUT ROWID")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_checks_hourly_hour ON checks_hourly(hour, device_id)")
+
     # --- schema v32: the role operator, and a user (a viewer) that can see only some groups ---------------------
     _add_column_if_missing(conn, "users", "scope", "TEXT")          # JSON list of group ids; NULL = everything
     _allow_operator_role(conn)

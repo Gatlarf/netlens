@@ -3,7 +3,7 @@ from dataclasses import replace
 from typing import Any, Optional
 
 from app.baselines import baseline_ports
-from app.db import add_event, get_or_create_device, utcnow
+from app.db import BatchedCommits, add_event, get_or_create_device, utcnow
 from app.plugins.enrich import refresh_hostname
 from app.scanner import vendor as vendor_db
 from app.scanner.classify import classify_device, classify_evidence
@@ -28,6 +28,8 @@ def save_scan_results(
 ) -> dict[str, Any]:
     if kind not in ("quick", "deep"):
         raise ValueError("kind must be 'quick' or 'deep'")
+    real = conn
+    conn = BatchedCommits(real)               # every helper commits for itself: on a big network that is thousands of disk writes (see app/db.py)
 
     if now is None:
         now = utcnow()
@@ -242,7 +244,7 @@ def save_scan_results(
 
         reclassify_device(conn, device_id)
 
-    conn.commit()
+    real.commit()
 
     return {"new": new_count, "updated": updated_count, "device_ids": device_ids, "rtts": rtts}
 

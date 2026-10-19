@@ -575,6 +575,32 @@ New installs have no shared token: you create the first administrator in the [fi
 
 An administrator can create **API tokens** for a user (shown once). They are Bearer tokens that act with the role of their user, for scripts, Prometheus (`/metrics`) and the Home Assistant integration; a viewer's token is enough for those because they only read. To be sure a token can never change anything, tick **read-only** when you create it: it then only reads, even when its user is an administrator. The [API reference](https://www.home.codeshrimp.com/docs/netlens/using-netlens/api-reference/) lists every endpoint.
 
+### Large networks and performance
+
+Netlens keeps everything in one SQLite file and is meant for homes, offices and a few sites. `tools/bench.py` builds a made-up network of any size and times what you wait for (`python tools/bench.py --devices 2000 --days 7`). The numbers below are the **first request after nothing was cached**, measured in the application itself (no network) on a fast desktop processor with an SSD; a small ARM board or a NAS will be several times slower. Pages that are cached for 30 seconds answer in a few milliseconds after that, and an answer up to two minutes old is shown at once while a fresh one is made in the background.
+
+| What you open | 500 devices | 2,000 devices | 10,000 devices |
+|---|---|---|---|
+| Device list | 25 ms | 46 ms | 166 ms |
+| Map | 18 ms | 47 ms | 211 ms |
+| Hierarchy | 87 ms | 88 ms | 189 ms |
+| Dashboard | 242 ms | 776 ms | 3.1 s |
+| Uptime page, 24 hours | 234 ms | 907 ms | 4.0 s |
+| Uptime page, 30 days | 583 ms | 2.4 s | 5.3 s |
+| Statistics | 371 ms | 1.2 s | 4.3 s |
+| Summary for Home Assistant | 173 ms | 655 ms | 2.8 s |
+| Prometheus metrics | 327 ms | 1.1 s | 4.5 s |
+| Monthly availability report | 548 ms | 2.2 s | 4.7 s |
+| Weekly report | 535 ms | 2.2 s | 4.9 s |
+| Saving a scan that finds every device | 93 ms | 474 ms | 5.9 s |
+| Start of the application | 109 ms | 387 ms | 1.8 s |
+| Database files | 118 MB | 475 MB | 1.0 GB |
+| Uptime history in them | 1.0 million checks (7 days) | 4.0 million checks (7 days) | 8.6 million checks (3 days) |
+
+What keeps it quick: an **hourly roll-up of the uptime history** (`checks_hourly`, exact sums per device and hour, kept up to date as checks are written, rebuilt in the background after an update) so availability over a week or a month adds up thousands of rows instead of millions; reports that read only the hours in which something failed; flapping and outage counts worked out inside SQLite; scans that save with a commit every 250 devices instead of one per device; and one pass instead of one per device for the hierarchy.
+
+Where the limits are: the uptime history grows with devices times checks (a check every 5 minutes for 90 days is 26,000 rows per device), so 10,000 devices means a database of several gigabytes. As a rule of thumb Netlens is comfortable up to about 2,000 devices on modest hardware and about 5,000 on a fast machine with an SSD. The Uptime page sends every device with its bars to the browser, so it is the heaviest page on a very large network. An external database for larger installations is planned.
+
 ### Roles and customer views
 
 **Settings → Users & tokens** has three roles. An **administrator** can do everything. An **operator** looks and acts: scans, tests, Wake-on-LAN, acknowledges and snoozes alerts, plans maintenance windows, approves or declines proposed fixes, and edits a device's name, type and group, but has no access to settings, users, credentials, backups, plugins, the terminal or remote access, and cannot delete anything. A **viewer** only looks.

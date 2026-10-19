@@ -141,8 +141,8 @@ def ancestors(hierarchy: dict[int, Parent], dev_id: int) -> list[int]:
     return chain
 
 
-def descendants(hierarchy: dict[int, Parent], dev_id: int) -> set[int]:
-    kids = children_map(hierarchy)
+def descendants(hierarchy: dict[int, Parent], dev_id: int, kids: dict[int, list[int]] | None = None) -> set[int]:
+    kids = children_map(hierarchy) if kids is None else kids
     found: set[int] = set()
     stack = list(kids.get(dev_id, []))
     while stack:
@@ -218,8 +218,12 @@ def hierarchy_payload(conn: sqlite3.Connection, guests: bool = False) -> dict[st
     devs, hierarchy = load_hierarchy(conn)
     kids = children_map(hierarchy)
 
-    def depth(dev_id: int) -> int:
-        return len(ancestors(hierarchy, dev_id))
+    depths = {dev_id: len(ancestors(hierarchy, dev_id)) for dev_id in devs}
+    below = dict.fromkeys(devs, 0)                  # how many devices are below each one: the deepest are added to their parent first, so one pass is enough
+    for dev_id in sorted(devs, key=depths.__getitem__, reverse=True):
+        parent = hierarchy[dev_id].parent_id
+        if parent in below:
+            below[parent] += below[dev_id] + 1
 
     nodes = []
     for dev_id, d in sorted(devs.items(), key=lambda kv: device_name(kv[1]).lower()):
@@ -235,8 +239,8 @@ def hierarchy_payload(conn: sqlite3.Connection, guests: bool = False) -> dict[st
             "reason": info.reason,
             "locked": info.locked,
             "children": len(kids.get(dev_id, [])),
-            "descendants": len(descendants(hierarchy, dev_id)),
-            "depth": depth(dev_id),
+            "descendants": below[dev_id],
+            "depth": depths[dev_id],
         })
     roots = [n["id"] for n in nodes if n["parent_id"] is None]
     device_count = len(nodes)

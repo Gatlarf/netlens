@@ -40,6 +40,22 @@ async def require_terminal_enabled(conn: HTTPConnection) -> None:
         raise HTTPException(status_code=403, detail=f"the web terminal is not available here: {why}")
 
 
+def _fold_checks(db_path: str) -> None:
+    """After the update that brought the hourly roll-up of the checks: count the history into it, in chunks (see app/checkstats.py)."""
+    import logging
+
+    from app import checkstats
+
+    try:
+        main = connect(db_path)
+        try:
+            checkstats.backfill(main)
+        finally:
+            main.close()
+    except Exception:  # noqa: BLE001 - until it is done the pages simply use the slower way
+        logging.getLogger(__name__).exception("could not build the hourly roll-up of the checks")
+
+
 def _backfill_graphs(db_path: str) -> None:
     """Once, after the update that brought the graphs: fill them from the uptime history Netlens already has."""
     import logging
@@ -97,6 +113,7 @@ async def lifespan(app: FastAPI):
         ))
         tasks.append(asyncio.create_task(service_loop(app.state.db_path)))
         tasks.append(asyncio.create_task(asyncio.to_thread(_backfill_graphs, app.state.db_path)))
+        tasks.append(asyncio.create_task(asyncio.to_thread(_fold_checks, app.state.db_path)))
         from app.hostmetrics import service as host_monitors
 
         tasks.append(asyncio.create_task(host_monitors.loop(app.state.db_path)))

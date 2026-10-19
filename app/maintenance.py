@@ -167,11 +167,12 @@ def device_ids(conn: sqlite3.Connection, window: dict) -> set[int]:
         marks = ",".join("?" for _ in scope["groups"])
         found |= {r["id"] for r in conn.execute(f"SELECT id FROM devices WHERE group_id IN ({marks})", scope["groups"])}
     if scope["behind"] and found:
-        from app.hierarchy import descendants, load_hierarchy
+        from app.hierarchy import children_map, descendants, load_hierarchy
 
         _, hierarchy = load_hierarchy(conn)
+        kids = children_map(hierarchy)
         for d in list(found):
-            found |= descendants(hierarchy, d)
+            found |= descendants(hierarchy, d, kids)
     return found
 
 
