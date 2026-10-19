@@ -21,6 +21,7 @@ class UserPatch(BaseModel):
 
 class NewToken(BaseModel):
     name: str
+    readonly: bool = False
 
 
 def _db(request: Request):
@@ -88,7 +89,7 @@ def add_token(request: Request, user_id: int, body: NewToken) -> dict:
     db = _db(request)
     try:
         try:
-            token_id, secret = users.create_api_token(db, user_id, body.name)
+            token_id, secret = users.create_api_token(db, user_id, body.name, body.readonly)
         except users.UserError as exc:
             raise _fail(exc)
         return {"id": token_id, "token": secret, "users": users.list_users(db)}

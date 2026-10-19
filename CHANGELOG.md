@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.83 — 2026-10-19
+
+### Added
+- **Read-only API tokens**: when you create an API token (Settings → Users & tokens) you can make it read-only. It then only reads, even when its user is an administrator, which is what Prometheus, Grafana and dashboards need.
+- **Per-interface metrics in Prometheus**: `netlens_host_interface_up`, `netlens_host_interface_utilization_ratio` and `netlens_host_interface_errors_per_second` next to the traffic numbers, per interface, for devices with an SNMP or SSH health monitor.
+- **Grafana dashboard**: the ready-made dashboard gets sections for interface traffic, utilisation, errors and link state, and for the processor, memory, disk and temperature of monitored devices, with a Device drop-down.
+- **API reference**: every endpoint listed and grouped in the documentation, generated with `tools/api_reference.py`.
+
 ## 0.4.82 — 2026-10-19
 
 ### Added

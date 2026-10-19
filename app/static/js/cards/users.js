@@ -68,7 +68,9 @@ function userRow(user, data, refresh, shown) {
   const tok = h("button", { type: "button", class: "btn" }, "New API token");
   tok.addEventListener("click", () => {
     const name = window.prompt("What is the token for? (for example Home Assistant)");
-    if (name) call(() => api(`/api/users/${user.id}/tokens`, { method: "POST", body: { name } }), null);
+    if (!name) return;
+    const readonly = window.confirm("Make it read-only?\n\nOK: the token can only read (right for Prometheus, Grafana and dashboards).\nCancel: it acts with the role of its user.");
+    call(() => api(`/api/users/${user.id}/tokens`, { method: "POST", body: { name, readonly } }), null);
   });
   actions.append(pw, " ", toggle, " ", tok, " ", del);
 
@@ -82,7 +84,7 @@ function userRow(user, data, refresh, shown) {
     const remove = h("button", { type: "button", class: "btn danger" }, "Revoke");
     remove.addEventListener("click", () => call(() => api(`/api/users/${user.id}/tokens/${t.id}`, { method: "DELETE" }), "Token revoked"));
     rows.push(h("tr", { class: "token-row" },
-      h("td", { colspan: "2" }, `API token "${t.name}"`),
+      h("td", { colspan: "2" }, `API token "${t.name}"`, t.readonly ? h("span", { class: "tag" }, "read-only") : null),
       h("td", {}, t.last_used ? `used ${fmtTime(t.last_used)}` : "never used"),
       h("td", {}, remove)));
   }
@@ -104,7 +106,7 @@ function fill(card, data, shown) {
   card.appendChild(h("p", { class: "hint" },
     "Administrators can change everything. Viewers can look at the map, devices, statistics and services but change nothing and see no settings. " +
     "The NETLENS_TOKEN access token always works as an administrator, so you cannot lock yourself out. " +
-    "API tokens are for scripts, Home Assistant and Prometheus and act with the role of their user: give Home Assistant a viewer's token."));
+    "API tokens are for scripts, Home Assistant and Prometheus. A token acts with the role of its user, unless you make it read-only: then it can only read, whoever owns it."));
   if (data.token_configured) {
     const haveAdmin = data.users.some((u) => u.role === "admin" && !u.disabled);
     card.appendChild(h("p", { class: "hint", id: "token-note" }, haveAdmin

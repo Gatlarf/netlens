@@ -199,6 +199,9 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
                  "uptime_s": ("netlens_host_uptime_seconds", "Time since a monitored device started", 1.0),
                  "net_rx_bps": ("netlens_host_receive_bits_per_second", "Received traffic of a monitored device", 1.0),
                  "net_tx_bps": ("netlens_host_transmit_bits_per_second", "Sent traffic of a monitored device", 1.0),
+                 "if_up": ("netlens_host_interface_up", "1 when the link of a network interface is up (monitored devices)", 1.0),
+                 "if_util_pct": ("netlens_host_interface_utilization_ratio", "How full a network interface is, the busier direction against the link speed (0-1)", 100.0),
+                 "if_err_ps": ("netlens_host_interface_errors_per_second", "Errors and discards per second on a network interface", 1.0),
                  "battery_pct": ("netlens_host_battery_ratio", "UPS battery charge (0-1)", 100.0),
                  "supply_pct": ("netlens_host_supply_ratio", "Printer supply left (0-1)", 100.0)}
         for m in conn.execute("SELECT m.device_id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS n FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1"):

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 30
+SCHEMA_VERSION = 31
 
 
 def utcnow() -> str:
@@ -499,6 +499,9 @@ def init_db(conn: sqlite3.Connection) -> None:
     # --- schema v16: DNS registration (see app/dns) -------------------------------------------
     _add_column_if_missing(conn, "devices", "dns_mode", "TEXT NOT NULL DEFAULT 'auto'")   # auto | always | never
     _add_column_if_missing(conn, "devices", "dns_name", "TEXT")                           # the user's own DNS name
+    # --- schema v31: an API token can be read-only whatever the role of its user ---------------------------------
+    _add_column_if_missing(conn, "api_tokens", "readonly", "INTEGER NOT NULL DEFAULT 0")
+
     # --- schema v30: users that sign in through an identity provider are recognised by its stable subject id -----
     _add_column_if_missing(conn, "users", "oidc_sub", "TEXT")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oidc_sub ON users(oidc_sub) WHERE oidc_sub IS NOT NULL")

@@ -193,3 +193,21 @@ def test_login_rate_limit_per_username(env):
     codes = [anon.post("/api/login", json={"username": "jo", "password": "nopenopenope"}).status_code for _ in range(7)]
     assert codes[:5] == [401] * 5 and codes[5:] == [429, 429]
     assert anon.post("/api/login", json={"username": "jo", "password": "longenough1"}).status_code == 429
+
+
+def test_read_only_token_cannot_write_even_for_an_administrator(env):
+    c, app, path = env
+    uid = make(c, "boss", "admin")
+    r = c.post(f"/api/users/{uid}/tokens", json={"name": "Prometheus", "readonly": True}, headers=ADMIN)
+    token = r.json()["token"]
+    listed = [t for u in c.get("/api/users", headers=ADMIN).json()["users"] if u["id"] == uid for t in u["tokens"]]
+    assert listed[0]["readonly"] is True
+    bearer = {"Authorization": f"Bearer {token}"}
+    anon = TestClient(app)
+    assert anon.get("/metrics", headers=bearer).status_code == 200
+    assert anon.get("/api/stats/summary", headers=bearer).status_code == 200
+    assert anon.get("/api/users", headers=bearer).status_code == 403
+    assert anon.post("/api/scans", json={"kind": "quick"}, headers=bearer).status_code == 403
+    # a normal token of the same administrator still writes
+    full = c.post(f"/api/users/{uid}/tokens", json={"name": "script"}, headers=ADMIN).json()["token"]
+    assert anon.get("/api/users", headers={"Authorization": f"Bearer {full}"}).status_code == 200

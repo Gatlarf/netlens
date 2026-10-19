@@ -141,8 +141,8 @@ def delete_user(conn: sqlite3.Connection, user_id: int) -> None:
 def list_users(conn: sqlite3.Connection) -> list[dict]:
     users = []
     for u in conn.execute("SELECT id, username, role, disabled, created, last_login FROM users ORDER BY username COLLATE NOCASE"):
-        tokens = conn.execute("SELECT id, name, created, last_used FROM api_tokens WHERE user_id = ? ORDER BY id", (u["id"],)).fetchall()
-        users.append({**dict(u), "disabled": bool(u["disabled"]), "tokens": [dict(t) for t in tokens]})
+        tokens = conn.execute("SELECT id, name, created, last_used, readonly FROM api_tokens WHERE user_id = ? ORDER BY id", (u["id"],)).fetchall()
+        users.append({**dict(u), "disabled": bool(u["disabled"]), "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
     return users
 
 
@@ -185,7 +185,7 @@ def end_session(conn: sqlite3.Connection, cookie: str | None) -> None:
         conn.commit()
 
 
-def create_api_token(conn: sqlite3.Connection, user_id: int, name: str) -> tuple[int, str]:
+def create_api_token(conn: sqlite3.Connection, user_id: int, name: str, readonly: bool = False) -> tuple[int, str]:
     """A long-lived token for scripts, Home Assistant or Prometheus. Returns (id, the token, shown only once)."""
     if get_user(conn, user_id) is None:
         raise UserError("no such user")
@@ -194,8 +194,8 @@ def create_api_token(conn: sqlite3.Connection, user_id: int, name: str) -> tuple
         raise UserError("give the token a name, for example Home Assistant")
     secret = TOKEN_PREFIX + secrets.token_urlsafe(32)
     cur = conn.execute(
-        "INSERT INTO api_tokens (user_id, name, token_hash, created) VALUES (?, ?, ?, ?)",
-        (user_id, name, _digest(secret), _iso(_now())),
+        "INSERT INTO api_tokens (user_id, name, token_hash, created, readonly) VALUES (?, ?, ?, ?, ?)",
+        (user_id, name, _digest(secret), _iso(_now()), 1 if readonly else 0),
     )
     conn.commit()
     return cur.lastrowid, secret
@@ -211,7 +211,7 @@ def user_for_token(conn: sqlite3.Connection, bearer: str):
     if not bearer or not bearer.startswith(TOKEN_PREFIX):
         return None
     row = conn.execute(
-        "SELECT t.id AS token_id, u.id, u.username, u.role FROM api_tokens t JOIN users u ON u.id = t.user_id "
+        "SELECT t.id AS token_id, t.readonly, u.id, u.username, u.role FROM api_tokens t JOIN users u ON u.id = t.user_id "
         "WHERE t.token_hash = ? AND u.disabled = 0",
         (_digest(bearer),),
     ).fetchone()

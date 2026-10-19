@@ -152,11 +152,14 @@ def identify(conn: HTTPConnection) -> Optional[Principal]:
         db = connect(conn.app.state.db_path)
         try:
             row = users.user_for_session(db, cookie) if cookie and cookie.startswith(users.SESSION_PREFIX) else None
-            row = row or (users.user_for_token(db, bearer) if bearer else None)
+            token_row = None if row else (users.user_for_token(db, bearer) if bearer else None)
+            row = row or token_row
         finally:
             db.close()
         if row:
-            return Principal(username=row["username"], role=row["role"], user_id=row["id"])
+            # a read-only token never writes, even when it belongs to an administrator
+            role = "viewer" if token_row is not None and token_row["readonly"] else row["role"]
+            return Principal(username=row["username"], role=role, user_id=row["id"])
     return None
 
 

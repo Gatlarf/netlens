@@ -101,3 +101,24 @@ def test_dns_metrics(db):
     conn.commit()
     s = parse(render_metrics(conn, NOW))
     assert s['netlens_dns_devices{state="pending"}'] == 3 and s['netlens_dns_devices{state="conflicts"}'] == 0
+
+
+def test_interface_health_is_exported_per_interface(db):
+    from app import tsdb
+    from app.stats import _parse
+
+    conn, _ = db
+    dev = conn.execute("SELECT id FROM devices ORDER BY id LIMIT 1").fetchone()[0]
+    conn.execute("INSERT INTO host_monitors (device_id, method, address, port, credential, interval_s, groups, alerts, enabled, created) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                 (dev, "snmp", "10.0.0.2", 161, "", 60, "[]", 1, 1, NOW))
+    conn.commit()
+    store = tsdb.for_conn(conn)
+    if store is None:
+        pytest.skip("in-memory database: no metrics store")
+    ts = int(_parse(NOW).timestamp()) - 30
+    store.record([("device", dev, "if_up", 1.0, "gi1", "state"), ("device", dev, "if_util_pct", 42.0, "gi1", "%"), ("device", dev, "if_err_ps", 0.5, "gi1", "/s")], ts=ts)
+    s = parse(render_metrics(conn, NOW))
+    keys = {k.split("{")[0]: v for k, v in s.items() if "gi1" in k}
+    assert keys["netlens_host_interface_up"] == 1
+    assert keys["netlens_host_interface_utilization_ratio"] == pytest.approx(0.42)
+    assert keys["netlens_host_interface_errors_per_second"] == pytest.approx(0.5)
