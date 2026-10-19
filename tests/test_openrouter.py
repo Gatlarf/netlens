@@ -176,3 +176,22 @@ def test_a_busy_server_is_waited_for_and_a_plain_text_reply_gets_one_reminder(mo
 
     reply, reminded = modelcheck._step(None, flaky, [{"role": "user", "content": "q"}])
     assert reply == '{"answer": "ok"}' and reminded is True and waits == [4.0] and len(calls) == 3
+
+
+def test_a_refused_key_is_not_a_poor_model(conn, monkeypatch):
+    import io
+    import urllib.error
+
+    from app import modelcheck
+
+    monkeypatch.setattr(modelcheck, "_sleep", lambda s: None)
+
+    def refuse(request, timeout=0):
+        raise urllib.error.HTTPError("u", 401, "x", {}, io.BytesIO(b""))
+
+    monkeypatch.setattr("urllib.request.urlopen", refuse)
+    with pytest.raises(openrouter.OpenRouterError, match="could not be tested"):
+        openrouter.run_test(conn, "a/big:free", "wrong", fetch_of(CATALOGUE))
+    assert openrouter.tests(conn) == {}
+    with pytest.raises(engineer.EngineerError, match="refused the API key"):
+        engineer.chat_with(openrouter.URL, "m", "k", [{"role": "user", "content": "x"}])

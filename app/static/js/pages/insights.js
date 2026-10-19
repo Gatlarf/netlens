@@ -16,8 +16,8 @@ export async function render(container) {
 
   function modelNote() {
     const s = data.status;
-    if (s.llm_ready) return "A language model is connected: it can answer free questions and word the summaries. Names and addresses are anonymised first (Settings → AI → Language model).";
-    if (!s.llm_configured) return "No language model is connected. Everything here still works from the numbers; connect one under Settings → AI → Language model if you want free-form answers.";
+    if (s.llm_ready) return "A language model is connected: it can answer free questions and word the summaries. Names and addresses are anonymised first (Settings → AI).";
+    if (!s.llm_configured) return "No language model is connected. Everything here still works from the numbers; connect one under Settings → AI if you want free-form answers.";
     return "A language model is set up but switched off for insights, so the plain versions are shown.";
   }
 

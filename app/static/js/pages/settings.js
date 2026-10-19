@@ -10,10 +10,9 @@ import { buildPluginGuideCard } from "../cards/plugin_guide.js";
 import { buildMapCard } from "../cards/map_settings.js";
 import { buildChannelsCard } from "../cards/channels.js";
 import { buildCentralCard } from "../cards/central.js";
-import { buildAssistantCard } from "../cards/assistant.js";
+import { buildAiCard } from "../cards/ai.js";
 import { buildLicenceCard } from "../cards/licence.js";
 import { buildIpv6Card } from "../cards/ipv6.js";
-import { buildEngineerCard } from "../cards/engineer.js";
 import { buildEscalationCard } from "../cards/escalation.js";
 import { buildSsoCard } from "../cards/sso.js";
 import { buildSiemCard } from "../cards/siem.js";
@@ -264,13 +263,7 @@ const STATIC_GROUPS = [
     title: "Connections",
     items: [
       { key: "central", label: "Report to a central Netlens", build: buildCentralCard },
-    ],
-  },
-  {
-    title: "AI",
-    items: [
-      { key: "engineer", label: "Language model (Netlens uses it)", build: buildEngineerCard },
-      { key: "assistant", label: "AI assistant (manages Netlens)", build: buildAssistantCard },
+      { key: "engineer", label: "AI", build: buildAiCard },
     ],
   },
   {
@@ -296,7 +289,7 @@ const STATIC_GROUPS = [
 const DEFAULT_PAGE = "ranges";
 const VIEWER_PAGE = "session";
 // the connectors were plugins-to-be before: keep their old addresses working
-const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus", notifications: "channels" };  // e-mail is a channel now
+const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus", notifications: "channels", assistant: "engineer" };  // e-mail is a channel now
 
 function integrationsGroup(plugins, updates = 0) {
   const items = [

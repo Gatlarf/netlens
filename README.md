@@ -637,7 +637,7 @@ Safety is the point of the design: Netlens only changes records it created itsel
 
 ### Free language models on OpenRouter
 
-Insights and the digital engineer need a language model. If you cannot run one yourself, **Settings → AI → Language model → No model of your own?** reads the list of free models from OpenRouter (you need a free OpenRouter account and key) and shows each with the result of Netlens's own six exams on it, best first. **Test** runs the exams on one model (about eight requests; free accounts allow only a few dozen a day), **Use this model** saves it. You can still type any address and model of your own.
+Insights and the digital engineer need a language model. If you cannot run one yourself, **Settings → AI → No model of your own?** reads the list of free models from OpenRouter (you need a free OpenRouter account and key) and shows each with the result of Netlens's own six exams on it, best first. **Test** runs the exams on one model (about eight requests; free accounts allow only a few dozen a day), **Use this model** saves it. You can still type any address and model of your own.
 
 Free models change often: they are added, renamed, limited or withdrawn without notice, and may keep your questions for their own use (leave the anonymising on). So the list is read live, and once a day Netlens checks that the model you chose is still offered and still free. If not, you see a warning in the card and on the dashboard, and an **Language model unavailable** event is raised that your notification channels can send. A model you typed yourself is never watched.
 

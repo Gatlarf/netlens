@@ -60,10 +60,9 @@ export async function buildEngineerCard() {
   const card = h("div", { class: "card" });
   function draw(info) {
     clear(card);
-    card.appendChild(h("h2", {}, "Language model"));
+    card.appendChild(h("h3", {}, "Language model"));
     card.appendChild(h("p", { class: "hint" },
-      "The language model Netlens itself uses, in two places. The digital engineer reads an incident (the event, the device, its recent events, earlier fixes) and says what it thinks is wrong and which of your remediation rules would fix it; it never runs anything and can only pick one of your rules. Insights uses it to answer free questions and to word summaries. Any OpenAI-compatible server works: a local one (llama.cpp, Ollama, LM Studio), a hosted one with your own key, or a free model on OpenRouter below. " +
-      "This is not the AI assistant that sets Netlens up for you from the outside: that is the next card in this group. Part of every licence and the free trial."));
+      "The model Netlens itself calls, in two places. The digital engineer reads an incident (the event, the device, its recent events, earlier fixes) and says what it thinks is wrong and which of your remediation rules would fix it; it never runs anything and can only pick one of your rules. Insights uses it to answer free questions and to word summaries. Any OpenAI-compatible server works: a local one (llama.cpp, Ollama, LM Studio), a hosted one with your own key, or a free model on OpenRouter below. Part of every licence and the free trial."));
     if (!info.allowed) card.appendChild(h("p", { class: "warn-text" }, "Needs a licence or the free trial (Settings → Licence)."));
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = info.enabled;

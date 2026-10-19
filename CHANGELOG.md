@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.97 — 2026-10-19
+
+### Changed
+- **One AI page**: the language model and the AI assistant are now two parts of a single page, Settings → AI, with a short menu entry. The old address of the assistant page still works.
+
+### Fixed
+- **A refused API key is no longer a "poor" model**: when OpenRouter refuses the key, asks for credit, or no exam gets any answer, the model is reported as "could not be tested" and nothing is saved. A refused key now says so ("refused the API key") instead of only "HTTP 401".
+
 ## 0.4.96 — 2026-10-19
 
 ### Changed

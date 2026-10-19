@@ -60,7 +60,7 @@ Each workflow lists the calls to look at and the ones that change things. Fetch 
 
 ### A language model for Insights and the digital engineer
 * `GET /api/engineer` shows the setting. `GET /api/engineer/openrouter` lists free models on OpenRouter right now (they change often). Choosing one needs the person's OpenRouter key, so
-  that is done in Settings → AI → Language model.
+  that is done in Settings → AI.
 
 ### Backups and updates
 * `GET /api/backups` lists backups and the schedule; the person makes, restores and downloads them in the interface. `GET /api/update` says whether a newer Netlens exists.

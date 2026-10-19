@@ -114,5 +114,5 @@ async def model_check(conn=Depends(get_conn)) -> dict:
     """Five small exams that show whether the connected language model is reliable enough (takes a minute with a slow model)."""
     _allowed(conn)
     if not insights.llm_ready(conn) and not engineer.settings(conn)["url"]:
-        raise HTTPException(status_code=409, detail="connect a language model first (Settings → AI → Language model)")
+        raise HTTPException(status_code=409, detail="connect a language model first (Settings → AI)")
     return await asyncio.to_thread(modelcheck.run, conn)

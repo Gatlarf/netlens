@@ -99,7 +99,7 @@ async def ask_engineer(run_id: int, conn=Depends(get_conn)) -> dict:
     if not licence.allows(conn, "engineer"):
         raise HTTPException(status_code=402, detail="the digital engineer needs a licence or the free trial (Settings → Licence)")
     if not engineer.settings(conn)["enabled"]:
-        raise HTTPException(status_code=422, detail="switch the language model on first (Settings → AI → Language model)")
+        raise HTTPException(status_code=422, detail="switch the language model on first (Settings → AI)")
     try:
         answer = await asyncio.to_thread(engineer.advise, conn, run_id)
     except (engineer.EngineerError, remediation.RuleError) as exc:

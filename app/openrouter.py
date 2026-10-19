@@ -95,7 +95,7 @@ def run_test(conn: sqlite3.Connection, model: str, key: str | None, fetch: Calla
     result = modelcheck.run(conn, ask)
     result["model"] = model
     if result["inconclusive"]:
-        raise OpenRouterError("OpenRouter was busy or its free allowance for today is used up, so this model could not be tested. Nothing was saved; try again later.")
+        raise OpenRouterError("This model could not be tested: OpenRouter was busy, today's free allowance is used up, or the API key was refused (check it in the API key field). Nothing was saved.")
     stored = tests(conn)
     stored[model] = {"verdict": result["verdict"], "passed": result["passed"], "total": result["total"], "at": utcnow()}
     for gone in [m for m in stored if m not in known]:      # forget exams of models that no longer exist
@@ -152,5 +152,5 @@ def watch(conn: sqlite3.Connection, fetch: Callable[[], dict] | None = None, for
 
 def message(model: str, state: str) -> str:
     if state == "gone":
-        return f"The language model {model} is not offered on OpenRouter any more. Choose another in Settings → AI → Language model."
-    return f"The language model {model} is no longer free on OpenRouter. Choose another in Settings → AI → Language model, or add credit to your OpenRouter account."
+        return f"The language model {model} is not offered on OpenRouter any more. Choose another in Settings → AI."
+    return f"The language model {model} is no longer free on OpenRouter. Choose another in Settings → AI, or add credit to your OpenRouter account."
