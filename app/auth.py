@@ -189,6 +189,15 @@ def identify(conn: HTTPConnection) -> Optional[Principal]:
         if row:
             # a read-only token never writes, even when it belongs to an administrator
             role = "viewer" if token_row is not None and token_row["readonly"] else row["role"]
+            if role == "operator":
+                db = connect(conn.app.state.db_path)
+                try:
+                    from app import licence
+
+                    if not licence.allows(db, "teams"):         # without a licence (or the trial) an operator is a viewer again; nothing is deleted
+                        role = "viewer"
+                finally:
+                    db.close()
             return Principal(username=row["username"], role=role, user_id=row["id"], scope=tuple(users.parse_scope(row["scope"]) or ()) or None)
     return None
 

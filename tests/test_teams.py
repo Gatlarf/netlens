@@ -3,7 +3,7 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from app import db as dbmod, groups, users
+from app import db as dbmod, groups, licence, users
 from app.config import load_settings
 from app.db import add_event, connect, get_or_create_device, init_db
 from app.main import create_app
@@ -44,6 +44,11 @@ def test_users_table_is_rebuilt_without_losing_anything(tmp_path):
     assert conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0] == 0 and conn.execute("SELECT COUNT(*) FROM api_tokens").fetchone()[0] == 0
     dbmod._allow_operator_role(conn)                                       # a second run changes nothing
     conn.close()
+
+
+@pytest.fixture(autouse=True)
+def licensed(monkeypatch):
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: True)
 
 
 @pytest.fixture
@@ -171,3 +176,26 @@ def test_scope_rules(env):
 def test_roles_listed(env):
     c, *_ = env
     assert c.get("/api/users", headers=ADMIN).json()["roles"] == ["admin", "operator", "viewer"]
+
+
+def test_operators_and_customer_views_need_a_licence(env, monkeypatch):
+    c, app, _, ids = env
+    make(c, "olga", "operator")
+    make(c, "carol", "viewer", [ids["a"]])
+    olga = sign_in(app, "olga")
+    assert olga.post("/api/snoozes", json={}).status_code == 422                      # licensed: reaches the handler
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: feature != "teams")
+    assert c.get("/api/users", headers=ADMIN).json()["teams_allowed"] is False
+    # creating or changing them is refused ...
+    assert c.post("/api/users", json={"username": "o2", "password": "longenough1", "role": "operator"}, headers=ADMIN).status_code == 402
+    assert c.post("/api/users", json={"username": "v2", "password": "longenough1", "role": "viewer", "scope": [ids["a"]]}, headers=ADMIN).status_code == 402
+    uid = make(c, "plain", "viewer")
+    assert c.patch(f"/api/users/{uid}", json={"role": "operator"}, headers=ADMIN).status_code == 402
+    assert c.patch(f"/api/users/{uid}", json={"scope": [ids["a"]]}, headers=ADMIN).status_code == 402
+    assert c.patch(f"/api/users/{uid}", json={"password": "anotherlong1"}, headers=ADMIN).status_code == 200      # other changes are fine
+    assert make(c, "plain2", "admin") and make(c, "plain3", "viewer")                                                # free roles stay free
+    # ... and what exists keeps working: an operator acts as a viewer, a customer view keeps its limit
+    assert olga.post("/api/snoozes", json={}).status_code == 403
+    assert olga.get("/api/devices").status_code == 200
+    carol = sign_in(app, "carol")
+    assert [d["custom_name"] for d in carol.get("/api/devices").json()] == ["a1", "a2"]

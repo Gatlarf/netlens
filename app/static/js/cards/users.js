@@ -1,7 +1,7 @@
 import { api, get } from "../api.js";
 import { h, clear, toast, fmtTime } from "../util.js";
 
-const ROLE_TEXT = { admin: "Administrator (everything)", operator: "Operator (looks and acts, no settings)", viewer: "Viewer (read-only)" };
+const ROLE_TEXT = { admin: "Administrator (everything)", operator: "Operator (looks and acts, no settings) - business feature", viewer: "Viewer (read-only)" };
 
 async function copyText(text) {
   try {
@@ -139,6 +139,10 @@ function fill(card, data, shown) {
     "Administrators can change everything. Viewers can look at the map, devices, statistics and services but change nothing and see no settings. " +
     "The NETLENS_TOKEN access token always works as an administrator, so you cannot lock yourself out. " +
     "API tokens are for scripts, Home Assistant and Prometheus. A token acts with the role of its user, unless you make it read-only: then it can only read, whoever owns it."));
+  card.appendChild(h("p", { class: data.teams_allowed === false ? "warn-text" : "hint" },
+    data.teams_allowed === false
+      ? "Operators and customer views (a viewer limited to some groups) are business features: they need a licence or the free trial (Settings → Licence). Existing ones keep their limits; an operator acts as a viewer until a licence is applied."
+      : "Operators (look and act, no settings) and customer views (a viewer limited to some groups) are business features, included in every licence and the free trial."));
   if (data.token_configured) {
     const haveAdmin = data.users.some((u) => u.role === "admin" && !u.disabled);
     card.appendChild(h("p", { class: "hint", id: "token-note" }, haveAdmin

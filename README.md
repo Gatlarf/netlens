@@ -603,7 +603,7 @@ Where the limits are: the uptime history grows with devices times checks (a chec
 
 ### Roles and customer views
 
-**Settings → Users & tokens** has three roles. An **administrator** can do everything. An **operator** looks and acts: scans, tests, Wake-on-LAN, acknowledges and snoozes alerts, plans maintenance windows, approves or declines proposed fixes, and edits a device's name, type and group, but has no access to settings, users, credentials, backups, plugins, the terminal or remote access, and cannot delete anything. A **viewer** only looks.
+**Settings → Users & tokens** has three roles. An **administrator** can do everything. An **operator** looks and acts: scans, tests, Wake-on-LAN, acknowledges and snoozes alerts, plans maintenance windows, approves or declines proposed fixes, and edits a device's name, type and group, but has no access to settings, users, credentials, backups, plugins, the terminal or remote access, and cannot delete anything. A **viewer** only looks. *(Operators and customer views are part of every licence and the free trial; administrators and viewers need none. Existing operators and limits are kept without a licence: an operator then acts as a viewer, and a limited viewer stays limited.)*
 
 A viewer can be **limited to some groups** (*Limit to groups* on the user): a customer view. It sees only the devices of those groups, their pages, history and events, and the Uptime page, and nothing else: no map, dashboard, statistics, settings or other customers' groups, and the interface only offers Devices and Uptime. Only a viewer can be limited, and promoting the user ends the limit. API tokens of a limited user keep the limit. A read-only token (see above) never writes, whatever its user may do.
 
