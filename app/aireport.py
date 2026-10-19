@@ -81,7 +81,8 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
         head = f"{who}: {', '.join(kinds)}" if who else (f"{', '.join(kinds).capitalize()} ({said})" if said else ", ".join(kinds).capitalize())
         group = {"inc": {"type": "incident", "strength": strength, "ts": inc["start"], "devices": names[:6],
                          "text": head + f" at {when} UTC. {inc['summary']}"}, "ids": ids, "changes": [],
-                 "blip": (tuple(kinds), re.sub(r"[\d.,:]+", "#", (inc.get("notes") or [""])[0])) if not ids and inc.get("notes") else None, "when": when}
+                 "blip": (tuple(kinds), re.sub(r"[\d.,:]+", "#", (inc.get("notes") or [""])[0])) if not ids and inc.get("notes") else None, "when": when,
+                 "said": (inc.get("notes") or [""])[0][:90]}
         pending.append(group)
         start = _ts(inc["start"])
         if strength != "info":
@@ -161,10 +162,10 @@ def _merge_blips(pending: list[dict[str, Any]]) -> list[dict[str, Any]]:
             done.add(key)
             group = by_blip[key]
             first, last = min(group, key=lambda x: x["inc"]["ts"]), max(group, key=lambda x: x["inc"]["ts"])
-            said = (first["inc"]["text"].split(" (", 1)[1].split(")", 1)[0] if " (" in first["inc"]["text"] else "")
+            said = first.get("said", "")
             what = ", ".join(key[0]).capitalize()
             merged = {"type": "recurring", "strength": "likely" if len(group) >= REPEATS else "possible", "ts": last["inc"]["ts"], "devices": first["inc"]["devices"],
-                      "text": f"{what} {len(group)} times" + (f" ({said})" if said else "") + f", from {first['when']} to {last['when']} UTC."}
+                      "text": f"{what} {len(group)} times" + (f" - {said}" if said else "") + f" from {first['when']} to {last['when']} UTC."}
             out.append({"inc": merged, "ids": [], "changes": [], "blip": key, "when": last["when"]})
     return out
 
