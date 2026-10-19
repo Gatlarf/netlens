@@ -94,7 +94,8 @@ class Redactor:
         """The real names and addresses back in a model's answer."""
         for token, value in sorted(self.back.items(), key=lambda kv: -len(kv[0])):
             text = text.replace(token, value)
-        return text
+        # a capable model often tidies "<device13>" into "device13" or "Device13": put those back too
+        return re.sub(r"(?<![\w<])<?(device|ip|mac)(\d+)>?(?![\w])", lambda m: self.back.get(f"<{m.group(1).lower()}{m.group(2)}>", m.group(0)), text, flags=re.I)
 
     def __call__(self, text: str) -> str:
         for name in self.names:

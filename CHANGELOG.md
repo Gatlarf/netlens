@@ -4,6 +4,9 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 
 ## 0.4.101 — 2026-10-19
 
+### Fixed
+- **Anonymised names come back with capable models**: a model that tidies a placeholder such as `<device13>` into `device13` no longer leaves it in the answer; the real name is put back.
+
 ### Added
 - ★ **Choose your AI provider**: Settings → AI → Language model has a Provider box with Anthropic (Claude), OpenAI (ChatGPT), Google (Gemini), Mistral (Le Chat), xAI (Grok), DeepSeek, Groq, OpenRouter, your own server and any OpenAI-compatible address. Picking one fills in the address, and **Load models** shows the models your key can use. Anthropic is called through its own API. A saved key is forgotten when you switch to another provider, so it is never sent to the wrong company.
 - A refusal from a provider now says why when it explains itself (for example an unsupported setting), instead of only "HTTP 400".

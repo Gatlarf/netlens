@@ -144,3 +144,14 @@ def test_api_lists_providers_and_models_and_never_lends_the_saved_key(tmp_path, 
         other = c.post("/api/engineer/models", json={"url": "https://api.openai.com/v1"}, headers=ADMIN)
         assert other.status_code == 422 and "API key first" in other.json()["detail"]            # the Anthropic key is not tried on OpenAI
         assert len(calls) == 1
+
+
+def test_names_come_back_even_when_a_model_drops_the_angle_brackets():
+    redact = engineer.Redactor(["sw-core", "cam1"])
+    sent = redact("sw-core and cam1 at 192.168.1.5 went offline")
+    assert "sw-core" not in sent and "192.168.1.5" not in sent
+    d1, d2 = redact.map["sw-core"], redact.map["cam1"]
+    assert redact.restore(f"{d1} and {d2} failed") == "sw-core and cam1 failed"
+    tidy = d1.strip("<>").capitalize()
+    assert redact.restore(f"{tidy} and {d2.strip('<>')} failed, see ip1.") == "sw-core and cam1 failed, see 192.168.1.5."
+    assert redact.restore("device77 is someone else's and ip1x stays") == "device77 is someone else's and ip1x stays"          # unknown numbers are left alone
