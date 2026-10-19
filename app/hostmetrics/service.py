@@ -38,7 +38,9 @@ DEFAULT_RULES: dict[str, dict[str, Any]] = {
     "if_util_pct": {"title": "Port busy", "unit": "%", "warn": 85, "crit": 95, "confirm": 5},
     "if_err_ps": {"title": "Port errors", "unit": "/s", "warn": 1, "crit": 10, "confirm": 3},
     "temp_c": {"title": "Temperature", "unit": "°C", "warn": 80, "crit": 90, "confirm": 3},
+    "sensor_fault": {"title": "Fan or power supply problem", "unit": "", "warn": 1, "crit": 2, "confirm": 2},
     "supply_pct": {"title": "Supply low", "unit": "%", "warn": 15, "crit": 5, "confirm": 1, "low": True},
+    "ups_load_pct": {"title": "UPS load", "unit": "%", "warn": 80, "crit": 95, "confirm": 3},
     "battery_pct": {"title": "UPS battery", "unit": "%", "warn": 50, "crit": 25, "confirm": 1, "low": True},
     "on_battery": {"title": "UPS on battery power", "unit": "", "warn": 1, "crit": None, "confirm": 1},
     "storage_status": {"title": "Storage problem", "unit": "", "warn": 1, "crit": 2, "confirm": 1},
@@ -520,6 +522,11 @@ def _describe(rule: dict[str, Any], metric: str, label: str, value: float, level
         if level == "ok":
             return f"{device}: {what} is healthy again"
         return f"{device}: {what} is {'degraded or needs attention (a disk may be failing or rebuilding)' if level == 'warning' else 'FAILED'}"
+    if metric == "sensor_fault":
+        what = label or "a hardware sensor"
+        if level == "ok":
+            return f"{device}: {what} is fine again"
+        return f"{device}: {what} {'has stopped (a fan is not turning)' if level == 'critical' else 'reports a failure (a fan or power supply)'}"
     if metric == "service_stopped":
         what = f"the service {label}" if label else "a service"
         return f"{device}: {what} is running again" if level == "ok" else f"{device}: {what} has stopped with an error"

@@ -23,6 +23,10 @@ const KNOWN = {
   if_err_ps: { title: "Port errors", unit: "/s", warn: 1, crit: 10, order: 8.6 },
   if_up: { title: "Link", unit: "state", order: 8.7 },
   temp_c: { title: "Temperature", unit: "°C", order: 9 },
+  ups_load_pct: { title: "UPS load", unit: "%", fixedMax: 100, warn: 80, crit: 95, order: 9.05 },
+  fan_rpm: { title: "Fan speed", unit: "rpm", order: 9.1 },
+  voltage_v: { title: "Voltage", unit: "V", order: 9.2 },
+  sensor_fault: { title: "Fan or power supply", unit: "state", order: 9.3 },
   uptime_s: { title: "Time since start", unit: "s", order: 10 },
   cert_days: { title: "Certificate days left", unit: "days", order: 14 },
 };

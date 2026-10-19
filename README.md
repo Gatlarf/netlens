@@ -495,7 +495,7 @@ Netlens keeps a time series of what it measures in its own small database file, 
 
 | Method | For | Reads |
 | --- | --- | --- |
-| **SNMP** v1, v2c and **v3** | switches, routers, NAS boxes, printers, UPS units, Windows with the SNMP service, Linux with `snmpd` | processor, memory, swap, disks (used and free), traffic, load, errors and link state per interface (port), temperatures (net-snmp), uptime, printer supplies, UPS battery and runtime |
+| **SNMP** v1, v2c and **v3** | switches, routers, NAS boxes, printers, UPS units, Windows with the SNMP service, Linux with `snmpd` | processor, memory, swap, disks (used and free), traffic, load, errors and link state per interface (port), temperatures (net-snmp and the standard sensor table), fan speeds and fan or power-supply failures, voltages, uptime, printer supplies, UPS battery, runtime and load (standard UPS data, plus APC and MikroTik specifics) |
 | **SSH** | Linux and other systems with `/proc` | processor, load, memory, swap, disks, traffic per interface, temperatures, uptime |
 | **WinRM** | Windows computers (any edition with Windows Remote Management, which Windows can switch on with one command) | the same readings as SSH to Windows, over WinRM with HTTPS (port 5986), NTLM or Basic login. One fixed, read-only PowerShell script; the form shows the lines that switch WinRM over HTTPS on |
 | **SSH to Windows** | Windows 10/11 and Server 2019+ with the OpenSSH server (an optional Windows feature) | processor, memory, swap, disks, traffic per adapter, uptime. Netlens recognises Windows by itself and runs one read-only PowerShell command; nothing is installed |
@@ -672,6 +672,15 @@ The result is always a tree: an assignment that would put a device below itself 
 - **Device page**, section **Network position** (inside the collapsed **Edit** card): shows what the device sits below and why, lists the devices below it, and lets you choose the parent: *Automatic*, *None (top level)* or a specific device. Devices below the current one are not offered, so a loop is impossible. If a chosen parent is deleted, the device goes back to automatic.
 
 The same data is available as `GET /api/hierarchy`, and `PATCH /api/devices/<id>` accepts `parent_mode` (`auto`, `none`, `device`) and `parent_device_id`.
+
+### Device messages: SNMP traps and syslog
+
+Devices can tell Netlens when something happens instead of waiting to be asked. **Settings → Device messages (traps, syslog)** switches on two UDP listeners (both off by default, on high ports because 162 and 514 need extra privileges; with `network_mode: host` they just work, with Docker bridge networking publish the ports):
+
+- **SNMP traps** (v1 and v2c traps, v2c informs are acknowledged; v3 traps are not supported) on port 1162. A trap is accepted only with one of the community names you list. Link down and link up (with the interface name), restarts, a UPS running on battery, spanning tree changes and authentication failures get their own wording; any other trap shows its identifier and values.
+- **Syslog** (RFC 3164 and RFC 5424 over UDP) on port 1514. Only messages at or above the severity you choose, from devices Netlens knows, become events; the rest are counted and dropped.
+
+The sender is matched to a device by its IP address (a syslog host name is tried when the address is unknown, and a v1 trap uses its agent address). The events are `link_down`, `link_up`, `device_restarted`, `snmp_trap` and `device_log`: they appear on the device page and in the Statistics, can be picked in the alert channels (link down is on by default for new channels), and go to log forwarding. A sender is limited to 60 events a minute. In the health monitoring of an SNMP device, the *Hardware sensors* group reads temperatures, fan speeds and voltages and raises *Fan or power supply problem* when a fan stops or a sensor reports a failure; *Vendor-specific readings* adds APC UPS and MikroTik values.
 
 ### Snooze and acknowledge
 

@@ -2,13 +2,21 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.84 — 2026-10-19
+
+### Added
+- ★ **SNMP traps and syslog from devices**: Settings → Device messages. A switch that loses a link, a UPS that goes on battery or a router that logs an error now shows up as an event on that device, in your alert channels and in log forwarding. SNMP v1 and v2c traps and informs (UDP 1162, community names you list) and RFC 3164 / 5424 syslog (UDP 1514, from known devices, at or above the severity you choose). Both are off until you switch them on; a sender is limited to 60 events a minute. New events: link down, link up, device restarted, SNMP trap, device log.
+- ★ **Fan and power-supply health**: the SNMP health monitor has a *Hardware sensors* group (the standard sensor table of switches, routers, NAS boxes and servers): temperatures, fan speeds, voltages, and a *Fan or power supply problem* alert when a fan stops or a sensor reports a failure. Also in Prometheus (`netlens_host_fan_speed_rpm`, `netlens_host_voltage_volts`, `netlens_host_sensor_fault`).
+- **Vendor-specific readings**: a *Vendor-specific readings* group adds APC UPS (battery, runtime, temperature, load) and MikroTik (voltage, board and CPU temperature, fans). Written from the vendor MIB documentation and tested against simulated devices only.
+- **UPS load** as a reading with its own limit (warning 80 %, critical 95 %).
+
 ## 0.4.83 — 2026-10-19
 
 ### Added
 - **Read-only API tokens**: when you create an API token (Settings → Users & tokens) you can make it read-only. It then only reads, even when its user is an administrator, which is what Prometheus, Grafana and dashboards need.
 - **Per-interface metrics in Prometheus**: `netlens_host_interface_up`, `netlens_host_interface_utilization_ratio` and `netlens_host_interface_errors_per_second` next to the traffic numbers, per interface, for devices with an SNMP or SSH health monitor.
 - **Grafana dashboard**: the ready-made dashboard gets sections for interface traffic, utilisation, errors and link state, and for the processor, memory, disk and temperature of monitored devices, with a Device drop-down.
-- **API reference**: every endpoint listed and grouped in the documentation, generated with `tools/api_reference.py`.
+- **API reference**: every endpoint listed and grouped in the documentation, generated from the application's own API description.
 
 ## 0.4.82 — 2026-10-19
 

@@ -302,9 +302,12 @@ SYNO_DISK_TEMP = (1, 3, 6, 1, 4, 1, 6574, 2, 1, 1, 6)
 SYNO_RAID_NAME = (1, 3, 6, 1, 4, 1, 6574, 3, 1, 1, 2)       # one row per volume / RAID group
 SYNO_RAID_STATUS = (1, 3, 6, 1, 4, 1, 6574, 3, 1, 1, 3)     # 1 normal ... 11 degraded, 12 crashed
 HR_SW_RUN_NAME = (1, 3, 6, 1, 2, 1, 25, 4, 2, 1, 2)       # the programs that run, one row each
-GROUPS = ("uptime", "cpu", "memory", "disk", "network", "temperature", "supplies", "ups", "storage")
+ENT_SENSOR = (1, 3, 6, 1, 2, 1, 99, 1, 1, 1)               # ENTITY-SENSOR-MIB (RFC 3433): .1 type, .2 scale, .3 precision, .4 value, .5 operating status
+ENT_PHYS_NAME = (1, 3, 6, 1, 2, 1, 47, 1, 1, 1, 1, 7)
+ENT_PHYS_DESCR = (1, 3, 6, 1, 2, 1, 47, 1, 1, 1, 1, 2)
+GROUPS = ("uptime", "cpu", "memory", "disk", "network", "temperature", "sensors", "supplies", "ups", "storage", "vendor")
 GROUP_TITLES = {"uptime": "Time since start", "cpu": "Processor", "memory": "Memory", "disk": "Disks", "network": "Network traffic",
-                "temperature": "Temperatures", "supplies": "Printer supplies", "ups": "UPS battery", "storage": "Storage health"}
+                "temperature": "Temperatures", "sensors": "Hardware sensors (temperature, fans, power)", "supplies": "Printer supplies", "ups": "UPS battery", "storage": "Storage health", "vendor": "Vendor-specific readings (APC, MikroTik)"}
 SKIP_MOUNTS = ("/dev", "/sys", "/proc", "/run", "/snap", "/var/lib/docker", "/var/lib/containers", "/boot/efi", "/var/lib/kubelet")
 MAX_INTERFACES = 64                       # ports of a switch; each gets traffic, load, link state and (when there are any) errors
 
@@ -503,6 +506,103 @@ def read_temperature(agent):
     return out[:12]
 
 
+MAX_SENSORS = 32
+SENSOR_VOLTS = (3, 4)           # entPhySensorType: voltsAC, voltsDC
+SENSOR_CELSIUS, SENSOR_RPM = 8, 10
+
+
+def read_sensors(agent):
+    """Temperatures, fan speeds, voltages and the fault state of the sensors a switch, router, NAS or server publishes (ENTITY-SENSOR-MIB).
+
+    A fan that stands still or a sensor that reports `nonoperational` (a failed power supply, a dead fan) gives `sensor_fault`: 2 for a stopped fan,
+    1 for any other failed sensor, 0 when it is fine."""
+    types = _table(agent, ENT_SENSOR + (1,))
+    if not types:
+        return []
+    scales, precisions = _table(agent, ENT_SENSOR + (2,)), _table(agent, ENT_SENSOR + (3,))
+    values, status = _table(agent, ENT_SENSOR + (4,)), _table(agent, ENT_SENSOR + (5,))
+    names = _table(agent, ENT_PHYS_NAME)
+    descr = _table(agent, ENT_PHYS_DESCR)
+    out = []
+    for key, kind in sorted(types.items())[:MAX_SENSORS]:
+        kind = _num(kind)
+        raw = _num(values.get(key))
+        if kind not in (*SENSOR_VOLTS, SENSOR_CELSIUS, SENSOR_RPM) and _num(status.get(key)) is None:
+            continue
+        label = _text(names.get(key), 40) or _text(descr.get(key), 40) or f"sensor {key[-1]}"
+        scale, precision = _num(scales.get(key)), _num(precisions.get(key)) or 0
+        value = None
+        if raw is not None:
+            value = raw * 10.0 ** ((((scale if scale is not None else 9) - 9) * 3) - precision)
+        oper = _num(status.get(key))
+        if oper == 2:                                  # unavailable: the sensor is not there, not broken
+            continue
+        fault = 1.0 if oper == 3 else 0.0
+        if kind == SENSOR_CELSIUS and value is not None and -40 < value < 200:
+            out.append(("temp_c", label, float(value), "\u00b0C"))
+        elif kind == SENSOR_RPM and value is not None:
+            out.append(("fan_rpm", label, float(value), "rpm"))
+            fault = 2.0 if value <= 0 and oper != 2 else fault
+        elif kind in SENSOR_VOLTS and value is not None and abs(value) < 1000:
+            out.append(("voltage_v", label, float(value), "V"))
+        if oper is not None or kind == SENSOR_RPM:
+            out.append(("sensor_fault", label, fault, "state"))
+    return out
+
+
+SYS_OBJECT_ID = (1, 3, 6, 1, 2, 1, 1, 2, 0)
+APC = (1, 3, 6, 1, 4, 1, 318)
+MIKROTIK = (1, 3, 6, 1, 4, 1, 14988)
+# PowerNet-MIB (APC UPS), from the vendor's MIB: battery capacity %, runtime (timeticks), temperature C, output status (3 = on battery), output load %
+APC_CAPACITY, APC_RUNTIME, APC_TEMP = APC + (1, 1, 1, 2, 2, 1, 0), APC + (1, 1, 1, 2, 2, 3, 0), APC + (1, 1, 1, 2, 2, 2, 0)
+APC_STATUS, APC_LOAD = APC + (1, 1, 1, 4, 1, 1, 0), APC + (1, 1, 1, 4, 2, 3, 0)
+# MIKROTIK-MIB health (RouterOS 6.4x and 7): temperature and CPU temperature and voltage in tenths, fan speeds in rpm
+MT_VOLTAGE, MT_TEMP, MT_CPU_TEMP = MIKROTIK + (1, 1, 3, 8, 0), MIKROTIK + (1, 1, 3, 10, 0), MIKROTIK + (1, 1, 3, 11, 0)
+MT_FAN1, MT_FAN2 = MIKROTIK + (1, 1, 3, 17, 0), MIKROTIK + (1, 1, 3, 18, 0)
+
+
+def _under(oid, base):
+    return tuple(oid[:len(base)]) == base
+
+
+def read_vendor(agent):
+    """Readings that only a few vendors publish, picked by the device's sysObjectID. Written from the vendor MIB documentation: a device
+    that does not answer a value simply contributes nothing."""
+    got = agent.get(SYS_OBJECT_ID)
+    ident = got.get(SYS_OBJECT_ID)
+    if not isinstance(ident, tuple):
+        return []
+    out = []
+    if _under(ident, APC):
+        got = agent.get(APC_CAPACITY, APC_RUNTIME, APC_TEMP, APC_STATUS, APC_LOAD)
+        capacity, runtime, temp, status, load = (_num(got.get(o)) for o in (APC_CAPACITY, APC_RUNTIME, APC_TEMP, APC_STATUS, APC_LOAD))
+        if capacity is not None:
+            out.append(("battery_pct", "", float(capacity), "%"))
+        if runtime is not None:
+            out.append(("battery_minutes", "", runtime / 6000.0, "min"))
+        if temp is not None and 0 < temp < 120:
+            out.append(("temp_c", "UPS battery", float(temp), "\u00b0C"))
+        if status is not None:
+            out.append(("on_battery", "", 1.0 if status == 3 else 0.0, "state"))
+        if load is not None and 0 <= load <= 200:
+            out.append(("ups_load_pct", "", float(load), "%"))
+    elif _under(ident, MIKROTIK):
+        got = agent.get(MT_VOLTAGE, MT_TEMP, MT_CPU_TEMP, MT_FAN1, MT_FAN2)
+        volts, board, cpu = (_num(got.get(o)) for o in (MT_VOLTAGE, MT_TEMP, MT_CPU_TEMP))
+        if volts is not None and volts > 0:
+            out.append(("voltage_v", "Supply", volts / 10.0, "V"))
+        if board is not None and 0 < board < 1200:
+            out.append(("temp_c", "Board", board / 10.0, "\u00b0C"))
+        if cpu is not None and 0 < cpu < 1200:
+            out.append(("temp_c", "CPU", cpu / 10.0, "\u00b0C"))
+        for number, o in ((1, MT_FAN1), (2, MT_FAN2)):
+            rpm = _num(got.get(o))
+            if rpm is not None:
+                out.append(("fan_rpm", f"Fan {number}", float(rpm), "rpm"))
+                out.append(("sensor_fault", f"Fan {number}", 2.0 if rpm <= 0 else 0.0, "state"))
+    return out
+
+
 def read_supplies(agent):
     names, levels, maxes = _table(agent, PRT_SUPPLY_DESCR), _table(agent, PRT_SUPPLY_LEVEL), _table(agent, PRT_SUPPLY_MAX)
     out = []
@@ -556,6 +656,10 @@ def collect(agent, groups=None, state=None, now=None):
                 continue
         elif group == "temperature":
             got = _safe(agent, read_temperature, agent)
+        elif group == "sensors":
+            got = _safe(agent, read_sensors, agent)
+        elif group == "vendor":
+            got = _safe(agent, read_vendor, agent)
         elif group == "supplies":
             got = _safe(agent, read_supplies, agent)
         elif group == "ups":

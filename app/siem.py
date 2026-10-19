@@ -68,7 +68,7 @@ def severity(kind: str) -> int:
 
     if kind in CRITICAL or kind.endswith(("_failed", "_critical")) or kind == "remediation_failed":
         return 2
-    if kind.endswith(("_warning", "_offline", "_late", "_unhealthy", "_unavailable", "_pending")) or kind in ("login_failed", "licence_expiring"):
+    if kind.endswith(("_warning", "_offline", "_late", "_unhealthy", "_unavailable", "_pending")) or kind in ("login_failed", "licence_expiring", "link_down"):
         return 4
     return 6
 

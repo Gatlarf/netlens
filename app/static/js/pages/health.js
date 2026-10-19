@@ -4,8 +4,8 @@ import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin } from "../util
 import { pageHead, emptyState } from "../ui.js";
 
 const REFRESH_MS = 30000;
-const METRIC_ORDER = ["cpu_pct", "mem_pct", "disk_pct", "temp_c", "battery_pct", "supply_pct", "on_battery", "storage_status", "service_stopped"];
-const EVENT_ONLY = ["on_battery", "storage_status", "service_stopped"];       // no numbers to set: it is a problem as soon as it happens
+const METRIC_ORDER = ["cpu_pct", "mem_pct", "disk_pct", "temp_c", "battery_pct", "supply_pct", "on_battery", "storage_status", "sensor_fault", "service_stopped"];
+const EVENT_ONLY = ["on_battery", "storage_status", "sensor_fault", "service_stopped"];       // no numbers to set: it is a problem as soon as it happens
 
 const fmtRate = (bps) => (bps === null || bps === undefined ? "–" : bps >= 1e9 ? `${(bps / 1e9).toFixed(1)} Gbit/s` : bps >= 1e6 ? `${(bps / 1e6).toFixed(1)} Mbit/s` : `${Math.round(bps / 1e3)} kbit/s`);
 const fmtUptime = (s) => (s === null || s === undefined ? "–" : s >= 86400 ? `${Math.floor(s / 86400)} d` : s >= 3600 ? `${Math.floor(s / 3600)} h` : `${Math.floor(s / 60)} min`);

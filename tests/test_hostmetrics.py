@@ -572,3 +572,82 @@ def test_a_temperature_warning_clears_when_the_reading_is_no_longer_taken(tmp_pa
     conn.execute("UPDATE metric_state SET level = 'warning'")
     service.evaluate(conn, 1, dev, "lxc", [])                                                 # a failed read changes nothing
     assert conn.execute("SELECT level FROM metric_state").fetchone()[0] == "warning"
+
+
+def sensors_mib(rows):
+    """rows: (index, type, scale, precision, raw value, oper status, name)"""
+    mib = sim.Mib()
+    for index, kind, scale, precision, raw, oper, name in rows:
+        mib.set(oid(snmp.ENT_SENSOR + (1,), index), kind)
+        mib.set(oid(snmp.ENT_SENSOR + (2,), index), scale)
+        mib.set(oid(snmp.ENT_SENSOR + (3,), index), precision)
+        mib.set(oid(snmp.ENT_SENSOR + (4,), index), raw)
+        mib.set(oid(snmp.ENT_SENSOR + (5,), index), oper)
+        mib.set(oid(snmp.ENT_PHYS_NAME, index), name.encode())
+    return mib
+
+
+def test_entity_sensors_give_temperature_fans_voltage_and_faults():
+    mib = sensors_mib([
+        (1, 8, 9, 1, 423, 1, "CPU temp"),             # units, 1 decimal: 42.3 C
+        (2, 10, 9, 0, 4200, 1, "Fan 1"),              # rpm
+        (3, 10, 9, 0, 0, 1, "Fan 2"),                 # stopped
+        (4, 4, 8, 0, 12000, 1, "PSU 1 12V"),          # milli volts: 12 V
+        (5, 4, 8, 0, 0, 3, "PSU 2 12V"),              # nonoperational: a failed power supply
+        (6, 8, 9, 0, 55, 2, "Absent sensor"),         # unavailable: ignored
+    ])
+    got = points(snmp.collect(Direct(mib), groups=["sensors"], state={}, now=1)[0])
+    assert got[("temp_c", "CPU temp")] == pytest.approx(42.3)
+    assert got[("fan_rpm", "Fan 1")] == 4200 and got[("sensor_fault", "Fan 1")] == 0
+    assert got[("sensor_fault", "Fan 2")] == 2
+    assert got[("voltage_v", "PSU 1 12V")] == pytest.approx(12.0)
+    assert got[("sensor_fault", "PSU 2 12V")] == 1 and got[("sensor_fault", "PSU 1 12V")] == 0
+    assert not any(label == "Absent sensor" for (_m, label) in got)
+
+
+def test_a_device_without_entity_sensors_reports_nothing():
+    pts, found = snmp.collect(Direct(sim.Mib()), groups=["sensors"], state={}, now=1)
+    assert pts == [] and "sensors" not in found
+
+
+def test_fan_fault_raises_an_alert_with_a_clear_sentence(tmp_path):
+    from app.db import connect, get_or_create_device, init_db
+    from app.hostmetrics import service
+
+    conn = connect(tmp_path / "t.db")
+    init_db(conn)
+    dev = get_or_create_device(conn, "aa:bb:cc:00:00:09", "10.0.0.9")
+    conn.execute("INSERT INTO host_monitors (device_id, method, address, port, credential, interval_s, groups, alerts, enabled, created) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                 (dev, "snmp", "10.0.0.9", 161, "", 60, "[]", 1, 1, "2026-01-01T00:00:00Z"))
+    conn.commit()
+    monitor = conn.execute("SELECT id FROM host_monitors").fetchone()[0]
+    pts = [("sensor_fault", "Fan 2", 2.0, "state")]
+    service.evaluate(conn, monitor, dev, "sw1", pts)
+    service.evaluate(conn, monitor, dev, "sw1", pts)
+    detail = conn.execute("SELECT kind, detail FROM events WHERE kind LIKE 'metric_%'").fetchone()
+    assert detail["kind"] == "metric_critical" and "Fan 2 has stopped" in detail["detail"]
+
+
+def test_vendor_readings_for_apc_and_mikrotik():
+    apc = sim.Mib()
+    apc.set(snmp.SYS_OBJECT_ID, (1, 3, 6, 1, 4, 1, 318, 1, 3, 2, 8))
+    for o, v in ((snmp.APC_CAPACITY, 87), (snmp.APC_RUNTIME, 90000), (snmp.APC_TEMP, 29), (snmp.APC_STATUS, 3), (snmp.APC_LOAD, 41)):
+        apc.set(o, v)
+    got = points(snmp.collect(Direct(apc), groups=["vendor"], state={}, now=1)[0])
+    assert got[("battery_pct", "")] == 87 and got[("battery_minutes", "")] == 15 and got[("temp_c", "UPS battery")] == 29
+    assert got[("on_battery", "")] == 1 and got[("ups_load_pct", "")] == 41
+
+    mt = sim.Mib()
+    mt.set(snmp.SYS_OBJECT_ID, (1, 3, 6, 1, 4, 1, 14988, 1))
+    for o, v in ((snmp.MT_VOLTAGE, 242), (snmp.MT_TEMP, 415), (snmp.MT_CPU_TEMP, 520), (snmp.MT_FAN1, 5100), (snmp.MT_FAN2, 0)):
+        mt.set(o, v)
+    got = points(snmp.collect(Direct(mt), groups=["vendor"], state={}, now=1)[0])
+    assert got[("voltage_v", "Supply")] == pytest.approx(24.2) and got[("temp_c", "Board")] == pytest.approx(41.5) and got[("temp_c", "CPU")] == pytest.approx(52.0)
+    assert got[("fan_rpm", "Fan 1")] == 5100 and got[("sensor_fault", "Fan 1")] == 0 and got[("sensor_fault", "Fan 2")] == 2
+
+
+def test_other_vendors_get_no_vendor_readings():
+    other = sim.Mib()
+    other.set(snmp.SYS_OBJECT_ID, (1, 3, 6, 1, 4, 1, 9, 1, 1))
+    pts, found = snmp.collect(Direct(other), groups=["vendor"], state={}, now=1)
+    assert pts == [] and found == []

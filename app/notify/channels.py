@@ -118,6 +118,11 @@ EVENT_LABELS = {
     "os_changed": "A device's operating system changes",
     "wifi_roamed": "A Wi-Fi device moves to another mesh node",
     "host_timeout": "A host times out during a scan",
+    "link_down": "A device reports that a network link went down (SNMP trap)",
+    "link_up": "A device reports that a network link came back (SNMP trap)",
+    "device_restarted": "A device reports that it restarted (SNMP trap)",
+    "snmp_trap": "A device sends another SNMP trap (UPS on battery, spanning tree change, vendor alarms ...)",
+    "device_log": "A device logs a message at or above the chosen severity (syslog)",
     "backup_failed": "A scheduled backup fails",
     "dhcp_rogue": "A new, untrusted DHCP server answers on the network",
     "gateway_changed": "The MAC address behind the gateway changes",
@@ -137,7 +142,7 @@ EVENT_LABELS = {
     "net_ok": "A network health problem or warning is gone",
     "login_failed": "Someone keeps entering a wrong password or token (a possible attack)",
 }
-DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "metric_critical", "remote_offline", "remote_service_down", "remote_metric_critical", "probe_offline", "probe_online", "port_opened", "port_unexpected", "port_missing", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "vuln_critical", "net_critical", "login_failed"]
+DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "metric_critical", "remote_offline", "remote_service_down", "remote_metric_critical", "probe_offline", "probe_online", "port_opened", "port_unexpected", "port_missing", "link_down", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "vuln_critical", "net_critical", "login_failed"]
 
 
 class ChannelError(Exception):
@@ -374,6 +379,7 @@ def _line(e: dict) -> str:
         "os_changed": f"{where}: system changed {detail}",
         "wifi_roamed": f"{name} moved: {detail}",
         "host_timeout": f"Scan timeout: {detail}",
+        "link_down": f"LINK DOWN on {name}: {detail}", "link_up": f"Link up on {name}: {detail}", "device_restarted": f"{name} {detail}", "snmp_trap": f"{name}: {detail}", "device_log": f"{name} log {detail}",
         "backup_failed": f"Scheduled backup failed: {detail}",
         "dhcp_rogue": f"ROGUE DHCP? {detail}",
         "gateway_changed": f"GATEWAY CHANGED: {detail}",
@@ -407,7 +413,7 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
     short = {
         "device_new": "new device", "device_offline": "offline", "device_online": "back online", "service_down": "service down",
         "service_up": "service up", "port_opened": "port opened", "port_closed": "port closed", "port_unexpected": "unexpected port", "port_missing": "port missing", "ip_changed": "IP changed", "ip_reused": "IP reused",
-        "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "backup_failed": "backup failed", "dhcp_rogue": "rogue DHCP", "gateway_changed": "gateway changed",
+        "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "link_down": "link down", "link_up": "link up", "device_restarted": "restarted", "snmp_trap": "SNMP trap", "device_log": "device log", "backup_failed": "backup failed", "dhcp_rogue": "rogue DHCP", "gateway_changed": "gateway changed",
         "dns_registered": "registered in DNS", "dns_updated": "DNS updated", "dns_failed": "DNS write failed",
         "remote_new": "remote device new", "remote_offline": "remote offline", "remote_online": "remote online", "remote_service_down": "remote service down",
         "remote_service_up": "remote service up", "remote_metric_warning": "remote health warning", "remote_metric_critical": "remote health critical",
