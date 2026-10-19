@@ -8,8 +8,55 @@ const RANGES = [["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["90d
 
 const dev = (item) => ({ ...item, href: `#/device/${item.id}` });
 
+// One short explanation per card, matched on the start of the title (some titles carry a count or a range).
+const TIPS = [
+  ["Devices online", "How many devices answered at each moment. A dip means devices went offline; the bucket size follows the chosen range."],
+  ["Devices over time", "The total number of known devices at the end of each day, so you can see the network grow or shrink."],
+  ["Events per day", "How many events (devices appearing, going online or offline, changing address or ports) were logged each day."],
+  ["By type", "Devices grouped by what Netlens thinks they are: router, phone, printer, server and so on."],
+  ["By group", "Devices grouped by the groups you created."],
+  ["Top vendors", "The manufacturers with the most devices, taken from the MAC address and what devices announce."],
+  ["Operating systems", "The operating systems devices report or that Netlens could tell from their fingerprint."],
+  ["Subnets", "How many devices live in each network range."],
+  ["Wired and Wi-Fi", "How many devices connect by cable and how many over Wi-Fi. Needs a router or access point plugin."],
+  ["Clients per network node", "How many devices hang off each switch, access point or router."],
+  ["Signal quality", "Wi-Fi clients grouped by signal strength. Weaker signal means slower and less reliable connections."],
+  ["Weakest clients", "The Wi-Fi clients with the lowest signal (in dBm; closer to zero is stronger) and the node they are connected to."],
+  ["Passive listening", "Whether Netlens quietly listens for DHCP, mDNS and UPnP announcements, and what it learned from them."],
+  ["Needs attention", "Guests that are stopped unexpectedly, restarting, unhealthy or out of date, and why."],
+  ["Certificates", "TLS certificates used by your reverse proxy sites, when they end and how many days are left."],
+  ["Internet speed over time", "Download and upload speed from the scheduled speed tests, over the chosen range."],
+  ["Spread in this period", "The lowest, average and highest speed measured in this range. A big gap means an unstable connection."],
+  ["Latest iperf3 tests", "The most recent speed tests run between Netlens and another iperf3 server on your network."],
+  ["Latest browser tests", "The most recent speed tests run from a browser, which measure the path from that device to Netlens."],
+  ["Least reliable", "Devices that were reachable for the smallest share of the last 7 days."],
+  ["Most reliable", "Devices that were reachable for the largest share of the last 7 days."],
+  ["Flapping", "Devices that switched between online and offline many times in the last 24 hours, often a bad cable, weak Wi-Fi or a device that sleeps."],
+  ["Offline the longest", "Devices that have been unreachable for the longest time right now."],
+  ["Slowest to answer", "Devices with the highest average response time (ping) in the last 24 hours."],
+  ["Most common open ports", "The ports found open on the most devices."],
+  ["Most common services", "The services (web, SSH, SMB and so on) found on the most devices."],
+  ["Devices with the most open ports", "Devices exposing the most ports. More open ports means a bigger surface to keep secure."],
+  ["Busiest parents", "The switches, access points or hosts with the most devices connected below them."],
+  ["Where the hierarchy comes from", "Which source told Netlens how devices connect: a plugin, an LLDP neighbour, a hypervisor or your own choice."],
+  ["Hypervisor hosts", "Each hypervisor host with the number of guests (VMs and containers) on it and how many are running."],
+  ["Scans in the last", "How many scans ran, how they ended and how long they took. The 95th percentile is the duration that 95 of 100 scans stayed under."],
+  ["Hosts found per scan", "How many hosts each recent scan found. A sudden drop can mean a scan problem or a network outage."],
+  ["Checks (24 h)", "Your service checks with their current state, uptime over 24 hours and response time."],
+  ["By kind", "The events in the chosen range, counted per type."],
+  ["Most active devices", "The five devices that logged the most events in the chosen range. A device that tops the list is changing a lot (coming and going, new address, new ports), not necessarily busy."],
+  ["Latest events", "The ten most recent events on the network, newest first."],
+  ["Netlens", "The installed version, the size of the database and how far back the history goes."],
+  ["Stored rows", "How many records Netlens keeps per kind. Useful to see what takes the room in the database."],
+  ["Backups and network checks", "State of the scheduled backups and of the check that looks for unexpected DHCP servers."],
+  ["Plugins", "Each plugin, whether it is on, and whether its latest sync worked."],
+];
+
 function card(title, ...children) {
-  return h("div", { class: "card stat-card" }, h("h2", {}, title), ...children);
+  const tip = TIPS.find(([k]) => title.startsWith(k));
+  const head = h("h2", {}, title);
+  if (tip) head.appendChild(h("span", { class: "info-tip", tabindex: "0", role: "note", "aria-label": tip[1], "data-tip": tip[1] }, "?"));
+  return h("div", { class: "card stat-card" }, head, ...children);
 }
 
 function table(headers, rows) {
