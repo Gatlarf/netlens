@@ -58,17 +58,57 @@ function openRouterSection(info, keyInput, refresh) {
 // Settings page: the language model behind the digital engineer.
 export async function buildEngineerCard() {
   const card = h("div", { class: "card" });
+  const catalogue = (await get("/api/engineer/providers")).providers;
+  const byId = Object.fromEntries(catalogue.map((p) => [p.id, p]));
   function draw(info) {
     clear(card);
     card.appendChild(h("h3", {}, "Language model"));
     card.appendChild(h("p", { class: "hint" },
-      "The model Netlens itself calls, in two places. The digital engineer reads an incident (the event, the device, its recent events, earlier fixes) and says what it thinks is wrong and which of your remediation rules would fix it; it never runs anything and can only pick one of your rules. Insights uses it to answer free questions and to word summaries. Any OpenAI-compatible server works: a local one (llama.cpp, Ollama, LM Studio), a hosted one with your own key, or a free model on OpenRouter below. Part of every licence and the free trial."));
+      "The model Netlens itself calls, in two places. The digital engineer reads an incident (the event, the device, its recent events, earlier fixes) and says what it thinks is wrong and which of your remediation rules would fix it; it never runs anything and can only pick one of your rules. Insights uses it to answer free questions and to word summaries. Pick a provider (Claude, ChatGPT, Gemini, Le Chat, Grok, OpenRouter ...), your own server (Ollama, llama.cpp, LM Studio) or any OpenAI-compatible address. A larger model writes clearly better reports and answers. Part of every licence and the free trial."));
     if (!info.allowed) card.appendChild(h("p", { class: "warn-text" }, "Needs a licence or the free trial (Settings → Licence)."));
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = info.enabled;
+    const provider = h("select", { "aria-label": "Provider" }, ...(info.provider ? [] : [h("option", { value: "" }, "Choose a provider ...")]),
+      ...catalogue.map((p) => h("option", { value: p.id, selected: p.id === info.provider }, p.name)));
     const url = h("input", { type: "url", value: info.url, placeholder: "http://192.168.0.5:8080/v1" });
-    const model = h("input", { type: "text", value: info.model, placeholder: "qwen2.5-14b-instruct" });
-    const key = h("input", { type: "password", autocomplete: "off", placeholder: info.has_key ? "(kept, type to change)" : "API key (empty for a local server)" });
+    const model = h("input", { type: "text", value: info.model, placeholder: "model name", list: "ai-models", autocomplete: "off" });
+    const models = h("datalist", { id: "ai-models" });
+    const modelNote = h("span", { class: "hint" }, "");
+    const loadModels = h("button", { class: "btn", type: "button" }, "Load models");
+    const key = h("input", { type: "password", autocomplete: "off", placeholder: info.has_key ? "(kept, type to change)" : "API key" });
+    const keyHelp = h("span", { class: "hint" }, "");
+    const orBox = openRouterSection(info, key, () => get("/api/engineer").then(draw));
+    async function fetchModels() {
+      loadModels.disabled = true;
+      clear(models);
+      modelNote.textContent = "Asking the provider ...";
+      try {
+        const r = await post("/api/engineer/models", { url: url.value, ...(key.value ? { api_key: key.value } : {}) });
+        for (const m of r.models) models.appendChild(h("option", { value: m.id }, m.name === m.id ? "" : m.name));
+        if (!model.value) model.value = r.models[0].id;
+        modelNote.textContent = `${r.models.length} models available to this key: pick one from the list or type a name. The first ones are the most likely choices.`;
+      } catch (err) { modelNote.textContent = err.message || "Could not load the models"; }
+      loadModels.disabled = false;
+    }
+    loadModels.addEventListener("click", fetchModels);
+    function describe() {
+      const p = byId[provider.value];
+      const own = !p || p.id === "local" || p.id === "custom";
+      url.readOnly = !own;
+      keyHelp.textContent = "";
+      if (p && p.key_url) keyHelp.append("Get a key at ", h("a", { href: p.key_url, target: "_blank", rel: "noopener" }, p.key_url.replace("https://", "")), ". A key belongs to one provider: changing the provider forgets the saved key. ");
+      if (p && p.id !== "local" && p.id !== "custom") keyHelp.append("This is a paid service of that company; Netlens sends only short, anonymised questions.");
+      orBox.style.display = provider.value === "openrouter" ? "" : "none";
+    }
+    provider.addEventListener("change", () => {
+      const p = byId[provider.value];
+      if (p) { url.value = p.url; model.value = ""; key.value = ""; clear(models); key.placeholder = provider.value === info.provider && info.has_key ? "(kept, type to change)" : p.id === "local" ? "API key (empty for most local servers)" : "API key"; }
+      modelNote.textContent = provider.value === info.provider && info.has_key ? "" : "Enter your API key, then press Load models.";
+      describe();
+      if (provider.value === info.provider && (info.has_key || provider.value === "local")) fetchModels();
+    });
+    describe();
+    if (info.provider && (info.has_key || info.provider === "local")) fetchModels();
     const redact = h("input", { type: "checkbox" });
     redact.checked = info.redact;
     const save = h("button", { class: "btn primary", type: "button" }, "Save");
@@ -85,7 +125,10 @@ export async function buildEngineerCard() {
       test.disabled = false;
     });
     card.append(h("label", { class: "check" }, enabled, " Language model is on (digital engineer and Insights)"),
-      h("div", { class: "field" }, h("label", {}, "Address (ends in /v1)"), url), h("div", { class: "field" }, h("label", {}, "Model"), model), h("div", { class: "field" }, h("label", {}, "API key"), key),
+      h("div", { class: "field" }, h("label", {}, "Provider"), provider),
+      h("div", { class: "field" }, h("label", {}, "Address"), url),
+      h("div", { class: "field" }, h("label", {}, "API key"), key, keyHelp),
+      h("div", { class: "field" }, h("label", {}, "Model"), model, models, " ", loadModels, h("div", {}, modelNote)),
       h("label", { class: "check" }, redact, " Make it anonymous: replace IP addresses, MAC addresses and device names by placeholders before anything is sent"),
       h("details", {}, h("summary", { class: "hint" }, "What a trustworthy model needs"), h("ul", { class: "hint" },
         h("li", {}, "An OpenAI-compatible chat API (llama.cpp, Ollama, LM Studio, OpenRouter, OpenAI ...) with a context of at least 8,000 tokens."),
@@ -95,7 +138,7 @@ export async function buildEngineerCard() {
         h("li", {}, "Run “Check the model” on the Automation → Insights page: six small exams with made-up data show how yours does."))),
       h("p", { class: "hint" }, "The commands of your rules are never sent, only their names and the kind of action. With a hosted model the incident still leaves your network: leave the anonymising on, or use a local model."),
       h("div", { class: "form-actions" }, save, test));
-    card.appendChild(openRouterSection(info, key, () => get("/api/engineer").then(draw)));
+    card.appendChild(orBox);
   }
   draw(await get("/api/engineer"));
   return card;

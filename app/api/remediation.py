@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app import engineer, licence, openrouter, remediation
+from app import engineer, licence, openrouter, providers, remediation
 from app.api.devices import get_conn
 
 router = APIRouter(prefix="/api", tags=["remediation"])
@@ -191,4 +191,29 @@ async def use_openrouter(body: OpenRouterPick, conn=Depends(get_conn)) -> dict:
     try:
         return {**await asyncio.to_thread(openrouter.use, conn, body.model, (body.api_key or "").strip() or None), "allowed": True}
     except (openrouter.OpenRouterError, engineer.EngineerError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+class ModelsBody(BaseModel):
+    url: str
+    api_key: str | None = None
+
+
+@router.get("/engineer/providers")
+def get_providers(conn=Depends(get_conn)) -> dict:
+    """The providers to choose from, with their addresses, and the one in use."""
+    return {"providers": providers.public(), "current": engineer.settings(conn)["provider"]}
+
+
+@router.post("/engineer/models")
+async def list_provider_models(body: ModelsBody, conn=Depends(get_conn)) -> dict:
+    """The models a provider offers this key. The saved key is used only for the provider it was saved for, never for another address."""
+    from app.db import get_setting
+
+    key = (body.api_key or "").strip()
+    if not key and providers.host_of(body.url) == providers.host_of(get_setting(conn, "engineer.url") or ""):
+        key = get_setting(conn, "engineer.api_key") or ""
+    try:
+        return {"models": await asyncio.to_thread(providers.list_models, body.url, key or None), "provider": providers.detect(body.url)}
+    except providers.ProviderError as exc:
         raise HTTPException(status_code=422, detail=str(exc))

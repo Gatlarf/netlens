@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.101 — 2026-10-19
+
+### Added
+- ★ **Choose your AI provider**: Settings → AI → Language model has a Provider box with Anthropic (Claude), OpenAI (ChatGPT), Google (Gemini), Mistral (Le Chat), xAI (Grok), DeepSeek, Groq, OpenRouter, your own server and any OpenAI-compatible address. Picking one fills in the address, and **Load models** shows the models your key can use. Anthropic is called through its own API. A saved key is forgotten when you switch to another provider, so it is never sent to the wrong company.
+- A refusal from a provider now says why when it explains itself (for example an unsupported setting), instead of only "HTTP 400".
+
 ## 0.4.99 — 2026-10-19
 
 ### Changed

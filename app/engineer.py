@@ -17,6 +17,7 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from app import providers
 from app.db import get_setting, set_setting, utcnow
 
 KEYS = ("engineer.enabled", "engineer.url", "engineer.model", "engineer.api_key", "engineer.redact")
@@ -45,13 +46,17 @@ class EngineerError(RuntimeError):
 
 
 def settings(conn: sqlite3.Connection) -> dict[str, Any]:
-    return {"enabled": get_setting(conn, "engineer.enabled") == "1", "url": get_setting(conn, "engineer.url") or "", "model": get_setting(conn, "engineer.model") or "",
+    url = get_setting(conn, "engineer.url") or ""
+    return {"enabled": get_setting(conn, "engineer.enabled") == "1", "url": url, "model": get_setting(conn, "engineer.model") or "", "provider": providers.detect(url),
             "has_key": bool(get_setting(conn, "engineer.api_key")), "redact": get_setting(conn, "engineer.redact") != "0"}
 
 
 def save_settings(conn: sqlite3.Connection, data: dict) -> dict[str, Any]:
     if ("url" in data and str(data["url"] or "").strip().rstrip("/") != get_setting(conn, "engineer.url")) or ("model" in data and str(data["model"] or "").strip()[:100] != get_setting(conn, "engineer.model")):
         conn.execute("DELETE FROM settings WHERE key IN ('engineer.source', 'openrouter.watch')")      # chosen by hand: the free-model watch no longer applies
+        conn.commit()
+    if "url" in data and providers.host_of(str(data["url"] or "")) != providers.host_of(get_setting(conn, "engineer.url") or "") and not data.get("api_key"):
+        conn.execute("DELETE FROM settings WHERE key = 'engineer.api_key'")        # a key belongs to one provider: it is never sent to another one
         conn.commit()
     if "url" in data:
         url = str(data["url"] or "").strip().rstrip("/")
@@ -127,32 +132,114 @@ def chat(conn: sqlite3.Connection, messages: list[dict], timeout: float = 90.0) 
 
 
 def chat_with(url: str, model: str, key: str | None, messages: list[dict], timeout: float = 90.0) -> str:
-    """One chat call to any OpenAI-compatible server."""
-    body = json.dumps({"model": model, "messages": messages, "temperature": 0.1, "max_tokens": 6000}).encode()
-    request = urllib.request.Request(url.rstrip("/") + "/chat/completions", data=body, method="POST", headers={"Content-Type": "application/json", "User-Agent": "Netlens-engineer"})
-    if key:
-        request.add_header("Authorization", f"Bearer {key}")
+    """One chat call to the language model: Anthropic's own API for Anthropic, the OpenAI chat protocol for everything else."""
+    host = providers.host_of(url)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:        # noqa: S310 - the address is the administrator's own setting
-            doc = json.loads(resp.read(2_000_000).decode("utf-8", "replace"))
-        text = str(doc["choices"][0]["message"].get("content") or "")
-        if not text.strip():                  # a model that thinks first can use up its allowance before it answers
-            raise EngineerError("the language model gave no answer (it may have run out of room while thinking)")
-        return text
+        if host == "api.anthropic.com":
+            return _chat_anthropic(url, model, key, messages, timeout)
+        return _chat_openai(url, model, key, messages, timeout, host)
     except urllib.error.HTTPError as exc:
-        if exc.code == 404 and "openrouter.ai" in url:
-            raise EngineerError("OpenRouter has no provider for this model any more (free models come and go): choose another one in Settings → AI") from None
+        if exc.code == 404 and ("openrouter.ai" in url or host == "api.anthropic.com"):
+            raise EngineerError(("OpenRouter has no provider for this model any more (free models come and go)" if "openrouter.ai" in url else f"{model} is not available to this key")
+                                + ": choose another one in Settings → AI") from None
         if exc.code in (401, 403):
             raise EngineerError(f"the language model refused the API key (HTTP {exc.code}): check the key") from None
         if exc.code == 402:
             raise EngineerError("the language model needs credit on the account (HTTP 402)") from None
         if exc.code == 429:
             raise EngineerError("the language model is busy or its free allowance for today is used up (HTTP 429): try again later") from None
-        raise EngineerError(f"the language model answered HTTP {exc.code}") from None
+        raise EngineerError(f"the language model answered HTTP {exc.code}{_why(exc)}") from None
     except (urllib.error.URLError, OSError) as exc:
         raise EngineerError(f"cannot reach the language model: {getattr(exc, 'reason', exc)}") from None
     except (ValueError, KeyError, IndexError, TypeError):
         raise EngineerError("the language model did not answer in the expected way") from None
+
+
+def _why(exc: urllib.error.HTTPError) -> str:
+    """The provider's own explanation of a refusal, when it gave one (short, and never anything but the error text)."""
+    body = getattr(exc, "_body", b"") or b""
+    try:
+        doc = json.loads(body.decode("utf-8", "replace"))
+        msg = doc.get("error", doc)
+        msg = msg.get("message") if isinstance(msg, dict) else msg
+        return f": {str(msg)[:160]}" if msg else ""
+    except (ValueError, AttributeError):
+        return ""
+
+
+def _post(request: urllib.request.Request, timeout: float) -> dict:
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:        # noqa: S310 - the address is the administrator's own setting
+            return json.loads(resp.read(2_000_000).decode("utf-8", "replace"))
+    except urllib.error.HTTPError as exc:
+        exc._body = exc.read(4000) if hasattr(exc, "read") else b""           # kept so the reason can be told, and so a 400 can be retried
+        raise
+
+
+def _chat_openai(url: str, model: str, key: str | None, messages: list[dict], timeout: float, host: str) -> str:
+    new_style = host == "api.openai.com"             # OpenAI's current models want max_completion_tokens and only the default temperature
+    body: dict[str, Any] = {"model": model, "messages": messages, ("max_completion_tokens" if new_style else "max_tokens"): 8000 if new_style else 6000}
+    if not new_style:
+        body["temperature"] = 0.1
+    for _ in range(3):
+        request = urllib.request.Request(url.rstrip("/") + "/chat/completions", data=json.dumps(body).encode(), method="POST",
+                                         headers={"Content-Type": "application/json", "User-Agent": "Netlens-engineer"})
+        if key:
+            request.add_header("Authorization", f"Bearer {key}")
+        try:
+            doc = _post(request, timeout)
+            break
+        except urllib.error.HTTPError as exc:
+            text = (getattr(exc, "_body", b"") or b"").decode("utf-8", "replace")
+            if exc.code == 400 and "max_tokens" in body and "max_completion_tokens" in text:
+                body["max_completion_tokens"] = body.pop("max_tokens")
+            elif exc.code == 400 and "max_completion_tokens" in body and "max_completion_tokens" in text and "unsupported" in text.lower():
+                body["max_tokens"] = body.pop("max_completion_tokens")
+            elif exc.code == 400 and "temperature" in body and "temperature" in text:
+                body.pop("temperature")
+            else:
+                raise
+    else:
+        raise EngineerError("the language model did not accept the request")
+    text = str(doc["choices"][0]["message"].get("content") or "")
+    if not text.strip():                  # a model that thinks first can use up its allowance before it answers
+        raise EngineerError("the language model gave no answer (it may have run out of room while thinking)")
+    return text
+
+
+def _chat_anthropic(url: str, model: str, key: str | None, messages: list[dict], timeout: float) -> str:
+    """Anthropic's Messages API: the system text is a field of its own and user and assistant turns must alternate."""
+    system = "\n\n".join(str(m["content"]) for m in messages if m["role"] == "system")
+    turns: list[dict[str, str]] = []
+    for m in messages:
+        if m["role"] == "system":
+            continue
+        if turns and turns[-1]["role"] == m["role"]:
+            turns[-1]["content"] += "\n\n" + str(m["content"])
+        else:
+            turns.append({"role": m["role"], "content": str(m["content"])})
+    if not turns or turns[0]["role"] != "user":
+        turns.insert(0, {"role": "user", "content": "Continue."})
+    body: dict[str, Any] = {"model": model, "max_tokens": 4096, "messages": turns, "temperature": 0.1}
+    if system:
+        body["system"] = system
+    for _ in range(2):
+        request = urllib.request.Request(url.rstrip("/") + "/messages", data=json.dumps(body).encode(), method="POST",
+                                         headers={"Content-Type": "application/json", "User-Agent": "Netlens-engineer", "anthropic-version": "2023-06-01", "x-api-key": key or ""})
+        try:
+            doc = _post(request, timeout)
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code == 400 and "temperature" in body and "temperature" in (getattr(exc, "_body", b"") or b"").decode("utf-8", "replace"):
+                body.pop("temperature")          # some newer models fix their own temperature
+            else:
+                raise
+    else:
+        raise EngineerError("the language model did not accept the request")
+    text = "".join(block.get("text", "") for block in doc.get("content", []) if isinstance(block, dict) and block.get("type") == "text")
+    if not text.strip():
+        raise EngineerError("the language model gave no answer")
+    return text
 
 
 def parse_answer(text: str) -> dict[str, Any]:

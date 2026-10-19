@@ -245,7 +245,7 @@ def test_the_engineer_approves_only_its_rule_with_high_confidence(conn):
 
 def test_engineer_settings_hide_the_key(conn):
     out = engineer.save_settings(conn, {"enabled": True, "url": "http://x/v1/", "model": "m", "api_key": "sk-secret"})
-    assert out == {"enabled": True, "url": "http://x/v1", "model": "m", "has_key": True, "redact": True}
+    assert out == {"enabled": True, "url": "http://x/v1", "model": "m", "provider": "custom", "has_key": True, "redact": True}
     assert "sk-secret" not in conn.execute("SELECT value FROM settings WHERE key = 'engineer.api_key'").fetchone()["value"]
     with pytest.raises(engineer.EngineerError):
         engineer.save_settings(conn, {"url": "ftp://x"})

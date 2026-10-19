@@ -45,6 +45,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Wake-on-LAN, ping and traceroute](#wake-on-lan-ping-and-traceroute)
   - [Users and API tokens](#users-and-api-tokens)
   - [Share links](#share-links)
+  - [Language model providers](#language-model-providers)
   - [AI report](#ai-report)
   - [AI assistant](#ai-assistant)
   - [Free language models on OpenRouter](#free-language-models-on-openrouter)
@@ -626,6 +627,12 @@ A viewer can be **limited to some groups** (*Limit to groups* on the user): a cu
 *Network → DNS* registers the devices Netlens knows in your DNS server and keeps their addresses right when DHCP hands out a new one. It needs a **DNS plugin** (for example *Technitium DNS*, see `plugins/technitium`). You enter your networks and their zones (`192.168.0.0/24 = home.example.com`, one line per network, several zones are fine), press **Read the DNS server now**, and Netlens shows a preview: what it would add or update, what is a **conflict**, and what is left alone. Nothing is written until you approve it; once the preview is what you want you can switch on *Apply automatically after every scan*. With the Docker plugin you can also tick *Give containers that share their host's address a name*: a running container on a bridge or host network that publishes a port then gets a CNAME to its host (`web.home.example.com`), and a container with its own network address is registered like any other device.
 
 Safety is the point of the design: Netlens only changes records it created itself (marked with a comment, and remembered), and **never changes a record that something else made**. A Windows machine that registers itself leaves a record; Netlens recognises it (also when the name differs from the one Netlens would choose) and leaves it alone, shows *Registers itself*, and does not register Windows machines at all by default. A device without a record waits for a grace period (2 hours by default) before it is registered, only devices you marked as *known* are registered (a stranger cannot claim a name by announcing a hostname), and a name that is already used by a record pointing elsewhere is a conflict that you resolve by hand. Devices without a name get a generated one (`tv-samsung-a1b2`, from a pattern you can change) that stays the same afterwards, and every device has a **DNS registration** setting on its page (*Automatic / Always register / Never register*) and a field for its own DNS name. Removing records of devices that are gone is off by default, and a limit caps how many changes one run may make. DNS events (*registered*, *updated*, *failed*) go to the event log and can go to the notification channels.
+
+### Language model providers
+
+**Settings → AI → Language model** has a **Provider** box: Anthropic (Claude), OpenAI (ChatGPT), Google (Gemini), Mistral (Le Chat), xAI (Grok), DeepSeek, Groq, OpenRouter, your own server (Ollama, llama.cpp, LM Studio) or any other OpenAI-compatible address. Picking one fills in the address; paste your API key from that provider's console (the link is shown), press **Load models** and Netlens asks the provider which models your key can use, newest and most capable first. You can also type a model name yourself. The same model serves Insights, the AI report and the digital engineer, and **Test the connection** and Insights → **Check the model** show whether it is good enough.
+
+A larger model from one of the big providers writes clearly better answers and reports than a small local one. They are paid services: Netlens only sends short, anonymised questions (names and addresses are replaced before anything leaves), but a busy network that raises many incidents does make requests. A key belongs to one provider: if you change the provider, the saved key is forgotten, so it is never sent to another company.
 
 ### AI report
 
