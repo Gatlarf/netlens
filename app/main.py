@@ -223,6 +223,7 @@ def create_app(
     app.state.login_limiter = LoginLimiter()
     app.state.user_limiter = LoginLimiter(max_failures=20, window=900.0)
     app.state.share_limiter = LoginLimiter(max_failures=30, window=60.0)
+    app.state.share_pin_limiter = LoginLimiter(max_failures=5, window=300.0)   # a PIN is short: five wrong ones per address, then wait
     app.state.terminal_backends = {"ssh": SSHBackend, "telnet": TelnetBackend}
     app.state.terminal_sessions = 0
 

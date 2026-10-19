@@ -11,3 +11,13 @@
 .share-services li { border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; }
 .share-footer { margin-top: 16px; color: var(--muted); font-size: 0.9rem; }
 @media (max-width: 600px) { .share-map { height: 320px; } }
+.share-message { border-left: 4px solid var(--accent); padding: 8px 12px; background: var(--surface); border-radius: var(--radius); white-space: pre-line; }
+.share-maint { color: var(--muted); }
+.share-bars { display: flex; gap: 2px; margin: 8px 0; }
+.share-bar { flex: 1 1 0; min-width: 3px; height: 28px; border-radius: 2px; background: var(--border); }
+.share-bar.good { background: var(--good, #15803d); }
+.share-bar.warn { background: #d97706; }
+.share-bar.bad { background: var(--bad); }
+.share-events { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; }
+.share-pin { max-width: 360px; margin: 48px auto; }
+.share-pin input { margin-right: 6px; }

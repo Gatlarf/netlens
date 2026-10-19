@@ -2,7 +2,7 @@
 
 Community is free and complete except for one thing: the central Netlens takes in **one** remote site. More sites need a licence key
 (Small business: 10 sites, Enterprise: unlimited, Supporter: 3 for a yearly coffee for the author). The business editions also have the features that mostly
-help organisations (single sign-on, log forwarding, operators and customer views, on-call schedules); Supporter has every other business feature.
+help organisations (single sign-on, log forwarding, operators and customer views, on-call schedules, share links for some groups only and white label); Supporter has every other business feature.
 Monitoring itself is never limited, nothing is deleted when a licence ends, and sites beyond the limit are only frozen.
 
 A key is `NLK1.<payload>.<signature>`: JSON payload, Ed25519 signature, checked here with the public key below, offline. The signing key
@@ -189,8 +189,8 @@ def status(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, A
     return out
 
 
-PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights", "vulnerabilities", "teams", "schedules")      # beyond the free Community edition (trial and every licence include them)
-BUSINESS_ONLY = ("sso", "siem", "teams", "schedules")      # of those, the ones the Supporter edition does not have: they mostly help organisations (the trial has them)
+PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights", "vulnerabilities", "teams", "schedules", "sharing")      # beyond the free Community edition (trial and every licence include them)
+BUSINESS_ONLY = ("sso", "siem", "teams", "schedules", "sharing")      # of those, the ones the Supporter edition does not have: they mostly help organisations (the trial has them)
 
 
 def allows(conn: sqlite3.Connection, feature: str, now: datetime | None = None) -> bool:

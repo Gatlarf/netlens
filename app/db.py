@@ -483,6 +483,10 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    # --- schema v34: share links choose their sections, scope and look, can have a PIN and a start date -----------
+    _add_column_if_missing(conn, "share_links", "options", "TEXT NOT NULL DEFAULT '{}'")      # JSON: sections, groups, services, texts, theme (see app/shares.py)
+    _add_column_if_missing(conn, "share_links", "pin_hash", "TEXT")                         # optional PIN, asked before any data is sent
+    _add_column_if_missing(conn, "share_links", "valid_from", "TEXT")                       # the link works from this moment on
     # --- schema v11: DHCP servers seen on the network (network checks) ----------------------------
     cur.execute(
         """

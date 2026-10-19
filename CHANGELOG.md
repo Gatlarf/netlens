@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.91 — 2026-10-19
+
+### Added
+- ★ **Share links you can shape**: choose exactly what a link shows (counts, services, availability history, map, devices, recent events), which device columns and services are included, whether names are hidden, and add a message and a title for your visitors. A link can have a PIN, start at a chosen moment, use a light or dark theme, and show only the devices of some groups; your own brand name and colour can replace Netlens.
+- **Edit a share link** without changing its address, and **New address** to replace a link that got into the wrong hands (the old address stops working at once).
+- A share page marks devices in planned maintenance, and the events list shows only that a device went offline or came back, never addresses or details.
+
 ## 0.4.90 — 2026-10-19
 
 ### Changed

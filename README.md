@@ -609,7 +609,14 @@ A viewer can be **limited to some groups** (*Limit to groups* on the user): a cu
 
 ### Share links
 
-**Settings → Share links** creates a secret address (`/share/<token>`) that shows the network read-only without a login: either the **map and device list** or only a **status page** (devices online and offline, service states). IP and MAC addresses are left out of the page and the data unless you tick them for that link, and a name that is only an address is shown as "Device N". A link can end after 1 to 90 days and stops working the moment you delete it; the card shows how often each was opened. Netlens itself should not be exposed to the internet without protection; share links are meant for people on your network or behind your own reverse proxy.
+**Settings → Share links** creates a secret address (`/share/<token>`) that shows the network read-only without a login. For each link you choose:
+
+- **What it shows**: any of the counts of devices online and offline, the services, an availability history (7 or 30 days, one bar per day), the map, the device list and the recent events (devices going offline or coming back, newest first; the events carry no addresses or details). *Map and device list*, *Status page only* and *Everything* are quick starting points.
+- **What is included**: which device columns (type, vendor, last seen), IP and MAC addresses (left out unless you tick them; a name that is only an address is shown as "Device N"), an option to hide all device names, only the services you tick, and only the devices in the groups you tick (the counts, services, map and events follow). Devices in a planned maintenance window are marked.
+- **How it looks**: a title for the page (the link's name is only for you), a message for the visitors such as "the router will be replaced on Tuesday", light, dark or the visitor's own theme, and your own brand name and accent colour in place of Netlens.
+- **Who can open it**: an optional PIN (asked before anything is sent; five wrong guesses from one address block it for five minutes), a date and time from which it works, and an end after 1 to 90 days.
+
+*Edit* changes a link without changing its address; *New address* makes a new secret address and the old one stops working at once. A link stops working the moment you delete it; the card shows how often each was opened. Netlens itself should not be exposed to the internet without protection; share links are meant for people on your network or behind your own reverse proxy.
 
 ### DNS registration
 
