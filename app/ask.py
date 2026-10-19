@@ -7,6 +7,7 @@ writes the answer. Names and addresses reach the model as placeholders and come 
 
 from __future__ import annotations
 
+import contextvars
 import json
 import re
 import sqlite3
@@ -20,6 +21,21 @@ STAMP = "%Y-%m-%dT%H:%M:%SZ"
 MAX_STEPS = 4
 MAX_RESULT = 3500
 LIMIT = 15
+
+
+# Which devices count. A phone going offline is not news: by default the answers are about the devices that are meant to be on
+# (marked always-on, or of an infrastructure kind) and about network problems. `scope="all"` brings everything back.
+INFRA_TYPES = ("router", "switch", "ap", "server", "nas", "vm", "camera", "printer", "appliance")
+_SCOPE: contextvars.ContextVar[str] = contextvars.ContextVar("ask_scope", default="all")
+
+
+def important_ids(conn) -> set[int] | None:
+    """The ids of the devices that matter, or None when every device counts (scope "all", or none of them is marked)."""
+    if _SCOPE.get() == "all":
+        return None
+    marks = ",".join("?" * len(INFRA_TYPES))
+    ids = {r["id"] for r in conn.execute(f"SELECT id FROM devices WHERE report_exclude = 0 AND (always_on = 1 OR COALESCE(type_override, device_type) IN ({marks}))", INFRA_TYPES)}
+    return ids or None
 
 
 def _days(value: Any, default: int = 7) -> int:
@@ -39,14 +55,16 @@ def _since(days: int, now: datetime | None) -> str:
 
 # ----------------------------------------------------------------------------- the tools (read only)
 def t_overview(conn, args, now=None) -> dict:
-    row = conn.execute("SELECT COUNT(*) AS n, SUM(online) AS up FROM devices").fetchone()
-    down = [_name(r) for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices WHERE online = 0 ORDER BY last_seen DESC LIMIT ?", (LIMIT,))]
+    keep = important_ids(conn)
+    rows = [r for r in conn.execute("SELECT id, custom_name, hostname, primary_ip, online FROM devices ORDER BY last_seen DESC") if keep is None or r["id"] in keep]
+    down = [_name(r) for r in rows if not r["online"]][:LIMIT]
     services = [r["name"] for r in conn.execute("SELECT name FROM service_checks WHERE enabled = 1 AND last_up = 0 LIMIT ?", (LIMIT,))]
-    return {"devices": row["n"], "online": row["up"] or 0, "offline_devices": down, "services_down": services}
+    return {"devices": len(rows), "online": sum(1 for r in rows if r["online"]), "offline_devices": down, "services_down": services}
 
 
 def t_offline_now(conn, args, now=None) -> dict:
-    rows = conn.execute("SELECT id, custom_name, hostname, primary_ip, last_seen, always_on FROM devices WHERE online = 0 ORDER BY always_on DESC, last_seen DESC LIMIT ?", (LIMIT * 2,)).fetchall()
+    keep = important_ids(conn)
+    rows = [r for r in conn.execute("SELECT id, custom_name, hostname, primary_ip, last_seen, always_on FROM devices WHERE online = 0 ORDER BY always_on DESC, last_seen DESC LIMIT 400") if keep is None or r["id"] in keep][:LIMIT * 2]
     return {"offline": [{"name": _name(r), "last_seen": r["last_seen"], "always_on": bool(r["always_on"])} for r in rows]}
 
 
@@ -54,8 +72,11 @@ def t_events(conn, args, now=None) -> dict:
     days, kind, text = _days(args.get("days"), 1), str(args.get("kind") or ""), str(args.get("device") or "").lower()
     names = {r["id"]: _name(r) for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices")}
     out = []
+    keep = important_ids(conn)
     for r in conn.execute("SELECT ts, kind, device_id, detail FROM events WHERE ts >= ? ORDER BY id DESC LIMIT 400", (_since(days, now),)):
         if kind and r["kind"] != kind:
+            continue
+        if keep is not None and r["device_id"] is not None and r["device_id"] not in keep and not text:
             continue
         if text and text not in (names.get(r["device_id"]) or "").lower() and text not in (r["detail"] or "").lower():
             continue
@@ -69,7 +90,8 @@ def t_availability(conn, args, now=None) -> dict:
     days = _days(args.get("days"), 7)
     end = now or datetime.now(timezone.utc)
     rep = reports.availability(conn, end - timedelta(days=days), end, with_services=True)
-    worst = sorted([d for d in rep["devices"] if d["outages"]], key=lambda d: d["availability"])[:LIMIT]
+    keep = important_ids(conn)
+    worst = sorted([d for d in rep["devices"] if d["outages"] and (keep is None or d["id"] in keep)], key=lambda d: d["availability"])[:LIMIT]
     return {"days": days, "summary": {k: rep["summary"][k] for k in ("devices", "devices_availability", "core_availability", "with_outages")},
             "least_available": [{"name": d["name"], "availability_pct": d["availability"], "outages": d["outages"], "down": d["down_text"]} for d in worst],
             "services_with_outages": [{"name": s["name"], "availability_pct": s["availability"], "down": s["down_text"]} for s in rep["services"] if s["outages"]][:LIMIT]}
@@ -80,11 +102,13 @@ def t_response_times(conn, args, now=None) -> dict:
     fastest = str(args.get("order") or "").lower() in ("fastest", "lowest", "asc")
     since = _since(days, now)
     direction = "ASC" if fastest else "DESC"
-    devices = conn.execute(f"SELECT COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, ROUND(AVG(c.rtt_ms), 1) AS avg_ms, ROUND(MAX(c.rtt_ms), 1) AS max_ms, COUNT(*) AS n "
-                           f"FROM checks c JOIN devices d ON d.id = c.device_id WHERE c.ts >= ? AND c.up = 1 AND c.rtt_ms IS NOT NULL GROUP BY c.device_id HAVING n >= 3 ORDER BY avg_ms {direction} LIMIT ?", (since, 10)).fetchall()
+    keep = important_ids(conn)
+    devices = conn.execute(f"SELECT c.device_id AS id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, ROUND(AVG(c.rtt_ms), 1) AS avg_ms, ROUND(MAX(c.rtt_ms), 1) AS max_ms, COUNT(*) AS n "
+                           f"FROM checks c JOIN devices d ON d.id = c.device_id WHERE c.ts >= ? AND c.up = 1 AND c.rtt_ms IS NOT NULL GROUP BY c.device_id HAVING n >= 3 ORDER BY avg_ms {direction} LIMIT 200", (since,)).fetchall()
+    devices = [r for r in devices if keep is None or r["id"] in keep][:10]
     services = conn.execute(f"SELECT s.name AS name, ROUND(AVG(r.ms), 1) AS avg_ms, ROUND(MAX(r.ms), 1) AS max_ms, COUNT(*) AS n FROM service_results r JOIN service_checks s ON s.id = r.check_id "
                             f"WHERE r.ts >= ? AND r.up = 1 AND r.ms IS NOT NULL GROUP BY r.check_id HAVING n >= 3 ORDER BY avg_ms {direction} LIMIT ?", (since, 5)).fetchall()
-    return {"days": days, "order": "fastest" if fastest else "slowest", "devices": [dict(r) for r in devices], "services": [dict(r) for r in services]}
+    return {"days": days, "order": "fastest" if fastest else "slowest", "devices": [{k: r[k] for k in ("name", "avg_ms", "max_ms", "n")} for r in devices], "services": [dict(r) for r in services]}
 
 
 def t_new_devices(conn, args, now=None) -> dict:
@@ -94,12 +118,14 @@ def t_new_devices(conn, args, now=None) -> dict:
 
 
 def t_incidents(conn, args, now=None) -> dict:
-    found = incidents.incidents(conn, _days(args.get("days"), 7), now)[:LIMIT]
+    keep = important_ids(conn)
+    found = [i for i in incidents.incidents(conn, _days(args.get("days"), 7), now) if keep is None or i["cause"] or not i.get("device_ids") or keep & set(i["device_ids"])][:LIMIT]
     return {"incidents": [{"start": i["start"], "title": i["title"], "summary": i["summary"], "resolved": i["resolved"]} for i in found]}
 
 
 def t_anomalies(conn, args, now=None) -> dict:
-    return {"unusual_now": [anomaly.describe(a) for a in anomaly.scan(conn)[:LIMIT]]}
+    keep = important_ids(conn)
+    return {"unusual_now": [anomaly.describe(a) for a in anomaly.scan(conn) if keep is None or a.get("device_id") is None or a["device_id"] in keep][:LIMIT]}
 
 
 def t_disks(conn, args, now=None) -> dict:
@@ -296,7 +322,7 @@ def render(tool: str, r: dict) -> str:
         if not r["total"]:
             return "There are no service checks."
         return f"{r['total']} service checks. " + ("Down: " + ", ".join(r["down"]) + "." if r["down"] else "All of them are up.")
-    if tool == "device" and r.get("type"):
+    if tool == "device" and "devices" in r:
         return "\n".join(f"{d['name']}: {'online' if d['online'] else 'offline (last seen ' + d['last_seen'] + ')'}" + (f", up {d['availability_7d_pct']}% over 7 days with {d['outages_7d']} outage(s)" if d["availability_7d_pct"] is not None else "") for d in r["devices"])
     if tool == "device":
         parts = [f"{r['name']} is {'online' if r['online'] else 'offline'} (last seen {r['last_seen']})."]
@@ -334,6 +360,7 @@ def system_prompt() -> str:
             "- For a list or a count of devices with some property (a kind, a manufacturer, an operating system, online or offline, an open port) use search_devices or ports. For one named device use device. For a kind of device (printer, switch, nas, camera ...) use search_devices with type, or device with that word.\n"
             "- Current readings (memory, processor, disk, temperature, battery) are in health. Forecasts (a disk that will fill up) are in disks.\n"
             "- Copy names and numbers exactly as they appear in the results. If a result is a list, mention every item that matters; say \"only\" only when the list has one item. Round long numbers to one decimal.\n"
+            "- The user cares about problems that matter: always-on devices (servers, routers, switches, NAS, cameras ...), services and network faults. The tools already leave out phones, tablets and other devices that come and go; never bring them up yourself.\n"
             "- Answer in the language of the question, in a few plain sentences.\n"
             '- If the data does not contain the answer, answer exactly: {"answer": "The data does not tell."}\n'
             "- Names such as <device1> or <ip2> are placeholders: write them exactly as they are.\n"
@@ -393,8 +420,19 @@ def _ask_model(conn, question: str, names: list[str], now, ask) -> dict | None:
     return None
 
 
-def answer(conn: sqlite3.Connection, question: str, now: datetime | None = None, ask=None, mode: str = "auto") -> dict[str, Any]:
-    """`mode`: "auto" (the language model when one is connected, else the built-in logic), "rules" (the built-in logic only) or "model" (the language model, with the built-in logic as the fallback)."""
+def answer(conn: sqlite3.Connection, question: str, now: datetime | None = None, ask=None, mode: str = "auto", scope: str = "all") -> dict[str, Any]:
+    """`scope`: "important" (only the always-on and infrastructure devices, and network problems) or "all" (every device).
+    `mode`: "auto" (the language model when one is connected, else the built-in logic), "rules" (the built-in logic only) or "model" (the language model, with the built-in logic as the fallback)."""
+    token = _SCOPE.set("important" if scope == "important" else "all")
+    try:
+        got = _answer(conn, question, now, ask, mode)
+    finally:
+        _SCOPE.reset(token)
+    got["scope"] = scope
+    return got
+
+
+def _answer(conn, question: str, now, ask, mode: str) -> dict[str, Any]:
     question = (question or "").strip()[:500]
     if not question:
         return {"answer": "Ask a question, or pick one of the ready-made ones.", "source": "rules", "tools": []}

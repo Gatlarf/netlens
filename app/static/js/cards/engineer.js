@@ -152,7 +152,7 @@ export async function buildEngineerCard() {
       h("div", { class: "field" }, h("label", {}, "Provider"), provider),
       h("div", { class: "field" }, h("label", {}, "Address"), url),
       h("div", { class: "field" }, h("label", {}, "API key"), key, keyHelp),
-      h("div", { class: "field" }, h("label", {}, "Model"), modelPick, " ", loadModels, model, h("div", {}, modelNote)),
+      h("div", { class: "field" }, h("label", {}, "Model"), modelPick, model, h("div", {}, loadModels), h("div", {}, modelNote)),
       h("label", { class: "check" }, redact, " Make it anonymous: replace IP addresses, MAC addresses and device names by placeholders before anything is sent"),
       h("details", {}, h("summary", { class: "hint" }, "What a trustworthy model needs"), h("ul", { class: "hint" },
         h("li", {}, "An OpenAI-compatible chat API (llama.cpp, Ollama, LM Studio, OpenRouter, OpenAI ...) with a context of at least 8,000 tokens."),

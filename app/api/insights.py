@@ -54,12 +54,13 @@ def get_insights(conn=Depends(get_conn)) -> dict[str, Any]:
 class Question(BaseModel):
     question: str = Field(max_length=500)
     mode: Literal["auto", "rules", "model"] = "auto"
+    include_all: bool = False                      # also phones, tablets and other devices that come and go
 
 
 @router.post("/insights/ask")
 async def ask_question(body: Question, conn=Depends(get_conn)) -> dict:
     _allowed(conn)
-    return await asyncio.to_thread(lambda: ask.answer(conn, body.question, mode=body.mode))
+    return await asyncio.to_thread(lambda: ask.answer(conn, body.question, mode=body.mode, scope="all" if body.include_all else "important"))
 
 
 @router.post("/insights/incidents/{incident_id}/words")
@@ -128,7 +129,7 @@ def get_report(period: Literal["6h", "24h", "3d", "7d"] = "24h", conn=Depends(ge
     """The latest written report of the period (or None) and, always, the findings of right now."""
     _allowed(conn)
     facts = aireport.collect(conn, period)
-    return {"periods": aireport.PERIODS, "report": aireport.latest(conn, period), "now": {**facts, "lines": aireport.plain_lines(facts)}}
+    return {"status": insights.status(conn), "periods": aireport.PERIODS, "report": aireport.latest(conn, period), "now": {**facts, "lines": aireport.plain_lines(facts)}}
 
 
 @router.post("/insights/report")

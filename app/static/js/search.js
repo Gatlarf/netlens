@@ -12,6 +12,7 @@ const PAGES = [
   ["Network health", "#/network-health", "ipv4 ipv6 gateway dns dhcp duplicate ip address subnet full range internet working check diagnose ipv6 addresses prefix subnet router advertisement slaac routable global link-local dhcpv6 working check"],
   ["Vulnerabilities", "#/vulnerabilities", "cve security scan greenbone openvas tenable nessus rapid7 insightvm exposed exploited patch critical findings vulnerability scanner"],
   ["Insights", "#/insights", "ask question incidents anomalies unusual predictions llm", true],
+  ["AI report", "#/reports", "ai report correlate events findings language model written", true],
   ["Remediation", "#/remediation", "automatic fix rules restart wake webhook", true],
   ["Smart home", "#/smarthome", "home assistant battery devices"],
   ["Speed tests", "#/speedtest", "bandwidth internet iperf throughput latency"],

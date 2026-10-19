@@ -636,7 +636,7 @@ A larger model from one of the big providers writes clearly better answers and r
 
 ### AI report
 
-**Insights → AI report** answers "what happened, and how does it hang together?" for the last 6 hours, 24 hours, 3 days or 7 days. Netlens finds the connections itself and numbers them as findings (F1, F2 ...), strongest first:
+**Reports → AI report** answers "what happened, and how does it hang together?" for the last 6 hours, 24 hours, 3 days or 7 days. Netlens finds the connections itself and numbers them as findings (F1, F2 ...), strongest first:
 
 - **Strong**: alerts that belong to one incident, where a device higher in the network hierarchy went wrong first and the devices behind it followed.
 - **Likely**: several devices that went wrong together and all sit behind the same switch or host, which itself reported nothing (a possible cause); a problem that came back three times or more, with the hour it usually happens.

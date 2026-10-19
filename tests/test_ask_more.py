@@ -164,3 +164,18 @@ def test_the_version_answer_does_not_claim_an_update_status_it_does_not_have(con
     assert "A newer version, 9.9.9, is available" in sentence()
     set_setting(conn, updates.CACHE_KEY, json.dumps({"latest": "0.0.1", "checked": "2026-11-01T08:00:00Z", "current": "0.0.1"}))
     assert "newest published version" in sentence()
+
+
+def test_scope_leaves_out_phones_by_default(conn):
+    conn.execute("UPDATE devices SET online = 0 WHERE id = 5")      # the macbook (a pc) and the iphone (id 4) are offline
+    both = ask.answer(conn, "what is offline?", NOW, mode="rules", scope="all")["answer"]
+    core = ask.answer(conn, "what is offline?", NOW, mode="rules", scope="important")["answer"]
+    assert "iphone-bert" in both and "macbook" in both
+    assert "iphone-bert" not in core and "macbook" not in core and "hp-laserjet" in core
+    by_name = ask.answer(conn, "is iphone-bert online?", NOW, mode="rules", scope="important")["answer"]
+    assert "iphone-bert" in by_name                                  # asking for a device by name always works
+
+
+def test_scope_without_marked_devices_counts_everything(conn):
+    conn.execute("UPDATE devices SET device_type = 'phone', always_on = 0")
+    assert "iphone-bert" in ask.answer(conn, "what is offline?", NOW, mode="rules", scope="important")["answer"]

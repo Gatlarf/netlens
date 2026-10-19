@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.104 — 2026-10-19
+
+### Changed
+- ★ **Ask your network cares about what matters**: by default the answers are about the devices that should always be on (servers, routers, switches, NAS, cameras, printers, anything marked always-on), the services and the network problems. A phone or tablet going offline no longer shows up. A box under the question, "Include phones, tablets and other devices that come and go", brings them back; asking about a device by name always works.
+- ★ **The AI report is part of Reports**: it is now a tab next to the monthly and weekly reports (Analysis → Reports → AI report), no longer a card on the Insights page.
+- **Insights is under Analysis**, no longer under Automation.
+- **Model name above the Load models button**, and the locked name box has the right dark colour in dark mode.
+
 ## 0.4.103 — 2026-10-19
 
 ### Changed

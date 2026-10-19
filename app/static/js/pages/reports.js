@@ -2,6 +2,7 @@ import { get, put, post } from "../api.js";
 import { h, clear, toast, isAdmin } from "../util.js";
 import { pageHead, tabbed } from "../ui.js";
 import { buildDocumentationCard } from "../cards/documentation.js";
+import { buildAiReportCard } from "../cards/aireport.js";
 
 // Reports: the weekly summary (text, as it is sent) and the monthly availability of devices and services.
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -113,9 +114,14 @@ export async function render(container) {
   const weeklySlot = h("div", {});
   const monthSlot = h("div", {});
   const docsSlot = h("div", {});
+  const aiSlot = h("div", {});
   container.appendChild(h("div", { class: "rep-page" },
-    pageHead("Reports", "The monthly availability figures, the weekly summary and the network documentation, ready to send or print."),
-    tabbed("netlens.reports.tab", [["month", "Monthly availability", monthSlot], ["week", "Weekly report", weeklySlot], ...(isAdmin() ? [["docs", "Network documentation", docsSlot]] : [])])));
+    pageHead("Reports", "The monthly availability figures, the weekly summary, the AI report and the network documentation, ready to send or print."),
+    tabbed("netlens.reports.tab", [["month", "Monthly availability", monthSlot], ["week", "Weekly report", weeklySlot], ...(isAdmin() ? [["ai", "AI report", aiSlot]] : []), ...(isAdmin() ? [["docs", "Network documentation", docsSlot]] : [])])));
+  if (isAdmin()) {
+    get("/api/insights/report?period=24h").then((r) => { if (!disposed) aiSlot.appendChild(buildAiReportCard(r.status)); })
+      .catch((err) => { if (!disposed) aiSlot.appendChild(h("p", { class: "hint" }, err.message || "Could not load")); });
+  }
   if (isAdmin()) buildDocumentationCard().then((c) => { if (!disposed) docsSlot.appendChild(c); }).catch((err) => docsSlot.appendChild(h("p", { class: "error" }, err.message || "Could not load")));
 
   async function drawWeekly() {
