@@ -70,14 +70,39 @@ def test_keys_are_checked(conn):
 def test_editions_and_site_counts(conn):
     assert licence.install(conn, key("business"), NOW)["sites"] == 10
     assert licence.install(conn, key("enterprise"), NOW)["sites"] is None
-    assert licence.install(conn, key("supporter", expires=None), NOW)["sites"] is None
+    assert licence.install(conn, key("supporter"), NOW)["sites"] == 3
     assert licence.install(conn, key("business", sites=25), NOW)["sites"] == 25
 
 
-def test_lifetime_key_never_ends(conn):
-    licence.install(conn, key("supporter", expires=None), NOW)
+def test_a_key_without_an_end_date_never_ends(conn):
+    licence.install(conn, key("enterprise", expires=None), NOW)
     st = licence.status(conn, NOW + timedelta(days=5000))
-    assert st["state"] == "active" and st["expires"] is None and st["name"] == "Supporter"
+    assert st["state"] == "active" and st["expires"] is None and st["name"] == "Enterprise"
+
+
+def test_supporter_is_a_yearly_key_with_a_grace_period(conn):
+    licence.install(conn, key("supporter", expires="2027-11-01"), NOW)
+    assert licence.status(conn, NOW)["name"] == "Supporter" and licence.status(conn, NOW)["state"] == "active"
+    assert licence.status(conn, NOW + timedelta(days=370))["state"] == "grace"
+    assert licence.status(conn, NOW + timedelta(days=420))["edition"] == "free"
+
+
+def test_supporter_has_the_business_features_except_the_ones_for_organisations(conn):
+    licence.install(conn, key("supporter"), NOW)
+    for feature in ("remediation", "engineer", "insights", "vulnerabilities", "oncall"):
+        assert licence.allows(conn, feature, NOW), feature
+    for feature in ("sso", "siem", "teams", "schedules"):
+        assert not licence.allows(conn, feature, NOW), feature
+    licence.install(conn, key("business"), NOW)
+    assert all(licence.allows(conn, f, NOW) for f in licence.PAID_FEATURES)
+    licence.install(conn, key("enterprise"), NOW)
+    assert all(licence.allows(conn, f, NOW) for f in licence.PAID_FEATURES)
+
+
+def test_the_free_trial_has_every_feature_and_community_none(conn):
+    assert not any(licence.allows(conn, f, NOW) for f in licence.PAID_FEATURES)
+    licence.start_trial(conn, NOW)
+    assert all(licence.allows(conn, f, NOW) for f in licence.PAID_FEATURES)
 
 
 def test_warning_grace_and_end(conn):

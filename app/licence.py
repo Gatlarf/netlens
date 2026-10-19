@@ -1,7 +1,8 @@
 """The licence: what an installation may do beyond the free Community edition.
 
 Community is free and complete except for one thing: the central Netlens takes in **one** remote site. More sites need a licence key
-(Small business: 10 sites, Enterprise: unlimited, Supporter: unlimited, for everybody who bought the author a coffee).
+(Small business: 10 sites, Enterprise: unlimited, Supporter: 3 for a yearly coffee for the author). The business editions also have the features that mostly
+help organisations (single sign-on, log forwarding, operators and customer views, on-call schedules); Supporter has every other business feature.
 Monitoring itself is never limited, nothing is deleted when a licence ends, and sites beyond the limit are only frozen.
 
 A key is `NLK1.<payload>.<signature>`: JSON payload, Ed25519 signature, checked here with the public key below, offline. The signing key
@@ -33,9 +34,10 @@ TRIAL_DAYS = 30
 GRACE_DAYS = 30
 WARN_DAYS = (30, 14, 7)
 FREE_SITES = 1
+SUPPORTER_SITES = 3
 EDITIONS = {
     "free": {"name": "Community", "sites": FREE_SITES},
-    "supporter": {"name": "Supporter", "sites": None},
+    "supporter": {"name": "Supporter", "sites": SUPPORTER_SITES},
     "business": {"name": "Small business", "sites": 10},
     "enterprise": {"name": "Enterprise", "sites": None},
 }
@@ -187,14 +189,18 @@ def status(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, A
     return out
 
 
-PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights", "vulnerabilities", "teams")      # beyond the free Community edition (trial and every licence include them)
+PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights", "vulnerabilities", "teams", "schedules")      # beyond the free Community edition (trial and every licence include them)
+BUSINESS_ONLY = ("sso", "siem", "teams", "schedules")      # of those, the ones the Supporter edition does not have: they mostly help organisations (the trial has them)
 
 
 def allows(conn: sqlite3.Connection, feature: str, now: datetime | None = None) -> bool:
     """Whether a feature that needs a licence may be used. Everything that was free stays free; only new business features are asked about."""
     if feature not in PAID_FEATURES:
         return True
-    return status(conn, now)["edition"] != "free"
+    edition = status(conn, now)["edition"]
+    if edition == "free":
+        return False
+    return not (feature in BUSINESS_ONLY and edition == "supporter")
 
 
 def site_limit(conn: sqlite3.Connection) -> int | None:

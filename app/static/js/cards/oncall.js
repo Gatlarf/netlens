@@ -16,8 +16,8 @@ export async function buildOncallCard() {
     const p = info.policy;
     card.appendChild(h("h2", {}, "On-call schedule"));
     card.appendChild(h("p", { class: "hint" },
-      "Decide who is notified, by day and hour. Add the people (each with the alert channels that reach them), the shifts (days, hours, and who shares them, taking turns weekly or daily if you like), overrides for swaps and holidays, and a fallback for the hours no shift covers. Then choose **Whoever is on call** in a level of the escalation policy: the alert goes to the channels of the people on call at that moment. Part of every licence and the free trial."));
-    if (!info.allowed) card.appendChild(h("p", { class: "warn-text" }, "Needs a licence or the free trial (Settings → Licence)."));
+      "Decide who is notified, by day and hour. Add the people (each with the alert channels that reach them), the shifts (days, hours, and who shares them, taking turns weekly or daily if you like), overrides for swaps and holidays, and a fallback for the hours no shift covers. Then choose **Whoever is on call** in a level of the escalation policy: the alert goes to the channels of the people on call at that moment. Part of the Small business and Enterprise editions and the free trial (escalation itself is in every licence)."));
+    if (!info.allowed) card.appendChild(h("p", { class: "warn-text" }, "Part of the Small business and Enterprise editions, and the free trial (Settings → Licence)."));
 
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = p.enabled;

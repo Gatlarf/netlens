@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.90 — 2026-10-19
+
+### Changed
+- **Editions**: the Supporter key is now a yearly key (30 days of grace, like the business editions) and takes in 3 remote sites. Single sign-on, log forwarding, operators and customer views, and on-call schedules are part of the Small business and Enterprise editions (and the free trial); Supporter keeps auto-remediation, Insights, the digital engineer, escalation and the vulnerability scanners. Escalation and on-call schedules are separate switches now.
+
 ## 0.4.89 — 2026-10-19
 
 ### Changed

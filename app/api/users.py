@@ -30,7 +30,7 @@ def _db(request: Request):
     return connect(request.app.state.db_path)
 
 
-NEEDS_LICENCE = "operators and customer views (viewers limited to some groups) need a licence or the free trial (Settings → Licence)"
+NEEDS_LICENCE = "operators and customer views (viewers limited to some groups) are part of the Small business and Enterprise editions (or the free trial): Settings → Licence"
 
 
 def _check_teams(db, role: str | None, scope) -> None:

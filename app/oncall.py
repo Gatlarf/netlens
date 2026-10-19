@@ -182,8 +182,10 @@ def on_call(conn: sqlite3.Connection, now: datetime | None = None, policy: dict 
 
 def channels_now(conn: sqlite3.Connection, now: datetime | None = None) -> list[str]:
     """The channel ids of whoever is on call now (empty when the schedule is off or nobody is on call)."""
+    from app import licence
+
     policy = get_policy(conn)
-    if not policy["enabled"]:
+    if not policy["enabled"] or not licence.allows(conn, "schedules", now):
         return []
     out: list[str] = []
     for person in on_call(conn, now, policy)["people"]:

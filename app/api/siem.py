@@ -25,7 +25,7 @@ def get_siem(conn=Depends(get_conn)) -> dict[str, Any]:
 @router.put("/siem")
 def put_siem(body: dict, conn=Depends(get_conn)) -> dict[str, Any]:
     if not licence.allows(conn, "siem"):
-        raise HTTPException(status_code=402, detail="log forwarding needs a licence or the free trial (Settings → Licence)")
+        raise HTTPException(status_code=402, detail="log forwarding is part of the Small business and Enterprise editions (or the free trial): Settings → Licence")
     try:
         siem.save_policy(conn, body)
     except siem.SiemError as exc:

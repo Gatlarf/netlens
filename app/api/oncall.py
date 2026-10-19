@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api", tags=["oncall"])
 
 def _doc(conn) -> dict[str, Any]:
     policy = oncall.get_policy(conn)
-    return {"allowed": licence.allows(conn, "oncall"), "policy": policy, "now": oncall.on_call(conn, policy=policy), "upcoming": oncall.timeline(conn),
+    return {"allowed": licence.allows(conn, "schedules"), "policy": policy, "now": oncall.on_call(conn, policy=policy), "upcoming": oncall.timeline(conn),
             "channels": [{"id": str(c.get("id")), "name": c.get("name") or c.get("type")} for c in load_channels(conn)]}
 
 
@@ -28,8 +28,8 @@ def get_oncall(conn=Depends(get_conn)) -> dict[str, Any]:
 @router.put("/oncall")
 def put_oncall(body: dict, conn=Depends(get_conn)) -> dict[str, Any]:
     """Save the on-call schedule."""
-    if not licence.allows(conn, "oncall"):
-        raise HTTPException(status_code=402, detail="on-call schedules need a licence or the free trial (Settings → Licence)")
+    if not licence.allows(conn, "schedules"):
+        raise HTTPException(status_code=402, detail="on-call schedules are part of the Small business and Enterprise editions (or the free trial): Settings → Licence")
     try:
         oncall.save_policy(conn, body)
     except oncall.OnCallError as exc:

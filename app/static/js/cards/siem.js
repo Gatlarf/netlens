@@ -9,8 +9,8 @@ export async function buildSiemCard() {
     const p = info.policy;
     card.appendChild(h("h2", {}, "Log forwarding (syslog)"));
     card.appendChild(h("p", { class: "hint" },
-      "Send what happens in Netlens (events) and what people do in it (the audit log) to your log server: Graylog, Splunk, Wazuh, Elastic, rsyslog ... as RFC 5424 syslog over UDP or TCP. Netlens remembers what it has sent, so a server that is down only delays the delivery. Part of every licence and the free trial."));
-    if (!info.allowed) card.appendChild(h("p", { class: "warn-text" }, "Needs a licence or the free trial (Settings → Licence)."));
+      "Send what happens in Netlens (events) and what people do in it (the audit log) to your log server: Graylog, Splunk, Wazuh, Elastic, rsyslog ... as RFC 5424 syslog over UDP or TCP. Netlens remembers what it has sent, so a server that is down only delays the delivery. Part of the Small business and Enterprise editions and the free trial."));
+    if (!info.allowed) card.appendChild(h("p", { class: "warn-text" }, "Part of the Small business and Enterprise editions, and the free trial (Settings → Licence)."));
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = p.enabled;
     const host = h("input", { type: "text", value: p.host, placeholder: "logs.example.com or 192.168.0.9" });

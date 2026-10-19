@@ -87,7 +87,7 @@ def get_sso(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
 @router.put("/sso")
 def put_sso(body: SsoBody, request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     if not licence.allows(conn, "sso"):
-        raise HTTPException(status_code=402, detail="single sign-on needs a licence or the free trial (Settings → Licence)")
+        raise HTTPException(status_code=402, detail="single sign-on is part of the Small business and Enterprise editions (or the free trial): Settings → Licence")
     try:
         oidc.save_settings(conn, body.model_dump(exclude_none=True))
     except oidc.OidcError as exc:

@@ -141,8 +141,8 @@ function fill(card, data, shown) {
     "API tokens are for scripts, Home Assistant and Prometheus. A token acts with the role of its user, unless you make it read-only: then it can only read, whoever owns it."));
   card.appendChild(h("p", { class: data.teams_allowed === false ? "warn-text" : "hint" },
     data.teams_allowed === false
-      ? "Operators and customer views (a viewer limited to some groups) are business features: they need a licence or the free trial (Settings → Licence). Existing ones keep their limits; an operator acts as a viewer until a licence is applied."
-      : "Operators (look and act, no settings) and customer views (a viewer limited to some groups) are business features, included in every licence and the free trial."));
+      ? "Operators and customer views (a viewer limited to some groups) are business features: they are part of the Small business and Enterprise editions and the free trial (Settings → Licence). Existing ones keep their limits; an operator acts as a viewer until a licence is applied."
+      : "Operators (look and act, no settings) and customer views (a viewer limited to some groups) are business features, part of the Small business and Enterprise editions and the free trial."));
   if (data.token_configured) {
     const haveAdmin = data.users.some((u) => u.role === "admin" && !u.disabled);
     card.appendChild(h("p", { class: "hint", id: "token-note" }, haveAdmin
