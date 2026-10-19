@@ -183,7 +183,7 @@ def test_the_same_parent_is_one_finding_with_all_the_names(conn, monkeypatch):
 def test_a_problem_without_a_device_has_no_empty_name(conn):
     add_event(conn, "service_down", "web check failed", device_id=None, now="2026-11-01T10:00:00Z")
     texts = [f["text"] for f in aireport.collect(conn, "24h", NOW)["findings"]]
-    assert texts and all(not t.startswith(":") for t in texts) and any(t.startswith("A service went down at 10:00 UTC") for t in texts)
+    assert texts and all(not t.startswith(":") for t in texts) and any(t.startswith("A service went down (web check failed) at 10:00 UTC") for t in texts)
 
 
 def test_the_report_counts_only_always_on_devices_unless_asked(conn):
@@ -198,3 +198,15 @@ def test_the_report_counts_only_always_on_devices_unless_asked(conn):
     assert "cam1" not in texts("important") and "nas" in texts("important")
     aireport.write(conn, "24h", now=NOW, scope="important")
     assert aireport.latest(conn, "24h", "important")["scope"] == "important" and aireport.latest(conn, "24h", "all") is None
+
+
+def test_service_alerts_carry_their_name_and_repeats_become_one_finding(conn):
+    for hour in ("08", "09", "10"):                                             # the same service goes down three times, with no device behind it
+        add_event(conn, "service_down", "Site cam.example.com is down (timeout)", now=f"2026-11-01T{hour}:00:00Z")
+        add_event(conn, "service_up", "Site cam.example.com is up again", now=f"2026-11-01T{hour}:05:00Z")
+    add_event(conn, "service_down", "Site files.example.com is down (refused)", now="2026-11-01T11:00:00Z")
+    found = aireport.collect(conn, "24h", NOW)["findings"]
+    texts = [f["text"] for f in found]
+    merged = [t for t in texts if "cam.example.com" in t]
+    assert len(merged) == 1 and "3 times" in merged[0] and "08:00" in merged[0] and "10:00" in merged[0]
+    assert any("files.example.com" in t for t in texts)                         # a single one keeps its own finding, now with its name

@@ -77,8 +77,11 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
         when = _ts(inc["start"]).strftime("%H:%M" if hours <= 24 else "%m-%d %H:%M")
         minor = not inc["cause"] and len(ids) < 3 and not (set(ids) & always_on) and set(kinds) <= {"went offline"}
         strength = "strong" if inc["cause"] else "info" if minor else "likely"
+        said = "; ".join(inc.get("notes") or [])
+        head = f"{who}: {', '.join(kinds)}" if who else (f"{', '.join(kinds).capitalize()} ({said})" if said else ", ".join(kinds).capitalize())
         group = {"inc": {"type": "incident", "strength": strength, "ts": inc["start"], "devices": names[:6],
-                         "text": (f"{who}: {', '.join(kinds)}" if who else ", ".join(kinds).capitalize()) + f" at {when} UTC. {inc['summary']}"}, "ids": ids, "changes": []}
+                         "text": head + f" at {when} UTC. {inc['summary']}"}, "ids": ids, "changes": [],
+                 "blip": (tuple(kinds), re.sub(r"[\d.,:]+", "#", (inc.get("notes") or [""])[0])) if not ids and inc.get("notes") else None, "when": when}
         pending.append(group)
         start = _ts(inc["start"])
         if strength != "info":
@@ -122,6 +125,7 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
         raw.append({"type": "recurring", "strength": "likely" if near >= REPEATS else "possible", "ts": stamps[-1], "devices": [name], "text": text})
 
     recurring = {dev for (dev, _kind), stamps in by_key.items() if len(stamps) >= REPEATS}
+    pending = _merge_blips(pending)
     shown = 0
     for group in sorted(pending, key=lambda g: g["inc"]["ts"], reverse=True):
         f = group["inc"]
@@ -140,6 +144,29 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
     found = [{"id": f"F{n}", **f} for n, f in enumerate(raw[:MAX_FINDINGS], 1)]
     return {"period": period, "scope": "important" if only is not None else "all", "label": PERIODS[period], "since": since, "until": now.strftime(changes.STAMP), "findings": found,
             "counts": {"incidents": len(incs), "changes": len(made), "findings": len(found)}}
+
+
+def _merge_blips(pending: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The same alert about a service or a site (no device behind it) that came again and again becomes one finding that counts them, not one per time."""
+    by_blip: dict[Any, list[dict[str, Any]]] = defaultdict(list)
+    for g in pending:
+        if g.get("blip"):
+            by_blip[g["blip"]].append(g)
+    out, done = [], set()
+    for g in pending:
+        key = g.get("blip")
+        if not key or len(by_blip[key]) < 2:
+            out.append(g)
+        elif key not in done:
+            done.add(key)
+            group = by_blip[key]
+            first, last = min(group, key=lambda x: x["inc"]["ts"]), max(group, key=lambda x: x["inc"]["ts"])
+            said = (first["inc"]["text"].split(" (", 1)[1].split(")", 1)[0] if " (" in first["inc"]["text"] else "")
+            what = ", ".join(key[0]).capitalize()
+            merged = {"type": "recurring", "strength": "likely" if len(group) >= REPEATS else "possible", "ts": last["inc"]["ts"], "devices": first["inc"]["devices"],
+                      "text": f"{what} {len(group)} times" + (f" ({said})" if said else "") + f", from {first['when']} to {last['when']} UTC."}
+            out.append({"inc": merged, "ids": [], "changes": [], "blip": key, "when": last["when"]})
+    return out
 
 
 def plain_lines(facts: dict[str, Any]) -> list[dict[str, Any]]:

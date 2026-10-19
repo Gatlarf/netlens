@@ -108,9 +108,10 @@ def _describe(c: dict, devices: dict, hierarchy: dict, now: datetime) -> dict[st
     ongoing = bool(c["_open"]) or any(p["device_id"] is None for p in problems) and (now - end) < timedelta(hours=1)
     resolved = not c["_open"] and all(p["device_id"] is not None for p in problems) if problems else True
     kinds = Counter(p["kind"] for p in problems)
+    notes = list(dict.fromkeys((p["detail"] or "").strip()[:120] for p in problems if (p["detail"] or "").strip()))[:3]       # what the alerts said: the only names a service or site alert has
     fixes = [{"text": r["detail"] or "", "ok": r["kind"] in ("remediation_ran", "remediation_recovered")} for r in c["remediation"] if r["kind"] != "remediation_pending"]
     facts = {"start": c["events"][0]["ts"], "end": c["events"][-1]["ts"], "problems": sum(kinds.values()), "devices": names[:12], "device_count": len(ids), "kinds": [WORDS.get(k, k) for k in kinds],
-             "probable_cause": cause, "over": resolved, "automatic_fixes": [f["text"] for f in fixes][:4]}
+             "probable_cause": cause, "alerts_said": notes, "over": resolved, "automatic_fixes": [f["text"] for f in fixes][:4]}
     title = (f"{cause['name']} went wrong and {cause['behind']} device{'s' if cause['behind'] != 1 else ''} behind it were affected" if cause
              else f"{names[0]}: {WORDS.get(problems[0]['kind'], problems[0]['kind'])}" if len(ids) == 1 and names
              else f"{len(ids)} devices had problems" if len(ids) > 1 else WORDS.get(problems[0]["kind"], problems[0]["kind"]).capitalize())
@@ -124,7 +125,7 @@ def _describe(c: dict, devices: dict, hierarchy: dict, now: datetime) -> dict[st
     if fixes:
         parts.append("Automatic fix: " + "; ".join(f["text"] for f in fixes[:2]) + ".")
     return {"id": c["events"][0]["id"], "start": c["events"][0]["ts"], "end": c["events"][-1]["ts"], "title": title[:140], "summary": " ".join(parts), "devices": names[:20],
-            "device_count": len(ids), "device_ids": ids, "events": len(c["events"]), "resolved": resolved, "ongoing": ongoing and not resolved, "cause": cause, "facts": facts}
+            "device_count": len(ids), "device_ids": ids, "notes": notes, "events": len(c["events"]), "resolved": resolved, "ongoing": ongoing and not resolved, "cause": cause, "facts": facts}
 
 
 def narrate(conn: sqlite3.Connection, incident: dict, ask=None) -> str | None:
