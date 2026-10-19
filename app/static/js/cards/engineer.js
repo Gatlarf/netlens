@@ -60,9 +60,10 @@ export async function buildEngineerCard() {
   const card = h("div", { class: "card" });
   function draw(info) {
     clear(card);
-    card.appendChild(h("h2", {}, "Digital engineer"));
+    card.appendChild(h("h2", {}, "Language model"));
     card.appendChild(h("p", { class: "hint" },
-      "A language model that reads an incident (the event, the device, its recent events, earlier fixes) and says what it thinks is wrong and which of your remediation rules would fix it. It never runs anything and can only pick one of your rules. Any OpenAI-compatible server works: a local one (llama.cpp, Ollama, LM Studio) or a hosted one with your own key. Part of every licence and the free trial."));
+      "The language model Netlens itself uses, in two places. The digital engineer reads an incident (the event, the device, its recent events, earlier fixes) and says what it thinks is wrong and which of your remediation rules would fix it; it never runs anything and can only pick one of your rules. Insights uses it to answer free questions and to word summaries. Any OpenAI-compatible server works: a local one (llama.cpp, Ollama, LM Studio), a hosted one with your own key, or a free model on OpenRouter below. " +
+      "This is not the AI assistant that sets Netlens up for you from the outside: that is the next card in this group. Part of every licence and the free trial."));
     if (!info.allowed) card.appendChild(h("p", { class: "warn-text" }, "Needs a licence or the free trial (Settings → Licence)."));
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = info.enabled;
@@ -84,7 +85,7 @@ export async function buildEngineerCard() {
       catch (err) { toast(err.message || "Failed", "error"); }
       test.disabled = false;
     });
-    card.append(h("label", { class: "check" }, enabled, " Digital engineer is on"),
+    card.append(h("label", { class: "check" }, enabled, " Language model is on (digital engineer and Insights)"),
       h("div", { class: "field" }, h("label", {}, "Address (ends in /v1)"), url), h("div", { class: "field" }, h("label", {}, "Model"), model), h("div", { class: "field" }, h("label", {}, "API key"), key),
       h("label", { class: "check" }, redact, " Make it anonymous: replace IP addresses, MAC addresses and device names by placeholders before anything is sent"),
       h("details", {}, h("summary", { class: "hint" }, "What a trustworthy model needs"), h("ul", { class: "hint" },

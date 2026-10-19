@@ -401,7 +401,7 @@ def answer(conn: sqlite3.Connection, question: str, now: datetime | None = None,
     names = [_name(r) for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices")] + [r["name"] for r in conn.execute("SELECT name FROM service_checks")]
     fell_back = False
     if mode == "model" and ask is None and not insights.llm_ready(conn):
-        return {"answer": "No language model is connected or it is switched off for insights (Settings → Digital engineer, and the switch below). Switch to the built-in logic or connect a model.", "source": "rules", "tools": [], "understood": False}
+        return {"answer": "No language model is connected or it is switched off for insights (Settings → AI → Language model, and the switch below). Switch to the built-in logic or connect a model.", "source": "rules", "tools": [], "understood": False}
     if ask is not None or (mode != "rules" and insights.llm_ready(conn)):
         got = _ask_model(conn, question, names, now, ask)
         if got:

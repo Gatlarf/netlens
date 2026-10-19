@@ -628,7 +628,7 @@ Safety is the point of the design: Netlens only changes records it created itsel
 
 ### AI assistant
 
-**Settings → AI assistant** lets an AI assistant (Claude, ChatGPT, a local model that can make web requests) help you set up Netlens, change it later, or find out why something is red. It works through the normal API with a token of its own and reads a guide written for language models (`/api/assistant/guide`: how to behave, a first look, and step-by-step workflows for scanning, alerts, monitoring, plugins and diagnosis). Make a token, copy the ready-made instructions, and paste them into your assistant.
+**Settings → AI → AI assistant** lets an AI assistant (Claude, ChatGPT, a local model that can make web requests) help you set up Netlens, change it later, or find out why something is red. It works through the normal API with a token of its own and reads a guide written for language models (`/api/assistant/guide`: how to behave, a first look, and step-by-step workflows for scanning, alerts, monitoring, plugins and diagnosis). Make a token, copy the ready-made instructions, and paste them into your assistant.
 
 - A **read-only** token can look, explain and diagnose. A token that **may change settings** changes one thing at a time, is told to ask you first, and every change is in the audit log under the token's name (Settings → Audit).
 - An assistant token never reaches users and tokens, stored passwords, backups and restores, share links, single sign-on, remote sessions and terminals, remediation rules (they run commands), plugin uploads or updates. It can delete only service checks, maintenance windows, snoozes, notification channels and groups. When it asks for something it may not do, the error says why, so it can hand the step to you.
@@ -637,7 +637,7 @@ Safety is the point of the design: Netlens only changes records it created itsel
 
 ### Free language models on OpenRouter
 
-Insights and the digital engineer need a language model. If you cannot run one yourself, **Settings → Digital engineer → No model of your own?** reads the list of free models from OpenRouter (you need a free OpenRouter account and key) and shows each with the result of Netlens's own six exams on it, best first. **Test** runs the exams on one model (about eight requests; free accounts allow only a few dozen a day), **Use this model** saves it. You can still type any address and model of your own.
+Insights and the digital engineer need a language model. If you cannot run one yourself, **Settings → AI → Language model → No model of your own?** reads the list of free models from OpenRouter (you need a free OpenRouter account and key) and shows each with the result of Netlens's own six exams on it, best first. **Test** runs the exams on one model (about eight requests; free accounts allow only a few dozen a day), **Use this model** saves it. You can still type any address and model of your own.
 
 Free models change often: they are added, renamed, limited or withdrawn without notice, and may keep your questions for their own use (leave the anonymising on). So the list is read live, and once a day Netlens checks that the model you chose is still offered and still free. If not, you see a warning in the card and on the dashboard, and an **Language model unavailable** event is raised that your notification channels can send. A model you typed yourself is never watched.
 

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.96 — 2026-10-19
+
+### Changed
+- **Clearer AI settings**: the settings menu has a new group **AI** with two cards. **Language model** (before: Digital engineer) is the model Netlens itself uses for the digital engineer and for Insights, including the free OpenRouter models. **AI assistant** is for an outside assistant that calls Netlens to help you set it up or find a problem. The two cards say how they differ.
+
 ## 0.4.95 — 2026-10-19
 
 ### Fixed

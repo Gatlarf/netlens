@@ -152,5 +152,5 @@ def watch(conn: sqlite3.Connection, fetch: Callable[[], dict] | None = None, for
 
 def message(model: str, state: str) -> str:
     if state == "gone":
-        return f"The language model {model} is not offered on OpenRouter any more. Choose another in Settings → Digital engineer."
-    return f"The language model {model} is no longer free on OpenRouter. Choose another in Settings → Digital engineer, or add credit to your OpenRouter account."
+        return f"The language model {model} is not offered on OpenRouter any more. Choose another in Settings → AI → Language model."
+    return f"The language model {model} is no longer free on OpenRouter. Choose another in Settings → AI → Language model, or add credit to your OpenRouter account."

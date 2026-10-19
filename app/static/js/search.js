@@ -53,7 +53,7 @@ const SETTINGS = [
   ["Device messages: SNMP traps and syslog", "inbound", "snmp trap syslog receive listen link down ups battery messages devices send port 162 514 1162 1514", ""],
   ["On-call schedule", "oncall", "on call oncall rota shifts who is notified override holiday swap fallback week rotation schedule", ""],
   ["Log forwarding", "siem", "syslog siem graylog splunk wazuh elastic rsyslog audit events forward logs", ""],
-  ["Digital engineer", "engineer", "llm language model ollama openai openrouter ai insights model anonymise", ""],
+  ["Language model", "engineer", "llm language model digital engineer ollama openai openrouter free ai insights model anonymise", ""],
   ["AI assistant", "assistant", "ai assistant claude chatgpt llm help setup configure token guide api agent mcp", ""],
   ["Licence", "licence", "license key edition paid activate community trial", ""],
   ["Setup guide", "wizard", "wizard getting started tour first run", ""],
@@ -151,7 +151,7 @@ function search(query, devs, plugs = []) {
 
 function sectionName(key) {
   const names = { ranges: "Scan ranges", nmap: "Scan performance", schedule: "Scan schedule", map: "Map", groups: "Groups", netchecks: "Network checks", dns: "DNS registration",
-    ignored: "Ignored devices", ipv6: "IPv6", sso: "Single sign-on", escalation: "Escalation", oncall: "On-call schedule", siem: "Log forwarding", inbound: "Device messages", engineer: "Digital engineer", licence: "Licence", wizard: "Setup guide", central: "Central Netlens", users: "Users & tokens", terminal: "Web terminal", channels: "Alert channels & quiet hours", maintenance: "Maintenance windows",
+    ignored: "Ignored devices", ipv6: "IPv6", sso: "Single sign-on", escalation: "Escalation", oncall: "On-call schedule", siem: "Log forwarding", inbound: "Device messages", engineer: "Language model", assistant: "AI assistant", licence: "Licence", wizard: "Setup guide", central: "Central Netlens", users: "Users & tokens", terminal: "Web terminal", channels: "Alert channels & quiet hours", maintenance: "Maintenance windows",
     backup: "Backup & restore", export: "Export", shares: "Share links", audit: "Audit log", about: "About", session: "Account", plugins: "Plugin manager", "plugin-browse": "Plugin store" };
   return names[key] || key;
 }

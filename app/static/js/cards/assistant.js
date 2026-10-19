@@ -17,7 +17,7 @@ function fill(card, state) {
   clear(card);
   card.appendChild(h("h2", {}, "AI assistant"));
   card.appendChild(h("p", { class: "hint" },
-    "Let an AI assistant (Claude, ChatGPT, a local model with tools) help you set up Netlens and change it later, or find out why something is red. " +
+    "The other direction from the language model card: here an AI assistant outside Netlens (Claude, ChatGPT, a local model with tools) calls Netlens to help you set it up and change it later, or to find out why something is red. " +
     "It works through the normal API with a token of its own and reads a guide written for language models. It never sees stored passwords and cannot reach users, backups, sharing links, single sign-on, remote sessions or the licence. " +
     "A read-only token can only look. A token that may change settings can change one thing at a time, is told to ask you first, and every change is written to the audit log under the token's name."));
   card.appendChild(h("p", { class: "hint" },

@@ -122,7 +122,7 @@ def build_context(conn: sqlite3.Connection, run_id: int) -> dict[str, Any]:
 def chat(conn: sqlite3.Connection, messages: list[dict], timeout: float = 90.0) -> str:
     cfg = settings(conn)
     if not cfg["url"] or not cfg["model"]:
-        raise EngineerError("set the address and the model of the language model first (Settings → Digital engineer)")
+        raise EngineerError("set the address and the model of the language model first (Settings → AI → Language model)")
     return chat_with(cfg["url"], cfg["model"], get_setting(conn, "engineer.api_key"), messages, timeout)
 
 
@@ -141,7 +141,7 @@ def chat_with(url: str, model: str, key: str | None, messages: list[dict], timeo
         return text
     except urllib.error.HTTPError as exc:
         if exc.code == 404 and "openrouter.ai" in url:
-            raise EngineerError("OpenRouter has no provider for this model any more (free models come and go): choose another one in Settings → Digital engineer") from None
+            raise EngineerError("OpenRouter has no provider for this model any more (free models come and go): choose another one in Settings → AI → Language model") from None
         if exc.code == 429:
             raise EngineerError("the language model is busy or its free allowance for today is used up (HTTP 429): try again later") from None
         raise EngineerError(f"the language model answered HTTP {exc.code}") from None

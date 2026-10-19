@@ -264,8 +264,13 @@ const STATIC_GROUPS = [
     title: "Connections",
     items: [
       { key: "central", label: "Report to a central Netlens", build: buildCentralCard },
-      { key: "engineer", label: "Digital engineer", build: buildEngineerCard },
-      { key: "assistant", label: "AI assistant", build: buildAssistantCard },
+    ],
+  },
+  {
+    title: "AI",
+    items: [
+      { key: "engineer", label: "Language model (Netlens uses it)", build: buildEngineerCard },
+      { key: "assistant", label: "AI assistant (manages Netlens)", build: buildAssistantCard },
     ],
   },
   {

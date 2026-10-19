@@ -1,7 +1,7 @@
 """Insights: questions, incident summaries, anomalies, identification of unknown devices, report summaries, post-mortems (a paid feature).
 
 Every one of them works without a language model: the numbers and the sentences come from Netlens itself. When the digital engineer
-(Settings → Digital engineer) is set up and `insights.llm` is on, a model may write the sentences more nicely or answer free questions;
+(Settings → AI → Language model) is set up and `insights.llm` is on, a model may write the sentences more nicely or answer free questions;
 a model never changes data and never decides anything, and when it cannot be reached the plain version is shown.
 """
 
