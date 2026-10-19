@@ -58,3 +58,14 @@ def test_api_needs_login_and_returns_the_timeline(tmp_path):
         assert client.get("/api/changes").status_code == 401
         body = client.get("/api/changes?period=7d", headers={"Authorization": "Bearer secret"}).json()
         assert body["period"] == "7d" and "items" in body and "settings" in body["categories"]
+
+
+def test_only_always_on_devices_leaves_out_the_others(conn):
+    conn.execute("INSERT INTO devices (id, mac, primary_ip, hostname, online, always_on, first_seen, last_seen) VALUES (2, 'aa:00:00:00:00:02', '10.0.0.6', 'iphone', 1, 0, 'x', 'x')")
+    conn.execute("UPDATE devices SET always_on = 1 WHERE id = 1")
+    conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES (?, 2, 'device_new', 'New device iphone')", (stamp(1),))
+    conn.commit()
+    everything = changes.timeline(conn, "24h", include_audit=True, now=NOW)
+    core = changes.timeline(conn, "24h", include_audit=True, now=NOW, only={1})
+    assert any(i["device"] == "iphone" for i in everything["items"]) and not any(i["device"] == "iphone" for i in core["items"])
+    assert any(i["kind"] == "change" for i in core["items"]) and any(i["device"] == "nas" for i in core["items"])      # changes made by people and the nas stay

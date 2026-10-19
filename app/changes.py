@@ -43,7 +43,8 @@ def category_of(kind: str) -> str:
 
 
 def timeline(conn: sqlite3.Connection, period: str = "24h", category: str = "", include_audit: bool = False, limit: int = 300,
-             now: datetime | None = None) -> dict[str, Any]:
+             now: datetime | None = None, only: set[int] | None = None) -> dict[str, Any]:
+    """`only`: the ids of the devices that count (the always-on ones, see app/relevance.py); what happened to other devices is left out, changes people made stay."""
     hours = PERIODS.get(period, 24)
     now = now or datetime.now(timezone.utc)
     since = (now - timedelta(hours=hours)).strftime(STAMP)
@@ -51,7 +52,7 @@ def timeline(conn: sqlite3.Connection, period: str = "24h", category: str = "", 
     items: list[dict[str, Any]] = []
     names = {r["id"]: r["name"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name FROM devices")}
     for r in conn.execute("SELECT id, ts, device_id, kind, detail FROM events WHERE ts >= ? ORDER BY id DESC LIMIT ?", (since, 2000)):
-        if r["kind"] in QUIET:
+        if r["kind"] in QUIET or (only is not None and r["device_id"] is not None and r["device_id"] not in only):
             continue
         items.append({"ts": r["ts"], "category": category_of(r["kind"]), "kind": r["kind"], "text": r["detail"] or r["kind"].replace("_", " "),
                       "device_id": r["device_id"], "device": names.get(r["device_id"]), "who": None})

@@ -6,6 +6,7 @@ import { eventLabel } from "../event_labels.js";
 const PERIODS = [["6h", "6 hours"], ["24h", "24 hours"], ["3d", "3 days"], ["7d", "7 days"], ["30d", "30 days"]];
 const SEEN_KEY = "netlens.changes.seen";
 const PERIOD_KEY = "netlens.changes.period";
+const CORE_KEY = "netlens.changes.core";
 
 function stored(key) {
   try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -29,6 +30,7 @@ export async function render(container) {
   let period = stored(PERIOD_KEY) || "24h";
   if (!PERIODS.some(([k]) => k === period)) period = "24h";
   let category = "";
+  let core = stored(CORE_KEY) === "1";        // only the devices marked always-on
   const lastSeen = stored(SEEN_KEY);       // what was new at the previous visit gets a mark
   let data = null;
   let timer = null;
@@ -37,6 +39,10 @@ export async function render(container) {
   const chips = h("div", { class: "chg-chips" });
   const list = h("div", { class: "chg-list" });
   const summary = h("p", { class: "hint" });
+  const coreBox = h("input", { type: "checkbox" });
+  coreBox.checked = core;
+  coreBox.addEventListener("change", () => { core = coreBox.checked; store(CORE_KEY, core ? "1" : "0"); load(); });
+  const coreRow = h("label", { class: "check", title: "Leave out what happened to phones, tablets and other devices that are not marked always-on. Changes made by people stay." }, coreBox, " Only always-on devices");
 
   function drawPeriods() {
     clear(periodBar);
@@ -109,7 +115,7 @@ export async function render(container) {
 
   async function load() {
     try {
-      data = await get(`/api/changes?period=${period}${category ? `&category=${category}` : ""}`);
+      data = await get(`/api/changes?period=${period}${category ? `&category=${category}` : ""}${core ? "&always_on=1" : ""}`);
       if (!disposed) draw();
     } catch (err) {
       if (!disposed) { clear(list); list.append(h("p", { class: "error" }, err.message || "Could not load what changed")); }
@@ -120,7 +126,7 @@ export async function render(container) {
   container.append(
     pageHead("What changed", "New and missing devices, alerts, address and port changes and the changes people made, on one timeline. " +
       (lastSeen ? `Entries marked new happened after your last visit ${timeAgo(lastSeen)}.` : ""), periodBar),
-    chips, summary, list);
+    chips, coreRow, summary, list);
   drawPeriods();
   await load();
   store(SEEN_KEY, new Date().toISOString().replace(/\.\d+Z$/, "Z"));
