@@ -191,3 +191,11 @@ def test_incidents_leave_out_devices_that_come_and_go(conn):
     core = incidents.incidents(conn, 7, NOW, only=ask.relevance.important_ids(conn))
     assert any(4 in i["device_ids"] for i in everything)
     assert all(4 not in i["device_ids"] for i in core) and any(2 in i["device_ids"] for i in core)
+
+
+def test_marked_always_on_devices_decide_when_there_are_any(conn):
+    from app import relevance
+
+    assert 2 in relevance.important_ids(conn)                         # nothing marked: the infrastructure kinds stand in (the printer)
+    conn.execute("UPDATE devices SET always_on = 1 WHERE id IN (1, 7)")   # the nas and the switch
+    assert relevance.important_ids(conn) == {1, 7}                    # now only what is marked counts, not the printer or the camera
