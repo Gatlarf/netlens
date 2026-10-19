@@ -9,7 +9,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app import anomaly, ask, forecast, identify, incidents, insights, modelcheck, postmortem, reportsummary
+from app import aireport, anomaly, ask, forecast, identify, incidents, insights, modelcheck, postmortem, reportsummary
 from app import engineer
 from app.api.devices import get_conn
 
@@ -116,3 +116,23 @@ async def model_check(conn=Depends(get_conn)) -> dict:
     if not insights.llm_ready(conn) and not engineer.settings(conn)["url"]:
         raise HTTPException(status_code=409, detail="connect a language model first (Settings → AI)")
     return await asyncio.to_thread(modelcheck.run, conn)
+
+
+class ReportBody(BaseModel):
+    period: Literal["6h", "24h", "3d", "7d"] = "24h"
+    use_model: bool = True
+
+
+@router.get("/insights/report")
+def get_report(period: Literal["6h", "24h", "3d", "7d"] = "24h", conn=Depends(get_conn)) -> dict[str, Any]:
+    """The latest written report of the period (or None) and, always, the findings of right now."""
+    _allowed(conn)
+    facts = aireport.collect(conn, period)
+    return {"periods": aireport.PERIODS, "report": aireport.latest(conn, period), "now": {**facts, "lines": aireport.plain_lines(facts)}}
+
+
+@router.post("/insights/report")
+async def make_report(body: ReportBody, conn=Depends(get_conn)) -> dict[str, Any]:
+    """Write the report of a period. With a language model it can take a minute; without one it is the findings, at once."""
+    _allowed(conn)
+    return await asyncio.to_thread(aireport.write, conn, body.period, None, None, body.use_model)

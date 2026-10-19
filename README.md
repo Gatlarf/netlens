@@ -45,6 +45,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Wake-on-LAN, ping and traceroute](#wake-on-lan-ping-and-traceroute)
   - [Users and API tokens](#users-and-api-tokens)
   - [Share links](#share-links)
+  - [AI report](#ai-report)
   - [AI assistant](#ai-assistant)
   - [Free language models on OpenRouter](#free-language-models-on-openrouter)
   - [Network checks](#network-checks)
@@ -625,6 +626,16 @@ A viewer can be **limited to some groups** (*Limit to groups* on the user): a cu
 *Network → DNS* registers the devices Netlens knows in your DNS server and keeps their addresses right when DHCP hands out a new one. It needs a **DNS plugin** (for example *Technitium DNS*, see `plugins/technitium`). You enter your networks and their zones (`192.168.0.0/24 = home.example.com`, one line per network, several zones are fine), press **Read the DNS server now**, and Netlens shows a preview: what it would add or update, what is a **conflict**, and what is left alone. Nothing is written until you approve it; once the preview is what you want you can switch on *Apply automatically after every scan*. With the Docker plugin you can also tick *Give containers that share their host's address a name*: a running container on a bridge or host network that publishes a port then gets a CNAME to its host (`web.home.example.com`), and a container with its own network address is registered like any other device.
 
 Safety is the point of the design: Netlens only changes records it created itself (marked with a comment, and remembered), and **never changes a record that something else made**. A Windows machine that registers itself leaves a record; Netlens recognises it (also when the name differs from the one Netlens would choose) and leaves it alone, shows *Registers itself*, and does not register Windows machines at all by default. A device without a record waits for a grace period (2 hours by default) before it is registered, only devices you marked as *known* are registered (a stranger cannot claim a name by announcing a hostname), and a name that is already used by a record pointing elsewhere is a conflict that you resolve by hand. Devices without a name get a generated one (`tv-samsung-a1b2`, from a pattern you can change) that stays the same afterwards, and every device has a **DNS registration** setting on its page (*Automatic / Always register / Never register*) and a field for its own DNS name. Removing records of devices that are gone is off by default, and a limit caps how many changes one run may make. DNS events (*registered*, *updated*, *failed*) go to the event log and can go to the notification channels.
+
+### AI report
+
+**Insights → AI report** answers "what happened, and how does it hang together?" for the last 6 hours, 24 hours, 3 days or 7 days. Netlens finds the connections itself and numbers them as findings (F1, F2 ...), strongest first:
+
+- **Strong**: alerts that belong to one incident, where a device higher in the network hierarchy went wrong first and the devices behind it followed.
+- **Likely**: several devices that went wrong together and all sit behind the same switch or host, which itself reported nothing (a possible cause); a problem that came back three times or more, with the hour it usually happens.
+- **Possible**: a change made in the 30 minutes before a problem began (from the audit log and from device, address and plugin changes), shown with who made it.
+
+Without a language model the report is this list. With one, the model writes 3 to 6 sentences from the findings and a few things to look at. Every sentence has to name the findings it rests on; Netlens throws away a sentence that names none, that names one that does not exist, or that contains a number which is not in the findings it cites, and says how many it removed. So a small model cannot invent a cause: at worst it writes less. Names and addresses are anonymised before they are sent, and the model never changes anything. The latest report of each period is kept until you write a new one.
 
 ### AI assistant
 

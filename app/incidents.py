@@ -124,7 +124,7 @@ def _describe(c: dict, devices: dict, hierarchy: dict, now: datetime) -> dict[st
     if fixes:
         parts.append("Automatic fix: " + "; ".join(f["text"] for f in fixes[:2]) + ".")
     return {"id": c["events"][0]["id"], "start": c["events"][0]["ts"], "end": c["events"][-1]["ts"], "title": title[:140], "summary": " ".join(parts), "devices": names[:20],
-            "device_count": len(ids), "events": len(c["events"]), "resolved": resolved, "ongoing": ongoing and not resolved, "cause": cause, "facts": facts}
+            "device_count": len(ids), "device_ids": ids, "events": len(c["events"]), "resolved": resolved, "ongoing": ongoing and not resolved, "cause": cause, "facts": facts}
 
 
 def narrate(conn: sqlite3.Connection, incident: dict, ask=None) -> str | None:
