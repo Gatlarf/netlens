@@ -71,8 +71,29 @@ export async function buildEngineerCard() {
     const provider = h("select", { "aria-label": "Provider" }, ...(info.provider ? [] : [h("option", { value: "" }, "Choose a provider ...")]),
       ...catalogue.map((p) => h("option", { value: p.id, selected: p.id === info.provider }, p.name)));
     const url = h("input", { type: "url", value: info.url, placeholder: "http://192.168.0.5:8080/v1" });
-    const model = h("input", { type: "text", value: info.model, placeholder: "model name", list: "ai-models", autocomplete: "off" });
-    const models = h("datalist", { id: "ai-models" });
+    const model = h("input", { type: "text", value: info.model, placeholder: "model name", autocomplete: "off" });
+    const modelPick = h("select", { "aria-label": "Model" });
+    let loaded = [];                      // the models the provider listed for this key
+    const CUSTOM = "__custom__";
+    const isOwn = () => ["local", "custom", ""].includes(provider.value);
+    // the box below the list only takes typing when "Custom ..." is chosen; otherwise it just shows the chosen model
+    function drawModels(wanted) {
+      const name = wanted !== undefined ? wanted : model.value.trim();
+      clear(modelPick);
+      for (const m of loaded) modelPick.appendChild(h("option", { value: m.id }, m.name && m.name !== m.id ? `${m.name} (${m.id})` : m.id));
+      modelPick.appendChild(h("option", { value: CUSTOM }, "Custom ... (type the name)"));
+      const known = loaded.some((m) => m.id === name);
+      modelPick.value = known ? name : CUSTOM;
+      if (!name && !isOwn() && loaded.length) { modelPick.value = loaded[0].id; }
+      applyPick();
+    }
+    function applyPick() {
+      const custom = modelPick.value === CUSTOM;
+      if (!custom) model.value = modelPick.value;
+      model.readOnly = !custom;
+      model.classList.toggle("is-locked", !custom);
+    }
+    modelPick.addEventListener("change", () => { applyPick(); if (modelPick.value === CUSTOM) { model.value = ""; model.focus(); } });
     const modelNote = h("span", { class: "hint" }, "");
     const loadModels = h("button", { class: "btn", type: "button" }, "Load models");
     const key = h("input", { type: "password", autocomplete: "off", placeholder: info.has_key ? "(kept, type to change)" : "API key" });
@@ -80,14 +101,13 @@ export async function buildEngineerCard() {
     const orBox = openRouterSection(info, key, () => get("/api/engineer").then(draw));
     async function fetchModels() {
       loadModels.disabled = true;
-      clear(models);
       modelNote.textContent = "Asking the provider ...";
       try {
         const r = await post("/api/engineer/models", { url: url.value, ...(key.value ? { api_key: key.value } : {}) });
-        for (const m of r.models) models.appendChild(h("option", { value: m.id }, m.name === m.id ? "" : m.name));
-        if (!model.value) model.value = r.models[0].id;
-        modelNote.textContent = `${r.models.length} models available to this key: pick one from the list or type a name. The first ones are the most likely choices.`;
-      } catch (err) { modelNote.textContent = err.message || "Could not load the models"; }
+        loaded = r.models;
+        drawModels();
+        modelNote.textContent = `${r.models.length} models available to this key, the most likely choices first. Choose "Custom ..." to type another name.`;
+      } catch (err) { loaded = []; drawModels(); modelNote.textContent = err.message || "Could not load the models"; }
       loadModels.disabled = false;
     }
     loadModels.addEventListener("click", fetchModels);
@@ -102,12 +122,16 @@ export async function buildEngineerCard() {
     }
     provider.addEventListener("change", () => {
       const p = byId[provider.value];
-      if (p) { url.value = p.url; model.value = ""; key.value = ""; clear(models); key.placeholder = provider.value === info.provider && info.has_key ? "(kept, type to change)" : p.id === "local" ? "API key (empty for most local servers)" : "API key"; }
+      if (p) { url.value = p.url; model.value = ""; key.value = ""; loaded = []; key.placeholder = provider.value === info.provider && info.has_key ? "(kept, type to change)" : p.id === "local" ? "API key (empty for most local servers)" : "API key"; }
       modelNote.textContent = provider.value === info.provider && info.has_key ? "" : "Enter your API key, then press Load models.";
       describe();
+      drawModels("");
+      if (provider.value === "local" || provider.value === "custom") { modelPick.value = CUSTOM; applyPick(); }
       if (provider.value === info.provider && (info.has_key || provider.value === "local")) fetchModels();
     });
     describe();
+    drawModels();
+    if (!info.model && isOwn()) { modelPick.value = CUSTOM; applyPick(); }          // a server of your own: type its model name
     if (info.provider && (info.has_key || info.provider === "local")) fetchModels();
     const redact = h("input", { type: "checkbox" });
     redact.checked = info.redact;
@@ -128,7 +152,7 @@ export async function buildEngineerCard() {
       h("div", { class: "field" }, h("label", {}, "Provider"), provider),
       h("div", { class: "field" }, h("label", {}, "Address"), url),
       h("div", { class: "field" }, h("label", {}, "API key"), key, keyHelp),
-      h("div", { class: "field" }, h("label", {}, "Model"), model, models, " ", loadModels, h("div", {}, modelNote)),
+      h("div", { class: "field" }, h("label", {}, "Model"), modelPick, " ", loadModels, model, h("div", {}, modelNote)),
       h("label", { class: "check" }, redact, " Make it anonymous: replace IP addresses, MAC addresses and device names by placeholders before anything is sent"),
       h("details", {}, h("summary", { class: "hint" }, "What a trustworthy model needs"), h("ul", { class: "hint" },
         h("li", {}, "An OpenAI-compatible chat API (llama.cpp, Ollama, LM Studio, OpenRouter, OpenAI ...) with a context of at least 8,000 tokens."),

@@ -688,3 +688,4 @@ table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 .ai-check { color: var(--muted); }
 .flash { animation: ai-flash 1.5s; }
 @keyframes ai-flash { from { background: color-mix(in srgb, var(--accent) 25%, transparent); } to { background: transparent; } }
+input.is-locked { background: var(--surface-2, #eef1f6); color: var(--muted); cursor: not-allowed; }
