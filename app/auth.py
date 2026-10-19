@@ -124,10 +124,11 @@ class Principal:
     user_id: Optional[int] = None  # None = the built-in NETLENS_TOKEN login
     builtin: bool = False
     scope: Optional[tuple] = None  # group ids a (viewer) user is limited to; None = no limit
+    assistant: Optional[str] = None  # 'read' or 'change' for a token made for an AI assistant (app/assistant.py); it is never a full administrator
 
     @property
     def is_admin(self) -> bool:
-        return self.role == "admin"
+        return self.role == "admin" and self.assistant is None
 
 
 BUILTIN = Principal(username="access token", role="admin", builtin=True)
@@ -189,6 +190,15 @@ def identify(conn: HTTPConnection) -> Optional[Principal]:
         if row:
             # a read-only token never writes, even when it belongs to an administrator
             role = "viewer" if token_row is not None and token_row["readonly"] else row["role"]
+            if token_row is not None and token_row["assistant"]:
+                from app import assistant, licence
+
+                db = connect(conn.app.state.db_path)
+                try:
+                    mode = assistant.effective_mode(db, token_row["assistant"], row["role"])
+                finally:
+                    db.close()
+                return Principal(username=f"{row['username']} (assistant: {token_row['token_name']})", role="admin" if mode == "change" else "viewer", user_id=row["id"], assistant=mode)
             if role == "operator":
                 db = connect(conn.app.state.db_path)
                 try:
@@ -207,6 +217,11 @@ def require_auth(request: HTTPConnection) -> None:
     if principal is None:
         raise HTTPException(status_code=401, detail="authentication required")
     request.state.user = principal
+    if principal.assistant:
+        from app import assistant
+
+        assistant.check(request.scope.get("method", "GET"), request.url.path, principal.assistant)
+        return
     if principal.role != "admin":
         method = request.scope.get("method", "GET")
         path = request.url.path

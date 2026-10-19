@@ -480,6 +480,12 @@ def _housekeeping_checks(conn, data_dir=None) -> None:
     except Exception:  # noqa: BLE001
         log.debug("PRAGMA optimize failed", exc_info=True)
     try:
+        from app import openrouter
+
+        openrouter.watch(conn)        # looks at OpenRouter at most once a day, and only when a free model of theirs was chosen
+    except Exception:  # noqa: BLE001 - offline is normal
+        log.debug("watching the chosen language model failed", exc_info=True)
+    try:
         from app import licence
 
         licence.notify(conn)

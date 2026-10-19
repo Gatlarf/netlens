@@ -54,6 +54,7 @@ const SETTINGS = [
   ["On-call schedule", "oncall", "on call oncall rota shifts who is notified override holiday swap fallback week rotation schedule", ""],
   ["Log forwarding", "siem", "syslog siem graylog splunk wazuh elastic rsyslog audit events forward logs", ""],
   ["Digital engineer", "engineer", "llm language model ollama openai openrouter ai insights model anonymise", ""],
+  ["AI assistant", "assistant", "ai assistant claude chatgpt llm help setup configure token guide api agent mcp", ""],
   ["Licence", "licence", "license key edition paid activate community trial", ""],
   ["Setup guide", "wizard", "wizard getting started tour first run", ""],
   ["Report to a central Netlens", "central", "probe remote site central accept configuration push", ""],

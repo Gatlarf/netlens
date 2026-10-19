@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.94 — 2026-10-19
+
+### Added
+- ★ **AI assistant**: Settings → AI assistant makes a token and ready-made instructions for an AI assistant (Claude, ChatGPT, a local model) that helps you set up Netlens, change it later or find out why something is red. It reads a guide written for language models (`/api/assistant/guide`) and works through the API, one change at a time, with every change in the audit log. A read-only token can look; a token that may change settings still cannot reach users, passwords, backups, sharing, single sign-on, remote sessions, remediation rules or updates.
+- ★ **Free language models on OpenRouter**: Settings → Digital engineer lists the free models OpenRouter offers right now, lets you test each with Netlens's own exams and use one with a click. Free models change often, so the list is read live and Netlens checks once a day that your model is still offered and free; if not, you get a warning, a dashboard item and an event.
+- A language model that answers HTTP 404 or 429 now says what that means (the model has gone, or today's free allowance is used up).
+
 ## 0.4.93 — 2026-10-19
 
 ### Added

@@ -547,6 +547,7 @@ def init_db(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "devices", "dns_name", "TEXT")                           # the user's own DNS name
     # --- schema v31: an API token can be read-only whatever the role of its user ---------------------------------
     _add_column_if_missing(conn, "api_tokens", "readonly", "INTEGER NOT NULL DEFAULT 0")
+    _add_column_if_missing(conn, "api_tokens", "assistant", "TEXT")          # NULL = an ordinary token; 'read' or 'change' = a token made for an AI assistant (app/assistant.py)
 
     # --- schema v30: users that sign in through an identity provider are recognised by its stable subject id -----
     _add_column_if_missing(conn, "users", "oidc_sub", "TEXT")

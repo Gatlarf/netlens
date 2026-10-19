@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app import engineer, licence, remediation
+from app import engineer, licence, openrouter, remediation
 from app.api.devices import get_conn
 
 router = APIRouter(prefix="/api", tags=["remediation"])
@@ -146,3 +146,49 @@ async def test_engineer(conn=Depends(get_conn)) -> dict:
     except engineer.EngineerError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     return {"ok": True, "answer": text[:200]}
+
+
+class OpenRouterPick(BaseModel):
+    model: str
+    api_key: str | None = None
+
+
+def _engineer_allowed(conn) -> None:
+    if not licence.allows(conn, "engineer"):
+        raise HTTPException(status_code=402, detail="the digital engineer needs a licence or the free trial (Settings → Licence)")
+
+
+def _key(conn, body: OpenRouterPick) -> str | None:
+    from app.db import get_setting
+
+    return (body.api_key or "").strip() or get_setting(conn, "engineer.api_key")
+
+
+@router.get("/engineer/openrouter")
+async def get_openrouter(refresh: bool = False, conn=Depends(get_conn)) -> dict:
+    """The free models OpenRouter offers right now (live), with the result of any exam on this installation, and the state of the chosen model."""
+    try:
+        models = await asyncio.to_thread(openrouter.free_models, conn, None, refresh)
+        error = None
+    except openrouter.OpenRouterError as exc:
+        models, error = [], str(exc)
+    state = openrouter.watch_state(conn)
+    return {"models": models, "error": error, "watch": state, "watch_message": openrouter.message(state["model"], state["state"]) if state and state["state"] != "ok" else None}
+
+
+@router.post("/engineer/openrouter/test")
+async def test_openrouter(body: OpenRouterPick, conn=Depends(get_conn)) -> dict:
+    _engineer_allowed(conn)
+    try:
+        return await asyncio.to_thread(openrouter.run_test, conn, body.model, _key(conn, body))
+    except openrouter.OpenRouterError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/engineer/openrouter/use")
+async def use_openrouter(body: OpenRouterPick, conn=Depends(get_conn)) -> dict:
+    _engineer_allowed(conn)
+    try:
+        return {**await asyncio.to_thread(openrouter.use, conn, body.model, (body.api_key or "").strip() or None), "allowed": True}
+    except (openrouter.OpenRouterError, engineer.EngineerError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))

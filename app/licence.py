@@ -189,7 +189,7 @@ def status(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, A
     return out
 
 
-PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights", "vulnerabilities", "teams", "schedules", "sharing")      # beyond the free Community edition (trial and every licence include them)
+PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights", "vulnerabilities", "teams", "schedules", "sharing", "assistant")      # beyond the free Community edition (trial and every licence include them)
 BUSINESS_ONLY = ("sso", "siem", "teams", "schedules", "sharing")      # of those, the ones the Supporter edition does not have: they mostly help organisations (the trial has them)
 
 

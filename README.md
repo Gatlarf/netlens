@@ -45,6 +45,8 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Wake-on-LAN, ping and traceroute](#wake-on-lan-ping-and-traceroute)
   - [Users and API tokens](#users-and-api-tokens)
   - [Share links](#share-links)
+  - [AI assistant](#ai-assistant)
+  - [Free language models on OpenRouter](#free-language-models-on-openrouter)
   - [Network checks](#network-checks)
   - [Groups](#groups)
   - [Update notice](#update-notice)
@@ -623,6 +625,21 @@ A viewer can be **limited to some groups** (*Limit to groups* on the user): a cu
 *Network → DNS* registers the devices Netlens knows in your DNS server and keeps their addresses right when DHCP hands out a new one. It needs a **DNS plugin** (for example *Technitium DNS*, see `plugins/technitium`). You enter your networks and their zones (`192.168.0.0/24 = home.example.com`, one line per network, several zones are fine), press **Read the DNS server now**, and Netlens shows a preview: what it would add or update, what is a **conflict**, and what is left alone. Nothing is written until you approve it; once the preview is what you want you can switch on *Apply automatically after every scan*. With the Docker plugin you can also tick *Give containers that share their host's address a name*: a running container on a bridge or host network that publishes a port then gets a CNAME to its host (`web.home.example.com`), and a container with its own network address is registered like any other device.
 
 Safety is the point of the design: Netlens only changes records it created itself (marked with a comment, and remembered), and **never changes a record that something else made**. A Windows machine that registers itself leaves a record; Netlens recognises it (also when the name differs from the one Netlens would choose) and leaves it alone, shows *Registers itself*, and does not register Windows machines at all by default. A device without a record waits for a grace period (2 hours by default) before it is registered, only devices you marked as *known* are registered (a stranger cannot claim a name by announcing a hostname), and a name that is already used by a record pointing elsewhere is a conflict that you resolve by hand. Devices without a name get a generated one (`tv-samsung-a1b2`, from a pattern you can change) that stays the same afterwards, and every device has a **DNS registration** setting on its page (*Automatic / Always register / Never register*) and a field for its own DNS name. Removing records of devices that are gone is off by default, and a limit caps how many changes one run may make. DNS events (*registered*, *updated*, *failed*) go to the event log and can go to the notification channels.
+
+### AI assistant
+
+**Settings → AI assistant** lets an AI assistant (Claude, ChatGPT, a local model that can make web requests) help you set up Netlens, change it later, or find out why something is red. It works through the normal API with a token of its own and reads a guide written for language models (`/api/assistant/guide`: how to behave, a first look, and step-by-step workflows for scanning, alerts, monitoring, plugins and diagnosis). Make a token, copy the ready-made instructions, and paste them into your assistant.
+
+- A **read-only** token can look, explain and diagnose. A token that **may change settings** changes one thing at a time, is told to ask you first, and every change is in the audit log under the token's name (Settings → Audit).
+- An assistant token never reaches users and tokens, stored passwords, backups and restores, share links, single sign-on, remote sessions and terminals, remediation rules (they run commands), plugin uploads or updates. It can delete only service checks, maintenance windows, snoozes, notification channels and groups. When it asks for something it may not do, the error says why, so it can hand the step to you.
+- `/api/assistant/endpoints` lists every call the token may make, with the fields of the request body. Passwords and keys are best typed by you into the interface rather than into the chat.
+- Anything you give an AI service leaves your network. Keep the token secret and delete it when the job is done.
+
+### Free language models on OpenRouter
+
+Insights and the digital engineer need a language model. If you cannot run one yourself, **Settings → Digital engineer → No model of your own?** reads the list of free models from OpenRouter (you need a free OpenRouter account and key) and shows each with the result of Netlens's own six exams on it, best first. **Test** runs the exams on one model (about eight requests; free accounts allow only a few dozen a day), **Use this model** saves it. You can still type any address and model of your own.
+
+Free models change often: they are added, renamed, limited or withdrawn without notice, and may keep your questions for their own use (leave the anonymising on). So the list is read live, and once a day Netlens checks that the model you chose is still offered and still free. If not, you see a warning in the card and on the dashboard, and an **Language model unavailable** event is raised that your notification channels can send. A model you typed yourself is never watched.
 
 ### Network checks
 

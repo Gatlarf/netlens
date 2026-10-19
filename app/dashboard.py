@@ -28,6 +28,16 @@ def _network_attention(conn: sqlite3.Connection) -> list[dict]:
     return [{"level": i["level"], "text": i["text"], "href": "#/network-health"} for i in nethealth.attention(conn)]
 
 
+def _llm_attention(conn: sqlite3.Connection) -> list[dict]:
+    """The free language model that was chosen on OpenRouter has gone away or is no longer free."""
+    from app import openrouter
+
+    state = openrouter.watch_state(conn)
+    if state and state["state"] != "ok":
+        return [{"level": "warn", "text": openrouter.message(state["model"], state["state"]), "href": "#/settings/engineer"}]
+    return []
+
+
 def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], core_down: list[dict] | None = None, down_checks: list[dict] | None = None) -> list[dict]:
     items: list[dict] = []
 
@@ -149,7 +159,7 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "summary": s,
         "devices_uptime": uptime,
         "service_checks": _services(conn, now)["checks"],
-        "attention": _attention(s, certs, login_failed, down, core_down, down_checks) + _network_attention(conn) + _site_vuln_attention(conn),
+        "attention": _attention(s, certs, login_failed, down, core_down, down_checks) + _network_attention(conn) + _site_vuln_attention(conn) + _llm_attention(conn),
         "events": events,
         "services_down": down,
         "login_failed_24h": login_failed,

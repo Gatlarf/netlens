@@ -26,6 +26,7 @@ export const EVENT_LABELS = {
   metric_ok: "Health normal",
   capacity_warning: "Disk filling up",
   anomaly: "Unusual reading",
+  llm_model_unavailable: "Language model unavailable",
   plugin_updated: "Plugin updated",
   plugin_update_failed: "Plugin update failed",
   plugin_update_skipped: "Plugin update held back",
