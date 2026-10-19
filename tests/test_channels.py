@@ -234,6 +234,18 @@ async def test_a_service_going_down_breaks_through_quiet_hours(db):
     assert (await process_channels(str(path), now=utc(2), poster=p))["sent"] == 0  # no bypass: held
 
 
+async def test_a_channel_with_its_own_quiet_hours_ignores_the_general_ones(db):
+    path, conn = db
+    sleepy = {**chan("sleepy"), "quiet": {"enabled": True, "start": "22:00", "end": "09:00", "tz": "UTC", "offset_min": 0, "bypass_critical": True}}
+    add_channels(conn, sleepy, chan("awake"))
+    add_event(conn, "device_new", "10.0.0.1", device_id=1)
+    conn.commit()
+    p = Poster()
+    r = await process_channels(str(path), now=utc(8), poster=p)               # 08:00: the general channel hears it, the sleepy person's own hours hold it
+    assert r["sent"] == 1
+    assert (await process_channels(str(path), now=utc(10), poster=p))["sent"] == 1           # after 09:00 it arrives
+
+
 async def test_disabled_channels_and_events_nobody_wants_advance_quietly(db):
     path, conn = db
     add_channels(conn, {**chan("off"), "enabled": False}, chan("a", events=["device_new"]))

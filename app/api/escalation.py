@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app import escalation, licence
+from app import escalation, licence, oncall
 from app.api.devices import get_conn
 from app.notify.channels import EVENT_LABELS, load_channels
 
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api", tags=["escalation"])
 def _doc(conn) -> dict[str, Any]:
     items = [{k: v for k, v in i.items() if k != "event"} for i in escalation.open_items(conn)]
     return {"allowed": licence.allows(conn, "oncall"), "policy": escalation.get_policy(conn), "open": items,
-            "channels": [{"id": str(c.get("id")), "name": c.get("name") or c.get("type")} for c in load_channels(conn)], "kinds": [{"id": k, "label": EVENT_LABELS[k]} for k in escalation.default_kinds() if k in EVENT_LABELS]
+            "channels": [{"id": oncall.TOKEN, "name": "Whoever is on call (see On-call schedule)"}] + [{"id": str(c.get("id")), "name": c.get("name") or c.get("type")} for c in load_channels(conn)], "kinds": [{"id": k, "label": EVENT_LABELS[k]} for k in escalation.default_kinds() if k in EVENT_LABELS]
             + [{"id": k, "label": v} for k, v in EVENT_LABELS.items() if k not in escalation.default_kinds() and not k.startswith("report_")]}
 
 

@@ -17,6 +17,7 @@ import { buildEscalationCard } from "../cards/escalation.js";
 import { buildSsoCard } from "../cards/sso.js";
 import { buildSiemCard } from "../cards/siem.js";
 import { buildInboundCard } from "../cards/inbound.js";
+import { buildOncallCard } from "../cards/oncall.js";
 import { buildUpdateCard } from "../update.js";
 import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
@@ -252,6 +253,7 @@ const STATIC_GROUPS = [
       { key: "channels", label: "Alert channels & quiet hours", build: buildChannelsCard },
       { key: "maintenance", label: "Maintenance windows", build: buildMaintenanceCard },
       { key: "escalation", label: "Escalation", build: buildEscalationCard },
+      { key: "oncall", label: "On-call schedule", build: buildOncallCard },
       { key: "siem", label: "Log forwarding", build: buildSiemCard },
       { key: "inbound", label: "Device messages (traps, syslog)", build: buildInboundCard },
     ],

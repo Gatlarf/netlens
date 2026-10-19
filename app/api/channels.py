@@ -27,6 +27,7 @@ class ChannelBody(BaseModel):
     enabled: bool | None = None
     events: list[str] | None = None
     filters: dict | None = None
+    quiet: dict | None = None               # this channel's own quiet hours; {} or enabled false removes them
     settings: dict[str, str | int | float | bool | None] | None = None
 
 
@@ -60,9 +61,10 @@ def create_channel(request: Request, body: ChannelBody) -> dict:
             settings = ch.clean_settings(body.type, body.settings or {})
             events = ch.clean_events(body.events if body.events is not None else ch.DEFAULT_EVENTS)
             filters = ch.clean_filters(body.filters)
+            quiet = ch.clean_channel_quiet(body.quiet)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
-        channel = {"id": ch.new_channel_id(), "type": body.type, "name": name, "enabled": body.enabled is not False, "events": events, "filters": filters,
+        channel = {"id": ch.new_channel_id(), "type": body.type, "name": name, "enabled": body.enabled is not False, "events": events, "filters": filters, "quiet": quiet,
                    "settings": settings, "last_event_id": ch.current_max_event_id(conn)}  # only report what happens from now on
         channels.append(channel)
         ch.save_channels(conn, channels)
@@ -84,6 +86,8 @@ def update_channel(request: Request, channel_id: str, body: ChannelBody) -> dict
                 channel["events"] = ch.clean_events(body.events)
             if body.filters is not None:
                 channel["filters"] = ch.clean_filters(body.filters)
+            if "quiet" in body.model_fields_set:
+                channel["quiet"] = ch.clean_channel_quiet(body.quiet)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         if body.name is not None and body.name.strip():

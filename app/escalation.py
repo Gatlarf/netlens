@@ -2,7 +2,8 @@
 
 A policy has levels: "after 15 minutes tell these channels, after 45 minutes those". It looks at the serious events (the kinds that break through quiet
 hours, or the ones you choose). An event stops escalating when somebody acknowledges it or when it has resolved itself (the matching recovery event
-arrived). Who is on call is whoever is behind the channels of a level: use a channel per person or per team (e-mail, ntfy, Telegram ...).
+arrived). Who is told is whoever is behind the channels of a level: use a channel per person or per team (e-mail, ntfy, Telegram ...), or put **whoever is on call**
+(`@oncall`) in a level and let the on-call schedule (app/oncall.py) choose the people at that moment.
 """
 
 from __future__ import annotations
@@ -47,7 +48,9 @@ def get_policy(conn: sqlite3.Connection) -> dict[str, Any]:
 def save_policy(conn: sqlite3.Connection, data: dict) -> dict[str, Any]:
     from app.notify.channels import EVENT_LABELS, load_channels
 
-    known = {str(c.get("id")) for c in load_channels(conn)}
+    from app.oncall import TOKEN as ONCALL
+
+    known = {str(c.get("id")) for c in load_channels(conn)} | {ONCALL}
     kinds = data.get("kinds") or default_kinds()
     if not isinstance(kinds, list) or any(k not in EVENT_LABELS for k in kinds):
         raise PolicyError("choose events from the list")
@@ -132,6 +135,14 @@ async def process(db_path: str, *, now: datetime | None = None, poster=None, mai
         for item, level, ids in due(conn, now):
             title = f"ESCALATION {level}: {ch.build_digest([item['event']])[0]}"
             body = f"Nobody has acknowledged this for {int((now - datetime.strptime(item['ts'], STAMP).replace(tzinfo=timezone.utc)).total_seconds() // 60)} minutes.\n\n{item['detail'] or item['kind']}"
+            from app import oncall
+
+            if oncall.TOKEN in ids:
+                now_on_call = oncall.channels_now(conn, now)
+                if not now_on_call and all(c == oncall.TOKEN for c in ids):
+                    log.warning("escalation level %s: nobody is on call; trying again next round", level)
+                    continue                                            # keep the alert open: the next round looks again
+                ids = [c for c in ids if c != oncall.TOKEN] + [c for c in now_on_call if c not in ids]
             for cid in ids:
                 channel = by_id.get(cid)
                 if channel is None or not channel.get("enabled", True):

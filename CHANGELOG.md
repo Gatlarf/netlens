@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.86 — 2026-10-19
+
+### Added
+- ★ **On-call schedules** (Settings → On-call schedule): who is notified, by day and hour. People with their channels, shifts (days, hours, taking turns weekly or daily), overrides for swaps and holidays, and a fallback. Choose **Whoever is on call** in a level of the escalation policy and the alert goes to the people on call at that moment. The card shows who is on call now and the coming week. When nobody is on call, the alert stays open and is retried.
+- ★ **Quiet hours per person**: a channel can have its own quiet hours (channel form → *Own quiet hours*) that replace the general ones for that channel only.
+
 ## 0.4.85 — 2026-10-19
 
 ### Added

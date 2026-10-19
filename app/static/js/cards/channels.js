@@ -79,6 +79,16 @@ function channelForm(overview, channel, onDone, defaultType, extra = { groups: [
   form.appendChild(h("h3", {}, "Only when"));
   const filters = filterBox(channel && channel.filters, extra.groups, extra.devices);
   form.appendChild(filters);
+  form.appendChild(h("h3", {}, "Own quiet hours"));
+  const q = (channel && channel.quiet) || { enabled: false, start: "23:00", end: "07:00", bypass_critical: true };
+  const qOn = h("input", { type: "checkbox", checked: Boolean(q.enabled) });
+  const qStart = h("input", { type: "time", value: q.start });
+  const qEnd = h("input", { type: "time", value: q.end });
+  const qBypass = h("input", { type: "checkbox", checked: q.bypass_critical !== false });
+  form.appendChild(h("div", { class: "field" }, h("label", {}, qOn, " This channel has its own quiet hours"),
+    h("p", { class: "hint" }, "For one person's sleep: a channel per person, each with their own hours. They replace the general quiet hours for this channel only. Held messages arrive as one digest afterwards."),
+    h("label", {}, "From ", qStart, " until ", qEnd), h("label", { class: "check-row" }, qBypass, " Still send when a service goes down"),
+    h("p", { class: "hint" }, `Times are in your time zone (${Intl.DateTimeFormat().resolvedOptions().timeZone}).`)));
   const error = h("p", { class: "error" }, "");
   const save = h("button", { type: "submit", class: "btn" }, channel ? "Save" : "Add channel");
   const cancel = h("button", { type: "button", class: "btn" }, "Cancel");
@@ -92,6 +102,7 @@ function channelForm(overview, channel, onDone, defaultType, extra = { groups: [
     for (const f of overview.types[typeSel.value].fields) settings[f.key] = form.querySelector(`[name="setting-${f.key}"]`).value;
     const body = {
       name: nameInput.value, settings, filters: filters.read(),
+      quiet: qOn.checked ? { enabled: true, start: qStart.value, end: qEnd.value, bypass_critical: qBypass.checked, tz: Intl.DateTimeFormat().resolvedOptions().timeZone, offset_min: -new Date().getTimezoneOffset() } : null,
       events: [...events.querySelectorAll("input[data-event]")].filter((i) => i.checked).map((i) => i.dataset.event),
     };
     save.disabled = true;

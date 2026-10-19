@@ -199,7 +199,7 @@ def public_channel(ch: dict) -> dict:
     spec = TYPES[ch["type"]]
     secret_keys = {f["key"] for f in spec["fields"] if f.get("secret")}
     return {
-        "id": ch["id"], "type": ch["type"], "name": ch["name"], "enabled": ch["enabled"], "events": ch["events"], "filters": clean_filters(ch.get("filters")),
+        "id": ch["id"], "type": ch["type"], "name": ch["name"], "enabled": ch["enabled"], "events": ch["events"], "filters": clean_filters(ch.get("filters")), "quiet": ch.get("quiet"),
         "settings": {k: v for k, v in ch["settings"].items() if k not in secret_keys},
         "secrets_set": {k: bool(ch["settings"].get(k)) for k in secret_keys},
         "status": ch.get("status"),
@@ -336,6 +336,14 @@ def clean_quiet(data: dict) -> dict:
         raise ValueError("invalid UTC offset")
     out["tz"], out["offset_min"] = tz, offset
     return out
+
+
+def clean_channel_quiet(data: Any) -> dict | None:
+    """A channel's own quiet hours (a person's sleep): used instead of the general ones for this channel. None when switched off."""
+    if not isinstance(data, dict) or not data.get("enabled"):
+        return None
+    quiet = clean_quiet({**data, "group_by_cause": True})
+    return {k: quiet[k] for k in ("enabled", "start", "end", "bypass_critical", "tz", "offset_min")}
 
 
 def local_time(now: datetime, quiet: dict) -> datetime:
@@ -566,7 +574,9 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
                             ch["last_event_id"] = top
                     changed = True
                     continue
-                if quiet_now and not (quiet["bypass_critical"] and any(e["kind"] in CRITICAL for e in wanted)):
+                own = ch.get("quiet")                       # this channel's own quiet hours (a person's sleep) replace the general ones
+                hold, bypass = (in_quiet_hours(now, own), own["bypass_critical"]) if own and own.get("enabled") else (quiet_now, quiet["bypass_critical"])
+                if hold and not (bypass and any(e["kind"] in CRITICAL for e in wanted)):
                     continue  # held back until the quiet hours end
                 if quiet.get("group_by_cause", True):
                     from app import rootcause

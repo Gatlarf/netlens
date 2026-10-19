@@ -142,7 +142,7 @@ VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/speedtest/up", "/api
 
 # An operator looks like a viewer and may also act on what happens: scan, test, wake, acknowledge, snooze, plan maintenance, approve fixes, edit a device's
 # name and group. Settings, users, credentials, backups, plugins, remote access and deleting things stay with the administrator.
-OPERATOR_READABLE = re.compile(r"^/api/(maintenance|escalation|remediation(/(rules|runs|paused|status))?|audit)$")
+OPERATOR_READABLE = re.compile(r"^/api/(maintenance|escalation|oncall|remediation(/(rules|runs|paused|status))?|audit)$")
 OPERATOR_WRITABLE = (
     ("POST", re.compile(r"^/api/(scans|scans/cancel|snoozes|maintenance|maintenance/now|speedtest/internet|speedtest/iperf/run|devices/group|devices/trust)$")),
     ("POST", re.compile(r"^/api/devices/\d+/(scan|ping|trace|wake|monitor/run|flapping/probe)$")),
