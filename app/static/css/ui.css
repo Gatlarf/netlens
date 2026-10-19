@@ -102,3 +102,5 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 .up-row { cursor: pointer; }
 .up-row .up-detail { grid-column: 1 / -1; cursor: default; }
 .up-row .up-detail .card { margin: 0; }
+tr.svc-sep td { background: var(--bg); padding-top: 12px; }
+tr.svc-sep:hover { background: var(--bg); }
