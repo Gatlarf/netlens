@@ -240,3 +240,19 @@ def test_server_list_rows_hide_secrets_keep_them_per_row_and_test_one_row(env):
     assert empty.status_code == 422 and "fill in" in empty.json()["detail"]
     # a client that still sends the single-server settings keeps working
     assert c.put("/api/plugins/proxmox", json={"config": {"url": "10.9.9.9", "token_id": "a", "token_secret": "b"}}).json()["config"]["servers"][0]["host"] == "10.9.9.9"
+
+
+def test_failure_grace_setting(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app.config import load_settings
+    from app.main import create_app
+
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    admin = {"Authorization": "Bearer secret"}
+    with TestClient(app) as c:
+        assert c.get("/api/plugin-settings", headers=admin).json() == {"failure_grace": 3}
+        assert c.put("/api/plugin-settings", json={"failure_grace": 5}, headers=admin).json() == {"failure_grace": 5}
+        assert c.get("/api/plugin-settings", headers=admin).json() == {"failure_grace": 5}
+        for bad in (0, 49, "x"):
+            assert c.put("/api/plugin-settings", json={"failure_grace": bad}, headers=admin).status_code == 422

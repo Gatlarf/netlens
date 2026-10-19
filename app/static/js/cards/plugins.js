@@ -87,6 +87,25 @@ function fillPluginsCard(card, data, notice = null) {
   card.appendChild(compatBox);
   get("/api/plugin-compat").then((compat) => fillCompat(compatBox, card, compat)).catch(() => {});
 
+  // a timeout now and then is normal behind a reverse proxy: a plugin is a problem only after this many failed syncs in a row
+  const graceBox = h("div", { class: "field" });
+  card.appendChild(graceBox);
+  get("/api/plugin-settings").then((s) => {
+    const input = h("input", { type: "number", min: "1", max: "48", value: String(s.failure_grace), class: "admin-only", "aria-label": "Failed syncs in a row" });
+    const save = h("button", { type: "button", class: "btn admin-only" }, "Save");
+    save.addEventListener("click", async () => {
+      try {
+        const res = await put("/api/plugin-settings", { failure_grace: Number(input.value) });
+        input.value = String(res.failure_grace);
+        toast("Saved", "success");
+      } catch (err) {
+        toast(err.message || "Could not save", "error");
+      }
+    });
+    graceBox.append(h("label", {}, "Report a plugin as a problem after "), input, " failed syncs in a row ", save,
+      h("span", { class: "hint" }, " Syncs run after every scan, so 3 is about 45 minutes with the usual 15-minute scan. A refused login is always reported at once."));
+  }).catch(() => {});
+
   if ((data.missing || []).length) {
     // settings that came back with a restore, for plugins whose files are not here (a new data folder): installing keeps them
     const box = h("div", { class: "baseline-box" });

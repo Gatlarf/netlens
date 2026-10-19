@@ -20,6 +20,7 @@ from app.plugins.runner import PluginRunError
 from app.plugins.service import (
     PluginService,
     clear_plugin_data,
+    failure_grace,
     forget_plugin,
     get_state,
     install_state,
@@ -65,6 +66,30 @@ def _summary(conn, plugin, categories: dict | None = None, auto: dict | None = N
         "auto_update": bool(auto.get(plugin.id)) if auto is not None else False,
         "auto_update_possible": (not plugin.builtin) and ((inst.provenance(conn, plugin.id) or {}).get("source") in ("index", "rollback")),
     }
+
+
+class PluginSettings(BaseModel):
+    failure_grace: int = Field(ge=1, le=48)
+
+
+@router.get("/plugin-settings")
+def get_plugin_settings(request: Request) -> dict:
+    """How many failed syncs in a row make a plugin a problem (dashboard, problem count)."""
+    conn = connect(request.app.state.db_path)
+    try:
+        return {"failure_grace": failure_grace(conn)}
+    finally:
+        conn.close()
+
+
+@router.put("/plugin-settings")
+def put_plugin_settings(request: Request, body: PluginSettings) -> dict:
+    conn = connect(request.app.state.db_path)
+    try:
+        set_setting(conn, "plugins.failure_grace", str(body.failure_grace))
+        return {"failure_grace": failure_grace(conn)}
+    finally:
+        conn.close()
 
 
 @router.get("/plugins")
