@@ -76,7 +76,7 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
         minor = not inc["cause"] and len(ids) < 3 and not (set(ids) & always_on) and set(kinds) <= {"went offline"}
         strength = "strong" if inc["cause"] else "info" if minor else "likely"
         group = {"inc": {"type": "incident", "strength": strength, "ts": inc["start"], "devices": names[:6],
-                         "text": f"{who}: {', '.join(kinds)} at {when} UTC. {inc['summary']}"}, "ids": ids, "changes": []}
+                         "text": (f"{who}: {', '.join(kinds)}" if who else ", ".join(kinds).capitalize()) + f" at {when} UTC. {inc['summary']}"}, "ids": ids, "changes": []}
         pending.append(group)
         start = _ts(inc["start"])
         if strength != "info":

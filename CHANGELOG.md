@@ -5,7 +5,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ## 0.4.99 — 2026-10-19
 
 ### Changed
-- **AI report is clearer**: findings now name the devices and the time, minor one-off outages of phones and the like rank last, a device that keeps failing is told once ("12 times in 24 hours") instead of as many single events, and the same switch behind several incidents is one finding. The first request to a language model that must still be loaded into memory may take a few minutes; the report now waits for it.
+- **AI report is clearer**: findings now name the devices and the time, minor one-off outages of phones and the like rank last, a device that keeps failing is told once ("12 times in 24 hours") instead of as many single events, and the same switch behind several incidents is one finding. A finding about a service no longer starts with an empty name. The first request to a language model that must still be loaded into memory may take a few minutes; the report now waits for it.
 
 ## 0.4.98 — 2026-10-19
 

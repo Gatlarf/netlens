@@ -178,3 +178,9 @@ def test_the_same_parent_is_one_finding_with_all_the_names(conn, monkeypatch):
         ev(conn, "device_online", back[:-1] + "1", 3)
     shared = [f for f in aireport.collect(conn, "24h", NOW)["findings"] if f["type"] == "shared_parent"]
     assert len(shared) == 1 and "2 problems" in shared[0]["text"] and "cam1" in shared[0]["text"] and "cam2" in shared[0]["text"] and "behind sw-core" in shared[0]["text"]
+
+
+def test_a_problem_without_a_device_has_no_empty_name(conn):
+    add_event(conn, "service_down", "web check failed", device_id=None, now="2026-11-01T10:00:00Z")
+    texts = [f["text"] for f in aireport.collect(conn, "24h", NOW)["findings"]]
+    assert texts and all(not t.startswith(":") for t in texts) and any(t.startswith("A service went down at 10:00 UTC") for t in texts)
