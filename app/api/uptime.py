@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.api.devices import get_conn
 from app.api.stats import _cached
+from app.auth import devices_in_scope, scope_of
 from app.db import connect
 from app.uptime import RANGES, core_choices, device_uptime, set_core, uptime_overview
 
@@ -22,7 +23,16 @@ def get_uptime_overview(request: Request, bars: int = Query(60, ge=1, le=240), r
         finally:
             conn.close()
 
-    return _cached(request, ("uptime", request.app.state.db_path, range, bars), build)
+    result = _cached(request, ("uptime", request.app.state.db_path, range, bars), build)
+    scope = scope_of(request)
+    if scope is not None:                      # a customer view: only the devices of its groups
+        conn = connect(request.app.state.db_path)
+        try:
+            allowed = devices_in_scope(conn, scope)
+        finally:
+            conn.close()
+        result = [r for r in result if r.get("id") in allowed]
+    return result
 
 
 @router.get("/devices/{device_id}/uptime")

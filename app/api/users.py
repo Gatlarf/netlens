@@ -11,12 +11,14 @@ class NewUser(BaseModel):
     username: str
     password: str
     role: str = "viewer"
+    scope: list[int] | None = None         # group ids a viewer is limited to (None = no limit)
 
 
 class UserPatch(BaseModel):
     role: str | None = None
     password: str | None = None
     disabled: bool | None = None
+    scope: list[int] | None = None
 
 
 class NewToken(BaseModel):
@@ -49,7 +51,7 @@ def add_user(request: Request, body: NewUser) -> dict:
     db = _db(request)
     try:
         try:
-            user_id = users.create_user(db, body.username, body.password, body.role)
+            user_id = users.create_user(db, body.username, body.password, body.role, body.scope)
         except users.UserError as exc:
             raise _fail(exc, 409 if "taken" in str(exc) else 422)
         return {"id": user_id, "users": users.list_users(db)}
@@ -62,7 +64,8 @@ def edit_user(request: Request, user_id: int, body: UserPatch) -> dict:
     db = _db(request)
     try:
         try:
-            users.update_user(db, user_id, role=body.role, password=body.password, disabled=body.disabled)
+            users.update_user(db, user_id, role=body.role, password=body.password, disabled=body.disabled,
+                              **({"scope": body.scope} if "scope" in body.model_fields_set else {}))
         except users.UserError as exc:
             raise _fail(exc)
         return {"users": users.list_users(db)}

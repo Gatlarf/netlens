@@ -120,9 +120,10 @@ class LoginLimiter:
 @dataclass(frozen=True)
 class Principal:
     username: str
-    role: str  # "admin" | "viewer"
+    role: str  # "admin" | "operator" | "viewer"
     user_id: Optional[int] = None  # None = the built-in NETLENS_TOKEN login
     builtin: bool = False
+    scope: Optional[tuple] = None  # group ids a (viewer) user is limited to; None = no limit
 
     @property
     def is_admin(self) -> bool:
@@ -138,6 +139,35 @@ VIEWER_READABLE = re.compile(
     r"|stats|stats/summary|dashboard|dashboard/layout|dashboard/default|dashboard/shared|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
 )
 VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/speedtest/up", "/api/speedtest/browser")  # a viewer may test the line from their own device
+
+# An operator looks like a viewer and may also act on what happens: scan, test, wake, acknowledge, snooze, plan maintenance, approve fixes, edit a device's
+# name and group. Settings, users, credentials, backups, plugins, remote access and deleting things stay with the administrator.
+OPERATOR_READABLE = re.compile(r"^/api/(maintenance|escalation|remediation(/(rules|runs|paused|status))?|audit)$")
+OPERATOR_WRITABLE = (
+    ("POST", re.compile(r"^/api/(scans|scans/cancel|snoozes|maintenance|maintenance/now|speedtest/internet|speedtest/iperf/run|devices/group|devices/trust)$")),
+    ("POST", re.compile(r"^/api/devices/\d+/(scan|ping|trace|wake|monitor/run|flapping/probe)$")),
+    ("POST", re.compile(r"^/api/(service-checks/\d+/run|escalation/\d+/ack|remediation/runs/\d+/(decide|ask))$")),
+    ("PUT", re.compile(r"^/api/maintenance/\d+$")),
+    ("DELETE", re.compile(r"^/api/(snoozes|maintenance/\d+)$")),
+    ("PATCH", re.compile(r"^/api/devices/\d+$")),
+)
+# A viewer limited to some groups (a customer view) reads only the devices of those groups: the device list, a device and its history, the uptime page and the events.
+SCOPED_READABLE = re.compile(
+    r"^/api/(session|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)|events|uptime|timeseries/device/\d+|timeseries/device/\d+/[A-Za-z0-9_.-]+)$"
+)
+SCOPED_MAY_POST = ("/api/logout", "/api/me/password")
+_DEVICE_IN_PATH = re.compile(r"^/api/(?:devices|timeseries/device)/(\d+)(?:/|$)")
+
+
+def scope_of(request: HTTPConnection) -> Optional[tuple]:
+    """The group ids the signed-in user is limited to, or None when there is no limit."""
+    principal = getattr(request.state, "user", None)
+    return principal.scope if principal is not None else None
+
+
+def devices_in_scope(conn, scope: tuple) -> set[int]:
+    marks = ",".join("?" * len(scope))
+    return {r[0] for r in conn.execute(f"SELECT id FROM devices WHERE group_id IN ({marks})", tuple(scope))}
 
 
 def identify(conn: HTTPConnection) -> Optional[Principal]:
@@ -159,7 +189,7 @@ def identify(conn: HTTPConnection) -> Optional[Principal]:
         if row:
             # a read-only token never writes, even when it belongs to an administrator
             role = "viewer" if token_row is not None and token_row["readonly"] else row["role"]
-            return Principal(username=row["username"], role=role, user_id=row["id"])
+            return Principal(username=row["username"], role=role, user_id=row["id"], scope=tuple(users.parse_scope(row["scope"]) or ()) or None)
     return None
 
 
@@ -171,11 +201,32 @@ def require_auth(request: HTTPConnection) -> None:
     if principal.role != "admin":
         method = request.scope.get("method", "GET")
         path = request.url.path
+        if principal.scope is not None:
+            _check_scoped(request, principal, method, path)
+            return
         allowed = ((method in ("GET", "HEAD") and VIEWER_READABLE.match(path)) or (method == "POST" and path in VIEWER_MAY_POST)
                    or (method in ("PUT", "DELETE") and path == "/api/dashboard/layout")     # everybody arranges their own dashboard
                    or (method in ("GET", "PUT") and path == "/api/me/preferences"))          # and chooses the page to start on
+        if not allowed and principal.role == "operator":
+            allowed = ((method in ("GET", "HEAD") and OPERATOR_READABLE.match(path))
+                       or any(method == m and rx.match(path) for m, rx in OPERATOR_WRITABLE))
         if not allowed:
-            raise HTTPException(status_code=403, detail="this needs an administrator")
+            raise HTTPException(status_code=403, detail="this needs an administrator" if principal.role == "viewer" else "an operator may not do this")
+
+
+def _check_scoped(request: HTTPConnection, principal: Principal, method: str, path: str) -> None:
+    allowed = ((method in ("GET", "HEAD") and SCOPED_READABLE.match(path)) or (method == "POST" and path in SCOPED_MAY_POST)
+               or (method in ("GET", "PUT") and path == "/api/me/preferences"))
+    if not allowed:
+        raise HTTPException(status_code=403, detail="this account can only see its own devices")
+    m = _DEVICE_IN_PATH.match(path)
+    if m:
+        db = connect(request.app.state.db_path)
+        try:
+            if int(m.group(1)) not in devices_in_scope(db, principal.scope):
+                raise HTTPException(status_code=404, detail="no such device")
+        finally:
+            db.close()
 
 
 def require_admin(request: HTTPConnection) -> None:

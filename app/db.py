@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 31
+SCHEMA_VERSION = 32
 
 
 def utcnow() -> str:
@@ -39,6 +40,30 @@ def connect(path: str | os.PathLike) -> sqlite3.Connection:
 
     return conn
 
+
+
+def _allow_operator_role(conn: sqlite3.Connection) -> None:
+    """The users table once only allowed the roles admin and viewer in a CHECK constraint, which SQLite cannot change in place: rebuild the table
+    (keeping every row, the id and the foreign keys of sessions and tokens) so that `operator` is accepted too."""
+    row = conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").fetchone()
+    if row is None or "'operator'" in row[0]:
+        return
+    sql = row[0]
+    new_sql = re.sub(r"\(\s*'admin'\s*,\s*'viewer'\s*\)", "('admin', 'operator', 'viewer')", sql)
+    if new_sql == sql:
+        return
+    new_sql = re.sub(r"CREATE TABLE (IF NOT EXISTS )?users\b", "CREATE TABLE users_new", new_sql, count=1)
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        conn.execute("DROP TABLE IF EXISTS users_new")
+        conn.execute(new_sql)
+        conn.execute("INSERT INTO users_new SELECT * FROM users")
+        conn.execute("DROP TABLE users")
+        conn.execute("ALTER TABLE users_new RENAME TO users")
+        conn.commit()
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
 
 
 def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:
@@ -395,7 +420,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY,
             username TEXT NOT NULL UNIQUE COLLATE NOCASE,
             password_hash TEXT NOT NULL,
-            role TEXT NOT NULL CHECK (role IN ('admin', 'viewer')),
+            role TEXT NOT NULL CHECK (role IN ('admin', 'operator', 'viewer')),
             disabled INTEGER NOT NULL DEFAULT 0,
             created TEXT NOT NULL,
             last_login TEXT
@@ -504,6 +529,9 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     # --- schema v30: users that sign in through an identity provider are recognised by its stable subject id -----
     _add_column_if_missing(conn, "users", "oidc_sub", "TEXT")
+    # --- schema v32: the role operator, and a user (a viewer) that can see only some groups ---------------------
+    _add_column_if_missing(conn, "users", "scope", "TEXT")          # JSON list of group ids; NULL = everything
+    _allow_operator_role(conn)
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oidc_sub ON users(oidc_sub) WHERE oidc_sub IS NOT NULL")
 
     # --- schema v18: events held back by a maintenance window carry the window's name ----------------------

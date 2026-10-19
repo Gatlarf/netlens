@@ -194,8 +194,8 @@ async def session(request: Request) -> JSONResponse:
         db.close()
     return JSONResponse({
         "authenticated": True,
-        "user": {"username": principal.username, "role": principal.role, "builtin": principal.builtin},
-        "start_page": start_page,
+        "user": {"username": principal.username, "role": principal.role, "builtin": principal.builtin, **({"scoped": True} if principal.scope is not None else {})},
+        "start_page": "#/devices" if principal.scope is not None else start_page,
         **_demo_info(request),
     })
 

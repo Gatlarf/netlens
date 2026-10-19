@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app import actions, baselines, flapping, groups as groups_mod, tsdb
+from app.auth import scope_of
 from app.db import add_event, connect, utcnow
 from app.scanner import store, vendor as vendor_db
 from app.scanner.classify import DEVICE_TYPES as CLASSIFY_TYPES
@@ -312,6 +313,9 @@ def list_devices(
     sql += " ORDER BY primary_ip, id"
 
     rows = conn.execute(sql, params).fetchall()
+    scope = scope_of(request)
+    if scope is not None:                  # a customer view: only the devices of its groups
+        rows = [r for r in rows if r["group_id"] in scope]
     drift = baselines.drift_counts(conn)
     result = []
     for row in rows:

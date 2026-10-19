@@ -7,7 +7,7 @@ const changed = () => document.dispatchEvent(new CustomEvent("netlens:snoozed"))
 
 export function snoozeMenu(subject) {
   if (!subject || !isAdmin()) return null;
-  const select = h("select", { class: "snooze-menu admin-only", "aria-label": "Snooze this problem", title: "I know about it: do not tell me again for a while (it ends by itself when the problem is over)" },
+  const select = h("select", { class: "snooze-menu act-only", "aria-label": "Snooze this problem", title: "I know about it: do not tell me again for a while (it ends by itself when the problem is over)" },
     h("option", { value: "" }, "Snooze…"), ...CHOICES.map(([m, t]) => h("option", { value: String(m) }, t)));
   select.addEventListener("click", (e) => e.stopPropagation());
   select.addEventListener("change", async () => {
@@ -27,7 +27,7 @@ export function snoozeMenu(subject) {
 
 export function wakeButton(subject) {
   if (!isAdmin()) return null;
-  const b = h("button", { class: "btn snooze-wake admin-only", type: "button", title: "Stop the snooze: tell me again if it is still a problem" }, "Wake");
+  const b = h("button", { class: "btn snooze-wake act-only", type: "button", title: "Stop the snooze: tell me again if it is still a problem" }, "Wake");
   b.addEventListener("click", async (e) => {
     e.stopPropagation();
     try {

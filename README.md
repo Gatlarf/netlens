@@ -121,7 +121,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Delete a device (optionally ignoring it in future scans), and a full scan of a single host from its page
 - Backup and restore of everything from the Settings page, with scheduled backups and retention
 - Port baselines (alert when a port opens that is not normal for the device), Wake-on-LAN, ping and traceroute from the device page
-- Several users (administrator or read-only viewer) with API tokens, and read-only share links for the map or a status page
+- Several users (administrator, operator or read-only viewer, optionally limited to some groups) with API tokens, and read-only share links for the map or a status page
 - Every setting you need day to day (ranges, schedule, terminal, mail, plugins) is editable in the browser
 
 ## Install
@@ -566,6 +566,12 @@ New installs have no shared token: you create the first administrator in the [fi
 **Access token (older installs):** if `NETLENS_TOKEN` is set in the container's environment, it keeps signing in as administrator (login dialog: "Sign in with the access token instead") and the first-start wizard does not appear. Remove it once you have an administrator account of your own; the Users page reminds you.
 
 An administrator can create **API tokens** for a user (shown once). They are Bearer tokens that act with the role of their user, for scripts, Prometheus (`/metrics`) and the Home Assistant integration; a viewer's token is enough for those because they only read. To be sure a token can never change anything, tick **read-only** when you create it: it then only reads, even when its user is an administrator. The [API reference](https://www.home.codeshrimp.com/docs/netlens/using-netlens/api-reference/) lists every endpoint.
+
+### Roles and customer views
+
+**Settings → Users & tokens** has three roles. An **administrator** can do everything. An **operator** looks and acts: scans, tests, Wake-on-LAN, acknowledges and snoozes alerts, plans maintenance windows, approves or declines proposed fixes, and edits a device's name, type and group, but has no access to settings, users, credentials, backups, plugins, the terminal or remote access, and cannot delete anything. A **viewer** only looks.
+
+A viewer can be **limited to some groups** (*Limit to groups* on the user): a customer view. It sees only the devices of those groups, their pages, history and events, and the Uptime page, and nothing else: no map, dashboard, statistics, settings or other customers' groups, and the interface only offers Devices and Uptime. Only a viewer can be limited, and promoting the user ends the limit. API tokens of a limited user keep the limit. A read-only token (see above) never writes, whatever its user may do.
 
 ### Share links
 

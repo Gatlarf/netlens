@@ -79,8 +79,8 @@ def save_settings(conn: sqlite3.Connection, data: dict) -> dict[str, Any]:
     if data.get("client_secret"):
         set_setting(conn, "oidc.client_secret", str(data["client_secret"]).strip())
     if "default_role" in data:
-        if data["default_role"] not in ("viewer", "admin"):
-            raise OidcError("the default role is viewer or admin")
+        if data["default_role"] not in ("viewer", "operator", "admin"):
+            raise OidcError("the default role is viewer, operator or admin")
         set_setting(conn, "oidc.default_role", data["default_role"])
     if "enabled" in data:
         set_setting(conn, "oidc.enabled", "1" if data["enabled"] else "0")

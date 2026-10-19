@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.85 — 2026-10-19
+
+### Added
+- ★ **Operator role**: a user who looks and acts. An operator can scan, test, send Wake-on-LAN, acknowledge and snooze alerts, plan maintenance, approve or decline fixes and edit a device's name, type and group, but cannot reach settings, users, credentials, backups, plugins, the terminal or remote access, and cannot delete anything. Single sign-on can use it as the default role.
+- ★ **Customer view**: a viewer can be limited to some groups (Settings → Users & tokens → *Limit to groups*). That user sees only the devices of those groups, their pages, history and events, and the Uptime page; the interface offers nothing else and the server refuses everything else. API tokens of such a user keep the limit.
+
+### Changed
+- The Users page lists the three roles, shows which viewers are limited, and the Scan button is also shown to operators. Existing users and tokens are kept (the users table is rebuilt once at the update).
+
 ## 0.4.84 — 2026-10-19
 
 ### Added

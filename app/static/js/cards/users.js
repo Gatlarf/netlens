@@ -1,7 +1,7 @@
 import { api, get } from "../api.js";
 import { h, clear, toast, fmtTime } from "../util.js";
 
-const ROLE_TEXT = { admin: "Administrator (everything)", viewer: "Viewer (read-only)" };
+const ROLE_TEXT = { admin: "Administrator (everything)", operator: "Operator (looks and acts, no settings)", viewer: "Viewer (read-only)" };
 
 async function copyText(text) {
   try {
@@ -10,6 +10,19 @@ async function copyText(text) {
   } catch (e) {
     return false;
   }
+}
+
+// A viewer can be limited to some groups (a customer view). Returns the box and a function that gives the chosen group ids (null = all).
+function groupPicker(groups, chosen) {
+  const box = h("div", { class: "scope-picker" });
+  const boxes = groups.map((g) => {
+    const input = h("input", { type: "checkbox", value: String(g.id) });
+    input.checked = (chosen || []).includes(g.id);
+    box.appendChild(h("label", { class: "check" }, input, ` ${g.name}`));
+    return input;
+  });
+  if (!groups.length) box.appendChild(h("p", { class: "hint" }, "No groups yet. Create groups under Settings → Groups and put devices in them."));
+  return { box, value: () => { const ids = boxes.filter((b) => b.checked).map((b) => Number(b.value)); return ids.length ? ids : null; } };
 }
 
 function newUserForm(data, refresh) {
@@ -23,11 +36,17 @@ function newUserForm(data, refresh) {
   form.appendChild(h("div", { class: "field" }, h("label", {}, "User name"), name));
   form.appendChild(h("div", { class: "field" }, h("label", {}, `Password (at least ${data.min_password} characters)`), password));
   form.appendChild(h("div", { class: "field" }, h("label", {}, "Role"), role));
+  const picker = groupPicker(data.groups || [], null);
+  const scopeField = h("div", { class: "field" }, h("label", {}, "Only these groups (optional: a customer view that sees nothing else)"), picker.box);
+  const showScope = () => { scopeField.hidden = role.value !== "viewer"; };
+  role.addEventListener("change", showScope);
+  showScope();
+  form.appendChild(scopeField);
   form.appendChild(h("button", { type: "submit", class: "btn" }, "Add user"));
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      const res = await api("/api/users", { method: "POST", body: { username: name.value, password: password.value, role: role.value } });
+      const res = await api("/api/users", { method: "POST", body: { username: name.value, password: password.value, role: role.value, scope: role.value === "viewer" ? picker.value() : null } });
       toast("User added", "success");
       refresh(res.users);
     } catch (err) {
@@ -72,10 +91,23 @@ function userRow(user, data, refresh, shown) {
     const readonly = window.confirm("Make it read-only?\n\nOK: the token can only read (right for Prometheus, Grafana and dashboards).\nCancel: it acts with the role of its user.");
     call(() => api(`/api/users/${user.id}/tokens`, { method: "POST", body: { name, readonly } }), null);
   });
-  actions.append(pw, " ", toggle, " ", tok, " ", del);
+  const parts = [pw, " ", toggle, " ", tok, " "];
+  if (user.role === "viewer") {
+    const lim = h("button", { type: "button", class: "btn" }, user.scope ? "Change groups" : "Limit to groups");
+    lim.addEventListener("click", () => {
+      const picker = groupPicker(data.groups || [], user.scope);
+      const save = h("button", { type: "button", class: "btn primary" }, "Save groups");
+      save.addEventListener("click", () => call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { scope: picker.value() } }), picker.value() ? "Limited to those groups" : "No limit"));
+      actions.append(h("div", { class: "scope-edit" }, h("p", { class: "hint" }, "Tick the groups this viewer may see. None ticked: everything."), picker.box, save));
+      lim.disabled = true;
+    });
+    parts.push(lim, " ");
+  }
+  parts.push(del);
+  actions.append(...parts);
 
   row.appendChild(h("td", {}, h("strong", {}, user.username), user.disabled ? h("span", { class: "tag" }, "disabled") : null));
-  row.appendChild(h("td", {}, role));
+  row.appendChild(h("td", {}, role, user.scope ? h("span", { class: "tag", title: "Sees only the devices of these groups" }, `${user.scope.length} group${user.scope.length === 1 ? "" : "s"}`) : null));
   row.appendChild(h("td", {}, user.last_login ? fmtTime(user.last_login) : "never"));
   row.appendChild(actions);
 
@@ -132,6 +164,8 @@ function fill(card, data, shown) {
 
 export async function buildUsersCard() {
   const card = h("div", { class: "card" });
-  fill(card, await get("/api/users"));
+  const data = await get("/api/users");
+  try { data.groups = (await get("/api/groups")).groups; } catch (e) { data.groups = []; }
+  fill(card, data);
   return card;
 }

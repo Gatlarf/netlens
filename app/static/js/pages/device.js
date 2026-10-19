@@ -872,8 +872,8 @@ export async function render(container, params) {
     }
 
     const TABS = [["overview", "Overview"], ["health", "Health"], ["network", "Network"], ["console", "Console"], ["settings", "Settings"]]
-      .filter(([key]) => panels[key]);
-    if (!panels[activeTab]) activeTab = "overview";
+      .filter(([key]) => panels[key] && !(document.body.dataset.scoped && key !== "overview"));      // a customer view has the overview only
+    if (!panels[activeTab] || document.body.dataset.scoped) activeTab = "overview";
     const tabBar = h("div", { class: "dev-tabs", role: "tablist" });
     const buttons = {};
     const select = (key) => {

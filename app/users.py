@@ -1,19 +1,21 @@
 """Users, sessions and API tokens.
 
 The built-in NETLENS_TOKEN keeps working as an administrator without a user record. Users added here have a role:
-`admin` (everything) or `viewer` (read-only, see app/auth.py for what a viewer may read).
+`admin` (everything), `operator` (looks and acts: scans, acknowledges, snoozes, maintenance, approves fixes; no settings) or `viewer` (read-only, see
+app/auth.py for what each may do). A viewer can be limited to some groups (`scope`), which makes it a customer view: only those devices.
 Passwords are stored as scrypt hashes; session and API tokens only as SHA-256 hashes of random values.
 """
 
 import base64
 import hashlib
+import json
 import hmac
 import re
 import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
-ROLES = ("admin", "viewer")
+ROLES = ("admin", "operator", "viewer")
 SESSION_DAYS = 30
 SESSION_PREFIX = "s."
 TOKEN_PREFIX = "nl_"
@@ -74,7 +76,7 @@ def check_password(password: str) -> str:
 
 def check_role(role: str) -> str:
     if role not in ROLES:
-        raise UserError("the role must be admin or viewer")
+        raise UserError("the role must be administrator, operator or viewer")
     return role
 
 
@@ -82,12 +84,35 @@ def _digest(secret: str) -> str:
     return hashlib.sha256(secret.encode()).hexdigest()
 
 
-def create_user(conn: sqlite3.Connection, username: str, password: str, role: str) -> int:
+def check_scope(conn: sqlite3.Connection, scope, role: str) -> str | None:
+    """The group ids a user is limited to, as stored JSON (None = no limit). Only a viewer can be limited, and only to groups that exist."""
+    if scope in (None, []):
+        return None
+    if role != "viewer":
+        raise UserError("only a viewer can be limited to some groups")
+    if not isinstance(scope, list) or any(isinstance(g, bool) or not isinstance(g, int) for g in scope):
+        raise UserError("the groups must be a list of group ids")
+    known = {r[0] for r in conn.execute("SELECT id FROM device_groups")}
+    if any(g not in known for g in scope):
+        raise UserError("that group does not exist")
+    return json.dumps(sorted(set(scope)))
+
+
+def parse_scope(value) -> list[int] | None:
+    try:
+        data = json.loads(value) if value else None
+    except ValueError:
+        return None
+    return [int(g) for g in data] if isinstance(data, list) and data else None
+
+
+def create_user(conn: sqlite3.Connection, username: str, password: str, role: str, scope=None) -> int:
     username, password, role = check_username(username), check_password(password), check_role(role)
+    stored_scope = check_scope(conn, scope, role)
     try:
         cur = conn.execute(
-            "INSERT INTO users (username, password_hash, role, created) VALUES (?, ?, ?, ?)",
-            (username, hash_password(password), role, _iso(_now())),
+            "INSERT INTO users (username, password_hash, role, created, scope) VALUES (?, ?, ?, ?, ?)",
+            (username, hash_password(password), role, _iso(_now()), stored_scope),
         )
     except sqlite3.IntegrityError:
         raise UserError("that user name is taken")
@@ -117,11 +142,20 @@ def get_user(conn: sqlite3.Connection, user_id: int):
     return conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
 
 
-def update_user(conn: sqlite3.Connection, user_id: int, *, role: str | None = None, password: str | None = None, disabled: bool | None = None) -> None:
-    if get_user(conn, user_id) is None:
+_UNSET = object()
+
+
+def update_user(conn: sqlite3.Connection, user_id: int, *, role: str | None = None, password: str | None = None, disabled: bool | None = None, scope=_UNSET) -> None:
+    current = get_user(conn, user_id)
+    if current is None:
         raise UserError("no such user")
+    final_role = check_role(role) if role is not None else current["role"]
+    if scope is not _UNSET:
+        conn.execute("UPDATE users SET scope = ? WHERE id = ?", (check_scope(conn, scope, final_role), user_id))
+    elif role is not None and final_role != "viewer":
+        conn.execute("UPDATE users SET scope = NULL WHERE id = ?", (user_id,))       # a limit only makes sense for a viewer
     if role is not None:
-        conn.execute("UPDATE users SET role = ? WHERE id = ?", (check_role(role), user_id))
+        conn.execute("UPDATE users SET role = ? WHERE id = ?", (final_role, user_id))
     if password is not None:
         conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hash_password(check_password(password)), user_id))
         conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))  # a new password ends every login
@@ -140,9 +174,9 @@ def delete_user(conn: sqlite3.Connection, user_id: int) -> None:
 
 def list_users(conn: sqlite3.Connection) -> list[dict]:
     users = []
-    for u in conn.execute("SELECT id, username, role, disabled, created, last_login FROM users ORDER BY username COLLATE NOCASE"):
+    for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope FROM users ORDER BY username COLLATE NOCASE"):
         tokens = conn.execute("SELECT id, name, created, last_used, readonly FROM api_tokens WHERE user_id = ? ORDER BY id", (u["id"],)).fetchall()
-        users.append({**dict(u), "disabled": bool(u["disabled"]), "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
+        users.append({**{k: v for k, v in dict(u).items() if k != "scope"}, "scope": parse_scope(u["scope"]), "disabled": bool(u["disabled"]), "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
     return users
 
 
@@ -173,7 +207,7 @@ def user_for_session(conn: sqlite3.Connection, cookie: str):
     if not cookie or not cookie.startswith(SESSION_PREFIX):
         return None
     return conn.execute(
-        "SELECT u.id, u.username, u.role FROM sessions s JOIN users u ON u.id = s.user_id "
+        "SELECT u.id, u.username, u.role, u.scope FROM sessions s JOIN users u ON u.id = s.user_id "
         "WHERE s.token_hash = ? AND s.expires > ? AND u.disabled = 0",
         (_digest(cookie[len(SESSION_PREFIX):]), _iso(_now())),
     ).fetchone()
@@ -211,7 +245,7 @@ def user_for_token(conn: sqlite3.Connection, bearer: str):
     if not bearer or not bearer.startswith(TOKEN_PREFIX):
         return None
     row = conn.execute(
-        "SELECT t.id AS token_id, t.readonly, u.id, u.username, u.role FROM api_tokens t JOIN users u ON u.id = t.user_id "
+        "SELECT t.id AS token_id, t.readonly, u.id, u.username, u.role, u.scope FROM api_tokens t JOIN users u ON u.id = t.user_id "
         "WHERE t.token_hash = ? AND u.disabled = 0",
         (_digest(bearer),),
     ).fetchone()

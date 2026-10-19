@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app import groups
+from app.auth import scope_of
 from app.db import connect
 
 router = APIRouter(prefix="/api", tags=["groups"])
@@ -25,7 +26,11 @@ def _db(request: Request):
 def get_groups(request: Request) -> dict:
     conn = _db(request)
     try:
-        return {"groups": groups.list_groups(conn)}
+        found = groups.list_groups(conn)
+        scope = scope_of(request)
+        if scope is not None:                  # a customer view only knows its own groups
+            found = [g for g in found if g["id"] in scope]
+        return {"groups": found}
     finally:
         conn.close()
 

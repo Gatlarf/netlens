@@ -335,6 +335,7 @@ async function applySession() {
   setSessionUser(session.authenticated ? session.user : null);
   // the coffee button in the top bar is for free and open-source use; a licensed install keeps it in the account menu only
   get("/api/licence").then((lic) => document.body.classList.toggle("licensed", lic.state === "active" || lic.state === "grace")).catch(() => {});
+  if (session.authenticated && session.user && session.user.scoped) restrictToOwnDevices();
   const out = el("#logout");
   if (out && session.user) out.title = `Signed in as ${session.user.username} (${session.user.role})`;
   const name = session.user ? session.user.username : "Account";
@@ -357,6 +358,25 @@ async function applySession() {
     maybeShowWhatsNew();
   }
   return session;
+}
+
+// A customer view (a viewer limited to some groups): the top bar offers only the pages it may open, and other addresses lead back to the devices.
+const SCOPED_ROUTES = ["#/devices", "#/uptime"];
+function restrictToOwnDevices() {
+  document.body.dataset.scoped = "1";
+  const nav = el("#nav");
+  if (nav && !nav.dataset.scoped) {
+    nav.dataset.scoped = "1";
+    nav.textContent = "";
+    for (const [href, label, route] of [["#/devices", "Devices", "devices"], ["#/uptime", "Uptime", "uptime"]]) {
+      const a = document.createElement("a");
+      Object.assign(a, { className: "nav-link", href, textContent: label });
+      a.dataset.route = route;
+      nav.appendChild(a);
+    }
+  }
+  const here = location.hash.split("?")[0];
+  if (!SCOPED_ROUTES.some((r) => here === r || here.startsWith(`${r}/`)) && !here.startsWith("#/device/")) location.replace("#/devices");
 }
 
 // Open on the page the user chose (only when no page was asked for: a link to a page, a reload and the back button are left alone)
@@ -503,7 +523,7 @@ async function init() {
     openLoginDialog();
   });
 
-  window.addEventListener("hashchange", renderPage);
+  window.addEventListener("hashchange", () => { if (document.body.dataset.scoped) restrictToOwnDevices(); renderPage(); });
 }
 
 init().finally(hideBoot);       // never leave the spinner on the screen, also when something went wrong

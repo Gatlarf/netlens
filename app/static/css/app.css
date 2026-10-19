@@ -613,7 +613,7 @@ dialog#login-dialog::backdrop {
 .topbar .brand, .topbar .brand:visited { color: var(--text); text-decoration: none; }
 
 /* a viewer account is read-only: controls that would be refused are hidden (the server enforces it) */
-body[data-role="viewer"] .admin-only { display: none !important; }
+body[data-role="viewer"] .admin-only, body[data-role="viewer"] .act-only, body[data-role="operator"] .admin-only { display: none !important; }
 #login-dialog label { display: block; margin-top: 10px; }
 #login-dialog input { width: 100%; box-sizing: border-box; }
 #login-dialog .btn { margin-top: 12px; }
@@ -784,3 +784,9 @@ body.setup-mode #nav, body.setup-mode .topbar-actions { display: none; }
 .d-range { display: flex; justify-content: space-between; font-size: 0.75rem; }
 .pool-buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 520px) { .d-two, .d-link-row { grid-template-columns: 1fr; } }
+
+/* users: choose the groups a viewer may see */
+.scope-picker { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0; }
+.scope-edit { margin-top: 8px; }
+/* a customer view has no scan button and no search of settings */
+body[data-scoped] #scan-menu-wrap, body[data-scoped] #search-btn, body[data-scoped] .coffee-btn, body[data-scoped] a[href^="/api/export"], body[data-scoped] .version-link, body[data-scoped] .update-badge { display: none !important; }
