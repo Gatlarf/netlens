@@ -29,7 +29,7 @@ def test_nothing_wrong_means_an_empty_attention_list():
 def test_attention_lists_problems_worst_first_with_a_link_each():
     s = _summary_stub(
         devices={"flapping": 2, "unknown": 1}, update={"available": True, "latest": "9.9", "plugin_updates": 0},
-        plugins=[{"id": "docker", "enabled": True, "ok": False, "error": "refused"}],
+        plugins=[{"id": "docker", "enabled": True, "ok": False, "failing": True, "error": "refused"}],
     )
     items = dashboard._attention(s, [{"name": "a.example", "days": 3}], 4, ["nas"])
     levels = [i["level"] for i in items]

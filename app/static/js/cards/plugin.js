@@ -9,7 +9,8 @@ function statusText(plugin) {
   if (!s) return null;
   if (!s.ok) {
     const paused = s.auth_failed ? ". Automatic syncing is paused until you save or sync again." : "";
-    return { error: true, text: `Last sync failed (${timeAgo(s.ts)}): ${s.error}${paused}` };
+    const retry = !s.auth_failed && s.fails && s.fails < s.grace ? `. Failure ${s.fails} of ${s.grace} before it counts as a problem; it is tried again at the next scan.` : "";
+    return { error: true, text: `Last sync failed (${timeAgo(s.ts)}): ${s.error}${paused}${retry}` };
   }
   const parts = [];
   for (const [key, label] of [["hosts", "hosts"], ["guests", "guests"], ["guests_matched", "matched"], ["nodes", "network nodes"], ["clients", "online clients"], ["links", "links"], ["sites", "sites"], ["sites_matched", "linked to a device"], ["certificates", "certificates"], ["checks", "checks"]]) {

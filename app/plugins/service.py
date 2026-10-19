@@ -99,8 +99,26 @@ def get_status(conn: sqlite3.Connection, plugin_id: str) -> dict | None:
     return status if isinstance(status, dict) else None
 
 
+FAILURE_GRACE = 3       # failed syncs in a row (about 45 minutes at the usual 15 minute scan) before a plugin counts as a problem
+
+
+def failure_grace(conn: sqlite3.Connection) -> int:
+    try:
+        return max(1, min(48, int(get_setting(conn, "plugins.failure_grace") or FAILURE_GRACE)))
+    except (TypeError, ValueError):
+        return FAILURE_GRACE
+
+
 def set_status(conn: sqlite3.Connection, plugin_id: str, **fields) -> None:
-    set_setting(conn, _key(plugin_id, "status"), json.dumps({"ts": utcnow(), **fields}))
+    """Remember the outcome of a sync. A failure also counts the failures in a row (`fails`) and when the run started (`first_failed`)."""
+    status = {"ts": utcnow(), **fields}
+    if fields.get("ok") is False:
+        before = get_status(conn, plugin_id) or {}
+        again = before.get("ok") is False
+        status["fails"] = (before.get("fails") or 1) + 1 if again else 1
+        status["first_failed"] = (before.get("first_failed") or before.get("ts")) if again else status["ts"]
+        status["grace"] = failure_grace(conn)
+    set_setting(conn, _key(plugin_id, "status"), json.dumps(status))
 
 
 def forget_plugin(conn: sqlite3.Connection, plugin_id: str) -> None:

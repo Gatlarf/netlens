@@ -351,3 +351,38 @@ def test_v4_database_is_migrated_to_plugins(tmp_path):
     apply_plugin(conn, pm)
     assert conn.execute("SELECT COUNT(*) FROM hypervisor_guests").fetchone()[0] == 1
     conn.close()
+
+
+def test_failures_in_a_row_are_counted_and_a_success_resets(db):
+    db = db[0]
+    from app import stats
+    from app.plugins.service import set_status
+
+    conn = connect(db)
+    set_setting(conn, "plugin.pf", json.dumps({"enabled": True}))
+    for n in (1, 2):
+        set_status(conn, "pf", ok=False, error="timed out", auth_failed=False)
+        row = next(p for p in stats._plugin_status(conn) if p["id"] == "pf")
+        assert (row["fails"], row["failing"], row["grace"]) == (n, False, 3)          # a blip is not a problem yet
+    set_status(conn, "pf", ok=False, error="timed out", auth_failed=False)
+    assert next(p for p in stats._plugin_status(conn) if p["id"] == "pf")["failing"] is True
+    set_status(conn, "pf", ok=True)
+    row = next(p for p in stats._plugin_status(conn) if p["id"] == "pf")
+    assert (row["fails"], row["failing"]) == (0, False)
+    set_status(conn, "pf", ok=False, error="timed out", auth_failed=False)
+    assert next(p for p in stats._plugin_status(conn) if p["id"] == "pf")["fails"] == 1        # the count starts over
+
+
+def test_refused_login_is_a_problem_at_once_and_the_grace_can_be_changed(db):
+    db = db[0]
+    from app import stats
+    from app.plugins.service import set_status
+
+    conn = connect(db)
+    set_setting(conn, "plugin.pf", json.dumps({"enabled": True}))
+    set_status(conn, "pf", ok=False, error="401", auth_failed=True)
+    assert next(p for p in stats._plugin_status(conn) if p["id"] == "pf")["failing"] is True
+    set_status(conn, "pf", ok=True)
+    set_setting(conn, "plugins.failure_grace", "1")
+    set_status(conn, "pf", ok=False, error="timed out", auth_failed=False)
+    assert next(p for p in stats._plugin_status(conn) if p["id"] == "pf")["failing"] is True

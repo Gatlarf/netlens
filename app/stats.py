@@ -470,6 +470,9 @@ def _services(conn, now: str) -> dict:
 
 
 def _plugin_status(conn) -> list[dict]:
+    from app.plugins.service import failure_grace
+
+    grace = failure_grace(conn)
     out = []
     for r in conn.execute("SELECT key FROM settings WHERE key LIKE 'plugin.%' AND key NOT LIKE 'plugin.%.%'").fetchall():
         plugin_id = r["key"][len("plugin."):]
@@ -481,9 +484,13 @@ def _plugin_status(conn) -> list[dict]:
             status = json.loads(get_setting(conn, f"plugin.{plugin_id}.status") or "null")
         except ValueError:
             status = None
+        ok = (status or {}).get("ok") if status else None
+        fails = ((status or {}).get("fails") or grace) if ok is False else 0      # a failure stored before the count existed is judged as before
+        # a refused login is a problem at once (syncing is paused); a timeout or a busy server only after a few failures in a row
+        failing = ok is False and (bool((status or {}).get("auth_failed")) or fails >= grace)
         out.append({
             "id": plugin_id, "enabled": enabled,
-            "ok": (status or {}).get("ok") if status else None,
+            "ok": ok, "failing": failing, "fails": fails, "grace": grace,
             "error": (status or {}).get("error") if status and not status.get("ok") else None,
             "ts": (status or {}).get("ts"),
         })
@@ -622,7 +629,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     age = int((_parse(now) - _parse(last_done["finished"])).total_seconds()) if last_done else None
     failed_24h = conn.execute("SELECT COUNT(*) FROM scans WHERE status = 'failed' AND started >= ?", (_ago(now, hours=24),)).fetchone()[0]
     plugins = _plugin_status(conn)
-    failing = [p for p in plugins if p["enabled"] and p["ok"] is False]
+    failing = [p for p in plugins if p["enabled"] and p["failing"]]
     # the last scan failed (a single failure in the past day that later scans recovered from is not a problem), a plugin is failing, or no scan finished for a while
     services = _services(conn, now)
     backups = _backups(conn, now)

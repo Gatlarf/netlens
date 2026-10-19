@@ -43,7 +43,7 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
     elif down:
         add("bad", f"{len(down)} service{'s' if len(down) != 1 else ''} down: {', '.join(down[:3])}{'…' if len(down) > 3 else ''}", "#/services")
     for p in s["plugins"]:
-        if p["enabled"] and p["ok"] is False:
+        if p["enabled"] and p.get("failing", p["ok"] is False):
             add("bad", f"Plugin {p['id']} is failing" + (f": {p['error']}" if p.get("error") else ""), f"#/settings/plugin-{p['id']}")
     last = s["scans"]["last"]
     if last and last["status"] == "failed":
