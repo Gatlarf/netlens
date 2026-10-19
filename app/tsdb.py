@@ -35,7 +35,7 @@ H1_SECONDS = 730 * 86400
 STEP_5M, STEP_1H = 300, 3600
 RANGES = {"1h": 3600, "6h": 6 * 3600, "24h": 86400, "7d": 7 * 86400, "30d": 30 * 86400, "90d": 90 * 86400, "1y": 365 * 86400}
 MAX_POINTS = 600
-ENTITIES = ("device", "service", "probe", "remote", "remote_service")
+ENTITIES = ("device", "service", "plugin", "probe", "remote", "remote_service")
 
 _stores: dict[str, "Store"] = {}
 _lock = threading.Lock()

@@ -575,7 +575,7 @@ def route(conn, q: str, names: list[str]) -> tuple[str, dict] | None:
         ("audit", r"who (changed|did|edited|deleted|added)|audit|changed (the )?settings|logged in|who logged"), ("ipv6", r"ipv6"),
         ("security", r"secur|rogue|intrud|suspicious|untrusted|not trusted|failed logins?|unexpected port|break-?in|attack|exposed to"), ("network_services", r"dhcp|dns record|dns registration|gateway|name servers?"), ("updates", r"updates? (are |is )?(available|waiting|pending)|outdated|out of date|newer (image|version) of|need updating"),
         ("smart_home", r"smart ?home|home assistant|zigbee|thermostat|\bsensors?\b|shelly|battery|batteries"),
-        ("system", r"which version|netlens version|what version|plugins?|licen[cs]e|edition|last scan|when did .* scan|scanning"), ("changes", r"what changed|configuration|settings changed|config"),
+        ("system", r"which version|netlens version|what version|installed plugins?|plugins? (are |is )?installed|licen[cs]e|edition|last scan|when did .* scan|scanning"), ("changes", r"what changed|configuration|settings changed|config"),
     ]
     if re.search(r"\bups\b", q) and re.search(r"battery|batteries", q):
         rules = [r for r in rules if r[0] != "smart_home"]

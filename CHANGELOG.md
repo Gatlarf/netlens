@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.112 — 2026-10-19
+
+### Added
+- ★ **Plugins are monitored like services**: the Services page has a Plugins section with a heartbeat bar of every switched-on plugin's latest syncs, the share of good syncs in 24 hours, the sync time and the last sync, and a click opens the same graph (sync success and sync time over time). It tells a slow or unreachable system from a broken plugin. Every sync is recorded (kept 30 days) and Ask your network can answer "how are the plugins doing?".
+
+### Fixed
+- **A timeout is no longer blamed on the Netlens upgrade**: the warning "Some plugins may not work with this Netlens" skipped no failure before; now an error about the network (timed out, cannot reach, connection refused, name not found ...) is not taken as a sign that the upgrade broke the plugin.
+
 ## 0.4.111 — 2026-10-19
 
 ### Changed

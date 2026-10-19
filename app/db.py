@@ -890,6 +890,20 @@ def init_db(conn: sqlite3.Connection) -> None:
     # --- schema v24: a health monitor can be set up by the central Netlens (source = 'central')
     _add_column_if_missing(conn, "host_monitors", "source", "TEXT")
 
+    # --- schema v26: the outcome of every plugin sync (heartbeats and response time of the plugins) ---------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS plugin_runs (
+            id INTEGER PRIMARY KEY,
+            plugin_id TEXT NOT NULL,
+            ts TEXT NOT NULL,
+            ok INTEGER NOT NULL,
+            ms REAL,
+            detail TEXT
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_plugin_runs ON plugin_runs(plugin_id, ts)")
     # --- schema v25: audit log (who changed what) -----------------------------------------------------------------
     cur.execute(
         """

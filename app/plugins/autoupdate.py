@@ -12,6 +12,8 @@ newer version that fixes it (if there is one) and the Netlens version to go back
 
 from __future__ import annotations
 
+from typing import Any
+
 import json
 import logging
 from pathlib import Path
@@ -149,6 +151,16 @@ def dismiss(conn) -> None:
     set_setting(conn, DISMISSED_KEY, VERSION)
 
 
+ENVIRONMENT = ("timed out", "timeout", "cannot reach", "could not reach", "connection refused", "connection reset", "no route to host", "network is unreachable", "name or service not known",
+               "temporary failure in name resolution", "nodename nor servname", "unreachable", "host is down", "ssl", "certificate verify")
+
+
+def environment_problem(error: Any) -> bool:
+    """A failure that is about the network or the system the plugin talks to (it does not answer, a name does not resolve), not about this Netlens version."""
+    text = str(error or "").lower()
+    return any(w in text for w in ENVIRONMENT)
+
+
 def check(conn, data_dir: Path | str, *, netlens_version: str = VERSION) -> dict:
     """{"upgrade": {...}|None, "problems": [{"id", "name", "version", "reason", "fix": {...}|None}], "dismissed": bool}.
 
@@ -177,7 +189,7 @@ def check(conn, data_dir: Path | str, *, netlens_version: str = VERSION) -> dict
                 reason = "this version " + reason
         if reason is None and up and plugin.manifest is not None:
             status = get_status(conn, pid) or {}
-            if status.get("error") and status.get("ts", "") >= up["at"]:
+            if status.get("error") and status.get("ts", "") >= up["at"] and not environment_problem(status["error"]):
                 reason = "it started failing after the Netlens upgrade: " + str(status["error"])[:160]
         if reason is None:
             continue

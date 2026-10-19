@@ -256,3 +256,17 @@ def test_failure_grace_setting(tmp_path):
         assert c.get("/api/plugin-settings", headers=admin).json() == {"failure_grace": 5}
         for bad in (0, 49, "x"):
             assert c.put("/api/plugin-settings", json={"failure_grace": bad}, headers=admin).status_code == 422
+
+
+def test_plugin_runs_list_the_enabled_plugins_like_service_checks(env):
+    c, ids, tmp = env
+    assert c.get("/api/plugin-runs").json() == []                      # nothing is switched on
+    c.put("/api/plugins/proxmox", json={"enabled": True, "config": {"url": "10.0.0.5", "token_id": "u@pam!n", "token_secret": "SECRET"}})
+    rows = c.get("/api/plugin-runs").json()
+    assert [r["id"] for r in rows] == ["proxmox"]
+    r = rows[0]
+    assert r["state"] == "up" and len(r["beats"]) == 1 and r["beats"][0]["up"] is True and r["uptime_24h"] == 100.0 and r["last_ms"] is not None
+    series = c.get(f"/api/timeseries/plugin/{r['series_id']}").json()["series"]
+    assert {s["metric"] for s in series} == {"up", "response_ms"}
+    c.post("/api/plugins/proxmox/sync")
+    assert len(c.get("/api/plugin-runs").json()[0]["beats"]) == 2

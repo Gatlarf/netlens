@@ -166,6 +166,18 @@ def t_services(conn, args, now=None) -> dict:
     return {"total": len(items), "down": [i["name"] for i in items if i["state"] == "down"], "services": items[:30]}
 
 
+def t_plugins(conn, args, now=None) -> dict:
+    """How the syncs of the plugins went (the integrations with Proxmox, Home Assistant ...): failures, the last error and how long a sync takes."""
+    days = _days(args.get("days"), 1)
+    out = []
+    for r in conn.execute("SELECT plugin_id, COUNT(*) AS n, SUM(ok) AS good, ROUND(AVG(ms), 0) AS avg_ms, ROUND(MAX(ms), 0) AS max_ms, MAX(ts) AS last_ts FROM plugin_runs WHERE ts >= ? GROUP BY plugin_id ORDER BY (n - good) DESC, plugin_id LIMIT ?",
+                          (_since(days, now), LIMIT)):
+        err = conn.execute("SELECT ts, detail FROM plugin_runs WHERE plugin_id = ? AND ok = 0 AND ts >= ? ORDER BY id DESC LIMIT 1", (r["plugin_id"], _since(days, now))).fetchone()
+        out.append({"plugin": r["plugin_id"], "syncs": r["n"], "failed": r["n"] - (r["good"] or 0), "avg_sync_ms": r["avg_ms"], "slowest_sync_ms": r["max_ms"], "last_sync": r["last_ts"],
+                    "last_error": (err["detail"] or "")[:160] if err else ""})
+    return {"days": days, "plugins": out}
+
+
 def _type_word(needle: str) -> str | None:
     for word in (needle, needle.rstrip("s"), needle.rstrip("es")):
         if word in TYPE_WORDS:
@@ -214,6 +226,7 @@ TOOLS: dict[str, tuple[Callable, str]] = {
     "disks": (t_disks, "FORECAST only, not current usage: disks that will fill up and memory use that keeps rising, with the days left. For current usage use health. args: none"),
     "fixes": (t_fixes, "recent automatic fixes (auto-remediation) and whether they worked. args: none"),
     "services": (t_services, "all service checks (websites, ports, DNS) with their state and response time. args: none"),
+    "plugins": (t_plugins, "how the syncs of the plugins (integrations such as Proxmox, Home Assistant, UniFi) went: failures, the last error, how long a sync takes. args: days (1-30)"),
     "device": (t_device, "details of one device, or of every device of a kind. args: name (a device name, host name or address, or a kind: printer, switch, nas, camera, router, tv, phone, server, pc ...)"),
 }
 
@@ -228,6 +241,7 @@ PRESETS = [
     {"id": "fixes", "text": "What did the automatic fixes do?", "tool": "fixes", "args": {}},
 ]
 KEYWORDS = [
+    ("plugins", r"\bplugins?\b|integrations?"),
     ("disks", r"fill up|filling|run out|will be full|when will|predict|forecast|leak"),
     ("health", r"\bram\b|memory|\bcpu\b|processor|temperature|\bhot\b|\bbusy\b|battery|\bups\b|\bdisks?\b|storage|disk space|\bfull\b|\bload\b"),
     ("response_times", r"response|latenc|\bping|\bslow|\bfast|\brtt\b|\blag"), ("services", r"\bservices?\b|website|\bsites?\b|checks? (is|are)"), ("anomalies", r"unusual|anomal|strange|weird|odd|abnormal"), ("fixes", r"\bfix|remediat|restart|reset|repair"),
@@ -255,7 +269,7 @@ def route(question: str, known_names: list[str], conn=None) -> tuple[str, dict]:
                 return "device", {"name": word}
     for tool, pattern in KEYWORDS:
         if re.search(pattern, q):
-            args = {"days": days} if tool in ("availability", "new_devices", "incidents", "events", "response_times") else {}
+            args = {"days": days} if tool in ("availability", "new_devices", "incidents", "events", "response_times", "plugins") else {}
             if tool == "health":
                 args = {"metric": next((m for w, m in (("ram", "memory"), ("memory", "memory"), ("cpu", "cpu"), ("processor", "cpu"), ("temp", "temperature"), ("hot", "temperature"), ("battery", "battery"), ("ups", "battery"),
                                                       ("busy", "cpu"), ("load", "cpu")) if re.search(rf"\b{w}", q)), "disk")}
@@ -315,6 +329,14 @@ def render(tool: str, r: dict) -> str:
         if r["past_their_limit"]:
             lines.append("Past their limit: " + "; ".join(f"{p['device']} ({p['level']})" for p in r["past_their_limit"][:6]) + ".")
         return "\n".join(lines)
+    if tool == "plugins":
+        if not r["plugins"]:
+            return f"No plugin has synced in the last {r['days']} day(s)."
+        bad = [p for p in r["plugins"] if p["failed"]]
+        head = f"{len(r['plugins'])} plugin(s) synced in the last {r['days']} day(s)" + (f"; {len(bad)} had failures." if bad else ", all without failures.")
+        lines = [f"{p['plugin']}: {p['failed']} of {p['syncs']} syncs failed" + (f" (last error: {p['last_error']})" if p["last_error"] else "") + (f", a sync takes about {p['avg_sync_ms']:g} ms" if p["avg_sync_ms"] else "") for p in bad[:6]]
+        slow = sorted((p for p in r["plugins"] if p["avg_sync_ms"]), key=lambda p: -p["avg_sync_ms"])[:3]
+        return "\n".join([head] + lines + (["Slowest syncs: " + "; ".join(f"{p['plugin']} {p['avg_sync_ms']:g} ms" for p in slow)] if slow else []))
     if tool == "services":
         if not r["total"]:
             return "There are no service checks."

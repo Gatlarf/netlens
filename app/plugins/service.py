@@ -6,13 +6,14 @@ import asyncio
 import json
 import logging
 import sqlite3
+import time
 from pathlib import Path
 from typing import Any, Callable
 
 from app import containers, imageupdates
 from app.db import add_event, connect, delete_setting, get_setting, set_setting, utcnow
 from app.plugins.contract import ContractError, clean_config, default_config, migrate_servers, missing_required, validate_output
-from app.plugins import enrich
+from app.plugins import enrich, runs
 from app.plugins.enrich import device_lookup, record_client_hints, record_client_links, record_router_names, record_wifi
 from app.plugins.matching import match_hypervisor, norm_mac, topology_links
 from app.plugins.registry import Plugin, discover
@@ -126,6 +127,7 @@ def forget_plugin(conn: sqlite3.Connection, plugin_id: str) -> None:
     for part in ("", "status", "data", "install"):
         delete_setting(conn, _key(plugin_id, part))
     clear_plugin_data(conn, plugin_id)
+    runs.forget(conn, plugin_id)
 
 
 def public_state(conn: sqlite3.Connection, plugin: Plugin) -> dict:
@@ -370,17 +372,20 @@ class PluginService:
             missing = missing_required(plugin.manifest, state["config"])
             if missing:
                 return {"error": "not configured yet: " + ", ".join(missing), "auth_failed": False}
+            started = time.monotonic()
             try:
                 raw = await self._call(plugin, "fetch", state["config"])
                 data = validate_output(plugin.manifest["kind"], raw)
             except PluginRunError as exc:
                 log.warning("plugin %s failed: %s", plugin.id, exc)
                 set_status(conn, plugin.id, ok=False, error=str(exc), auth_failed=exc.auth_failed)
+                runs.record(conn, plugin.id, False, None, str(exc))
                 return {"error": str(exc), "auth_failed": exc.auth_failed}
             except ContractError as exc:
                 log.warning("plugin %s returned invalid data: %s", plugin.id, exc)
                 message = f"the plugin returned data that does not follow the contract: {exc}"
                 set_status(conn, plugin.id, ok=False, error=message, auth_failed=False)
+                runs.record(conn, plugin.id, False, None, message)
                 return {"error": message, "auth_failed": False}
             set_setting(conn, _key(plugin.id, "data"), json.dumps(data))
             if plugin.manifest["kind"] == "hypervisor" and state["config"].get("check_image_updates"):
@@ -404,6 +409,7 @@ class PluginService:
                 except sqlite3.Error:
                     log.exception("could not store the router's names and Wi-Fi samples")
             set_status(conn, plugin.id, ok=True, **summary)
+            runs.record(conn, plugin.id, True, (time.monotonic() - started) * 1000)
             return summary
         finally:
             conn.close()

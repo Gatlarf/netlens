@@ -199,3 +199,13 @@ def test_marked_always_on_devices_decide_when_there_are_any(conn):
     assert 2 in relevance.important_ids(conn)                         # nothing marked: the infrastructure kinds stand in (the printer)
     conn.execute("UPDATE devices SET always_on = 1 WHERE id IN (1, 7)")   # the nas and the switch
     assert relevance.important_ids(conn) == {1, 7}                    # now only what is marked counts, not the printer or the camera
+
+
+def test_ask_knows_how_the_plugins_are_doing(conn):
+    from app.plugins import runs
+
+    runs.record(conn, "home-assistant", False, None, "cannot reach ha.example.com:443: timed out")
+    runs.record(conn, "home-assistant", True, 900.0)
+    runs.record(conn, "proxmox", True, 300.0)
+    a = ask.answer(conn, "how are the plugins doing?", mode="rules")
+    assert a["tools"] == ["plugins"] and "home-assistant: 1 of 2 syncs failed" in a["answer"] and "timed out" in a["answer"]

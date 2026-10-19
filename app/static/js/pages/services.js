@@ -21,9 +21,45 @@ async function heartbeats(check) {
   }
 }
 
+// The plugins that are switched on, as monitored things: how their syncs went, how long they took, and the same graph when you click a line.
+// A plugin that cannot reach its system shows up here as red bars, which tells a slow or unreachable system from a plugin that is broken.
+function pluginSection(plugins, openGraphs) {
+  if (!plugins.length) return null;
+  const table = h("table", { class: "data" });
+  table.appendChild(h("thead", {}, h("tr", {}, ["", "Plugin", "Type", "History", "24 h", "Sync", "Last sync"].map((t) => h("th", {}, t)))));
+  const tbody = h("tbody");
+  for (const p of plugins) {
+    const hb = h("td", {});
+    hb.appendChild(heartbeatBar(p.beats.map((r) => ({ ts: r.ts, up: r.up, rtt_ms: r.ms })), 60));
+    const graphRow = h("tr", { class: "svc-graph-row", hidden: !openGraphs.has(p.id) }, h("td", { colspan: 7 }));
+    const showGraph = async () => {
+      const cell = graphRow.firstChild;
+      if (cell.firstChild) return;
+      const card = await buildPerformanceCard("plugin", p.series_id, { title: `${p.name}: syncs` });
+      cell.appendChild(card || h("p", { class: "hint" }, "No measurements yet. They appear after the first syncs."));
+    };
+    if (openGraphs.has(p.id)) showGraph();
+    const dot = h("span", { class: `svc-dot svc-${p.state === "up" ? "up" : p.state === "down" ? "down" : "unknown"}`, title: p.state === "up" ? "Last sync went well" : p.state === "down" ? "Last sync failed" : "Waiting" }, "");
+    const line = h("tr", { class: "svc-line", title: "Click for the history graph" },
+      h("td", {}, dot), h("td", {}, h("a", { href: "#/settings/plugins" }, p.name), p.state === "down" && p.last_detail ? h("div", { class: "hint" }, p.last_detail) : null),
+      h("td", { class: "hint" }, p.kind || ""), hb, h("td", { class: uptimeClass(p.uptime_24h) }, uptimeText(p.uptime_24h)),
+      h("td", {}, p.last_ms === null ? "–" : p.last_ms >= 1000 ? `${(p.last_ms / 1000).toFixed(1)} s` : `${Math.round(p.last_ms)} ms`), h("td", {}, p.last_ts ? timeAgo(p.last_ts) : "never"));
+    line.addEventListener("click", (e) => {
+      if (e.target.closest("a, button, .hb-bar, .rl")) return;
+      graphRow.hidden = !graphRow.hidden;
+      if (graphRow.hidden) openGraphs.delete(p.id); else { openGraphs.add(p.id); showGraph(); }
+    });
+    tbody.append(line, graphRow);
+  }
+  table.appendChild(tbody);
+  return h("div", { class: "card" }, h("h2", {}, "Plugins"),
+    h("p", { class: "hint" }, "How the syncs of the plugins that are switched on went. A red bar is a sync that failed, often because the system it talks to did not answer."), h("div", { class: "table-wrap" }, table));
+}
+
 export async function render(container) {
   let destroyed = false;
   const openGraphs = new Set();      // checks whose graph is open (kept when the table is redrawn)
+  const openPlugins = new Set();
   const addBtn = h("button", { class: "btn primary admin-only", type: "button" }, "Add check");
   const top = pageHead("Services", "HTTP pages, TCP ports, DNS lookups, certificates and processes, checked at the interval you choose.", addBtn);
   const formSlot = h("div", {});
@@ -47,9 +83,12 @@ export async function render(container) {
       if (!destroyed) body.replaceChildren(h("p", { class: "error" }, err.message || "Failed to load"));
       return;
     }
+    let plugins = [];
+    try { plugins = await get("/api/plugin-runs"); } catch (err) { /* the plugins are an extra; the checks still show */ }
     if (destroyed) return;
+    const plugs = pluginSection(plugins, openPlugins);
     if (!checks.length) {
-      body.replaceChildren(emptyState("No checks yet", "Add one to watch a web page, a port or a DNS server. Typical examples: your router's web page (HTTP), your NAS on port 445 (TCP), your DNS server resolving example.com (DNS).", h("button", { class: "btn primary admin-only", type: "button", onclick: () => addBtn.click() }, "Add check")));
+      body.replaceChildren(...[emptyState("No checks yet", "Add one to watch a web page, a port or a DNS server. Typical examples: your router's web page (HTTP), your NAS on port 445 (TCP), your DNS server resolving example.com (DNS).", h("button", { class: "btn primary admin-only", type: "button", onclick: () => addBtn.click() }, "Add check")), plugs].filter(Boolean));
       return;
     }
     const table = h("table", { class: "data" });
@@ -109,7 +148,7 @@ export async function render(container) {
       tbody.appendChild(graphRow);
     }
     table.appendChild(tbody);
-    body.replaceChildren(h("div", { class: "table-wrap" }, table));
+    body.replaceChildren(...[h("div", { class: "table-wrap" }, table), plugs].filter(Boolean));
   }
 
   await load();

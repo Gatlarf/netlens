@@ -92,6 +92,32 @@ def put_plugin_settings(request: Request, body: PluginSettings) -> dict:
         conn.close()
 
 
+@router.get("/plugin-runs")
+def plugin_runs(request: Request, limit: int = 60) -> list[dict]:
+    """The enabled plugins as monitored things, like the service checks: the outcome of the recent syncs, the share of good ones in 24 hours and how long a sync takes."""
+    from app.plugins import runs
+
+    conn = connect(request.app.state.db_path)
+    try:
+        out = []
+        for p in _service(request).plugins().values():
+            if p.manifest is None:
+                continue
+            state = public_state(conn, p)
+            if not state["enabled"]:
+                continue
+            beats = runs.history(conn, p.id, max(1, min(limit, 200)))
+            last = beats[-1] if beats else None
+            ok_ms = [b["ms"] for b in beats if b["ms"] is not None]
+            out.append({"id": p.id, "name": p.name, "kind": p.manifest.get("kind"), "series_id": runs.series_id(p.id), "builtin": p.builtin,
+                        "state": None if last is None else ("up" if last["up"] else "down"), "last_ts": last["ts"] if last else None, "last_ms": ok_ms[-1] if ok_ms else None,
+                        "last_detail": (last["detail"] if last and not last["up"] else ""), "uptime_24h": runs.uptime_24h(conn, p.id), "beats": beats})
+        out.sort(key=lambda r: r["name"].lower())
+        return out
+    finally:
+        conn.close()
+
+
 @router.get("/plugins")
 def list_plugins(request: Request) -> dict:
     service = _service(request)

@@ -386,3 +386,28 @@ def test_refused_login_is_a_problem_at_once_and_the_grace_can_be_changed(db):
     set_setting(conn, "plugins.failure_grace", "1")
     set_status(conn, "pf", ok=False, error="timed out", auth_failed=False)
     assert next(p for p in stats._plugin_status(conn) if p["id"] == "pf")["failing"] is True
+
+
+def test_a_network_error_is_not_blamed_on_the_upgrade(tmp_path):
+    from app.plugins import autoupdate
+
+    assert autoupdate.environment_problem("cannot reach ha.example.com:443: timed out")
+    assert autoupdate.environment_problem("Connection refused")
+    assert not autoupdate.environment_problem("KeyError: 'devices'") and not autoupdate.environment_problem("the plugin returned data that does not follow the contract: x")
+
+
+def test_every_sync_is_recorded_like_a_service_check(tmp_path):
+    from app.db import connect, init_db
+    from app.plugins import runs
+
+    conn = connect(tmp_path / "r.db")
+    init_db(conn)
+    runs.record(conn, "proxmox", True, 420.0)
+    runs.record(conn, "proxmox", False, None, "cannot reach pve:8006: timed out")
+    runs.record(conn, "proxmox", True, 380.0)
+    beats = runs.history(conn, "proxmox")
+    assert [b["up"] for b in beats] == [True, False, True] and beats[1]["ms"] is None and beats[0]["ms"] == 420.0
+    assert runs.uptime_24h(conn, "proxmox") == 66.67 and runs.uptime_24h(conn, "other") is None
+    assert runs.series_id("proxmox") == runs.series_id("proxmox") != runs.series_id("unifi")
+    runs.forget(conn, "proxmox")
+    assert runs.history(conn, "proxmox") == []
