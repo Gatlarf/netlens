@@ -61,7 +61,7 @@ export async function render(container) {
     const button = (p) => h("button", { class: "btn ghost", type: "button", onclick: () => ask(p.text) }, p.text);
     const presets = h("div", { class: "ins-presets" }, ...data.presets.slice(0, 7).map(button));
     const more = data.presets.length > 7 ? h("details", {}, h("summary", { class: "hint" }, `More questions you can ask (${data.presets.length - 7})`), h("div", { class: "ins-presets" }, ...data.presets.slice(7).map(button))) : null;
-    return h("div", { class: "card" }, h("h2", {}, "Ask your network"), form, data.status.llm_configured ? switcher : null, scopeRow, presets, more, out);
+    return h("div", { class: "card" }, h("h2", {}, "Ask your network"), form, data.status.llm_configured ? switcher : null, scopeRow, presets, more, out, h("hr", {}), settingsCard());
   }
 
   function incidentsCard() {
@@ -171,8 +171,7 @@ export async function render(container) {
       check.disabled = false;
     });
     return h("div", {}, h("p", { class: "hint" }, modelNote()), s.llm_configured ? h("div", { class: "form-actions" }, check) : null, result,
-      h("label", { class: "check" }, llm, " Let the language model word the answers and incident summaries"),
-      h("p", { class: "hint" }, "The weekly report has its own switches (Reports → Weekly report)."));
+      h("label", { class: "check" }, llm, " Let the language model word the answers and incident summaries"));
   }
 
   function draw() {
@@ -184,8 +183,7 @@ export async function render(container) {
       return;
     }
     const side = h("div", { class: "col-left" }, unusualCard(), predictionsCard(), unknownCard());
-    const settings = h("div", { class: "card ins-settings" }, h("h2", {}, "Settings"), settingsCard());
-    body.append(settings, askCard(), h("div", { class: "grid-2 ins-grid" }, incidentsCard(), side));
+    body.append(askCard(), h("div", { class: "grid-2 ins-grid" }, incidentsCard(), side));
   }
 
   await load();
