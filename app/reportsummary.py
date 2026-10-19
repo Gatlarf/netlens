@@ -1,7 +1,7 @@
 """Two or three sentences at the top of the weekly report (a paid feature, see app/insights.py).
 
 The sentences are written from the numbers of the report itself; a language model, when set up, may only rewrite them. It can be switched off
-(Insights page) and the report is then the same as before.
+(Reports → Weekly report, which also has its own switch for the model) and the report is then the same as before.
 """
 
 from __future__ import annotations
@@ -11,16 +11,33 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
-from app import incidents, insights
+from app import incidents, insights, relevance
 from app.db import get_setting, set_setting
 
-KEY = "reports.summary"
+KEY = "reports.summary"                   # the old switch on the Insights page, used until the weekly report's own setting is saved
 SYSTEM = ("You write the opening of a weekly network report for a home or small-business administrator: at most four plain sentences, no greeting, no advice. "
           "Use only the facts in the JSON and invent nothing. Mention what needs attention first, then how the week went.")
 
 
+def _weekly(conn: sqlite3.Connection) -> dict:
+    try:
+        data = json.loads(get_setting(conn, "reports.weekly") or "{}")
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def enabled(conn: sqlite3.Connection) -> bool:
-    return get_setting(conn, KEY) != "0" and insights.allowed(conn)
+    """The weekly report starts with a summary: the setting of the weekly report (Reports -> Weekly report), independent of the Insights page."""
+    mine = _weekly(conn).get("summary")
+    on = mine if isinstance(mine, bool) else get_setting(conn, KEY) != "0"
+    return on and insights.allowed(conn)
+
+
+def model_wanted(conn: sqlite3.Connection) -> bool:
+    """The language model may word the summary: again a setting of the weekly report itself."""
+    mine = _weekly(conn).get("summary_model")
+    return mine if isinstance(mine, bool) else True
 
 
 def set_enabled(conn: sqlite3.Connection, on: bool) -> None:
@@ -28,7 +45,7 @@ def set_enabled(conn: sqlite3.Connection, on: bool) -> None:
 
 
 def facts(conn: sqlite3.Connection, report: dict[str, Any], now: datetime | None = None) -> dict[str, Any]:
-    found = incidents.incidents(conn, 7, now)
+    found = incidents.incidents(conn, 7, now, only=relevance.important_ids(conn))
     ev = report["events"]
     av = report["availability"]
     big = max(found, key=lambda i: (i["device_count"], i["events"]), default=None)
@@ -55,5 +72,5 @@ def plain(f: dict[str, Any]) -> str:
 
 def summary(conn: sqlite3.Connection, report: dict[str, Any], now: datetime | None = None, ask=None) -> str:
     f = facts(conn, report, now)
-    text = insights.complete(conn, SYSTEM, json.dumps(f, indent=1), ask=ask)
+    text = insights.complete(conn, SYSTEM, json.dumps(f, indent=1), ask=ask, own_switch=True) if model_wanted(conn) else None
     return text or plain(f)

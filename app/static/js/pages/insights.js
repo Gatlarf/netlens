@@ -6,11 +6,21 @@ const TYPES = ["router", "switch", "ap", "server", "pc", "phone", "tablet", "tv"
 
 export async function render(container) {
   let destroyed = false, data;
+  let everything = false;           // also phones, tablets and other devices that come and go
+  try { everything = localStorage.getItem("netlens.ask.all") === "1"; } catch (e) { /* private window */ }
+  // one tick box, shown where it matters (the question and the incidents); it redraws the page
+  function scopeBox() {
+    const box = h("input", { type: "checkbox" });
+    box.checked = everything;
+    box.addEventListener("change", () => { everything = box.checked; try { localStorage.setItem("netlens.ask.all", everything ? "1" : "0"); } catch (e) { /* ignore */ } load(); });
+    return h("label", { class: "check", title: "Off: only the devices that should always be on (servers, routers, switches, NAS, cameras, anything marked always-on), services and network problems. On: phones, tablets and the like count too." },
+      box, " Include phones, tablets and other devices that come and go");
+  }
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
   container.append(pageHead("Insights", "Questions, incidents, unusual readings and predictions, worked out from your own data. The AI report is under Reports."), body);
 
   async function load() {
-    try { data = await get("/api/insights"); } catch (err) { if (!destroyed) { clear(body); body.appendChild(h("p", { class: "error" }, err.message || "Could not load.")); } return; }
+    try { data = await get(`/api/insights${everything ? "?include_all=1" : ""}`); } catch (err) { if (!destroyed) { clear(body); body.appendChild(h("p", { class: "error" }, err.message || "Could not load.")); } return; }
     if (!destroyed) draw();
   }
 
@@ -33,13 +43,7 @@ export async function render(container) {
       radio.addEventListener("change", () => { mode = v; try { localStorage.setItem("netlens.ask.mode", v); } catch (e) { /* ignore */ } });
       return h("label", { class: "check", title: v === "auto" ? "The language model when one is connected, otherwise the built-in logic" : v === "rules" ? "Only Netlens's own logic: fast, private, limited to the ready-made kinds of question" : "The language model, which can also handle free-form questions" }, radio, " " + label);
     }));
-    let everything = false;
-    try { everything = localStorage.getItem("netlens.ask.all") === "1"; } catch (e) { /* private window */ }
-    const allBox = h("input", { type: "checkbox" });
-    allBox.checked = everything;
-    allBox.addEventListener("change", () => { everything = allBox.checked; try { localStorage.setItem("netlens.ask.all", everything ? "1" : "0"); } catch (e) { /* ignore */ } });
-    const scopeRow = h("label", { class: "check", title: "Off: answers are about the devices that should always be on (servers, routers, switches, NAS, cameras, anything marked always-on), services and network problems. On: phones, tablets and the like count too." },
-      allBox, " Include phones, tablets and other devices that come and go");
+    const scopeRow = scopeBox();
     const go = h("button", { class: "btn primary", type: "submit" }, "Ask");
     async function ask(question) {
       input.value = question;
@@ -62,6 +66,7 @@ export async function render(container) {
 
   function incidentsCard() {
     const card = h("div", { class: "card" }, h("h2", {}, `Incidents, last 7 days (${data.incidents.length})`));
+    card.appendChild(scopeBox());
     if (!data.incidents.length) card.appendChild(h("p", { class: "hint" }, "No incidents. When several alerts belong together they are shown here as one story."));
     const SHOWN = 6;
     const more = [];
@@ -100,9 +105,15 @@ export async function render(container) {
   function predictionsCard() {
     const p = data.predictions;
     const card = h("div", { class: "card" }, h("h2", {}, "Predictions"));
+    card.appendChild(h("p", { class: "hint" }, "A date is only given when the history follows a straight line for at least a week. Memory that levels off or is given back now and then is not called a leak."));
     if (!p.disks.length && !p.memory.length) card.appendChild(h("p", {}, "Nothing is on course to run out within a year."));
     for (const d of p.disks) card.appendChild(h("div", { class: "rem-run" }, `${d.device} ${d.label}: ${d.current}% used, full in about ${Math.max(1, Math.round(d.days_to_full))} days (around ${d.full_on}).`));
-    for (const m of p.memory) card.appendChild(h("div", { class: "rem-run" }, `${m.device}: memory use keeps rising (${m.current}% now), it would run out in about ${Math.max(1, Math.round(m.days_to_full))} days. A leak, or a cache that never shrinks.`));
+    for (const m of p.memory) {
+      const kinds = { levelling: "the rise is slowing down, like a cache that has filled", resets: "memory is given back now and then (restarts or clean-ups)", irregular: "it moves up and down" };
+      card.appendChild(h("div", { class: "rem-run" }, m.days_to_full != null
+        ? `${m.device}: memory use rose in a steady line over ${m.days_of_data} days (${m.current}% now, about ${m.slope_per_day} points a day). At that pace it would run out in about ${Math.max(1, Math.round(m.days_to_full))} days, which is what a leak looks like. Check whether it is one.`
+        : `${m.device}: memory is nearly full (${m.current}%) but does not follow a straight line over ${m.days_of_data} days: ${kinds[m.pattern] || "no clear pattern"}. No date can be given.`));
+    }
     return card;
   }
 
@@ -145,9 +156,8 @@ export async function render(container) {
   function settingsCard() {
     const s = data.status;
     const llm = h("input", { type: "checkbox" }); llm.checked = s.llm_wanted; llm.disabled = !s.llm_configured;
-    const rep = h("input", { type: "checkbox" }); rep.checked = s.report_summary;
-    const save = async () => { try { await put("/api/insights/settings", { llm: llm.checked, report_summary: rep.checked }); toast("Saved", "success"); await load(); } catch (err) { toast(err.message || "Failed", "error"); } };
-    llm.addEventListener("change", save); rep.addEventListener("change", save);
+    const save = async () => { try { await put("/api/insights/settings", { llm: llm.checked }); toast("Saved", "success"); await load(); } catch (err) { toast(err.message || "Failed", "error"); } };
+    llm.addEventListener("change", save);
     const result = h("div", {});
     const check = h("button", { class: "btn", type: "button", title: "Six small exams with made-up data" }, "Check the model");
     check.addEventListener("click", async () => {
@@ -161,8 +171,8 @@ export async function render(container) {
       check.disabled = false;
     });
     return h("div", {}, h("p", { class: "hint" }, modelNote()), s.llm_configured ? h("div", { class: "form-actions" }, check) : null, result,
-      h("label", { class: "check" }, llm, " Let the language model word the answers and summaries"),
-      h("label", { class: "check" }, rep, " Start the weekly report with a short summary"));
+      h("label", { class: "check" }, llm, " Let the language model word the answers and incident summaries"),
+      h("p", { class: "hint" }, "The weekly report has its own switches (Reports → Weekly report)."));
   }
 
   function draw() {
@@ -174,8 +184,8 @@ export async function render(container) {
       return;
     }
     const side = h("div", { class: "col-left" }, unusualCard(), predictionsCard(), unknownCard());
-    const settings = h("details", { class: "card ins-settings" }, h("summary", {}, h("strong", {}, "Settings")), settingsCard());
-    body.append(askCard(), h("div", { class: "grid-2 ins-grid" }, incidentsCard(), side), settings);
+    const settings = h("div", { class: "card ins-settings" }, h("h2", {}, "Settings"), settingsCard());
+    body.append(settings, askCard(), h("div", { class: "grid-2 ins-grid" }, incidentsCard(), side));
   }
 
   await load();

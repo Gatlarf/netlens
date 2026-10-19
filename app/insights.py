@@ -35,10 +35,16 @@ def llm_ready(conn: sqlite3.Connection) -> bool:
     return bool(cfg["enabled"] and cfg["url"] and cfg["model"] and llm_wanted(conn) and licence.allows(conn, "engineer"))
 
 
-def complete(conn: sqlite3.Connection, system: str, user: str, names: list[str] | None = None, ask=None, timeout: float | None = None) -> str | None:
+def model_usable(conn: sqlite3.Connection) -> bool:
+    """A language model is set up and allowed, whatever the insights switch says (the weekly report has a switch of its own)."""
+    cfg = engineer.settings(conn)
+    return bool(cfg["enabled"] and cfg["url"] and cfg["model"] and licence.allows(conn, "engineer"))
+
+
+def complete(conn: sqlite3.Connection, system: str, user: str, names: list[str] | None = None, ask=None, timeout: float | None = None, own_switch: bool = False) -> str | None:
     """The model's answer (addresses and names anonymised on the way out and put back on the way in), or None when there is no model or it fails.
-    `ask(messages)` replaces the call in tests."""
-    if ask is None and not llm_ready(conn):
+    `ask(messages)` replaces the call in tests. `own_switch`: the caller has a switch of its own, so the insights switch is not consulted."""
+    if ask is None and not (model_usable(conn) if own_switch else llm_ready(conn)):
         return None
     redact = engineer.Redactor(names or []) if engineer.settings(conn)["redact"] else None
     text = redact(user) if redact else user

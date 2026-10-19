@@ -59,3 +59,19 @@ def test_the_report_gets_a_short_opening_with_or_without_a_model(conn):
     assert reportsummary.summary(conn, report, NOW, ask=lambda m: "A quiet week.") == "A quiet week."
     reportsummary.set_enabled(conn, False)
     assert reportsummary.enabled(conn) is False
+
+
+def test_weekly_summary_has_its_own_switches(conn):
+    from app import insights, reports
+
+    asked = []
+    reports.save_settings(conn, {"summary": True, "summary_model": False})
+    insights.set_llm_wanted(conn, True)
+    report = reports.weekly(conn, NOW)
+    assert reportsummary.enabled(conn) and not reportsummary.model_wanted(conn)
+    assert reportsummary.summary(conn, report, NOW, ask=lambda m: asked.append(m) or "words") != "words" and not asked     # the model is not asked
+    reports.save_settings(conn, {"summary": False})
+    insights.set_llm_wanted(conn, False)                                   # the Insights switch does not matter to the weekly report
+    assert reportsummary.enabled(conn) is False
+    reports.save_settings(conn, {"summary": True, "summary_model": True})
+    assert reportsummary.enabled(conn) and reportsummary.model_wanted(conn)

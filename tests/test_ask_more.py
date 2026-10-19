@@ -179,3 +179,15 @@ def test_scope_leaves_out_phones_by_default(conn):
 def test_scope_without_marked_devices_counts_everything(conn):
     conn.execute("UPDATE devices SET device_type = 'phone', always_on = 0")
     assert "iphone-bert" in ask.answer(conn, "what is offline?", NOW, mode="rules", scope="important")["answer"]
+
+
+def test_incidents_leave_out_devices_that_come_and_go(conn):
+    from app import incidents
+
+    for dev in (4, 2):                                               # the iphone (a phone) and the printer
+        add_event(conn, "device_offline", detail="x", device_id=dev, now="2026-11-01T10:00:00Z")
+    conn.commit()
+    everything = incidents.incidents(conn, 7, NOW)
+    core = incidents.incidents(conn, 7, NOW, only=ask.relevance.important_ids(conn))
+    assert any(4 in i["device_ids"] for i in everything)
+    assert all(4 not in i["device_ids"] for i in core) and any(2 in i["device_ids"] for i in core)

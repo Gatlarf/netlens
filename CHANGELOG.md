@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.105 — 2026-10-19
+
+### Changed
+- ★ **Memory is only called a leak when the history says so**: the prediction now looks at up to 60 days of daily medians. A date ("would run out in ...") is given only for a steady, straight rise over at least a week. Memory that levels off (a cache that fills), is given back now and then (restarts, clean-ups) or moves irregularly gets no date and is mentioned only when it is nearly full.
+- ★ **Insights incidents and unusual readings count the devices that should always be on**: alerts of phones, tablets and other devices that come and go no longer make a week look worse than it was, and the incident text only mentions the devices that count. A tick box on the incidents (and on the question) brings them back. The weekly summary uses the same rule.
+- ★ **The weekly report has its own AI switches** (Reports → Weekly report): start with a short summary, and let the language model word it. They no longer depend on the Insights page, which keeps only its own switch for answers and incident summaries.
+- **The Insights settings are at the top** of the page instead of folded away at the bottom.
+
 ## 0.4.104 — 2026-10-19
 
 ### Changed

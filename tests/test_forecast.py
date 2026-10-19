@@ -190,3 +190,34 @@ def test_a_rising_memory_is_listed_but_never_announced_as_a_disk(conn):
     leaks = forecast.memory_trends(conn, now)
     assert len(leaks) == 1 and leaks[0]["device"] == "nas" and 10 < leaks[0]["days_to_full"] < 20
     assert forecast.forecasts(conn, now) == [] and forecast.check(conn, now) == []
+
+
+def _mem(conn, shape, days=14, now=None):
+    now = now or int(time.time())
+    store = tsdb.for_conn(conn)
+    for t in range(now - days * DAY, now + 1, 3600):
+        store.record([("device", 1, "mem_pct", shape((t - (now - days * DAY)) / DAY), "", "%")], ts=t)
+    store.rollup(now)
+    return now
+
+
+def test_memory_that_levels_off_is_not_a_leak(conn):
+    now = _mem(conn, lambda d: 90 - 40 * (0.7 ** d))               # a cache that fills and then stays: rises fast, then flat
+    for m in forecast.memory_trends(conn, now):
+        assert m["days_to_full"] is None and m["pattern"] == "levelling"
+
+
+def test_memory_that_is_given_back_is_not_a_leak(conn):
+    now = _mem(conn, lambda d: 50 + 8 * (d % 4))                   # grows for four days, then a restart gives it back
+    assert forecast.memory_trends(conn, now) == []
+    assert forecast.memory_pattern(tsdb.for_conn(conn).query("device", 1, "mem_pct", "", span=forecast.MEM_SPAN, end=now, points=300)["points"])["pattern"] == "resets"
+
+
+def test_a_week_is_needed_before_it_is_called_a_leak(conn):
+    now = _mem(conn, lambda d: 50 + 2 * d, days=5)
+    assert forecast.memory_trends(conn, now) == []
+
+
+def test_nine_days_of_a_straight_rise_is_a_leak(conn):
+    now = _mem(conn, lambda d: 50 + 2 * d, days=9)
+    assert forecast.memory_trends(conn, now)[0]["pattern"] == "steady"

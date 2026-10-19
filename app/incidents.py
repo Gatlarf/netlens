@@ -45,12 +45,12 @@ def _span(seconds: float) -> str:
     return f"{hours:.1f} hours" if hours < 48 else f"{hours / 24:.1f} days"
 
 
-def incidents(conn: sqlite3.Connection, days: int = 7, now: datetime | None = None) -> list[dict[str, Any]]:
-    """The incidents of the last `days` days, the newest first."""
+def incidents(conn: sqlite3.Connection, days: int = 7, now: datetime | None = None, only: set[int] | None = None) -> list[dict[str, Any]]:
+    """The incidents of the last `days` days, the newest first. `only`: the ids of the devices that count (see app/relevance.py); what happened to the other devices is left out."""
     now = now or datetime.now(timezone.utc)
     cutoff = (now - timedelta(days=days)).strftime(STAMP)
     kinds = PROBLEMS | set(RECOVERS) | REMEDIATION
-    rows = [dict(r) for r in conn.execute("SELECT id, ts, device_id, kind, detail FROM events WHERE ts >= ? AND maintenance IS NULL ORDER BY id", (cutoff,)) if r["kind"] in kinds]
+    rows = [dict(r) for r in conn.execute("SELECT id, ts, device_id, kind, detail FROM events WHERE ts >= ? AND maintenance IS NULL ORDER BY id", (cutoff,)) if r["kind"] in kinds and (only is None or r["device_id"] is None or r["device_id"] in only)]
     clusters: list[dict] = []
     open_by_key: dict[tuple, dict] = {}
     for e in rows:

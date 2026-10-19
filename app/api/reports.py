@@ -64,7 +64,10 @@ def weekly(conn=Depends(get_conn)) -> dict:
     """The weekly summary as it would be sent now, and the schedule."""
     data = reports.weekly(conn)
     title, text = reports.weekly_text(data)
-    return {"title": title, "text": text, "data": data, "settings": reports.get_settings(conn), "days": reports.DAYS}
+    from app import engineer, insights
+
+    ai = {"allowed": insights.allowed(conn), "llm_configured": bool(engineer.settings(conn)["url"])}
+    return {"title": title, "text": text, "data": data, "settings": reports.get_settings(conn), "days": reports.DAYS, "ai": ai}
 
 
 class SettingsBody(BaseModel):
@@ -83,6 +86,8 @@ class SettingsBody(BaseModel):
     business_days: list[int] | None = None
     business_start: int | None = None
     business_end: int | None = None
+    summary: bool | None = None         # start the weekly text with a short summary (a paid feature)
+    summary_model: bool | None = None   # the language model may word that summary
     monthly: bool | None = None         # e-mail the report of the last month
     monthly_day: int | None = None
     monthly_hour: int | None = None

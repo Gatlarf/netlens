@@ -9,7 +9,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app import aireport, anomaly, ask, forecast, identify, incidents, insights, modelcheck, postmortem, reportsummary
+from app import aireport, anomaly, relevance, ask, forecast, identify, incidents, insights, modelcheck, postmortem
 from app import engineer
 from app.api.devices import get_conn
 
@@ -34,21 +34,24 @@ def _cached(conn, key: str, make, ttl: float = 90.0):
     return value
 
 
-def _overview(conn) -> dict[str, Any]:
-    state = {**insights.status(conn), "report_summary": reportsummary.enabled(conn) if insights.allowed(conn) else False}
+def _overview(conn, include_all: bool = False) -> dict[str, Any]:
+    state = insights.status(conn)
+    keep = None if include_all else relevance.important_ids(conn)
     out: dict[str, Any] = {"status": state, "presets": [{"id": p["id"], "text": p["text"]} for p in ask.PRESETS]}
     if not state["allowed"]:
         return out
-    out["incidents"] = [{k: i[k] for k in ("id", "start", "end", "title", "summary", "devices", "device_count", "resolved", "ongoing")} for i in incidents.incidents(conn, 7)[:30]]
-    out["anomalies"] = _cached(conn, "anomalies", lambda: [{**a, "text": anomaly.describe(a)} for a in anomaly.scan(conn)[:30]])
+    out["incidents"] = [{k: i[k] for k in ("id", "start", "end", "title", "summary", "devices", "device_count", "resolved", "ongoing")} for i in incidents.incidents(conn, 7, only=keep)[:30]]
+    out["anomalies"] = _cached(conn, "anomalies", lambda: [{**a, "text": anomaly.describe(a)} for a in anomaly.scan(conn)])
+    out["anomalies"] = [a for a in out["anomalies"] if keep is None or a.get("device_id") is None or a["device_id"] in keep][:30]
     out["predictions"] = {"disks": [f for f in forecast.cached(conn) if f["days_to_full"] is not None][:20], "memory": forecast.memory_trends(conn)[:20]}
     out["unknown_devices"] = identify.unknown_devices(conn, 50)
     return out
 
 
 @router.get("/insights")
-def get_insights(conn=Depends(get_conn)) -> dict[str, Any]:
-    return _overview(conn)
+def get_insights(include_all: bool = False, conn=Depends(get_conn)) -> dict[str, Any]:
+    """`include_all`: also the phones, tablets and other devices that come and go (by default only the devices that should always be on count)."""
+    return _overview(conn, include_all)
 
 
 class Question(BaseModel):
@@ -67,7 +70,7 @@ async def ask_question(body: Question, conn=Depends(get_conn)) -> dict:
 async def incident_words(incident_id: int, conn=Depends(get_conn)) -> dict:
     """The incident in the language model's words (the plain summary stays when there is no model)."""
     _allowed(conn)
-    found = next((i for i in incidents.incidents(conn, 30) if i["id"] == incident_id), None)
+    found = next((i for only in (relevance.important_ids(conn), None) for i in incidents.incidents(conn, 30, only=only) if i["id"] == incident_id), None)
     if found is None:
         raise HTTPException(status_code=404, detail="that incident is no longer in the list")
     text = await asyncio.to_thread(incidents.narrate, conn, found)
@@ -97,7 +100,6 @@ async def get_postmortem(run_id: int, words: bool = False, conn=Depends(get_conn
 
 class SettingsBody(BaseModel):
     llm: bool | None = None
-    report_summary: bool | None = None
 
 
 @router.put("/insights/settings")
@@ -105,8 +107,6 @@ def put_settings(body: SettingsBody, conn=Depends(get_conn)) -> dict:
     _allowed(conn)
     if body.llm is not None:
         insights.set_llm_wanted(conn, body.llm)
-    if body.report_summary is not None:
-        reportsummary.set_enabled(conn, body.report_summary)
     return _overview(conn)["status"]
 
 

@@ -14,7 +14,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
-from app import engineer, forecast, incidents, insights, anomaly, reports
+from app import engineer, forecast, incidents, insights, anomaly, relevance, reports
 from app.insights import complete  # noqa: F401 - re-exported for the tests
 
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
@@ -25,17 +25,12 @@ LIMIT = 15
 
 # Which devices count. A phone going offline is not news: by default the answers are about the devices that are meant to be on
 # (marked always-on, or of an infrastructure kind) and about network problems. `scope="all"` brings everything back.
-INFRA_TYPES = ("router", "switch", "ap", "server", "nas", "vm", "camera", "printer", "appliance")
 _SCOPE: contextvars.ContextVar[str] = contextvars.ContextVar("ask_scope", default="all")
 
 
 def important_ids(conn) -> set[int] | None:
     """The ids of the devices that matter, or None when every device counts (scope "all", or none of them is marked)."""
-    if _SCOPE.get() == "all":
-        return None
-    marks = ",".join("?" * len(INFRA_TYPES))
-    ids = {r["id"] for r in conn.execute(f"SELECT id FROM devices WHERE report_exclude = 0 AND (always_on = 1 OR COALESCE(type_override, device_type) IN ({marks}))", INFRA_TYPES)}
-    return ids or None
+    return None if _SCOPE.get() == "all" else relevance.important_ids(conn)
 
 
 def _days(value: Any, default: int = 7) -> int:
@@ -118,8 +113,7 @@ def t_new_devices(conn, args, now=None) -> dict:
 
 
 def t_incidents(conn, args, now=None) -> dict:
-    keep = important_ids(conn)
-    found = [i for i in incidents.incidents(conn, _days(args.get("days"), 7), now) if keep is None or i["cause"] or not i.get("device_ids") or keep & set(i["device_ids"])][:LIMIT]
+    found = incidents.incidents(conn, _days(args.get("days"), 7), now, only=important_ids(conn))[:LIMIT]
     return {"incidents": [{"start": i["start"], "title": i["title"], "summary": i["summary"], "resolved": i["resolved"]} for i in found]}
 
 
@@ -132,7 +126,7 @@ def t_disks(conn, args, now=None) -> dict:
     items = [f for f in forecast.cached(conn) if f.get("days_to_full") is not None][:LIMIT]
     leaks = forecast.memory_trends(conn)[:LIMIT]
     return {"filling_up": [{"device": f["device"], "disk": f["label"], "used_pct": f["current"], "full_in_days": f["days_to_full"]} for f in items], "checked": len(forecast.cached(conn)),
-            "memory_rising": [{"device": m["device"], "used_pct": m["current"], "out_of_memory_in_days": m["days_to_full"]} for m in leaks]}
+            "memory_rising": [{"device": m["device"], "used_pct": m["current"], "pattern": m["pattern"], "out_of_memory_in_days": m["days_to_full"]} for m in leaks]}
 
 
 HEALTH_METRICS = {"memory": "mem_pct", "ram": "mem_pct", "cpu": "cpu_pct", "processor": "cpu_pct", "disk": "disk_pct", "storage": "disk_pct", "temperature": "temp_c", "temp": "temp_c",
@@ -271,6 +265,7 @@ def route(question: str, known_names: list[str], conn=None) -> tuple[str, dict]:
     return "", {}
 
 
+MEMORY_PATTERNS = {"levelling": "the rise is slowing down, like a cache that has filled", "resets": "memory is given back now and then", "irregular": "it moves up and down"}
 RENDERERS: dict[str, Callable[[dict], str]] = {}
 
 
@@ -305,7 +300,9 @@ def render(tool: str, r: dict) -> str:
         return "\n".join(r["unusual_now"]) or "Nothing is behaving unusually right now."
     if tool == "disks":
         lines = [f"{d['device']} {d['disk']}: {d['used_pct']}% used, full in about {d['full_in_days']} days" for d in r["filling_up"]]
-        lines += [f"{m['device']}: memory use keeps rising ({m['used_pct']}% now), would run out in about {m['out_of_memory_in_days']} days" for m in r.get("memory_rising", [])]
+        lines += [(f"{m['device']}: memory use has risen in a steady line ({m['used_pct']}% now); at that pace it would run out in about {m['out_of_memory_in_days']} days, which is what a leak looks like"
+                   if m["out_of_memory_in_days"] is not None else f"{m['device']}: memory is nearly full ({m['used_pct']}%) but does not follow a straight line ({MEMORY_PATTERNS.get(m.get('pattern'), 'irregular')}), so there is no date")
+                  for m in r.get("memory_rising", [])]
         return "\n".join(lines) or f"No disk is on course to fill up ({r['checked']} checked) and no memory use keeps rising."
     if tool == "fixes":
         return "\n".join(f"{x['at'][:16].replace('T', ' ')} {x['rule']} on {x['device']}: {x['state']}" + (" (the problem went away)" if x["recovered"] else "") for x in r["runs"][:8]) or "No automatic fixes have run."

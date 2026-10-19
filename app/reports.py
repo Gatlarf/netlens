@@ -31,6 +31,7 @@ MONTHLY_KEY = "reports.monthly_sent"
 DEFAULTS.update({"max_items": 5,                                       # how many outages, disks ... the weekly text lists
                  "ignore_maintenance": False,                            # leave the time of planned maintenance windows out of the figures
                  "hours": "all", "business_days": [0, 1, 2, 3, 4], "business_start": 8, "business_end": 18,     # "business" = count only these hours (the time of the server)
+                 "summary": True, "summary_model": True,                                  # start the weekly text with a short summary, which the language model may word
                  "monthly": False, "monthly_day": 1, "monthly_hour": 8, "monthly_target": None})               # e-mail the report of the last month
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -361,7 +362,7 @@ def _int(value: Any, key: str, low: int, high: int) -> int:
 
 def clean_setting(key: str, value: Any) -> Any:
     """One setting, checked; raises ValueError with a message the user can read."""
-    if key in ("enabled", "ignore_maintenance", "monthly", *SECTIONS):
+    if key in ("enabled", "ignore_maintenance", "monthly", "summary", "summary_model", *SECTIONS):
         if not isinstance(value, bool):
             raise ValueError(f"{key} must be true or false")
         return value
@@ -402,6 +403,8 @@ def get_settings(conn) -> dict[str, Any]:
                     out[key] = clean_setting(key, data[key])
                 except ValueError:
                     pass                                   # a damaged value is replaced by the default
+        if "summary" not in data:                                  # the summary switch used to live on the Insights page
+            out["summary"] = get_setting(conn, "reports.summary") != "0"
         if out["business_end"] <= out["business_start"]:
             out["business_start"], out["business_end"] = DEFAULTS["business_start"], DEFAULTS["business_end"]
     return out

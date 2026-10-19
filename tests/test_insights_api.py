@@ -48,7 +48,7 @@ def test_overview_ask_identify_and_settings(client, monkeypatch):
     first = body["incidents"][0]["id"]
     words = c.post(f"/api/insights/incidents/{first}/words", headers=AUTH).json()
     assert words["source"] == "rules" and words["text"]
-    assert c.put("/api/insights/settings", json={"llm": False, "report_summary": False}, headers=AUTH).json()["llm_wanted"] is False
+    assert c.put("/api/insights/settings", json={"llm": False}, headers=AUTH).json()["llm_wanted"] is False
 
 
 def test_the_mode_of_a_question_is_chosen_by_the_caller(client, monkeypatch):

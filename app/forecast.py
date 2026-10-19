@@ -88,8 +88,60 @@ def forecasts(conn, now: float | None = None) -> list[dict[str, Any]]:
     return out
 
 
+MEM_SPAN = 60 * 86400
+MEM_MIN_DAYS = 7              # a leak needs a week of history before it is called one
+MEM_MIN_FIT = 0.7             # how well the days must follow one straight line (R squared)
+MEM_DROP = 4.0                # percentage points of memory given back from one day to the next: a restart or a clean-up
+MEM_QUIET_ABOVE = 85.0        # a rise that is not a straight line is only mentioned when memory is nearly full
+
+
+def _theil_sen(xs: list[float], ys: list[float]) -> tuple[float, float]:
+    """(slope, intercept) by the median of pairwise slopes."""
+    slopes = [(ys[j] - ys[i]) / (xs[j] - xs[i]) for i in range(len(xs)) for j in range(i + 1, len(xs)) if xs[j] > xs[i]]
+    slope = statistics.median(slopes) if slopes else 0.0
+    return slope, statistics.median(y - slope * x for x, y in zip(xs, ys))
+
+
+def memory_pattern(points: list[list[float]]) -> dict[str, Any]:
+    """How memory use moved over the history, judged on the daily medians (the daily rhythm and short peaks do not count):
+    "steady" (one straight line: what a leak looks like), "levelling" (it rose but the rise slows down: a cache filling up),
+    "resets" (memory is given back now and then: restarts or clean-ups, so there is no running out), "irregular" (no line fits) or "unknown" (too little history)."""
+    by_day: dict[int, list[float]] = {}
+    for p in points:
+        if p[1] is not None:
+            by_day.setdefault(int(p[0] // 86400), []).append(p[1])
+    days = sorted(by_day)
+    out: dict[str, Any] = {"pattern": "unknown", "slope_per_day": None, "fit": None, "days_of_data": len(days), "rise": None}
+    if len(days) < MEM_MIN_DAYS:
+        return out
+    xs = [float(d - days[0]) for d in days]
+    ys = [statistics.median(by_day[d]) for d in days]
+    slope, icpt = _theil_sen(xs, ys)
+    mean = statistics.fmean(ys)
+    total = sum((y - mean) ** 2 for y in ys)
+    resid = sum((y - (icpt + slope * x)) ** 2 for x, y in zip(xs, ys))
+    fit = 1 - resid / total if total > 1e-9 else 0.0
+    out.update(slope_per_day=round(slope, 3), fit=round(fit, 2), rise=round(ys[-1] - ys[0], 1))
+    drops = sum(1 for a, b in zip(ys, ys[1:]) if a - b >= MEM_DROP)
+    half = len(ys) // 2
+    first, _ = _theil_sen(xs[:half], ys[:half]) if half >= 3 else (slope, 0)
+    recent, _ = _theil_sen(xs[half:], ys[half:]) if len(ys) - half >= 3 else (slope, 0)
+    if drops:
+        out["pattern"] = "resets"
+    elif slope < MIN_SLOPE:
+        out["pattern"] = "irregular"
+    elif recent < 0.5 * first or recent < 0.5 * slope:
+        out["pattern"] = "levelling"
+    elif fit >= MEM_MIN_FIT:
+        out["pattern"] = "steady"
+    else:
+        out["pattern"] = "irregular"
+    return out
+
+
 def memory_trends(conn, now: float | None = None) -> list[dict[str, Any]]:
-    """Monitored hosts whose memory use keeps rising (a leak): the same straight-line estimate, for the hosts whose memory will run out within a year.
+    """Monitored hosts whose memory use is rising. Only a steady, straight rise over a week or more (what a leak looks like) gets a date; memory that
+    levels off, is given back now and then or moves irregularly gets none, and is mentioned only when it is nearly full.
     Only listed, never announced: a cache that grows is normal until the trend is clear for weeks."""
     now = now if now is not None else time.time()
     store = tsdb.for_conn(conn)
@@ -100,11 +152,21 @@ def memory_trends(conn, now: float | None = None) -> list[dict[str, Any]]:
         for s in store.metrics_of("device", r["device_id"]):
             if s["metric"] != "mem_pct" or s["last"] is None or s["last_ts"] is None or now - s["last_ts"] > FRESH:
                 continue
-            data = store.query("device", r["device_id"], "mem_pct", s["label"], span=SPAN, end=int(now), points=300)
-            est = estimate(data["points"], s["last"], now)
-            if est.get("days_to_full") is not None:
-                out.append({"device_id": r["device_id"], "device": r["name"], "current": round(s["last"], 1), **est})
-    out.sort(key=lambda i: i["days_to_full"])
+            data = store.query("device", r["device_id"], "mem_pct", s["label"], span=MEM_SPAN, end=int(now), points=300)
+            pat = memory_pattern(data["points"])
+            item = {"device_id": r["device_id"], "device": r["name"], "current": round(s["last"], 1), "days_to_full": None, "full_on": None, **pat}
+            slope = pat["slope_per_day"]
+            if pat["pattern"] == "steady":
+                days = max(0.0, (100.0 - s["last"]) / slope)
+                if days > HORIZON_DAYS:
+                    continue
+                item.update(days_to_full=round(days, 1), full_on=time.strftime("%Y-%m-%d", time.gmtime(now + days * 86400)))
+            elif pat["pattern"] in ("levelling", "irregular", "resets") and slope is not None and slope >= MIN_SLOPE and s["last"] >= MEM_QUIET_ABOVE:
+                pass
+            else:
+                continue
+            out.append(item)
+    out.sort(key=lambda i: (i["days_to_full"] is None, i["days_to_full"] if i["days_to_full"] is not None else 0))
     return out
 
 

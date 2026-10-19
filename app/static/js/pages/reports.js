@@ -168,6 +168,18 @@ export async function render(container) {
         try { await put("/api/reports/weekly/settings", { scope: scope.value }); drawWeekly(); } catch (err) { toast(err.message || "Could not save", "error"); }
       });
       card.append(h("div", { class: "rep-schedule" }, h("strong", {}, "Covers: "), scope), h("div", { class: "rep-schedule" }, h("strong", {}, "Include: "), ...boxes));
+      if (w.ai && w.ai.allowed) {        // the summary and the language model: switches of this report, independent of the Insights page
+        const flag = (key, label, disabled) => {
+          const box = h("input", { type: "checkbox" });
+          box.checked = w.settings[key] !== false; box.disabled = !!disabled;
+          box.addEventListener("change", async () => { try { await put("/api/reports/weekly/settings", { [key]: box.checked }); toast("Saved", "success"); drawWeekly(); } catch (err) { toast(err.message || "Could not save", "error"); } });
+          return h("label", { class: "check" }, box, ` ${label}`);
+        };
+        card.append(h("div", { class: "rep-ai" }, h("strong", {}, "Summary: "),
+          flag("summary", "Start the report with a short summary"),
+          flag("summary_model", w.ai.llm_configured ? "Let the language model word the summary" : "Let the language model word the summary (no model connected, Settings → AI)", !w.ai.llm_configured),
+          h("p", { class: "hint" }, "These two switches are for the weekly report only. The summary is worked out from the numbers of the report; the model may only reword it, and when it fails the plain version is sent.")));
+      }
       card.appendChild(reportOptions(w.settings));
       const send = h("button", { class: "btn", type: "button" }, "Send it now");
       send.addEventListener("click", async () => {
