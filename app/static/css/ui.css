@@ -98,3 +98,7 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 .preview-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .preview-actions { display: flex; gap: 8px; }
 .preview-frame { flex: 1; width: 100%; border: 0; background: #fff; }
+.svc-line { cursor: pointer; }
+.up-row { cursor: pointer; }
+.up-row .up-detail { grid-column: 1 / -1; cursor: default; }
+.up-row .up-detail .card { margin: 0; }

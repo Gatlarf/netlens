@@ -1,5 +1,5 @@
 import { get, post, patch, del } from "../api.js";
-import { h, clear, toast, timeAgo } from "../util.js";
+import { h, clear, toast, timeAgo, shortName } from "../util.js";
 import { pageHead, rowMenu, emptyState } from "../ui.js";
 import { heartbeatBar, uptimeText, uptimeClass } from "../heartbeat.js";
 import { buildServiceForm } from "../cards/service_form.js";
@@ -53,12 +53,13 @@ export async function render(container) {
       return;
     }
     const table = h("table", { class: "data" });
-    table.appendChild(h("thead", {}, h("tr", {}, ["", "Name", "Target", "Device", "History", "24 h", "Response", "Checked", ""].map((t) => h("th", {}, t)))));
+    table.appendChild(h("thead", {}, h("tr", {}, ["", "Name", "Device", "History", "24 h", "Resp.", "Checked", ""].map((t) => h("th", {}, t)))));
     const tbody = h("tbody");
     for (const c of checks) {
       const hb = h("td", {});
       heartbeats(c).then((bar) => { if (!destroyed) hb.appendChild(bar); });
-      const run = h("button", { class: "btn admin-only", type: "button" }, "Run now");
+      const run = h("button", { class: "btn admin-only", type: "button" }, "Run");
+      run.title = "Run the check now";
       run.addEventListener("click", async () => {
         run.disabled = true;
         try {
@@ -83,7 +84,7 @@ export async function render(container) {
       };
       const more = rowMenu([{ label: "Edit", onclick: doEdit }, { label: c.enabled ? "Pause" : "Resume", onclick: doPause }, { label: "Delete", onclick: doRemove, danger: true }], { cls: "admin-only" });
       const graphBtn = h("button", { class: "btn", type: "button", "aria-expanded": String(openGraphs.has(c.id)) }, "Graph");
-      const graphRow = h("tr", { class: "svc-graph-row", hidden: !openGraphs.has(c.id) }, h("td", { colspan: 9 }));
+      const graphRow = h("tr", { class: "svc-graph-row", hidden: !openGraphs.has(c.id) }, h("td", { colspan: 8 }));
       const showGraph = async () => {
         const cell = graphRow.firstChild;
         if (cell.firstChild) return;
@@ -97,11 +98,14 @@ export async function render(container) {
         graphBtn.setAttribute("aria-expanded", String(open));
         if (open) { openGraphs.add(c.id); showGraph(); } else openGraphs.delete(c.id);
       });
-      tbody.appendChild(h("tr", {},
-        h("td", {}, stateDot(c)), h("td", {}, c.name, c.state === "down" && c.last_detail ? h("div", { class: "hint" }, c.last_detail) : null),
-        h("td", { class: "mono" }, c.target), h("td", {}, c.device_id ? h("a", { href: `#/device/${c.device_id}` }, c.device_name || `device ${c.device_id}`) : ""),
+      const line = h("tr", { class: "svc-line", title: "Click for the history graph" },
+        h("td", {}, stateDot(c)), h("td", { title: c.target || null }, c.name, c.state === "down" && c.last_detail ? h("div", { class: "hint" }, c.last_detail) : null),
+        h("td", {}, c.device_id ? h("a", { href: `#/device/${c.device_id}`, title: c.device_name || null }, shortName(c.device_name) || `device ${c.device_id}`) : ""),
         hb, h("td", { class: uptimeClass(c.uptime_24h) }, uptimeText(c.uptime_24h)), h("td", {}, c.last_ms === null ? "–" : `${Math.round(c.last_ms)} ms`),
-        h("td", {}, c.last_ts ? timeAgo(c.last_ts) : "never"), h("td", { class: "actions" }, run, graphBtn, more)));
+        h("td", {}, c.last_ts ? timeAgo(c.last_ts) : "never"), h("td", { class: "actions" }, run, graphBtn, more));
+      // a click on the line opens the graph, except on a link, a button or the heartbeat bar (those have their own meaning)
+      line.addEventListener("click", (e) => { if (!e.target.closest("a, button, input, select, .hb-bar, .rl, .row-menu, .actions")) graphBtn.click(); });
+      tbody.appendChild(line);
       tbody.appendChild(graphRow);
     }
     table.appendChild(tbody);

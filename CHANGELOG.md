@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.111 — 2026-10-19
+
+### Changed
+- **Click a line to see its graph**: on Services, clicking a line opens the same history graph as the Graph button; on Uptime, clicking a device opens its response-time and availability history under the row. Clicks on the device link, the heartbeat bar or the response line, and the buttons keep their own meaning.
+- **A narrower Services table**: the Target column is gone (the target shows when you point at the name), the device name has the domain name removed when one is set in the settings, and the buttons are shorter ("Run" instead of "Run now").
+
 ## 0.4.110 — 2026-10-19
 
 ### Fixed

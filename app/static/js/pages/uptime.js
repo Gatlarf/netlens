@@ -1,6 +1,7 @@
 import { get, put } from "../api.js";
 import { h, clear, toast, statusDot, shortName } from "../util.js";
 import { pageHead } from "../ui.js";
+import { buildPerformanceCard } from "../cards/performance.js";
 import { heartbeatBar, responseLine, rangeTabs, savedRange, RANGES, uptimeText, uptimeClass } from "../heartbeat.js";
 
 const PCT = { "24h": "up_24h", "7d": "up_7d", "30d": "up_30d" };
@@ -17,6 +18,7 @@ const tone = (pct) => (pct === null || pct === undefined ? "off" : pct >= 99 ? "
 
 export async function render(container) {
   let disposed = false, inFlight = false, timer = null;
+  const openGraphs = new Set();      // devices whose history graph is open (kept when the list is redrawn)
   let range = savedRange(), scope = savedScope(), sort = "worst", filterText = "", onlyProblems = false, data = null;
 
   const phone = () => window.matchMedia("(max-width: 700px)").matches;
@@ -53,13 +55,27 @@ export async function render(container) {
     const n = slots();
     const resp = avgResponse(item);
     const num = (key, label) => h("div", { class: `up-num ${key === range ? "picked" : ""}` }, h("small", {}, label), h("strong", { class: uptimeClass(item[PCT[key]]) }, uptimeText(item[PCT[key]])));
-    return h("div", { class: `up-row ${tone(pct)}`, dataset: { search: `${(item.name || "").toLowerCase()} ${(item.ip || "").toLowerCase()}` } },
+    const detail = h("div", { class: "up-detail", hidden: !openGraphs.has(item.id) });
+    const fill = async () => {
+      if (detail.firstChild) return;
+      const card = await buildPerformanceCard("device", item.id, { title: `${shortName(item.name) || item.ip}: history`, only: ["up", "rtt_ms"] });
+      detail.appendChild(card || h("p", { class: "hint" }, "No measurements yet."));
+    };
+    if (openGraphs.has(item.id)) fill();
+    const rowEl = h("div", { class: `up-row ${tone(pct)}`, dataset: { search: `${(item.name || "").toLowerCase()} ${(item.ip || "").toLowerCase()}` } },
       h("div", { class: "up-who" },
         h("div", { class: "up-state" }, statusDot(item.online), h("a", { href: `#/device/${item.id}`, title: item.name || null }, shortName(item.name) || "")),
         item.ip && item.ip !== item.name ? h("div", { class: "mono hint" }, item.ip) : null),
       h("div", { class: "up-avail" }, h("span", { class: "up-graph-label" }, "Availability"), heartbeatBar(item.bars || [], n)),
       h("div", { class: "up-resp" }, h("span", { class: "up-graph-label" }, `Response time · average ${fmtMs(resp)}`), responseLine(item.bars || [], n, { height: 34 })),
-      h("div", { class: "up-nums" }, num("24h", "24 h"), num("7d", "7 days"), num("30d", "30 days")));
+      h("div", { class: "up-nums" }, num("24h", "24 h"), num("7d", "7 days"), num("30d", "30 days")), detail);
+    // a click on the row opens the graph, except on the device link and the bars (they show their own details)
+    rowEl.addEventListener("click", (e) => {
+      if (e.target.closest("a, button, .hb-bar, .rl, .up-detail")) return;
+      detail.hidden = !detail.hidden;
+      if (detail.hidden) openGraphs.delete(item.id); else { openGraphs.add(item.id); fill(); }
+    });
+    return rowEl;
   }
 
   function drawList() {
