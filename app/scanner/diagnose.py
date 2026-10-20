@@ -81,7 +81,7 @@ def diagnose(error_text: str = "") -> dict[str, Any]:
         cause = f"The interface {wanted} is not visible inside the container: it is not using the host network. Add network_mode: host and re-create the container."
     elif not root and file_cap is False:
         cause = ("The container has NET_RAW and NET_ADMIN, but the file system under it dropped the capability that the image puts on nmap, and nmap runs as a normal "
-                 "user. (This happens on some Synology and other NAS storage set-ups.) Work-around, weaker than the default: add user: \"0:0\" to the netlens service AND DAC_OVERRIDE "
+                 "user. (Some storage set-ups do this; it does not happen on a current Synology DSM 7.2 with Container Manager 24, where the standard file works.) Work-around, weaker than the default: add user: \"0:0\" to the netlens service AND DAC_OVERRIDE "
                  "to its cap_add list, then re-create it. Without DAC_OVERRIDE a root container cannot write its data folder. Read the README (Troubleshooting) for what this costs.")
     elif not root and eff_raw is False and file_cap is None:
         cause = "The container has the capabilities, but nmap, running as a normal user, did not get them. Try running the container as root: add user: \"0:0\" to the netlens service and re-create it."
