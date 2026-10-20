@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.127 — 2026-10-20
+
+### Fixed
+- ★ **The Synology problem is explained and named**: Container Manager uses the *aufs* storage driver on ext4 volumes, and aufs drops the file capability the image puts on nmap, so scans fail with `dnet: Failed to open device`. Reproduced on a virtual DSM; btrfs volumes are not affected. The Scans page diagnosis now says "aufs" and shows the container's file system; the README gives the check (`docker info | grep 'Storage Driver'`) and the tested work-around (`user: "0:0"` plus `DAC_OVERRIDE`), or a btrfs volume.
+
 ## 0.4.126 — 2026-10-20
 
 ### Changed

@@ -51,6 +51,19 @@ def nmap_file_capability() -> bool | None:
         return None
 
 
+def root_filesystem() -> str | None:
+    """The file system type of the container's root (the Docker storage driver shows here: overlay, btrfs, aufs ...)."""
+    try:
+        for line in Path("/proc/self/mountinfo").read_text().splitlines():
+            left, _, right = line.partition(" - ")
+            fields = left.split()
+            if len(fields) > 4 and fields[4] == "/":
+                return right.split()[0]
+    except (OSError, IndexError):
+        pass
+    return None
+
+
 def interfaces() -> list[str]:
     try:
         return sorted(os.listdir("/sys/class/net"))
@@ -67,6 +80,7 @@ def diagnose(error_text: str = "") -> dict[str, Any]:
     eff_raw = _has(effective, CAP_NET_RAW)
     no_new = st.get("NoNewPrivs") == "1"
     file_cap = nmap_file_capability()
+    fs = root_filesystem()
     named = re.search(r"failed to open device ([\w.@-]+)", error_text, re.I)
     wanted = named.group(1) if named else None
     nics = interfaces()
@@ -79,6 +93,11 @@ def diagnose(error_text: str = "") -> dict[str, Any]:
         cause = "The container runs with no-new-privileges, which stops nmap from using its capabilities. Remove security_opt: no-new-privileges and re-create the container."
     elif wanted and nics and wanted not in nics:
         cause = f"The interface {wanted} is not visible inside the container: it is not using the host network. Add network_mode: host and re-create the container."
+    elif not root and file_cap is False and fs == "aufs":
+        cause = ("The container has NET_RAW and NET_ADMIN, but Docker here uses the aufs storage driver (on a Synology that is a volume formatted as ext4), and aufs does not "
+                 "keep the file capability that the image puts on nmap, which runs as a normal user. A btrfs volume does not have this problem. Work-around, weaker than the default: "
+                 "add user: \"0:0\" to the netlens service AND DAC_OVERRIDE to its cap_add list, then re-create it (tested on aufs). Without DAC_OVERRIDE a root container cannot write "
+                 "its data folder. Read the README (Troubleshooting) for what this costs.")
     elif not root and file_cap is False:
         cause = ("The container has NET_RAW and NET_ADMIN, but the file system under it dropped the capability that the image puts on nmap, and nmap runs as a normal "
                  "user. (Some storage set-ups do this; it does not happen on a current Synology DSM 7.2 with Container Manager 24, where the standard file works.) Work-around, weaker than the default: add user: \"0:0\" to the netlens service AND DAC_OVERRIDE "
@@ -87,7 +106,7 @@ def diagnose(error_text: str = "") -> dict[str, Any]:
         cause = "The container has the capabilities, but nmap, running as a normal user, did not get them. Try running the container as root: add user: \"0:0\" to the netlens service and re-create it."
     findings.append(f"Container capabilities: NET_RAW {'yes' if raw else 'no' if raw is False else '?'}, NET_ADMIN {'yes' if admin else 'no' if admin is False else '?'}")
     findings.append(f"Running as {'root' if root else 'a normal user (uid %d)' % os.geteuid()}; no-new-privileges {'ON' if no_new else 'off'}")
-    findings.append(f"nmap file capability: {'present' if file_cap else 'MISSING' if file_cap is False else 'unknown'}")
+    findings.append(f"nmap file capability: {'present' if file_cap else 'MISSING' if file_cap is False else 'unknown'}" + (f"; container file system: {fs}" if fs else ""))
     if nics:
         findings.append(f"Network interfaces seen: {', '.join(nics[:12])}" + (f" ({wanted} {'is' if wanted in nics else 'is NOT'} among them)" if wanted else ""))
-    return {"cause": cause, "findings": findings, "root": root, "file_capability": file_cap, "bounding": {"NET_RAW": raw, "NET_ADMIN": admin}, "no_new_privileges": no_new}
+    return {"filesystem": fs, "cause": cause, "findings": findings, "root": root, "file_capability": file_cap, "bounding": {"NET_RAW": raw, "NET_ADMIN": admin}, "no_new_privileges": no_new}

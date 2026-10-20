@@ -76,3 +76,21 @@ def test_the_endpoint_is_admin_only(tmp_path):
     with TestClient(app) as viewer:
         viewer.post("/api/login", json={"username": "vera", "password": "a-long-enough-password"})
         assert viewer.get("/api/scans/diagnose").status_code == 403
+
+
+def test_aufs_is_named_as_the_reason_when_the_capability_is_lost(monkeypatch):
+    _status(monkeypatch)
+    monkeypatch.setattr(d, "nmap_file_capability", lambda: False)
+    monkeypatch.setattr(d, "root_filesystem", lambda: "aufs")
+    monkeypatch.setattr(d, "interfaces", lambda: ["eth0", "eth1"])
+    out = d.diagnose("nmap exited with code 1: dnet: Failed to open device eth1")
+    assert "aufs" in out["cause"] and "ext4" in out["cause"] and "DAC_OVERRIDE" in out["cause"] and out["filesystem"] == "aufs"
+    assert any("container file system: aufs" in f for f in out["findings"])
+
+
+def test_the_root_file_system_is_read_from_the_mounts(monkeypatch, tmp_path):
+    f = tmp_path / "mountinfo"
+    f.write_text("161 101 0:82 / / rw,relatime master:3 - aufs none rw,si=abc\n162 161 0:84 / /proc rw - proc proc rw\n")
+    real = d.Path
+    monkeypatch.setattr(d, "Path", lambda p: f if p == "/proc/self/mountinfo" else real(p))
+    assert d.root_filesystem() == "aufs"
