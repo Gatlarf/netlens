@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.116 — 2026-10-20
+
+### Added
+- ★ **Monthly availability per remote site**: on the page of a site, choose a month and see the availability per device and per check, the outages and the time down, for all devices or only the always-on ones, with a CSV download. Time in which the site did not report is listed separately.
+- **More of a site on its page**: the last scan, the backups, the monitored devices, and per device the address, system, open ports and first-seen date.
+
+### Changed
+- ★ **Remote sites alert only for always-on devices**: when a site marks any device as always-on, only those raise "went offline" and "back online" alerts. Sites that mark none behave as before.
+
 ## 0.4.115 — 2026-10-20
 
 ### Added

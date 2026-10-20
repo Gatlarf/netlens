@@ -81,6 +81,42 @@ def probe_detail(probe_id: int, conn=Depends(get_conn)) -> dict[str, Any]:
             "snoozed_until": snoozed["until"] if snoozed else None, "snooze": f"site:{probe_id}"}
 
 
+def _availability(conn, probe_id: int, month: str | None, scope: str, services: bool) -> dict:
+    from datetime import datetime, timezone
+
+    from app import reports, siteavail
+
+    _row(conn, probe_id)
+    month = month or datetime.now(timezone.utc).strftime("%Y-%m")
+    if scope not in reports.SCOPES:
+        raise HTTPException(status_code=422, detail=f"scope must be one of {', '.join(reports.SCOPES)}")
+    try:
+        return siteavail.availability(conn, probe_id, month, scope, services)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/probes/{probe_id}/availability")
+def site_availability(probe_id: int, month: str | None = None, scope: str = "all", services: bool = True, conn=Depends(get_conn)) -> dict[str, Any]:
+    """The availability of the devices and checks of one remote site in a calendar month (default: this one), from the history the site reported."""
+    from app import siteavail
+
+    out = _availability(conn, probe_id, month, scope, services)
+    out["months"] = siteavail.months(conn, probe_id)
+    return out
+
+
+@router.get("/probes/{probe_id}/availability.csv")
+def site_availability_csv(probe_id: int, month: str | None = None, scope: str = "all", services: bool = True, conn=Depends(get_conn)):
+    from fastapi.responses import PlainTextResponse
+
+    from app import reports
+
+    out = _availability(conn, probe_id, month, scope, services)
+    name = "".join(c if c.isalnum() else "-" for c in _row(conn, probe_id)["name"]).strip("-").lower() or "site"
+    return PlainTextResponse(reports.availability_csv(out), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="netlens-{name}-availability-{out["month"]}.csv"'})
+
+
 class CommandBody(BaseModel):
     command: str
 

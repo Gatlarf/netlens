@@ -41,6 +41,49 @@ function setupSteps(name, token) {
     h("p", { class: "hint" }, "Nothing at the other location needs to be reachable from here: it always connects out. If this Netlens sits behind a reverse proxy, its public https address is the one to enter."));
 }
 
+
+const pct = (v) => (v === null || v === undefined ? "–" : `${v}%`.replace(".0%", "%"));
+const monthName = (m) => new Date(`${m}-01T12:00:00Z`).toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
+
+// The monthly availability of one site: the same figures as Reports → Monthly availability, from the history the site reported.
+async function buildAvailabilityCard(probe) {
+  const card = h("div", { class: "card" }), body = h("div", {});
+  let month = "", scope = "all";
+  async function load() {
+    clear(body);
+    let r;
+    try {
+      r = await get(`/api/probes/${probe.id}/availability?scope=${scope}${month ? `&month=${month}` : ""}`);
+    } catch (err) {
+      body.appendChild(h("p", { class: "error" }, err.message || "Could not load the availability"));
+      return;
+    }
+    month = r.month;
+    const sum = r.summary;
+    body.appendChild(h("p", {}, [scope === "core" ? null : `All devices: ${pct(sum.devices_availability)}`, sum.core_devices && scope !== "core" ? `Always-on devices: ${pct(sum.core_availability)}` : scope === "core" ? `Always-on devices: ${pct(sum.core_availability)}` : null,
+      sum.services ? `Checks: ${pct(sum.services_availability)}` : null, `${sum.with_outages} with an outage`].filter(Boolean).join(" · ")));
+    if (sum.silent_seconds >= 60) body.appendChild(h("p", { class: "hint" }, `The site did not report for ${sum.silent_text} this month. That time is not counted in the figures (nothing was measured), but nothing at that location was being watched.`));
+    const rows = [...r.devices.map((d) => ({ ...d, kind: "Device" })), ...r.services.map((x) => ({ ...x, kind: "Check" }))].sort((a, b) => a.availability - b.availability || a.name.localeCompare(b.name));
+    if (!rows.length) { body.appendChild(h("p", { class: "hint" }, "No measurements for this month yet.")); return; }
+    const table = h("table", { class: "data" }, h("thead", {}, h("tr", {}, ["", "Name", "Availability", "Outages", "Longest", "Time down"].map((t) => h("th", {}, t)))),
+      h("tbody", {}, rows.map((d) => h("tr", {}, h("td", { class: "hint" }, d.kind), h("td", {}, shortName(d.name), d.always_on ? h("span", { class: "hint" }, " (always on)") : null),
+        h("td", { class: d.availability < 99 ? "d-bad" : d.availability < 100 ? "d-warn" : "" }, pct(d.availability), d.ongoing ? " (down now)" : ""), h("td", {}, String(d.outages || "")), h("td", {}, d.outages ? d.longest : ""), h("td", {}, d.outages ? d.down_text : "")))));
+    body.appendChild(h("div", { class: "table-wrap" }, table));
+    body.appendChild(h("p", {}, h("a", { class: "btn", href: `/api/probes/${probe.id}/availability.csv?month=${month}&scope=${scope}`, download: "" }, "Download as CSV")));
+    body.appendChild(h("p", { class: "hint" }, "Measured at the resolution of the stored history: every 5 minutes for the last 90 days, hourly before that."));
+  }
+  const first = await get(`/api/probes/${probe.id}/availability`);
+  month = first.month;
+  const monthSel = h("select", { "aria-label": "Month" }, first.months.map((m) => h("option", { value: m }, monthName(m))));
+  monthSel.value = month;
+  monthSel.addEventListener("change", () => { month = monthSel.value; load(); });
+  const scopeSel = h("select", { "aria-label": "Which devices" }, h("option", { value: "all" }, "All devices"), h("option", { value: "core" }, "Only always-on devices"));
+  scopeSel.addEventListener("change", () => { scope = scopeSel.value; load(); });
+  card.append(h("h2", {}, "Availability per month"), h("div", { class: "up-tools" }, monthSel, scopeSel), body);
+  await load();
+  return card;
+}
+
 let managedDirty = false;      // the "Managed from here" card has changes that are not saved: the page must not redraw itself
 const KIND_TITLE = { http: "Website (HTTP/HTTPS)", tcp: "Port (TCP)", dns: "DNS lookup", cert: "Certificate" };
 
@@ -259,6 +302,11 @@ export async function render(container) {
       tile("Devices online", `${p.devices.online} / ${p.devices.total}`, p.devices.core_down ? `${p.devices.core_down} always-on device${p.devices.core_down === 1 ? "" : "s"} offline` : "all always-on devices answer", p.devices.core_down ? "bad" : p.devices.online === p.devices.total ? "ok" : "warn"),
       tile("Service checks", `${p.services.total - p.services.down} / ${p.services.total}`, p.services.down ? `${p.services.down} down` : "all up", p.services.down ? "bad" : "ok"),
       tile("Health", String(p.problems.count), p.problems.count ? (p.problems.critical ? `${p.problems.critical} critical` : `${p.problems.count} warning${p.problems.count === 1 ? "" : "s"}`) : "within limits", p.problems.critical ? "bad" : p.problems.count ? "warn" : "ok")));
+    const bits = [];
+    if (data.scan && data.scan.finished) bits.push(`Last scan ${timeAgo(data.scan.finished)}${data.scan.hosts !== null && data.scan.hosts !== undefined ? ` (${data.scan.hosts} devices found)` : ""}${data.scan.running ? ", one is running now" : ""}`);
+    if (p.backups && p.backups.configured) bits.push(`Backups: ${p.backups.protected}/${p.backups.guests} guests protected${p.backups.failed ? `, ${p.backups.failed} failed` : ""}${p.backups.late ? `, ${p.backups.late} late` : ""}${p.backups.newest ? `, newest ${timeAgo(p.backups.newest)}` : ""}`);
+    if (data.monitors && data.monitors.length) bits.push(`${data.monitors.length} device${data.monitors.length === 1 ? "" : "s"} monitored for health (${data.monitors.filter((m) => m.ok === false).length} cannot be read)`);
+    if (bits.length) body.appendChild(h("p", { class: "hint" }, bits.join(" · ")));
     if (p.vulns && p.vulns.configured) {
       const v = p.vulns, c = v.counts;
       body.appendChild(h("div", { class: "card" }, h("h2", {}, "Vulnerabilities"),
@@ -314,6 +362,7 @@ export async function render(container) {
         /* an older server: nothing to manage */
       }
     }
+    try { body.appendChild(await buildAvailabilityCard(p)); } catch (err) { /* an older server: no figures */ }
     const devCard = h("div", { class: "card" }, h("h2", {}, "Devices"));
     const devTools = h("div", { class: "up-tools" });
     const devTable = h("div", { class: "table-wrap" });
@@ -334,6 +383,8 @@ export async function render(container) {
         btn.addEventListener("click", async () => {
           graphRow.hidden = !graphRow.hidden;
           if (!graphRow.hidden && !graphRow.firstChild.firstChild) {
+            graphRow.firstChild.appendChild(h("p", { class: "hint" }, [d.mac ? `MAC ${d.mac}` : null, d.os ? `System ${d.os}` : null, d.ports && d.ports.length ? `Open ports ${d.ports.join(", ")}` : null,
+              d.first_seen ? `First seen ${fmtTime(d.first_seen)}` : null, m && m.error ? `Health: ${m.error}` : null].filter(Boolean).join(" · ")));
             const card = await buildPerformanceCard("remote", d.id, { title: `${shortName(d.name)}: history` });
             graphRow.firstChild.appendChild(card || h("p", { class: "hint" }, "No measurements yet. They appear after a few reports."));
           }

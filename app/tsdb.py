@@ -363,6 +363,37 @@ class Store:
         finally:
             conn.close()
 
+    def buckets(self, entity: str, entity_id: int, metric: str, start: int, end: int, label: str = "", now: int | None = None) -> list[tuple]:
+        """The finest data there is for [start, end): (ts, width, count, sum, lowest) per bucket, oldest first. Raw samples come as width 1,
+        the 5-minute tier as 300, the hourly tier (for what the 5-minute tier no longer holds) as 3600. Used for availability figures."""
+        now = int(now if now is not None else time.time())
+        try:
+            conn = self._connect()
+        except sqlite3.Error:
+            return []
+        try:
+            s = conn.execute("SELECT id FROM series WHERE entity = ? AND entity_id = ? AND metric = ? AND label = ?", (entity, entity_id, metric, label)).fetchone()
+            if s is None:
+                return []
+            sid = s["id"]
+
+            def done(key: str) -> int:
+                row = conn.execute("SELECT v FROM meta WHERE k = ?", (key,)).fetchone()
+                return row["v"] if row else 0
+
+            m5_from = now - M5_SECONDS + STEP_1H                         # from here the 5-minute tier is complete; before it only the hourly tier is
+            h1_end, m5_end = min(end, max(start, m5_from)), done("m5_done")
+            out = []
+            if start < h1_end:
+                out += [(r[0], STEP_1H, r[1], r[2], r[3]) for r in conn.execute("SELECT ts, n, s, lo FROM h1 WHERE series = ? AND ts >= ? AND ts < ?", (sid, start, h1_end))]
+            lo = max(start, h1_end)
+            if lo < end:
+                out += [(r[0], STEP_5M, r[1], r[2], r[3]) for r in conn.execute("SELECT ts, n, s, lo FROM m5 WHERE series = ? AND ts >= ? AND ts < ? AND ts < ?", (sid, lo, end, m5_end))]
+                out += [(r[0], 1, 1, r[1], r[1]) for r in conn.execute("SELECT ts, v FROM raw WHERE series = ? AND ts >= ? AND ts < ? AND ts >= ?", (sid, lo, end, m5_end))]
+            return sorted(out)
+        finally:
+            conn.close()
+
     def query(self, entity: str, entity_id: int, metric: str, label: str = "", span: int = 86400, end: int | None = None, points: int = 240) -> dict:
         """Points [[t, avg, min, max], ...] for the last `span` seconds, oldest first, at most about `points` of them."""
         end = int(end if end is not None else time.time())

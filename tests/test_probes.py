@@ -56,11 +56,11 @@ def test_token_is_stored_as_a_hash(conn):
 
 def test_first_report_is_the_baseline_and_changes_raise_events(conn):
     row, _ = make(conn)
-    first = {"devices": [device("aa:00:00:00:00:01", "printer"), device("aa:00:00:00:00:02", "nas", always_on=True)], "services": [service("svc:1", "Web")]}
+    first = {"devices": [device("aa:00:00:00:00:01", "printer", always_on=True), device("aa:00:00:00:00:02", "nas", always_on=True)], "services": [service("svc:1", "Web")]}
     result = probes.ingest(conn, row, first, now=NOW)
     assert result["devices"] == 2 and kinds(conn) == []                   # nothing is "new" on the first report
     row = conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone()
-    second = {"devices": [device("aa:00:00:00:00:01", "printer", online=False), device("aa:00:00:00:00:02", "nas", always_on=True), device("aa:00:00:00:00:03", "phone")],
+    second = {"devices": [device("aa:00:00:00:00:01", "printer", online=False, always_on=True), device("aa:00:00:00:00:02", "nas", always_on=True), device("aa:00:00:00:00:03", "phone")],
               "services": [service("svc:1", "Web", "down")]}
     probes.ingest(conn, row, second, now=LATER)
     assert set(kinds(conn)) == {"remote_offline", "remote_new", "remote_service_down"}
@@ -68,7 +68,7 @@ def test_first_report_is_the_baseline_and_changes_raise_events(conn):
     assert any("Branch office: printer (192.168.1.10) went offline" == d for d in details)
     assert any("Web" in d and "timed out" in d for d in details)
     p = probes.get(conn, row["id"])
-    assert p["devices"] == {"total": 3, "online": 2, "core_down": 0} and p["services"] == {"total": 1, "down": 1} and p["state"] in ("connected", "silent")
+    assert p["devices"] == {"total": 3, "online": 2, "core_down": 1} and p["services"] == {"total": 1, "down": 1} and p["state"] in ("connected", "silent")
 
 
 def test_health_problems_are_diffed(conn):
@@ -452,3 +452,67 @@ async def test_a_site_starts_the_scan_it_was_asked_for():
     assert await central.run_commands({"commands": ["scan", "scan_deep"]}, m) == ["scan", "scan_deep"] and m.started == ["quick", "deep"]
     assert await central.run_commands({"commands": ["scan"]}, Manager(busy=True)) == []
     assert await central.run_commands({}, m) == []
+
+
+def test_only_always_on_devices_raise_offline_alerts_when_the_site_marks_any(conn):
+    row, _ = make(conn)
+    both = [device("aa:00:00:00:00:01", "router", always_on=True), device("aa:00:00:00:00:02", "phone")]
+    report(conn, row, both, NOW)
+    report(conn, row, [device("aa:00:00:00:00:01", "router", always_on=True), device("aa:00:00:00:00:02", "phone", online=False)], LATER)
+    assert kinds(conn) == []                                                     # a phone going offline is not worth an alert
+    report(conn, row, [device("aa:00:00:00:00:01", "router", online=False, always_on=True), device("aa:00:00:00:00:02", "phone", online=False)], "2026-03-10T12:02:00Z")
+    assert kinds(conn) == ["remote_offline"]
+    row2, _ = make(conn, "Unmarked")                                             # nothing marked there: every device counts, as before
+    report(conn, row2, [device("aa:00:00:00:00:05", "pc")], NOW)
+    report(conn, row2, [device("aa:00:00:00:00:05", "pc", online=False)], LATER)
+    assert kinds(conn) == ["remote_offline", "remote_offline"]
+
+
+def test_the_monthly_availability_of_a_site(conn):
+    from datetime import datetime, timezone
+
+    from app import siteavail
+
+    row, _ = make(conn)
+    report(conn, row, [device("aa:00:00:00:00:01", "router", always_on=True), device("aa:00:00:00:00:02", "phone")], NOW)
+    ids = {r["key"]: r["id"] for r in conn.execute("SELECT key, id FROM remote_devices")}
+    store = tsdb.for_conn(conn)
+    t0 = int(datetime(2026, 3, 1, tzinfo=timezone.utc).timestamp())
+    rows = []
+    for i in range(0, 10 * 86400, 300):                                          # ten days, every 5 minutes; the router is down for one hour on day 3
+        t = t0 + i
+        down = 2 * 86400 <= i < 2 * 86400 + 3600
+        rows.append((t, "remote", ids["aa:00:00:00:00:01"], "up", 0.0 if down else 1.0, "", "state"))
+        rows.append((t, "remote", ids["aa:00:00:00:00:02"], "up", 1.0, "", "state"))
+    store.record_bulk(rows)
+    now = datetime(2026, 3, 11, tzinfo=timezone.utc)
+    store.rollup(int(now.timestamp()))
+    out = siteavail.availability(conn, row["id"], "2026-03", now=now)
+    router = next(d for d in out["devices"] if d["name"] == "router")
+    assert router["outages"] == 1 and 3300 <= router["down_seconds"] <= 3900 and 99.5 < router["availability"] < 99.8 and router["longest"] in ("1 h", "55 min", "60 min", "65 min")
+    assert next(d for d in out["devices"] if d["name"] == "phone")["availability"] == 100.0 and out["summary"]["with_outages"] == 1
+    only = siteavail.availability(conn, row["id"], "2026-03", scope="core", now=now)
+    assert [d["name"] for d in only["devices"]] == ["router"] and only["summary"]["core_availability"] == router["availability"]
+    assert siteavail.availability(conn, row["id"], "2026-02", now=now)["devices"] == []
+
+
+def test_the_months_of_a_site_start_when_it_was_added(conn):
+    from datetime import datetime, timezone
+
+    from app import siteavail
+
+    row, _ = make(conn)
+    conn.execute("UPDATE probes SET created = '2026-01-15T10:00:00Z' WHERE id = ?", (row["id"],))
+    assert siteavail.months(conn, row["id"], datetime(2026, 3, 5, tzinfo=timezone.utc)) == ["2026-03", "2026-02", "2026-01"]
+
+
+def test_the_availability_api_and_csv(client):
+    made = client.post("/api/probes", json={"name": "Av"}).json()
+    pid = made["probe"]["id"]
+    j = client.get(f"/api/probes/{pid}/availability?month=2026-03").json()
+    assert j["devices"] == [] and j["month"] == "2026-03" and j["months"]
+    assert client.get(f"/api/probes/{pid}/availability?month=nonsense").status_code == 422
+    assert client.get(f"/api/probes/{pid}/availability?scope=x").status_code == 422
+    assert client.get("/api/probes/999/availability").status_code == 404
+    csv = client.get(f"/api/probes/{pid}/availability.csv?month=2026-03")
+    assert csv.status_code == 200 and "Availability %" in csv.text and "netlens-av-availability-2026-03.csv" in csv.headers["content-disposition"]

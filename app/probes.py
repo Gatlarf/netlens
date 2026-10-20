@@ -217,6 +217,7 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
     old_devices = {r["key"]: r for r in conn.execute("SELECT * FROM remote_devices WHERE probe_id = ?", (probe_id,))}
     old_services = {r["key"]: r for r in conn.execute("SELECT * FROM remote_services WHERE probe_id = ?", (probe_id,))}
 
+    marked = any(d["always_on"] for d in devices)       # when the site marks its always-on devices, only those raise an offline alert (nobody wants one for a phone)
     seen_keys = set()
     for d in devices:
         if d["key"] in seen_keys:
@@ -232,7 +233,7 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
                 (probe_id, d["key"], d["mac"], d["ip"], d["name"], d["vendor"], d["type"], d["os"], int(d["online"]), int(d["always_on"]), json.dumps(d["ports"]),
                  d["first_seen"], d["last_seen"]))
         else:
-            if not baseline and bool(before["online"]) != d["online"]:
+            if not baseline and bool(before["online"]) != d["online"] and (d["always_on"] or not marked):
                 events.append(("remote_online" if d["online"] else "remote_offline", f"{site}: {shown} " + ("is back online" if d["online"] else "went offline")))
             conn.execute(
                 "UPDATE remote_devices SET mac=?, ip=?, name=?, vendor=?, type=?, os=?, online=?, always_on=?, ports=?, last_seen=? WHERE id=?",
