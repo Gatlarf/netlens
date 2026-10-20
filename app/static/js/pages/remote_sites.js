@@ -93,6 +93,7 @@ async function buildManagedCard(probe, devices, state) {
   let cfg = await get(`/api/probes/${probe.id}/config`);
   let draft = JSON.parse(JSON.stringify(cfg));
   let dirty = false;
+  let editSvc = null, editMon = null;          // index of the check or monitor being changed
   managedDirty = false;
 
   function status() {
@@ -110,29 +111,55 @@ async function buildManagedCard(probe, devices, state) {
     if (!draft.services.length) card.appendChild(h("p", { class: "hint" }, "None."));
     for (const [i, s] of draft.services.entries()) {
       card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, s.name),
-        h("span", {}, `${KIND_TITLE[s.kind] || s.kind} · ${s.host}${s.port ? `:${s.port}` : ""}${s.path || ""}`, " ",
-          h("button", { class: "btn", type: "button", onclick: () => { draft.services.splice(i, 1); dirty = true; draw(); } }, "Remove"))));
+        h("span", {}, `${KIND_TITLE[s.kind] || s.kind} · ${s.host}${s.port ? `:${s.port}` : ""}${s.path || ""} · every ${s.interval_s || 60} s`, " ",
+          h("button", { class: "btn", type: "button", onclick: () => { editSvc = i; draw(); } }, "Edit"), " ",
+          h("button", { class: "btn", type: "button", onclick: () => { draft.services.splice(i, 1); editSvc = null; dirty = true; draw(); } }, "Remove"))));
     }
     const name = h("input", { type: "text", placeholder: "Name" }), kind = h("select", {}, Object.entries(KIND_TITLE).map(([k, t]) => h("option", { value: k }, t)));
     const host = h("input", { type: "text", placeholder: "Host or address" }), port = h("input", { type: "number", placeholder: "Port" }), path = h("input", { type: "text", placeholder: "Path or name (/ , example.com)" });
-    const addService = h("button", { class: "btn", type: "button" }, "Add the check");
+    const every = h("input", { type: "number", min: "10", max: "86400", placeholder: "Every (s)", title: "Seconds between checks", style: "width:6.5rem" });
+    const was = editSvc !== null ? draft.services[editSvc] : null;
+    if (was) { name.value = was.name; kind.value = was.kind; host.value = was.host; port.value = was.port || ""; path.value = was.path || ""; every.value = was.interval_s || 60; } else every.value = 60;
+    const addService = h("button", { class: "btn", type: "button" }, was ? "Update the check" : "Add the check");
     addService.addEventListener("click", () => {
       if (!name.value.trim() || !host.value.trim()) { toast("Give the check a name and a host", "error"); return; }
-      const item = { name: name.value.trim(), kind: kind.value, host: host.value.trim(), path: path.value.trim(), interval_s: 60, timeout_s: 5 };
-      if (port.value) item.port = Number(port.value);
-      draft.services.push(item);
+      const item = { ...(was || {}), name: name.value.trim(), kind: kind.value, host: host.value.trim(), path: path.value.trim(), interval_s: Number(every.value) || 60, timeout_s: (was && was.timeout_s) || 5 };
+      if (port.value) item.port = Number(port.value); else delete item.port;
+      if (was) draft.services[editSvc] = item; else draft.services.push(item);
+      editSvc = null;
       dirty = true;
       draw();
     });
-    card.appendChild(h("div", { class: "rs-add" }, name, kind, host, port, path, addService));
+    card.appendChild(h("div", { class: "rs-add" }, name, kind, host, port, path, every, addService, was ? h("button", { class: "btn", type: "button", onclick: () => { editSvc = null; draw(); } }, "Cancel") : null));
 
     card.appendChild(h("h3", {}, "Health monitors"));
     if (!draft.monitors.length) card.appendChild(h("p", { class: "hint" }, "None."));
     for (const [i, m] of draft.monitors.entries()) {
       const dev = devices.find((d) => d.key === m.device_key);
       card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, dev ? dev.name : m.device_key),
-        h("span", {}, `${m.method.toUpperCase()}${m.version ? ` ${m.version}` : ""} · every ${m.interval_s} s`, " ",
-          h("button", { class: "btn", type: "button", onclick: () => { draft.monitors.splice(i, 1); dirty = true; draw(); } }, "Remove"))));
+        h("span", {}, `${m.method.toUpperCase()}${m.version ? ` ${m.version}` : ""} · every ${m.interval_s} s${m.alerts === false ? " · no alerts" : ""}`, " ",
+          h("button", { class: "btn", type: "button", onclick: () => { editMon = i; draw(); } }, "Edit"), " ",
+          h("button", { class: "btn", type: "button", onclick: () => { draft.monitors.splice(i, 1); editMon = null; dirty = true; draw(); } }, "Remove"))));
+    }
+    if (editMon !== null) {
+      const m = draft.monitors[editMon], dev = devices.find((d) => d.key === m.device_key);
+      const every = h("input", { type: "number", min: "15", max: "86400", value: String(m.interval_s), style: "width:6.5rem", "aria-label": "Seconds between readings" });
+      const alerts = h("input", { type: "checkbox" });
+      alerts.checked = m.alerts !== false;
+      const community = h("input", { type: "password", autocomplete: "off", placeholder: "New community (empty keeps the saved one)" });
+      const pass = h("input", { type: "password", autocomplete: "new-password", placeholder: "New password (empty keeps the saved one)" });
+      const apply = h("button", { class: "btn", type: "button" }, "Update the monitor");
+      apply.addEventListener("click", () => {
+        m.interval_s = Number(every.value) || 60;
+        m.alerts = alerts.checked;
+        if (m.method === "snmp" && community.value) m.community = community.value;
+        if (m.method === "ssh" && pass.value) m.password = pass.value;
+        editMon = null;
+        dirty = true;
+        draw();
+      });
+      card.appendChild(h("div", { class: "rs-add" }, h("strong", {}, `${dev ? dev.name : m.device_key}: `), every, h("label", {}, alerts, " alerts"), m.method === "snmp" ? community : pass, apply,
+        h("button", { class: "btn", type: "button", onclick: () => { editMon = null; draw(); } }, "Cancel")));
     }
     const free = devices.filter((d) => !draft.monitors.some((m) => m.device_key === d.key));
     const device = h("select", {}, free.map((d) => h("option", { value: d.key }, `${d.name}${d.ip ? ` (${d.ip})` : ""}`)));
@@ -250,6 +277,33 @@ export async function render(container) {
     name.focus();
   }
 
+  // Removing a site: everything this Netlens kept for it goes; the alerts raised about it can stay as history or go too.
+  function removeForm(p) {
+    clear(form);
+    const events = h("input", { type: "checkbox" });
+    const go = h("button", { class: "btn danger", type: "button" }, `Remove ${p.name}`);
+    go.addEventListener("click", async () => {
+      go.disabled = true;
+      try {
+        const r = await del(`/api/probes/${p.id}${events.checked ? "?events=true" : ""}`);
+        const d = r.details || {};
+        const parts = [`${d.devices} device${d.devices === 1 ? "" : "s"}`, `${d.checks} check${d.checks === 1 ? "" : "s"}`, d.events ? `${d.events} event${d.events === 1 ? "" : "s"}` : null, d.windows ? `${d.windows} maintenance window${d.windows === 1 ? "" : "s"} updated` : null, d.logins ? `${d.logins} customer login${d.logins === 1 ? "" : "s"} updated` : null].filter(Boolean);
+        toast(`Removed ${p.name}: ${parts.join(", ")}`, "success");
+        clear(form);
+        location.hash = "#/remote-sites";
+      } catch (err) {
+        toast(err.message || "Could not remove", "error");
+        go.disabled = false;
+      }
+    });
+    form.appendChild(h("div", { class: "card error" }, h("h2", {}, `Remove ${p.name}?`),
+      h("p", {}, "This removes the site, its devices and checks, their graphs, its snooze and what is waiting to be sent to it, and takes it out of maintenance windows and customer logins. A customer login that only saw this site is disabled."),
+      h("label", { class: "check" }, events, ` Also delete the alerts raised about this site (otherwise they stay in the history)`),
+      h("p", { class: "hint" }, "The remote Netlens keeps running; switch off Settings → Report to a central Netlens there, or it will keep trying with the old token."),
+      h("div", { class: "form-actions" }, go, h("button", { class: "btn", type: "button", onclick: () => clear(form) }, "Cancel"))));
+    form.scrollIntoView({ block: "nearest" });
+  }
+
   async function showDetail(id) {
     let data;
     try {
@@ -287,10 +341,7 @@ export async function render(container) {
         if (!window.confirm("Make a new token? The remote Netlens stops reporting until you enter the new one there.")) return;
         try { const r = await post(`/api/probes/${id}/token`, {}); clear(form); form.appendChild(setupSteps(p.name, r.token)); form.scrollIntoView({ block: "nearest" }); } catch (err) { toast(err.message || "Could not make a token", "error"); }
       } }, "New token"),
-      h("button", { class: "btn danger", type: "button", onclick: async () => {
-        if (!window.confirm(`Remove ${p.name} and everything it reported (devices, checks and graphs)?`)) return;
-        try { await del(`/api/probes/${id}`); toast("Removed", "success"); location.hash = "#/remote-sites"; } catch (err) { toast(err.message || "Could not remove", "error"); }
-      } }, "Remove"));
+      h("button", { class: "btn danger", type: "button", onclick: () => removeForm(p) }, "Remove"));
     top.append(h("div", { class: "up-head" }, h("div", {}, h("p", {}, h("a", { href: "#/remote-sites" }, "← Remote sites")), h("h1", {}, p.name),
       h("p", { class: "hint" }, p.last_seen ? `Last report ${timeAgo(p.last_seen)} (${fmtTime(p.last_seen)})${p.version ? ` · Netlens ${p.version}` : ""}${p.last_ip ? ` · from ${p.last_ip}` : ""}` : "Has not reported yet")),
     admin ? tools : null));

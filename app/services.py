@@ -458,7 +458,9 @@ async def run_due_checks(db_path: str, now: str | None = None) -> int:
 
 
 def prune_results(conn, now: str | None = None) -> None:
-    cutoff = (_parse(now or utcnow()) - timedelta(days=RESULT_RETENTION_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    from app import dbmaint
+
+    cutoff = (_parse(now or utcnow()) - timedelta(days=dbmaint.days(conn, "service_results_days"))).strftime("%Y-%m-%dT%H:%M:%SZ")
     conn.execute("DELETE FROM service_results WHERE ts < ?", (cutoff,))
     conn.commit()
 
@@ -580,11 +582,13 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
                 try:
                     prune_results(conn)
                     try:
-                        from app import audit
+                        from app import audit, dbmaint
 
                         audit.prune(conn)
+                        if dbmaint.due(conn):                 # the weekly upkeep: retention, leftovers, optimize
+                            await asyncio.to_thread(dbmaint.run_tidy, conn)
                     except Exception:  # noqa: BLE001
-                        log.exception("pruning the audit log failed")
+                        log.exception("pruning the audit log or the weekly database upkeep failed")
                     try:
                         from app import forecast
 

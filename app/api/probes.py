@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from app import probes as probes_mod
 from app.api.devices import get_conn
-from app.auth import LoginLimiter, client_ip
+from app.auth import LoginLimiter, client_ip, sites_of
 from app.db import connect
 
 router = APIRouter(prefix="/api", tags=["remote-sites"])
@@ -33,8 +33,9 @@ def _row(conn, probe_id: int):
 
 
 @router.get("/probes")
-def list_probes(conn=Depends(get_conn)) -> list[dict]:
-    return [probes_mod.present(conn, r) for r in conn.execute("SELECT * FROM probes ORDER BY name COLLATE NOCASE")]
+def list_probes(request: Request, conn=Depends(get_conn)) -> list[dict]:
+    mine = sites_of(request)                 # a customer login sees only its own sites
+    return [probes_mod.present(conn, r) for r in conn.execute("SELECT * FROM probes ORDER BY name COLLATE NOCASE") if mine is None or r["id"] in mine]
 
 
 @router.get("/probes-search")
@@ -186,10 +187,10 @@ def put_config(probe_id: int, body: ConfigBody, conn=Depends(get_conn)) -> dict[
 
 
 @router.delete("/probes/{probe_id}")
-def delete_probe(probe_id: int, conn=Depends(get_conn)) -> dict:
+def delete_probe(probe_id: int, events: bool = False, conn=Depends(get_conn)) -> dict:
+    """Remove a site with everything kept for it. `events=true` also removes the alerts raised about it."""
     _row(conn, probe_id)
-    probes_mod.delete(conn, probe_id)
-    return {"removed": probe_id}
+    return {"removed": probe_id, "details": probes_mod.delete(conn, probe_id, events=events)}
 
 
 # ----------------------------------------------------------------------------- the report of a probe

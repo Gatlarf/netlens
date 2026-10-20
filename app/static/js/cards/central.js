@@ -24,10 +24,13 @@ export async function buildCentralCard() {
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = info.enabled;
     const result = h("div", {});
+    const trust = h("input", { type: "checkbox" });
+    trust.checked = !!info.pin;
     const accept = h("input", { type: "checkbox" });
     accept.checked = !!info.accept_config;
     const body = () => {
       const out = { url: url.value.trim(), enabled: enabled.checked, accept_config: accept.checked };
+      if (trust.checked !== !!info.pin || (trust.checked && url.value.trim() !== info.url)) out.trust_certificate = trust.checked;
       if (token.value.trim()) out.token = token.value.trim();
       return out;
     };
@@ -71,6 +74,9 @@ export async function buildCentralCard() {
     card.appendChild(h("form", { class: "edit-form", onsubmit: (e) => e.preventDefault() },
       field("Address of the central Netlens", url, "Use https:// across the internet. A plain http:// address is accepted for a server on your own network (a VPN, for example)."),
       field("Token", token, "Made on the central Netlens for this location. It is stored encrypted here."),
+      h("label", {}, trust, " Trust the certificate of the central Netlens (it is self-signed)"),
+      h("p", { class: "hint" }, info.pin ? `Trusted certificate (SHA-256): ${info.pin}. Compare it with the certificate of the central Netlens. If that certificate is ever replaced, reports stop until you untick this box, save, tick it and save again.`
+        : "Only for a central Netlens with its own (self-signed) certificate, for example behind a VPN. Netlens remembers the certificate it sees when you save and accepts only that one. With a normal certificate (Let’s Encrypt, a reverse proxy) leave this off."),
       h("label", {}, enabled, " Report to the central Netlens"),
       h("label", {}, accept, " Accept configuration and commands from the central Netlens"),
       h("p", { class: "hint" }, "When ticked, the central Netlens may set up service checks and health monitors here (they appear marked as managed from the central Netlens and cannot be changed here) and ask this Netlens to scan its network. Leave it off to keep all settings at this location. Logins it sends are stored encrypted."),

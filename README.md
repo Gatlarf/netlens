@@ -536,6 +536,14 @@ The central Netlens keeps the remote devices apart from its own (two sites may u
 
 **Scan now, snooze and the site's own log.** With the same tick box a site also takes commands: *Scan now* on the page of a site asks the remote Netlens to scan its network (it starts with the site's next report, so within a minute). *Snooze* on that page holds back all alerts of the site for an hour to a week, for planned work at that location; the events are still recorded, marked as snoozed. The page also lists the recent events of the site, and warns when the clock of the remote machine is more than two minutes off from the central one (graphs would be shifted). The remote Netlens shows the same warning on its Settings page.
 
+**Removing a site.** *Remove* on the page of a site deletes the site, its devices and checks, the graph history of both, its snooze, the configuration and commands waiting for it, and takes it out of maintenance windows and customer logins (a customer login that only saw that site is disabled, so it never turns into an unlimited one). You choose whether the alerts raised about the site stay in the history (the default) or go too, and Netlens tells you what it removed. Switch off *Report to a central Netlens* on the remote side, or it keeps trying with the old token. Anything that could still be left behind (for example after a crash) is found by **Settings → Database → Clean up leftovers**.
+
+**Managed checks can be edited**: *Edit* next to a check or monitor in *Managed from here* changes its address, port, interval or alerts, without losing the saved login.
+
+**A central Netlens with a self-signed certificate.** Tick *Trust the certificate of the central Netlens* in **Settings → Report to a central Netlens**: Netlens remembers the fingerprint of the certificate it sees when you save, shows it so you can compare it, and from then on accepts exactly that certificate and nothing else. If the certificate is replaced, reports stop with a clear message until you trust the new one. With a normal certificate (Let's Encrypt, a reverse proxy) leave it off.
+
+**Maintenance windows and customer logins cover sites.** A maintenance window can cover chosen remote sites (everything about them is held back during the window, including a site that stops reporting; if it is still silent when the window ends you get the normal alert). A viewer can be limited to chosen remote sites (**Settings → Users & tokens → Limit to sites**, business feature): a customer then signs in and sees only their own sites, with graphs, checks, events and the monthly availability, and nothing else.
+
 **Everything of a site on one page.** Besides the devices, checks and health, the page of a site shows the last scan, the backups and the monitored devices of that location, the details of each device (address, system, open ports, first seen) with its graphs, and **Availability per month**: pick a month and see, per device and per check, the availability, the number and length of outages and the time down, for all devices or only the always-on ones, with a CSV download. The figures come from the history the site reported (every 5 minutes for the last 90 days, hourly before that); time in which the site did not report at all is not counted but is listed. **A remote site raises offline alerts only for its always-on devices** as soon as it has marked any (phones and tablets would otherwise bury the real problems); new devices, failing checks and health problems are announced as before.
 
 ### Maintenance windows
@@ -807,6 +815,16 @@ The **Full scan** button next to a device's name runs one thorough scan of that 
 ### Backup and restore
 
 **Settings → Backup and restore → Download backup** gives you a consistent snapshot of the whole database (devices, history, settings, saved credentials) and the installed plugins (their code, not the built-in ones) while Netlens keeps running. A restore into a new container therefore brings everything back as it was, plugins included and switched on as before; the plugin versions of the backup replace the installed ones. Backups made before 0.3.129 have no plugin code: restore them, then install the plugins again from the Plugins page (it lists them, and their settings come back). **Restore from file** replaces the current data with a backup; it asks for confirmation, refuses to run during a scan, keeps a safety copy of the previous data next to the database (`netlens.db.pre-restore`), and upgrades a backup made by an older version automatically. A backup from a newer Netlens version is refused. Treat backup files like passwords because they contain the saved SMTP and plugin credentials.
+
+### Database maintenance
+
+**Settings → Database** shows what the data takes and gives you the tools to tidy it. Netlens keeps two files: the main database (devices, events, scans, settings) and the graph store (measurements; it prunes itself: 7 days in full detail, 90 days at 5 minutes, 2 years per hour). The page shows both sizes, how much of the main file could be reclaimed, the free disk space and every table with its rows and size.
+
+- **How long data is kept**: events (default 2 years), finished scans (1 year), presence checks (90 days), service check results (30 days) and the audit log (1 year). Events and scans used to grow for ever; 0 keeps them for ever.
+- **Remove old data** (with a preview that only counts), **Clean up leftovers** (rows and graph series that belong to devices, checks or remote sites that no longer exist, found with a preview first), **Optimize** (refreshes the statistics the database uses), **Rebuild indexes**, **Compact** (VACUUM: gives freed space back to the disk; needs free space of about the size of the larger file, and writes wait for a moment) and **Check integrity** (both files, and rows that point at nothing).
+- **A weekly run** (Sunday night) removes old data, cleans up leftovers, optimizes and checkpoints by itself; **Run it now** does the same on demand. Compacting stays a button of its own. Every action is in the audit log, and the page says when the weekly run last ran.
+
+Only administrators see this page. Two indexes were added for the events table (by device and by kind), which makes removing a device or a site much faster on a database with many events.
 
 ### Scan progress
 

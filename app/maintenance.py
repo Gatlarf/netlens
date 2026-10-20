@@ -17,6 +17,8 @@ from datetime import datetime, timedelta, timezone
 from app.db import add_event, get_setting, set_setting
 
 KEY = "maintenance_windows"
+SITE_SILENCED = {"remote_new", "remote_offline", "remote_online", "remote_service_down", "remote_service_up", "remote_metric_warning", "remote_metric_critical", "remote_metric_ok",
+                 "probe_offline", "probe_online"}      # what a window holds back about a remote site
 SILENCED = {"device_offline", "device_online", "service_down", "service_up", "metric_warning", "metric_critical", "metric_ok", "capacity_warning", "capacity_critical", "anomaly"}     # events a window holds back
 DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
@@ -56,9 +58,9 @@ def clean_window(data: dict, current: dict | None = None) -> dict:
         raise ValueError("give the window a name (at most 80 characters)")
     scope_in = data.get("scope") if isinstance(data.get("scope"), dict) else {}
     scope = {"all": bool(scope_in.get("all")), "groups": _ids(scope_in.get("groups", []), "groups"),
-             "devices": _ids(scope_in.get("devices", []), "devices"), "behind": bool(scope_in.get("behind"))}
-    if not (scope["all"] or scope["groups"] or scope["devices"]):
-        raise ValueError("choose what the window covers: everything, a group or some devices")
+             "devices": _ids(scope_in.get("devices", []), "devices"), "behind": bool(scope_in.get("behind")), "sites": _ids(scope_in.get("sites", []), "sites")}
+    if not (scope["all"] or scope["groups"] or scope["devices"] or scope["sites"]):
+        raise ValueError("choose what the window covers: everything, a group, some devices or a remote site")
     sched_in = data.get("schedule") if isinstance(data.get("schedule"), dict) else {}
     kind = sched_in.get("type")
     if kind == "weekly":
@@ -187,12 +189,45 @@ def covered(conn: sqlite3.Connection, now: datetime | None = None) -> dict[int, 
     return out
 
 
-def tag_for(conn: sqlite3.Connection, kind: str, device_id: int | None, now: str | None = None) -> str | None:
-    """The window an event belongs to, when it is one a window holds back (used by add_event)."""
+def covered_sites(conn: sqlite3.Connection, now: datetime | None = None) -> dict[int, str]:
+    """Remote site id -> name of the active window that covers it."""
+    now = now or datetime.now(timezone.utc)
+    out: dict[int, str] = {}
+    for window in load_windows(conn):
+        if is_active(window, now):
+            for sid in window["scope"].get("sites", []):
+                out.setdefault(sid, window["name"])
+    return out
+
+
+def tag_for(conn: sqlite3.Connection, kind: str, device_id: int | None, now: str | None = None, subject: str | None = None) -> str | None:
+    """The window an event belongs to, when it is one a window holds back (used by add_event). A remote site's event carries the subject `site:<id>`."""
+    when = datetime.strptime(now, STAMP).replace(tzinfo=timezone.utc) if now else datetime.now(timezone.utc)
+    if subject and subject.startswith("site:") and kind in SITE_SILENCED:
+        try:
+            return covered_sites(conn, when).get(int(subject[5:]))
+        except ValueError:
+            return None
     if device_id is None or kind not in SILENCED:
         return None
-    when = datetime.strptime(now, STAMP).replace(tzinfo=timezone.utc) if now else datetime.now(timezone.utc)
     return covered(conn, when).get(device_id)
+
+
+def forget_site(conn: sqlite3.Connection, probe_id: int) -> int:
+    """A removed remote site leaves the windows that listed it; a window that only covered that site is removed. Returns how many windows changed."""
+    changed, kept = 0, []
+    for w in load_windows(conn):
+        sites = w["scope"].get("sites", [])
+        if probe_id in sites:
+            changed += 1
+            w["scope"]["sites"] = [x for x in sites if x != probe_id]
+            sc = w["scope"]
+            if not (sc["all"] or sc["groups"] or sc["devices"] or sc["sites"]):
+                continue
+        kept.append(w)
+    if changed:
+        save_windows(conn, kept)
+    return changed
 
 
 # ----------------------------------------------------------------------------- after a window
@@ -208,5 +243,14 @@ def announce_still_down(conn: sqlite3.Connection, now: datetime | None = None) -
         last = conn.execute("SELECT kind, maintenance FROM events WHERE device_id = ? AND kind IN ('device_offline', 'device_online') ORDER BY id DESC LIMIT 1", (row["id"],)).fetchone()
         if last and last["kind"] == "device_offline" and last["maintenance"] and last["maintenance"] != "Snoozed":
             add_event(conn, "device_offline", f"{row['primary_ip'] or ''} still offline after maintenance '{last['maintenance']}'".strip(), device_id=row["id"], now=now.strftime(STAMP))
+            announced += 1
+    held_sites = covered_sites(conn, now)
+    for row in conn.execute("SELECT id, name, customer FROM probes WHERE offline_notified = 1 AND enabled = 1").fetchall():       # a site that went silent during a window and still is
+        if row["id"] in held_sites:
+            continue
+        last = conn.execute("SELECT kind, maintenance FROM events WHERE kind IN ('probe_offline', 'probe_online') AND detail LIKE ? ORDER BY id DESC LIMIT 1", (f"{row['name']}%",)).fetchone() \
+            or conn.execute("SELECT kind, maintenance FROM events WHERE kind IN ('probe_offline', 'probe_online') AND detail LIKE ? ORDER BY id DESC LIMIT 1", (f"%/ {row['name']}%",)).fetchone()
+        if last and last["kind"] == "probe_offline" and last["maintenance"] and last["maintenance"] != "Snoozed":
+            add_event(conn, "probe_offline", f"{row['name']} is still not reporting after maintenance '{last['maintenance']}'", now=now.strftime(STAMP), subject=f"site:{row['id']}")
             announced += 1
     return announced

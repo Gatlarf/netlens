@@ -441,6 +441,10 @@ def take_commands(conn: sqlite3.Connection, probe_id: int) -> list[str]:
     return queue
 
 
+def site_event_ids(conn: sqlite3.Connection, probe_id: int) -> list[int]:
+    return [e["id"] for e in site_events(conn, probe_id, limit=10**9)]
+
+
 def site_events(conn: sqlite3.Connection, probe_id: int, limit: int = 30) -> list[dict]:
     """What happened at a site, newest first: the alerts this Netlens raised about it (they all start with the site's name)."""
     row = conn.execute("SELECT name, customer FROM probes WHERE id = ?", (probe_id,)).fetchone()
@@ -453,10 +457,39 @@ def site_events(conn: sqlite3.Connection, probe_id: int, limit: int = 30) -> lis
     return [dict(r) for r in rows]
 
 
-def delete(conn: sqlite3.Connection, probe_id: int) -> None:
-    for table, entity in (("remote_devices", "remote"), ("remote_services", "remote_service")):
+def delete(conn: sqlite3.Connection, probe_id: int, events: bool = False) -> dict[str, int]:
+    """Remove a remote site and everything this Netlens kept for it: its devices and checks, their graph history, the snooze, the commands and
+    configuration waiting for it, and its place in maintenance windows and customer logins. `events=True` also removes the alerts raised about it
+    (otherwise they stay in the history, which is what an audit trail wants). Returns what was removed."""
+    gone = {"devices": 0, "checks": 0, "events": 0, "snoozes": 0, "windows": 0, "logins": 0}
+    if events:
+        gone["events"] = len(site_event_ids(conn, probe_id))
+        for chunk in _chunks(site_event_ids(conn, probe_id)):
+            conn.execute(f"DELETE FROM events WHERE id IN ({','.join('?' * len(chunk))})", chunk)
+    for table, entity, key in (("remote_devices", "remote", "devices"), ("remote_services", "remote_service", "checks")):
         for r in conn.execute(f"SELECT id FROM {table} WHERE probe_id = ?", (probe_id,)).fetchall():
             tsdb_forget(entity, r["id"], conn)
+            gone[key] += 1
     conn.execute("DELETE FROM probes WHERE id = ?", (probe_id,))
     conn.execute("DELETE FROM settings WHERE key IN (?, ?)", (_commands_key(probe_id), f"probe.config.{probe_id}"))
+    from app import maintenance, snooze
+
+    if snooze.clear(conn, f"site:{probe_id}"):
+        gone["snoozes"] = 1
+    try:
+        gone["windows"] = maintenance.forget_site(conn, probe_id)
+    except Exception:  # noqa: BLE001 - a broken window list must not keep a site from being removed
+        log.exception("removing the site from the maintenance windows failed")
+    try:
+        from app import users
+
+        gone["logins"] = users.forget_site(conn, probe_id)
+    except Exception:  # noqa: BLE001
+        log.exception("removing the site from customer logins failed")
     conn.commit()
+    return gone
+
+
+def _chunks(items: list, n: int = 500):
+    for i in range(0, len(items), n):
+        yield items[i:i + n]

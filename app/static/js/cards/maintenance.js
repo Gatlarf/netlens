@@ -13,7 +13,7 @@ function toLocalInput(iso) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function scopeText(w, groups, devices) {
+function scopeText(w, groups, devices, sites = []) {
   const s = w.scope;
   if (s.all) return "everything";
   const parts = [];
@@ -21,31 +21,36 @@ function scopeText(w, groups, devices) {
   if (g.length) parts.push(`group${g.length > 1 ? "s" : ""} ${g.join(", ")}`);
   const d = s.devices.map((id) => (devices.find((x) => x.id === id) || {}).name).filter(Boolean);
   if (d.length) parts.push(d.length > 3 ? `${d.slice(0, 3).join(", ")} and ${d.length - 3} more` : d.join(", "));
-  return parts.join(" + ") + (s.behind ? ", and the devices behind them" : "");
+  const r = (s.sites || []).map((id) => (sites.find((x) => x.id === id) || {}).name).filter(Boolean);
+  if (r.length) parts.push(`remote site${r.length > 1 ? "s" : ""} ${r.join(", ")}`);
+  return parts.join(" + ") + (s.behind && (g.length || d.length) ? ", and the devices behind them" : "");
 }
 
-function windowForm(existing, groups, devices, onDone, onCancel) {
+function windowForm(existing, groups, devices, sites, onDone, onCancel) {
   const w = existing || { name: "", enabled: true, scope: { all: false, groups: [], devices: [], behind: true }, schedule: { type: "weekly", days: [0, 2, 5, 6], start: "03:00", end: "04:00" } };
   const form = h("form", { class: "edit-form maintenance-form" });
   const name = h("input", { type: "text", name: "name", required: true, maxlength: "80", value: w.name, placeholder: "AiMesh nightly reboot" });
 
   // what it covers
-  const mode = w.scope.all ? "all" : w.scope.groups.length && !w.scope.devices.length ? "groups" : "devices";
+  const mode = w.scope.all ? "all" : (w.scope.sites || []).length && !w.scope.devices.length && !w.scope.groups.length ? "sites" : w.scope.groups.length && !w.scope.devices.length ? "groups" : "devices";
   const modeSel = h("select", { name: "mode" },
-    h("option", { value: "devices" }, "Chosen devices"), h("option", { value: "groups" }, "Groups"), h("option", { value: "all" }, "Everything"));
+    h("option", { value: "devices" }, "Chosen devices"), h("option", { value: "groups" }, "Groups"), ...(sites.length ? [h("option", { value: "sites" }, "Remote sites")] : []), h("option", { value: "all" }, "Everything"));
   modeSel.value = mode;
   const deviceSel = h("select", { name: "devices", multiple: true, size: "8", "aria-label": "Devices" });
   for (const d of devices) deviceSel.appendChild(h("option", { value: String(d.id), selected: w.scope.devices.includes(d.id) }, `${d.name}${d.primary_ip && d.primary_ip !== d.name ? ` (${d.primary_ip})` : ""}`));
   const groupBox = h("div", { class: "event-boxes" });
   for (const g of groups) groupBox.appendChild(h("label", { class: "check-row" }, h("input", { type: "checkbox", "data-group": String(g.id), checked: w.scope.groups.includes(g.id) }), " ", g.name));
   if (!groups.length) groupBox.appendChild(h("span", { class: "hint" }, "No groups yet (Settings → Groups)."));
+  const siteSel = h("select", { name: "sites", multiple: true, size: String(Math.min(8, Math.max(3, sites.length))), "aria-label": "Remote sites" });
+  for (const x of sites) siteSel.appendChild(h("option", { value: String(x.id), selected: (w.scope.sites || []).includes(x.id) }, x.customer ? `${x.customer} / ${x.name}` : x.name));
   const behind = h("input", { type: "checkbox", name: "behind", checked: w.scope.behind });
   const scopeBox = h("div", {});
   const syncScope = () => {
     clear(scopeBox);
     if (modeSel.value === "devices") scopeBox.append(deviceSel, h("p", { class: "hint" }, "Hold Ctrl (or Cmd) to choose several."));
     if (modeSel.value === "groups") scopeBox.appendChild(groupBox);
-    behindRow.hidden = modeSel.value === "all";
+    if (modeSel.value === "sites") scopeBox.append(siteSel, h("p", { class: "hint" }, "Everything about the chosen sites is held back during the window: their devices, checks, health readings and a site that stops reporting."));
+    behindRow.hidden = modeSel.value === "all" || modeSel.value === "sites";
   };
   const behindRow = h("label", { class: "check-row" }, behind, " Also the devices behind them (a mesh node that reboots takes its clients with it)");
 
@@ -89,7 +94,8 @@ function windowForm(existing, groups, devices, onDone, onCancel) {
         all: mode2 === "all",
         groups: mode2 === "groups" ? [...groupBox.querySelectorAll("input[data-group]:checked")].map((i) => Number(i.dataset.group)) : [],
         devices: mode2 === "devices" ? [...deviceSel.selectedOptions].map((o) => Number(o.value)) : [],
-        behind: behind.checked && mode2 !== "all",
+        sites: mode2 === "sites" ? [...siteSel.selectedOptions].map((o) => Number(o.value)) : [],
+        behind: behind.checked && mode2 !== "all" && mode2 !== "sites",
       },
       schedule: typeSel.value === "weekly"
         ? { type: "weekly", days: dayBoxes.map((l) => l.querySelector("input")).filter((i) => i.checked).map((i) => Number(i.dataset.day)), start: start.value, end: end.value }
@@ -112,7 +118,8 @@ function windowForm(existing, groups, devices, onDone, onCancel) {
 
 export async function buildMaintenanceCard() {
   const card = h("div", { class: "card" });
-  const [overview, groupData, deviceList] = await Promise.all([get("/api/maintenance"), get("/api/groups"), get("/api/devices")]);
+  const [overview, groupData, deviceList, siteList] = await Promise.all([get("/api/maintenance"), get("/api/groups"), get("/api/devices"), get("/api/probes").catch(() => [])]);
+  const sites = siteList.filter((x) => !x.locked);
   const groups = groupData.groups || [];
   const devices = [...deviceList].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
@@ -150,7 +157,7 @@ export async function buildMaintenanceCard() {
         remove.addEventListener("click", () => {
           if (window.confirm(w.active ? `End the window "${w.name}" now? A recurring window is removed completely.` : `Delete the window "${w.name}"?`)) call(() => del(`/api/maintenance/${w.id}`), "Window removed");
         });
-        body.appendChild(h("tr", {}, h("td", {}, w.name), h("td", {}, w.summary), h("td", {}, scopeText(w, groups, devices), h("div", { class: "hint" }, `${w.devices_covered} device(s)`)), h("td", {}, status), h("td", {}, edit, " ", toggle, " ", remove)));
+        body.appendChild(h("tr", {}, h("td", {}, w.name), h("td", {}, w.summary), h("td", {}, scopeText(w, groups, devices, sites), h("div", { class: "hint" }, `${w.devices_covered} device(s)`)), h("td", {}, status), h("td", {}, edit, " ", toggle, " ", remove)));
       }
       table.appendChild(body);
       card.appendChild(h("div", { class: "table-wrap" }, table));
@@ -160,7 +167,7 @@ export async function buildMaintenanceCard() {
 
     if (editing === true || (editing && editing.id)) {
       card.appendChild(h("h3", {}, editing === true ? "New window" : `Edit "${editing.name}"`));
-      card.appendChild(windowForm(editing === true ? null : editing, groups, devices, (o) => draw(o), () => draw(data)));
+      card.appendChild(windowForm(editing === true ? null : editing, groups, devices, sites, (o) => draw(o), () => draw(data)));
     } else {
       const add = h("button", { type: "button", class: "btn" }, "+ Add maintenance window");
       add.addEventListener("click", () => draw(data, true));

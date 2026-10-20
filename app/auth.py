@@ -123,7 +123,8 @@ class Principal:
     role: str  # "admin" | "operator" | "viewer"
     user_id: Optional[int] = None  # None = the built-in NETLENS_TOKEN login
     builtin: bool = False
-    scope: Optional[tuple] = None  # group ids a (viewer) user is limited to; None = no limit
+    scope: Optional[tuple] = None  # group ids a (viewer) user is limited to; None = no limit. () for a customer who sees remote sites only
+    sites: Optional[tuple] = None  # remote site ids a (viewer) user is limited to; None = not a site customer
     assistant: Optional[str] = None  # 'read' or 'change' for a token made for an AI assistant (app/assistant.py); it is never a full administrator
 
     @property
@@ -157,6 +158,9 @@ SCOPED_READABLE = re.compile(
     r"^/api/(session|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)|events|uptime|timeseries/device/\d+|timeseries/device/\d+/[A-Za-z0-9_.-]+)$"
 )
 SCOPED_MAY_POST = ("/api/logout", "/api/me/password")
+SCOPED_SITE_READABLE = re.compile(r"^/api/(probes|probes/\d+|probes/\d+/availability(\.csv)?|timeseries/(remote|remote_service)/\d+(/[A-Za-z0-9_.-]+)?)$")
+_SITE_IN_PATH = re.compile(r"^/api/probes/(\d+)")
+_REMOTE_IN_PATH = re.compile(r"^/api/timeseries/(remote|remote_service)/(\d+)")
 _DEVICE_IN_PATH = re.compile(r"^/api/(?:devices|timeseries/device)/(\d+)(?:/|$)")
 
 
@@ -164,6 +168,14 @@ def scope_of(request: HTTPConnection) -> Optional[tuple]:
     """The group ids the signed-in user is limited to, or None when there is no limit."""
     principal = getattr(request.state, "user", None)
     return principal.scope if principal is not None else None
+
+
+def sites_of(request: HTTPConnection) -> Optional[tuple]:
+    """The remote site ids the signed-in user is limited to, or None when there is no site limit (a user limited to groups only has none: scope_of tells)."""
+    principal = getattr(request.state, "user", None)
+    if principal is None or principal.scope is None:
+        return None
+    return principal.sites or ()
 
 
 def devices_in_scope(conn, scope: tuple) -> set[int]:
@@ -208,7 +220,9 @@ def identify(conn: HTTPConnection) -> Optional[Principal]:
                         role = "viewer"
                 finally:
                     db.close()
-            return Principal(username=row["username"], role=role, user_id=row["id"], scope=tuple(users.parse_scope(row["scope"]) or ()) or None)
+            groups = tuple(users.parse_scope(row["scope"]) or ()) or None
+            sites = tuple(users.parse_scope(row["site_scope"]) or ()) or None
+            return Principal(username=row["username"], role=role, user_id=row["id"], scope=groups if groups is not None else (() if sites is not None else None), sites=sites)
     return None
 
 
@@ -239,10 +253,27 @@ def require_auth(request: HTTPConnection) -> None:
 
 
 def _check_scoped(request: HTTPConnection, principal: Principal, method: str, path: str) -> None:
-    allowed = ((method in ("GET", "HEAD") and SCOPED_READABLE.match(path)) or (method == "POST" and path in SCOPED_MAY_POST)
+    site_ok = bool(principal.sites) and method in ("GET", "HEAD") and SCOPED_SITE_READABLE.match(path)
+    allowed = ((method in ("GET", "HEAD") and SCOPED_READABLE.match(path)) or site_ok or (method == "POST" and path in SCOPED_MAY_POST)
                or (method in ("GET", "PUT") and path == "/api/me/preferences"))
     if not allowed:
         raise HTTPException(status_code=403, detail="this account can only see its own devices")
+    if site_ok:
+        m = _SITE_IN_PATH.match(path)
+        r = _REMOTE_IN_PATH.match(path)
+        if m or r:
+            db = connect(request.app.state.db_path)
+            try:
+                if m:
+                    probe_id = int(m.group(1))
+                else:
+                    table = "remote_devices" if r.group(1) == "remote" else "remote_services"
+                    row = db.execute(f"SELECT probe_id FROM {table} WHERE id = ?", (int(r.group(2)),)).fetchone()
+                    probe_id = row["probe_id"] if row else -1
+                if probe_id not in principal.sites:
+                    raise HTTPException(status_code=404, detail="no such remote site")
+            finally:
+                db.close()
     m = _DEVICE_IN_PATH.match(path)
     if m:
         db = connect(request.app.state.db_path)

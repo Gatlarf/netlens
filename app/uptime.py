@@ -25,7 +25,7 @@ def record_checks(
     ranges: list[str],
     now: str | None = None,
     rtts: dict[int, float] | None = None,
-    keep_days: int = 90,
+    keep_days: int | None = None,
 ) -> int:
     if now is None:
         now = utcnow()
@@ -78,7 +78,9 @@ def record_checks(
     if store is not None and samples:
         store.record(samples, ts=int(_parse_ts(now).timestamp()))
 
-    cutoff = _cutoff(now, keep_days)
+    from app import dbmaint
+
+    cutoff = _cutoff(now, keep_days or dbmaint.days(conn, "checks_days"))
     conn.execute("DELETE FROM checks WHERE ts < ?", (cutoff,))
     checkstats.prune(conn, now)
     conn.commit()

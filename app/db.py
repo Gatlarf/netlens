@@ -559,6 +559,7 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     # --- schema v32: the role operator, and a user (a viewer) that can see only some groups ---------------------
     _add_column_if_missing(conn, "users", "scope", "TEXT")          # JSON list of group ids; NULL = everything
+    _add_column_if_missing(conn, "users", "site_scope", "TEXT")      # JSON list of remote site ids a viewer may see; NULL = none (see `scope`)
     _allow_operator_role(conn)
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oidc_sub ON users(oidc_sub) WHERE oidc_sub IS NOT NULL")
 
@@ -925,6 +926,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     # Indexes
     cur.execute("CREATE INDEX IF NOT EXISTS idx_device_ips_ip ON device_ips(ip)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_events_device ON events(device_id)")           # removing a device sets its events to NULL: without this each removal reads every event
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_events_kind_ts ON events(kind, ts)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ports_device_id ON ports(device_id)")
 
     conn.commit()
@@ -1034,7 +1037,7 @@ def add_event(
     from app.maintenance import tag_for
 
     try:
-        window = tag_for(conn, kind, device_id, now)
+        window = tag_for(conn, kind, device_id, now, subject)
     except Exception:  # noqa: BLE001 - a broken window list must never lose an event
         window = None
     if subject is None and device_id is not None and kind in ("device_offline", "device_online"):

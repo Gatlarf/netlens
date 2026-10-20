@@ -21,6 +21,7 @@ import { buildOncallCard } from "../cards/oncall.js";
 import { buildUpdateCard } from "../update.js";
 import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
+import { buildDatabaseCard } from "../cards/database.js";
 import { buildAccountCard } from "../cards/account.js";
 import { buildAuditCard } from "../cards/audit.js";
 import { buildUsersCard } from "../cards/users.js";
@@ -270,6 +271,7 @@ const STATIC_GROUPS = [
     title: "Data",
     items: [
       { key: "backup", label: "Backup & restore", build: buildBackupCard },
+      { key: "database", label: "Database", build: buildDatabaseCard },
       { key: "export", label: "Export", build: buildExportCard },
       { key: "shares", label: "Share links", build: buildSharesCard },
     ],

@@ -106,13 +106,44 @@ def parse_scope(value) -> list[int] | None:
     return [int(g) for g in data] if isinstance(data, list) and data else None
 
 
-def create_user(conn: sqlite3.Connection, username: str, password: str, role: str, scope=None) -> int:
+def check_sites(conn: sqlite3.Connection, sites, role: str) -> str | None:
+    """The remote sites a viewer is limited to, as stored JSON (None = not limited to sites). Only a viewer, and only sites that exist."""
+    if sites in (None, []):
+        return None
+    if role != "viewer":
+        raise UserError("only a viewer can be limited to some remote sites")
+    if not isinstance(sites, list) or any(isinstance(g, bool) or not isinstance(g, int) for g in sites):
+        raise UserError("the remote sites must be a list of site ids")
+    known = {r[0] for r in conn.execute("SELECT id FROM probes")}
+    if any(g not in known for g in sites):
+        raise UserError("that remote site does not exist")
+    return json.dumps(sorted(set(sites)))
+
+
+def forget_site(conn: sqlite3.Connection, probe_id: int) -> int:
+    """A removed remote site leaves the customer logins that listed it. A login that had nothing else to see is disabled (it must not turn into an unlimited one)."""
+    changed = 0
+    for u in conn.execute("SELECT id, scope, site_scope FROM users WHERE site_scope IS NOT NULL").fetchall():
+        sites = parse_scope(u["site_scope"]) or []
+        if probe_id not in sites:
+            continue
+        changed += 1
+        rest = [x for x in sites if x != probe_id]
+        if rest:
+            conn.execute("UPDATE users SET site_scope = ? WHERE id = ?", (json.dumps(rest), u["id"]))
+        else:
+            conn.execute("UPDATE users SET site_scope = NULL" + (", disabled = 1" if not parse_scope(u["scope"]) else "") + " WHERE id = ?", (u["id"],))
+    return changed
+
+
+def create_user(conn: sqlite3.Connection, username: str, password: str, role: str, scope=None, sites=None) -> int:
     username, password, role = check_username(username), check_password(password), check_role(role)
     stored_scope = check_scope(conn, scope, role)
+    stored_sites = check_sites(conn, sites, role)
     try:
         cur = conn.execute(
-            "INSERT INTO users (username, password_hash, role, created, scope) VALUES (?, ?, ?, ?, ?)",
-            (username, hash_password(password), role, _iso(_now()), stored_scope),
+            "INSERT INTO users (username, password_hash, role, created, scope, site_scope) VALUES (?, ?, ?, ?, ?, ?)",
+            (username, hash_password(password), role, _iso(_now()), stored_scope, stored_sites),
         )
     except sqlite3.IntegrityError:
         raise UserError("that user name is taken")
@@ -145,7 +176,7 @@ def get_user(conn: sqlite3.Connection, user_id: int):
 _UNSET = object()
 
 
-def update_user(conn: sqlite3.Connection, user_id: int, *, role: str | None = None, password: str | None = None, disabled: bool | None = None, scope=_UNSET) -> None:
+def update_user(conn: sqlite3.Connection, user_id: int, *, role: str | None = None, password: str | None = None, disabled: bool | None = None, scope=_UNSET, sites=_UNSET) -> None:
     current = get_user(conn, user_id)
     if current is None:
         raise UserError("no such user")
@@ -153,7 +184,9 @@ def update_user(conn: sqlite3.Connection, user_id: int, *, role: str | None = No
     if scope is not _UNSET:
         conn.execute("UPDATE users SET scope = ? WHERE id = ?", (check_scope(conn, scope, final_role), user_id))
     elif role is not None and final_role != "viewer":
-        conn.execute("UPDATE users SET scope = NULL WHERE id = ?", (user_id,))       # a limit only makes sense for a viewer
+        conn.execute("UPDATE users SET scope = NULL, site_scope = NULL WHERE id = ?", (user_id,))       # a limit only makes sense for a viewer
+    if sites is not _UNSET:
+        conn.execute("UPDATE users SET site_scope = ? WHERE id = ?", (check_sites(conn, sites, final_role), user_id))
     if role is not None:
         conn.execute("UPDATE users SET role = ? WHERE id = ?", (final_role, user_id))
     if password is not None:
@@ -174,9 +207,9 @@ def delete_user(conn: sqlite3.Connection, user_id: int) -> None:
 
 def list_users(conn: sqlite3.Connection) -> list[dict]:
     users = []
-    for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope FROM users ORDER BY username COLLATE NOCASE"):
+    for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope, site_scope FROM users ORDER BY username COLLATE NOCASE"):
         tokens = conn.execute("SELECT id, name, created, last_used, readonly, assistant FROM api_tokens WHERE user_id = ? ORDER BY id", (u["id"],)).fetchall()
-        users.append({**{k: v for k, v in dict(u).items() if k != "scope"}, "scope": parse_scope(u["scope"]), "disabled": bool(u["disabled"]), "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
+        users.append({**{k: v for k, v in dict(u).items() if k not in ("scope", "site_scope")}, "scope": parse_scope(u["scope"]), "sites": parse_scope(u["site_scope"]), "disabled": bool(u["disabled"]), "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
     return users
 
 
@@ -207,7 +240,7 @@ def user_for_session(conn: sqlite3.Connection, cookie: str):
     if not cookie or not cookie.startswith(SESSION_PREFIX):
         return None
     return conn.execute(
-        "SELECT u.id, u.username, u.role, u.scope FROM sessions s JOIN users u ON u.id = s.user_id "
+        "SELECT u.id, u.username, u.role, u.scope, u.site_scope FROM sessions s JOIN users u ON u.id = s.user_id "
         "WHERE s.token_hash = ? AND s.expires > ? AND u.disabled = 0",
         (_digest(cookie[len(SESSION_PREFIX):]), _iso(_now())),
     ).fetchone()
@@ -245,7 +278,7 @@ def user_for_token(conn: sqlite3.Connection, bearer: str):
     if not bearer or not bearer.startswith(TOKEN_PREFIX):
         return None
     row = conn.execute(
-        "SELECT t.id AS token_id, t.readonly, t.assistant, t.name AS token_name, u.id, u.username, u.role, u.scope FROM api_tokens t JOIN users u ON u.id = t.user_id "
+        "SELECT t.id AS token_id, t.readonly, t.assistant, t.name AS token_name, u.id, u.username, u.role, u.scope, u.site_scope FROM api_tokens t JOIN users u ON u.id = t.user_id "
         "WHERE t.token_hash = ? AND u.disabled = 0",
         (_digest(bearer),),
     ).fetchone()

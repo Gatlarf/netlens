@@ -12,6 +12,7 @@ class NewUser(BaseModel):
     password: str
     role: str = "viewer"
     scope: list[int] | None = None         # group ids a viewer is limited to (None = no limit)
+    sites: list[int] | None = None         # remote site ids a viewer is limited to (a customer who sees its own sites)
 
 
 class UserPatch(BaseModel):
@@ -19,6 +20,7 @@ class UserPatch(BaseModel):
     password: str | None = None
     disabled: bool | None = None
     scope: list[int] | None = None
+    sites: list[int] | None = None
 
 
 class NewToken(BaseModel):
@@ -51,6 +53,7 @@ def get_users(request: Request) -> dict:
             "users": users.list_users(db), "roles": list(users.ROLES), "min_password": users.MIN_PASSWORD,
             "token_configured": bool(request.app.state.settings.token),  # NETLENS_TOKEN is set in the environment
             "teams_allowed": licence.allows(db, "teams"),
+            "sites": [{"id": r["id"], "name": r["name"], "customer": r["customer"] or ""} for r in db.execute("SELECT id, name, customer FROM probes ORDER BY name COLLATE NOCASE")],
         }
     finally:
         db.close()
@@ -60,9 +63,9 @@ def get_users(request: Request) -> dict:
 def add_user(request: Request, body: NewUser) -> dict:
     db = _db(request)
     try:
-        _check_teams(db, body.role, body.scope)
+        _check_teams(db, body.role, body.scope or body.sites)
         try:
-            user_id = users.create_user(db, body.username, body.password, body.role, body.scope)
+            user_id = users.create_user(db, body.username, body.password, body.role, body.scope, body.sites)
         except users.UserError as exc:
             raise _fail(exc, 409 if "taken" in str(exc) else 422)
         return {"id": user_id, "users": users.list_users(db)}
@@ -74,10 +77,10 @@ def add_user(request: Request, body: NewUser) -> dict:
 def edit_user(request: Request, user_id: int, body: UserPatch) -> dict:
     db = _db(request)
     try:
-        _check_teams(db, body.role, body.scope if "scope" in body.model_fields_set else None)
+        _check_teams(db, body.role, (body.scope if "scope" in body.model_fields_set else None) or (body.sites if "sites" in body.model_fields_set else None))
         try:
             users.update_user(db, user_id, role=body.role, password=body.password, disabled=body.disabled,
-                              **({"scope": body.scope} if "scope" in body.model_fields_set else {}))
+                              **({"scope": body.scope} if "scope" in body.model_fields_set else {}), **({"sites": body.sites} if "sites" in body.model_fields_set else {}))
         except users.UserError as exc:
             raise _fail(exc)
         return {"users": users.list_users(db)}

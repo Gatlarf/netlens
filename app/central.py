@@ -10,9 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import gzip
+import hashlib
+import http.client
 import ipaddress
 import json
 import logging
+import socket
+import ssl
 import time
 import urllib.error
 import urllib.parse
@@ -46,7 +50,8 @@ def get_link(conn) -> dict[str, Any]:
     except ValueError:
         data = {}
     return {"url": str(data.get("url") or ""), "token": str(data.get("token") or ""), "enabled": bool(data.get("enabled")),
-            "interval_s": int(data.get("interval_s") or DEFAULT_INTERVAL), "accept_config": bool(data.get("accept_config"))}
+            "interval_s": int(data.get("interval_s") or DEFAULT_INTERVAL), "accept_config": bool(data.get("accept_config")),
+            "pin": str(data.get("pin") or "")}
 
 
 def public_link(conn) -> dict[str, Any]:
@@ -55,7 +60,7 @@ def public_link(conn) -> dict[str, Any]:
         status = json.loads(get_setting(conn, STATUS_KEY) or "{}")
     except ValueError:
         status = {}
-    return {"url": link["url"], "has_token": bool(link["token"]), "enabled": link["enabled"], "interval_s": link["interval_s"], "accept_config": link["accept_config"],
+    return {"url": link["url"], "has_token": bool(link["token"]), "enabled": link["enabled"], "interval_s": link["interval_s"], "accept_config": link["accept_config"], "pin": link["pin"],
             "config_rev": get_config_rev(conn), "status": status}
 
 
@@ -88,9 +93,16 @@ def set_link(conn, data: dict[str, Any]) -> dict[str, Any]:
         raise LinkError("the interval must be between 15 and 3600 seconds")
     enabled = bool(data.get("enabled", cur["enabled"]))
     accept = bool(data.get("accept_config", cur["accept_config"]))
+    pin = cur["pin"] if url == cur["url"] else ""                  # a trusted certificate belongs to one address
+    if data.get("trust_certificate") is True:
+        if not url.startswith("https://"):
+            raise LinkError("a certificate can only be trusted for an https:// address")
+        pin = fetch_fingerprint(url)
+    elif data.get("trust_certificate") is False:
+        pin = ""
     if enabled and not (url and token):
         raise LinkError("enter the address of the central Netlens and the token it gave you")
-    set_setting(conn, LINK_KEY, json.dumps({"url": url, "token": token, "enabled": enabled, "interval_s": interval, "accept_config": accept}))
+    set_setting(conn, LINK_KEY, json.dumps({"url": url, "token": token, "enabled": enabled, "interval_s": interval, "accept_config": accept, "pin": pin}))
     return public_link(conn)
 
 
@@ -157,9 +169,54 @@ def snapshot(conn, since_ts: int, now_ts: float | None = None) -> dict[str, Any]
             "scan": {"finished": scan["finished"] if scan else None, "hosts": scan["hosts_found"] if scan else None, "running": bool(running)}}
 
 
+# ----------------------------------------------------------------------------- a self-signed certificate
+def _fingerprint(der: bytes) -> str:
+    digest = hashlib.sha256(der).hexdigest().upper()
+    return ":".join(digest[i:i + 2] for i in range(0, len(digest), 2))
+
+
+def fetch_fingerprint(url: str, timeout: float = 10.0) -> str:
+    """The SHA-256 fingerprint of the certificate the server at `url` presents now (trust on first use: the user compares it with the central Netlens)."""
+    parts = urllib.parse.urlsplit(url)
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    try:
+        with socket.create_connection((parts.hostname, parts.port or 443), timeout=timeout) as raw, context.wrap_socket(raw, server_hostname=parts.hostname) as tls:
+            return _fingerprint(tls.getpeercert(binary_form=True))
+    except (OSError, ssl.SSLError) as exc:
+        raise LinkError(f"cannot read the certificate of the central Netlens: {exc}") from None
+
+
+class _PinnedConnection(http.client.HTTPSConnection):
+    """An HTTPS connection that does not look at who signed the certificate but accepts exactly the one that was trusted."""
+
+    def __init__(self, *args, pin: str = "", **kwargs):
+        super().__init__(*args, **kwargs)
+        self._pin = pin
+
+    def connect(self) -> None:
+        super().connect()
+        if _fingerprint(self.sock.getpeercert(binary_form=True)) != self._pin:
+            self.sock.close()
+            raise ssl.SSLError("the certificate is not the one you trusted")
+
+
+def _opener(pin: str):
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+
+    class Handler(urllib.request.HTTPSHandler):
+        def https_open(self, req):
+            return self.do_open(lambda host, **kw: _PinnedConnection(host, pin=pin, context=context, **{k: v for k, v in kw.items() if k != "context"}), req)
+
+    return urllib.request.build_opener(Handler)
+
+
 # ----------------------------------------------------------------------------- sending
-def send(url: str, token: str, payload: dict[str, Any], timeout: float = TIMEOUT) -> dict[str, Any]:
-    """POST the report. Raises LinkError with a sentence for the user."""
+def send(url: str, token: str, payload: dict[str, Any], timeout: float = TIMEOUT, pin: str = "") -> dict[str, Any]:
+    """POST the report. Raises LinkError with a sentence for the user. With `pin` the server may present a self-signed certificate, but exactly that one."""
     body = gzip.compress(json.dumps(payload, separators=(",", ":")).encode())
     if len(body) > MAX_BODY:
         raise LinkError("the report is too large to send")
@@ -167,7 +224,8 @@ def send(url: str, token: str, payload: dict[str, Any], timeout: float = TIMEOUT
         url + "/api/probe/push", data=body, method="POST",
         headers={"Content-Type": "application/json", "Content-Encoding": "gzip", "Authorization": f"Bearer {token}", "User-Agent": f"Netlens/{VERSION}"})
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310 - scheme checked when the link was saved
+        opener = _opener(pin).open if pin and url.startswith("https://") else urllib.request.urlopen
+        with opener(request, timeout=timeout) as resp:  # noqa: S310 - scheme checked when the link was saved
             return json.loads(resp.read(2 * 1024 * 1024).decode("utf-8", "replace") or "{}")
     except urllib.error.HTTPError as exc:
         if exc.code == 401:
@@ -177,6 +235,11 @@ def send(url: str, token: str, payload: dict[str, Any], timeout: float = TIMEOUT
         raise LinkError(f"the central Netlens answered with an error ({exc.code})") from None
     except (urllib.error.URLError, OSError, ValueError) as exc:
         reason = getattr(exc, "reason", exc)
+        text = str(reason)
+        if "not the one you trusted" in text:
+            raise LinkError("the certificate of the central Netlens is not the one you trusted: it was replaced (or someone is in between). If you expected that, trust it again in the settings") from None
+        if "CERTIFICATE_VERIFY_FAILED" in text:
+            raise LinkError("the certificate of the central Netlens is not trusted (self-signed or from an unknown authority): tick “Trust this certificate” in the settings if you recognise it") from None
         raise LinkError(f"cannot reach the central Netlens: {reason}") from None
 
 
@@ -221,7 +284,7 @@ def push_once(db_path: str, now_ts: float | None = None, force: bool = False) ->
         payload["config_rev"] = get_config_rev(conn)
         newest = max([s["ts"] for s in payload["samples"]] + [since])
         try:
-            reply = send(link["url"], link["token"], payload)
+            reply = send(link["url"], link["token"], payload, **({"pin": link["pin"]} if link["pin"] else {}))
             status = {"ts": utcnow(), "ok": True, "error": None, "devices": len(payload["devices"]), "services": len(payload["services"]),
                       "samples": len(payload["samples"]), "central_events": reply.get("events"), "skew_s": _skew(reply.get("time"))}
             commands = [c for c in (reply.get("commands") or []) if c in ("scan", "scan_deep")] if link["accept_config"] else []

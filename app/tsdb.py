@@ -363,6 +363,17 @@ class Store:
         finally:
             conn.close()
 
+    def series_owners(self) -> list[tuple[str, int]]:
+        """The distinct (entity, entity id) pairs that have graph data."""
+        try:
+            conn = self._connect()
+        except sqlite3.Error:
+            return []
+        try:
+            return [(r[0], r[1]) for r in conn.execute("SELECT DISTINCT entity, entity_id FROM series")]
+        finally:
+            conn.close()
+
     def buckets(self, entity: str, entity_id: int, metric: str, start: int, end: int, label: str = "", now: int | None = None) -> list[tuple]:
         """The finest data there is for [start, end): (ts, width, count, sum, lowest) per bucket, oldest first. Raw samples come as width 1,
         the 5-minute tier as 300, the hourly tier (for what the 5-minute tier no longer holds) as 3600. Used for availability figures."""

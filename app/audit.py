@@ -40,6 +40,8 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("POST", r"^/api/users/(\d+)/tokens$", "Made an API token for user {0}"),
     ("POST", r"^/api/tokens", "Made an API token"),
     ("DELETE", r"^/api/tokens/(\d+)$", "Removed an API token"),
+    ("PUT", r"^/api/database/retention$", "Changed how long data is kept"),
+    ("POST", r"^/api/database/(purge|orphans|optimize|reindex|compact|integrity|tidy)$", "Database maintenance: {0}"),
     ("POST", r"^/api/probes$", "Added a remote site"),
     ("PATCH", r"^/api/probes/(\d+)$", "Changed remote site {0}"),
     ("POST", r"^/api/probes/(\d+)/token$", "Made a new token for remote site {0}"),
@@ -110,7 +112,9 @@ def log_request(conn: sqlite3.Connection, principal, ip: str, method: str, path:
 
 
 def prune(conn: sqlite3.Connection) -> None:
-    conn.execute("DELETE FROM audit_log WHERE ts < datetime('now', ?)", (f"-{RETENTION_DAYS} days",))
+    from app import dbmaint
+
+    conn.execute("DELETE FROM audit_log WHERE ts < datetime('now', ?)", (f"-{dbmaint.days(conn, 'audit_days')} days",))
     conn.execute("DELETE FROM audit_log WHERE id <= (SELECT MAX(id) FROM audit_log) - ?", (MAX_ROWS,))
     conn.commit()
 

@@ -2,6 +2,18 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.117 — 2026-10-20
+
+### Added
+- ★ **Settings → Database**: sizes of both database files, every table with rows and size, and the tools to keep them healthy: remove old data (with a preview), clean up leftovers, optimize, rebuild indexes, compact (VACUUM) and check integrity. A weekly run does the safe parts by itself.
+- ★ **Retention for events and scans**: they used to grow for ever. Events are now kept 2 years and finished scans 1 year by default; presence checks, service check results and the audit log are configurable too. 0 keeps events and scans for ever.
+- ★ **Removing a remote site cleans up after it**: its devices and checks, their graph history, its snooze, the configuration and commands waiting for it, its place in maintenance windows and customer logins (a customer login that only saw that site is disabled). You choose whether its alerts stay in the history, and Netlens says what was removed.
+- ★ **Customer logins for remote sites**: a viewer can be limited to chosen remote sites and then sees only those, with their graphs, checks, events and monthly availability.
+- ★ **Maintenance windows can cover remote sites**, including a site that stops reporting.
+- ★ **A central Netlens with a self-signed certificate**: trust its certificate by fingerprint (Settings → Report to a central Netlens). Exactly that certificate is accepted; a replaced one is refused with a clear message.
+- **Managed checks and monitors can be edited** (address, port, interval, alerts) without losing the saved login.
+- Two indexes on the events table; removing a device or site no longer reads every event.
+
 ## 0.4.116 — 2026-10-20
 
 ### Added

@@ -516,3 +516,154 @@ def test_the_availability_api_and_csv(client):
     assert client.get("/api/probes/999/availability").status_code == 404
     csv = client.get(f"/api/probes/{pid}/availability.csv?month=2026-03")
     assert csv.status_code == 200 and "Availability %" in csv.text and "netlens-av-availability-2026-03.csv" in csv.headers["content-disposition"]
+
+
+# ----------------------------------------------------------------------------- a self-signed central Netlens
+def _self_signed(tmp_path, cn="localhost"):
+    import shutil
+    import subprocess
+
+    if not shutil.which("openssl"):
+        pytest.skip("openssl is needed to make a test certificate")
+    key, crt = tmp_path / f"{cn}.key", tmp_path / f"{cn}.crt"
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(key), "-out", str(crt), "-days", "2", "-subj", f"/CN={cn}",
+                    "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1"], check=True, capture_output=True)
+    return crt, key
+
+
+def _serve(crt, key):
+    import http.server
+    import ssl
+    import threading
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("content-length") or 0))
+            body = b'{"ok": true, "time": "2026-03-10T12:00:00Z"}'
+            self.send_response(200)
+            self.send_header("content-type", "application/json")
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(str(crt), str(key))
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, f"https://127.0.0.1:{server.server_address[1]}"
+
+
+def test_a_self_signed_central_needs_its_certificate_to_be_trusted(conn, tmp_path):
+    crt, key = _self_signed(tmp_path)
+    server, url = _serve(crt, key)
+    try:
+        with pytest.raises(central.LinkError, match="not trusted"):
+            central.send(url, "nlp_x", {})
+        pin = central.fetch_fingerprint(url)
+        assert len(pin) == 95 and central.send(url, "nlp_x", {}, pin=pin)["ok"]
+        with pytest.raises(central.LinkError, match="not the one you trusted"):
+            central.send(url, "nlp_x", {}, pin="AA:" + pin[3:])
+        link = central.set_link(conn, {"url": url, "token": "nlp_x", "trust_certificate": True})
+        assert link["pin"] == pin
+        assert central.set_link(conn, {"interval_s": 120})["pin"] == pin                 # kept when only something else changes
+        assert central.set_link(conn, {"trust_certificate": False})["pin"] == ""
+        with pytest.raises(central.LinkError):
+            central.set_link(conn, {"url": "http://10.0.0.5", "trust_certificate": True})
+    finally:
+        server.shutdown()
+
+
+# ----------------------------------------------------------------------------- maintenance windows, removal and customer logins
+def _window(conn, sites, start="2026-03-10T11:00:00Z", end="2026-03-10T13:00:00Z"):
+    from app import maintenance
+
+    w = maintenance.clean_window({"name": "Power work", "scope": {"sites": sites}, "schedule": {"type": "once", "start": start, "end": end}})
+    maintenance.save_windows(conn, maintenance.load_windows(conn) + [w])
+    return w
+
+
+def test_a_maintenance_window_can_cover_a_remote_site(conn):
+    a, _ = make(conn, "Branch")
+    b, _ = make(conn, "Other")
+    report(conn, a, [device("aa:00:00:00:00:01", "nas", always_on=True)], NOW)
+    report(conn, b, [device("aa:00:00:00:00:02", "cam", always_on=True)], NOW)
+    _window(conn, [a["id"]])
+    report(conn, a, [device("aa:00:00:00:00:01", "nas", online=False, always_on=True)], LATER)
+    report(conn, b, [device("aa:00:00:00:00:02", "cam", online=False, always_on=True)], LATER)
+    held = {r["detail"]: r["maintenance"] for r in conn.execute("SELECT detail, maintenance FROM events")}
+    assert held["Branch: nas (192.168.1.10) went offline"] == "Power work" and held["Other: cam (192.168.1.10) went offline"] is None
+
+
+def test_a_window_with_no_scope_is_refused_and_a_removed_site_leaves_it():
+    from app import maintenance
+
+    with pytest.raises(ValueError):
+        maintenance.clean_window({"name": "x", "scope": {"sites": []}, "schedule": {"type": "once", "start": "2026-03-10T11:00:00Z", "end": "2026-03-10T13:00:00Z"}})
+
+
+def test_removing_a_site_cleans_up_everything_kept_for_it(conn):
+    from app import maintenance, snooze, users
+
+    a, _ = make(conn, "Branch")
+    b, _ = make(conn, "Keep")
+    report(conn, a, [device("aa:00:00:00:00:01", "nas")], NOW, services=[service("svc:1", "Web")])
+    report(conn, a, [device("aa:00:00:00:00:01", "nas", online=False)], LATER, services=[service("svc:1", "Web")])
+    report(conn, b, [device("aa:00:00:00:00:09", "cam")], NOW)
+    report(conn, b, [device("aa:00:00:00:00:09", "cam", online=False)], LATER)
+    store = tsdb.for_conn(conn)
+    ids = [r["id"] for r in conn.execute("SELECT id FROM remote_devices WHERE probe_id = ?", (a["id"],))]
+    store.record_bulk([(2_000_000_000, "remote", ids[0], "up", 1.0, "", "")])
+    snooze.snooze(conn, f"site:{a['id']}", 60)
+    _window(conn, [a["id"]])
+    _window(conn, [a["id"], b["id"]], "2026-03-10T14:00:00Z", "2026-03-10T15:00:00Z")
+    users.create_user(conn, "cust", "a-long-enough-password", "viewer", sites=[a["id"]])
+    users.create_user(conn, "cust2", "a-long-enough-password", "viewer", sites=[a["id"], b["id"]])
+    conn.execute("INSERT INTO settings (key, value) VALUES (?, '{}')", (f"probe.config.{a['id']}",))
+    conn.commit()
+    gone = probes.delete(conn, a["id"], events=True)
+    assert gone == {"devices": 1, "checks": 1, "events": 1, "snoozes": 1, "windows": 2, "logins": 2}
+    assert [r["detail"] for r in conn.execute("SELECT detail FROM events")] == ["Keep: cam (192.168.1.10) went offline"]        # the other site's history stays
+    assert conn.execute("SELECT COUNT(*) FROM remote_devices WHERE probe_id = ?", (a["id"],)).fetchone()[0] == 0
+    assert ("remote", ids[0]) not in store.series_owners() and not snooze.active(conn)
+    assert [w["name"] for w in maintenance.load_windows(conn)] == ["Power work"] and maintenance.load_windows(conn)[0]["scope"]["sites"] == [b["id"]]
+    left = {u["username"]: u for u in users.list_users(conn)}
+    assert left["cust"]["disabled"] is True and left["cust"]["sites"] is None            # it must not become a login that sees everything
+    assert left["cust2"]["disabled"] is False and left["cust2"]["sites"] == [b["id"]]
+    assert conn.execute("SELECT COUNT(*) FROM settings WHERE key LIKE 'probe.%'").fetchone()[0] == 0
+    kept = make(conn, "Third")[0]
+    report(conn, kept, [device("aa:00:00:00:00:07", "x")], NOW)
+    assert probes.delete(conn, kept["id"])["events"] == 0                                 # without the option the history stays
+
+
+def test_a_customer_sees_only_its_own_sites(tmp_path):
+    from app import users
+
+    tsdb.forget_all()
+    path = tmp_path / "t.db"
+    c = connect(path)
+    init_db(c)
+    mine, _ = make(c, "Mine")
+    other, _ = make(c, "Other")
+    report(c, mine, [device("aa:00:00:00:00:01", "nas")], NOW)
+    report(c, other, [device("aa:00:00:00:00:02", "cam")], NOW)
+    mine_dev = c.execute("SELECT id FROM remote_devices WHERE probe_id = ?", (mine["id"],)).fetchone()[0]
+    other_dev = c.execute("SELECT id FROM remote_devices WHERE probe_id = ?", (other["id"],)).fetchone()[0]
+    users.create_user(c, "cust", "a-long-enough-password", "viewer", sites=[mine["id"]])
+    c.close()
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=path)
+    with TestClient(app) as tc:
+        assert tc.post("/api/login", json={"username": "cust", "password": "a-long-enough-password"}).status_code == 200
+        me = tc.get("/api/session").json()
+        assert me["user"]["scoped"] and me["user"]["sites"] and not me["user"]["devices"] and me["start_page"] == "#/remote-sites"
+        assert [p["name"] for p in tc.get("/api/probes").json()] == ["Mine"]
+        assert tc.get(f"/api/probes/{mine['id']}").status_code == 200 and tc.get(f"/api/probes/{other['id']}").status_code == 404
+        assert tc.get(f"/api/probes/{mine['id']}/availability").status_code == 200 and tc.get(f"/api/probes/{other['id']}/availability.csv").status_code == 404
+        assert tc.get(f"/api/timeseries/remote/{mine_dev}/up").status_code == 200 and tc.get(f"/api/timeseries/remote/{other_dev}/up").status_code == 404
+        assert tc.get("/api/devices").json() == [] and tc.get("/api/probes-search?q=cam").status_code == 403
+        assert tc.post(f"/api/probes/{mine['id']}/command", json={"command": "scan"}).status_code == 403
+        assert tc.delete(f"/api/probes/{mine['id']}").status_code == 403 and tc.get("/api/database").status_code == 403
+    tsdb.forget_all()

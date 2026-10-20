@@ -25,6 +25,19 @@ function groupPicker(groups, chosen) {
   return { box, value: () => { const ids = boxes.filter((b) => b.checked).map((b) => Number(b.value)); return ids.length ? ids : null; } };
 }
 
+// The same for remote sites: a customer who sees its own sites only.
+function sitePicker(sites, chosen) {
+  const box = h("div", { class: "scope-picker" });
+  const boxes = sites.map((s) => {
+    const input = h("input", { type: "checkbox", value: String(s.id) });
+    input.checked = (chosen || []).includes(s.id);
+    box.appendChild(h("label", { class: "check" }, input, ` ${s.customer ? `${s.customer} / ` : ""}${s.name}`));
+    return input;
+  });
+  if (!sites.length) box.appendChild(h("p", { class: "hint" }, "No remote sites yet (Monitoring → Remote sites)."));
+  return { box, value: () => { const ids = boxes.filter((b) => b.checked).map((b) => Number(b.value)); return ids.length ? ids : null; } };
+}
+
 function newUserForm(data, refresh) {
   const form = h("form", { class: "edit-form", id: "new-user-form" });
   const name = h("input", { type: "text", name: "username", required: true, autocomplete: "off", maxlength: "32" });
@@ -38,15 +51,18 @@ function newUserForm(data, refresh) {
   form.appendChild(h("div", { class: "field" }, h("label", {}, "Role"), role));
   const picker = groupPicker(data.groups || [], null);
   const scopeField = h("div", { class: "field" }, h("label", {}, "Only these groups (optional: a customer view that sees nothing else)"), picker.box);
-  const showScope = () => { scopeField.hidden = role.value !== "viewer"; };
+  const sitesPick = sitePicker(data.sites || [], null);
+  const siteField = h("div", { class: "field" }, h("label", {}, "Only these remote sites (optional: a customer who sees its own sites and nothing else)"), sitesPick.box);
+  const showScope = () => { scopeField.hidden = role.value !== "viewer"; siteField.hidden = role.value !== "viewer" || !(data.sites || []).length; };
   role.addEventListener("change", showScope);
   showScope();
   form.appendChild(scopeField);
+  form.appendChild(siteField);
   form.appendChild(h("button", { type: "submit", class: "btn" }, "Add user"));
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      const res = await api("/api/users", { method: "POST", body: { username: name.value, password: password.value, role: role.value, scope: role.value === "viewer" ? picker.value() : null } });
+      const res = await api("/api/users", { method: "POST", body: { username: name.value, password: password.value, role: role.value, scope: role.value === "viewer" ? picker.value() : null, sites: role.value === "viewer" ? sitesPick.value() : null } });
       toast("User added", "success");
       refresh(res.users);
     } catch (err) {
@@ -102,12 +118,23 @@ function userRow(user, data, refresh, shown) {
       lim.disabled = true;
     });
     parts.push(lim, " ");
+    if ((data.sites || []).length) {
+      const limSites = h("button", { type: "button", class: "btn" }, user.sites ? "Change sites" : "Limit to sites");
+      limSites.addEventListener("click", () => {
+        const picker = sitePicker(data.sites || [], user.sites);
+        const save = h("button", { type: "button", class: "btn primary" }, "Save sites");
+        save.addEventListener("click", () => call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { sites: picker.value() } }), picker.value() ? "Limited to those sites" : "No site limit"));
+        actions.append(h("div", { class: "scope-edit" }, h("p", { class: "hint" }, "Tick the remote sites this viewer may see (a customer view). None ticked: no site limit."), picker.box, save));
+        limSites.disabled = true;
+      });
+      parts.push(limSites, " ");
+    }
   }
   parts.push(del);
   actions.append(...parts);
 
   row.appendChild(h("td", {}, h("strong", {}, user.username), user.disabled ? h("span", { class: "tag" }, "disabled") : null));
-  row.appendChild(h("td", {}, role, user.scope ? h("span", { class: "tag", title: "Sees only the devices of these groups" }, `${user.scope.length} group${user.scope.length === 1 ? "" : "s"}`) : null));
+  row.appendChild(h("td", {}, role, user.sites ? h("span", { class: "tag", title: "Sees only these remote sites" }, `${user.sites.length} site${user.sites.length === 1 ? "" : "s"}`) : null, user.scope ? h("span", { class: "tag", title: "Sees only the devices of these groups" }, `${user.scope.length} group${user.scope.length === 1 ? "" : "s"}`) : null));
   row.appendChild(h("td", {}, user.last_login ? fmtTime(user.last_login) : "never"));
   row.appendChild(actions);
 
@@ -170,6 +197,7 @@ export async function buildUsersCard() {
   const card = h("div", { class: "card" });
   const data = await get("/api/users");
   try { data.groups = (await get("/api/groups")).groups; } catch (e) { data.groups = []; }
+  data.sites = data.sites || [];
   fill(card, data);
   return card;
 }

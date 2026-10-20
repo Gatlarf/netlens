@@ -335,7 +335,7 @@ async function applySession() {
   setSessionUser(session.authenticated ? session.user : null);
   // the coffee button in the top bar is for free and open-source use; a licensed install keeps it in the account menu only
   get("/api/licence").then((lic) => document.body.classList.toggle("licensed", lic.state === "active" || lic.state === "grace")).catch(() => {});
-  if (session.authenticated && session.user && session.user.scoped) restrictToOwnDevices();
+  if (session.authenticated && session.user && session.user.scoped) { scopedUser = session.user; restrictToOwnDevices(); }
   const out = el("#logout");
   if (out && session.user) out.title = `Signed in as ${session.user.username} (${session.user.role})`;
   const name = session.user ? session.user.username : "Account";
@@ -361,14 +361,16 @@ async function applySession() {
 }
 
 // A customer view (a viewer limited to some groups): the top bar offers only the pages it may open, and other addresses lead back to the devices.
-const SCOPED_ROUTES = ["#/devices", "#/uptime"];
+let scopedUser = {};
 function restrictToOwnDevices() {
   document.body.dataset.scoped = "1";
+  const pages = [...(scopedUser.devices ? [["#/devices", "Devices", "devices"], ["#/uptime", "Uptime", "uptime"]] : []), ...(scopedUser.sites ? [["#/remote-sites", "Remote sites", "remote_sites"]] : [])];
+  const SCOPED_ROUTES = pages.map((p) => p[0]);
   const nav = el("#nav");
   if (nav && !nav.dataset.scoped) {
     nav.dataset.scoped = "1";
     nav.textContent = "";
-    for (const [href, label, route] of [["#/devices", "Devices", "devices"], ["#/uptime", "Uptime", "uptime"]]) {
+    for (const [href, label, route] of pages) {
       const a = document.createElement("a");
       Object.assign(a, { className: "nav-link", href, textContent: label });
       a.dataset.route = route;
@@ -376,7 +378,7 @@ function restrictToOwnDevices() {
     }
   }
   const here = location.hash.split("?")[0];
-  if (!SCOPED_ROUTES.some((r) => here === r || here.startsWith(`${r}/`)) && !here.startsWith("#/device/")) location.replace("#/devices");
+  if (!SCOPED_ROUTES.some((r) => here === r || here.startsWith(`${r}/`)) && !(scopedUser.devices && here.startsWith("#/device/"))) location.replace(SCOPED_ROUTES[0] || "#/devices");
 }
 
 // Open on the page the user chose (only when no page was asked for: a link to a page, a reload and the back button are left alone)

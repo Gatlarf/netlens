@@ -69,6 +69,7 @@ const SETTINGS = [
   ["Tell me when", "channels", "events which alerts notifications kinds", "Add channel"],
   ["Maintenance windows", "maintenance", "planned downtime reboot silence hold back schedule recurring", ""],
   ["Backup and restore", "backup", "export import restore copy database", ""],
+  ["Database maintenance", "database", "database vacuum compact purge retention index reindex optimize integrity cleanup old data events size", ""],
   ["Scheduled backups", "backup", "automatic backup keep retention", "Scheduled backups"],
   ["Encryption key", "backup", "vault passwords key secrets", "Encryption key"],
   ["Export", "export", "csv json devices download", ""],
