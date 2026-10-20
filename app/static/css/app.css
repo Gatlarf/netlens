@@ -810,3 +810,19 @@ body.setup-mode #nav, body.setup-mode .topbar-actions { display: none; }
 .scope-edit { margin-top: 8px; }
 /* a customer view has no scan button and no search of settings */
 body[data-scoped] #scan-menu-wrap, body[data-scoped] #search-btn, body[data-scoped] .coffee-btn, body[data-scoped] a[href^="/api/export"], body[data-scoped] .version-link, body[data-scoped] .update-badge { display: none !important; }
+
+/* Settings → Database */
+.db-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 12px 0 18px; }
+.db-tile { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; background: color-mix(in srgb, var(--bg) 55%, var(--surface)); }
+.db-tile-title { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.db-tile-value { font-size: 26px; font-weight: 600; margin: 2px 0; }
+.db-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 24px; align-items: start; margin-bottom: 18px; }
+.db-panel h3 { margin-top: 0; }
+.db-retention table.data td { vertical-align: middle; }
+.db-tool { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.db-tool:last-of-type { border-bottom: 0; }
+.db-tool-buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.db-out { margin-top: 10px; min-height: 1.5em; }
+@media (max-width: 1100px) { .db-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 520px) { .db-tool { grid-template-columns: minmax(0, 1fr); } .db-tool-buttons { justify-content: flex-start; } }
+.db-tables { max-height: 26rem; overflow: auto; }
