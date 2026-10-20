@@ -359,10 +359,14 @@ class ScanManager:
                 conn.close()
         except Exception as exc:
             if is_capability_error(exc):             # the commonest set-up mistake: say so plainly in the container log, not only in the page
+                from app.scanner.diagnose import diagnose
+
+                found = diagnose(str(exc))
                 logging.getLogger(__name__).error(
-                    "scan %s failed: SETTING MISSING on the netlens container. nmap cannot do raw network scans, so it needs the capabilities NET_RAW and NET_ADMIN "
-                    "and the host network (cap_add: [NET_RAW, NET_ADMIN] and network_mode: host in the compose file; in Portainer: Network = host and the "
-                    "Capabilities tab). Re-create the container after adding them; no-new-privileges must be off. Original error: %r", scan_id, exc)
+                    "scan %s failed: nmap cannot do raw network scans in this container. It needs the capabilities NET_RAW and NET_ADMIN and the host network "
+                    "(cap_add: [NET_RAW, NET_ADMIN] and network_mode: host in the compose file; in Portainer: Network = host and the Capabilities tab), with "
+                    "no-new-privileges off, and the container must be re-created after a change. Netlens looked inside the container: %s. Most likely cause: %s Original error: %r",
+                    scan_id, "; ".join(found["findings"]), found["cause"] or "none of the usual settings is wrong; see Troubleshooting in the README.", exc)
             else:
                 logging.getLogger(__name__).warning("scan %s failed: %r", scan_id, exc)
             conn = connect(self.db_path)

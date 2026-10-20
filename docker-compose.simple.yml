@@ -23,6 +23,8 @@ services:
     cap_add:                    # same level as "image:" (not under "environment:")
       - NET_RAW
       - NET_ADMIN
+    # user: "0:0"              # only if scans fail with "dnet: Failed to open device" although NET_RAW and NET_ADMIN are set (some Synology / NAS set-ups
+    #                          # drop the file capability that nmap needs when it runs as a normal user). It still has only the two capabilities.
     read_only: true
     tmpfs:
       - /tmp

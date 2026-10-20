@@ -216,6 +216,8 @@ Common mistakes:
 
 **How do I know it worked?** Press *Scan* in Netlens: it finds your devices. If it finds nothing, or *Settings → Scan performance → Passive listening* says "Not running" and mentions `NET_RAW`, the container is missing the host network or one of the two capabilities. To check from a terminal: `docker inspect netlens --format '{{.HostConfig.NetworkMode}} {{.HostConfig.CapAdd}}'` should print `host [NET_RAW NET_ADMIN]` (the order may differ).
 
+**Both are in the file, but scans still fail with `dnet: Failed to open device ...`?** Then the container has the capabilities, but nmap (which runs as a normal user) does not get them: some storage set-ups, seen on Synology, drop the capability the image puts on the nmap file. The Scans page tells you when this is the case (*What Netlens found inside the container*). Add `user: "0:0"` to the `netlens:` service (same indentation as `image:`) and re-create the container: it then runs as root, which still has only `NET_RAW` and `NET_ADMIN`. Details under Troubleshooting.
+
 ### Portainer (for example on DietPi or any other device)
 
 There are two ways: a **stack** (recommended, because the settings are written down in the file) and a single **container form**. If you change the settings of a container that is already running, Portainer has to re-create it; your data survives because it lives in the volume.
@@ -1099,6 +1101,8 @@ tests
   | Portainer container form | **Network** tab = *host*; **Capabilities** tab: switch *NET_RAW* and *NET_ADMIN* on; **Duplicate/Edit** and deploy again (the volume at `/data` keeps your data) |
   | Synology | use **Container Manager → Project** with the compose file; the container wizard has no capability setting. Edit the project and **Build** again |
   | `docker run` | add `--network host --cap-add NET_RAW --cap-add NET_ADMIN` |
+
+  **The capabilities are in the file, but scans still fail** (the container log says `dnet: Failed to open device eth0` or similar, typically on a Synology or another NAS): the Scans page then shows *What Netlens found inside the container* and the most likely cause. Netlens checks, in this order: the capabilities in the container, `no-new-privileges`, the host network, and whether **nmap still has its file capability**. nmap runs as a normal user and depends on a capability that the image puts on the nmap file; some storage drivers and file systems drop it, so the container has the rights but nmap does not. The fix is to run the container as root, which still has only the two capabilities: add `user: "0:0"` to the `netlens:` service (same indentation as `image:`), then **re-create** the container (Synology: Project → Action → Stop, edit, **Build**). To see it yourself: `sudo docker exec netlens getcap /usr/bin/nmap` should print `cap_net_admin,cap_net_raw=eip`; empty output means the capability was lost.
 
   Also make sure `no-new-privileges` is not set and the container is not started with `--cap-drop ALL` alone. Check with `docker inspect netlens --format '{{.HostConfig.NetworkMode}} {{.HostConfig.CapAdd}}'`: it should print `host [NET_RAW NET_ADMIN]`. The full explanation with an annotated example is under [Where do `NET_RAW` and `NET_ADMIN` go?](#where-do-net_raw-and-net_admin-go).
 - **Container keeps restarting (running, then restarting):** the app is exiting at startup and `restart: unless-stopped` starts it again. The reason is in the container log:

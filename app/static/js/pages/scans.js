@@ -165,7 +165,12 @@ export async function render(container, params) {
       // the newest scan failed because the container misses NET_RAW / NET_ADMIN or the host network: say what to do, in full
       const newest = scans[0];
       if (newest && newest.status === "failed" && /^A container setting is missing/.test(newest.error || "")) {
-        scansBody.appendChild(h("div", { class: "card error" }, h("h2", {}, "The last scan could not run: a container setting is missing"),
+        const why = h("div", {});
+        if (isAdmin()) get("/api/scans/diagnose").then((d) => {
+          why.append(h("p", {}, h("strong", {}, "What Netlens found inside the container: "), (d.findings || []).join(" · ")));
+          if (d.cause) why.append(h("p", { class: "error" }, h("strong", {}, "Most likely cause: "), d.cause));
+        }).catch(() => {});
+        scansBody.appendChild(h("div", { class: "card error" }, h("h2", {}, "The last scan could not run: a container setting is missing"), why,
           h("p", {}, "Netlens needs the host network and two extra capabilities, ", h("code", {}, "NET_RAW"), " and ", h("code", {}, "NET_ADMIN"), ", on its container. They are settings of the container, not of Netlens:"),
           h("ul", {},
             h("li", {}, "In a compose file or stack: in the ", h("code", {}, "netlens:"), " service add ", h("code", {}, "network_mode: host"), " and a ", h("code", {}, "cap_add:"), " list with ", h("code", {}, "NET_RAW"), " and ", h("code", {}, "NET_ADMIN"), " (same indentation as ", h("code", {}, "image:"), ")."),

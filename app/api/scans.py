@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlite3 import Connection
 
 from app.api.devices import get_conn
+from app.db import connect
 from app.scanner.orchestrator import ScanBusy
 from app.scanner.scans import elapsed_seconds, list_scans, running_scan, typical_duration
 
@@ -66,3 +67,18 @@ async def create_scan(
     except ScanBusy:
         raise HTTPException(status_code=409, detail="scan already running")
     return {"id": scan_id}
+
+
+@router.get("/scans/diagnose")
+async def diagnose_scans(request: Request) -> dict[str, Any]:
+    """What this container has (capabilities, user, nmap's file capability, interfaces) and the likely reason raw scans fail. Administrators only."""
+    from app.scanner.diagnose import diagnose
+
+    last = None
+    conn = connect(request.app.state.db_path)
+    try:
+        row = conn.execute("SELECT error FROM scans WHERE status = 'failed' ORDER BY id DESC LIMIT 1").fetchone()
+        last = row["error"] if row else None
+    finally:
+        conn.close()
+    return diagnose(last or "")

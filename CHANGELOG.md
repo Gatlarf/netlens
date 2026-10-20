@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.124 — 2026-10-20
+
+### Added
+- ★ **Netlens now says why raw scans fail**: when nmap reports `dnet: Failed to open device ...` the Scans page and the container log show what Netlens found inside the container (capabilities, user, no-new-privileges, nmap's file capability, interfaces) and the most likely cause. On NAS systems that drop file capabilities (seen on a Synology) the fix is `user: "0:0"` on the netlens service; the README and the compose file explain it.
+
 ## 0.4.122 — 2026-10-20
 
 ### Fixed
