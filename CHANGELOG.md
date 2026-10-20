@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.136 — 2026-10-20
+
+### Changed
+- **Portable SQL** (preparation for running the database on its own server): the application code no longer uses SQLite-only statements. `INSERT OR REPLACE/IGNORE` became `ON CONFLICT`, new row ids come from `RETURNING id` instead of `lastrowid`, case-insensitive sorting and searching use `LOWER()` instead of `COLLATE NOCASE` and a case-sensitive `LIKE`, date arithmetic is done in Python instead of `datetime('now', ...)`, and everything that is specific to one engine (listing tables, copying the database, refreshing statistics) sits in `app/dbengine.py`. Nothing changes for you, except that the audit log clean-up and the IPv4 health event counts now use exact ISO times (they compared against a differently formatted time before).
+- The device search and the audit log search ignore case explicitly (they relied on SQLite's `LIKE` doing so).
+
+### Added
+- `docs/SQL-RULES.md` (the portable SQL rules) and `tests/test_portable_sql.py`, which fails when a SQLite-only construct appears outside the few modules that are SQLite files by nature (schema, metrics store, file backup, file upkeep).
+
 ## 0.4.135 — 2026-10-20
 
 ### Changed

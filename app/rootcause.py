@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import sqlite3
 
+from app.db import Error as db_Error
+
 from app.hierarchy import ancestors, device_name, load_hierarchy
 
 FOLLOWS = {"device_offline", "service_down", "metric_warning", "metric_critical"}
@@ -23,7 +25,7 @@ def collapse(conn: sqlite3.Connection, events: list[dict]) -> list[dict]:
         return events
     try:
         devices, hierarchy = load_hierarchy(conn)
-    except sqlite3.Error:
+    except db_Error:
         return events
     hidden: dict[int, list[dict]] = {}
     kept_ids = set()

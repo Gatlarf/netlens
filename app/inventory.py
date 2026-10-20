@@ -74,8 +74,8 @@ def overview(conn: sqlite3.Connection) -> dict[str, Any]:
     """Everything the Smart home page shows."""
     names = {r["id"]: r["custom_name"] or r["hostname"] or r["primary_ip"] or f"device {r['id']}" for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices")}
     servers = [{"plugin_id": r["plugin_id"], "id": r["server_id"], "name": r["name"], "ip": r["ip"], "version": r["version"], "online": bool(r["online"]), "warnings": json.loads(r["warnings"] or "[]")}
-               for r in conn.execute("SELECT * FROM inventory_servers ORDER BY name COLLATE NOCASE")]
-    rows = conn.execute("SELECT * FROM inventory_devices ORDER BY name COLLATE NOCASE").fetchall()
+               for r in conn.execute("SELECT * FROM inventory_servers ORDER BY LOWER(name)")]
+    rows = conn.execute("SELECT * FROM inventory_devices ORDER BY LOWER(name)").fetchall()
     by_id = {(r["plugin_id"], r["dev_id"]): r["name"] for r in rows}
     devices = [{"plugin_id": r["plugin_id"], "id": r["dev_id"], "server_id": r["server_id"], "name": r["name"], "manufacturer": r["manufacturer"], "model": r["model"], "area": r["area"], "sw": r["sw"],
                 "protocol": r["protocol"], "mac": r["mac"], "ip": r["ip"], "via_id": r["via_id"], "via": by_id.get((r["plugin_id"], r["via_id"])) if r["via_id"] else None, "available": bool(r["available"]),

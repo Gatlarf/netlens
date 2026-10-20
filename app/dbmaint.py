@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from app import tsdb
+from app import dbengine, tsdb
 from app.db import get_setting, set_setting
 
 log = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ def main_path(conn: sqlite3.Connection) -> Path | None:
 
 
 def table_names(conn: sqlite3.Connection) -> list[str]:
-    return [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
+    return dbengine.table_names(conn)
 
 
 def table_sizes(conn: sqlite3.Connection) -> dict[str, int] | None:

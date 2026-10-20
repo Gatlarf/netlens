@@ -20,7 +20,7 @@ def _allowed(conn) -> None:
 
 
 def _overview(conn) -> dict[str, Any]:
-    devices = [{"id": r["id"], "name": r["custom_name"] or r["hostname"] or r["primary_ip"]} for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices ORDER BY 2 COLLATE NOCASE")]
+    devices = [{"id": r["id"], "name": r["custom_name"] or r["hostname"] or r["primary_ip"]} for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices ORDER BY LOWER(COALESCE(custom_name, hostname, primary_ip))")]
     from app.notify.channels import EVENT_LABELS
 
     return {"allowed": licence.allows(conn, "remediation"), "paused": remediation.paused(conn), "rules": remediation.list_rules(conn), "runs": remediation.recent_runs(conn),

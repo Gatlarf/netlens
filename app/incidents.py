@@ -8,6 +8,8 @@ probable cause. The sentence is written from the facts by Netlens; a language mo
 from __future__ import annotations
 
 import sqlite3
+
+from app.db import Error as db_Error
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -85,7 +87,7 @@ def incidents(conn: sqlite3.Connection, days: int = 7, now: datetime | None = No
                 c["_last"] = max(c["_last"], when)
     try:
         devices, hierarchy = load_hierarchy(conn)
-    except sqlite3.Error:
+    except db_Error:
         devices, hierarchy = {}, {}
     out = [_describe(c, devices, hierarchy, now) for c in clusters if c["problems"]]
     out.sort(key=lambda i: i["start"], reverse=True)

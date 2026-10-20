@@ -11,7 +11,7 @@ import re
 import sqlite3
 from typing import Any
 
-from app.db import utcnow
+from app.db import ago, utcnow
 
 RETENTION_DAYS = 365
 MAX_ROWS = 50000
@@ -114,7 +114,7 @@ def log_request(conn: sqlite3.Connection, principal, ip: str, method: str, path:
 def prune(conn: sqlite3.Connection) -> None:
     from app import dbmaint
 
-    conn.execute("DELETE FROM audit_log WHERE ts < datetime('now', ?)", (f"-{dbmaint.days(conn, 'audit_days')} days",))
+    conn.execute("DELETE FROM audit_log WHERE ts < ?", (ago(days=dbmaint.days(conn, "audit_days")),))
     conn.execute("DELETE FROM audit_log WHERE id <= (SELECT MAX(id) FROM audit_log) - ?", (MAX_ROWS,))
     conn.commit()
 
@@ -128,7 +128,7 @@ def entries(conn: sqlite3.Connection, limit: int = 100, before: int | None = Non
         where.append("user = ?")
         args.append(user)
     if q:
-        where.append("(action LIKE ? OR path LIKE ?)")
-        args += [f"%{q}%", f"%{q}%"]
+        where.append("(LOWER(action) LIKE ? OR LOWER(path) LIKE ?)")
+        args += [f"%{q.lower()}%", f"%{q.lower()}%"]
     sql = "SELECT id, ts, user, role, ip, method, path, status, action FROM audit_log" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY id DESC LIMIT ?"
     return [dict(r) for r in conn.execute(sql, (*args, max(1, min(int(limit), 1000))))]

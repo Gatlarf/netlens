@@ -3,6 +3,8 @@
 import re
 import sqlite3
 
+from app.db import IntegrityError as db_IntegrityError, insert_id
+
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 PALETTE = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2", "#be185d", "#65a30d", "#7c3aed", "#ea580c"]
 MAX_GROUPS = 200
@@ -31,7 +33,7 @@ def list_groups(conn: sqlite3.Connection) -> list[dict]:
     return [
         {"id": r["id"], "name": r["name"], "color": r["color"], "count": r["n"]}
         for r in conn.execute(
-            "SELECT g.id, g.name, g.color, (SELECT COUNT(*) FROM devices d WHERE d.group_id = g.id) AS n FROM device_groups g ORDER BY g.name COLLATE NOCASE"
+            "SELECT g.id, g.name, g.color, (SELECT COUNT(*) FROM devices d WHERE d.group_id = g.id) AS n FROM device_groups g ORDER BY LOWER(g.name)"
         )
     ]
 
@@ -43,11 +45,11 @@ def create(conn: sqlite3.Connection, name: str, color: str | None = None) -> int
         raise GroupError("that is a lot of groups; delete some first")
     color = _color(color, PALETTE[total % len(PALETTE)])
     try:
-        cur = conn.execute("INSERT INTO device_groups (name, color) VALUES (?, ?)", (name, color))
-    except sqlite3.IntegrityError:
+        new_id = insert_id(conn, "INSERT INTO device_groups (name, color) VALUES (?, ?)", (name, color))
+    except db_IntegrityError:
         raise GroupError("a group with that name exists")
     conn.commit()
-    return cur.lastrowid
+    return new_id
 
 
 def update(conn: sqlite3.Connection, group_id: int, name: str | None = None, color: str | None = None) -> None:
@@ -57,7 +59,7 @@ def update(conn: sqlite3.Connection, group_id: int, name: str | None = None, col
     try:
         conn.execute("UPDATE device_groups SET name = ?, color = ? WHERE id = ?",
                      (_name(name) if name is not None else row["name"], _color(color, row["color"]), group_id))
-    except sqlite3.IntegrityError:
+    except db_IntegrityError:
         raise GroupError("a group with that name exists")
     conn.commit()
 

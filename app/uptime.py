@@ -1,7 +1,7 @@
 import sqlite3
 import ipaddress
 from datetime import datetime, timedelta, timezone
-from app import checkstats, tsdb
+from app import checkstats, dbengine, tsdb
 from app.db import utcnow
 
 
@@ -275,15 +275,16 @@ def _bucket_rows(conn: sqlite3.Connection, now: str, days: int, bars: int, devic
     is exactly that measurement; a slice with several says how many there were and how many failed. A slice is down when any check in it failed."""
     end = _parse_ts(now)
     start = end - timedelta(days=days)
-    size = days * 86400 / bars
     t0 = int(start.timestamp())
-    sql = ("SELECT device_id, MIN(?, CAST((CAST(strftime('%s', ts) AS INTEGER) - ?) / ? AS INTEGER)) AS b, COUNT(*) AS n, SUM(up) AS ups, "
-           "AVG(rtt_ms) AS rtt, MAX(rtt_ms) AS rtt_max, MIN(ts) AS first, MAX(ts) AS last FROM checks WHERE ts >= ? AND ts <= ?")
-    args: list = [bars - 1, t0, size, _format_ts(start), now]
+    # slice number = seconds since the start * slices / seconds in the period, in whole numbers (the same on every engine); the very last second belongs to the last slice
+    sql = ("SELECT device_id, b, COUNT(*) AS n, SUM(up) AS ups, AVG(rtt_ms) AS rtt, MAX(rtt_ms) AS rtt_max, MIN(ts) AS first, MAX(ts) AS last FROM ("
+           "SELECT device_id, ts, up, rtt_ms, CASE WHEN x > ? THEN ? ELSE x END AS b FROM ("
+           f"SELECT device_id, ts, up, rtt_ms, (({dbengine.epoch_sql('ts')} - ?) * ?) / ? AS x FROM checks WHERE ts >= ? AND ts <= ?")
+    args: list = [bars - 1, bars - 1, t0, bars, days * 86400, _format_ts(start), now]
     if device_id is not None:
         sql += " AND device_id = ?"
         args.append(device_id)
-    sql += " GROUP BY device_id, b ORDER BY device_id, b"
+    sql += ") AS s1) AS s2 GROUP BY device_id, b ORDER BY device_id, b"
     out: dict[int, list[dict]] = {}
     for r in conn.execute(sql, args):
         down = r["n"] - (r["ups"] or 0)

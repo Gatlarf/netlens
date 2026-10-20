@@ -113,7 +113,7 @@ async def get_remote(request: Request) -> dict:
             ports.setdefault(r["device_id"], []).append(dict(r))
         devices = []
         for d in conn.execute(
-            "SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip, online, device_type FROM devices ORDER BY online DESC, name COLLATE NOCASE"
+            "SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip, online, device_type FROM devices ORDER BY online DESC, LOWER(COALESCE(custom_name, hostname, primary_ip))"
         ).fetchall():
             services = services_of(ports.get(d["id"], []))
             if services and target_allowed(d["primary_ip"], request.app.state.settings.ranges):

@@ -8,7 +8,7 @@ import math
 from datetime import datetime, timedelta, timezone
 
 from app import tsdb, vault
-from app.db import utcnow
+from app.db import insert_id, utcnow
 from app.demo.network import BY_KEY, ip
 
 GB = 1024 ** 3
@@ -132,8 +132,10 @@ def seed(conn, ids: dict[str, int], now: datetime, days: int = 14) -> None:
             continue
         secret = {"community": "public", "version": "2c"} if method == "snmp" else {"username": "monitor", "password": "demo-password"}
         conn.execute(
-            "INSERT OR REPLACE INTO host_monitors (device_id, method, address, port, credential, interval_s, groups, alerts, enabled, last_ts, last_ok, since, created) "
-            "VALUES (?,?,?,?,?,?,?,?,1,?,1,?,?)",
+            "INSERT INTO host_monitors (device_id, method, address, port, credential, interval_s, groups, alerts, enabled, last_ts, last_ok, since, created) "
+            "VALUES (?,?,?,?,?,?,?,?,1,?,1,?,?) ON CONFLICT (device_id) DO UPDATE SET method = excluded.method, address = excluded.address, port = excluded.port, "
+            "credential = excluded.credential, interval_s = excluded.interval_s, groups = excluded.groups, alerts = excluded.alerts, enabled = 1, last_ts = excluded.last_ts, "
+            "last_ok = 1, since = excluded.since, created = excluded.created",
             (device_id, method, ip(BY_KEY[key]), 161 if method == "snmp" else 22, vault.encrypt(conn, json.dumps(secret)), 60, json.dumps(groups), 1, stamp,
              (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ"), stamp))
         monitor_id = conn.execute("SELECT id FROM host_monitors WHERE device_id = ?", (device_id,)).fetchone()[0]
@@ -147,7 +149,8 @@ def seed(conn, ids: dict[str, int], now: datetime, days: int = 14) -> None:
             if metric == "storage_status" and value >= 1:
                 level, since = ("critical" if value >= 2 else "warning"), (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
             if metric in ("disk_pct", "cpu_pct", "mem_pct", "temp_c", "supply_pct", "battery_pct", "storage_status"):
-                conn.execute("INSERT OR REPLACE INTO metric_state (monitor_id, metric, label, level, since, value) VALUES (?,?,?,?,?,?)", (monitor_id, metric, label, level, since, value))
+                conn.execute("INSERT INTO metric_state (monitor_id, metric, label, level, since, value) VALUES (?,?,?,?,?,?) "
+                             "ON CONFLICT (monitor_id, metric, label) DO UPDATE SET level = excluded.level, since = excluded.since, value = excluded.value", (monitor_id, metric, label, level, since, value))
     if store is not None:
         rows = []
         step = 300
@@ -215,20 +218,17 @@ def seed_remote(conn, now: datetime, days: int = 7) -> None:
                       "latest": {"cpu": 12.0, "mem": 58.0, "disk": 87.0, "temp": 44.0}, "disk_label": "/volume1"}],
         "scan": {"finished": stamp, "running": False, "hosts": 8}, "counts": {"devices": len(SITE_DEVICES), "services": len(SITE_SERVICES), "samples": 0},
     }
-    cur = conn.execute("INSERT INTO probes (name, token_hash, created, last_seen, last_ip, version, interval_s, snapshot_ts, summary) VALUES (?,?,?,?,?,?,?,?,?)",
-                       (SITE_NAME, "demo-" + token, (now - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ"), stamp, "203.0.113.45", "0.4.0", 60, stamp, json.dumps(summary)))
-    probe_id = cur.lastrowid
+    probe_id = insert_id(conn, "INSERT INTO probes (name, token_hash, created, last_seen, last_ip, version, interval_s, snapshot_ts, summary) VALUES (?,?,?,?,?,?,?,?,?)",
+                         (SITE_NAME, "demo-" + token, (now - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ"), stamp, "203.0.113.45", "0.4.0", 60, stamp, json.dumps(summary)))
     dev_ids = {}
     for key, name, ip_, vendor, kind, always_on, ports, online in SITE_DEVICES:
-        c = conn.execute("INSERT INTO remote_devices (probe_id, key, mac, ip, name, vendor, type, online, always_on, ports, first_seen, last_seen) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                         (probe_id, key, key, ip_, name, vendor, kind, int(online), int(always_on), json.dumps(ports), (now - timedelta(days=25)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                          stamp if online else (now - timedelta(hours=5)).strftime("%Y-%m-%dT%H:%M:%SZ")))
-        dev_ids[key] = c.lastrowid
+        dev_ids[key] = insert_id(conn, "INSERT INTO remote_devices (probe_id, key, mac, ip, name, vendor, type, online, always_on, ports, first_seen, last_seen) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                                 (probe_id, key, key, ip_, name, vendor, kind, int(online), int(always_on), json.dumps(ports), (now - timedelta(days=25)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                  stamp if online else (now - timedelta(hours=5)).strftime("%Y-%m-%dT%H:%M:%SZ")))
     svc_ids = {}
     for key, name, kind, target, state, ms in SITE_SERVICES:
-        c = conn.execute("INSERT INTO remote_services (probe_id, key, name, kind, target, state, ms, detail, since, checked) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                         (probe_id, key, name, kind, target, state, ms, "valid for 40 more days" if kind == "cert" else "answered", (now - timedelta(days=9)).strftime("%Y-%m-%dT%H:%M:%SZ"), stamp))
-        svc_ids[key] = c.lastrowid
+        svc_ids[key] = insert_id(conn, "INSERT INTO remote_services (probe_id, key, name, kind, target, state, ms, detail, since, checked) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                                 (probe_id, key, name, kind, target, state, ms, "valid for 40 more days" if kind == "cert" else "answered", (now - timedelta(days=9)).strftime("%Y-%m-%dT%H:%M:%SZ"), stamp))
     for when, kind, text in ((now - timedelta(hours=5), "remote_offline", f"{SITE_NAME}: manager-laptop (10.20.0.23) went offline"),
                              (now - timedelta(days=2), "remote_metric_warning", f"{SITE_NAME}: nas-branch: disk full on /volume1 is 87% (limit 85%)"),
                              (now - timedelta(days=4, hours=3), "remote_service_down", f"{SITE_NAME}: Printer queue (10.20.0.30:9100) is down: timed out"),

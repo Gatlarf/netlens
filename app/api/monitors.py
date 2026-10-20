@@ -159,7 +159,7 @@ def overview(conn=Depends(get_conn)) -> dict:
     out = []
     rows = conn.execute(
         "SELECT m.*, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.online AS online, COALESCE(d.type_override, d.device_type) AS type "
-        "FROM host_monitors m JOIN devices d ON d.id = m.device_id ORDER BY name COLLATE NOCASE").fetchall()
+        "FROM host_monitors m JOIN devices d ON d.id = m.device_id ORDER BY LOWER(COALESCE(d.custom_name, d.hostname, d.primary_ip))").fetchall()
     known = store.metrics_of_many("device", [r["device_id"] for r in rows]) if store is not None else {}
     saved = hm.all_overrides(conn)
     for row in rows:

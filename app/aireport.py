@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app import changes, engineer, incidents, insights, relevance
-from app.db import get_setting, set_setting, utcnow
+from app.db import Error as db_Error, get_setting, set_setting, utcnow
 from app.hierarchy import ancestors, device_name, load_hierarchy
 
 PERIODS = {"6h": "the last 6 hours", "24h": "the last 24 hours", "3d": "the last 3 days", "7d": "the last 7 days"}
@@ -60,7 +60,7 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
     raw: list[dict[str, Any]] = []
     try:
         devices, hierarchy = load_hierarchy(conn)
-    except sqlite3.Error:
+    except db_Error:
         devices, hierarchy = {}, {}
     incs = [i for i in incidents.incidents(conn, days=max(1, -(-hours // 24)), now=now, only=only) if i["start"] >= since]
     made = changes.timeline(conn, period, include_audit=True, limit=400, now=now)["items"]

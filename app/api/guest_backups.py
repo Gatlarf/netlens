@@ -25,7 +25,7 @@ def sites(conn) -> list[dict]:
 
     frozen = probes.locked_ids(conn)
     out = []
-    for row in conn.execute("SELECT id, name, enabled, last_seen, summary FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
+    for row in conn.execute("SELECT id, name, enabled, last_seen, summary FROM probes WHERE enabled = 1 ORDER BY LOWER(name)"):
         if row["id"] in frozen:
             continue
         backups = json.loads(row["summary"] or "{}").get("backups") or {}

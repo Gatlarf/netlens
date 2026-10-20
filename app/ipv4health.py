@@ -17,7 +17,7 @@ import socket
 import sqlite3
 from typing import Any
 
-from app.db import set_setting, get_setting, utcnow
+from app.db import ago, set_setting, get_setting, utcnow
 from app.ipv6health import _tcp, finding_key
 from app.scanner.ipv6 import SKIP_IFACES
 from app.scanner.netinfo import run_ip
@@ -112,8 +112,8 @@ def facts_from(conn: sqlite3.Connection, ranges: list[str]) -> dict[str, Any]:
 
     devices = [{"id": r["id"], "name": r["name"], "ip": r["primary_ip"], "mac": (r["mac"] or "").lower(), "online": bool(r["online"])}
                for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip, mac, online FROM devices WHERE primary_ip IS NOT NULL")]
-    events = {r["kind"]: r["n"] for r in conn.execute("SELECT kind, COUNT(*) AS n FROM events WHERE kind IN ('ip_reused', 'gateway_changed', 'dhcp_rogue') AND ts >= datetime('now', '-30 days') GROUP BY kind")}
-    reused = conn.execute("SELECT COUNT(DISTINCT detail) FROM events WHERE kind = 'ip_reused' AND ts >= datetime('now', '-30 days')").fetchone()[0]
+    events = {r["kind"]: r["n"] for r in conn.execute("SELECT kind, COUNT(*) AS n FROM events WHERE kind IN ('ip_reused', 'gateway_changed', 'dhcp_rogue') AND ts >= ? GROUP BY kind", (ago(days=30),))}
+    reused = conn.execute("SELECT COUNT(DISTINCT detail) FROM events WHERE kind = 'ip_reused' AND ts >= ?", (ago(days=30),)).fetchone()[0]
     return {"devices": devices, "ranges": ranges, "dhcp": netchecks.list_servers(conn), "dhcp_last": netchecks.get_last(conn), "gateway": netchecks.get_gateway(conn), "events": events, "reused_addresses": reused}
 
 

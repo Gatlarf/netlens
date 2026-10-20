@@ -27,6 +27,8 @@ import time
 from pathlib import Path
 from typing import Iterable
 
+from app.db import insert_id
+
 log = logging.getLogger(__name__)
 
 RAW_SECONDS = 7 * 86400
@@ -113,8 +115,7 @@ class Store:
             return found
         row = conn.execute("SELECT id FROM series WHERE entity = ? AND entity_id = ? AND metric = ? AND label = ?", key).fetchone()
         if row is None:
-            cur = conn.execute("INSERT INTO series (entity, entity_id, metric, label, unit) VALUES (?,?,?,?,?)", (*key, unit))
-            sid = cur.lastrowid
+            sid = insert_id(conn, "INSERT INTO series (entity, entity_id, metric, label, unit) VALUES (?,?,?,?,?)", (*key, unit))
         else:
             sid = row["id"]
             if unit:
@@ -143,7 +144,7 @@ class Store:
                     if value != value or value in (float("inf"), float("-inf")):
                         continue
                     sid = self._series_id(conn, entity, int(entity_id), str(metric), str(label), str(unit))
-                    conn.execute("INSERT OR REPLACE INTO raw (series, ts, v) VALUES (?,?,?)", (sid, ts, value))
+                    conn.execute("INSERT INTO raw (series, ts, v) VALUES (?,?,?) ON CONFLICT (series, ts) DO UPDATE SET v = excluded.v", (sid, ts, value))
                     rows += 1
                 conn.commit()
             finally:
@@ -164,7 +165,7 @@ class Store:
                     if value is None or entity not in ENTITIES:
                         continue
                     sid = self._series_id(conn, entity, int(entity_id), str(metric), str(label or ""), str(unit or ""))
-                    conn.execute("INSERT OR REPLACE INTO raw (series, ts, v) VALUES (?,?,?)", (sid, int(ts), float(value)))
+                    conn.execute("INSERT INTO raw (series, ts, v) VALUES (?,?,?) ON CONFLICT (series, ts) DO UPDATE SET v = excluded.v", (sid, int(ts), float(value)))
                     oldest = int(ts) if oldest is None else min(oldest, int(ts))
                     n += 1
                 if oldest is not None:
@@ -256,7 +257,7 @@ class Store:
 
             count += feed("device", ((r[0], r[1], r[2], r[3]) for r in main.execute("SELECT device_id, ts, up, rtt_ms FROM checks ORDER BY id")))
             count += feed("service", ((r[0], r[1], r[2], r[3]) for r in main.execute("SELECT check_id, ts, up, ms FROM service_results ORDER BY id")))
-            conn.execute("INSERT OR REPLACE INTO meta (k, v) VALUES ('backfill_done', 2)")
+            conn.execute("INSERT INTO meta (k, v) VALUES ('backfill_done', 2) ON CONFLICT (k) DO UPDATE SET v = excluded.v")
             conn.commit()
         finally:
             conn.close()
@@ -269,7 +270,7 @@ class Store:
         oldest = None
         for entity, ident, metric, value, label, unit, ts in batch:
             sid = self._series_id(conn, entity, int(ident), metric, label, unit)
-            conn.execute("INSERT OR IGNORE INTO raw (series, ts, v) VALUES (?,?,?)", (sid, ts, float(value)))
+            conn.execute("INSERT INTO raw (series, ts, v) VALUES (?,?,?) ON CONFLICT (series, ts) DO NOTHING", (sid, ts, float(value)))
             oldest = ts if oldest is None else min(oldest, ts)
             n += 1
         if oldest is not None:
@@ -296,15 +297,17 @@ class Store:
                 start = max(start, 0) // step * step
                 if src == "raw":
                     conn.execute(
-                        f"INSERT OR REPLACE INTO {dst} (series, ts, n, s, lo, hi) "
-                        f"SELECT series, ts / {step} * {step}, COUNT(*), SUM(v), MIN(v), MAX(v) FROM raw WHERE ts >= ? AND ts < ? GROUP BY series, ts / {step}",
+                        f"INSERT INTO {dst} (series, ts, n, s, lo, hi) "
+                        f"SELECT series, ts / {step} * {step}, COUNT(*), SUM(v), MIN(v), MAX(v) FROM raw WHERE ts >= ? AND ts < ? GROUP BY series, ts / {step} "
+                        "ON CONFLICT (series, ts) DO UPDATE SET n = excluded.n, s = excluded.s, lo = excluded.lo, hi = excluded.hi",
                         (start, limit))
                 else:
                     conn.execute(
-                        f"INSERT OR REPLACE INTO {dst} (series, ts, n, s, lo, hi) "
-                        f"SELECT series, ts / {step} * {step}, SUM(n), SUM(s), MIN(lo), MAX(hi) FROM m5 WHERE ts >= ? AND ts < ? GROUP BY series, ts / {step}",
+                        f"INSERT INTO {dst} (series, ts, n, s, lo, hi) "
+                        f"SELECT series, ts / {step} * {step}, SUM(n), SUM(s), MIN(lo), MAX(hi) FROM m5 WHERE ts >= ? AND ts < ? GROUP BY series, ts / {step} "
+                        "ON CONFLICT (series, ts) DO UPDATE SET n = excluded.n, s = excluded.s, lo = excluded.lo, hi = excluded.hi",
                         (start, limit))
-                conn.execute("INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)", (key, limit))
+                conn.execute("INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT (k) DO UPDATE SET v = excluded.v", (key, limit))
             conn.commit()
         finally:
             conn.close()

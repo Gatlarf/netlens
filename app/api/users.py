@@ -55,7 +55,7 @@ def get_users(request: Request) -> dict:
             "users": users.list_users(db), "roles": list(users.ROLES), "min_password": users.MIN_PASSWORD,
             "token_configured": bool(request.app.state.settings.token),  # NETLENS_TOKEN is set in the environment
             "teams_allowed": licence.allows(db, "teams"),
-            "sites": [{"id": r["id"], "name": r["name"], "customer": r["customer"] or ""} for r in db.execute("SELECT id, name, customer FROM probes ORDER BY name COLLATE NOCASE")],
+            "sites": [{"id": r["id"], "name": r["name"], "customer": r["customer"] or ""} for r in db.execute("SELECT id, name, customer FROM probes ORDER BY LOWER(name)")],
         }
     finally:
         db.close()

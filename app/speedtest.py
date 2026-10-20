@@ -13,7 +13,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 
-from app.db import get_setting, set_setting, utcnow
+from app.db import get_setting, insert_id, set_setting, utcnow
 
 KINDS = ("internet", "iperf-in", "iperf-out", "browser")
 KEEP_DAYS = 365
@@ -71,12 +71,13 @@ def _round(v, n=1):
 
 
 def record(conn, kind: str, target: str = "", *, down=None, up=None, latency=None, jitter=None, ok: bool = True, error: str | None = None, detail: dict | None = None, now: str | None = None) -> int:
-    cur = conn.execute(
+    new_id = insert_id(
+        conn,
         "INSERT INTO speedtests (ts, kind, target, down_mbps, up_mbps, latency_ms, jitter_ms, ok, error, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (now or utcnow(), kind, target[:200], _round(down), _round(up), _round(latency), _round(jitter, 2), 1 if ok else 0, (error or None) and error[:300], json.dumps(detail or {})),
     )
     conn.commit()
-    return cur.lastrowid
+    return new_id
 
 
 def prune(conn, now: str | None = None) -> None:

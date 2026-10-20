@@ -162,7 +162,7 @@ def t_fixes(conn, args, now=None) -> dict:
 
 
 def t_services(conn, args, now=None) -> dict:
-    rows = conn.execute("SELECT name, kind, last_up, last_ms, last_detail FROM service_checks WHERE enabled = 1 ORDER BY last_up IS NULL, last_up, name COLLATE NOCASE LIMIT 60").fetchall()
+    rows = conn.execute("SELECT name, kind, last_up, last_ms, last_detail FROM service_checks WHERE enabled = 1 ORDER BY last_up IS NULL, last_up, LOWER(name) LIMIT 60").fetchall()
     items = [{"name": r["name"], "kind": r["kind"], "state": "unknown" if r["last_up"] is None else "up" if r["last_up"] else "down", "response_ms": r["last_ms"], "detail": (r["last_detail"] or "")[:80] if r["last_up"] == 0 else ""} for r in rows]
     return {"total": len(items), "down": [i["name"] for i in items if i["state"] == "down"], "services": items[:30]}
 

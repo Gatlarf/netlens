@@ -225,7 +225,7 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
     # remote sites that report to this Netlens
     from app import probes as probes_mod
 
-    for row in conn.execute("SELECT * FROM probes ORDER BY name COLLATE NOCASE"):
+    for row in conn.execute("SELECT * FROM probes ORDER BY LOWER(name)"):
         site = probes_mod.present(conn, row)
         if site["locked"]:
             continue

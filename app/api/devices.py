@@ -301,10 +301,10 @@ def list_devices(
 
     if q:
         conditions.append(
-            "(hostname LIKE ? OR custom_name LIKE ? OR primary_ip LIKE ? OR mac LIKE ? OR vendor LIKE ? "
-            "OR id IN (SELECT device_id FROM device_ipv6 WHERE ip LIKE ?))"
+            "(LOWER(hostname) LIKE ? OR LOWER(custom_name) LIKE ? OR LOWER(primary_ip) LIKE ? OR LOWER(mac) LIKE ? OR LOWER(vendor) LIKE ? "
+            "OR id IN (SELECT device_id FROM device_ipv6 WHERE LOWER(ip) LIKE ?))"
         )
-        like = f"%{q}%"
+        like = f"%{q.lower()}%"      # LIKE ignores case on SQLite but not on PostgreSQL: lower both sides
         params.extend([like, like, like, like, like, like])
 
     if conditions:

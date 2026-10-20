@@ -26,7 +26,7 @@ def remember_fingerprint(
     """Store a fingerprint for a device. If a row already exists, leave it unchanged."""
     ts = now or utcnow()
     conn.execute(
-        "INSERT OR IGNORE INTO host_keys (device_id, fingerprint, first_seen) VALUES (?, ?, ?)",
+        "INSERT INTO host_keys (device_id, fingerprint, first_seen) VALUES (?, ?, ?) ON CONFLICT (device_id) DO NOTHING",
         (device_id, fingerprint, ts),
     )
     conn.commit()

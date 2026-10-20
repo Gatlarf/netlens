@@ -3,18 +3,19 @@ import statistics
 from datetime import datetime, timezone
 from typing import Optional
 
-from app.db import utcnow
+from app.db import insert_id, utcnow
 
 
 def create_scan(conn: sqlite3.Connection, kind: str, now: str | None = None, target: str | None = None) -> int:
     conn.row_factory = sqlite3.Row
     started = now or utcnow()
-    cursor = conn.execute(
+    new_id = insert_id(
+        conn,
         "INSERT INTO scans (kind, status, started, target) VALUES (?, ?, ?, ?)",
         (kind, "running", started, target),
     )
     conn.commit()
-    return cursor.lastrowid
+    return new_id
 
 
 def finish_scan(

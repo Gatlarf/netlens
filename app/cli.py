@@ -51,7 +51,7 @@ def run(argv: list[str]) -> int:
             for u in users.list_users(conn):
                 print(f"{u['username']:<24} {u['role']:<7} {'disabled' if u['disabled'] else 'active':<9} last login: {u['last_login'] or 'never'}")
             return 0
-        row = conn.execute("SELECT id FROM users WHERE username = ? COLLATE NOCASE", (args.username,)).fetchone()
+        row = conn.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (args.username,)).fetchone()
         try:
             if args.command == "reset-password":
                 if row is None:

@@ -38,7 +38,7 @@ def _row(conn, probe_id: int):
 @router.get("/probes")
 def list_probes(request: Request, conn=Depends(get_conn)) -> list[dict]:
     mine = sites_of(request)                 # a customer login sees only its own sites
-    return [probes_mod.present(conn, r) for r in conn.execute("SELECT * FROM probes ORDER BY name COLLATE NOCASE") if mine is None or r["id"] in mine]
+    return [probes_mod.present(conn, r) for r in conn.execute("SELECT * FROM probes ORDER BY LOWER(name)") if mine is None or r["id"] in mine]
 
 
 @router.get("/probes-search")
@@ -50,7 +50,7 @@ def search_remote_devices(q: str = "", conn=Depends(get_conn)) -> list[dict]:
     like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
     locked = probes_mod.locked_ids(conn)
     rows = conn.execute("SELECT d.id, d.probe_id, d.name, d.ip, d.vendor, p.name AS site FROM remote_devices d JOIN probes p ON p.id = d.probe_id "
-                        "WHERE lower(d.name || ' ' || COALESCE(d.ip, '') || ' ' || COALESCE(d.mac, '') || ' ' || COALESCE(d.vendor, '')) LIKE ? ESCAPE '\\' ORDER BY d.name COLLATE NOCASE LIMIT 30", (like,)).fetchall()
+                        "WHERE lower(d.name || ' ' || COALESCE(d.ip, '') || ' ' || COALESCE(d.mac, '') || ' ' || COALESCE(d.vendor, '')) LIKE ? ESCAPE '\\' ORDER BY LOWER(d.name) LIMIT 30", (like,)).fetchall()
     return [{"id": r["id"], "probe_id": r["probe_id"], "name": r["name"], "ip": r["ip"], "vendor": r["vendor"], "site": r["site"]} for r in rows if r["probe_id"] not in locked][:10]
 
 
@@ -71,10 +71,10 @@ def probe_detail(probe_id: int, conn=Depends(get_conn)) -> dict[str, Any]:
     summary = json.loads(row["summary"] or "{}")
     devices = [{"id": r["id"], "key": r["key"], "name": r["name"], "ip": r["ip"], "mac": r["mac"], "vendor": r["vendor"], "type": r["type"], "os": r["os"],
                 "online": bool(r["online"]), "always_on": bool(r["always_on"]), "ports": json.loads(r["ports"] or "[]"), "first_seen": r["first_seen"], "last_seen": r["last_seen"]}
-               for r in conn.execute("SELECT * FROM remote_devices WHERE probe_id = ? ORDER BY online ASC, name COLLATE NOCASE", (probe_id,))]
+               for r in conn.execute("SELECT * FROM remote_devices WHERE probe_id = ? ORDER BY online ASC, LOWER(name)", (probe_id,))]
     services = [{"id": r["id"], "key": r["key"], "name": r["name"], "kind": r["kind"], "target": r["target"], "state": r["state"], "ms": r["ms"],
                  "detail": r["detail"], "since": r["since"], "checked": r["checked"]}
-                for r in conn.execute("SELECT * FROM remote_services WHERE probe_id = ? ORDER BY name COLLATE NOCASE", (probe_id,))]
+                for r in conn.execute("SELECT * FROM remote_services WHERE probe_id = ? ORDER BY LOWER(name)", (probe_id,))]
     from app import snooze
 
     snoozed = snooze.active(conn).get(f"site:{probe_id}")
@@ -143,7 +143,7 @@ def update_probe(probe_id: int, body: NameBody, conn=Depends(get_conn)) -> dict:
             name = probes_mod.clean_name(body.name)
         except probes_mod.ProbeError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
-        if conn.execute("SELECT 1 FROM probes WHERE name = ? COLLATE NOCASE AND id != ?", (name, probe_id)).fetchone():
+        if conn.execute("SELECT 1 FROM probes WHERE LOWER(name) = LOWER(?) AND id != ?", (name, probe_id)).fetchone():
             raise HTTPException(status_code=422, detail="there is already a remote site with that name")
         conn.execute("UPDATE probes SET name = ? WHERE id = ?", (name, probe_id))
     if body.customer is not None:

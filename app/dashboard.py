@@ -13,7 +13,7 @@ def _site_vuln_attention(conn: sqlite3.Connection) -> list[dict]:
     from app import probes
 
     out = []
-    for r in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
+    for r in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY LOWER(name)"):
         p = probes.present(conn, r)
         crit = (p["vulns"].get("counts") or {}).get("critical", 0) if p["vulns"].get("configured") and not p["locked"] else 0
         if crit:
@@ -137,7 +137,7 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
     ]
     login_failed = conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'login_failed' AND ts >= ?", (_ago(now, hours=24),)).fetchone()[0]
     certs = sites_mod.certificates(conn)
-    down_checks = [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM service_checks WHERE enabled = 1 AND last_up = 0 ORDER BY name COLLATE NOCASE")]
+    down_checks = [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM service_checks WHERE enabled = 1 AND last_up = 0 ORDER BY LOWER(name)")]
     down = [c["name"] for c in down_checks]
     week = checkstats.totals(conn, _ago(now, days=7))
     worst = [

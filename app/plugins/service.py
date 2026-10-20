@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from app import containers, imageupdates
-from app.db import add_event, connect, delete_setting, get_setting, set_setting, utcnow
+from app.db import Error as db_Error, add_event, connect, delete_setting, get_setting, set_setting, utcnow
 from app.plugins.contract import ContractError, clean_config, default_config, migrate_servers, missing_required, validate_output
 from app.plugins import enrich, runs
 from app.plugins.enrich import device_lookup, record_client_hints, record_client_links, record_router_names, record_wifi
@@ -398,7 +398,7 @@ class PluginService:
                     if dns_settings(conn)["networks"].strip():       # nothing to plan until a network and zone are set
                         plan = make_plan(conn, plugin.id, data, persist=True)
                         summary.update({"planned": sum(1 for i in plan["items"] if i["state"] in ("add", "update", "delete")), "conflicts": plan["counts"].get("conflict", 0)})
-                except (sqlite3.Error, ValueError):
+                except (db_Error, ValueError):
                     log.exception("could not work out the DNS plan")
             if plugin.manifest["kind"] == "topology":
                 try:  # what the router tells us besides the links; a failure here must not fail the sync
@@ -406,7 +406,7 @@ class PluginService:
                     record_client_hints(conn, data)
                     record_client_links(conn, plugin.id, data)
                     summary.update(record_wifi(conn, data))
-                except sqlite3.Error:
+                except db_Error:
                     log.exception("could not store the router's names and Wi-Fi samples")
             set_status(conn, plugin.id, ok=True, **summary)
             runs.record(conn, plugin.id, True, (time.monotonic() - started) * 1000)
@@ -419,7 +419,7 @@ class PluginService:
         conn = connect(self.db_path)
         try:
             imageupdates.refresh(conn, imageupdates.images_of(data["guests"]))
-        except (sqlite3.Error, OSError, ValueError):
+        except (db_Error, OSError, ValueError):
             log.exception("could not check the images for updates")
         finally:
             conn.close()

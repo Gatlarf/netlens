@@ -161,7 +161,7 @@ def unprotected(conn: sqlite3.Connection) -> list[dict]:
         f"""SELECT g.plugin_id, g.guest_id, g.name, g.kind, g.status, g.device_id FROM hypervisor_guests g
            WHERE g.kind IN ('qemu', 'vm', 'lxc', 'ct') AND g.plugin_id IN {COVERED}
              AND NOT EXISTS (SELECT 1 FROM backup_targets t WHERE t.guest_plugin_id = g.plugin_id AND t.guest_id = g.guest_id)
-           ORDER BY g.name COLLATE NOCASE"""
+           ORDER BY LOWER(g.name)"""
     ).fetchall()
     return [{"plugin_id": r["plugin_id"], "guest_id": r["guest_id"], "name": r["name"], "kind": r["kind"], "status": r["status"], "device_id": r["device_id"]} for r in rows]
 
@@ -171,15 +171,15 @@ def overview(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str,
     now = now or datetime.now(timezone.utc)
     devices = {r["id"]: r["custom_name"] or r["hostname"] or r["primary_ip"] or f"device {r['id']}" for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices")}
     servers = [{"plugin_id": r["plugin_id"], "id": r["server_id"], "name": r["name"], "ip": r["ip"], "version": r["version"], "online": bool(r["online"]), "device_id": r["device_id"],
-                "device": devices.get(r["device_id"]), "warnings": json.loads(r["warnings"] or "[]")} for r in conn.execute("SELECT * FROM backup_servers ORDER BY name COLLATE NOCASE")]
+                "device": devices.get(r["device_id"]), "warnings": json.loads(r["warnings"] or "[]")} for r in conn.execute("SELECT * FROM backup_servers ORDER BY LOWER(name)")]
     stores = []
-    for r in conn.execute("SELECT * FROM backup_stores ORDER BY name COLLATE NOCASE"):
+    for r in conn.execute("SELECT * FROM backup_stores ORDER BY LOWER(name)"):
         days = None if not _parse(r["full"]) else int((_parse(r["full"]) - now).total_seconds() // 86400)
         stores.append({"plugin_id": r["plugin_id"], "id": r["store_id"], "server_id": r["server_id"], "name": r["name"], "total": r["total"], "used": r["used"], "avail": r["avail"],
                        "percent": round(r["used"] / r["total"] * 100, 1) if r["total"] and r["used"] is not None else None, "full": r["full"], "days_to_full": days, "level": r["level"],
                        **{f"{j}_{k}": r[f"{j}_{k}"] for j in ("gc", "prune", "verify", "sync") for k in ("state", "at")}})
     targets = []
-    for r in conn.execute("SELECT * FROM backup_targets ORDER BY name COLLATE NOCASE, backup_id"):
+    for r in conn.execute("SELECT * FROM backup_targets ORDER BY LOWER(name), backup_id"):
         age = _age(r["last_backup"], now)
         targets.append({"plugin_id": r["plugin_id"], "id": r["target_id"], "server_id": r["server_id"], "store_id": r["store_id"], "type": r["type"], "backup_id": r["backup_id"],
                         "name": r["name"] or f"{r['type']} {r['backup_id']}", "count": r["count"], "last_backup": r["last_backup"], "age_s": age, "last_state": r["last_state"], "last_size": r["last_size"],
@@ -229,9 +229,9 @@ def report(conn: sqlite3.Connection) -> dict[str, Any]:
     if not summ["configured"]:
         return {"configured": False}
     stores = [{"name": r["name"], "percent": round(r["used"] / r["total"] * 100, 1) if r["total"] and r["used"] is not None else None, "level": r["level"]}
-              for r in conn.execute("SELECT name, used, total, level FROM backup_stores ORDER BY name COLLATE NOCASE LIMIT 20")]
+              for r in conn.execute("SELECT name, used, total, level FROM backup_stores ORDER BY LOWER(name) LIMIT 20")]
     attention = [{"name": r["name"] or f"{r['type']} {r['backup_id']}", "state": "failed" if r["last_state"] == "failed" else "late"}
-                 for r in conn.execute("SELECT * FROM backup_targets WHERE last_state = 'failed' OR stale = 1 ORDER BY name COLLATE NOCASE LIMIT 30")]
+                 for r in conn.execute("SELECT * FROM backup_targets WHERE last_state = 'failed' OR stale = 1 ORDER BY LOWER(name) LIMIT 30")]
     return {**summ, "stores": stores, "attention": attention}
 
 

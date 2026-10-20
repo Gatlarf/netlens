@@ -239,7 +239,7 @@ def sign_in(conn: sqlite3.Connection, claims: dict, cfg: dict) -> str:
     if row is None:
         base = re.sub(r"[^A-Za-z0-9._@-]", "", str(claims.get("preferred_username") or claims.get("email") or claims.get("name") or "sso-user"))[:30] or "sso-user"
         name, n = base, 1
-        while conn.execute("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE", (name,)).fetchone():
+        while conn.execute("SELECT 1 FROM users WHERE LOWER(username) = LOWER(?)", (name,)).fetchone():
             n += 1
             name = f"{base[:26]}-{n}"
         try:

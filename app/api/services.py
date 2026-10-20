@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app import tsdb
 from app.api.devices import get_conn
-from app.db import utcnow
+from app.db import insert_id, utcnow
 from app.services import CheckError, describe, record_result, run_check, validate_check
 from app.stats import _ago
 
@@ -58,7 +58,7 @@ def _present(conn, c: dict[str, Any], days: dict[int, Any] | None = None, names:
 
 @router.get("/service-checks")
 def list_checks(device_id: int | None = None, conn=Depends(get_conn)) -> list[dict]:
-    rows = conn.execute("SELECT * FROM service_checks" + (" WHERE device_id = ?" if device_id is not None else "") + " ORDER BY name COLLATE NOCASE, id", (device_id,) if device_id is not None else ()).fetchall()
+    rows = conn.execute("SELECT * FROM service_checks" + (" WHERE device_id = ?" if device_id is not None else "") + " ORDER BY LOWER(name), id", (device_id,) if device_id is not None else ()).fetchall()
     days = {r["check_id"]: (r["u"], r["n"]) for r in conn.execute("SELECT check_id, SUM(up) AS u, COUNT(*) AS n FROM service_results WHERE ts >= ? GROUP BY check_id", (_ago(utcnow(), hours=24),))}
     names = {r["id"]: r["n"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices WHERE id IN (SELECT device_id FROM service_checks WHERE device_id IS NOT NULL)")}
     return [_present(conn, dict(r), days, names) for r in rows]
@@ -81,12 +81,13 @@ def create_check(body: CheckBody, conn=Depends(get_conn)) -> dict:
     count = conn.execute("SELECT COUNT(*) FROM service_checks").fetchone()[0]
     if count >= 200:
         raise HTTPException(status_code=422, detail="at most 200 checks")
-    cur = conn.execute(
+    new_id = insert_id(
+        conn,
         "INSERT INTO service_checks (device_id, name, kind, host, port, path, expect, interval_s, timeout_s, enabled, created) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (body.device_id, data["name"], data["kind"], data["host"], data["port"], data["path"], data["expect"], data["interval_s"], data["timeout_s"], data["enabled"], utcnow()),
     )
     conn.commit()
-    return _present(conn, _row(conn, cur.lastrowid))
+    return _present(conn, _row(conn, new_id))
 
 
 @router.patch("/service-checks/{check_id}")

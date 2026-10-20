@@ -55,7 +55,7 @@ def get_dashboard(request: Request) -> dict:
                                          "text": text, "href": f"#/device/{p['device_id']}", "snooze": p["snooze"]})
             from app import probes as probes_mod
 
-            for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
+            for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY LOWER(name)"):
                 site = probes_mod.present(conn, row)
                 href = f"#/remote-sites?id={site['id']}"
                 if site["locked"]:

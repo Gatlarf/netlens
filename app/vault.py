@@ -25,6 +25,8 @@ from pathlib import Path
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from app import dbengine
+
 log = logging.getLogger(__name__)
 PREFIX = "enc:v1:"
 KEY_FILE = "secret.key"
@@ -204,11 +206,7 @@ def migrate(conn: sqlite3.Connection) -> int:
     if path:
         copy = Path(path).with_name(Path(path).name + ".pre-encryption")
         if not copy.exists():
-            dst = sqlite3.connect(copy)
-            try:
-                conn.backup(dst)
-            finally:
-                dst.close()
+            dbengine.copy_database(conn, copy)
             os.chmod(copy, 0o600)
     for r in rows:
         conn.execute("UPDATE settings SET value = ? WHERE key = ?", (encrypt(conn, r["value"]), r["key"]))

@@ -89,7 +89,7 @@ def collect(conn: sqlite3.Connection, ranges: list[str], now: datetime | None = 
     devices.sort(key=lambda d: _ip_key(d["ip"]))
     v4, v6 = ipv4health.last(conn), ipv6health.last(conn)
     checks = [{"name": r["name"], "kind": r["kind"], "target": f"{r['host']}{':' + str(r['port']) if r['port'] else ''}{r['path'] or ''}", "up": r["last_up"]}
-              for r in conn.execute("SELECT name, kind, host, port, path, last_up FROM service_checks WHERE enabled = 1 ORDER BY name COLLATE NOCASE")]
+              for r in conn.execute("SELECT name, kind, host, port, path, last_up FROM service_checks WHERE enabled = 1 ORDER BY LOWER(name)")]
     backups = guestbackups.overview(conn, now) if conn.execute("SELECT 1 FROM backup_servers LIMIT 1").fetchone() else None
     allowed = licence.allows(conn, "vulnerabilities")
     return {"generated": now.strftime("%Y-%m-%d %H:%M UTC"), "devices": devices, "ranges": ranges, "v4": v4, "v6": v6, "services": checks, "certificates": sites.certificates(conn), "backups": backups,
@@ -106,7 +106,7 @@ def collect_site(conn: sqlite3.Connection, probe_id: int, now: datetime | None =
                 "online": bool(r["online"]), "last_seen": r["last_seen"]} for r in conn.execute("SELECT * FROM remote_devices WHERE probe_id = ?", (probe_id,))]
     devices.sort(key=lambda d: _ip_key(d["ip"]))
     checks = [{"name": r["name"], "kind": r["kind"], "target": r["target"] or "", "up": 1 if r["state"] == "up" else 0 if r["state"] == "down" else None}
-              for r in conn.execute("SELECT name, kind, target, state FROM remote_services WHERE probe_id = ? ORDER BY name COLLATE NOCASE", (probe_id,))]
+              for r in conn.execute("SELECT name, kind, target, state FROM remote_services WHERE probe_id = ? ORDER BY LOWER(name)", (probe_id,))]
     try:
         problems = json.loads(probe["summary"] or "{}").get("problems") or []
     except ValueError:

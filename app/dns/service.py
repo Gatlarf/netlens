@@ -210,7 +210,8 @@ def record_results(conn: sqlite3.Connection, plugin_id: str, changes: list[dict]
             conn.execute("DELETE FROM dns_records WHERE plugin_id = ? AND zone = ? AND name = ? AND type = ? AND value = ?", (plugin_id, c["zone"], c["name"], c["type"], old))
         if c["action"] in ("add", "update"):
             conn.execute(
-                "INSERT OR REPLACE INTO dns_records (plugin_id, zone, name, type, value, device_id, created) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO dns_records (plugin_id, zone, name, type, value, device_id, created) VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT (plugin_id, zone, name, type, value) DO UPDATE SET device_id = excluded.device_id, created = excluded.created",
                 (plugin_id, c["zone"], c["name"], c["type"], c["value"], device_id, now),
             )
         if c["type"] != "PTR":      # one event per device change, not one for its reverse record too

@@ -205,7 +205,7 @@ def availability(conn, start: datetime, end: datetime, scope: str = "all", with_
     totals = checkstats.range_totals(conn, a, b)
     down = checkstats.down_hours(conn, a, b) if totals is not None else {}
     all_devices = conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip AS ip, COALESCE(type_override, device_type) AS type, always_on FROM devices "
-                               f"WHERE {' AND '.join(where)} ORDER BY name COLLATE NOCASE", args).fetchall()
+                               f"WHERE {' AND '.join(where)} ORDER BY LOWER(COALESCE(custom_name, hostname, primary_ip))", args).fetchall()
     for first in range(0, len(all_devices), BATCH):                      # the checks of a batch of devices come in one statement, not one per device
         batch = all_devices[first:first + BATCH]
         plans: dict[int, Any] = {}
@@ -248,7 +248,7 @@ def availability(conn, start: datetime, end: datetime, scope: str = "all", with_
                             "availability": round(ups / count * 100, 2), "down_seconds": round(down_s), "down_text": duration(down_s),
                             "outages": len(outs), "longest": duration(max([o["seconds"] for o in outs], default=0)), "ongoing": any(o["ongoing"] for o in outs)})
     services = []
-    checks = conn.execute("SELECT id, name, kind, host, port FROM service_checks WHERE enabled = 1 ORDER BY name COLLATE NOCASE").fetchall() if with_services else []
+    checks = conn.execute("SELECT id, name, kind, host, port FROM service_checks WHERE enabled = 1 ORDER BY LOWER(name)").fetchall() if with_services else []
     for first in range(0, len(checks), BATCH):
         batch = checks[first:first + BATCH]
         results = _rows_of(conn, "service_results", "check_id", "ts, up, ms", [c["id"] for c in batch], a, b)
@@ -338,7 +338,7 @@ def weekly(conn, now: datetime | None = None, options: dict[str, Any] | None = N
             raise LookupError("left out by the settings")
         from app import probes
 
-        for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
+        for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY LOWER(name)"):
             p = probes.present(conn, row)
             sites.append({"name": p["name"], "state": p["state"], "problems": (p.get("problems") or {}).get("count", 0)})
     except Exception:  # noqa: BLE001 - remote sites are optional

@@ -6,7 +6,7 @@ import os
 import time
 import re
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +16,17 @@ SCHEMA_VERSION = 33
 def utcnow() -> str:
     """Return current UTC time as ISO-8601 with seconds precision and trailing 'Z'."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def ago(**delta: float) -> str:
+    """The time `delta` (days=, hours=, ...) before now, in the stored format. Use it instead of SQL date functions, which differ between engines."""
+    return (datetime.now(timezone.utc) - timedelta(**delta)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# What the rest of the application catches. Code outside this module says `except db.Error` / `db.IntegrityError`, never the driver's own classes,
+# so a second database driver only has to be added here.
+Error = sqlite3.Error
+IntegrityError = sqlite3.IntegrityError
 
 
 class Connection(sqlite3.Connection):
@@ -64,6 +75,15 @@ def factory() -> type[Connection]:
         return Connection
     SlowConnection.threshold = ms / 1000
     return SlowConnection
+
+
+def insert_id(conn, sql: str, params=()) -> int | None:
+    """Run one INSERT and return the id of the new row (None when nothing was inserted, for example ON CONFLICT DO NOTHING).
+    RETURNING works on SQLite (3.35 and later) and on PostgreSQL; `cursor.lastrowid` exists only on SQLite."""
+    cur = conn.execute(sql.rstrip().rstrip(";") + " RETURNING id", params)
+    row = cur.fetchone()
+    cur.close()
+    return row[0] if row else None
 
 
 def main_file(conn: sqlite3.Connection) -> str:
@@ -188,10 +208,11 @@ def _migrate_to_plugins(conn: sqlite3.Connection) -> None:
     if "proxmox_guests" in tables:
         conn.execute(
             """
-            INSERT OR IGNORE INTO hypervisor_guests
+            INSERT INTO hypervisor_guests
                 (plugin_id, guest_id, name, kind, host_name, status, macs, ips, device_id, host_device_id, updated)
             SELECT 'proxmox', CAST(vmid AS TEXT), name, kind, node, status, macs, ips, device_id, host_device_id, updated
-            FROM proxmox_guests
+            FROM proxmox_guests WHERE 1 = 1
+            ON CONFLICT DO NOTHING
             """
         )
         conn.execute("DROP TABLE proxmox_guests")
@@ -1038,14 +1059,14 @@ def get_or_create_device(
             device_id = row["id"]
         else:
             # Create new device with MAC
-            cur.execute(
+            device_id = insert_id(
+                conn,
                 """
                 INSERT INTO devices (mac, primary_ip, first_seen, last_seen, online)
                 VALUES (?, ?, ?, ?, 1)
                 """,
                 (normalized_mac, ip, now, now),
             )
-            device_id = cur.lastrowid
     else:
         # Find device with mac IS NULL and primary_ip == ip
         cur.execute(
@@ -1057,14 +1078,14 @@ def get_or_create_device(
             device_id = row["id"]
         else:
             # Create new device without MAC
-            cur.execute(
+            device_id = insert_id(
+                conn,
                 """
                 INSERT INTO devices (mac, primary_ip, first_seen, last_seen, online)
                 VALUES (?, ?, ?, ?, 1)
                 """,
                 (None, ip, now, now),
             )
-            device_id = cur.lastrowid
 
     # Update last_seen, primary_ip, online
     cur.execute(
@@ -1118,8 +1139,8 @@ def add_event(
             window = snooze.tag(conn, kind, subject, now)
         except Exception:  # noqa: BLE001 - same: never lose an event over a broken snooze list
             window = None
-    cur = conn.cursor()
-    cur.execute(
+    new_id = insert_id(
+        conn,
         """
         INSERT INTO events (ts, device_id, kind, detail, maintenance)
         VALUES (?, ?, ?, ?, ?)
@@ -1127,7 +1148,7 @@ def add_event(
         (now, device_id, kind, detail, window),
     )
     conn.commit()
-    return cur.lastrowid
+    return new_id
 
 
 def list_devices(conn: sqlite3.Connection) -> list[dict[str, Any]]:

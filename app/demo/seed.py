@@ -14,7 +14,8 @@ import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from app.db import get_setting, set_setting
+from app import dbengine
+from app.db import get_setting, insert_id, set_setting
 from app.demo import network as net
 from app.demo.network import ALWAYS_ON, BY_KEY, DEVICES, DOMAIN, GROUPS, REVERSE_ZONE, chain, ip, mac
 
@@ -100,7 +101,7 @@ def _timeline(rng: random.Random, now: datetime) -> tuple[list[datetime], dict[s
 
 # ----------------------------------------------------------------------------- the pieces
 def _wipe(conn) -> None:
-    tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")]
+    tables = dbengine.table_names(conn)
     for table in tables:
         if table not in KEEP:
             conn.execute(f'DELETE FROM "{table}"')
@@ -118,14 +119,15 @@ def _ensure_user(conn) -> None:
 def _devices(conn, now: datetime, up_now: dict[str, bool], rng: random.Random) -> dict[str, int]:
     group_ids = {}
     for name, color in GROUPS:
-        group_ids[name] = conn.execute("INSERT INTO device_groups (name, color) VALUES (?, ?)", (name, color)).lastrowid
+        group_ids[name] = insert_id(conn, "INSERT INTO device_groups (name, color) VALUES (?, ?)", (name, color))
     ids: dict[str, int] = {}
     first = fmt(now - timedelta(days=HISTORY_DAYS))
     for s in DEVICES:
         recent = s.key in ("ph_ben", "tv_kids", "cam_attic", "p1")                         # joined the network lately
         first_seen = fmt(now - timedelta(days=rng.randint(2, 9))) if recent else first
         last_seen = fmt(now) if up_now[s.key] else fmt(now - timedelta(minutes=rng.randint(40, 600)))
-        cur = conn.execute(
+        device_id = insert_id(
+            conn,
             """INSERT INTO devices (mac, primary_ip, hostname, vendor, os_name, os_confidence, device_type, custom_name, notes, online, first_seen, last_seen,
                                     notify_offline, parent_mode, trusted, hints, os_type, group_id, dns_mode, always_on)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'auto', ?, '[]', ?, ?, 'auto', ?)""",
@@ -134,13 +136,13 @@ def _devices(conn, now: datetime, up_now: dict[str, bool], rng: random.Random) -
              "general purpose" if s.type in ("server", "pc", "nas") else "specialized", group_ids.get(s.group),
              1 if s.key in ALWAYS_ON else 0),
         )
-        ids[s.key] = cur.lastrowid
-        conn.execute("INSERT INTO device_ips (device_id, ip, first_seen, last_seen) VALUES (?, ?, ?, ?)", (cur.lastrowid, ip(s), first_seen, last_seen))
-        conn.execute("INSERT INTO device_names (device_id, name, source, first_seen, last_seen) VALUES (?, ?, 'ptr', ?, ?)", (cur.lastrowid, f"{s.name}.{DOMAIN}", first_seen, last_seen))
-        conn.execute("INSERT INTO device_names (device_id, name, source, first_seen, last_seen) VALUES (?, ?, 'mdns', ?, ?)", (cur.lastrowid, s.name, first_seen, last_seen))
+        ids[s.key] = device_id
+        conn.execute("INSERT INTO device_ips (device_id, ip, first_seen, last_seen) VALUES (?, ?, ?, ?)", (device_id, ip(s), first_seen, last_seen))
+        conn.execute("INSERT INTO device_names (device_id, name, source, first_seen, last_seen) VALUES (?, ?, 'ptr', ?, ?)", (device_id, f"{s.name}.{DOMAIN}", first_seen, last_seen))
+        conn.execute("INSERT INTO device_names (device_id, name, source, first_seen, last_seen) VALUES (?, ?, 'mdns', ?, ?)", (device_id, s.name, first_seen, last_seen))
         for port, service, product in s.ports:
             conn.execute("INSERT INTO ports (device_id, proto, port, state, service, product, version, updated) VALUES (?, 'tcp', ?, 'open', ?, ?, NULL, ?)",
-                         (cur.lastrowid, port, service, product or None, fmt(now)))
+                         (device_id, port, service, product or None, fmt(now)))
     return ids
 
 
@@ -253,17 +255,18 @@ def _services(conn, ids, times, up, rng, now) -> list[int]:
     check_ids = []
     spikes = {"Public site (www.example.net)": (now - timedelta(days=2)).replace(hour=5, minute=0, second=0, microsecond=0)}
     for name, kind, key, host, port, path, expect, interval, base in SERVICE_CHECKS:
-        cur = conn.execute(
+        check_id = insert_id(
+            conn,
             """INSERT INTO service_checks (device_id, name, kind, host, port, path, expect, interval_s, timeout_s, enabled, created)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 5, 1, ?)""", (ids[key], name, kind, host, port, path, expect, interval, fmt(now - timedelta(days=HISTORY_DAYS))))
-        check_ids.append(cur.lastrowid)
+        check_ids.append(check_id)
         rows, last = [], None
         spike = spikes.get(name)
         for i, t in enumerate(times):
             ok = up[key][i] and not (spike and spike <= t < spike + timedelta(minutes=30))
             ms = round(base * rng.uniform(0.6, 1.8) * (6 if rng.random() < 0.02 else 1), 1) if ok else None
             detail = "answered" if ok else ("timed out" if kind != "http" or key != "web1" else "HTTP 502")
-            rows.append((cur.lastrowid, fmt(t), 1 if ok else 0, ms, detail))
+            rows.append((check_id, fmt(t), 1 if ok else 0, ms, detail))
             last = (fmt(t), 1 if ok else 0, ms, detail)
         conn.executemany("INSERT INTO service_results (check_id, ts, up, ms, detail) VALUES (?, ?, ?, ?, ?)", rows)
         since = fmt(times[-1])
@@ -273,7 +276,7 @@ def _services(conn, ids, times, up, rng, now) -> list[int]:
                 break
         else:
             since = rows[0][1]
-        conn.execute("UPDATE service_checks SET last_ts = ?, last_up = ?, last_ms = ?, last_detail = ?, since = ? WHERE id = ?", (*last, since, cur.lastrowid))
+        conn.execute("UPDATE service_checks SET last_ts = ?, last_up = ?, last_ms = ?, last_detail = ?, since = ? WHERE id = ?", (*last, since, check_id))
     return check_ids
 
 

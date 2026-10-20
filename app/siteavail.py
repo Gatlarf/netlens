@@ -71,13 +71,13 @@ def availability(conn: sqlite3.Connection, probe_id: int, month: str, scope: str
     store = tsdb.for_conn(conn)
     devices, services = [], []
     if store is not None:
-        for d in conn.execute("SELECT id, name, ip, type, always_on FROM remote_devices WHERE probe_id = ? ORDER BY name COLLATE NOCASE", (probe_id,)):
+        for d in conn.execute("SELECT id, name, ip, type, always_on FROM remote_devices WHERE probe_id = ? ORDER BY LOWER(name)", (probe_id,)):
             if scope == "core" and not d["always_on"]:
                 continue
             f = figures(store.buckets("remote", d["id"], "up", s0, s1, now=n), s0, s1, n)
             if f:
                 devices.append({"id": d["id"], "name": d["name"] or d["ip"], "ip": d["ip"], "type": d["type"], "always_on": bool(d["always_on"]), **f})
-        for sv in conn.execute("SELECT id, name, kind, target FROM remote_services WHERE probe_id = ? ORDER BY name COLLATE NOCASE", (probe_id,)) if with_services else []:
+        for sv in conn.execute("SELECT id, name, kind, target FROM remote_services WHERE probe_id = ? ORDER BY LOWER(name)", (probe_id,)) if with_services else []:
             f = figures(store.buckets("remote_service", sv["id"], "up", s0, s1, now=n), s0, s1, n)
             if f:
                 services.append({"id": sv["id"], "name": sv["name"], "kind": sv["kind"], "target": sv["target"] or "", **f})

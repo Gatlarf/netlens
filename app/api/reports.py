@@ -47,7 +47,7 @@ def availability(month: str | None = Query(None), scope: str = Query("all"), ser
     `hours=business`: count only the business hours; `ignore_maintenance=true`: leave out the time of planned maintenance windows (both default to the saved report settings)."""
     out = _report(conn, month, scope, services, group, only_outages, target, hours, ignore_maintenance)
     out["months"] = reports.months_available(conn)
-    out["groups"] = [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM device_groups ORDER BY name COLLATE NOCASE")]
+    out["groups"] = [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM device_groups ORDER BY LOWER(name)")]
     return out
 
 

@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app import ask
+from app.db import main_file
 from app.ask import LIMIT, _days, _name, _since
 
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
@@ -134,7 +135,7 @@ def t_guests(conn, args, now=None) -> dict:
     if args.get("text"):
         where.append("(LOWER(name) LIKE ? ESCAPE '\\' OR LOWER(host_name) LIKE ? ESCAPE '\\')")
         params += [_like(args["text"])] * 2
-    rows = conn.execute(f"SELECT * FROM hypervisor_guests WHERE {' AND '.join(where)} ORDER BY status, name COLLATE NOCASE LIMIT 200", params).fetchall()
+    rows = conn.execute(f"SELECT * FROM hypervisor_guests WHERE {' AND '.join(where)} ORDER BY status, LOWER(name) LIMIT 200", params).fetchall()
     if status == "unhealthy":
         rows = [r for r in rows if '"unhealthy"' in (r["details"] or "")]
     states = {r["status"]: r["n"] for r in conn.execute("SELECT status, COUNT(*) AS n FROM hypervisor_guests GROUP BY status")}
@@ -204,7 +205,7 @@ def t_remote_sites(conn, args, now=None) -> dict:
     from app import probes
 
     sites = []
-    for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY name COLLATE NOCASE"):
+    for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY LOWER(name)"):
         p = probes.present(conn, row)
         sites.append({"name": p["name"], "state": p["state"], "last_seen": row["last_seen"], "problems": (p.get("problems") or {}).get("count", 0), "devices": (p.get("devices") or {}) if isinstance(p.get("devices"), dict) else p.get("devices")})
     return {"sites": sites}
@@ -212,7 +213,7 @@ def t_remote_sites(conn, args, now=None) -> dict:
 
 def t_smart_home(conn, args, now=None) -> dict:
     focus = args.get("focus")
-    rows = conn.execute("SELECT name, area, available, battery, battery_low, update_available, unavailable_since FROM inventory_devices ORDER BY name COLLATE NOCASE").fetchall()
+    rows = conn.execute("SELECT name, area, available, battery, battery_low, update_available, unavailable_since FROM inventory_devices ORDER BY LOWER(name)").fetchall()
     if not rows:
         return {"configured": False}
     return {"configured": True, "focus": focus, "devices": len(rows), "unavailable": [{"name": r["name"], "area": r["area"], "since": r["unavailable_since"]} for r in rows if not r["available"]][:LIMIT],
@@ -304,7 +305,7 @@ def t_system(conn, args, now=None) -> dict:
     from app.version import VERSION
 
     scans = conn.execute("SELECT kind, status, started, finished, hosts_found FROM scans ORDER BY id DESC LIMIT 3").fetchall()
-    data_dir = conn.execute("PRAGMA database_list").fetchone()[2]
+    data_dir = main_file(conn)
     plugins = []
     try:
         from pathlib import Path

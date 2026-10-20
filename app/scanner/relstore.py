@@ -1,6 +1,8 @@
 import sqlite3
 from typing import Any
 
+from app.db import insert_id
+
 from app.scanner.relations import Edge
 
 
@@ -67,14 +69,14 @@ def add_manual(
             (relation_id,),
         )
     else:
-        cursor = conn.execute(
+        relation_id = insert_id(
+            conn,
             """
             INSERT INTO relations (src_id, dst_id, kind, source, confidence, manual)
             VALUES (?, ?, ?, 'manual', 1.0, 1)
             """,
             (src_id, dst_id, kind),
         )
-        relation_id = cursor.lastrowid
 
     conn.commit()
     return relation_id

@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app import tsdb
-from app.db import add_event, utcnow
+from app.db import add_event, insert_id, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -80,14 +80,14 @@ def create(conn: sqlite3.Connection, name: str) -> tuple[dict, str]:
     limit = licence.site_limit(conn)
     if limit is not None and conn.execute("SELECT COUNT(*) FROM probes").fetchone()[0] >= limit:
         raise LicenceLimit(f"The {licence.status(conn)['name']} edition takes in {limit} remote site{'s' if limit != 1 else ''}. Add a licence key (Settings → Licence) or start the free 30-day trial for more.")
-    if conn.execute("SELECT 1 FROM probes WHERE name = ? COLLATE NOCASE", (name,)).fetchone():
+    if conn.execute("SELECT 1 FROM probes WHERE LOWER(name) = LOWER(?)", (name,)).fetchone():
         raise ProbeError("there is already a remote site with that name")
     if conn.execute("SELECT COUNT(*) FROM probes").fetchone()[0] >= 50:
         raise ProbeError("at most 50 remote sites")
     token = new_token()
-    cur = conn.execute("INSERT INTO probes (name, token_hash, created) VALUES (?, ?, ?)", (name, hash_token(token), utcnow()))
+    new_id = insert_id(conn, "INSERT INTO probes (name, token_hash, created) VALUES (?, ?, ?)", (name, hash_token(token), utcnow()))
     conn.commit()
-    return get(conn, cur.lastrowid), token
+    return get(conn, new_id), token
 
 
 def rotate_token(conn: sqlite3.Connection, probe_id: int) -> str:

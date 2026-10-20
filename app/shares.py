@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from app import checkstats, maintenance, stats, users
-from app.db import utcnow
+from app.db import insert_id, utcnow
 
 MODES = ("view", "status")
 SECTIONS = ("summary", "services", "map", "devices", "uptime", "events")
@@ -157,12 +157,13 @@ def create(conn: sqlite3.Connection, name: str, mode: str, show_ips: bool = Fals
     if mode not in MODES:
         raise ShareError("the link shows either the map and devices, or only a status page")
     opts = clean_options(conn, options, mode)
-    cur = conn.execute(
+    new_id = insert_id(
+        conn,
         "INSERT INTO share_links (token, name, mode, show_ips, show_macs, created, expires, options, pin_hash, valid_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (secrets.token_urlsafe(24), name, _mode_of(opts), int(bool(show_ips)), int(bool(show_macs)), utcnow(), _expiry(expires_days), _stored(opts), _pin(pin), _valid_from(valid_from)),
     )
     conn.commit()
-    return cur.lastrowid
+    return new_id
 
 
 def update(conn: sqlite3.Connection, link_id: int, changes: dict) -> None:
@@ -241,8 +242,8 @@ def list_links(conn: sqlite3.Connection) -> list[dict]:
 def choices(conn: sqlite3.Connection) -> dict:
     """What the form can pick from."""
     return {
-        "groups": [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM device_groups ORDER BY name COLLATE NOCASE")],
-        "services": [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM service_checks WHERE enabled = 1 ORDER BY name COLLATE NOCASE")],
+        "groups": [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM device_groups ORDER BY LOWER(name)")],
+        "services": [{"id": r["id"], "name": r["name"]} for r in conn.execute("SELECT id, name FROM service_checks WHERE enabled = 1 ORDER BY LOWER(name)")],
     }
 
 

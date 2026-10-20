@@ -453,7 +453,7 @@ def _events(conn, now: str, days: int) -> dict:
 
 def _services(conn, now: str) -> dict:
     since = _ago(now, hours=24)
-    rows = conn.execute("SELECT id, name, kind, host, port, path, enabled, last_up, last_ms, last_detail FROM service_checks ORDER BY name COLLATE NOCASE").fetchall()
+    rows = conn.execute("SELECT id, name, kind, host, port, path, enabled, last_up, last_ms, last_detail FROM service_checks ORDER BY LOWER(name)").fetchall()
     uptime = {r["check_id"]: _pct(r["u"], r["n"]) for r in conn.execute("SELECT check_id, SUM(up) AS u, COUNT(*) AS n FROM service_results WHERE ts >= ? GROUP BY check_id", (since,))}
     checks = [
         {"id": r["id"], "name": r["name"], "kind": r["kind"], "state": None if r["last_up"] is None else ("up" if r["last_up"] else "down"),

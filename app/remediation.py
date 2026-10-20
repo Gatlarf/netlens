@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 from app import licence, vault
-from app.db import add_event, get_setting, set_setting, utcnow
+from app.db import add_event, ago, get_setting, insert_id, main_file, set_setting, utcnow
 
 log = logging.getLogger(__name__)
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
@@ -148,7 +148,7 @@ def _row_to_rule(conn: sqlite3.Connection, row: sqlite3.Row, with_secret: bool =
 
 
 def list_rules(conn: sqlite3.Connection, with_secret: bool = False) -> list[dict]:
-    return [_row_to_rule(conn, r, with_secret) for r in conn.execute("SELECT * FROM remediation_rules ORDER BY name COLLATE NOCASE")]
+    return [_row_to_rule(conn, r, with_secret) for r in conn.execute("SELECT * FROM remediation_rules ORDER BY LOWER(name)")]
 
 
 def get_rule(conn: sqlite3.Connection, rule_id: int, with_secret: bool = False) -> dict | None:
@@ -166,11 +166,11 @@ def save_rule(conn: sqlite3.Connection, data: dict, rule_id: int | None = None) 
         raise RuleError("that rule does not exist")
     fields = clean_rule(conn, data, current)
     if rule_id is None:
-        cur = conn.execute(
+        rule_id = insert_id(
+            conn,
             "INSERT INTO remediation_rules (name, enabled, kinds, device_id, match_text, action, secret, mode, cooldown_min, max_per_day, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (fields["name"], int(fields["enabled"]), json.dumps(fields["kinds"]), fields["device_id"], fields["match_text"], json.dumps(fields["action"]), _store_secret(conn, fields["secret"]),
              fields["mode"], fields["cooldown_min"], fields["max_per_day"], utcnow()))
-        rule_id = cur.lastrowid
     else:
         conn.execute(
             "UPDATE remediation_rules SET name = ?, enabled = ?, kinds = ?, device_id = ?, match_text = ?, action = ?, secret = ?, mode = ?, cooldown_min = ?, max_per_day = ? WHERE id = ?",
@@ -264,7 +264,7 @@ def run_vm(conn: sqlite3.Connection, rule: dict, run: dict) -> str:
     guest = conn.execute("SELECT * FROM hypervisor_guests WHERE device_id = ? ORDER BY updated DESC LIMIT 1", (device_id,)).fetchone() if device_id else None
     if guest is None:
         raise RuntimeError("no hypervisor plugin has reported this device as a virtual machine (install the plugin of its hypervisor and let it sync)")
-    plugin = discover(Path(conn.execute("PRAGMA database_list").fetchone()[2]).parent).get(guest["plugin_id"])
+    plugin = discover(Path(main_file(conn)).parent).get(guest["plugin_id"])
     power = rule["action"]["power"]
     if plugin is None or plugin.manifest is None:
         raise RuntimeError(f"the plugin {guest['plugin_id']} is not available")
@@ -330,12 +330,13 @@ def recent_runs(conn: sqlite3.Connection, limit: int = 100) -> list[dict]:
 
 
 def _new_run(conn: sqlite3.Connection, rule: dict, event: dict | None, state: str, stamp: str, device_id: int | None = None, result: str | None = None) -> int:
-    cur = conn.execute(
+    new_id = insert_id(
+        conn,
         "INSERT INTO remediation_runs (rule_id, rule_name, action_type, event_id, device_id, kind, detail, state, result, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (rule["id"], rule["name"], rule["action"]["type"], event["id"] if event else None, device_id if device_id is not None else (event or {}).get("device_id"), (event or {}).get("kind"),
          ((event or {}).get("detail") or "")[:300], state, result, stamp))
     conn.commit()
-    return cur.lastrowid
+    return new_id
 
 
 def paused(conn: sqlite3.Connection) -> bool:
@@ -443,9 +444,9 @@ def check_recovery(conn: sqlite3.Connection, now: datetime | None = None) -> int
 
 
 def summary(conn: sqlite3.Connection) -> dict[str, int]:
-    one = lambda sql: conn.execute(sql).fetchone()[0]    # noqa: E731
+    one = lambda sql, *args: conn.execute(sql, args).fetchone()[0]    # noqa: E731
     return {"rules": one("SELECT COUNT(*) FROM remediation_rules WHERE enabled = 1"), "pending": one("SELECT COUNT(*) FROM remediation_runs WHERE state = 'pending'"),
-            "failed_today": one("SELECT COUNT(*) FROM remediation_runs WHERE state = 'failed' AND created >= datetime('now', '-1 day')")}
+            "failed_today": one("SELECT COUNT(*) FROM remediation_runs WHERE state = 'failed' AND created >= ?", ago(days=1))}
 
 
 async def process(db_path: str, *, runners: dict | None = None, now: datetime | None = None, ask=None) -> dict:

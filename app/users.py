@@ -15,6 +15,8 @@ import secrets
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
+from app.db import IntegrityError as db_IntegrityError, insert_id
+
 ROLES = ("admin", "operator", "viewer")
 SESSION_DAYS = 30
 SESSION_PREFIX = "s."
@@ -158,14 +160,15 @@ def create_user(conn: sqlite3.Connection, username: str, password: str, role: st
     stored_scope = check_scope(conn, scope, role)
     stored_sites = check_sites(conn, sites, role)
     try:
-        cur = conn.execute(
+        new_id = insert_id(
+            conn,
             "INSERT INTO users (username, password_hash, role, created, scope, site_scope) VALUES (?, ?, ?, ?, ?, ?)",
             (username, hash_password(password), role, _iso(_now()), stored_scope, stored_sites),
         )
-    except sqlite3.IntegrityError:
+    except db_IntegrityError:
         raise UserError("that user name is taken")
     conn.commit()
-    return cur.lastrowid
+    return new_id
 
 
 def has_users(conn: sqlite3.Connection) -> bool:
@@ -178,12 +181,13 @@ def create_first_admin(conn: sqlite3.Connection, username: str, password: str) -
     Returns the new id, or None when somebody else was first.
     """
     username, password = check_username(username), check_password(password)
-    cur = conn.execute(
+    new_id = insert_id(
+        conn,
         "INSERT INTO users (username, password_hash, role, created) SELECT ?, ?, 'admin', ? WHERE NOT EXISTS (SELECT 1 FROM users)",
         (username, hash_password(password), _iso(_now())),
     )
     conn.commit()
-    return cur.lastrowid if cur.rowcount == 1 else None
+    return new_id
 
 
 def get_user(conn: sqlite3.Connection, user_id: int):
@@ -228,7 +232,7 @@ def delete_user(conn: sqlite3.Connection, user_id: int) -> None:
 
 def list_users(conn: sqlite3.Connection) -> list[dict]:
     users = []
-    for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope, site_scope FROM users ORDER BY username COLLATE NOCASE"):
+    for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope, site_scope FROM users ORDER BY LOWER(username)"):
         tokens = conn.execute("SELECT id, name, created, last_used, readonly, assistant FROM api_tokens WHERE user_id = ? ORDER BY id", (u["id"],)).fetchall()
         users.append({**{k: v for k, v in dict(u).items() if k not in ("scope", "site_scope")}, "scope": parse_scope(u["scope"]), "sites": parse_scope(u["site_scope"]), "disabled": bool(u["disabled"]), "last_admin": u["role"] == "admin" and not u["disabled"] and _other_admins(conn, u["id"]) == 0, "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
     return users
@@ -236,7 +240,7 @@ def list_users(conn: sqlite3.Connection) -> list[dict]:
 
 def login(conn: sqlite3.Connection, username: str, password: str) -> str | None:
     """Check a password; returns a new session cookie value, or None. Takes equally long for unknown users."""
-    row = conn.execute("SELECT * FROM users WHERE username = ? COLLATE NOCASE", (username or "",)).fetchone()
+    row = conn.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username or "",)).fetchone()
     ok = verify_password(password or "", row["password_hash"] if row else _DUMMY)
     if not row or not ok or row["disabled"]:
         return None
@@ -281,12 +285,13 @@ def create_api_token(conn: sqlite3.Connection, user_id: int, name: str, readonly
     if not name:
         raise UserError("give the token a name, for example Home Assistant")
     secret = TOKEN_PREFIX + secrets.token_urlsafe(32)
-    cur = conn.execute(
+    new_id = insert_id(
+        conn,
         "INSERT INTO api_tokens (user_id, name, token_hash, created, readonly, assistant) VALUES (?, ?, ?, ?, ?, ?)",
         (user_id, name, _digest(secret), _iso(_now()), 1 if (readonly or assistant == "read") else 0, assistant),
     )
     conn.commit()
-    return cur.lastrowid, secret
+    return new_id, secret
 
 
 def delete_api_token(conn: sqlite3.Connection, user_id: int, token_id: int) -> None:

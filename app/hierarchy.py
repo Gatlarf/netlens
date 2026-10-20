@@ -196,7 +196,7 @@ def _guest_nodes(conn: sqlite3.Connection, devices: dict) -> list[dict[str, Any]
     out = []
     for r in conn.execute(
         """SELECT plugin_id, guest_id, name, kind, status, host_device_id, details FROM hypervisor_guests
-           WHERE device_id IS NULL AND host_device_id IS NOT NULL AND kind NOT IN ('qemu', 'vm') ORDER BY name COLLATE NOCASE"""
+           WHERE device_id IS NULL AND host_device_id IS NOT NULL AND kind NOT IN ('qemu', 'vm') ORDER BY LOWER(name)"""
     ):
         if r["host_device_id"] not in devices:
             continue
