@@ -29,6 +29,23 @@ class UserError(ValueError):
     """A problem the user can fix; the text is shown to them."""
 
 
+class LastAdminError(UserError):
+    """The change would leave no enabled administrator: nobody could sign in to fix it except through the command line."""
+
+
+LAST_ADMIN = ("This is the last administrator. Make another user an administrator first: without one nobody could manage Netlens "
+              "from the web interface (the only way back is the command line).")
+
+
+def _other_admins(conn: sqlite3.Connection, user_id: int) -> int:
+    return conn.execute("SELECT COUNT(*) FROM users WHERE role = 'admin' AND disabled = 0 AND id != ?", (user_id,)).fetchone()[0]
+
+
+def is_last_admin(conn: sqlite3.Connection, user_id: int) -> bool:
+    row = conn.execute("SELECT role, disabled FROM users WHERE id = ?", (user_id,)).fetchone()
+    return bool(row) and row["role"] == "admin" and not row["disabled"] and _other_admins(conn, user_id) == 0
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -181,6 +198,8 @@ def update_user(conn: sqlite3.Connection, user_id: int, *, role: str | None = No
     if current is None:
         raise UserError("no such user")
     final_role = check_role(role) if role is not None else current["role"]
+    if is_last_admin(conn, user_id) and (final_role != "admin" or disabled):
+        raise LastAdminError(LAST_ADMIN)             # neither a role change nor disabling may take away the last administrator, not even the user's own
     if scope is not _UNSET:
         conn.execute("UPDATE users SET scope = ? WHERE id = ?", (check_scope(conn, scope, final_role), user_id))
     elif role is not None and final_role != "viewer":
@@ -200,6 +219,8 @@ def update_user(conn: sqlite3.Connection, user_id: int, *, role: str | None = No
 
 
 def delete_user(conn: sqlite3.Connection, user_id: int) -> None:
+    if is_last_admin(conn, user_id):
+        raise LastAdminError(LAST_ADMIN)
     if conn.execute("DELETE FROM users WHERE id = ?", (user_id,)).rowcount == 0:
         raise UserError("no such user")
     conn.commit()  # sessions and tokens go with the user (foreign keys)
@@ -209,7 +230,7 @@ def list_users(conn: sqlite3.Connection) -> list[dict]:
     users = []
     for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope, site_scope FROM users ORDER BY username COLLATE NOCASE"):
         tokens = conn.execute("SELECT id, name, created, last_used, readonly, assistant FROM api_tokens WHERE user_id = ? ORDER BY id", (u["id"],)).fetchall()
-        users.append({**{k: v for k, v in dict(u).items() if k not in ("scope", "site_scope")}, "scope": parse_scope(u["scope"]), "sites": parse_scope(u["site_scope"]), "disabled": bool(u["disabled"]), "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
+        users.append({**{k: v for k, v in dict(u).items() if k not in ("scope", "site_scope")}, "scope": parse_scope(u["scope"]), "sites": parse_scope(u["site_scope"]), "disabled": bool(u["disabled"]), "last_admin": u["role"] == "admin" and not u["disabled"] and _other_admins(conn, u["id"]) == 0, "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
     return users
 
 

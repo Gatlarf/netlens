@@ -42,6 +42,8 @@ def _check_teams(db, role: str | None, scope) -> None:
 
 
 def _fail(exc: users.UserError, status: int = 422) -> HTTPException:
+    if isinstance(exc, users.LastAdminError):
+        status = 409
     return HTTPException(status_code=404 if str(exc).startswith("no such") else status, detail=str(exc))
 
 

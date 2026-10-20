@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.133 — 2026-10-20
+
+### Fixed
+- ★ **The last administrator can no longer lock everybody out**: the web interface (and the API) refuses to change the role of, disable or delete the last enabled administrator. In Settings → Users & tokens the buttons are greyed out with the reason; create or promote another administrator first. A disabled administrator does not count.
+
 ## 0.4.131 — 2026-10-20
 
 ### Added

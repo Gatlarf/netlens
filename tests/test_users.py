@@ -211,3 +211,68 @@ def test_read_only_token_cannot_write_even_for_an_administrator(env):
     # a normal token of the same administrator still writes
     full = c.post(f"/api/users/{uid}/tokens", json={"name": "script"}, headers=ADMIN).json()["token"]
     assert anon.get("/api/users", headers={"Authorization": f"Bearer {full}"}).status_code == 200
+
+
+# ----------------------------------------------------------------------------- the last administrator cannot be removed from the web interface
+def test_the_last_administrator_keeps_the_role_and_the_account(tmp_path):
+    from app import db as dbm, users
+
+    conn = dbm.connect(tmp_path / "t.db")
+    dbm.init_db(conn)
+    boss = users.create_user(conn, "boss", "a-long-enough-password", "admin")
+    viewer = users.create_user(conn, "vera", "a-long-enough-password", "viewer")
+    assert users.is_last_admin(conn, boss) and not users.is_last_admin(conn, viewer)
+    for change in (dict(role="viewer"), dict(role="operator"), dict(disabled=True)):
+        with pytest.raises(users.LastAdminError):
+            users.update_user(conn, boss, **change)
+    with pytest.raises(users.LastAdminError):
+        users.delete_user(conn, boss)
+    users.update_user(conn, boss, password="another-long-password", role="admin", disabled=False)          # harmless changes are fine
+    assert conn.execute("SELECT role, disabled FROM users WHERE id = ?", (boss,)).fetchone()[:] == ("admin", 0)
+    second = users.create_user(conn, "two", "a-long-enough-password", "admin")
+    assert not users.is_last_admin(conn, boss)
+    users.update_user(conn, boss, role="viewer")                      # allowed now: another administrator exists
+    assert users.is_last_admin(conn, second)
+    with pytest.raises(users.LastAdminError):
+        users.update_user(conn, second, role="viewer")
+    users.update_user(conn, viewer, role="admin")
+    users.delete_user(conn, second)                                   # and the other one may go when a third remains
+    assert users.is_last_admin(conn, viewer)
+
+
+def test_a_disabled_administrator_does_not_count(tmp_path):
+    from app import db as dbm, users
+
+    conn = dbm.connect(tmp_path / "t.db")
+    dbm.init_db(conn)
+    a = users.create_user(conn, "a", "a-long-enough-password", "admin")
+    b = users.create_user(conn, "b", "a-long-enough-password", "admin")
+    users.update_user(conn, b, disabled=True)
+    assert users.is_last_admin(conn, a)
+    with pytest.raises(users.LastAdminError):
+        users.delete_user(conn, a)
+    users.update_user(conn, b, disabled=False)                        # enabling never needs a check
+    assert not users.is_last_admin(conn, a)
+
+
+def test_the_api_says_why_with_409_and_flags_the_user(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app import db as dbm, users
+    from app.config import load_settings
+    from app.main import create_app
+
+    p = tmp_path / "t.db"
+    c = dbm.connect(p)
+    dbm.init_db(c)
+    boss = users.create_user(c, "boss", "a-long-enough-password", "admin")
+    c.close()
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=p)
+    with TestClient(app, headers={"Authorization": "Bearer secret"}) as tc:
+        listed = tc.get("/api/users").json()["users"]
+        assert listed[0]["last_admin"] is True
+        for r in (tc.patch(f"/api/users/{boss}", json={"role": "viewer"}), tc.patch(f"/api/users/{boss}", json={"disabled": True}), tc.delete(f"/api/users/{boss}")):
+            assert r.status_code == 409 and "last administrator" in r.json()["detail"]
+        assert tc.post("/api/users", json={"username": "two", "password": "a-long-enough-password", "role": "admin"}).status_code == 201
+        assert all(not u["last_admin"] for u in tc.get("/api/users").json()["users"])
+        assert tc.patch(f"/api/users/{boss}", json={"role": "viewer"}).status_code == 200

@@ -77,6 +77,7 @@ function userRow(user, data, refresh, shown) {
   const role = h("select", { "aria-label": `Role of ${user.username}` });
   for (const r of data.roles) role.appendChild(h("option", { value: r }, ROLE_TEXT[r] || r));
   role.value = user.role;
+  if (user.last_admin) { role.disabled = true; role.title = "This is the last administrator: make another user an administrator first"; }
   const call = async (request, done) => {
     try {
       const res = await request();
@@ -107,6 +108,7 @@ function userRow(user, data, refresh, shown) {
     const readonly = window.confirm("Make it read-only?\n\nOK: the token can only read (right for Prometheus, Grafana and dashboards).\nCancel: it acts with the role of its user.");
     call(() => api(`/api/users/${user.id}/tokens`, { method: "POST", body: { name, readonly } }), null);
   });
+  if (user.last_admin) for (const b of [toggle, del]) { b.disabled = true; b.title = "This is the last administrator: make another user an administrator first"; }
   const parts = [pw, " ", toggle, " ", tok, " "];
   if (user.role === "viewer") {
     const lim = h("button", { type: "button", class: "btn" }, user.scope ? "Change groups" : "Limit to groups");
