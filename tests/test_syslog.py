@@ -87,3 +87,13 @@ def test_the_api_is_for_administrators(tmp_path, logger_setup):
     with TestClient(app) as viewer:
         assert viewer.post("/api/login", json={"username": "vera", "password": "a-long-enough-password"}).status_code == 200
         assert viewer.get("/api/system-log").status_code == 403 and viewer.get("/api/system-log/download").status_code == 403
+
+
+def test_every_table_is_made_resizable_by_one_observer():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "app" / "static" / "js"
+    js = (root / "colresize.js").read_text()
+    assert "export function autoResizable" in js and "table.data, table.table, table.rep-table" in js and "no-resize" in js
+    app = (root / "app.js").read_text()
+    assert 'import { autoResizable } from "./colresize.js"' in app and "autoResizable();" in app

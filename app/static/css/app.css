@@ -335,11 +335,12 @@ table.data thead th {
 }
 
 /* columns the reader can resize (static/js/colresize.js) */
-table.data.resizable thead th { position: sticky; padding-right: 14px; }
+table.resizable thead th { padding-right: 14px; }
+table.resizable:not(.data) thead th { position: relative; }
 .col-grip { position: absolute; top: 0; right: 0; bottom: 0; width: 9px; cursor: col-resize; touch-action: none; user-select: none; }
 .col-grip::after { content: ""; position: absolute; top: 25%; bottom: 25%; right: 3px; width: 2px; border-radius: 1px; background: var(--border); }
 .col-grip:hover::after, .col-grip.dragging::after { background: var(--accent); }
-table.data.resizable[style*="fixed"] td { overflow-wrap: anywhere; }
+table.resizable[style*="fixed"] td { overflow-wrap: anywhere; }
 table.data td.col-text { white-space: normal; overflow-wrap: anywhere; min-width: 14rem; }
 @media (max-width: 700px) { .col-grip { display: none; } }
 

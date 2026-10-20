@@ -71,3 +71,25 @@ export function makeResizable(table, key) {
   });
   return table;
 }
+
+// Every ordinary table gets resizable columns by itself: this watches the page and prepares each table that appears (also after a page redraws it).
+// A table opts out with the class "no-resize"; tables with merged heading cells or several heading rows, and tables of one column, are left alone.
+const SELECTOR = "table.data, table.table, table.rep-table";
+let scheduled = false;
+
+function prepare(table) {
+  if (table.classList.contains("no-resize") || table.querySelector("thead .col-grip")) return;
+  const rows = table.querySelectorAll("thead tr");
+  const heads = table.querySelectorAll("thead th");
+  if (rows.length !== 1 || heads.length < 2 || table.querySelector("thead th[colspan]")) return;
+  const key = `${location.hash.split("?")[0] || "#/"}|${[...heads].map((th) => th.textContent.trim()).join("|")}`.slice(0, 200);
+  makeResizable(table, key);
+}
+
+export function autoResizable() {
+  const run = () => { scheduled = false; document.querySelectorAll(SELECTOR).forEach(prepare); };
+  new MutationObserver(() => {
+    if (!scheduled) { scheduled = true; requestAnimationFrame(run); }
+  }).observe(document.body, { childList: true, subtree: true });
+  run();
+}

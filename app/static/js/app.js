@@ -1,4 +1,5 @@
 import { initSearch } from "./search.js";
+import { autoResizable } from "./colresize.js";
 import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
 import { initUpdateBadge } from "./update.js";
@@ -539,6 +540,7 @@ initThemeToggle();
 initUpdateBadge();
 initTopbar();
 initSearch();
+autoResizable();
 
 // Installable app (needs HTTPS or localhost); the worker only caches the public interface files, see sw.js
 if ("serviceWorker" in navigator && window.isSecureContext) {
