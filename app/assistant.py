@@ -20,10 +20,10 @@ from app import licence
 GUIDE = Path(__file__).resolve().parent / "assistant_guide.md"
 MODES = ("read", "change")
 # nothing here, not even to read: secrets, accounts, ways to run commands, ways to take everything
-NEVER = re.compile(r"^/api/(users|vault|shares|sso|backup|restore|auth|setup|login|logout|me|assistant/token|terminal|remote|central)(/|$)")
+NEVER = re.compile(r"^/api/(users|vault|shares|sso|backup|restore|auth|setup|login|logout|me|assistant/token|terminal|remote|central|mcp)(/|$)")
 # reading is fine, changing is not
 READ_ONLY_FOR_CHANGE = re.compile(r"^/api/(licence|remediation|engineer|update|backups|siem|documentation|probes/[^/]+/token)(/|$)")
-DELETABLE = re.compile(r"^/api/(service-checks|maintenance|snoozes|notify-channels|groups)/[^/]+$")
+DELETABLE = re.compile(r"^/api/((service-checks|maintenance|notify-channels|groups)/[^/]+|snoozes)$")      # snoozes are ended with DELETE /api/snoozes?subject=...
 WHY = {
     "never": "an assistant token may not use this part of Netlens (accounts, secrets, backups, remote sessions and sharing are for people)",
     "read": "this token can only read; ask the person to create a token that may change settings (Settings → AI assistant)",

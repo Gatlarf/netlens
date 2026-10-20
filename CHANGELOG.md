@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.134 — 2026-10-20
+
+### Added
+- ★ **MCP server**: AI agents (Claude, OpenClaw, Cursor and other Model Context Protocol clients) can now use Netlens as a set of tools at `/mcp`. 40 tools look (dashboard, devices, events, what changed, remote sites and their availability, scans, logs, plugins, alert channels ...) and 42 change things (start scans, ping, scan or wake a device, edit devices and groups, service checks, snoozes, maintenance windows, notification channels, quiet hours, remote sites and their managed checks, scan ranges and intervals, retention, database maintenance, the weekly report), plus `api_request` for any other call the token may make. Every tool is one call to Netlens' own API with the agent's assistant token, so the assistant limits and the audit log apply unchanged. **Settings → AI → MCP server** switches it on (it is off by default), allows or forbids changes, sets a calls-per-minute limit, turns groups of tools off, makes a token and shows the settings for Claude Code, JSON-configured agents and `mcp-remote`.
+
+### Fixed
+- An assistant token could not end a snooze (`DELETE /api/snoozes?subject=...`), although the assistant documentation says it may; it can now.
+
 ## 0.4.133 — 2026-10-20
 
 ### Fixed

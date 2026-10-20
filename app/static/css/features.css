@@ -689,3 +689,12 @@ table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 .flash { animation: ai-flash 1.5s; }
 @keyframes ai-flash { from { background: color-mix(in srgb, var(--accent) 25%, transparent); } to { background: transparent; } }
 input.is-locked { background: var(--bg); color: var(--muted); cursor: not-allowed; opacity: .85; }
+
+/* MCP server card (Settings → AI) */
+.mcp-copy { display: flex; gap: 8px; align-items: flex-start; }
+.mcp-copy textarea, .mcp-copy input { flex: 1 1 auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; resize: vertical; min-width: 0; }
+.mcp-group { margin: 4px 0; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.mcp-group summary { cursor: pointer; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.mcp-group summary::marker { color: var(--muted); }
+.mcp-tools { margin: 6px 0 2px 26px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8em; color: var(--muted); overflow-wrap: anywhere; }
+.mcp-connect h4 { margin: 14px 0 4px; }

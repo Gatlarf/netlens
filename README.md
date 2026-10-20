@@ -51,6 +51,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Language model providers](#language-model-providers)
   - [AI report](#ai-report)
   - [AI assistant](#ai-assistant)
+  - [MCP server](#mcp-server)
   - [Free language models on OpenRouter](#free-language-models-on-openrouter)
   - [Network checks](#network-checks)
   - [Groups](#groups)
@@ -787,6 +788,19 @@ By default the report counts only the devices marked always-on (the same tick bo
 - An assistant token never reaches users and tokens, stored passwords, backups and restores, share links, single sign-on, remote sessions and terminals, remediation rules (they run commands), plugin uploads or updates. It can delete only service checks, maintenance windows, snoozes, notification channels and groups. When it asks for something it may not do, the error says why, so it can hand the step to you.
 - `/api/assistant/endpoints` lists every call the token may make, with the fields of the request body. Passwords and keys are best typed by you into the interface rather than into the chat.
 - Anything you give an AI service leaves your network. Keep the token secret and delete it when the job is done.
+- An agent that speaks the Model Context Protocol (Claude Code, OpenClaw, Cursor) can use the same tokens through the [MCP server](#mcp-server) instead of the written guide.
+
+### MCP server
+
+**Settings → AI → MCP server** lets an AI agent (Claude, OpenClaw, Cursor, anything that speaks the [Model Context Protocol](https://modelcontextprotocol.io)) use Netlens as a set of tools. Where the AI assistant reads a guide and calls the API itself, an MCP agent sees named tools such as `get_dashboard`, `list_devices`, `list_sites`, `start_scan`, `snooze`, `create_maintenance` or `send_site_command`, each with a description and typed arguments. 40 tools look, 42 change something, and `api_request` reaches any other call the token may make.
+
+It is **off until you switch it on**. The endpoint is `POST /mcp` (streamable HTTP, JSON replies, no session) on the address you already use for Netlens.
+
+- **Same access, same limits.** An agent signs in with an **assistant token** (made in the same card, or under AI assistant). Every tool is one call to Netlens' own API made with that token, so the assistant rules apply unchanged: a read token only looks, a change token needs the licence or the trial, and nothing reaches users and tokens, stored passwords, backups, share links, single sign-on, remote sessions, the licence or these MCP settings. The full access token and a browser session are refused on `/mcp`. Every change is in the audit log under the token's name.
+- **You decide what exists.** *Switch on* and *Allow changes through MCP* (off: every agent can only look, whatever its token may do), a **calls-per-minute limit** per token, and a switch per **group of tools**: overview, devices, services, sites, system, scans and tests, change devices and groups, change service checks, alerts and planned work, change remote sites, change settings, ask Insights, and the generic API call. A switched-off tool is not listed and is refused if called by name.
+- **Careful defaults.** Database *purge* and *orphan cleanup* only report what they would remove unless the agent says otherwise; deleting is limited to service checks, maintenance windows, snoozes, notification channels and groups (the assistant rule), and the instructions the server hands to every agent say: look first, say what you will change, wait for a yes, one change at a time.
+- **Connect an agent.** The card makes a token and shows the settings to paste: a `claude mcp add --transport http` command for Claude Code, a JSON block (`url` and an `Authorization: Bearer` header) for agents that take a configuration, and an `npx mcp-remote` line for agents that only start local programs. The address is `https://your-netlens/mcp`; use HTTPS when the agent is not on your own network.
+- **Also pushing events?** Forwarding events to OpenClaw or n8n (Settings → Alert channels) is the other direction and works alongside the MCP server: Netlens tells the agent when something happens, the agent asks Netlens what to do about it.
 
 ### Free language models on OpenRouter
 
