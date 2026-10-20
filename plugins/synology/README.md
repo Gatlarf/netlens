@@ -29,7 +29,12 @@ Press **Run diagnostic** on the plugin's page. It signs in once with the values 
 
 ## What was tested
 
-Written from the public DSM web API and tested against a **simulated DSM** only (login, errors, missing features, two systems). It has not yet run on a real Synology: the field names of the Container Manager and Virtual Machine Manager lists are the likeliest to differ between DSM versions, which is what the diagnostic is for. A tester with a **DS923+** is welcome.
+Written from the public DSM web API and first tested against a **simulated DSM**. Since then it has also run against a **real DSM 7.2.2 (a virtual DSM, `virtual-dsm`) with Container Manager 24.0.2**: login, DSM info, network, containers and packages all work. What that showed, and what the plugin does about it:
+
+- The container **list has no ports and no networks**; they come from `SYNO.Docker.Container get` (a full `docker inspect`), which the plugin now asks for per container (at most 60 containers, one request each, and it stops asking after three refusals). The published ports come from `HostConfig.PortBindings`, so a stopped container shows them too.
+- DSM's network card list has **no MAC addresses**, so the NAS itself is matched by its IP address.
+- A container on Docker's own bridge (`02:42:...`) is internal and is not offered as a device; a container on a **macvlan** network (its own MAC and IP on your network) is, so it is matched to the device Netlens found.
+- **Virtual Machine Manager** is not installed on a virtual DSM, so the VM list is only tested against the simulator. A tester with a **DS923+** or similar is welcome.
 
 ## Notes for reviewers
 

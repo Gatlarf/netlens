@@ -21,10 +21,17 @@ INFO = {"model": "DS923+", "ram": 4096, "serial": "2260ABC123", "temperature": 4
 NETWORK = {"server_name": "nas-kelder", "gateway": "192.168.0.1", "dns_primary": "192.168.0.1"}
 INTERFACES = {"ifaces": [{"ifname": "eth0", "ip": "192.168.0.20", "mask": "255.255.255.0", "mac": "00:11:32:AA:BB:CC", "status": "connected"},
                          {"ifname": "eth1", "ip": "", "mac": "00:11:32:AA:BB:CD"}]}
+# the real DSM 7.2.2 container list has no ports or networks (checked on a virtual DSM): they come from `get`, a full docker inspect
 CONTAINERS = {"containers": [
-    {"name": "/pihole", "id": "abc", "image": "pihole/pihole:latest", "status": "running", "up_time": "2026-10-01T10:00:00Z",
-     "ports": [{"container_port": 53, "host_port": 53, "type": "udp", "host_ip": "0.0.0.0"}, {"container_port": 80, "host_port": 8081, "type": "tcp"}]},
-    {"name": "grafana", "id": "def", "image": "grafana/grafana", "status": "exited"}], "total": 2}
+    {"name": "/pihole", "id": "abc", "image": "pihole/pihole:latest", "status": "running", "up_time": "2026-10-01T10:00:00Z"},
+    {"name": "grafana", "id": "def", "image": "grafana/grafana", "status": "exited"},
+    {"name": "unifi", "id": "ghi", "image": "jacobalberty/unifi", "status": "running"}], "total": 3}
+INSPECT = {
+    "pihole": {"HostConfig": {"PortBindings": {"53/udp": [{"HostIp": "0.0.0.0", "HostPort": "53"}], "80/tcp": [{"HostIp": "", "HostPort": "8081"}]}},
+               "NetworkSettings": {"Ports": {}, "Networks": {"bridge": {"IPAddress": "172.17.0.2", "MacAddress": "02:42:ac:11:00:02"}}}},
+    "grafana": {"HostConfig": {"PortBindings": {"3000/tcp": [{"HostIp": "127.0.0.1", "HostPort": "3000"}]}}, "NetworkSettings": {"Ports": {}, "Networks": {"bridge": {"IPAddress": "", "MacAddress": ""}}}},
+    "unifi": {"HostConfig": {"PortBindings": {}}, "NetworkSettings": {"Networks": {"lan": {"IPAddress": "192.168.0.45", "MacAddress": "02:00:C0:A8:00:2D"}}}},
+}
 MACHINES = {"guests": [{"guest_id": "g-1", "guest_name": "Windows 11", "status": "running", "vcpu_num": 4, "vram_size": 8388608,
                         "vnics": [{"mac": "00:11:32:11:22:33", "network_name": "Default VM Network"}]},
                        {"guest_id": "g-2", "guest_name": "Ubuntu", "status": "shutdown", "vcpu_num": 2, "vram_size": 2097152, "vnics": []}]}
@@ -88,6 +95,10 @@ class FakeDSM:
                     return self._answer({"success": False, "error": {"code": 119}})
                 if api in fake.options["denied"]:
                     return self._answer({"success": False, "error": {"code": 105}})
+                if api == "SYNO.Docker.Container" and method == "get":
+                    if "get" in fake.options["missing"]:
+                        return self._answer({"success": False, "error": {"code": 105}})
+                    return self._answer({"success": True, "data": {"details": INSPECT[p.get("name")]}})
                 data = {"SYNO.DSM.Info": INFO, "SYNO.Core.Network": NETWORK, "SYNO.Core.Network.Interface": INTERFACES, "SYNO.Docker.Container": CONTAINERS,
                         "SYNO.Virtualization.API.Guest": MACHINES, "SYNO.Core.Package": PACKAGES}.get(api)
                 if data is None:
@@ -129,7 +140,10 @@ def test_fetch_gives_host_and_guests(dsm):
     assert by_id["container:pihole"]["kind"] == "container" and by_id["container:pihole"]["status"] == "running"
     assert by_id["container:pihole"]["details"]["image"] == "pihole/pihole:latest"
     assert by_id["container:pihole"]["details"]["exposed"] is True                 # port 53 is bound to all interfaces
-    assert by_id["container:grafana"]["status"] == "stopped"
+    assert {(p["host_port"], p["proto"]) for p in by_id["container:pihole"]["details"]["ports"]} == {(53, "udp"), (8081, "tcp")}
+    assert by_id["container:pihole"]["macs"] == [] and by_id["container:pihole"]["ips"] == []        # Docker's own bridge (02:42:..) is not a device on the network
+    assert by_id["container:grafana"]["status"] == "stopped" and by_id["container:grafana"]["details"]["exposed"] is False        # published on 127.0.0.1 only: also for a stopped container
+    assert by_id["container:unifi"]["macs"] == ["02:00:c0:a8:00:2d"] and by_id["container:unifi"]["ips"] == ["192.168.0.45"]        # a macvlan container is a device of its own
     assert by_id["vm:g-1"]["kind"] == "qemu" and by_id["vm:g-1"]["macs"] == ["00:11:32:11:22:33"] and by_id["vm:g-1"]["details"]["cpus"] == 4
     assert by_id["vm:g-2"]["status"] == "stopped"
     assert by_id["pkg:ContainerManager"]["kind"] == "app" and by_id["pkg:SynologyDrive"]["status"] == "stopped"
@@ -156,7 +170,7 @@ def test_the_host_mac_comes_from_the_card_with_the_address():
 
 def test_test_message_counts(dsm):
     message = plugin.test(dsm.config())["message"]
-    assert "DS923+" in message and "2 container(s)" in message and "2 virtual machine(s)" in message and "2 package(s)" in message
+    assert "DS923+" in message and "3 container(s)" in message and "2 virtual machine(s)" in message and "2 package(s)" in message
 
 
 def test_wrong_password_stops_retries(dsm):
@@ -180,7 +194,7 @@ def test_a_missing_feature_is_a_note_not_a_failure():
     server = FakeDSM(missing={"SYNO.Virtualization.API.Guest", "SYNO.Core.Package"}, denied={"SYNO.Core.Network"})
     try:
         out = validate_output("hypervisor", plugin.fetch(server.config()))
-        assert not [g for g in out["guests"] if g["kind"] in ("qemu", "app")] and len(out["guests"]) == 2
+        assert not [g for g in out["guests"] if g["kind"] in ("qemu", "app")] and len(out["guests"]) == 3
         message = plugin.test(server.config())["message"]
         assert "virtual machines" in message and "network name" in message and "no permission" in message
     finally:
@@ -224,7 +238,7 @@ def test_two_systems_keep_their_guests_apart(dsm):
         config["servers"].append({"host": other.url, "username": "netlens", "password": "good-pass"})
         out = plugin.fetch(config)
         ids = [g["id"] for g in out["guests"]]
-        assert len(ids) == len(set(ids)) == 12 and len(out["hosts"]) == 2
+        assert len(ids) == len(set(ids)) == 14 and len(out["hosts"]) == 2
     finally:
         other.close()
 
@@ -234,4 +248,17 @@ def test_diagnostic_never_contains_names_or_addresses(dsm):
     text = json.dumps(report)
     for secret in ("pihole", "nas-kelder", "00:11:32", "Windows 11", "192.168.0.20", "good-pass", "2260ABC123"):
         assert secret not in text
-    assert report["steps"]["containers"]["ok"] and report["result"]["by_kind"] == {"container": 2, "qemu": 2, "app": 2}
+    assert report["steps"]["containers"]["ok"] and report["result"]["by_kind"] == {"container": 3, "qemu": 2, "app": 2}
+
+
+def test_without_permission_to_read_container_details_the_list_still_works(dsm_missing_get):
+    out = plugin.fetch(dsm_missing_get.config())
+    assert {g["name"] for g in out["guests"] if g["kind"] == "container"} == {"pihole", "grafana", "unifi"}
+    assert plugin.test(dsm_missing_get.config())["message"].count("container details") == 1
+
+
+@pytest.fixture
+def dsm_missing_get():
+    fake = FakeDSM(missing={"get"})
+    yield fake
+    fake.close()

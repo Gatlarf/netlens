@@ -25,6 +25,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+MAX_INSPECT = 60                  # containers whose details are read (one request each)
 APIS = ("SYNO.DSM.Info", "SYNO.Core.Network", "SYNO.Core.Network.Interface", "SYNO.Docker.Container", "SYNO.Virtualization.API.Guest", "SYNO.Core.Package")
 SESSION = "Netlens"
 
@@ -169,6 +170,23 @@ class DSM:
             notes.append(f"{label}: {exc}")
             return None
 
+    def inspect_containers(self, containers, notes):
+        """DSM's container list has no ports or networks; `get` gives the full `docker inspect` of one container. Added to each list item as "_inspect"."""
+        failed = 0
+        for item in _listing(containers, "containers")[:MAX_INSPECT]:
+            name = str(item.get("name") or "").lstrip("/")
+            if not name or failed >= 3:
+                continue
+            try:
+                got = self.call("SYNO.Docker.Container", "get", 1, name=name)
+            except SynologyError as exc:
+                failed += 1
+                if failed == 1:
+                    notes.append(f"container details: {exc}")
+                continue
+            if isinstance(got, dict) and isinstance(got.get("details"), dict):
+                item["_inspect"] = got["details"]
+
     def snapshot(self):
         notes = []
         info = self.call("SYNO.DSM.Info", "getinfo", 2)
@@ -177,6 +195,7 @@ class DSM:
         network = self.optional(notes, "network name", "SYNO.Core.Network", "get", 1)
         interfaces = self.optional(notes, "network cards", "SYNO.Core.Network.Interface", "list", 1)
         containers = self.optional(notes, "containers", "SYNO.Docker.Container", "list", 1, limit=-1, offset=0, type="all")
+        self.inspect_containers(containers, notes)
         machines = self.optional(notes, "virtual machines", "SYNO.Virtualization.API.Guest", "list", 1)
         packages = self.optional(notes, "packages", "SYNO.Core.Package", "list", 1, additional=json.dumps(["status"]))
         return {"info": info, "network": network if isinstance(network, dict) else {}, "interfaces": interfaces, "containers": containers,
@@ -242,8 +261,43 @@ def _status(value):
     return {"shutdown": "stopped", "shut_down": "stopped", "poweroff": "stopped", "exited": "stopped", "up": "running", "stop": "stopped"}.get(text, text)
 
 
-def _container_ports(item):
+INTERNAL_NETWORKS = {"bridge", "host", "none", "ingress"}
+
+
+def _inspect_ports(inspect):
+    """The published ports from a `docker inspect`: HostConfig.PortBindings (also there for a stopped container), else NetworkSettings.Ports."""
+    bindings = (inspect.get("HostConfig") or {}).get("PortBindings") or (inspect.get("NetworkSettings") or {}).get("Ports") or {}
     out = []
+    for key, targets in bindings.items() if isinstance(bindings, dict) else []:
+        container_port, _, proto = str(key).partition("/")
+        for target in targets or []:
+            if not isinstance(target, dict):
+                continue
+            host_port = _int(int(target["HostPort"])) if str(target.get("HostPort") or "").isdigit() else None
+            if host_port:
+                out.append({"container_port": _int(int(container_port)) if container_port.isdigit() else None, "host_port": host_port, "proto": (proto or "tcp").lower(),
+                            "bind": str(target.get("HostIp") or "")})
+    return out
+
+
+def _lan_addresses(inspect):
+    """MAC and IP addresses of a container that sits on the network itself (macvlan, ipvlan). Docker's own bridges (02:42:...) are internal and left out."""
+    macs, ips = [], []
+    for name, net in ((inspect.get("NetworkSettings") or {}).get("Networks") or {}).items():
+        if name in INTERNAL_NETWORKS or not isinstance(net, dict):
+            continue
+        mac = _mac(net.get("MacAddress"))
+        if mac and not mac.startswith("02:42:"):
+            macs.append(mac)
+            if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", str(net.get("IPAddress") or "")):
+                ips.append(str(net["IPAddress"]))
+    return macs, ips
+
+
+def _container_ports(item):
+    out = _inspect_ports(item["_inspect"]) if isinstance(item.get("_inspect"), dict) else []
+    if out:
+        return out[:100]
     for port in item.get("ports") or item.get("port_bindings") or []:
         if not isinstance(port, dict):
             continue
@@ -265,8 +319,9 @@ def to_hypervisor(snapshot, connect_host=""):
         details = {"image": str(item.get("image") or "")[:200], "health": str(item.get("health") or "")[:40],
                    "started": str(item.get("up_time") or item.get("started") or "")[:40], "ports": ports}
         details["exposed"] = any(p["bind"] in ("0.0.0.0", "::", "") for p in ports) if ports else None
+        macs, ips = _lan_addresses(item["_inspect"]) if isinstance(item.get("_inspect"), dict) else ([], [])
         guests.append({"id": f"container:{name}", "name": name, "kind": "container", "host_id": host["id"], "status": _status(item.get("status") or item.get("state")),
-                       "macs": [], "ips": [], "details": _clean(details)})
+                       "macs": macs, "ips": ips, "details": _clean(details)})
     for item in _listing(snapshot["machines"], "guests", "vms", "machines"):
         name = str(item.get("guest_name") or item.get("name") or "").strip()
         ident = str(item.get("guest_id") or item.get("id") or name)
