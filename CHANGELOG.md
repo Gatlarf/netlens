@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.125 — 2026-10-20
+
+### Fixed
+- ★ **Corrected the work-around for a lost nmap capability**: running the container as root with `user: "0:0"` alone stops Netlens at start-up (a root without `DAC_OVERRIDE` cannot write its data folder). The README, the compose file and the Scans page now say to add `DAC_OVERRIDE` as well, and spell out what the work-around costs (the whole app, not only nmap, then holds `NET_ADMIN`) and that it is only for a container whose nmap really lost its capability (`docker exec netlens getcap /usr/bin/nmap` prints nothing). Tested on a container with the capability removed.
+
 ## 0.4.124 — 2026-10-20
 
 ### Added

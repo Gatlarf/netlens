@@ -41,7 +41,7 @@ def test_the_file_capability_was_lost_as_on_a_synology(monkeypatch):
     monkeypatch.setattr(d, "nmap_file_capability", lambda: False)
     monkeypatch.setattr(d, "interfaces", lambda: ["eth0", "eth1", "lo"])
     out = d.diagnose("nmap exited with code 1: dnet: Failed to open device eth1\nQUITTING!")
-    assert 'user: "0:0"' in out["cause"] and out["file_capability"] is False
+    assert 'user: "0:0"' in out["cause"] and "DAC_OVERRIDE" in out["cause"] and out["file_capability"] is False
     assert any("MISSING" in f for f in out["findings"]) and any("eth1 is among" in f for f in out["findings"])
 
 

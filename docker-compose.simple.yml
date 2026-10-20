@@ -23,8 +23,10 @@ services:
     cap_add:                    # same level as "image:" (not under "environment:")
       - NET_RAW
       - NET_ADMIN
-    # user: "0:0"              # only if scans fail with "dnet: Failed to open device" although NET_RAW and NET_ADMIN are set (some Synology / NAS set-ups
-    #                          # drop the file capability that nmap needs when it runs as a normal user). It still has only the two capabilities.
+    # Only if scans fail with "dnet: Failed to open device" although NET_RAW and NET_ADMIN are set AND `docker exec netlens getcap /usr/bin/nmap` prints nothing
+    # (some Synology / NAS set-ups drop the file capability nmap needs as a normal user): run as root and add DAC_OVERRIDE to cap_add above. This is weaker than the
+    # default (the whole app then holds NET_ADMIN, not only nmap); read the README, Troubleshooting, before using it.
+    # user: "0:0"
     read_only: true
     tmpfs:
       - /tmp
