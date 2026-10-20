@@ -4,6 +4,9 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 
 ## 0.4.121 — 2026-10-20
 
+### Fixed
+- Links to the Codeshrimp website now use the public address www.codeshrimp.com.
+
 ### Changed
 - **Settings → Database uses the whole screen**: summary tiles on top, the retention and the maintenance tools side by side, and the tables in a scrolling list, instead of one narrow column.
 

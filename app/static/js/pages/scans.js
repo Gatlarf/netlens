@@ -172,7 +172,7 @@ export async function render(container, params) {
             h("li", {}, "In Portainer's container form: the ", h("em", {}, "Network"), " tab = host, and the ", h("em", {}, "Capabilities"), " tab: switch NET_RAW and NET_ADMIN on."),
             h("li", {}, "On a Synology: use a Project (compose file); the container wizard cannot set capabilities."),
             h("li", {}, "Do not use ", h("code", {}, "no-new-privileges"), ". A running container does not pick up new capabilities: re-create it (stack: Update the stack).")),
-          h("p", {}, h("a", { href: "https://www.home.codeshrimp.com/docs/netlens/install/where-do-net-raw-and-net-admin-go/", target: "_blank", rel: "noopener" }, "Step-by-step instructions for Portainer, Synology and compose"))));
+          h("p", {}, h("a", { href: "https://www.codeshrimp.com/docs/netlens/install/where-do-net-raw-and-net-admin-go/", target: "_blank", rel: "noopener" }, "Step-by-step instructions for Portainer, Synology and compose"))));
       }
       const table = h("table", { class: "data" });
       const thead = h("thead");

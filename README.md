@@ -649,7 +649,7 @@ New installs have no shared token: you create the first administrator in the [fi
 
 **Access token (older installs):** if `NETLENS_TOKEN` is set in the container's environment, it keeps signing in as administrator (login dialog: "Sign in with the access token instead") and the first-start wizard does not appear. Remove it once you have an administrator account of your own; the Users page reminds you.
 
-An administrator can create **API tokens** for a user (shown once). They are Bearer tokens that act with the role of their user, for scripts, Prometheus (`/metrics`) and the Home Assistant integration; a viewer's token is enough for those because they only read. To be sure a token can never change anything, tick **read-only** when you create it: it then only reads, even when its user is an administrator. The [API reference](https://www.home.codeshrimp.com/docs/netlens/using-netlens/api-reference/) lists every endpoint.
+An administrator can create **API tokens** for a user (shown once). They are Bearer tokens that act with the role of their user, for scripts, Prometheus (`/metrics`) and the Home Assistant integration; a viewer's token is enough for those because they only read. To be sure a token can never change anything, tick **read-only** when you create it: it then only reads, even when its user is an administrator. The [API reference](https://www.codeshrimp.com/docs/netlens/using-netlens/api-reference/) lists every endpoint.
 
 ### Large networks and performance
 

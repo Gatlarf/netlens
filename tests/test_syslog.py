@@ -97,3 +97,10 @@ def test_every_table_is_made_resizable_by_one_observer():
     assert "export function autoResizable" in js and "table.data, table.table, table.rep-table" in js and "no-resize" in js
     app = (root / "app.js").read_text()
     assert 'import { autoResizable } from "./colresize.js"' in app and "autoResizable();" in app
+
+
+def test_the_application_links_to_the_public_website_address_only():
+    from pathlib import Path
+
+    for path in list((Path(__file__).resolve().parent.parent / "app").rglob("*.js")) + list((Path(__file__).resolve().parent.parent / "app").rglob("*.py")):
+        assert "www.home.codeshrimp.com" not in path.read_text(encoding="utf-8", errors="ignore"), f"{path.name} links to the temporary website address"
