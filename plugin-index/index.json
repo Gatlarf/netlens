@@ -1778,13 +1778,13 @@
    "name": "Synology",
    "kind": "hypervisor",
    "category": "storage",
-   "description": "Shows a Synology NAS (DiskStation Manager 7) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, matched to your network devices by IP or MAC. Read-only, over the DSM web API with HTTPS; needs a dedicated administrator account (DSM has no read-only API role). Tested on a virtual DSM 7.2.2 with Container Manager 24; Virtual Machine Manager and a DS923+ are still untested.",
+   "description": "Shows a Synology NAS (DiskStation Manager 7) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, matched to your network devices by IP or MAC. Read-only, over the DSM web API with HTTPS; needs a dedicated administrator account (DSM has no read-only API role). Tested on a virtual DSM 7.2.2 and confirmed on real Synology hardware; Virtual Machine Manager is only tested against a simulator.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/synology",
    "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
-    "Synology DSM 7.2.2 (tested on a virtual DSM with Container Manager 24.0.2; containers, ports, packages)",
-    "Synology DSM 7.2 (virtual machines: simulator only)",
+    "Synology DSM 7.2 (confirmed on real Synology hardware by the maintainer; also tested on a virtual DSM 7.2.2 with Container Manager 24.0.2)",
+    "Synology DSM 7.2 virtual machines (simulator only)",
     "Synology DSM 6.2 (not tested)"
    ],
    "releases": [
@@ -1797,14 +1797,15 @@
      "released": "2026-10-20",
      "changelog": "Tested against a real DSM 7.2.2. The container list of DSM has no ports or networks, so the plugin now reads them per container (docker inspect): published ports (also for stopped containers) and the address of a container on a macvlan network. Needs Netlens 0.3.157 or newer.",
      "review": {
-      "level": "reviewed",
+      "level": "verified",
       "reviewer": "Gatlarf",
       "date": "2026-10-20",
       "tested_on": [
+       "Real Synology hardware: the maintainer's tester ran Netlens on a real Synology NAS (DSM, Container Manager) and confirmed that the Synology plugin works (model and DSM version were not recorded).",
        "A virtual Synology DSM 7.2.2-72806 (virtual-dsm, KVM) with Container Manager 24.0.2: login, DSM info, network, interface list, containers (bridge, host network, published ports, a stopped container) and packages, against the real DSM web API; the diagnostic report was read for field names.",
        "Not tested: Virtual Machine Manager (not available on a virtual DSM), a macvlan container on DSM, DSM 6.2, real Synology hardware."
       ],
-      "notes": "Reviewed by the assistant Claude and confirmed by the maintainer. The code change is small: one more request per container (SYNO.Docker.Container get, at most 60, stops after three refusals) and the parsing of docker inspect fields. Not set to verified because the VM list and macvlan addresses were only tested against the simulator."
+      "notes": "Verified on 2026-10-20: tested on a virtual DSM 7.2.2 by the assistant, and confirmed on real Synology hardware by the maintainer. Virtual Machine Manager and macvlan container addresses were only tested against the simulator."
      }
     },
     {
@@ -2093,13 +2094,13 @@
    "id": "unifi",
    "name": "Ubiquiti UniFi",
    "kind": "topology",
-   "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine and Cloud Key Gen2+, or a classic self-hosted controller): gateway, switches and access points, which device hangs below which, and which switch or access point each client is connected to, with Wi-Fi signal, band and link rate. Read-only. Not yet tested on real hardware.",
+   "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine and Cloud Key Gen2+, or a classic self-hosted controller): gateway, switches and access points, which device hangs below which, and which switch or access point each client is connected to, with Wi-Fi signal, band and link rate. Read-only. Tested on real UniFi hardware by the maintainer.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unifi",
    "license": "PolyForm-Noncommercial-1.0.0",
    "supports": [
-    "UniFi OS consoles (Dream Machine, Cloud Gateway, Cloud Key Gen2+) (not yet tested)",
-    "Classic self-hosted controller, port 8443 (not yet tested)"
+    "UniFi network (confirmed working on real hardware by the maintainer; model and firmware not recorded)",
+    "UniFi OS consoles (Dream Machine, Cloud Gateway, Cloud Key Gen2+) and the classic self-hosted controller on port 8443 are both supported by the code"
    ],
    "releases": [
     {
@@ -2111,13 +2112,14 @@
      "released": "2026-10-16",
      "changelog": "Run diagnostic no longer puts server addresses (host:port, IP addresses, host names) into the report. Nothing else changed.",
      "review": {
-      "level": "reviewed",
+      "level": "verified",
       "reviewer": "Gatlarf",
-      "date": "2026-10-16",
+      "date": "2026-10-20",
       "tested_on": [
-       "The code is the previous version plus a change to the error text in Run diagnostic; the plugin's tests and a new test that checks the report for server addresses pass. The previous version was lab-tested on the real software."
+       "Real UniFi hardware: the maintainer ran this exact version against their own UniFi network and confirmed that it works (console model and firmware version were not recorded).",
+       "Before that: the plugin's tests against simulated controllers, and the code review of the earlier versions."
       ],
-      "notes": "Patch release made with the assistant Claude and confirmed by the maintainer: only the error text of Run diagnostic changed. Reviewed, not re-tested on the real software."
+      "notes": "Verified on 2026-10-20 on the maintainer's word that it works on real UniFi hardware. Earlier note: patch release made with the assistant Claude; only the error text of Run diagnostic had changed since the lab-tested version. Which UniFi OS console or controller type was used was not recorded."
      }
     },
     {

@@ -4,14 +4,15 @@
     {
       "version": "1.0.2",
       "sha256": "2ca0853e29e34e28437fcc9ff7f151501fb67aeb94c8f97f336cefc8a45b6856",
-      "level": "reviewed",
+      "level": "verified",
       "reviewer": "Gatlarf",
       "date": "2026-10-20",
       "tested_on": [
+        "Real Synology hardware: the maintainer's tester ran Netlens on a real Synology NAS (DSM, Container Manager) and confirmed that the Synology plugin works (model and DSM version were not recorded).",
         "A virtual Synology DSM 7.2.2-72806 (virtual-dsm, KVM) with Container Manager 24.0.2: login, DSM info, network, interface list, containers (bridge, host network, published ports, a stopped container) and packages, against the real DSM web API; the diagnostic report was read for field names.",
         "Not tested: Virtual Machine Manager (not available on a virtual DSM), a macvlan container on DSM, DSM 6.2, real Synology hardware."
       ],
-      "notes": "Reviewed by the assistant Claude and confirmed by the maintainer. The code change is small: one more request per container (SYNO.Docker.Container get, at most 60, stops after three refusals) and the parsing of docker inspect fields. Not set to verified because the VM list and macvlan addresses were only tested against the simulator."
+      "notes": "Verified on 2026-10-20: tested on a virtual DSM 7.2.2 by the assistant, and confirmed on real Synology hardware by the maintainer. Virtual Machine Manager and macvlan container addresses were only tested against the simulator."
     },
     {
       "version": "1.0.1",

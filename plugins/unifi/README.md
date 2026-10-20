@@ -5,8 +5,7 @@ below which. Works with a **UniFi OS console** (Dream Machine / Pro / SE, Dream 
 **classic self-hosted controller** (port 8443). Netlens then shows the real network position in the hierarchy and on the map, and the Wi-Fi
 signal, band and link rate of wireless clients.
 
-> **Status: not yet tested on real hardware.** It is written from the controller API that the UniFi web interface uses (documented by the
-> community) and tested against simulated controllers. Please test it and report back, see *Testing* below.
+> **Status: verified on real hardware.** The maintainer ran it against real UniFi equipment and confirmed that it works (2026-10-20; the console model and firmware were not recorded). It is written from the controller API that the UniFi web interface uses (documented by the community) and was first tested against simulated controllers. If something differs on your model or firmware, please report back, see *Testing* below.
 
 ## What it does (read-only)
 

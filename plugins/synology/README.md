@@ -29,7 +29,7 @@ Press **Run diagnostic** on the plugin's page. It signs in once with the values 
 
 ## What was tested
 
-Written from the public DSM web API and first tested against a **simulated DSM**. Since then it has also run against a **real DSM 7.2.2 (a virtual DSM, `virtual-dsm`) with Container Manager 24.0.2**: login, DSM info, network, containers and packages all work. What that showed, and what the plugin does about it:
+**Confirmed on real Synology hardware** by the maintainer (2026-10-20; model and DSM version were not recorded). Written from the public DSM web API and first tested against a **simulated DSM**. Since then it has also run against a **real DSM 7.2.2 (a virtual DSM, `virtual-dsm`) with Container Manager 24.0.2**: login, DSM info, network, containers and packages all work. What that showed, and what the plugin does about it:
 
 - The container **list has no ports and no networks**; they come from `SYNO.Docker.Container get` (a full `docker inspect`), which the plugin now asks for per container (at most 60 containers, one request each, and it stops asking after three refusals). The published ports come from `HostConfig.PortBindings`, so a stopped container shows them too.
 - DSM's network card list has **no MAC addresses**, so the NAS itself is matched by its IP address.
