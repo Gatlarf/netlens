@@ -42,6 +42,38 @@ function setupSteps(name, token) {
 }
 
 
+const ALERT_MODES = [["auto", "Always-on devices when the site marks any, otherwise all devices"], ["core", "Only always-on devices"], ["all", "All devices"], ["none", "No device alerts"]];
+const KEEP_CHOICES = [["", "The general retention (Settings → Database)"], ["30", "30 days"], ["90", "90 days"], ["180", "180 days"], ["365", "1 year"], ["730", "2 years"]];
+
+// What this site alerts about and how long its history is kept here.
+function buildSiteSettingsCard(probe, done) {
+  const mode = h("select", { "aria-label": "Offline alerts for" }, ALERT_MODES.map(([v, t]) => h("option", { value: v }, t)));
+  mode.value = probe.alert_mode || "auto";
+  const keep = h("select", { "aria-label": "Keep the history for" }, KEEP_CHOICES.map(([v, t]) => h("option", { value: v }, t)));
+  if (probe.keep_days && !KEEP_CHOICES.some(([v]) => v === String(probe.keep_days))) keep.appendChild(h("option", { value: String(probe.keep_days) }, `${probe.keep_days} days`));
+  keep.value = probe.keep_days ? String(probe.keep_days) : "";
+  const save = h("button", { class: "btn primary", type: "button" }, "Save");
+  save.addEventListener("click", async () => {
+    save.disabled = true;
+    try {
+      await patch(`/api/probes/${probe.id}`, { alert_mode: mode.value, keep_days: keep.value ? Number(keep.value) : null });
+      toast("Saved", "success");
+      done();
+    } catch (err) {
+      toast(err.message || "Could not save", "error");
+      save.disabled = false;
+    }
+  });
+  return h("details", { class: "card admin-only managed-fold" }, h("summary", {}, h("strong", {}, "Alerts and retention of this site"),
+    h("span", { class: "hint" }, ` · ${(ALERT_MODES.find(([v]) => v === (probe.alert_mode || "auto")) || ALERT_MODES[0])[1].toLowerCase()}${probe.muted && probe.muted.length ? ` · ${probe.muted.length} muted` : ""}${probe.keep_days ? ` · history ${probe.keep_days} days` : ""}`)),
+    h("div", { class: "edit-form" },
+      h("div", { class: "field" }, h("label", {}, "Offline and back-online alerts for"), mode,
+        h("p", { class: "hint" }, "Applies to “went offline” and “back online” of devices. Service checks, health problems and a silent site are always announced. You can also mute single devices in the device list below.")),
+      h("div", { class: "field" }, h("label", {}, "Keep the history of this site for"), keep,
+        h("p", { class: "hint" }, "Graph points and alerts older than this are removed by the weekly upkeep (or Settings → Database → Remove old data). The monthly availability can only go back as far as the history is kept.")),
+      h("div", { class: "form-actions" }, save)));
+}
+
 const pct = (v) => (v === null || v === undefined ? "–" : `${v}%`.replace(".0%", "%"));
 const monthName = (m) => new Date(`${m}-01T12:00:00Z`).toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
 
@@ -414,6 +446,7 @@ export async function render(container) {
       }
     }
     try { body.appendChild(await buildAvailabilityCard(p)); } catch (err) { /* an older server: no figures */ }
+    if (admin) body.appendChild(buildSiteSettingsCard(p, () => showDetail(id)));
     const devCard = h("div", { class: "card" }, h("h2", {}, "Devices"));
     const devTools = h("div", { class: "up-tools" });
     const devTable = h("div", { class: "table-wrap" });
@@ -427,7 +460,7 @@ export async function render(container) {
         const m = monitorByKey.get(d.key);
         const health = m ? (m.ok === false ? h("span", { class: "error", title: m.error || "" }, "cannot be read")
           : m.latest && m.latest.cpu !== undefined && m.latest.cpu !== null ? `${Math.round(m.latest.cpu)}% cpu${m.latest.mem != null ? `, ${Math.round(m.latest.mem)}% mem` : ""}` : "monitored") : "";
-        const row = h("tr", {}, h("td", {}, statusDot(d.online)), h("td", {}, shortName(d.name), d.always_on ? h("span", { class: "hint" }, " (always on)") : null),
+        const row = h("tr", {}, h("td", {}, statusDot(d.online)), h("td", {}, shortName(d.name), d.always_on ? h("span", { class: "hint" }, " (always on)") : null, (p.muted || []).includes(d.key) ? h("span", { class: "hint" }, " (muted)") : null),
           h("td", { class: "mono" }, d.ip || ""), h("td", {}, d.type || ""), h("td", {}, d.vendor || ""), h("td", {}, health), h("td", {}, d.last_seen ? timeAgo(d.last_seen) : ""));
         const graphRow = h("tr", { class: "rs-graph", hidden: true }, h("td", { colspan: 8 }));
         const btn = h("button", { class: "btn", type: "button" }, "Graphs");
@@ -440,7 +473,13 @@ export async function render(container) {
             graphRow.firstChild.appendChild(card || h("p", { class: "hint" }, "No measurements yet. They appear after a few reports."));
           }
         });
-        row.appendChild(h("td", {}, btn));
+        const muted = (p.muted || []).includes(d.key);
+        const mute = h("button", { class: "btn admin-only", type: "button", title: muted ? "This device raises no offline alert. Click to alert again." : "Stop the offline alerts of this device" }, muted ? "Unmute" : "Mute");
+        mute.addEventListener("click", async () => {
+          const next = muted ? p.muted.filter((k) => k !== d.key) : [...(p.muted || []), d.key];
+          try { await patch(`/api/probes/${id}`, { muted: next }); toast(muted ? "Alerts back on" : "Muted: no offline alerts for this device", "success"); showDetail(id); } catch (err) { toast(err.message || "Could not change", "error"); }
+        });
+        row.appendChild(h("td", {}, btn, " ", admin ? mute : null));
         tb.append(row, graphRow);
       }
       table.appendChild(tb);

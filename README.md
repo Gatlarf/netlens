@@ -13,6 +13,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
 - [Install](#install)
   - [Docker Compose (any Linux device with Docker)](#docker-compose-any-linux-device-with-docker)
   - [Docker without Compose](#docker-without-compose)
+  - [Where do `NET_RAW` and `NET_ADMIN` go?](#where-do-net_raw-and-net_admin-go)
   - [Portainer (for example on DietPi or any other device)](#portainer-for-example-on-dietpi-or-any-other-device)
   - [Synology NAS (DSM 7.2 or newer, Container Manager)](#synology-nas-dsm-72-or-newer-container-manager)
   - [First start](#first-start)
@@ -169,44 +170,87 @@ volumes:
 Then run `docker compose up -d netlens` and open `http://<this-device>:8080`. To update later: `docker compose pull netlens && docker compose up -d netlens`.
 Your own data folder instead of a Docker volume: replace `netlens-data:/data` with `/path/to/netlens:/data` and run `sudo chown 10001:10001 /path/to/netlens` once.
 
+### Where do `NET_RAW` and `NET_ADMIN` go?
+
+Netlens needs three settings that most container tools do not set for you. They belong to the **Netlens container** (not to the host, not to Docker itself, not to Netlens' own settings):
+
+| Setting | What it does | In a compose file or stack | In a container form (Portainer, Synology wizard) |
+|---|---|---|---|
+| **Host network** | lets it see the devices on your LAN | `network_mode: host` | Network = **host** |
+| **`NET_RAW`** | raw packets: ARP, ping and nmap scans, listening for DHCP | `cap_add:` list | Capabilities → **NET_RAW** on |
+| **`NET_ADMIN`** | network configuration used by the scanner | `cap_add:` list | Capabilities → **NET_ADMIN** on |
+
+In a compose file `cap_add:` is a line **of the `netlens:` service itself**: the same indentation as `image:` and `network_mode:`, and its two entries are a list below it. This is the part that goes wrong most often, so here is the whole service with the right places marked:
+
+```yaml
+services:                       # the top of the file
+  netlens:                      # the name of this container (2 spaces in)
+    image: ghcr.io/gatlarf/netlens:latest
+    container_name: netlens
+    restart: unless-stopped
+    network_mode: host          # <- same level as "image:"
+    cap_drop:                   # <- same level as "image:"
+      - ALL
+    cap_add:                    # <- same level as "image:": NOT under "environment:", NOT under "volumes:"
+      - NET_RAW                 #    4 spaces for "cap_add", 6 spaces for each "- NAME"
+      - NET_ADMIN
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - netlens-data:/data
+    environment:
+      - TZ=Europe/Brussels
+
+volumes:                        # the top level again (no indentation)
+  netlens-data:
+```
+
+Common mistakes:
+
+- `cap_add:` **at the top level** (no indentation) or **under `environment:`**: the container starts, but without the capabilities. Compose may also refuse the file ("additional properties not allowed").
+- `NET_RAW` and `NET_ADMIN` **written in the environment** (`- NET_RAW=true`): they are not variables.
+- Tabs instead of spaces: YAML only accepts spaces.
+- `privileged: true` instead: it also works for scanning, but gives the container the whole host. Use the two capabilities.
+- `security_opt: no-new-privileges:true`: it stops the scanner from using the capabilities. Leave it out.
+
+**How do I know it worked?** Press *Scan* in Netlens: it finds your devices. If it finds nothing, or *Settings → Scan performance → Passive listening* says "Not running" and mentions `NET_RAW`, the container is missing the host network or one of the two capabilities. To check from a terminal: `docker inspect netlens --format '{{.HostConfig.NetworkMode}} {{.HostConfig.CapAdd}}'` should print `host [NET_RAW NET_ADMIN]` (the order may differ).
+
 ### Portainer (for example on DietPi or any other device)
 
-Netlens needs two things that Portainer does not set by default: the **host network** and two extra **capabilities**, `NET_RAW` and `NET_ADMIN`
-(they let it scan the network and listen for devices announcing themselves). Without them the container starts, but scanning does not work.
-There are two ways to set this up. A stack is easier because the settings are already in the file.
+There are two ways: a **stack** (recommended, because the settings are written down in the file) and a single **container form**. If you change the settings of a container that is already running, Portainer has to re-create it; your data survives because it lives in the volume.
 
 **Option 1: a stack (recommended)**
 
-1. **Stacks → Add stack**, give it a name (`netlens`), choose **Web editor**.
-2. Paste the contents of [`docker-compose.simple.yml`](docker-compose.simple.yml), optionally set `TZ` under *Environment variables*, and press **Deploy the stack**.
-3. Open `http://<this-device>:8080`.
+1. In Portainer choose your environment (usually *local*), then **Stacks → Add stack**.
+2. **Name**: `netlens`. **Build method**: **Web editor**.
+3. Paste the whole compose file from the box above (or the contents of [`docker-compose.simple.yml`](docker-compose.simple.yml)) into the editor. `network_mode: host` and the `cap_add:` list are already in it; there is nothing else to tick.
+4. Optional: under **Environment variables** add `TZ` with your time zone (for example `Europe/Brussels`). Leave everything else as it is.
+5. Press **Deploy the stack**, wait for it to turn green, and open `http://<this-device>:8080`.
 
-The file already contains `network_mode: host` and `cap_add: [NET_RAW, NET_ADMIN]`. (Already have a stack for your other containers? Paste only the
-`netlens:` service from above into that stack's editor, add the `netlens-data:` volume, and update the stack.)
+Already have a stack for your other containers? Open that stack, press **Editor**, paste only the `netlens:` service under `services:` (keep the indentation: `netlens:` lines up with your other services), add `netlens-data:` under `volumes:` at the bottom, and press **Update the stack**.
 
-To update later: open the stack and press **Update the stack** with **Re-pull image** switched on.
+To update Netlens later: open the stack, press **Editor** and then **Update the stack** with **Re-pull image and redeploy** switched on.
 
 **Option 2: one container by hand (Containers → Add container)**
+
+Portainer spreads the settings over several tabs under **Advanced container settings** (below the Image field). The capabilities have their **own tab**, called *Capabilities*; it is not part of *Runtime & Resources*.
 
 | Where in Portainer | What to set |
 |---|---|
 | **Name** | `netlens` |
-| **Image** | `ghcr.io/gatlarf/netlens:latest` (no registry login needed) |
-| **Advanced container settings → Network → Network** | **host** |
-| **Advanced container settings → Runtime & Resources → Capabilities** | switch **NET_RAW** and **NET_ADMIN** to **On**; leave all others as they are |
-| **Advanced container settings → Volumes → map additional volume** | container `/data`, a new volume (for example `netlens-data`) |
-| **Advanced container settings → Restart policy** | **Unless stopped** |
-| **Env** (optional) | `TZ` = your time zone, for example `Europe/Brussels` |
+| **Image** | `ghcr.io/gatlarf/netlens:latest` (no registry login needed; leave *Always pull the image* on) |
+| **Network ports configuration** | leave empty: with the host network the page is on port 8080 of the device itself |
+| **Advanced container settings → Network** tab → *Network* | **host** |
+| **Advanced container settings → Capabilities** tab | a list of switches: turn **NET_RAW** and **NET_ADMIN** to **On**; leave all the others as they are |
+| **Advanced container settings → Volumes** tab → *map additional volume* | *container* `/data`, *volume* a new volume (for example `netlens-data`), *Writable* |
+| **Advanced container settings → Restart policy** tab | **Unless stopped** |
+| **Advanced container settings → Env** tab (optional) | *add environment variable*: `TZ` = your time zone, for example `Europe/Brussels` |
+| **Advanced container settings → Runtime & Resources** tab | leave **Privileged mode** off |
 
-Then press **Deploy the container** and open `http://<this-device>:8080`. Leave **Privileged mode** off. Do not add `no-new-privileges`
-under *Security*, because it stops the scanner from using the two capabilities.
+Then press **Deploy the container** and open `http://<this-device>:8080`. Do not add `no-new-privileges` under *Security*.
 
-**Already running without the capabilities?** Capabilities cannot be changed on a running container. Open the container in Portainer, press
-**Duplicate/Edit**, set the network and the two capabilities as in the table (the same volume at `/data` keeps all your data), and **Deploy the container**
-again after removing the old one (Portainer asks to replace it).
-
-**How do I know it worked?** Press *Scan* in Netlens: it finds your devices. If it finds nothing, or the passive listening card in *Settings → Scan performance* says "Not running" and mentions `NET_RAW`,
-the container is missing the host network or one of the two capabilities.
+**Already running without the capabilities?** Capabilities cannot be changed on a running container. Open the container in Portainer, press **Duplicate/Edit**, set the *Network* and *Capabilities* tabs as in the table (keep the same volume at `/data`: all your data stays), and press **Deploy the container**; Portainer asks to replace the old one. With a stack, add the lines to the stack in the editor and press **Update the stack**.
 
 ### Docker Compose with a separate file (any Linux device with Docker)
 
@@ -229,13 +273,24 @@ docker run -d --name netlens --restart unless-stopped --network host \
 
 ### Synology NAS (DSM 7.2 or newer, Container Manager)
 
-1. Open **Container Manager → Project → Create**. Name it `netlens`, choose a path for the project (any shared folder), and as source choose **Create docker-compose.yml**.
-2. Paste the contents of [`docker-compose.simple.yml`](docker-compose.simple.yml), press **Next** and finish; the project starts the container.
-3. Open `http://<nas-address>:8080`. (DSM itself uses ports 5000 and 5001. If something else on the NAS already uses 8080, add `NETLENS_BIND=0.0.0.0:8081` to the `environment:` list and use that port.)
+On a Synology use a **Project** (that is Container Manager's name for a compose file). The graphical "Create container" wizard of Container Manager does not let you choose individual capabilities (it only has an all-or-nothing *high privilege* switch, which gives the container far more rights than Netlens needs). In a Project the two capabilities are simply lines in the file.
 
-To update later: **Project → netlens → Action → Build** (it pulls the newest image) and start it again. The data is in a Docker volume, so there are no folder permissions to set up.
-(Older DSM versions with the *Docker* package can use the same compose file under *Project* if available, or create the container by hand with: host network, the two capabilities
-`NET_RAW` and `NET_ADMIN` added, the image above, and a volume mounted at `/data`.)
+1. Open **Container Manager → Project → Create**.
+2. **Project name**: `netlens`. **Path**: press *Set path* and pick or create a shared folder for it (for example `docker/netlens`); this only holds the compose file.
+3. **Source**: choose **Create docker-compose.yml**. An editor opens.
+4. Paste the complete file from [Where do `NET_RAW` and `NET_ADMIN` go?](#where-do-net_raw-and-net_admin-go) (or the contents of [`docker-compose.simple.yml`](docker-compose.simple.yml)). `network_mode: host` and the `cap_add:` list are already in it. Set `TZ` to your time zone if you like.
+5. Press **Next**. The *Web portal settings* page can be skipped: Netlens does not need DSM's reverse proxy. Press **Next**, then **Done**. Container Manager downloads the image and starts the container.
+6. Open `http://<nas-address>:8080`.
+
+Good to know on a Synology:
+
+- **Port 8080 busy?** DSM itself uses 5000 and 5001. If another package already uses 8080, add `NETLENS_BIND=0.0.0.0:8081` to the `environment:` list and open that port instead. With the host network there is no port mapping to set.
+- **The data** lives in a Docker volume (`netlens-data`), so there are no folder permissions to set up. If you prefer a shared folder, replace `netlens-data:/data` with `/volume1/docker/netlens-data:/data` and give the user `10001` read and write permission on that folder (File Station → folder → Properties → Permission), otherwise Netlens cannot save its data.
+- **Firewall:** if the DSM firewall is on, allow TCP 8080 from your LAN.
+- **To check the settings:** Container Manager → **Container** → `netlens` → **Details** shows the network (*host*); the capabilities are in the project file. Or from SSH: `sudo docker inspect netlens --format '{{.HostConfig.NetworkMode}} {{.HostConfig.CapAdd}}'`.
+- **To update later:** **Project → netlens → Action → Build** (it pulls the newest image), then start it again.
+- **To change the file:** **Project → netlens → Action → Stop**, then **Edit** the compose file (the capabilities are the `cap_add:` lines), save and **Build** again. A container that already runs never picks up new capabilities until it is re-created like this.
+- **Older DSM with the *Docker* package:** if it has *Project*, use the same file. Without it, the container wizard's *Enable high privilege* switch is the only way to get raw network access; it works, but prefer upgrading to Container Manager.
 
 ### First start
 
@@ -543,6 +598,10 @@ The central Netlens keeps the remote devices apart from its own (two sites may u
 **A central Netlens with a self-signed certificate.** Tick *Trust the certificate of the central Netlens* in **Settings → Report to a central Netlens**: Netlens remembers the fingerprint of the certificate it sees when you save, shows it so you can compare it, and from then on accepts exactly that certificate and nothing else. If the certificate is replaced, reports stop with a clear message until you trust the new one. With a normal certificate (Let's Encrypt, a reverse proxy) leave it off.
 
 **Maintenance windows and customer logins cover sites.** A maintenance window can cover chosen remote sites (everything about them is held back during the window, including a site that stops reporting; if it is still silent when the window ends you get the normal alert). A viewer can be limited to chosen remote sites (**Settings → Users & tokens → Limit to sites**, business feature): a customer then signs in and sees only their own sites, with graphs, checks, events and the monthly availability, and nothing else.
+
+**Alerts and retention per site.** Under *Alerts and retention of this site* (on the page of a site) you choose which devices raise "went offline" and "back online": the always-on devices when the site marks any and otherwise all (the default), only the always-on devices, all devices, or none. *Mute* in the device list silences a single device. Service checks, health problems and a silent site are always announced. You can also choose how long the history of that site is kept here (30 days to 2 years, or the general retention of Settings → Database); older graph points and alerts of that site are removed by the weekly upkeep.
+
+**When the central Netlens cannot be reached.** A remote Netlens that has failed to report for 10 minutes raises an event on its own notification channels (*This Netlens cannot reach its central Netlens*, with the reason) and another when the link works again, so somebody at that location hears of it. It keeps scanning and alerting on its own meanwhile. A short break that mends itself says nothing.
 
 **Everything of a site on one page.** Besides the devices, checks and health, the page of a site shows the last scan, the backups and the monitored devices of that location, the details of each device (address, system, open ports, first seen) with its graphs, and **Availability per month**: pick a month and see, per device and per check, the availability, the number and length of outages and the time down, for all devices or only the always-on ones, with a CSV download. The figures come from the history the site reported (every 5 minutes for the last 90 days, hourly before that); time in which the site did not report at all is not counted but is listed. **A remote site raises offline alerts only for its always-on devices** as soon as it has marked any (phones and tablets would otherwise bury the real problems); new devices, failing checks and health problems are announced as before.
 
@@ -1025,6 +1084,17 @@ tests
 
 ## Troubleshooting
 
+- **The Scan log (Scans & events → Scans) says "A container setting is missing: nmap could not run because the container lacks the NET_RAW and NET_ADMIN capabilities" (older versions: "nmap could not run: it lacks the capabil…")**, or a scan finds nothing, or *Settings → Scan performance → Passive listening* says "Not running": the Netlens container was started without the host network or without the two capabilities. These are settings of the **container**, not of Netlens, and a running container never picks up new ones, so it has to be re-created. The container log then shows `scan N failed: SETTING MISSING on the netlens container ...` (`docker logs netlens`). Fix it where you run the container:
+
+  | Where you run it | What to change |
+  |---|---|
+  | Compose file / stack | in the `netlens:` service add `network_mode: host` and `cap_add:` with `NET_RAW` and `NET_ADMIN` (same indentation as `image:`), then `docker compose up -d` |
+  | Portainer stack | the same lines in the stack's editor, then **Update the stack** |
+  | Portainer container form | **Network** tab = *host*; **Capabilities** tab: switch *NET_RAW* and *NET_ADMIN* on; **Duplicate/Edit** and deploy again (the volume at `/data` keeps your data) |
+  | Synology | use **Container Manager → Project** with the compose file; the container wizard has no capability setting. Edit the project and **Build** again |
+  | `docker run` | add `--network host --cap-add NET_RAW --cap-add NET_ADMIN` |
+
+  Also make sure `no-new-privileges` is not set and the container is not started with `--cap-drop ALL` alone. Check with `docker inspect netlens --format '{{.HostConfig.NetworkMode}} {{.HostConfig.CapAdd}}'`: it should print `host [NET_RAW NET_ADMIN]`. The full explanation with an annotated example is under [Where do `NET_RAW` and `NET_ADMIN` go?](#where-do-net_raw-and-net_admin-go).
 - **Container keeps restarting (running, then restarting):** the app is exiting at startup and `restart: unless-stopped` starts it again. The reason is in the container log:
 
   ```bash

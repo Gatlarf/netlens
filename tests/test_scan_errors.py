@@ -39,3 +39,20 @@ def test_run_nmap_non_executable_becomes_scanerror(tmp_path):
         asyncio.run(run_nmap("quick", ["192.168.1.0/24"], nmap_path=str(fake)))
     assert "cannot execute nmap" in str(ei.value)
     assert "NET_RAW" in explain_scan_error(ei.value)
+
+
+def test_the_missing_capability_message_says_a_setting_is_missing_and_where_to_add_it():
+    from app.scanner.errors import is_capability_error
+
+    msg = explain_scan_error("[Errno 1] Operation not permitted")
+    assert msg.startswith("A container setting is missing") and "cap_add" in msg and "network_mode: host" in msg and "Capabilities" in msg
+    assert len(msg.split(" (detail")[0]) < 400                      # the page keeps the first 400 characters: the advice must not be cut off
+    assert is_capability_error(PermissionError(13, "Permission denied")) and not is_capability_error("nmap timed out")
+
+
+def test_the_container_log_gets_a_plain_error_line(caplog):
+    import logging
+
+    from app.scanner.orchestrator import is_capability_error
+
+    assert is_capability_error("dnet: Failed to open device eth0")

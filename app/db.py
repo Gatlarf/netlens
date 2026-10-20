@@ -848,6 +848,9 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     _add_column_if_missing(conn, "probes", "customer", "TEXT NOT NULL DEFAULT ''")             # who the site belongs to (an IT-support person looks after several customers)
+    _add_column_if_missing(conn, "probes", "keep_days", "INTEGER")                              # how long this site's history is kept here; NULL = the general retention
+    _add_column_if_missing(conn, "probes", "alert_mode", "TEXT NOT NULL DEFAULT 'auto'")        # which devices raise offline alerts: auto, core, all, none
+    _add_column_if_missing(conn, "probes", "muted", "TEXT NOT NULL DEFAULT '[]'")               # JSON list of device keys that raise no offline alert
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS remote_devices (

@@ -5,8 +5,9 @@ from __future__ import annotations
 _RULES: list[tuple[tuple[str, ...], str]] = [
     (
         ("operation not permitted", "permission denied", "requires root", "dnet:", "errno 1", "errno 13"),
-        "nmap could not run: it lacks the capabilities for raw network scans. The container needs "
-        "NET_RAW and NET_ADMIN added (and must not use no-new-privileges); see Troubleshooting in the README.",
+        "A container setting is missing: nmap could not run because the container lacks the NET_RAW and NET_ADMIN capabilities "
+        "(or the host network). Add cap_add: [NET_RAW, NET_ADMIN] and network_mode: host to the netlens service (Portainer: Network = host, "
+        "Capabilities = NET_RAW + NET_ADMIN), without no-new-privileges, and re-create the container. See Troubleshooting in the README.",
     ),
     (
         ("nmap not found", "no such file or directory: 'nmap'", "errno 2"),
@@ -30,6 +31,12 @@ _RULES: list[tuple[tuple[str, ...], str]] = [
         "The scan was interrupted because Netlens restarted.",
     ),
 ]
+
+
+def is_capability_error(exc: BaseException | str) -> bool:
+    """Is this the failure of a container that was started without NET_RAW / NET_ADMIN (or without the host network)?"""
+    lowered = (exc.strip() if isinstance(exc, str) else str(exc)).lower()
+    return any(n in lowered for n in _RULES[0][0])
 
 
 def explain_scan_error(exc: BaseException | str) -> str:

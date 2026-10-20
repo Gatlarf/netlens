@@ -667,3 +667,100 @@ def test_a_customer_sees_only_its_own_sites(tmp_path):
         assert tc.post(f"/api/probes/{mine['id']}/command", json={"command": "scan"}).status_code == 403
         assert tc.delete(f"/api/probes/{mine['id']}").status_code == 403 and tc.get("/api/database").status_code == 403
     tsdb.forget_all()
+
+
+# ----------------------------------------------------------------------------- alert modes, retention per site, a broken link
+def _flip(conn, row, mode=None, muted=None):
+    probes.clean_settings(conn, row["id"], alert_mode=mode, muted=muted)
+    return conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone()
+
+
+def _offline_events(conn, row, devices_before, devices_after):
+    count = lambda: conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'remote_offline'").fetchone()[0]
+    n = count()
+    probes.ingest(conn, conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone(), {"devices": devices_before}, now=NOW)
+    probes.ingest(conn, conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone(), {"devices": devices_after}, now=LATER)
+    return count() - n
+
+
+@pytest.mark.parametrize("mode,expected", [("auto", 1), ("core", 1), ("all", 2), ("none", 0)])
+def test_the_alert_mode_of_a_site(conn, mode, expected):
+    row, _ = make(conn, f"S-{mode}")
+    _flip(conn, row, mode=mode)
+    probes.ingest(conn, conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone(), {"devices": []}, now=NOW)         # the baseline
+    both = lambda on: [device("aa:00:00:00:00:01", "router", online=on, always_on=True), device("aa:00:00:00:00:02", "phone", online=on)]
+    assert _offline_events(conn, row, both(True), both(False)) == expected
+
+
+def test_a_muted_device_raises_no_offline_alert_but_others_do(conn):
+    row, _ = make(conn)
+    _flip(conn, row, mode="all", muted=["aa:00:00:00:00:02"])
+    probes.ingest(conn, conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone(), {"devices": []}, now=NOW)
+    both = lambda on: [device("aa:00:00:00:00:01", "router", online=on), device("aa:00:00:00:00:02", "phone", online=on)]
+    assert _offline_events(conn, row, both(True), both(False)) == 1
+    assert probes.present(conn, conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone())["muted"] == ["aa:00:00:00:00:02"]
+
+
+def test_site_settings_are_checked(conn):
+    row, _ = make(conn)
+    for bad in ({"alert_mode": "sometimes"}, {"keep_days": 3}, {"keep_days": True}, {"muted": "x"}, {"muted": [1]}):
+        with pytest.raises(probes.ProbeError):
+            probes.clean_settings(conn, row["id"], **bad)
+    probes.clean_settings(conn, row["id"], keep_days=90)
+    assert conn.execute("SELECT keep_days FROM probes").fetchone()[0] == 90
+    probes.clean_settings(conn, row["id"], alert_mode="core")
+    assert conn.execute("SELECT keep_days FROM probes").fetchone()[0] == 90                  # untouched when not mentioned
+    probes.clean_settings(conn, row["id"], keep_days=None)
+    assert conn.execute("SELECT keep_days FROM probes").fetchone()[0] is None
+
+
+def test_a_site_with_its_own_retention_loses_older_history_only(conn):
+    import time as _t
+
+    from app import dbmaint
+
+    a, _ = make(conn, "Short")
+    b, _ = make(conn, "Long")
+    report(conn, a, [device("aa:00:00:00:00:01", "nas")], NOW)
+    report(conn, b, [device("aa:00:00:00:00:02", "cam")], NOW)
+    ids = {r["probe_id"]: r["id"] for r in conn.execute("SELECT probe_id, id FROM remote_devices")}
+    store = tsdb.for_conn(conn)
+    now = int(_t.time())
+    rows = [(now - d * 86400, "remote", ids[p], "up", 1.0, "", "") for p in (a["id"], b["id"]) for d in (1, 20, 40)]
+    store.record_bulk(rows)
+    store.rollup(now)
+    old = _t.strftime("%Y-%m-%dT%H:%M:%SZ", _t.gmtime(now - 100 * 86400))
+    conn.execute("INSERT INTO events (ts, kind, detail) VALUES (?, 'remote_offline', 'Short: old thing'), (?, 'remote_offline', 'Long: old thing')", (old, old))
+    conn.commit()
+    probes.clean_settings(conn, a["id"], keep_days=30)
+    preview = dbmaint.purge(conn, dry_run=True)
+    assert preview["site_points"] >= 1 and preview["site_events"] == 1
+    assert len(store.query("remote", ids[a["id"]], "up", span=60 * 86400)["points"]) == 3          # a preview changes nothing
+    dbmaint.purge(conn)
+    assert len(store.query("remote", ids[a["id"]], "up", span=60 * 86400)["points"]) == 2          # the 40-day-old point went
+    assert len(store.query("remote", ids[b["id"]], "up", span=60 * 86400)["points"]) == 3          # the other site has no retention of its own
+    assert [r["detail"] for r in conn.execute("SELECT detail FROM events")] == ["Long: old thing"]
+
+
+def test_the_api_takes_site_settings(client):
+    pid = client.post("/api/probes", json={"name": "Cfg"}).json()["probe"]["id"]
+    r = client.patch(f"/api/probes/{pid}", json={"alert_mode": "core", "keep_days": 180, "muted": ["aa:bb"]}).json()
+    assert r["alert_mode"] == "core" and r["keep_days"] == 180 and r["muted"] == ["aa:bb"]
+    assert client.patch(f"/api/probes/{pid}", json={"keep_days": None}).json()["keep_days"] is None
+    assert client.patch(f"/api/probes/{pid}", json={"keep_days": 2}).status_code == 422
+    assert client.patch(f"/api/probes/{pid}", json={"alert_mode": "x"}).status_code == 422
+    assert client.patch(f"/api/probes/{pid}", json={"name": "Cfg2"}).json()["alert_mode"] == "core"          # other changes keep it
+
+
+def test_a_central_netlens_that_stays_unreachable_is_reported_here(conn):
+    fail = {"ok": False, "error": "cannot reach the central Netlens: timed out"}
+    assert central._watch_link(conn, fail, 1000) is None                                  # the first failure is no news
+    assert central._watch_link(conn, fail, 1000 + 300) is None
+    assert central._watch_link(conn, fail, 1000 + 600) == "central_unreachable"
+    assert central._watch_link(conn, fail, 1000 + 900) is None                            # once
+    assert central._watch_link(conn, {"ok": True}, 2000) == "central_reachable"
+    assert central._watch_link(conn, {"ok": True}, 2060) is None
+    assert kinds(conn) == ["central_unreachable", "central_reachable"]
+    assert "timed out" in conn.execute("SELECT detail FROM events WHERE kind = 'central_unreachable'").fetchone()[0]
+    central._watch_link(conn, fail, 5000)                                                 # a short break that mends itself says nothing
+    assert central._watch_link(conn, {"ok": True}, 5100) is None and kinds(conn) == ["central_unreachable", "central_reachable"]

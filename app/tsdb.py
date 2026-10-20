@@ -363,6 +363,31 @@ class Store:
         finally:
             conn.close()
 
+    def trim(self, entity: str, entity_ids: list[int], before: int, dry_run: bool = False) -> int:
+        """Remove the points older than `before` (a unix time) of these entities, in every tier. Returns how many raw, 5-minute and hourly points went."""
+        if not entity_ids:
+            return 0
+        try:
+            conn = self._connect()
+        except sqlite3.Error:
+            return 0
+        total = 0
+        try:
+            marks = ",".join("?" * len(entity_ids))
+            series = [r[0] for r in conn.execute(f"SELECT id FROM series WHERE entity = ? AND entity_id IN ({marks})", (entity, *entity_ids))]
+            for chunk in [series[i:i + 500] for i in range(0, len(series), 500)]:
+                m = ",".join("?" * len(chunk))
+                for table in ("raw", "m5", "h1"):
+                    if dry_run:
+                        total += conn.execute(f"SELECT COUNT(*) FROM {table} WHERE ts < ? AND series IN ({m})", (before, *chunk)).fetchone()[0]
+                    else:
+                        total += conn.execute(f"DELETE FROM {table} WHERE ts < ? AND series IN ({m})", (before, *chunk)).rowcount
+            if not dry_run:
+                conn.commit()
+            return total
+        finally:
+            conn.close()
+
     def series_owners(self) -> list[tuple[str, int]]:
         """The distinct (entity, entity id) pairs that have graph data."""
         try:

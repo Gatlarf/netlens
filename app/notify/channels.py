@@ -110,6 +110,8 @@ EVENT_LABELS = {
     "probe_offline": "A remote site stops reporting",
     "licence_expiring": "The licence is about to end (or has ended)",
     "probe_online": "A remote site reports again",
+    "central_unreachable": "This Netlens cannot reach its central Netlens for a while (it is a remote site)",
+    "central_reachable": "This Netlens reaches its central Netlens again",
     "port_opened": "A new port opens on a device",
     "port_closed": "A port closes on a device",
     "port_unexpected": "A port outside the device's baseline opens",
@@ -143,7 +145,7 @@ EVENT_LABELS = {
     "net_ok": "A network health problem or warning is gone",
     "login_failed": "Someone keeps entering a wrong password or token (a possible attack)",
 }
-DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "metric_critical", "remote_offline", "remote_service_down", "remote_metric_critical", "probe_offline", "probe_online", "port_opened", "port_unexpected", "port_missing", "link_down", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "vuln_critical", "net_critical", "login_failed"]
+DEFAULT_EVENTS = ["device_new", "device_offline", "service_down", "service_up", "metric_critical", "remote_offline", "remote_service_down", "remote_metric_critical", "probe_offline", "probe_online", "central_unreachable", "central_reachable", "port_opened", "port_unexpected", "port_missing", "link_down", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "vuln_critical", "net_critical", "login_failed"]
 
 
 class ChannelError(Exception):
@@ -398,6 +400,7 @@ def _line(e: dict) -> str:
         "remote_new": detail, "remote_offline": f"OFFLINE: {detail}", "remote_online": detail, "remote_service_down": f"SERVICE DOWN: {detail}", "remote_service_up": detail,
         "remote_metric_warning": f"Warning: {detail}", "remote_metric_critical": f"CRITICAL: {detail}", "remote_metric_ok": f"Normal again: {detail}",
         "probe_offline": f"REMOTE SITE SILENT: {detail}", "probe_online": detail, "licence_expiring": f"Licence: {detail}",
+        "central_unreachable": f"CENTRAL NETLENS UNREACHABLE: {detail}", "central_reachable": detail,
         "metric_warning": f"Warning: {detail}",
         "metric_critical": f"CRITICAL: {detail}",
         "metric_ok": f"Normal again: {detail}",
@@ -427,7 +430,7 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
         "dns_registered": "registered in DNS", "dns_updated": "DNS updated", "dns_failed": "DNS write failed",
         "remote_new": "remote device new", "remote_offline": "remote offline", "remote_online": "remote online", "remote_service_down": "remote service down",
         "remote_service_up": "remote service up", "remote_metric_warning": "remote health warning", "remote_metric_critical": "remote health critical",
-        "remote_metric_ok": "remote health normal", "probe_offline": "site silent", "probe_online": "site reporting",
+        "remote_metric_ok": "remote health normal", "probe_offline": "site silent", "probe_online": "site reporting", "central_unreachable": "central unreachable", "central_reachable": "central reachable",
         "metric_warning": "health warning", "metric_critical": "health critical", "metric_ok": "health normal", "capacity_warning": "disk filling up", "capacity_critical": "disk almost full", "anomaly": "unusual reading", "remediation_pending": "approval needed", "remediation_ran": "fix done", "remediation_failed": "fix failed", "remediation_recovered": "fix worked", "inventory_unavailable": "device unavailable", "inventory_available": "device available", "inventory_battery_low": "battery low", "guest_backup_failed": "backup failed", "guest_backup_late": "backup late", "guest_backup_recovered": "backup recovered", "vuln_critical": "vulnerability", "net_critical": "network problem", "net_warning": "network warning", "net_ok": "network ok", "unreachable": "behind an offline device",
         "container_unhealthy": "container unhealthy", "container_restarting": "container restarting", "container_stopped": "container stopped",
         "guest_stopped": "guest stopped", "guest_started": "guest started", "guest_update_available": "update available", "cert_expiring": "certificate expiring", "login_failed": "failed logins",

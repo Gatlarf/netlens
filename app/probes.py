@@ -30,6 +30,8 @@ TOKEN_PREFIX = "nlp_"
 MAX_DEVICES, MAX_SERVICES, MAX_SAMPLES, MAX_PROBLEMS = 3000, 500, 30000, 200
 SILENT_AFTER_S = 240              # a probe that has not reported for this long is "not heard from"
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
+ALERT_MODES = {"auto": "always-on devices when the site marks any, otherwise all", "core": "only always-on devices", "all": "all devices", "none": "no device alerts"}
+KEEP_DAYS = (7, 3650)
 NAME_RE = re.compile(r"^[^\x00-\x1f]{1,60}$")
 # the measurements a site may report: the names Netlens itself produces, so a misbehaving site cannot fill the store with its own
 ALLOWED_METRICS = frozenset({"up", "rtt_ms", "response_ms", "cert_days", "cpu_pct", "load1", "mem_pct", "swap_pct", "disk_pct", "disk_free_b", "net_rx_bps",
@@ -106,6 +108,53 @@ def get(conn: sqlite3.Connection, probe_id: int) -> dict | None:
     return present(conn, row) if row else None
 
 
+def _muted(value: Any) -> list[str]:
+    try:
+        data = json.loads(value) if isinstance(value, str) else value
+    except ValueError:
+        return []
+    return [str(k) for k in data if isinstance(k, str)] if isinstance(data, list) else []
+
+
+def clean_settings(conn: sqlite3.Connection, probe_id: int, keep_days: Any = ..., alert_mode: Any = None, muted: Any = None) -> None:
+    """Change what is kept and alerted for one site. keep_days None = the general retention; `...` leaves it as it is."""
+    if keep_days is not ...:
+        if keep_days is not None and (isinstance(keep_days, bool) or not isinstance(keep_days, int) or not KEEP_DAYS[0] <= keep_days <= KEEP_DAYS[1]):
+            raise ProbeError(f"keep the history of a site between {KEEP_DAYS[0]} and {KEEP_DAYS[1]} days, or leave it empty for the general retention")
+        conn.execute("UPDATE probes SET keep_days = ? WHERE id = ?", (keep_days, probe_id))
+    if alert_mode is not None:
+        if alert_mode not in ALERT_MODES:
+            raise ProbeError(f"alerts must be one of {', '.join(ALERT_MODES)}")
+        conn.execute("UPDATE probes SET alert_mode = ? WHERE id = ?", (alert_mode, probe_id))
+    if muted is not None:
+        if not isinstance(muted, list) or any(not isinstance(k, str) or not k or len(k) > 80 for k in muted) or len(muted) > 3000:
+            raise ProbeError("muted devices must be a list of device keys")
+        conn.execute("UPDATE probes SET muted = ? WHERE id = ?", (json.dumps(sorted(set(muted))), probe_id))
+    conn.commit()
+
+
+def trim_history(conn: sqlite3.Connection, now: float | None = None, dry_run: bool = False) -> dict[str, int]:
+    """For the sites with a retention of their own: remove their graph points and alerts older than that. Returns counts."""
+    now = now if now is not None else time.time()
+    out = {"site_points": 0, "site_events": 0}
+    store = tsdb.for_conn(conn)
+    for row in conn.execute("SELECT id, keep_days FROM probes WHERE keep_days IS NOT NULL").fetchall():
+        before = int(now - row["keep_days"] * 86400)
+        if store is not None:
+            for table, entity in (("remote_devices", "remote"), ("remote_services", "remote_service")):
+                ids = [r[0] for r in conn.execute(f"SELECT id FROM {table} WHERE probe_id = ?", (row["id"],))]
+                out["site_points"] += store.trim(entity, ids, before, dry_run=dry_run)
+        cutoff = datetime.fromtimestamp(before, timezone.utc).strftime(STAMP)
+        old = [e["id"] for e in site_events(conn, row["id"], limit=10**9) if e["ts"] < cutoff]
+        out["site_events"] += len(old)
+        if old and not dry_run:
+            for chunk in _chunks(old):
+                conn.execute(f"DELETE FROM events WHERE id IN ({','.join('?' * len(chunk))})", chunk)
+    if not dry_run:
+        conn.commit()
+    return out
+
+
 def _parse(ts: str | None) -> float | None:
     if not ts:
         return None
@@ -145,7 +194,7 @@ def present(conn: sqlite3.Connection, row: sqlite3.Row, now: float | None = None
         "devices": {"total": counts["total"], "online": counts["online"], "core_down": counts["core_down"]},
         "services": {"total": services["total"], "down": services["down"]},
         "problems": {"count": len(problems), "critical": sum(1 for p in problems if p.get("level") == "critical")},
-        "scan": summary.get("scan"), "skew_s": summary.get("skew_s"), "backups": summary.get("backups") or {"configured": False}, "vulns": _vulns_view(conn, summary),
+        "scan": summary.get("scan"), "skew_s": summary.get("skew_s"), "keep_days": row["keep_days"], "alert_mode": row["alert_mode"] or "auto", "muted": _muted(row["muted"]), "backups": summary.get("backups") or {"configured": False}, "vulns": _vulns_view(conn, summary),
     }
 
 
@@ -218,6 +267,12 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
     old_services = {r["key"]: r for r in conn.execute("SELECT * FROM remote_services WHERE probe_id = ?", (probe_id,))}
 
     marked = any(d["always_on"] for d in devices)       # when the site marks its always-on devices, only those raise an offline alert (nobody wants one for a phone)
+    mode, muted = probe["alert_mode"] or "auto", set(_muted(probe["muted"]))
+
+    def alerts(d: dict) -> bool:                        # does this device raise "went offline" and "back online" for this site?
+        if d["key"] in muted or mode == "none":
+            return False
+        return True if mode == "all" else d["always_on"] if mode == "core" else (d["always_on"] or not marked)
     seen_keys = set()
     for d in devices:
         if d["key"] in seen_keys:
@@ -233,7 +288,7 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
                 (probe_id, d["key"], d["mac"], d["ip"], d["name"], d["vendor"], d["type"], d["os"], int(d["online"]), int(d["always_on"]), json.dumps(d["ports"]),
                  d["first_seen"], d["last_seen"]))
         else:
-            if not baseline and bool(before["online"]) != d["online"] and (d["always_on"] or not marked):
+            if not baseline and bool(before["online"]) != d["online"] and alerts(d):
                 events.append(("remote_online" if d["online"] else "remote_offline", f"{site}: {shown} " + ("is back online" if d["online"] else "went offline")))
             conn.execute(
                 "UPDATE remote_devices SET mac=?, ip=?, name=?, vendor=?, type=?, os=?, online=?, always_on=?, ports=?, last_seen=? WHERE id=?",

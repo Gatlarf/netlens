@@ -2,6 +2,19 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.118 — 2026-10-20
+
+### Fixed
+- ★ **A missing NET_RAW / NET_ADMIN is now explained properly**: the scan error starts with "A container setting is missing" and says where to add the settings (compose file, Portainer tabs, Synology Project). The Scans page shows a notice with the steps instead of an error cut off after 40 characters (click an error to read all of it), and the container log gets one plain ERROR line.
+
+### Changed
+- The Portainer and Synology instructions are rewritten: where `cap_add` goes in the file (annotated example, common mistakes), the Portainer *Capabilities* tab, why a Synology needs a Project, and how to check that it worked.
+
+### Added
+- ★ **A remote site tells its own people when the central Netlens is unreachable**: after 10 minutes of failed reports it raises an alert on its own channels with the reason, and another when the link is back. A short break says nothing.
+- ★ **Which devices of a remote site raise offline alerts**: per site, choose automatic (always-on devices when the site marks any), only always-on, all, or none, and *Mute* single devices.
+- ★ **Retention per remote site**: keep the history of a site for 30 days to 2 years, or follow the general retention. The weekly upkeep (and Settings → Database → Remove old data) removes the older graph points and alerts of that site.
+
 ## 0.4.117 — 2026-10-20
 
 ### Added

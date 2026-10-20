@@ -132,6 +132,18 @@ export async function render(container, params) {
         scansBody.appendChild(h("div", { class: "empty" }, "No scans yet."));
         return;
       }
+      // the newest scan failed because the container misses NET_RAW / NET_ADMIN or the host network: say what to do, in full
+      const newest = scans[0];
+      if (newest && newest.status === "failed" && /^A container setting is missing/.test(newest.error || "")) {
+        scansBody.appendChild(h("div", { class: "card error" }, h("h2", {}, "The last scan could not run: a container setting is missing"),
+          h("p", {}, "Netlens needs the host network and two extra capabilities, ", h("code", {}, "NET_RAW"), " and ", h("code", {}, "NET_ADMIN"), ", on its container. They are settings of the container, not of Netlens:"),
+          h("ul", {},
+            h("li", {}, "In a compose file or stack: in the ", h("code", {}, "netlens:"), " service add ", h("code", {}, "network_mode: host"), " and a ", h("code", {}, "cap_add:"), " list with ", h("code", {}, "NET_RAW"), " and ", h("code", {}, "NET_ADMIN"), " (same indentation as ", h("code", {}, "image:"), ")."),
+            h("li", {}, "In Portainer's container form: the ", h("em", {}, "Network"), " tab = host, and the ", h("em", {}, "Capabilities"), " tab: switch NET_RAW and NET_ADMIN on."),
+            h("li", {}, "On a Synology: use a Project (compose file); the container wizard cannot set capabilities."),
+            h("li", {}, "Do not use ", h("code", {}, "no-new-privileges"), ". A running container does not pick up new capabilities: re-create it (stack: Update the stack).")),
+          h("p", {}, h("a", { href: "https://www.home.codeshrimp.com/docs/netlens/install/where-do-net-raw-and-net-admin-go/", target: "_blank", rel: "noopener" }, "Step-by-step instructions for Portainer, Synology and compose"))));
+      }
       const table = h("table", { class: "data" });
       const thead = h("thead");
       const headRow = h("tr");
@@ -158,7 +170,14 @@ export async function render(container, params) {
 
         const errText = truncate(scan.error);
         const errCell = h("td", { class: "muted" }, errText);
-        if (scan.error) errCell.title = scan.error;
+        if (scan.error) {
+          errCell.title = scan.error;
+          if (scan.error.length > 40) {           // click to read all of it
+            errCell.style.cursor = "pointer";
+            let open = false;
+            errCell.addEventListener("click", () => { open = !open; errCell.textContent = open ? scan.error : errText; });
+          }
+        }
         row.appendChild(errCell);
 
         tbody.appendChild(row);

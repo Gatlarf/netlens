@@ -5,7 +5,7 @@ const fmtSize = (b) => (b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : 
 const num = (n) => Number(n).toLocaleString();
 const NAMES = { events: "events", scans: "finished scans", checks: "presence checks", service_results: "service check results", audit: "audit log lines", sessions: "expired sign-ins",
   metric_state: "health states", port_baselines: "port baselines", wifi_samples: "Wi-Fi samples", checks_hourly: "hourly roll-ups", remote_devices: "remote devices", remote_services: "remote checks",
-  settings: "left-over settings", graph_series: "graph series of things that are gone" };
+  settings: "left-over settings", site_points: "graph points of sites with their own retention", site_events: "alerts of sites with their own retention", graph_series: "graph series of things that are gone" };
 const sentence = (counts) => {
   const parts = Object.entries(counts).filter(([, n]) => n).map(([k, n]) => `${num(n)} ${NAMES[k] || k.replace(/_/g, " ")}`);
   return parts.length ? parts.join(", ") : "nothing";

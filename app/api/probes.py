@@ -23,6 +23,9 @@ class NameBody(BaseModel):
     name: str | None = None
     enabled: bool | None = None
     customer: str | None = None
+    keep_days: int | None = None          # how long the history of this site is kept (empty = the general retention)
+    alert_mode: str | None = None         # auto, core, all or none: which devices raise offline alerts
+    muted: list[str] | None = None        # device keys that raise no offline alert
 
 
 def _row(conn, probe_id: int):
@@ -150,6 +153,10 @@ def update_probe(probe_id: int, body: NameBody, conn=Depends(get_conn)) -> dict:
         conn.execute("UPDATE probes SET customer = ? WHERE id = ?", (customer, probe_id))
     if body.enabled is not None:
         conn.execute("UPDATE probes SET enabled = ? WHERE id = ?", (int(body.enabled), probe_id))
+    try:
+        probes_mod.clean_settings(conn, probe_id, keep_days=body.keep_days if "keep_days" in body.model_fields_set else ..., alert_mode=body.alert_mode, muted=body.muted)
+    except probes_mod.ProbeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     conn.commit()
     return probes_mod.present(conn, _row(conn, row["id"]))
 

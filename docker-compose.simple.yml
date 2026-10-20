@@ -6,6 +6,9 @@
 # Works the same in Portainer (Stacks > Add stack > Web editor: paste this file) and in Synology Container Manager
 # (Project > Create). Your data lives in the Docker volume "netlens-data" and survives updates and re-creating the container.
 #
+# The three lines that matter are network_mode, cap_drop and cap_add. They belong to the netlens service itself (same indentation as "image:"),
+# not to "environment:". Without them the container starts but cannot scan. In a container form: Network = host, Capabilities = NET_RAW and NET_ADMIN on.
+#
 # Optional: set TZ to your time zone (for example Europe/Brussels) so times in e-mails and charts match your clock.
 
 services:
@@ -17,7 +20,7 @@ services:
     network_mode: host
     cap_drop:
       - ALL
-    cap_add:
+    cap_add:                    # same level as "image:" (not under "environment:")
       - NET_RAW
       - NET_ADMIN
     read_only: true

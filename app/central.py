@@ -33,6 +33,8 @@ log = logging.getLogger(__name__)
 LINK_KEY = "central.link"
 STATUS_KEY = "central.status"
 MARK_KEY = "central.pushed_ts"
+FAIL_KEY = "central.failing"          # JSON {"since": ts, "notified": bool}: the reports have been failing since then
+ALERT_AFTER_S = 600                   # the central Netlens has not been reachable for this long: tell the people at this site
 REV_KEY = "central.config_rev"
 DEFAULT_INTERVAL = 60
 MAX_BODY = 8 * 1024 * 1024
@@ -243,6 +245,33 @@ def send(url: str, token: str, payload: dict[str, Any], timeout: float = TIMEOUT
         raise LinkError(f"cannot reach the central Netlens: {reason}") from None
 
 
+def _watch_link(conn, status: dict[str, Any], now_ts: float) -> str | None:
+    """The reports to the central Netlens have been failing for a while (or work again): raise an event here, so this site's own channels tell somebody.
+    Returns the event kind raised, if any. Without it a broken link is only visible to somebody who opens the settings page."""
+    from app.db import add_event
+
+    try:
+        state = json.loads(get_setting(conn, FAIL_KEY) or "{}")
+    except ValueError:
+        state = {}
+    if status.get("ok"):
+        if state:
+            set_setting(conn, FAIL_KEY, "{}")
+            if state.get("notified"):
+                add_event(conn, "central_reachable", "The central Netlens can be reached again", subject="central")
+                return "central_reachable"
+        return None
+    since = state.get("since") or now_ts
+    notified = bool(state.get("notified"))
+    kind = None
+    if not notified and now_ts - since >= ALERT_AFTER_S:
+        mins = int((now_ts - since) // 60)
+        add_event(conn, "central_unreachable", f"The central Netlens has not been reachable for {mins} minutes: {status.get('error') or 'unknown reason'}. This site keeps working on its own.", subject="central")
+        notified, kind = True, "central_unreachable"
+    set_setting(conn, FAIL_KEY, json.dumps({"since": since, "notified": notified}))
+    return kind
+
+
 def _skew(central_time: Any) -> int | None:
     """Seconds this clock is ahead (+) or behind (-) of the central Netlens, from the time in its reply."""
     try:
@@ -304,6 +333,7 @@ def push_once(db_path: str, now_ts: float | None = None, force: bool = False) ->
         except LinkError as exc:
             status = {"ts": utcnow(), "ok": False, "error": str(exc), "devices": len(payload["devices"]), "services": len(payload["services"]), "samples": 0}
         set_setting(conn, STATUS_KEY, json.dumps(status))
+        status["event"] = _watch_link(conn, status, now_ts)
         return status
     finally:
         conn.close()
@@ -323,6 +353,10 @@ async def loop(db_path: str, scan_manager=None) -> None:
             if link["enabled"] and link["url"] and link["token"] and time.monotonic() - last >= link["interval_s"]:
                 last = time.monotonic()
                 status = await asyncio.to_thread(push_once, db_path)
+                if status.get("event"):                       # the link broke or came back: send the alert now
+                    from app.notify.channels import process_channels
+
+                    await process_channels(db_path)
                 if scan_manager is not None and status.get("commands"):
                     await run_commands(status, scan_manager)
         except asyncio.CancelledError:

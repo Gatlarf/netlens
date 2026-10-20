@@ -18,7 +18,7 @@ export async function buildCentralCard() {
     clear(card);
     card.appendChild(h("h2", {}, "Report to a central Netlens"));
     card.appendChild(h("p", { class: "hint" },
-      "Use this when this Netlens watches a second location (a branch office, a holiday house, a customer) and you want one overview. This Netlens keeps scanning and checking its own network as before and sends what it finds to the central Netlens every minute. The connection goes out from here; nothing at this location has to be reachable from outside. On the central Netlens open Monitoring → Remote sites → Add a remote site to get the address and the token."));
+      "Use this when this Netlens watches a second location (a branch office, a holiday house, a customer) and you want one overview. This Netlens keeps scanning and checking its own network as before and sends what it finds to the central Netlens every minute. The connection goes out from here; nothing at this location has to be reachable from outside. If the central Netlens cannot be reached for 10 minutes, this Netlens raises an alert on its own notification channels (and another when it is back). On the central Netlens open Monitoring → Remote sites → Add a remote site to get the address and the token."));
     const url = h("input", { type: "url", placeholder: "https://netlens.example.com", value: info.url || "", spellcheck: "false" });
     const token = h("input", { type: "password", autocomplete: "off", placeholder: info.has_token ? "(kept, paste to change)" : "nlp_…" });
     const enabled = h("input", { type: "checkbox" });

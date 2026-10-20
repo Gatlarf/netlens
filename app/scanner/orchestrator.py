@@ -5,7 +5,7 @@ import logging
 import sqlite3
 from typing import Any
 
-from app.scanner.errors import explain_scan_error
+from app.scanner.errors import explain_scan_error, is_capability_error
 from app.scanner.nmap_runner import ScanError, _is_valid_target, run_nmap
 from app.scanner.options import ScanOptions
 from app.scanner.nmap_parser import parse_nmap_xml
@@ -358,7 +358,13 @@ class ScanManager:
             finally:
                 conn.close()
         except Exception as exc:
-            logging.getLogger(__name__).warning("scan %s failed: %r", scan_id, exc)
+            if is_capability_error(exc):             # the commonest set-up mistake: say so plainly in the container log, not only in the page
+                logging.getLogger(__name__).error(
+                    "scan %s failed: SETTING MISSING on the netlens container. nmap cannot do raw network scans, so it needs the capabilities NET_RAW and NET_ADMIN "
+                    "and the host network (cap_add: [NET_RAW, NET_ADMIN] and network_mode: host in the compose file; in Portainer: Network = host and the "
+                    "Capabilities tab). Re-create the container after adding them; no-new-privileges must be off. Original error: %r", scan_id, exc)
+            else:
+                logging.getLogger(__name__).warning("scan %s failed: %r", scan_id, exc)
             conn = connect(self.db_path)
             try:
                 finish_scan(

@@ -196,6 +196,12 @@ def purge(conn: sqlite3.Connection, dry_run: bool = False, now: datetime | None 
             out["sessions"] = conn.execute("DELETE FROM sessions WHERE expires < ?", (now_s,)).rowcount
     except sqlite3.Error:
         out["sessions"] = 0
+    try:      # the remote sites with a retention of their own
+        from app import probes
+
+        out.update(probes.trim_history(conn, now=now.timestamp(), dry_run=dry_run))
+    except sqlite3.Error:
+        pass
     if not dry_run:
         conn.commit()
     return out
