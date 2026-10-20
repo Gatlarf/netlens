@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.119 — 2026-10-20
+
+### Added
+- ★ **System log** (Scans & events → System log, administrators): the application's own log, kept across restarts in a small rotating file (`/data/logs/netlens.log`), with an Errors / Warnings / Everything filter, search and download. The same lines now also reach the container log, which showed almost nothing of the application before. `NETLENS_LOG_LEVEL` sets how much is written.
+- ★ **Resizable columns**: drag the edge of a column heading (double-click to reset); the widths are remembered per table in the browser. It starts on the scan list, and text such as a scan error now wraps in the space available instead of being cut off after 40 characters.
+
 ## 0.4.118 — 2026-10-20
 
 ### Fixed

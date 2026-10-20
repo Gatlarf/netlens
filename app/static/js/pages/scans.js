@@ -1,5 +1,6 @@
 import { get } from "../api.js";
-import { h, clear, fmtTime, timeAgo } from "../util.js";
+import { h, clear, fmtTime, timeAgo, isAdmin } from "../util.js";
+import { makeResizable } from "../colresize.js";
 import { pageHead } from "../ui.js";
 import { EVENT_LABELS as KIND_LABELS, eventLabel } from "../event_labels.js";
 
@@ -66,17 +67,11 @@ function duration(started, finished) {
   return `${seconds}s`;
 }
 
-function truncate(text, max = 40) {
-  if (!text) return "";
-  const s = String(text);
-  return s.length > max ? s.slice(0, max) + "…" : s;
-}
-
 export async function render(container, params) {
   clear(container);
 
   let tab = "events";
-  try { if (localStorage.getItem("netlens.scans.tab") === "scans") tab = "scans"; } catch (e) { /* default */ }
+  try { const saved = localStorage.getItem("netlens.scans.tab"); if (saved === "scans" || (saved === "system" && isAdmin())) tab = saved; } catch (e) { /* default */ }
   const tabs = h("nav", { class: "dev-tabs", role: "tablist", "aria-label": "Events or scans" });
   const grid = h("div", { class: "scan-panels" });
 
@@ -106,14 +101,49 @@ export async function render(container, params) {
   eventsCard.appendChild(filterRow);
   eventsCard.appendChild(eventsBody);
 
+  // Third card: the log of the application itself (administrators)
+  const sysCard = h("div", { class: "card" });
+  const sysBody = h("div", { class: "card-body" });
+  const sysLevel = h("select", { class: "kind-filter", "aria-label": "Level" }, h("option", { value: "error" }, "Errors"), h("option", { value: "warning" }, "Warnings and errors"), h("option", { value: "info" }, "Everything (information too)"));
+  sysLevel.value = "warning";
+  const sysSearch = h("input", { type: "search", placeholder: "Search the log", "aria-label": "Search the log", style: "min-width:14rem" });
+  const sysDownload = h("a", { class: "btn", href: "/api/system-log/download", download: "netlens.log" }, "Download");
+  sysCard.append(h("div", { class: "filter-row" }, sysLevel, sysSearch, sysDownload), sysBody);
+
+  async function loadSystem() {
+    try {
+      const r = await get(`/api/system-log?level=${sysLevel.value}&q=${encodeURIComponent(sysSearch.value)}&limit=300`);
+      clear(sysBody);
+      if (!r.entries.length) {
+        sysBody.appendChild(h("div", { class: "empty" }, r.files ? "Nothing at this level" + (sysSearch.value ? " matches the search" : "") + "." : "No system log yet: it starts with the next start of Netlens."));
+      } else {
+        const list = h("div", { class: "sys-log" });
+        for (const e of r.entries) {
+          list.appendChild(h("div", { class: `sys-line sys-${e.level}` }, h("span", { class: "sys-time", title: e.ts }, fmtTime(e.ts)), h("span", { class: "sys-level" }, e.level), h("span", { class: "sys-name" }, e.logger), h("span", { class: "sys-text" }, e.message)));
+        }
+        sysBody.appendChild(list);
+      }
+      sysBody.appendChild(h("p", { class: "hint" }, `The application's own log, newest first, kept across restarts (${r.files} file${r.files === 1 ? "" : "s"}, ${(r.bytes / 1024).toFixed(0)} KB, the oldest lines are dropped when it is full). The same lines appear in the container log (docker logs).`));
+    } catch (err) {
+      clear(sysBody);
+      sysBody.appendChild(h("div", { class: "empty" }, "Failed to load the system log."));
+    }
+  }
+  sysLevel.addEventListener("change", loadSystem);
+  let sysTimer = null;
+  sysSearch.addEventListener("input", () => { clearTimeout(sysTimer); sysTimer = setTimeout(loadSystem, 300); });
+
   grid.appendChild(eventsCard);
   grid.appendChild(scansCard);
+  grid.appendChild(sysCard);
   const showTab = () => {
     eventsCard.hidden = tab !== "events";
     scansCard.hidden = tab !== "scans";
+    sysCard.hidden = tab !== "system";
+    if (tab === "system") loadSystem();
     for (const b of tabs.querySelectorAll("button")) { b.classList.toggle("active", b.dataset.tab === tab); b.setAttribute("aria-selected", String(b.dataset.tab === tab)); }
   };
-  for (const [key, label] of [["events", "Events"], ["scans", "Scans"]]) {
+  for (const [key, label] of [["events", "Events"], ["scans", "Scans"], ...(isAdmin() ? [["system", "System log"]] : [])]) {
     tabs.appendChild(h("button", { type: "button", role: "tab", class: "dev-tab", "data-tab": key, onclick: () => { tab = key; try { localStorage.setItem("netlens.scans.tab", key); } catch (e) { /* not remembered */ } showTab(); } }, label));
   }
   showTab();
@@ -168,22 +198,15 @@ export async function render(container, params) {
         row.appendChild(h("td", {}, String(scan.hosts_found ?? 0)));
         row.appendChild(h("td", {}, duration(scan.started, scan.finished)));
 
-        const errText = truncate(scan.error);
-        const errCell = h("td", { class: "muted" }, errText);
-        if (scan.error) {
-          errCell.title = scan.error;
-          if (scan.error.length > 40) {           // click to read all of it
-            errCell.style.cursor = "pointer";
-            let open = false;
-            errCell.addEventListener("click", () => { open = !open; errCell.textContent = open ? scan.error : errText; });
-          }
-        }
+        const errCell = h("td", { class: "muted col-text" }, scan.error || "");          // all of it: it wraps in the space the column has (drag a heading edge to give it more)
+        if (scan.error) errCell.title = scan.error;
         row.appendChild(errCell);
 
         tbody.appendChild(row);
       }
       table.appendChild(tbody);
-      scansBody.appendChild(table);
+      makeResizable(table, "scans");
+      scansBody.appendChild(h("div", { class: "table-wrap" }, table));
     } catch (err) {
       scansBody.appendChild(h("div", { class: "empty" }, "Failed to load scans."));
     }
@@ -238,7 +261,7 @@ export async function render(container, params) {
 
   refresh();
 
-  intervalId = setInterval(() => { if (!document.hidden) refresh(); }, 10000);
+  intervalId = setInterval(() => { if (!document.hidden) { refresh(); if (tab === "system" && document.activeElement !== sysSearch) loadSystem(); } }, 10000);
 
   const onScanFinished = () => {
     refresh();

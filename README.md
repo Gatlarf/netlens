@@ -376,7 +376,7 @@ then remove `NETLENS_TOKEN` from your compose file.
 
 ```bash
 docker compose ps                  # status and health
-docker compose logs -f netlens     # logs (scan errors also appear in the UI under "Scans & events")
+docker compose logs -f netlens     # logs (the same lines are in the browser: Scans & events → System log)
 docker compose pull && docker compose up -d   # update to the newest published image
 docker compose down                # stop and remove the container (the data volume is kept)
 ```
@@ -885,6 +885,12 @@ The **Full scan** button next to a device's name runs one thorough scan of that 
 
 Only administrators see this page. Two indexes were added for the events table (by device and by kind), which makes removing a device or a site much faster on a database with many events.
 
+### Scans & events: the scan list, the events and the system log
+
+**Scans & events** has three tabs. *Events* is what happened on the network, *Scans* lists the scans with their result and, for a failed scan, the complete error text, and *System log* (administrators) is the application's own log: what Netlens itself reports, kept across restarts in a small rotating file in the data folder (`/data/logs/netlens.log`, 3 files of at most 2 MB, the oldest lines are dropped). Choose *Errors*, *Warnings and errors* or *Everything*, search it, and **Download** it to send with a support question. The same lines appear in the container log (`docker logs netlens`), which is gone when the container is re-created and out of reach on many NAS systems. `NETLENS_LOG_LEVEL` (`debug`, `info`, `warning`, `error`) sets how much is written; the default is `info`. Requests are not in this log (that is the audit log in Settings), and passwords and tokens are never written to it.
+
+**Resizing columns.** Drag the right edge of a column heading to make that column wider or narrower; double-click the edge to go back to automatic widths. Netlens remembers the widths in your browser. Without a chosen width the table uses the space there is, so long text such as a scan error wraps instead of being cut off. This works on the scan list first and will come to more tables.
+
 ### Scan progress
 
 While a scan runs, the header shows what it is doing, for example `Deep scan · Service scan 45% · 12 hosts`, with a progress bar for the current nmap step, the **time the scan has taken so far and the typical duration of your recent scans of the same type** (the median of the last 20, so one scan that hung does not distort it), for example `1m 16s (typical 7m 26s)`. The strip appears under the header only while a scan runs. Scan failures are explained (for example missing network capabilities) in **Scans & events** and in the logs.
@@ -1118,7 +1124,7 @@ tests
 - **A guest does not show under its Proxmox host:** the connector matches by MAC address, so Netlens must have scanned that guest at least once on the same network. Run a scan and press *Sync now*.
 - **Health monitoring says "cannot be read":** the message on the device's Health monitoring card says why. SNMP: the device does not answer, so check that SNMP is switched on, the community string (many devices use `public`), that the device's access list allows this host, and the port (161). SSH: `the login was refused` means a wrong user name, password or key; `cannot connect` means the port is closed or a firewall is in the way. *Test* in the form shows what the device answers before you save. Windows needs the SNMP feature installed and a community set on it.
 - **A remote site shows "Not heard from":** the remote Netlens has stopped reporting. Open its Settings → Report to a central Netlens: the status line says what went wrong (`cannot reach the central Netlens` is a network or address problem, `refused the token` means the token was replaced or the site removed). The remote Netlens only needs to be able to open an outgoing connection to the central one.
-- **No devices found:** Check ranges, host networking, and that nmap has capabilities. Check `docker logs netlens`; scan errors appear under "Scans & events".
+- **No devices found:** Check ranges, host networking, and that nmap has capabilities (the first Troubleshooting entry above). Scan errors appear under **Scans & events → Scans**, and the application's own log under **Scans & events → System log**.
 - **OS detection empty:** Needs deep scan and root-capable nmap.
 - **Terminal button missing:** Port 22/23 not seen open yet, `NETLENS_TERMINAL=off`, or you opened Netlens through a reverse proxy (see *Web terminal*).
 

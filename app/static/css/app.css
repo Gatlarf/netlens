@@ -334,6 +334,25 @@ table.data thead th {
   white-space: nowrap;
 }
 
+/* columns the reader can resize (static/js/colresize.js) */
+table.data.resizable thead th { position: sticky; padding-right: 14px; }
+.col-grip { position: absolute; top: 0; right: 0; bottom: 0; width: 9px; cursor: col-resize; touch-action: none; user-select: none; }
+.col-grip::after { content: ""; position: absolute; top: 25%; bottom: 25%; right: 3px; width: 2px; border-radius: 1px; background: var(--border); }
+.col-grip:hover::after, .col-grip.dragging::after { background: var(--accent); }
+table.data.resizable[style*="fixed"] td { overflow-wrap: anywhere; }
+table.data td.col-text { white-space: normal; overflow-wrap: anywhere; min-width: 14rem; }
+@media (max-width: 700px) { .col-grip { display: none; } }
+
+/* the application's own log */
+.sys-log { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+.sys-line { display: flex; gap: 10px; padding: 3px 0; border-bottom: 1px solid var(--border); align-items: baseline; flex-wrap: wrap; }
+.sys-time { color: var(--muted); white-space: nowrap; }
+.sys-level { text-transform: uppercase; font-weight: 600; min-width: 5.5ch; }
+.sys-error .sys-level, .sys-critical .sys-level { color: var(--bad); }
+.sys-warning .sys-level { color: var(--warn); }
+.sys-name { color: var(--muted); }
+.sys-text { flex: 1 1 24rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+
 table.data tbody tr:nth-child(even) { background: color-mix(in srgb, var(--bg) 55%, var(--surface)); }
 
 table.data tbody tr:hover { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
