@@ -2,10 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
-## 0.4.121 — 2026-10-20
+## 0.4.122 — 2026-10-20
 
 ### Fixed
 - Links to the Codeshrimp website now use the public address www.codeshrimp.com.
+
+## 0.4.121 — 2026-10-20
 
 ### Changed
 - **Settings → Database uses the whole screen**: summary tiles on top, the retention and the maintenance tools side by side, and the tables in a scrolling list, instead of one narrow column.
