@@ -69,8 +69,9 @@ def scan(conn, now: float | None = None) -> list[dict[str, Any]]:
     snames = {r["id"]: (r["name"], r["device_id"]) for r in conn.execute("SELECT id, name, device_id FROM service_checks WHERE enabled = 1")}
     out = []
     for entity, ids in (("device", online), ("service", set(snames))):
+        known = store.metrics_of_many(entity, ids)
         for entity_id in ids:
-            for s in store.metrics_of(entity, entity_id):
+            for s in known.get(entity_id, []):
                 spec = WATCHED.get((entity, s["metric"]))
                 if spec is None or s["last"] is None or s["last_ts"] is None or now - s["last_ts"] > 3600:
                     continue

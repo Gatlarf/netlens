@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import bisect
 import calendar
+import itertools
 import json
 import logging
+import operator
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -154,6 +156,31 @@ def maintenance_spans(conn, start: datetime, end: datetime) -> dict[int, _Spans]
     return {d: _Spans(v) for d, v in per_device.items()}
 
 
+BATCH = 50                       # devices or checks whose rows are fetched in one statement (enough to save round trips, few enough to keep memory small)
+
+
+def _rows_of(conn, table: str, key: str, columns: str, ids: list[int], a: str, b: str) -> dict[int, list]:
+    """{id: [rows oldest first]} for [a, b) from one statement. `table`, `key` and `columns` are fixed names from this module, never user input."""
+    out: dict[int, list] = {i: [] for i in ids}
+    if ids:
+        cur = conn.execute(f"SELECT {key} AS k, {columns} FROM {table} WHERE {key} IN ({','.join('?' * len(ids))}) AND ts >= ? AND ts < ? ORDER BY {key}, ts, id", [*ids, a, b])
+        for k, group in itertools.groupby(cur, operator.itemgetter(0)):          # grouping in C: a big report has hundreds of thousands of rows
+            out[k] = list(group)
+    return out
+
+
+def _windows_of(conn, windows: list[tuple[int, str, str]]) -> dict[int, list]:
+    """{device_id: [checks inside that device's windows, oldest first]}; the windows of one device come in time order."""
+    out: dict[int, list] = {}
+    for i in range(0, len(windows), 100):
+        chunk = windows[i:i + 100]
+        cond = " OR ".join("(device_id = ? AND ts >= ? AND ts < ?)" for _ in chunk)
+        cur = conn.execute(f"SELECT device_id AS k, ts, up FROM checks WHERE {cond} ORDER BY device_id, ts, id", [x for w in chunk for x in w])
+        for k, group in itertools.groupby(cur, operator.itemgetter(0)):
+            out.setdefault(k, []).extend(group)
+    return out
+
+
 def availability(conn, start: datetime, end: datetime, scope: str = "all", with_services: bool = True, group_id: int | None = None,
                  only_outages: bool = False, target: float | None = None, hours: str = "all", business: dict[str, Any] | None = None,
                  ignore_maintenance: bool = False) -> dict[str, Any]:
@@ -177,48 +204,67 @@ def availability(conn, start: datetime, end: datetime, scope: str = "all", with_
         args.append(group_id)
     totals = checkstats.range_totals(conn, a, b)
     down = checkstats.down_hours(conn, a, b) if totals is not None else {}
-    for d in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip AS ip, COALESCE(type_override, device_type) AS type, always_on FROM devices "
-                          f"WHERE {' AND '.join(where)} ORDER BY name COLLATE NOCASE", args):
-        count = ups = None
-        if inside is None and d["id"] not in quiet and totals is not None:
-            u, n = totals.get(d["id"], (0, 0, 0, 0))[:2]
-            if n == 0:
+    all_devices = conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip AS ip, COALESCE(type_override, device_type) AS type, always_on FROM devices "
+                               f"WHERE {' AND '.join(where)} ORDER BY name COLLATE NOCASE", args).fetchall()
+    for first in range(0, len(all_devices), BATCH):                      # the checks of a batch of devices come in one statement, not one per device
+        batch = all_devices[first:first + BATCH]
+        plans: dict[int, Any] = {}
+        for d in batch:
+            if inside is None and d["id"] not in quiet and totals is not None:
+                u, n = totals.get(d["id"], (0, 0, 0, 0))[:2]
+                if n == 0:
+                    plans[d["id"]] = "none"
+                elif u == n:                             # never down this period: there is nothing to look up (the usual device on a healthy network)
+                    plans[d["id"]] = "healthy"
+                else:                                    # only the hours with a failed check (and the one after) can hold a down period; the counts come from the roll-up
+                    mine = down.get(d["id"], [])
+                    plans[d["id"]] = ("all" if len(mine) * 2 >= span / 3600 * 0.6 else "windows", checkstats.change_windows(mine, a, b))   # most of the period: read it whole, it is cheaper
+            else:
+                plans[d["id"]] = "range"
+        whole = _rows_of(conn, "checks", "device_id", "ts, up", [i for i, p in plans.items() if p == "range" or (isinstance(p, tuple) and p[0] == "all")], a, b)
+        parts = _windows_of(conn, [(i, w0, w1) for i, p in plans.items() if isinstance(p, tuple) and p[0] == "windows" for w0, w1 in p[1]])
+        for d in batch:
+            plan = plans[d["id"]]
+            if plan == "none":
                 continue
-            if u == n:                                   # never down this period: there is nothing to look up (the usual device on a healthy network)
+            if plan == "healthy":
+                n = totals[d["id"]][1]
                 devices.append({"id": d["id"], "name": d["name"] or d["ip"], "ip": d["ip"], "type": d["type"], "always_on": bool(d["always_on"]), "checks": n,
                                 "availability": 100.0, "down_seconds": 0, "down_text": duration(0), "outages": 0, "longest": duration(0), "ongoing": False})
                 continue
-            # only the hours with a failed check (and the one after) can hold a down period: read just those, the counts come from the roll-up
-            rows = []
-            for w0, w1 in checkstats.change_windows(down.get(d["id"], []), a, b):
-                rows += conn.execute("SELECT ts, up FROM checks WHERE device_id = ? AND ts >= ? AND ts < ? ORDER BY ts, id", (d["id"], w0, w1)).fetchall()
-            count, ups = n, u
-        else:
-            rows = conn.execute("SELECT ts, up FROM checks WHERE device_id = ? AND ts >= ? AND ts < ? ORDER BY ts, id", (d["id"], a, b)).fetchall()
-            if inside is not None or d["id"] in quiet:
-                skip = quiet.get(d["id"])
-                rows = [r for r in rows if (inside is None or inside.contains(r["ts"])) and (skip is None or not skip.contains(r["ts"]))]
+            if plan == "range":
+                rows = whole.get(d["id"], [])
+                if inside is not None or d["id"] in quiet:
+                    skip = quiet.get(d["id"])
+                    rows = [r for r in rows if (inside is None or inside.contains(r["ts"])) and (skip is None or not skip.contains(r["ts"]))]
+                if not rows:
+                    continue
+                count, ups = len(rows), sum(1 for r in rows if r["up"])
+            else:
+                rows = (whole if plan[0] == "all" else parts).get(d["id"], [])
+                count, ups = totals[d["id"]][1], totals[d["id"]][0]
+            outs, down_s = _outages(rows, start, end)
+            devices.append({"id": d["id"], "name": d["name"] or d["ip"], "ip": d["ip"], "type": d["type"], "always_on": bool(d["always_on"]), "checks": count,
+                            "availability": round(ups / count * 100, 2), "down_seconds": round(down_s), "down_text": duration(down_s),
+                            "outages": len(outs), "longest": duration(max([o["seconds"] for o in outs], default=0)), "ongoing": any(o["ongoing"] for o in outs)})
+    services = []
+    checks = conn.execute("SELECT id, name, kind, host, port FROM service_checks WHERE enabled = 1 ORDER BY name COLLATE NOCASE").fetchall() if with_services else []
+    for first in range(0, len(checks), BATCH):
+        batch = checks[first:first + BATCH]
+        results = _rows_of(conn, "service_results", "check_id", "ts, up, ms", [c["id"] for c in batch], a, b)
+        for s in batch:
+            rows = results.get(s["id"], [])
+            if inside is not None:
+                rows = [r for r in rows if inside.contains(r["ts"])]
             if not rows:
                 continue
-            count, ups = len(rows), sum(1 for r in rows if r["up"])
-        outs, down_s = _outages(rows, start, end)
-        devices.append({"id": d["id"], "name": d["name"] or d["ip"], "ip": d["ip"], "type": d["type"], "always_on": bool(d["always_on"]), "checks": count,
-                        "availability": round(ups / count * 100, 2), "down_seconds": round(down_s), "down_text": duration(down_s),
-                        "outages": len(outs), "longest": duration(max([o["seconds"] for o in outs], default=0)), "ongoing": any(o["ongoing"] for o in outs)})
-    services = []
-    for s in conn.execute("SELECT id, name, kind, host, port FROM service_checks WHERE enabled = 1 ORDER BY name COLLATE NOCASE") if with_services else []:
-        rows = conn.execute("SELECT ts, up, ms FROM service_results WHERE check_id = ? AND ts >= ? AND ts < ? ORDER BY ts, id", (s["id"], a, b)).fetchall()
-        if inside is not None:
-            rows = [r for r in rows if inside.contains(r["ts"])]
-        if not rows:
-            continue
-        up = sum(1 for r in rows if r["up"])
-        outs, down_s = _outages(rows, start, end)
-        ms = [r["ms"] for r in rows if r["up"] and r["ms"] is not None]
-        services.append({"id": s["id"], "name": s["name"], "kind": s["kind"], "target": f"{s['host']}:{s['port']}" if s["port"] else s["host"], "checks": len(rows),
-                         "availability": round(up / len(rows) * 100, 3), "down_seconds": round(down_s), "down_text": duration(down_s), "outages": len(outs),
-                         "longest": duration(max([o["seconds"] for o in outs], default=0)), "avg_ms": round(sum(ms) / len(ms), 1) if ms else None,
-                         "ongoing": any(o["ongoing"] for o in outs)})
+            up = sum(1 for r in rows if r["up"])
+            outs, down_s = _outages(rows, start, end)
+            ms = [r["ms"] for r in rows if r["up"] and r["ms"] is not None]
+            services.append({"id": s["id"], "name": s["name"], "kind": s["kind"], "target": f"{s['host']}:{s['port']}" if s["port"] else s["host"], "checks": len(rows),
+                             "availability": round(up / len(rows) * 100, 3), "down_seconds": round(down_s), "down_text": duration(down_s), "outages": len(outs),
+                             "longest": duration(max([o["seconds"] for o in outs], default=0)), "avg_ms": round(sum(ms) / len(ms), 1) if ms else None,
+                             "ongoing": any(o["ongoing"] for o in outs)})
     core = [d for d in devices if d["always_on"]]
 
     def mean(items):

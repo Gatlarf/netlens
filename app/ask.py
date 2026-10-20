@@ -144,8 +144,9 @@ def t_health(conn, args, now=None) -> dict:
     t = (now or datetime.now(timezone.utc)).timestamp()
     rows = []
     monitored = conn.execute("SELECT m.device_id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1").fetchall()
+    known = store.metrics_of_many("device", [r["device_id"] for r in monitored]) if store else {}
     for r in monitored:
-        for s in (store.metrics_of("device", r["device_id"]) if store else []):
+        for s in known.get(r["device_id"], []):
             if s["metric"] == metric and s["last"] is not None and s["last_ts"] is not None and t - s["last_ts"] < 3 * 3600:
                 rows.append({"device": r["name"], "label": s["label"], "value": round(s["last"], 1), "unit": s["unit"]})
     rows.sort(key=lambda x: x["value"], reverse=metric not in LOW_IS_BAD)

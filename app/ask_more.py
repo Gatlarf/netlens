@@ -166,8 +166,10 @@ def t_certificates(conn, args, now=None) -> dict:
 
     store = tsdb.for_conn(conn)
     out = []
-    for c in conn.execute("SELECT id, name, host FROM service_checks WHERE enabled = 1"):
-        for s in (store.metrics_of("service", c["id"]) if store else []):
+    checks = conn.execute("SELECT id, name, host FROM service_checks WHERE enabled = 1").fetchall()
+    known = store.metrics_of_many("service", [c["id"] for c in checks]) if store else {}
+    for c in checks:
+        for s in known.get(c["id"], []):
             if s["metric"] == "cert_days" and s["last"] is not None:
                 out.append({"name": c["name"], "host": c["host"], "days_left": round(s["last"])})
     out.sort(key=lambda x: x["days_left"])

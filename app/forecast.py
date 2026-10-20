@@ -74,9 +74,10 @@ def forecasts(conn, now: float | None = None) -> list[dict[str, Any]]:
         return []
     out = []
     rows = conn.execute(
-        "SELECT m.device_id, m.alerts, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1")
+        "SELECT m.device_id, m.alerts, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1").fetchall()
+    known = store.metrics_of_many("device", [r["device_id"] for r in rows])
     for r in rows:
-        for s in store.metrics_of("device", r["device_id"]):
+        for s in known.get(r["device_id"], []):
             if s["metric"] != "disk_pct" or s["last"] is None or s["last_ts"] is None or now - s["last_ts"] > FRESH:
                 continue
             data = store.query("device", r["device_id"], "disk_pct", s["label"], span=SPAN, end=int(now), points=300)
@@ -148,8 +149,10 @@ def memory_trends(conn, now: float | None = None) -> list[dict[str, Any]]:
     if store is None:
         return []
     out = []
-    for r in conn.execute("SELECT m.device_id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1"):
-        for s in store.metrics_of("device", r["device_id"]):
+    rows = conn.execute("SELECT m.device_id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1").fetchall()
+    known = store.metrics_of_many("device", [r["device_id"] for r in rows])
+    for r in rows:
+        for s in known.get(r["device_id"], []):
             if s["metric"] != "mem_pct" or s["last"] is None or s["last_ts"] is None or now - s["last_ts"] > FRESH:
                 continue
             data = store.query("device", r["device_id"], "mem_pct", s["label"], span=MEM_SPAN, end=int(now), points=300)

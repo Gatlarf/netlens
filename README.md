@@ -482,6 +482,7 @@ Restoring the backup matters because a newer version may have changed the databa
 | `NETLENS_TERMINAL_REMOTE` | `off` | Where the terminal may be used from: `off` = direct local connections only (not through a reverse proxy / HTTPS address), `lan` = also through a proxy for local clients, `any` = anywhere |
 | `NETLENS_TRUSTED_PROXIES` | *(empty)* | Reverse proxies whose `X-Forwarded-For` header is believed, as addresses or networks (`192.168.0.184` or `192.168.0.0/24`, comma separated). **Set this when you reach Netlens through a reverse proxy**: without it every visitor looks like the proxy, so the login throttle (5 wrong attempts a minute) is shared by everybody and a stranger can lock you out |
 | `NETLENS_API_DOCS` | `off` | `on` serves the API documentation pages `/docs`, `/redoc` and `/openapi.json`; they are off so a stranger cannot read a map of the API |
+| `NETLENS_SLOW_QUERY_MS` | `0` (off) | Write every database statement that takes longer than this many milliseconds to the system log (with its duration, where in the code it ran, and the statement) |
 | `NETLENS_BIND` | `0.0.0.0:8080` | Bind address and port |
 | `NETLENS_DATA_DIR` | `/data` | Data directory |
 
@@ -706,7 +707,7 @@ An administrator can create **API tokens** for a user (shown once). They are Bea
 
 ### Large networks and performance
 
-Netlens keeps everything in one SQLite file and is meant for homes, offices and a few sites. `tools/bench.py` builds a made-up network of any size and times what you wait for (`python tools/bench.py --devices 2000 --days 7`). The numbers below are the **first request after nothing was cached**, measured in the application itself (no network) on a fast desktop processor with an SSD; a small ARM board or a NAS will be several times slower. Pages that are cached for 30 seconds answer in a few milliseconds after that, and an answer up to two minutes old is shown at once while a fresh one is made in the background.
+Netlens keeps everything in one SQLite file and is meant for homes, offices and a few sites. `tools/bench.py` builds a made-up network of any size and times what you wait for (`python tools/bench.py --devices 2000 --days 7`). `tools/dbbench.py` counts the database statements per page and shows what a slower database would cost. The numbers below are the **first request after nothing was cached**, measured in the application itself (no network) on a fast desktop processor with an SSD; a small ARM board or a NAS will be several times slower. Pages that are cached for 30 seconds answer in a few milliseconds after that, and an answer up to two minutes old is shown at once while a fresh one is made in the background.
 
 | What you open | 500 devices | 2,000 devices | 10,000 devices |
 |---|---|---|---|

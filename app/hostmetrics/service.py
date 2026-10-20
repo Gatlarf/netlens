@@ -95,11 +95,16 @@ def rules(conn, device_id: int | None = None) -> dict[str, dict[str, Any]]:
     return out
 
 
-def device_overrides(conn, device_id: int) -> dict[str, dict[str, Any]]:
-    """Only what was changed for this device (empty when it follows the general limits)."""
-    mine = _saved(conn, DEVICE_LIMITS_KEY)
+def device_overrides(conn, device_id: int, saved: dict | None = None) -> dict[str, dict[str, Any]]:
+    """Only what was changed for this device (empty when it follows the general limits). `saved` = all_overrides(), for a loop over devices."""
+    mine = saved if saved is not None else _saved(conn, DEVICE_LIMITS_KEY)
     item = mine.get(str(device_id)) if isinstance(mine, dict) else None
     return item if isinstance(item, dict) else {}
+
+
+def all_overrides(conn) -> dict:
+    mine = _saved(conn, DEVICE_LIMITS_KEY)
+    return mine if isinstance(mine, dict) else {}
 
 
 def _clean_rules(data: dict) -> dict[str, dict]:
@@ -328,7 +333,8 @@ def save_monitor(conn, device_id: int, data: dict[str, Any], groups: list[str] |
 
 
 # ----------------------------------------------------------------------------- newest readings
-def latest_readings(store, device_id: int) -> dict[str, Any]:
+def latest_readings(store, device_id: int, series: list[dict] | None = None) -> dict[str, Any]:
+    """The newest reading of each kind for a device. A page that lists many devices passes `series` (from store.metrics_of_many) to ask the store once."""
     out: dict[str, Any] = {"cpu": None, "mem": None, "disk": None, "disk_label": None, "temp": None, "battery": None, "uptime": None, "rx": None, "tx": None,
                            "supply": None, "supply_label": None}
     if store is None:
@@ -337,7 +343,7 @@ def latest_readings(store, device_id: int) -> dict[str, Any]:
     worst = None
     rx = tx = 0.0
     seen_net = False
-    for s in store.metrics_of("device", device_id):
+    for s in (series if series is not None else store.metrics_of("device", device_id)):
         if s["last"] is None or s["last_ts"] is None or now - s["last_ts"] > 3600:
             continue
         m = s["metric"]

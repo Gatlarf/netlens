@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.135 — 2026-10-20
+
+### Changed
+- ★ **Far fewer database round trips for the busy pages** (preparation for running the database on its own server): the dashboard needed 312 statements on a 500-device network and now needs 134, the statistics summary 274 → 97, the monitors page 210 → 11, the service checks list 203 → 5, and the availability report 7,716 → 94. The graphs now read the newest value of all series of all devices at once instead of one query per series, the lists look up the 24-hour uptime and device names in one statement, the availability report fetches the checks of 50 devices per statement, and a connection no longer asks the database for the name of its own file. The answers are unchanged. On the local SQLite file this is a little faster; with a database server on the network (0.5 ms per statement) the dashboard goes from about 0.36 s to 0.26 s and the availability report from 4.7 s to 0.8 s.
+
+### Added
+- **Slow-query log**: set `NETLENS_SLOW_QUERY_MS` (for example `50`) and every database statement slower than that is written to the system log (Scans & events → System log) with its duration, the place in the code and the statement. Off by default.
+- **`tools/dbbench.py`**: counts the statements each page runs and shows how long it would take if every statement cost an extra 0.5 or 2 ms (a database on the same host, on a LAN, over a VPN). A new test (`tests/test_query_budget.py`) fails when a page runs more statements in a bigger network or goes over its budget, so a query inside a loop cannot come back unnoticed.
+
 ## 0.4.134 — 2026-10-20
 
 ### Added

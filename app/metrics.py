@@ -44,7 +44,9 @@ class _Out:
 def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_running: bool = False, data_dir=None, passive: dict | None = None) -> str:
     now = now or utcnow()
     doc = summary(conn, now, scan_running=scan_running, data_dir=data_dir, passive=passive)
-    db_file = next((r[2] for r in conn.execute("PRAGMA database_list") if r[1] == "main"), None)
+    from app.db import main_file
+
+    db_file = main_file(conn) or None
     stats = compute_stats(conn, "24h", now, db_path=db_file or None)
     out = _Out()
     out.sample("netlens_info", 1, "Netlens version", version=VERSION)
@@ -209,8 +211,10 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
                  "if_err_ps": ("netlens_host_interface_errors_per_second", "Errors and discards per second on a network interface", 1.0),
                  "battery_pct": ("netlens_host_battery_ratio", "UPS battery charge (0-1)", 100.0),
                  "supply_pct": ("netlens_host_supply_ratio", "Printer supply left (0-1)", 100.0)}
-        for m in conn.execute("SELECT m.device_id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS n FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1"):
-            for series in store.metrics_of("device", m["device_id"]):
+        monitors = conn.execute("SELECT m.device_id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS n FROM host_monitors m JOIN devices d ON d.id = m.device_id WHERE m.enabled = 1").fetchall()
+        known = store.metrics_of_many("device", [m["device_id"] for m in monitors])
+        for m in monitors:
+            for series in known.get(m["device_id"], []):
                 spec = names.get(series["metric"])
                 if spec and series["last"] is not None and series["last_ts"] is not None and _parse_now(now) - series["last_ts"] < 3600:
                     labels = {"device": m["n"]}

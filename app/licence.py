@@ -69,10 +69,10 @@ def parse(token: str, public_key: str | None = None) -> dict[str, Any]:
 
 # ----------------------------------------------------------------------------- clock and storage
 def _data_dir(conn: sqlite3.Connection) -> Path | None:
-    for row in conn.execute("PRAGMA database_list"):
-        if row[1] == "main" and row[2]:
-            return Path(row[2]).resolve().parent
-    return None
+    from app.db import main_file
+
+    file = main_file(conn)
+    return Path(file).resolve().parent if file else None
 
 
 def _setting(conn: sqlite3.Connection, key: str) -> str | None:

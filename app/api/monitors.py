@@ -157,15 +157,18 @@ def overview(conn=Depends(get_conn)) -> dict:
         cur = levels.get(p["device_id"], "ok")
         levels[p["device_id"]] = "critical" if "critical" in (cur, p["level"]) else "warning"
     out = []
-    for row in conn.execute(
+    rows = conn.execute(
         "SELECT m.*, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.online AS online, COALESCE(d.type_override, d.device_type) AS type "
-        "FROM host_monitors m JOIN devices d ON d.id = m.device_id ORDER BY name COLLATE NOCASE"):
+        "FROM host_monitors m JOIN devices d ON d.id = m.device_id ORDER BY name COLLATE NOCASE").fetchall()
+    known = store.metrics_of_many("device", [r["device_id"] for r in rows]) if store is not None else {}
+    saved = hm.all_overrides(conn)
+    for row in rows:
         out.append({
             "device_id": row["device_id"], "name": row["name"], "ip": row["ip"], "type": row["type"], "online": bool(row["online"]),
             "method": row["method"], "enabled": bool(row["enabled"]), "alerts": bool(row["alerts"]), "last_ts": row["last_ts"],
             "last_ok": None if row["last_ok"] is None else bool(row["last_ok"]), "last_error": row["last_error"],
-            "level": levels.get(row["device_id"], "ok"), "latest": _latest(store, row["device_id"]),
-            "limits": hm.rules(conn, row["device_id"]) if hm.device_overrides(conn, row["device_id"]) else None,
+            "level": levels.get(row["device_id"], "ok"), "latest": _latest(store, row["device_id"], known.get(row["device_id"], [])),
+            "limits": hm.rules(conn, row["device_id"]) if hm.device_overrides(conn, row["device_id"], saved) else None,
         })
     return {"monitors": out, "problems": hm.problems(conn)}
 

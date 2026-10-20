@@ -52,13 +52,9 @@ def is_encrypted(value: str | None) -> bool:
 
 
 def _db_file(conn: sqlite3.Connection) -> str:
-    try:
-        for _seq, name, path in conn.execute("PRAGMA database_list"):
-            if name == "main":
-                return path or ""
-    except sqlite3.Error:
-        pass
-    return ""
+    from app.db import main_file
+
+    return main_file(conn)
 
 
 def parse_key(text: str) -> bytes:

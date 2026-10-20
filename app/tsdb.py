@@ -42,13 +42,9 @@ _lock = threading.Lock()
 
 
 def db_file(conn: sqlite3.Connection) -> str:
-    try:
-        for _seq, name, path in conn.execute("PRAGMA database_list"):
-            if name == "main":
-                return path or ""
-    except sqlite3.Error:
-        pass
-    return ""
+    from app.db import main_file
+
+    return main_file(conn)
 
 
 def for_conn(conn: sqlite3.Connection) -> "Store | None":
@@ -81,7 +77,9 @@ class Store:
 
     # ------------------------------------------------------------------ connection and schema
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.path, timeout=15)
+        from app.db import factory
+
+        conn = sqlite3.connect(self.path, timeout=15, factory=factory())
         conn.row_factory = sqlite3.Row
         if not self._ready:
             with self._guard:
@@ -335,17 +333,31 @@ class Store:
     # ------------------------------------------------------------------ reading
     def metrics_of(self, entity: str, entity_id: int) -> list[dict]:
         """Which series an entity has: [{metric, label, unit, last_ts, last}]."""
+        return self.metrics_of_many(entity, [entity_id]).get(entity_id, [])
+
+    def metrics_of_many(self, entity: str, entity_ids: Iterable[int] | None = None) -> dict[int, list[dict]]:
+        """The series of many entities at once ({entity_id: [{metric, label, unit, last_ts, last}]}), one statement per 500 ids; None = every entity of that kind.
+        A page that shows a reading per device must not ask once per series: with a database on another machine every question is a round trip."""
         try:
             conn = self._connect()
         except sqlite3.Error:
-            return []
+            return {}
+        out: dict[int, list[dict]] = {}
         try:
-            out = []
-            for s in conn.execute("SELECT id, metric, label, unit FROM series WHERE entity = ? AND entity_id = ? ORDER BY metric, label", (entity, entity_id)):
-                last = conn.execute("SELECT ts, v FROM raw WHERE series = ? ORDER BY ts DESC LIMIT 1", (s["id"],)).fetchone()
-                if last is None:
-                    last = conn.execute("SELECT ts + 0 AS ts, s / n AS v FROM m5 WHERE series = ? ORDER BY ts DESC LIMIT 1", (s["id"],)).fetchone()
-                out.append({"metric": s["metric"], "label": s["label"], "unit": s["unit"], "last_ts": last["ts"] if last else None, "last": last["v"] if last else None})
+            ids = None if entity_ids is None else sorted({int(i) for i in entity_ids})
+            for chunk in ([None] if ids is None else [ids[i:i + 500] for i in range(0, len(ids), 500)]):
+                where, args = "s.entity = ?", [entity]
+                if chunk is not None:
+                    where += " AND s.entity_id IN (%s)" % ",".join("?" * len(chunk))
+                    args += chunk
+                rows = conn.execute(
+                    "SELECT s.entity_id, s.metric, s.label, s.unit, r.ts AS rts, r.v AS rv, m.ts + 0 AS mts, m.s / m.n AS mv FROM series s "
+                    "LEFT JOIN raw r ON r.series = s.id AND r.ts = (SELECT MAX(ts) FROM raw WHERE series = s.id) "
+                    "LEFT JOIN m5 m ON r.ts IS NULL AND m.series = s.id AND m.ts = (SELECT MAX(ts) FROM m5 WHERE series = s.id) "
+                    "WHERE " + where + " ORDER BY s.entity_id, s.metric, s.label", args).fetchall()
+                for r in rows:
+                    ts, v = (r["rts"], r["rv"]) if r["rts"] is not None else (r["mts"], r["mv"])
+                    out.setdefault(r["entity_id"], []).append({"metric": r["metric"], "label": r["label"], "unit": r["unit"], "last_ts": ts, "last": v})
             return out
         finally:
             conn.close()
@@ -408,14 +420,14 @@ class Store:
         except sqlite3.Error:
             return []
         try:
-            s = conn.execute("SELECT id FROM series WHERE entity = ? AND entity_id = ? AND metric = ? AND label = ?", (entity, entity_id, metric, label)).fetchone()
+            s = conn.execute("SELECT id, (SELECT v FROM meta WHERE k = 'm5_done') AS m5 FROM series WHERE entity = ? AND entity_id = ? AND metric = ? AND label = ?",
+                             (entity, entity_id, metric, label)).fetchone()
             if s is None:
                 return []
             sid = s["id"]
 
             def done(key: str) -> int:
-                row = conn.execute("SELECT v FROM meta WHERE k = ?", (key,)).fetchone()
-                return row["v"] if row else 0
+                return s["m5"] or 0
 
             m5_from = now - M5_SECONDS + STEP_1H                         # from here the 5-minute tier is complete; before it only the hourly tier is
             h1_end, m5_end = min(end, max(start, m5_from)), done("m5_done")
@@ -441,7 +453,8 @@ class Store:
         except sqlite3.Error:
             return out
         try:
-            s = conn.execute("SELECT id, unit FROM series WHERE entity = ? AND entity_id = ? AND metric = ? AND label = ?", (entity, entity_id, metric, label)).fetchone()
+            s = conn.execute("SELECT id, unit, (SELECT v FROM meta WHERE k = 'm5_done') AS m5, (SELECT v FROM meta WHERE k = 'h1_done') AS h1 "
+                             "FROM series WHERE entity = ? AND entity_id = ? AND metric = ? AND label = ?", (entity, entity_id, metric, label)).fetchone()
             if s is None:
                 return out
             out["unit"] = s["unit"]
@@ -455,9 +468,10 @@ class Store:
             wanted = max(span / points, base)
             step = int(-(-wanted // base) * base)               # a whole number of tier steps
             out["step"] = step
+            marks = {"m5_done": s["m5"] or 0, "h1_done": s["h1"] or 0}        # the roll-up marks came with the series: no statement of their own
+
             def done(key: str) -> int:
-                row = conn.execute("SELECT v FROM meta WHERE k = ?", (key,)).fetchone()
-                return row["v"] if row else 0
+                return marks[key]
 
             # the complete buckets come from the tier, the newest (not yet rolled up) part from the finer tiers
             parts, args = [], []

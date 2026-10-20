@@ -577,8 +577,9 @@ def _health(conn: sqlite3.Connection) -> tuple[dict, dict[int, dict]]:
         levels[p["device_id"]] = "critical" if "critical" in (cur, p["level"]) else "warning"
     store = tsdb.for_conn(conn)
     per_device = {}
+    known = store.metrics_of_many("device", [r["device_id"] for r in rows]) if store is not None else {}
     for r in rows:
-        latest = hm.latest_readings(store, r["device_id"])
+        latest = hm.latest_readings(store, r["device_id"], known.get(r["device_id"], []))
         per_device[r["device_id"]] = {"level": levels.get(r["device_id"], "ok"), "readable": None if r["last_ok"] is None else bool(r["last_ok"]),
                                       **{k: latest[k] for k in ("cpu", "mem", "disk", "temp", "battery", "rx", "tx")}}
     days = [f["days_to_full"] for f in forecast.cached(conn) if f["days_to_full"] is not None]

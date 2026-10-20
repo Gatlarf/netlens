@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -17,6 +18,68 @@ def utcnow() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+class Connection(sqlite3.Connection):
+    """A SQLite connection that remembers which file it opened (`file`), so nobody has to ask the database with a PRAGMA each time."""
+
+    file: str = ""
+
+
+class SlowConnection(Connection):
+    """A connection that writes a line to the system log for each statement slower than NETLENS_SLOW_QUERY_MS (see `factory`)."""
+
+    threshold = 0.0
+
+    def _note(self, sql: str, started: float) -> None:
+        took = time.perf_counter() - started
+        if took < self.threshold:
+            return
+        import logging
+        import traceback
+
+        where = next((f"{f.filename.rsplit('/app/', 1)[-1]}:{f.lineno}" for f in reversed(traceback.extract_stack()) if "/app/" in f.filename and not f.filename.endswith("/db.py")), "?")
+        logging.getLogger("netlens.slowquery").warning("%.0f ms at %s: %s", took * 1000, where, " ".join(str(sql).split())[:300])
+
+    def execute(self, sql, *args, **kwargs):
+        started = time.perf_counter()
+        try:
+            return super().execute(sql, *args, **kwargs)
+        finally:
+            self._note(sql, started)
+
+    def executemany(self, sql, *args, **kwargs):
+        started = time.perf_counter()
+        try:
+            return super().executemany(sql, *args, **kwargs)
+        finally:
+            self._note(sql, started)
+
+
+def factory() -> type[Connection]:
+    """The connection class to use: the plain one, or, when NETLENS_SLOW_QUERY_MS is a number above 0, the one that logs slow statements."""
+    try:
+        ms = float(os.environ.get("NETLENS_SLOW_QUERY_MS", "") or 0)
+    except ValueError:
+        ms = 0.0
+    if ms <= 0:
+        return Connection
+    SlowConnection.threshold = ms / 1000
+    return SlowConnection
+
+
+def main_file(conn: sqlite3.Connection) -> str:
+    """The file of the main database ("" for an in-memory one). Free for a connection made by connect(); otherwise one PRAGMA."""
+    known = getattr(conn, "file", "")
+    if known:
+        return known
+    try:
+        for _seq, name, path in conn.execute("PRAGMA database_list"):
+            if name == "main":
+                return path or ""
+    except sqlite3.Error:
+        pass
+    return ""
+
+
 def connect(path: str | os.PathLike) -> sqlite3.Connection:
     """Open a SQLite connection with sensible defaults for Netlens."""
     # Create parent directory for file paths before connecting.
@@ -26,8 +89,11 @@ def connect(path: str | os.PathLike) -> sqlite3.Connection:
         if p.parent and p.parent != Path(".") and not p.exists():
             p.parent.mkdir(parents=True, exist_ok=True)
 
-    conn = sqlite3.connect(path, check_same_thread=False)
+    conn = sqlite3.connect(path, check_same_thread=False, factory=factory())
     conn.row_factory = sqlite3.Row
+    text = os.fspath(path) if isinstance(path, (str, os.PathLike)) else ""
+    if text and text != ":memory:" and not text.startswith("file:"):
+        conn.file = str(Path(text).resolve())
 
     # Enable foreign keys.
     conn.execute("PRAGMA foreign_keys=ON")

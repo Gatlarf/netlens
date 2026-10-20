@@ -32,23 +32,36 @@ def _row(conn, check_id: int) -> dict[str, Any]:
     return dict(row)
 
 
-def _present(conn, c: dict[str, Any]) -> dict[str, Any]:
-    day = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM service_results WHERE check_id = ? AND ts >= ?", (c["id"], _ago(utcnow(), hours=24))).fetchone()
-    dev = conn.execute("SELECT COALESCE(custom_name, hostname, primary_ip) AS n FROM devices WHERE id = ?", (c["device_id"],)).fetchone() if c["device_id"] else None
+def _present(conn, c: dict[str, Any], days: dict[int, Any] | None = None, names: dict[int, str] | None = None) -> dict[str, Any]:
+    """One check as the API shows it. A list passes `days` ({check_id: (up, total)} for 24 h) and `names` ({device_id: name}) so it asks the database once, not per check."""
+    if days is None:
+        r = conn.execute("SELECT SUM(up) AS u, COUNT(*) AS n FROM service_results WHERE check_id = ? AND ts >= ?", (c["id"], _ago(utcnow(), hours=24))).fetchone()
+        day = (r["u"], r["n"])
+    else:
+        day = days.get(c["id"], (0, 0))
+    if not c["device_id"]:
+        dev_name = None
+    elif names is not None:
+        dev_name = names.get(c["device_id"])
+    else:
+        dev = conn.execute("SELECT COALESCE(custom_name, hostname, primary_ip) AS n FROM devices WHERE id = ?", (c["device_id"],)).fetchone()
+        dev_name = dev["n"] if dev else None
     return {
-        "id": c["id"], "device_id": c["device_id"], "device_name": dev["n"] if dev else None, "name": c["name"], "kind": c["kind"],
+        "id": c["id"], "device_id": c["device_id"], "device_name": dev_name, "name": c["name"], "kind": c["kind"],
         "host": c["host"], "port": c["port"], "path": c["path"], "expect": c["expect"], "interval_s": c["interval_s"],
         "timeout_s": c["timeout_s"], "enabled": bool(c["enabled"]), "target": describe(c), "source": c.get("source"),
         "state": None if c["last_up"] is None else ("up" if c["last_up"] else "down"),
         "last_ts": c["last_ts"], "last_ms": c["last_ms"], "last_detail": c["last_detail"], "since": c["since"],
-        "uptime_24h": round(day["u"] / day["n"] * 100, 2) if day["n"] else None,
+        "uptime_24h": round(day[0] / day[1] * 100, 2) if day[1] else None,
     }
 
 
 @router.get("/service-checks")
 def list_checks(device_id: int | None = None, conn=Depends(get_conn)) -> list[dict]:
     rows = conn.execute("SELECT * FROM service_checks" + (" WHERE device_id = ?" if device_id is not None else "") + " ORDER BY name COLLATE NOCASE, id", (device_id,) if device_id is not None else ()).fetchall()
-    return [_present(conn, dict(r)) for r in rows]
+    days = {r["check_id"]: (r["u"], r["n"]) for r in conn.execute("SELECT check_id, SUM(up) AS u, COUNT(*) AS n FROM service_results WHERE ts >= ? GROUP BY check_id", (_ago(utcnow(), hours=24),))}
+    names = {r["id"]: r["n"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices WHERE id IN (SELECT device_id FROM service_checks WHERE device_id IS NOT NULL)")}
+    return [_present(conn, dict(r), days, names) for r in rows]
 
 
 def _check_device(conn, device_id: int | None, kind: str | None = None) -> None:
