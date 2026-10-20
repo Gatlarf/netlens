@@ -44,6 +44,7 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("PATCH", r"^/api/probes/(\d+)$", "Changed remote site {0}"),
     ("POST", r"^/api/probes/(\d+)/token$", "Made a new token for remote site {0}"),
     ("PUT", r"^/api/probes/(\d+)/config$", "Changed what is managed at remote site {0}"),
+    ("POST", r"^/api/probes/(\d+)/command$", "Sent a command to remote site {0}"),
     ("DELETE", r"^/api/probes/(\d+)$", "Removed remote site {0}"),
     ("PUT", r"^/api/central$", "Changed the report to the central Netlens"),
     ("POST", r"^/api/backup/restore$", "Restored a backup"),

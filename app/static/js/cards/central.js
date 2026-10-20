@@ -60,6 +60,10 @@ export async function buildCentralCard() {
       result.appendChild(h("p", { class: st.ok ? "" : "error" },
         st.ok ? `Last report ${timeAgo(st.ts)}: ${st.devices} devices, ${st.services} service checks, ${st.samples} measurements.` : `Last report ${timeAgo(st.ts)} failed: ${st.error}`));
     }
+    if (st.skew_s !== null && st.skew_s !== undefined && Math.abs(st.skew_s) > 120) {
+      result.appendChild(h("p", { class: "error" }, `The clock of this machine is ${Math.abs(st.skew_s) >= 3600 ? `${Math.round(Math.abs(st.skew_s) / 360) / 10} hours` : `${Math.round(Math.abs(st.skew_s) / 60)} minutes`} ${st.skew_s > 0 ? "ahead of" : "behind"} the central Netlens. Check its time and time zone: graphs would be shifted and measurements too far from the real time are not kept.`));
+    }
+    if (st.commands && st.commands.length) result.appendChild(h("p", { class: "hint" }, "The central Netlens asked for a scan; it was started."));
     if (st.config) {
       const c = st.config;
       result.appendChild(h("p", { class: c.error ? "error" : "hint" }, c.error ? c.error : `Configuration from the central Netlens (revision ${info.config_rev}): ${c.services} service check(s), ${c.monitors} monitor(s).${c.skipped && c.skipped.length ? ` Skipped: ${c.skipped.join("; ")}` : ""}`));
@@ -68,8 +72,8 @@ export async function buildCentralCard() {
       field("Address of the central Netlens", url, "Use https:// across the internet. A plain http:// address is accepted for a server on your own network (a VPN, for example)."),
       field("Token", token, "Made on the central Netlens for this location. It is stored encrypted here."),
       h("label", {}, enabled, " Report to the central Netlens"),
-      h("label", {}, accept, " Accept configuration from the central Netlens"),
-      h("p", { class: "hint" }, "When ticked, the central Netlens may set up service checks and health monitors here (they appear marked as managed from the central Netlens and cannot be changed here). Leave it off to keep all settings at this location. Logins it sends are stored encrypted."),
+      h("label", {}, accept, " Accept configuration and commands from the central Netlens"),
+      h("p", { class: "hint" }, "When ticked, the central Netlens may set up service checks and health monitors here (they appear marked as managed from the central Netlens and cannot be changed here) and ask this Netlens to scan its network. Leave it off to keep all settings at this location. Logins it sends are stored encrypted."),
       h("div", { class: "form-actions" }, save, send), result));
   }
 

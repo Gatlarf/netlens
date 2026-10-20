@@ -2,6 +2,17 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.115 — 2026-10-20
+
+### Added
+- ★ **Scan now at a remote site**: the page of a remote site has a *Scan now* button. The remote Netlens starts a quick scan with its next report (it must have *Accept configuration and commands from the central Netlens* ticked).
+- ★ **Snooze a whole remote site**: for planned work at a location, *Snooze* on the site page holds back every alert of that site (devices, checks, health readings, silence) for a while. The events are still recorded and marked as snoozed.
+- **Recent events on the site page**: the alerts raised about that site, newest first.
+- **Clock check**: when the clock of a remote machine is more than two minutes off from the central Netlens, both sides say so (the measurements of a site with a wrong clock are shifted or not kept).
+
+### Changed
+- The tick box on the remote Netlens now reads *Accept configuration and commands from the central Netlens*.
+
 ## 0.4.114 — 2026-10-19
 
 ### Added

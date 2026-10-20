@@ -71,9 +71,28 @@ def probe_detail(probe_id: int, conn=Depends(get_conn)) -> dict[str, Any]:
     services = [{"id": r["id"], "key": r["key"], "name": r["name"], "kind": r["kind"], "target": r["target"], "state": r["state"], "ms": r["ms"],
                  "detail": r["detail"], "since": r["since"], "checked": r["checked"]}
                 for r in conn.execute("SELECT * FROM remote_services WHERE probe_id = ? ORDER BY name COLLATE NOCASE", (probe_id,))]
+    from app import snooze
+
+    snoozed = snooze.active(conn).get(f"site:{probe_id}")
     return {"probe": probes_mod.present(conn, row), "devices": devices, "services": services, "problems": summary.get("problems") or [],
             "monitors": summary.get("monitors") or [], "scan": summary.get("scan"),
-            "config_state": {"accepts": bool(summary.get("accepts_config")), "site_rev": summary.get("config_rev") or 0}}
+            "config_state": {"accepts": bool(summary.get("accepts_config")), "site_rev": summary.get("config_rev") or 0},
+            "events": probes_mod.site_events(conn, probe_id), "pending_commands": probes_mod.pending_commands(conn, probe_id),
+            "snoozed_until": snoozed["until"] if snoozed else None, "snooze": f"site:{probe_id}"}
+
+
+class CommandBody(BaseModel):
+    command: str
+
+
+@router.post("/probes/{probe_id}/command", status_code=202)
+def send_command(probe_id: int, body: CommandBody, conn=Depends(get_conn)) -> dict[str, Any]:
+    """Ask the remote site to do something (for now: scan its network). It is handed over with the site's next report."""
+    _row(conn, probe_id)
+    try:
+        return {"pending": probes_mod.queue_command(conn, probe_id, body.command)}
+    except probes_mod.ProbeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @router.patch("/probes/{probe_id}")
@@ -182,6 +201,10 @@ async def push(request: Request) -> dict:
             config = probe_config.for_probe(conn, probe["id"], payload)
             if config is not None:
                 result["config"] = config
+            if payload.get("accepts_config"):
+                commands = probes_mod.take_commands(conn, probe["id"])
+                if commands:
+                    result["commands"] = commands
     finally:
         conn.close()
     # the events this report raised should reach the channels now, not at the next scan

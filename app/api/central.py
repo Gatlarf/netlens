@@ -42,4 +42,6 @@ async def push_now(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     if not link["url"] or not link["token"]:
         raise HTTPException(status_code=422, detail="enter the address of the central Netlens and the token first")
     status = await asyncio.to_thread(central.push_once, request.app.state.db_path, None, True)
+    if status.get("commands"):
+        await central.run_commands(status, request.app.state.scan_manager)
     return {"status": status, **central.public_link(conn)}

@@ -2,6 +2,7 @@ import { get, post, patch, put, del } from "../api.js";
 import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin, fmtTime } from "../util.js";
 import { pageHead, emptyState, previewHtml } from "../ui.js";
 import { buildPerformanceCard } from "../cards/performance.js";
+import { snoozeMenu, wakeButton, untilText } from "../snooze.js";
 
 const REFRESH_MS = 30000;
 const STATE_TEXT = { connected: "Reporting", silent: "Not heard from", waiting: "Waiting for the first report" };
@@ -52,7 +53,7 @@ async function buildManagedCard(probe, devices, state) {
   managedDirty = false;
 
   function status() {
-    if (!state.accepts) return h("p", { class: "hint" }, "This site does not accept configuration yet. On the remote Netlens tick Settings → Report to a central Netlens → “Accept configuration from the central Netlens”.");
+    if (!state.accepts) return h("p", { class: "hint" }, "This site does not accept configuration yet. On the remote Netlens tick Settings → Report to a central Netlens → “Accept configuration and commands from the central Netlens”.");
     if (cfg.rev === state.site_rev) return h("p", { class: "hint" }, `The site has revision ${state.site_rev}: it is up to date.`);
     return h("p", { class: "hint" }, `Revision ${cfg.rev} is waiting; the site has ${state.site_rev}. It arrives with the next report.`);
   }
@@ -220,6 +221,10 @@ export async function render(container) {
     const admin = isAdmin();
     const tools = h("div", { class: "form-actions admin-only" });
     tools.append(
+      h("button", { class: "btn", type: "button", title: "Ask the remote Netlens to scan its network now (it must accept commands)", disabled: !p.enabled || p.state !== "connected",
+        onclick: async () => {
+          try { await post(`/api/probes/${id}/command`, { command: "scan" }); toast("Asked. The site starts the scan with its next report.", "success"); showDetail(id); } catch (err) { toast(err.message || "Could not send the command", "error"); }
+        } }, data.pending_commands.includes("scan") ? "Scan requested…" : "Scan now"),
       h("button", { class: "btn", type: "button", onclick: async () => {
         const name = window.prompt("New name", p.name);
         if (!name || name.trim() === p.name) return;
@@ -246,6 +251,9 @@ export async function render(container) {
     top.append(h("div", { class: "up-head" }, h("div", {}, h("p", {}, h("a", { href: "#/remote-sites" }, "← Remote sites")), h("h1", {}, p.name),
       h("p", { class: "hint" }, p.last_seen ? `Last report ${timeAgo(p.last_seen)} (${fmtTime(p.last_seen)})${p.version ? ` · Netlens ${p.version}` : ""}${p.last_ip ? ` · from ${p.last_ip}` : ""}` : "Has not reported yet")),
     admin ? tools : null));
+    if (data.snoozed_until) body.appendChild(h("div", { class: "card" }, h("strong", {}, "Alerts for this site are snoozed"), ` for another ${untilText(data.snoozed_until)}: its events are recorded but not sent. `, wakeButton(data.snooze)));
+    else if (admin) body.appendChild(h("p", { class: "hint" }, "Planned work at this site? ", snoozeMenu(data.snooze), " holds back all of its alerts for a while."));
+    if (p.skew_s !== null && p.skew_s !== undefined && Math.abs(p.skew_s) > 120) body.appendChild(h("div", { class: "card error" }, h("strong", {}, "The clock of this site is off. "), `It is ${Math.abs(p.skew_s) >= 3600 ? `${Math.round(Math.abs(p.skew_s) / 360) / 10} hours` : `${Math.round(Math.abs(p.skew_s) / 60)} minutes`} ${p.skew_s > 0 ? "ahead of" : "behind"} this Netlens. Its graphs can be shifted, and measurements that are too far from the real time are not kept. Check the time and time zone of that machine.`));
     if (p.state === "silent") body.appendChild(h("div", { class: "card error" }, h("strong", {}, "This site has stopped reporting. "), "The devices below show how they were when it last reported; nothing at that location is being watched until it reports again."));
     body.appendChild(h("div", { class: "up-tiles" },
       tile("Devices online", `${p.devices.online} / ${p.devices.total}`, p.devices.core_down ? `${p.devices.core_down} always-on device${p.devices.core_down === 1 ? "" : "s"} offline` : "all always-on devices answer", p.devices.core_down ? "bad" : p.devices.online === p.devices.total ? "ok" : "warn"),
@@ -340,6 +348,10 @@ export async function render(container) {
     devCard.append(devTools, devTable);
     drawDevices();
     body.appendChild(devCard);
+    if (data.events.length) {
+      body.appendChild(h("div", { class: "card" }, h("h2", {}, "Recent events"),
+        h("ul", { class: "d-attention" }, data.events.map((e) => h("li", {}, h("span", { class: "hint" }, `${fmtTime(e.ts)} `), e.detail || e.kind, e.maintenance ? h("span", { class: "hint" }, ` (${e.maintenance})`) : null)))));
+    }
   }
 
   async function refresh() {
@@ -351,7 +363,9 @@ export async function render(container) {
     }
   }
 
+  const onSnoozed = () => { if (!disposed && queryId()) showDetail(queryId()); };
+  document.addEventListener("netlens:snoozed", onSnoozed);
   await showList();
   timer = setInterval(() => { if (!disposed && !form.firstChild && !managedDirty && !body.querySelector(".rs-add :focus") && !body.querySelector("tr.rs-graph:not([hidden])")) refresh(); }, REFRESH_MS);
-  return () => { disposed = true; if (timer) clearInterval(timer); };
+  return () => { disposed = true; if (timer) clearInterval(timer); document.removeEventListener("netlens:snoozed", onSnoozed); };
 }

@@ -361,3 +361,94 @@ def test_a_site_reports_vulnerabilities_and_a_growing_critical_count_is_announce
     row = conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone()
     probes.ingest(conn, row, {"devices": [], "services": []}, now="2026-03-10T12:03:00Z")
     assert probes.get(conn, row["id"])["vulns"] == {"configured": False}
+
+
+# ----------------------------------------------------------------------------- snooze, commands, clock and events of a site
+def report(conn, row, devices, now, **extra):
+    return probes.ingest(conn, conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone(), {"devices": devices, "services": [], **extra}, now=now)
+
+
+def test_a_snoozed_site_holds_back_all_of_its_alerts(conn):
+    from app import snooze
+    from datetime import datetime, timezone
+
+    row, _ = make(conn)
+    report(conn, row, [device("aa:00:00:00:00:01", "nas", always_on=True)], NOW)
+    snooze.snooze(conn, f"site:{row['id']}", 60, now=datetime(2026, 3, 10, 12, 0, tzinfo=timezone.utc))
+    report(conn, row, [device("aa:00:00:00:00:01", "nas", online=False, always_on=True)], LATER)
+    report(conn, row, [device("aa:00:00:00:00:01", "nas", always_on=True)], "2026-03-10T12:02:00Z")
+    held = conn.execute("SELECT kind, maintenance FROM events ORDER BY id").fetchall()
+    assert [r["kind"] for r in held] == ["remote_offline", "remote_online"] and all(r["maintenance"] == "Snoozed" for r in held)
+    assert snooze.active(conn, datetime(2026, 3, 10, 12, 3, tzinfo=timezone.utc))                 # coming back online does not end a planned snooze
+
+
+def test_commands_wait_for_a_site_that_accepts_them_and_are_handed_over_once(conn):
+    row, _ = make(conn)
+    with pytest.raises(probes.ProbeError):
+        probes.queue_command(conn, row["id"], "scan")                                              # it has not said it accepts
+    report(conn, row, [], NOW, accepts_config=True)
+    with pytest.raises(probes.ProbeError):
+        probes.queue_command(conn, row["id"], "reboot")
+    probes.queue_command(conn, row["id"], "scan")
+    assert probes.queue_command(conn, row["id"], "scan") == ["scan"]
+    assert probes.take_commands(conn, row["id"]) == ["scan"] and probes.take_commands(conn, row["id"]) == []
+
+
+def test_the_clock_of_a_site_is_compared_with_ours(conn):
+    row, _ = make(conn)
+    report(conn, row, [], NOW, sent="2026-03-10T12:10:00Z")
+    assert probes.present(conn, conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone())["skew_s"] == 600
+    report(conn, row, [], LATER)
+    assert probes.present(conn, conn.execute("SELECT * FROM probes WHERE id = ?", (row["id"],)).fetchone())["skew_s"] is None
+
+
+def test_the_events_of_one_site_only(conn):
+    a, _ = make(conn, "Branch")
+    b, _ = make(conn, "Branch 2")
+    report(conn, a, [device("aa:00:00:00:00:01", "nas")], NOW)
+    report(conn, a, [device("aa:00:00:00:00:01", "nas", online=False)], LATER)
+    report(conn, b, [device("aa:00:00:00:00:09", "cam")], NOW)
+    report(conn, b, [device("aa:00:00:00:00:09", "cam", online=False)], LATER)
+    mine = probes.site_events(conn, a["id"])
+    assert len(mine) == 1 and mine[0]["kind"] == "remote_offline" and "nas" in mine[0]["detail"]
+
+
+def test_a_site_removed_forgets_its_commands(conn):
+    row, _ = make(conn)
+    report(conn, row, [], NOW, accepts_config=True)
+    probes.queue_command(conn, row["id"], "scan_deep")
+    probes.delete(conn, row["id"])
+    assert conn.execute("SELECT COUNT(*) FROM settings WHERE key LIKE 'probe.commands.%'").fetchone()[0] == 0
+
+
+def test_the_command_reaches_the_site_in_the_reply_to_its_report(client):
+    made = client.post("/api/probes", json={"name": "Cmd"}).json()
+    tok, pid = made["token"], made["probe"]["id"]
+    anon = TestClient(client.app)
+    push = lambda body: anon.post("/api/probe/push", json=body, headers={"Authorization": f"Bearer {tok}"}).json()
+    assert client.post(f"/api/probes/{pid}/command", json={"command": "scan"}).status_code == 409           # it does not accept commands yet
+    assert "commands" not in push({"devices": [], "accepts_config": True})
+    assert client.post(f"/api/probes/{pid}/command", json={"command": "scan"}).status_code == 202
+    assert client.get(f"/api/probes/{pid}").json()["pending_commands"] == ["scan"]
+    assert push({"devices": [], "accepts_config": False}).get("commands") is None                           # a site that stopped accepting gets nothing
+    assert push({"devices": [], "accepts_config": True})["commands"] == ["scan"]
+    assert "commands" not in push({"devices": [], "accepts_config": True}) and "time" in push({"devices": []})
+
+
+@pytest.mark.asyncio
+async def test_a_site_starts_the_scan_it_was_asked_for():
+    from app.scanner.orchestrator import ScanBusy
+
+    class Manager:
+        def __init__(self, busy=False):
+            self.started, self.busy = [], busy
+
+        async def start(self, kind):
+            if self.busy:
+                raise ScanBusy("scan already running")
+            self.started.append(kind)
+
+    m = Manager()
+    assert await central.run_commands({"commands": ["scan", "scan_deep"]}, m) == ["scan", "scan_deep"] and m.started == ["quick", "deep"]
+    assert await central.run_commands({"commands": ["scan"]}, Manager(busy=True)) == []
+    assert await central.run_commands({}, m) == []

@@ -119,7 +119,7 @@ async def lifespan(app: FastAPI):
         tasks.append(asyncio.create_task(host_monitors.loop(app.state.db_path)))
         from app import central, remediation
 
-        tasks.append(asyncio.create_task(central.loop(app.state.db_path)))
+        tasks.append(asyncio.create_task(central.loop(app.state.db_path, app.state.scan_manager)))
         tasks.append(asyncio.create_task(remediation.loop(app.state.db_path)))
         from app import escalation
 

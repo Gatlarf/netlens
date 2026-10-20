@@ -180,6 +180,31 @@ def send(url: str, token: str, payload: dict[str, Any], timeout: float = TIMEOUT
         raise LinkError(f"cannot reach the central Netlens: {reason}") from None
 
 
+def _skew(central_time: Any) -> int | None:
+    """Seconds this clock is ahead (+) or behind (-) of the central Netlens, from the time in its reply."""
+    try:
+        theirs = datetime.strptime(central_time, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+    except (ValueError, TypeError):
+        return None
+    return int(round(time.time() - theirs))
+
+
+async def run_commands(status: dict[str, Any], scan_manager) -> list[str]:
+    """Do what the central Netlens asked for in its reply. Returns what was started."""
+    from app.scanner.orchestrator import ScanBusy
+
+    started = []
+    for command in status.get("commands") or []:
+        try:
+            await scan_manager.start("deep" if command == "scan_deep" else "quick")
+            started.append(command)
+        except ScanBusy:
+            log.info("the central Netlens asked for a scan, but one is already running")
+        except Exception:  # noqa: BLE001 - a command must never stop the reports
+            log.exception("could not start the scan the central Netlens asked for")
+    return started
+
+
 def push_once(db_path: str, now_ts: float | None = None, force: bool = False) -> dict[str, Any]:
     """One report. Returns the status that was stored."""
     now_ts = now_ts if now_ts is not None else time.time()
@@ -198,7 +223,10 @@ def push_once(db_path: str, now_ts: float | None = None, force: bool = False) ->
         try:
             reply = send(link["url"], link["token"], payload)
             status = {"ts": utcnow(), "ok": True, "error": None, "devices": len(payload["devices"]), "services": len(payload["services"]),
-                      "samples": len(payload["samples"]), "central_events": reply.get("events")}
+                      "samples": len(payload["samples"]), "central_events": reply.get("events"), "skew_s": _skew(reply.get("time"))}
+            commands = [c for c in (reply.get("commands") or []) if c in ("scan", "scan_deep")] if link["accept_config"] else []
+            if commands:
+                status["commands"] = commands
             set_setting(conn, MARK_KEY, str(newest))
             config = reply.get("config") if link["accept_config"] and isinstance(reply, dict) else None
             if isinstance(config, dict) and isinstance(config.get("rev"), int) and not isinstance(config.get("rev"), bool):
@@ -218,7 +246,7 @@ def push_once(db_path: str, now_ts: float | None = None, force: bool = False) ->
         conn.close()
 
 
-async def loop(db_path: str) -> None:
+async def loop(db_path: str, scan_manager=None) -> None:
     """Background task: report to the central Netlens at the chosen interval (when it is switched on)."""
     await asyncio.sleep(20)
     last = 0.0
@@ -231,7 +259,9 @@ async def loop(db_path: str) -> None:
                 conn.close()
             if link["enabled"] and link["url"] and link["token"] and time.monotonic() - last >= link["interval_s"]:
                 last = time.monotonic()
-                await asyncio.to_thread(push_once, db_path)
+                status = await asyncio.to_thread(push_once, db_path)
+                if scan_manager is not None and status.get("commands"):
+                    await run_commands(status, scan_manager)
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001 - a failing report must never stop the scans

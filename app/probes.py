@@ -145,7 +145,7 @@ def present(conn: sqlite3.Connection, row: sqlite3.Row, now: float | None = None
         "devices": {"total": counts["total"], "online": counts["online"], "core_down": counts["core_down"]},
         "services": {"total": services["total"], "down": services["down"]},
         "problems": {"count": len(problems), "critical": sum(1 for p in problems if p.get("level") == "critical")},
-        "scan": summary.get("scan"), "backups": summary.get("backups") or {"configured": False}, "vulns": _vulns_view(conn, summary),
+        "scan": summary.get("scan"), "skew_s": summary.get("skew_s"), "backups": summary.get("backups") or {"configured": False}, "vulns": _vulns_view(conn, summary),
     }
 
 
@@ -332,7 +332,7 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
             events.append(("vuln_critical", f"{site}: {more} new critical vulnerabilit{'ies' if more != 1 else 'y'}" + (", at least one known to be exploited" if new_vulns["exploited"] > (old_vulns.get("exploited") or 0) else "")))
     summary = {"vulns": new_vulns, "problems": problems, "monitors": _monitors(payload.get("monitors")), "scan": _scan(payload.get("scan")), "backups": guestbackups.clean_report(payload.get("backups")),
                "counts": {"devices": len(devices), "services": len(services), "samples": recorded},
-               "accepts_config": bool(payload.get("accepts_config")),
+               "accepts_config": bool(payload.get("accepts_config")), "skew_s": _skew(payload.get("sent"), now),
                "config_rev": payload.get("config_rev") if isinstance(payload.get("config_rev"), int) and not isinstance(payload.get("config_rev"), bool) else 0}
     conn.execute(
         "UPDATE probes SET last_seen = ?, last_ip = ?, version = ?, interval_s = ?, snapshot_ts = ?, summary = ?, offline_notified = 0 WHERE id = ?",
@@ -341,8 +341,14 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
     if probe["offline_notified"] and not baseline:
         events.insert(0, ("probe_online", f"{site} is reporting again"))
     for kind, text in events:
-        add_event(conn, kind, text, now=now, subject=f"site:{probe_id}" if kind in ("probe_online", "probe_offline") else None)
-    return {"ok": True, "interval_s": interval, "devices": len(devices), "services": len(services), "samples": recorded, "events": len(events)}
+        add_event(conn, kind, text, now=now, subject=f"site:{probe_id}")          # a snooze of the site holds back all of its alerts
+    return {"ok": True, "interval_s": interval, "devices": len(devices), "services": len(services), "samples": recorded, "events": len(events), "time": utcnow()}
+
+
+def _skew(sent: Any, now: str) -> int | None:
+    """Seconds the site's clock is ahead (+) or behind (-) of this one, when the report says when it was sent."""
+    a, b = _parse(sent if isinstance(sent, str) else None), _parse(now)
+    return None if a is None or b is None else int(round(a - b))
 
 
 def tsdb_forget(entity: str, entity_id: int, conn: sqlite3.Connection) -> None:
@@ -390,9 +396,66 @@ def check_silent(conn: sqlite3.Connection, now: float | None = None) -> list[str
     return raised
 
 
+# ----------------------------------------------------------------------------- commands for a site
+COMMANDS = {"scan": "a quick scan", "scan_deep": "a deep scan"}
+
+
+def _commands_key(probe_id: int) -> str:
+    return f"probe.commands.{probe_id}"
+
+
+def pending_commands(conn: sqlite3.Connection, probe_id: int) -> list[str]:
+    from app.db import get_setting
+
+    try:
+        data = json.loads(get_setting(conn, _commands_key(probe_id)) or "[]")
+    except ValueError:
+        return []
+    return [c for c in data if c in COMMANDS] if isinstance(data, list) else []
+
+
+def queue_command(conn: sqlite3.Connection, probe_id: int, command: str) -> list[str]:
+    """Ask the site to do something with its next report (it must accept commands). The same command is kept once."""
+    from app.db import set_setting
+
+    if command not in COMMANDS:
+        raise ProbeError(f"unknown command; choose one of {', '.join(COMMANDS)}")
+    row = conn.execute("SELECT summary FROM probes WHERE id = ?", (probe_id,)).fetchone()
+    if not json.loads(row["summary"] or "{}").get("accepts_config"):
+        raise ProbeError("this site does not accept commands yet: tick “Accept configuration and commands from the central Netlens” in its Settings → Report to a central Netlens")
+    queue = pending_commands(conn, probe_id)
+    if command not in queue:
+        queue.append(command)
+    set_setting(conn, _commands_key(probe_id), json.dumps(queue))
+    return queue
+
+
+def take_commands(conn: sqlite3.Connection, probe_id: int) -> list[str]:
+    """The commands waiting for the site; they are handed over once."""
+    from app.db import set_setting
+
+    queue = pending_commands(conn, probe_id)
+    if queue:
+        set_setting(conn, _commands_key(probe_id), "[]")
+    return queue
+
+
+def site_events(conn: sqlite3.Connection, probe_id: int, limit: int = 30) -> list[dict]:
+    """What happened at a site, newest first: the alerts this Netlens raised about it (they all start with the site's name)."""
+    row = conn.execute("SELECT name, customer FROM probes WHERE id = ?", (probe_id,)).fetchone()
+    if row is None:
+        return []
+    label = f"{row['customer']} / {row['name']}" if row["customer"] else row["name"]
+    like = label.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    rows = conn.execute("SELECT id, ts, kind, detail, maintenance FROM events WHERE (detail LIKE ? ESCAPE '\\' OR detail LIKE ? ESCAPE '\\') AND (kind LIKE 'remote\\_%' ESCAPE '\\' OR kind LIKE 'probe\\_%' ESCAPE '\\' OR kind = 'vuln_critical') "
+                        "ORDER BY id DESC LIMIT ?", (like + ": %", like + " has not reported%", limit)).fetchall()
+    return [dict(r) for r in rows]
+
+
 def delete(conn: sqlite3.Connection, probe_id: int) -> None:
     for table, entity in (("remote_devices", "remote"), ("remote_services", "remote_service")):
         for r in conn.execute(f"SELECT id FROM {table} WHERE probe_id = ?", (probe_id,)).fetchall():
             tsdb_forget(entity, r["id"], conn)
     conn.execute("DELETE FROM probes WHERE id = ?", (probe_id,))
+    conn.execute("DELETE FROM settings WHERE key IN (?, ?)", (_commands_key(probe_id), f"probe.config.{probe_id}"))
     conn.commit()
