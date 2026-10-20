@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.131 — 2026-10-20
+
+### Added
+- ★ **Synology plugin 1.0.2** (Plugin store): tested against a real DSM 7.2.2. DSM's container list has no ports or networks, so the plugin now reads them per container: the published ports (also for a stopped container) and the address of a container on a macvlan network.
+- **A README section and website page for Synology ext4 volumes**: how to recognise the aufs problem, and the two fixes (a btrfs volume, or the root work-around with `DAC_OVERRIDE`) with the full project file and what the work-around costs.
+
 ## 0.4.128 — 2026-10-20
 
 ### Fixed

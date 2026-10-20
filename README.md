@@ -16,6 +16,7 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Where do `NET_RAW` and `NET_ADMIN` go?](#where-do-net_raw-and-net_admin-go)
   - [Portainer (for example on DietPi or any other device)](#portainer-for-example-on-dietpi-or-any-other-device)
   - [Synology NAS (DSM 7.2 or newer, Container Manager)](#synology-nas-dsm-72-or-newer-container-manager)
+  - [Synology: scans fail on an ext4 volume (aufs)](#synology-scans-fail-on-an-ext4-volume-aufs)
   - [First start](#first-start)
   - [HTTPS](#https)
   - [Advanced: a host folder, building from source, an existing compose stack](#advanced-a-host-folder-building-from-source-an-existing-compose-stack)
@@ -292,7 +293,56 @@ Good to know on a Synology:
 - **To check the settings:** Container Manager → **Container** → `netlens` → **Details** shows the network (*host*); the capabilities are in the project file. Or from SSH: `sudo docker inspect netlens --format '{{.HostConfig.NetworkMode}} {{.HostConfig.CapAdd}}'`.
 - **To update later:** **Project → netlens → Action → Build** (it pulls the newest image), then start it again.
 - **To change the file:** **Project → netlens → Action → Stop**, then **Edit** the compose file (the capabilities are the `cap_add:` lines), save and **Build** again. A container that already runs never picks up new capabilities until it is re-created like this.
+- **Scans fail with `dnet: Failed to open device`?** That is the ext4 volume case: see [Synology: scans fail on an ext4 volume (aufs)](#synology-scans-fail-on-an-ext4-volume-aufs).
 - **Older DSM with the *Docker* package:** if it has *Project*, use the same file. Without it, the container wizard's *Enable high privilege* switch is the only way to get raw network access; it works, but prefer upgrading to Container Manager.
+
+### Synology: scans fail on an ext4 volume (aufs)
+
+**Symptom:** the Scans page says *A container setting is missing* (or the container log says `dnet: Failed to open device eth1`, `eth0` ... or nmap says *Couldn't open a raw socket*), although `network_mode: host` and `cap_add: [NET_RAW, NET_ADMIN]` are in the project file and the container was re-created.
+
+**Cause:** this is a limit of the Synology Docker set-up, not a mistake in your file. Netlens runs nmap as an ordinary user and gives it its two network capabilities as *file capabilities* on the nmap program. Container Manager stores containers with the **btrfs** driver on a volume formatted as btrfs, and the capability survives. On a volume formatted as **ext4** it uses the **aufs** driver (DSM's own kernel has no overlay driver), and aufs silently drops file capabilities, so nmap has no rights even though the container has them. We reproduced it on a virtual DSM 7.2.2: btrfs works with the standard file, ext4 with aufs fails exactly like this.
+
+**Check it (SSH to the NAS):**
+
+```bash
+sudo docker info | grep 'Storage Driver'          # aufs = this problem, btrfs = something else
+sudo docker exec netlens getcap /usr/bin/nmap      # prints nothing = the capability is gone
+```
+
+The Scans page says the same under *What Netlens found inside the container* (`container file system: aufs`, `nmap file capability: MISSING`).
+
+**Fix 1 (recommended): use a btrfs volume.** Nothing in Netlens changes. DSM cannot convert an ext4 volume to btrfs in place: create a new storage pool and volume formatted as **btrfs** (Storage Manager → Storage Pool → Create, then Volume), then install **Container Manager on that volume** (Package Center asks which volume to use; if it is already installed on the ext4 volume, back up your projects and the data of your containers, uninstall it, and install it again on the btrfs volume). The standard compose file then works as it is.
+
+**Fix 2: run the container as root with one more capability.** Use this only if you cannot use a btrfs volume. It is a weaker set-up than the default, so read the cost below. Edit the project (Container Manager → Project → `netlens` → Action → Stop → Edit) and make the service look like this:
+
+```yaml
+services:
+  netlens:
+    image: ghcr.io/gatlarf/netlens:latest
+    container_name: netlens
+    restart: unless-stopped
+    network_mode: host
+    user: "0:0"                 # run as root inside the container (this is the workaround)
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+      - DAC_OVERRIDE            # needed: without it root cannot write the data folder and Netlens stops at start-up
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - netlens-data:/data
+    environment:
+      - TZ=Europe/Brussels
+volumes:
+  netlens-data:
+```
+
+Then **Build** the project again (a running container never picks up new capabilities or a new user). Verified on a virtual DSM with an ext4 volume: scans work and the data folder is writable.
+
+**What Fix 2 costs.** "Root" inside the container is not root on your NAS: the container is not privileged, keeps `cap_drop: ALL` apart from the three capabilities, has a read-only file system and sees only its own data volume, so it cannot touch the rest of the NAS's files. But: (1) with the host network, `NET_ADMIN` lets a process change the NAS's network settings (routes, firewall rules), and now the whole Netlens process (web server, plugins, web terminal) holds it, not only nmap; (2) `DAC_OVERRIDE` lets that process ignore file permissions inside the container (only `/data` and `/tmp` are writable); (3) a flaw in Netlens would run as root in the container. Keep port 8080 off the internet, only use it on a network you trust, and switch the web terminal off (`NETLENS_TERMINAL=off`) if you do not use it. The standard image is not changed for this: it stays an unprivileged user with exactly two capabilities.
 
 ### First start
 
@@ -1103,6 +1153,8 @@ tests
   | `docker run` | add `--network host --cap-add NET_RAW --cap-add NET_ADMIN` |
 
   **The capabilities are in the file, but scans still fail** (the container log says `dnet: Failed to open device eth0` or similar): the Scans page then shows *What Netlens found inside the container* and the most likely cause. Netlens checks, in this order: the capabilities in the container, `no-new-privileges`, the host network, and whether **nmap still has its file capability**. nmap runs as a normal user and depends on a capability that the image puts on the nmap file; some storage drivers and file systems drop it, so the container has the rights but nmap does not. Check it yourself: `sudo docker exec netlens getcap /usr/bin/nmap` should print `cap_net_admin,cap_net_raw=eip`; empty output means the capability was lost. If it is present and scans still fail, the cause is elsewhere: send the *What Netlens found inside the container* line from the Scans page and the output of `docker exec netlens ip -br link` and `docker exec netlens ip route` with your question.
+
+  **On a Synology this is almost always the ext4 volume (storage driver aufs): see [Synology: scans fail on an ext4 volume (aufs)](#synology-scans-fail-on-an-ext4-volume-aufs) for the check and both fixes.**
 
   **Workaround (only if the capability is really lost).** Run the container as root and give it one more capability, so that root can still write its own data folder: in the `netlens:` service (same indentation as `image:`) add `user: "0:0"` and add `DAC_OVERRIDE` to the `cap_add:` list (`NET_RAW`, `NET_ADMIN`, `DAC_OVERRIDE`), then **re-create** the container (Synology: Project → Action → Stop, edit, **Build**). Without `DAC_OVERRIDE` Netlens cannot write `/data` and stops at start-up (a root without that capability obeys file permissions like anyone else). We tested this combination on a virtual Synology with an ext4 volume (aufs): scans work and the data folder is writable. Without `DAC_OVERRIDE` the container stops at start-up. The alternative that keeps everything as it is: run Container Manager on a btrfs volume.
 

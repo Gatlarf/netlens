@@ -95,7 +95,7 @@ def diagnose(error_text: str = "") -> dict[str, Any]:
         cause = f"The interface {wanted} is not visible inside the container: it is not using the host network. Add network_mode: host and re-create the container."
     elif not root and file_cap is False and fs == "aufs":
         cause = ("The container has NET_RAW and NET_ADMIN, but Docker here uses the aufs storage driver (on a Synology that is a volume formatted as ext4), and aufs does not "
-                 "keep the file capability that the image puts on nmap, which runs as a normal user. A btrfs volume does not have this problem. Work-around, weaker than the default: "
+                 "keep the file capability that the image puts on nmap, which runs as a normal user. A btrfs volume does not have this problem (best fix: install Container Manager on a btrfs volume; the README section \"Synology: scans fail on an ext4 volume (aufs)\" explains both fixes). Work-around, weaker than the default: "
                  "add user: \"0:0\" to the netlens service AND DAC_OVERRIDE to its cap_add list, then re-create it (tested on aufs). Without DAC_OVERRIDE a root container cannot write "
                  "its data folder. Read the README (Troubleshooting) for what this costs.")
     elif not root and file_cap is False:

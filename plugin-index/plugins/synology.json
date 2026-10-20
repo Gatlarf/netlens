@@ -3,15 +3,25 @@
   "name": "Synology",
   "kind": "hypervisor",
   "category": "storage",
-  "description": "Shows a Synology NAS (DiskStation Manager 7) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, matched to your network devices by IP or MAC. Read-only, over the DSM web API with HTTPS; needs a dedicated administrator account (DSM has no read-only API role). Tested against a simulated DSM only; a real DS923+ test is pending.",
+  "description": "Shows a Synology NAS (DiskStation Manager 7) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, matched to your network devices by IP or MAC. Read-only, over the DSM web API with HTTPS; needs a dedicated administrator account (DSM has no read-only API role). Tested on a virtual DSM 7.2.2 with Container Manager 24; Virtual Machine Manager and a DS923+ are still untested.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/synology",
   "license": "PolyForm-Noncommercial-1.0.0",
   "supports": [
-    "Synology DSM 7.2 (not tested on hardware yet)",
+    "Synology DSM 7.2.2 (tested on a virtual DSM with Container Manager 24.0.2; containers, ports, packages)",
+    "Synology DSM 7.2 (virtual machines: simulator only)",
     "Synology DSM 6.2 (not tested)"
   ],
   "releases": [
+    {
+      "version": "1.0.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.0.2/synology.zip",
+      "sha256": "2ca0853e29e34e28437fcc9ff7f151501fb67aeb94c8f97f336cefc8a45b6856",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-20",
+      "changelog": "Tested against a real DSM 7.2.2. The container list of DSM has no ports or networks, so the plugin now reads them per container (docker inspect): published ports (also for stopped containers) and the address of a container on a macvlan network. Needs Netlens 0.3.157 or newer."
+    },
     {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.0.1/synology.zip",
