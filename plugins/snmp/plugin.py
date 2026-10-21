@@ -7,6 +7,11 @@ Read-only SNMP v1 / v2c over UDP (standard library only, the protocol is encoded
     IF-MIB          ifName / ifDescr, ifPhysAddress                            port names and the MACs the switch itself uses
     Q-BRIDGE-MIB    dot1qTpFdbPort (else BRIDGE-MIB dot1dTpFdbPort)            the MAC address table: which MAC was learned on which port
     LLDP-MIB        lldpRemChassisId, lldpRemPortId, lldpRemSysName            what is plugged into each port (other switches in particular)
+    CISCO-CDP-MIB   cdpCacheDeviceId, cdpCacheDevicePort, cdpCacheAddress      the same for Cisco neighbours that only speak CDP
+    CISCO-VTP-MIB   vtpVlanState                                               which VLANs exist (Cisco keeps one MAC table per VLAN)
+
+Cisco IOS has one BRIDGE-MIB per VLAN, reached by adding "@<vlan>" to the community string (public@25). Without that a Catalyst shows only
+VLAN 1. When the switch is a Cisco and has no Q-BRIDGE table, every VLAN is read that way (setting "Cisco VLAN indexing").
 
 Netlens turns that into: every polled switch is a node, switches hang below each other following LLDP (from the core switch),
 and every MAC found on an ordinary port is a wired client of that switch, with the port name. A MAC that was learned on a
@@ -14,6 +19,7 @@ port that leads to another switch (an uplink) is ignored there, so a device is a
 into, not to every switch above it.
 """
 
+import copy
 import ipaddress
 import os
 import re
@@ -24,6 +30,11 @@ from collections import Counter, defaultdict
 # ----------------------------------------------------------------------------- OIDs
 SYS_DESCR = (1, 3, 6, 1, 2, 1, 1, 1, 0)
 SYS_NAME = (1, 3, 6, 1, 2, 1, 1, 5, 0)
+SYS_OBJECT_ID = (1, 3, 6, 1, 2, 1, 1, 2, 0)
+CISCO_ENTERPRISE = (1, 3, 6, 1, 4, 1, 9)
+VTP_VLAN_STATE = (1, 3, 6, 1, 4, 1, 9, 9, 46, 1, 3, 1, 1, 2)    # .<management domain>.<vlan>; 1 = operational
+CDP_CACHE = (1, 3, 6, 1, 4, 1, 9, 9, 23, 1, 2, 1, 1)             # cdpCacheEntry; column .<ifIndex>.<neighbour index>
+CDP_ADDRESS, CDP_DEVICE_ID, CDP_DEVICE_PORT = (CDP_CACHE + (c,) for c in (4, 6, 7))
 BRIDGE_ADDRESS = (1, 3, 6, 1, 2, 1, 17, 1, 1, 0)
 BASE_PORT_IFINDEX = (1, 3, 6, 1, 2, 1, 17, 1, 4, 1, 2)
 IF_NAME = (1, 3, 6, 1, 2, 1, 31, 1, 1, 1, 1)
@@ -38,6 +49,8 @@ LLDP_CHASSIS_SUBTYPE, LLDP_CHASSIS_ID, LLDP_PORT_SUBTYPE, LLDP_PORT_ID, LLDP_SYS
 LLDP_LOCAL_PORT = (1, 0, 8802, 1, 1, 2, 1, 3, 7, 1)            # lldpLocPortEntry; columns .2 subtype, .3 id
 
 FDB_LEARNED = 3          # dot1qTpFdbStatus / dot1dTpFdbStatus: learned (self = 4 and mgmt = 5 are the switch's own addresses)
+MAX_VLANS = 300          # VLANs read one by one on a Cisco (each is a separate walk)
+RESERVED_VLANS = range(1002, 1006)     # FDDI / Token Ring defaults every Catalyst lists
 MAX_ROWS = 40000         # a table longer than this is cut off instead of walked forever
 SAMPLES = 3
 
@@ -231,6 +244,14 @@ class Agent:
         self.retries = int(retries)
         self._next_id = int.from_bytes(os.urandom(3), "big")
 
+    def for_vlan(self, vlan):
+        """The same switch, asked about one VLAN: Cisco IOS answers the BRIDGE-MIB of that VLAN to "community@vlan". One retry is enough:
+        a VLAN the switch does not know is simply not answered."""
+        other = copy.copy(self)
+        other.community = f"{self.community}@{vlan}"
+        other.retries = min(self.retries, 1)
+        return other
+
     def _ask(self, pdu_type, oids, max_repetitions=20):
         last = None
         for _ in range(self.retries + 1):
@@ -309,8 +330,12 @@ def _text(raw, limit=100):
 class Switch:
     """What one switch tells: identity, ports, the MAC address table and its LLDP neighbours."""
 
-    def __init__(self, agent):
+    def __init__(self, agent, vlan_indexing="auto"):
         self.agent = agent
+        self.vlan_indexing = vlan_indexing
+        self.cisco = False
+        self.vlans_read = 0
+        self.cdp_ok = False
         self.host = agent.host
         self.descr = self.name = ""
         self.mac = None
@@ -323,8 +348,10 @@ class Switch:
         self.lldp_ok = False
 
     def read(self):
-        got = self.agent.get(SYS_DESCR, SYS_NAME, BRIDGE_ADDRESS)
+        got = self.agent.get(SYS_DESCR, SYS_NAME, BRIDGE_ADDRESS, SYS_OBJECT_ID)
         self.descr, self.name = _text(got.get(SYS_DESCR), 200), _text(got.get(SYS_NAME), 100)
+        object_id = got.get(SYS_OBJECT_ID)
+        self.cisco = isinstance(object_id, tuple) and object_id[:len(CISCO_ENTERPRISE)] == CISCO_ENTERPRISE
         self.mac = _mac(got.get(BRIDGE_ADDRESS))
         self.ports = {suffix[0]: _text(value, 60) for suffix, value in self.agent.walk(IF_NAME) if suffix and _text(value, 60)}
         for suffix, value in self.agent.walk(IF_DESCR):
@@ -336,7 +363,10 @@ class Switch:
             self.macs.add(self.mac)
         self.bridge_port = {suffix[0]: value for suffix, value in self.agent.walk(BASE_PORT_IFINDEX) if suffix and isinstance(value, int)}
         self._read_fdb()
+        if self.vlan_indexing == "always" or (self.vlan_indexing == "auto" and self.cisco and self.fdb_source != "Q-BRIDGE-MIB"):
+            self._read_vlan_fdb()
         self._read_lldp()
+        self._read_cdp()
         return self
 
     def _if_of(self, bridge_port):
@@ -355,6 +385,56 @@ class Switch:
             if not mac or port <= 0 or status.get(tuple(octets), FDB_LEARNED) != FDB_LEARNED:
                 continue
             self.fdb.setdefault(mac, self._if_of(port))
+
+    def _vlans(self):
+        """The VLANs of a Cisco switch: the operational ones of CISCO-VTP-MIB, else the VLAN interfaces (Vlan25) it has, always VLAN 1."""
+        found = {s[-1] for s, v in self.agent.walk(VTP_VLAN_STATE) if len(s) >= 2 and v == 1}
+        if not found:
+            found = {int(m.group(1)) for name in self.ports.values() for m in [re.fullmatch(r"(?i)vl(?:an)?\s?(\d+)", name)] if m}
+        found.add(1)
+        return sorted(v for v in found if 1 <= v <= 4094 and v not in RESERVED_VLANS)[:MAX_VLANS]
+
+    def _read_vlan_fdb(self):
+        """The MAC address table of every VLAN, through community@vlan (Cisco IOS has no single table). A VLAN that does not answer is skipped."""
+        silent = 0
+        for vlan in self._vlans():
+            agent = self.agent.for_vlan(vlan)
+            try:
+                mapping = {s[0]: v for s, v in agent.walk(BASE_PORT_IFINDEX) if s and isinstance(v, int)}
+                rows = [(s[-6:], v) for s, v in agent.walk(BRIDGE_FDB_PORT) if len(s) == 6 and isinstance(v, int)]
+                status = {tuple(s[-6:]): v for s, v in agent.walk(BRIDGE_FDB_STATUS) if len(s) == 6}
+            except Timeout:
+                silent += 1
+                if silent >= 3:          # three in a row: this switch does not do community indexing, do not wait for every VLAN
+                    break
+                continue
+            silent = 0
+            self.vlans_read += 1
+            for octets, port in rows:
+                mac = _mac(bytes(octets))
+                if not mac or port <= 0 or status.get(tuple(octets), FDB_LEARNED) != FDB_LEARNED:
+                    continue
+                self.fdb.setdefault(mac, mapping.get(port, self._if_of(port)))
+        if self.vlans_read:
+            self.fdb_source = f"BRIDGE-MIB per VLAN ({self.vlans_read} VLANs)"
+
+    def _read_cdp(self):
+        """Cisco Discovery Protocol neighbours. CDP names the neighbour (device id, management address) but gives no MAC address."""
+        ids = {s: _text(v, 80) for s, v in self.agent.walk(CDP_DEVICE_ID) if len(s) == 2}
+        if not ids:
+            return
+        self.cdp_ok = True
+        ports = {s: _text(v, 60) for s, v in self.agent.walk(CDP_DEVICE_PORT) if len(s) == 2}
+        addresses = {s: ".".join(str(b) for b in v) for s, v in self.agent.walk(CDP_ADDRESS) if len(s) == 2 and isinstance(v, (bytes, bytearray)) and len(v) == 4}
+        for key, name in sorted(ids.items()):
+            index = key[0]
+            known = self.neighbours.get(index)
+            ip = addresses.get(key)
+            if known is None:
+                self.neighbours[index] = {"mac": None, "name": name, "port": ports.get(key, ""), "ip": ip}
+            elif ip and not known.get("ip"):
+                known["ip"] = ip
+                known["name"] = known.get("name") or name
 
     def _read_lldp(self):
         chassis = {s[1:]: v for s, v in self.agent.walk(LLDP_CHASSIS_ID) if len(s) >= 3}
@@ -399,7 +479,7 @@ def read_switches(config):
     switches, problems = [], []
     for host, community in hosts:
         try:
-            switches.append(Switch(Agent(host, community, config.get("version") or "2c", timeout)).read())
+            switches.append(Switch(Agent(host, community, config.get("version") or "2c", timeout), config.get("vlan_indexing") or "auto").read())
         except (SnmpError, ValueError) as exc:
             problems.append(f"{host}: {exc}")
     if not switches:
@@ -407,8 +487,14 @@ def read_switches(config):
     return switches, problems
 
 
+def _short(name):
+    """A device name as CDP and LLDP spell it, reduced for comparing: "Core-SW.example.net" and "core-sw(FOC1234)" both give "core-sw"."""
+    return re.split(r"[.(]", str(name or "").strip().lower(), maxsplit=1)[0]
+
+
 def to_topology(switches, root_host=None):
     nodes, owner, switch_of = [], {}, {}
+    by_name, by_ip = {}, {}
     for sw in switches:
         mac = sw.mac or next(iter(sorted(sw.macs)), None)
         if not mac:
@@ -418,6 +504,9 @@ def to_topology(switches, root_host=None):
         switch_of[id(node)] = sw
         for m in node["macs"]:
             owner.setdefault(m, node)
+        if _short(node["name"]):
+            by_name.setdefault(_short(node["name"]), node)
+        by_ip.setdefault(node["ip"], node)
 
     # which switches face each other (LLDP), and which ports are those uplinks / downlinks
     links = defaultdict(set)      # node mac -> {neighbour node mac}
@@ -426,6 +515,10 @@ def to_topology(switches, root_host=None):
         sw = switch_of[id(node)]
         for index, neighbour in sw.neighbours.items():
             other = owner.get(neighbour["mac"]) if neighbour["mac"] else None
+            if other is None and neighbour.get("ip"):                  # CDP: the neighbour's management address
+                other = by_ip.get(neighbour["ip"])
+            if other is None and _short(neighbour.get("name")):        # CDP / LLDP without a usable address: the name
+                other = by_name.get(_short(neighbour["name"]))
             if other is not None and other is not node:
                 links[node["mac"]].add(other["mac"])
                 trunk[node["mac"]].add(index)
@@ -514,18 +607,20 @@ def diagnose(config):
             except Exception as exc:  # noqa: BLE001 - the point is to record what failed
                 entry["steps"][name] = {"ok": False, "error": _problem(exc)}
 
-        step("system", lambda: (lambda got: {"sysDescr": SYS_DESCR in got, "sysName": SYS_NAME in got, "bridge_mac": BRIDGE_ADDRESS in got})(agent.get(SYS_DESCR, SYS_NAME, BRIDGE_ADDRESS)))
+        step("system", lambda: (lambda got: {"sysDescr": SYS_DESCR in got, "sysName": SYS_NAME in got, "bridge_mac": BRIDGE_ADDRESS in got,
+                                              "enterprise": (got.get(SYS_OBJECT_ID) or ())[6:7] if isinstance(got.get(SYS_OBJECT_ID), tuple) else None})(agent.get(SYS_DESCR, SYS_NAME, BRIDGE_ADDRESS, SYS_OBJECT_ID)))
         step("sysDescr", lambda: re.sub(r"[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}", "<mac>", _text(agent.get(SYS_DESCR).get(SYS_DESCR), 120)))
         for name, base in (("ifName", IF_NAME), ("ifDescr", IF_DESCR), ("ifPhysAddress", IF_PHYS), ("dot1dBasePortIfIndex", BASE_PORT_IFINDEX),
                            ("dot1qTpFdbPort", QBRIDGE_FDB_PORT), ("dot1qTpFdbStatus", QBRIDGE_FDB_STATUS), ("dot1dTpFdbPort", BRIDGE_FDB_PORT),
-                           ("lldpRemChassisId", LLDP_CHASSIS_ID), ("lldpRemSysName", LLDP_SYS_NAME), ("lldpLocPortId", LLDP_LOCAL_PORT + (3,))):
+                           ("lldpRemChassisId", LLDP_CHASSIS_ID), ("lldpRemSysName", LLDP_SYS_NAME), ("lldpLocPortId", LLDP_LOCAL_PORT + (3,)),
+                           ("vtpVlanState", VTP_VLAN_STATE), ("cdpCacheDeviceId", CDP_DEVICE_ID), ("cdpCacheAddress", CDP_ADDRESS)):
             step(name, lambda base=base: {"rows": len(agent.walk(base))})
         try:
-            sw = Switch(agent).read()
+            sw = Switch(agent, config.get("vlan_indexing") or "auto").read()
             switches.append(sw)
             entry["summary"] = {
                 "ports": len(sw.ports), "learned_macs": len(sw.fdb), "fdb_source": sw.fdb_source, "own_macs": len(sw.macs),
-                "lldp": sw.lldp_ok, "lldp_neighbours": len(sw.neighbours), "macs_per_port_max": max(Counter(sw.fdb.values()).values(), default=0),
+                "lldp": sw.lldp_ok, "cdp": sw.cdp_ok, "cisco": sw.cisco, "vlans_read": sw.vlans_read, "neighbours": len(sw.neighbours), "macs_per_port_max": max(Counter(sw.fdb.values()).values(), default=0),
             }
         except Exception as exc:  # noqa: BLE001
             entry["error"] = _problem(exc)

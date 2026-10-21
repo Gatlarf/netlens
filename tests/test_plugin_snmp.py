@@ -33,6 +33,8 @@ def encode_value(value):
         return plugin._int(value)
     if isinstance(value, bytes):
         return plugin._tlv(0x04, value)
+    if isinstance(value, tuple):
+        return plugin._oid(value)
     if isinstance(value, plugin.NoSuch):
         return bytes([0x82, 0])
     raise TypeError(value)
@@ -338,3 +340,157 @@ def test_the_real_udp_path_against_a_local_agent():
     finally:
         stop.set()
         server.close()
+
+
+# ---------------------------------------------------------------- Cisco: one BRIDGE-MIB per VLAN (community@vlan), VTP and CDP
+CISCO_CAT = (1, 3, 6, 1, 4, 1, 9, 1, 1208)
+
+
+class CiscoMib(Mib):
+    """A Catalyst: the plain community shows VLAN 1 only, "community@N" shows VLAN N, and a VLAN it does not have is not answered (a timeout)."""
+
+    def __init__(self, community="public"):
+        super().__init__(community)
+        self.vlans = {}
+        self.communities = []
+
+    def handle(self, payload):
+        community = decode_request(payload)[2]
+        self.communities.append(community)
+        _, _, vlan = community.partition("@")
+        number = int(vlan) if vlan else 1
+        if vlan and number not in self.vlans:
+            raise plugin.Timeout("no such VLAN instance")
+        saved, saved_community = self.values, self.community
+        self.values, self.community = {**saved, **self.vlans.get(number, {})}, community
+        try:
+            return super().handle(payload)
+        finally:
+            self.values, self.community = saved, saved_community
+
+
+def cisco_mib(name, mac, ports, vlans, vtp=True, qbridge=None, cdp=(), descr="Cisco IOS Software, C2960 Software"):
+    """ports {ifIndex: name}; vlans {vlan: [(client mac, ifIndex)]}; cdp [(ifIndex, device id, remote port, ip)]."""
+    m = CiscoMib()
+    m.set(plugin.SYS_DESCR, descr.encode())
+    m.set(plugin.SYS_NAME, name.encode())
+    m.set(plugin.SYS_OBJECT_ID, CISCO_CAT)
+    m.set(plugin.BRIDGE_ADDRESS, mac_bytes(mac))
+    for index, port in ports.items():
+        m.set(plugin.IF_NAME + (index,), port.encode())
+        m.set(plugin.IF_PHYS + (index,), mac_bytes(mac))
+    if vtp:
+        for vlan in list(vlans) + [1002, 1003, 1004, 1005]:
+            m.set(plugin.VTP_VLAN_STATE + (1, vlan), 1)
+    for vlan, clients in vlans.items():
+        view = m.vlans.setdefault(vlan, {})
+        for index in ports:
+            view[plugin.BASE_PORT_IFINDEX + (index - 1000,)] = index
+        for client, index in clients:
+            view[plugin.BRIDGE_FDB_PORT + octets(client)] = index - 1000
+            view[plugin.BRIDGE_FDB_STATUS + octets(client)] = 3
+    if qbridge:
+        for client, index in qbridge:
+            m.set(plugin.QBRIDGE_FDB_PORT + (1,) + octets(client), index - 1000)
+            m.set(plugin.QBRIDGE_FDB_STATUS + (1,) + octets(client), 3)
+            m.set(plugin.BASE_PORT_IFINDEX + (index - 1000,), index)
+    for n, (index, device, remote_port, ip) in enumerate(cdp, start=1):
+        m.set(plugin.CDP_DEVICE_ID + (index, n), device.encode())
+        m.set(plugin.CDP_DEVICE_PORT + (index, n), remote_port.encode())
+        m.set(plugin.CDP_ADDRESS + (index, n), bytes(int(x) for x in ip.split(".")))
+    return m
+
+
+def serve(monkeypatch, agents):
+    def send(address, payload, timeout):
+        if address[0] not in agents:
+            raise plugin.Timeout("no answer")
+        return agents[address[0]].handle(payload)
+
+    monkeypatch.setattr(plugin, "SEND", send)
+
+
+def test_a_catalyst_is_read_per_vlan(monkeypatch):
+    cat = cisco_mib("CAT", "c0:00:00:00:01:01", {1001: "Gi1/0/1", 1002: "Gi1/0/2", 1003: "Gi1/0/3"},
+                    {1: [(TV, 1001)], 25: [(CAM, 1002), (NAS, 1003)], 30: [(PHONE, 1003)]})
+    serve(monkeypatch, {"10.1.0.1": cat})
+    out = validate_output("topology", plugin.fetch({"hosts": "10.1.0.1", "community": "public"}))
+    where = {c["mac"]: c["port"] for c in out["clients"]}
+    assert where == {TV: "Gi1/0/1", CAM: "Gi1/0/2", NAS: "Gi1/0/3", PHONE: "Gi1/0/3"}         # all VLANs, not only VLAN 1
+    asked = set(cat.communities)
+    assert {"public@25", "public@30"} <= asked and not any(c.endswith(("@1002", "@1003", "@1004", "@1005")) for c in asked)
+
+
+def test_a_cisco_with_a_qbridge_table_is_not_read_per_vlan_unless_asked(monkeypatch):
+    cat = cisco_mib("CAT", "c0:00:00:00:01:02", {1001: "Gi1/0/1"}, {1: [(TV, 1001)], 25: [(CAM, 1001)]}, qbridge=[(TV, 1001), (CAM, 1001)])
+    serve(monkeypatch, {"10.1.0.2": cat})
+    plugin.fetch({"hosts": "10.1.0.2", "community": "public"})
+    assert not any("@" in c for c in cat.communities)
+    plugin.fetch({"hosts": "10.1.0.2", "community": "public", "vlan_indexing": "always"})
+    assert "public@25" in cat.communities
+
+
+def test_vlan_indexing_can_be_switched_off(monkeypatch):
+    cat = cisco_mib("CAT", "c0:00:00:00:01:03", {1001: "Gi1/0/1"}, {1: [(TV, 1001)], 25: [(CAM, 1001)]})
+    serve(monkeypatch, {"10.1.0.3": cat})
+    out = plugin.fetch({"hosts": "10.1.0.3", "community": "public", "vlan_indexing": "off"})
+    assert [c["mac"] for c in out["clients"]] == [TV] and not any("@" in c for c in cat.communities)
+
+
+def test_a_switch_that_is_not_a_cisco_is_never_asked_with_community_at_vlan(monkeypatch):
+    m = switch_mib("OTHER", "x", "c0:00:00:00:01:04", {1001: "1"}, [(TV, 1001)], qbridge=False)
+    seen = []
+    serve(monkeypatch, {"10.1.0.4": type("Spy", (), {"handle": lambda self, payload: (seen.append(decode_request(payload)[2]), m.handle(payload))[1]})()})
+    plugin.fetch({"hosts": "10.1.0.4", "community": "public"})
+    assert set(seen) == {"public"}
+
+
+def test_vlans_without_vtp_come_from_the_vlan_interfaces(monkeypatch):
+    cat = cisco_mib("CAT", "c0:00:00:00:01:05", {1001: "Gi1/0/1", 5025: "Vl25"}, {1: [(TV, 1001)], 25: [(CAM, 1001)]}, vtp=False)
+    serve(monkeypatch, {"10.1.0.5": cat})
+    out = plugin.fetch({"hosts": "10.1.0.5", "community": "public"})
+    assert {c["mac"] for c in out["clients"]} == {TV, CAM}
+
+
+def test_silent_vlans_do_not_stall_the_read(monkeypatch):
+    cat = cisco_mib("CAT", "c0:00:00:00:01:06", {1001: "Gi1/0/1"}, {1: [(TV, 1001)], 25: [(CAM, 1001)]})
+    for vlan in (30, 31, 32, 33, 34):                       # VTP lists VLANs this stack member has no instance for
+        cat.set(plugin.VTP_VLAN_STATE + (1, vlan), 1)
+    serve(monkeypatch, {"10.1.0.6": cat})
+    out = plugin.fetch({"hosts": "10.1.0.6", "community": "public"})
+    assert {c["mac"] for c in out["clients"]} == {TV, CAM}
+    assert sum(1 for c in cat.communities if c.endswith(("@30", "@31", "@32", "@33", "@34"))) <= 6      # gave up after three silent VLANs
+
+
+def test_cisco_switches_are_linked_by_cdp(monkeypatch):
+    core = cisco_mib("CORE-SW", "c0:00:00:00:02:01", {1001: "Gi1/0/1", 1002: "Gi1/0/2"},
+                     {1: [(NAS, 1001), ("c0:00:00:00:02:02", 1002), (TV, 1002)]},
+                     cdp=[(1002, "access-sw.example.net", "Gi1/0/48", "10.2.0.2")])
+    access = cisco_mib("ACCESS-SW", "c0:00:00:00:02:02", {1001: "Gi1/0/1", 1048: "Gi1/0/48"},
+                       {1: [(TV, 1001), ("c0:00:00:00:02:01", 1048), (NAS, 1048)]},
+                       cdp=[(1048, "core-sw(FOC1234)", "Gi1/0/2", "10.2.0.1")])
+    serve(monkeypatch, {"10.2.0.1": core, "10.2.0.2": access})
+    out = validate_output("topology", plugin.fetch({"hosts": "10.2.0.1 10.2.0.2", "community": "public", "root": "10.2.0.1"}))
+    nodes = {n["name"]: n for n in out["nodes"]}
+    assert nodes["ACCESS-SW"]["parent_mac"] == "c0:00:00:00:02:01" and nodes["CORE-SW"]["parent_mac"] is None
+    where = {c["mac"]: (c["node_mac"], c["port"]) for c in out["clients"]}
+    assert where[TV] == ("c0:00:00:00:02:02", "Gi1/0/1") and where[NAS] == ("c0:00:00:00:02:01", "Gi1/0/1")
+
+
+def test_cdp_neighbours_match_by_address_when_the_name_differs(monkeypatch):
+    a = cisco_mib("A", "c0:00:00:00:03:01", {1001: "Gi1"}, {1: []}, cdp=[(1001, "some-other-name", "Gi2", "10.3.0.2")])
+    b = cisco_mib("B", "c0:00:00:00:03:02", {1001: "Gi2"}, {1: []})
+    serve(monkeypatch, {"10.3.0.1": a, "10.3.0.2": b})
+    out = plugin.fetch({"hosts": "10.3.0.1 10.3.0.2", "community": "public", "root": "10.3.0.1"})
+    assert {n["name"]: n["parent_mac"] for n in out["nodes"]} == {"A": None, "B": "c0:00:00:00:03:01"}
+
+
+def test_diagnose_reports_cisco_facts_without_content(monkeypatch):
+    cat = cisco_mib("SECRETNAME", "c0:00:00:00:01:07", {1001: "Gi1/0/1"}, {1: [(TV, 1001)], 25: [(CAM, 1001)]}, cdp=[(1001, "peer-sw", "Gi1", "10.9.9.9")])
+    serve(monkeypatch, {"10.1.0.7": cat})
+    report = plugin.diagnose({"hosts": "10.1.0.7", "community": "public"})
+    summary = report["switches"][0]["summary"]
+    assert summary["cisco"] is True and summary["vlans_read"] == 2 and summary["cdp"] is True
+    assert report["switches"][0]["steps"]["system"]["result"]["enterprise"] == (9,)
+    text = json.dumps(report)
+    assert "SECRETNAME" not in text and "peer-sw" not in text and "c0:00:00" not in text and "10.9.9.9" not in text

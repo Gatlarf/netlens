@@ -1,11 +1,11 @@
 {
   "id": "snmp",
   "name": "SNMP switches",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",
-  "description": "Asks managed switches (SNMP v1 / v2c, read-only) which devices are plugged into which port: the MAC address table of every switch, and LLDP to see how the switches are connected to each other. Netlens then shows each device's switch and port and places the switches in the hierarchy. Works with any switch that has SNMP and the standard bridge MIB (TP-Link, Netgear, HP / Aruba, Cisco, Zyxel, MikroTik, Ubiquiti and others).",
+  "description": "Asks managed switches (SNMP v1 / v2c, read-only) which devices are plugged into which port: the MAC address table of every switch, and LLDP (and Cisco CDP) to see how the switches are connected. Netlens then shows each device's switch and port and places the switches in the hierarchy. Works with switches that offer the standard bridge MIB (TP-Link, Netgear, HP / Aruba, Juniper, Huawei, Zyxel, MikroTik...); Cisco is read per VLAN.",
   "timeout": 120,
   "diagnose": true,
   "config": [
@@ -65,6 +65,27 @@
       "label": "Core switch",
       "placeholder": "192.168.1.2",
       "help": "Optional. The switch closest to your router, from which the others hang. Without it the switch with the most neighbours is used."
+    },
+    {
+      "key": "vlan_indexing",
+      "type": "select",
+      "label": "Cisco VLAN indexing",
+      "options": [
+        {
+          "value": "auto",
+          "label": "Automatic (Cisco switches without a Q-BRIDGE table)"
+        },
+        {
+          "value": "always",
+          "label": "Always (read every VLAN of every switch)"
+        },
+        {
+          "value": "off",
+          "label": "Off"
+        }
+      ],
+      "default": "auto",
+      "help": "Cisco IOS keeps a separate MAC address table for every VLAN and shows only VLAN 1 to a plain community string. Netlens then asks for each VLAN with community@vlan. Leave it on Automatic unless the diagnostic shows a switch whose devices are missing."
     },
     {
       "key": "timeout",

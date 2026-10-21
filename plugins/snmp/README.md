@@ -5,7 +5,7 @@ shows **"Connected to: SW_GARDEN · port gi1/0/5"** on every device's page and p
 the hierarchy and on the map. It works with any switch that offers SNMP v1 or v2c and the standard bridge MIB: TP-Link (JetStream / Smart),
 Netgear, HP / Aruba, Cisco, Zyxel, MikroTik, Ubiquiti and others. Read-only: it only ever sends SNMP *get* requests.
 
-> **Status: verified against a real device** (reported by the maintainer, 2026-10-16), after tests against simulated switches (a codec checked against a real SNMP packet, and a simulated network of two switches with LLDP). More switch models are still welcome: *Run diagnostic* makes a report.
+> **Status: verified against a real device** (reported by the maintainer, 2026-10-16), after tests against simulated switches (a codec checked against a real SNMP packet, and a simulated network of two switches with LLDP). The Cisco parts of 1.2.0 (per-VLAN tables, CDP) follow Cisco's documentation and are tested against a simulated Catalyst only; a report from a real Catalyst is welcome. More switch models are still welcome: *Run diagnostic* makes a report.
 > Please try it on a real switch and report what you see, see *Testing* below.
 
 ## What it reads
@@ -17,12 +17,18 @@ Netgear, HP / Aruba, Cisco, Zyxel, MikroTik, Ubiquiti and others. Read-only: it 
 | IF-MIB | `ifName` (else `ifDescr`), `ifPhysAddress` | port names, and the MACs the switch itself uses |
 | Q-BRIDGE-MIB (else BRIDGE-MIB) | `dot1qTpFdbPort` / `dot1dTpFdbPort` and their status | the MAC address table: which MAC was learned on which port |
 | LLDP-MIB | `lldpRemChassisId`, `lldpRemSysName`, `lldpLocPortId` | which port leads to which other switch |
+| CISCO-CDP-MIB | `cdpCacheDeviceId`, `cdpCacheDevicePort`, `cdpCacheAddress` | the same for Cisco neighbours that only speak CDP (matched to your switches by management address, else by name) |
+| CISCO-VTP-MIB | `vtpVlanState` | which VLANs a Cisco switch has (see below) |
 
 How Netlens uses it: every switch you list becomes a node. Two switches that see each other by LLDP are linked (from the **core switch**, which you can
 name, else the one with the most neighbours). Every MAC in an address table becomes a wired client **of the switch whose port it was learned on,
 unless that port is an uplink to another switch**: a TV plugged into the garden switch is also visible in the core switch's table, but there it sits
 on the port that leads to the garden switch, so it is ignored. Without LLDP, a MAC seen on several switches is attributed to the one where its port
 carries the fewest addresses (the edge). Multicast and the switches' own addresses are skipped.
+
+### Cisco: one MAC table per VLAN (version 1.2.0)
+
+A Cisco IOS switch keeps a separate BRIDGE-MIB for every VLAN and shows only VLAN 1 to a plain community string. When the switch is a Cisco (its `sysObjectID` is below 1.3.6.1.4.1.9) and has no Q-BRIDGE table, Netlens asks for each operational VLAN with `community@vlan` (`public@25`) and merges the tables. VLANs the switch does not answer for are skipped, and three silent VLANs in a row stop the loop. The setting *Cisco VLAN indexing* can force it (*Always*, for a Cisco that has a Q-BRIDGE table that is incomplete) or turn it off. Juniper, Huawei, HP/Aruba and most others publish the whole table through Q-BRIDGE-MIB and need none of this.
 
 ## Set-up
 
