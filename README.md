@@ -527,6 +527,16 @@ Quick scans are normally a few seconds. **Deep scans are the slow part**: they p
 | Host timeout (default 120 s for quick scans, 900 s for deep scans; 0 = no limit) | caps the worst case: one slow or rate-limiting device can otherwise hold a deep scan up for an hour | a host nmap gives up on is skipped for that scan only: it stays online and keeps its known ports, and a "Host timeout" event is logged |
 | Quick scan: hosts only (no ports) | fastest quick scan | quick scans no longer refresh ports (deep scans still do) |
 
+### Gentle scanning (printers, TVs, smart devices)
+
+A deep scan looks at what runs behind each open port (service detection), guesses the operating system and traces the route. Some devices do not like that: a printer may print the probe as a page of rubbish, a cheap camera or smart plug may hang or reboot, a TV asks its owner whether a device may connect. A **gentle** device is only checked for open ports; it gets no service detection, scripts, OS detection or traceroute.
+
+* **On by default** for printers, smart devices (IoT), cameras, TVs, speakers, game consoles and appliances. Quick scans never probe services, so they are not affected.
+* **Per kind of device:** *Settings → Scan performance → Gentle scanning per kind of device* has a tick box for every kind. **Scan everything fully** restores the behaviour before 0.4.137; **Recommended** restores the defaults.
+* **Per device:** the *Gentle scanning* box on the device page overrides the kind, in both directions.
+* **The cost:** service names, versions and the OS of gentle devices are no longer refreshed. Start a **full scan** of one device when you want them.
+* A device Netlens has not recognised yet is probed normally until its first scan has told what it is.
+
 ### Cancelling a scan
 
 While a scan runs, the strip under the header has a **Cancel scan** button. It stops nmap immediately and marks the scan as `cancelled` in **Scans & events**; nothing from that scan is saved, no notifications are sent and it does not count towards the typical duration. It is only available until the results start being saved (the button is greyed out for the last moment of a scan). The same is available as `POST /api/scans/cancel`.
