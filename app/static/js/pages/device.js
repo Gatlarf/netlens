@@ -8,6 +8,7 @@ import { buildDeviceMonitorCard, isMonitorFormOpen } from "../cards/device_monit
 import { buildHealthGlance } from "../cards/health_glance.js";
 import { buildDevicePortsCard, PORT_METRICS } from "../cards/device_ports.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
+import { buildSwitchPortsCard } from "../cards/switch_ports.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
 import { stateDot } from "./services.js";
 import { buildParentCard } from "../cards/device_parent.js";
@@ -839,6 +840,9 @@ export async function render(container, params) {
     const wifiSlot = slot();
     nRight.appendChild(wifiSlot);
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
+    const portsSlot = slot();
+    nRight.appendChild(portsSlot);
+    buildSwitchPortsCard(device.id).then((c) => { if (c && !disposed) portsSlot.appendChild(c); }).catch(() => {});
     const virtualizationCard = buildVirtualizationCard(device);
     if (virtualizationCard) nRight.appendChild(virtualizationCard);
     const backupCard = buildBackupCard(device);

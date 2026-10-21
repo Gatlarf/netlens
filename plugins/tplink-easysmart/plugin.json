@@ -1,0 +1,30 @@
+{
+  "id": "tplink-easysmart",
+  "name": "TP-Link Easy Smart switch",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads a TP-Link Easy Smart switch (TL-SG105E, TL-SG108E, TL-SG1016PE, TL-SG1024DE and relatives) from its web page: the switch as a network node with the state, speed and packet counters of every port. Netlens shows them on the switch's device page and logs an event when a port goes down or comes back. These switches have no SNMP and no MAC address table, so the devices behind a port cannot be listed. Read-only: it only reads two status pages and logs out again.",
+  "timeout": 60,
+  "diagnose": true,
+  "info": {
+    "title": "Good to know before you switch it on",
+    "text": "Easy Smart switches speak plain HTTP and, once someone has logged in, treat every request from that same IP address as logged in (CVE-2017-17746). Netlens logs out after each read, but run it from a machine that you trust (the Netlens container's host) and keep the switch on a trusted network. Use the switch's own login (the default user is admin); only 16 sessions fit, so close any open browser tab on the switch when a read fails with 'sessions full'. The password can be at most 16 characters long (the switch's limit)."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Switches",
+      "required": true,
+      "help": "One line per switch.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "192.168.0.250", "required": true},
+        {"key": "username", "label": "User name", "placeholder": "admin", "required": true},
+        {"key": "password", "label": "Password", "type": "password", "required": true},
+        {"key": "name", "label": "Name in Netlens", "placeholder": "Core switch", "optional": true}
+      ]
+    }
+  ]
+}

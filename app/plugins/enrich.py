@@ -185,3 +185,50 @@ def record_wifi(conn: sqlite3.Connection, data: dict, now: str | None = None) ->
     conn.execute("DELETE FROM wifi_samples WHERE ts < ?", (old,))
     conn.commit()
     return {"samples": samples, "roams": roams}
+
+
+PORT_RETENTION_DAYS = 14
+
+
+def record_switch_ports(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None) -> int:
+    """Store the ports a topology node reports (a switch without SNMP): the latest state, one counter sample per sync, and a
+    `link_down` / `link_up` event when a port changed state since the previous sync. Returns the number of ports recorded."""
+    from datetime import datetime, timedelta, timezone
+
+    now = now or utcnow()
+    by_mac, by_ip = device_lookup(conn)
+    recorded = 0
+    for node in data.get("nodes", []):
+        ports = node.get("ports") or []
+        device_id = next((by_mac[m] for m in node["macs"] if m in by_mac), None) or by_ip.get(node.get("ip") or "")
+        if device_id is None or not ports:
+            continue
+        before = {r["port"]: r["up"] for r in conn.execute("SELECT port, up FROM switch_ports WHERE device_id = ?", (device_id,))}
+        for port in ports:
+            number, up = port["port"], 1 if port["up"] else 0
+            label = f"port {number}" + (f" ({port['name']})" if port.get("name") else "")
+            if number in before and before[number] != up:
+                add_event(conn, "link_up" if up else "link_down", f"{node.get('name') or node['mac']}: {label}" + (f" at {port['speed_mbps']:g} Mbit/s" if up and port.get("speed_mbps") else ""), device_id=device_id, now=now)
+            counters = (port.get("tx_packets"), port.get("rx_packets"), port.get("tx_errors"), port.get("rx_errors"))
+            conn.execute(
+                """
+                INSERT INTO switch_ports (device_id, port, plugin_id, name, enabled, up, speed_mbps, duplex, tx_packets, rx_packets, tx_errors, rx_errors, updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(device_id, port) DO UPDATE SET plugin_id = excluded.plugin_id, name = excluded.name, enabled = excluded.enabled, up = excluded.up,
+                    speed_mbps = excluded.speed_mbps, duplex = excluded.duplex, tx_packets = excluded.tx_packets, rx_packets = excluded.rx_packets,
+                    tx_errors = excluded.tx_errors, rx_errors = excluded.rx_errors, updated = excluded.updated
+                """,
+                (device_id, number, plugin_id, port.get("name"), 1 if port["enabled"] else 0, up, port.get("speed_mbps"), port.get("duplex"), *counters, now),
+            )
+            conn.execute(
+                "INSERT INTO switch_port_samples (device_id, port, ts, up, speed_mbps, tx_packets, rx_packets, tx_errors, rx_errors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (device_id, number, now, up, port.get("speed_mbps"), *counters),
+            )
+            recorded += 1
+        gone = [n for n in before if n not in {p["port"] for p in ports}]
+        for number in gone:
+            conn.execute("DELETE FROM switch_ports WHERE device_id = ? AND port = ?", (device_id, number))
+    old = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc) - timedelta(days=PORT_RETENTION_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    conn.execute("DELETE FROM switch_port_samples WHERE ts < ?", (old,))
+    conn.commit()
+    return recorded

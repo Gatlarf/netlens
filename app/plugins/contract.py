@@ -896,6 +896,36 @@ def _inventory(data: Any) -> dict:
     return {"servers": servers, "devices": devices}
 
 
+def _switch_ports(value: Any, path: str) -> list[dict]:
+    """The ports of a switch node: link state, speed and packet counters (a plugin for a switch that has no SNMP reads them from its web page)."""
+    ports, seen = [], set()
+    for i, raw in enumerate(_list(value, path)[:128]):
+        p = f"{path}[{i}]"
+        raw = _dict(raw, p)
+        number = _optional_number(raw.get("port"), f"{p}.port", 1, 1024, integer=True)
+        if number is None:
+            _fail(f"{p}.port", "is required")
+        if number in seen:
+            _fail(f"{p}.port", f"port {number} is listed twice")
+        seen.add(number)
+        duplex = raw.get("duplex")
+        if duplex not in (None, "full", "half"):
+            _fail(f"{p}.duplex", "must be full or half")
+        for key in ("up", "enabled"):
+            if key in raw and not isinstance(raw[key], bool):
+                _fail(f"{p}.{key}", "must be true or false")
+        ports.append({
+            "port": number,
+            "name": _text(raw.get("name"), f"{p}.name", max_len=40) or None,
+            "enabled": raw.get("enabled", True),
+            "up": raw.get("up", False),
+            "speed_mbps": _optional_number(raw.get("speed_mbps"), f"{p}.speed_mbps", 0, 1000000),
+            "duplex": duplex,
+            **{k: _optional_number(raw.get(k), f"{p}.{k}", 0, 2**63 - 1, integer=True) for k in ("tx_packets", "rx_packets", "tx_errors", "rx_errors")},
+        })
+    return ports
+
+
 def _topology(data: Any) -> dict:
     data = _dict(data, "output")
     nodes, node_macs = [], set()
@@ -918,6 +948,7 @@ def _topology(data: Any) -> dict:
             "model": _text(raw.get("model"), f"{path}.model", max_len=100),
             "role": role,
             "parent_mac": _mac(raw.get("parent_mac"), f"{path}.parent_mac"),
+            "ports": _switch_ports(raw.get("ports"), f"{path}.ports"),
         })
     known = {m for n in nodes for m in n["macs"]}
     for i, n in enumerate(nodes):

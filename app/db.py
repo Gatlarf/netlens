@@ -628,6 +628,38 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_wifi_device_ts ON wifi_samples(device_id, ts)")
+    # ports of a switch as a topology plugin reports them (link state, speed, packet counters), the latest state and a history of counter samples
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS switch_ports (
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            port INTEGER NOT NULL,
+            plugin_id TEXT NOT NULL,
+            name TEXT,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            up INTEGER NOT NULL DEFAULT 0,
+            speed_mbps REAL,
+            duplex TEXT,
+            tx_packets BIGINT, rx_packets BIGINT, tx_errors BIGINT, rx_errors BIGINT,
+            updated TEXT NOT NULL,
+            PRIMARY KEY (device_id, port)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS switch_port_samples (
+            id INTEGER PRIMARY KEY,
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            port INTEGER NOT NULL,
+            ts TEXT NOT NULL,
+            up INTEGER NOT NULL DEFAULT 0,
+            speed_mbps REAL,
+            tx_packets BIGINT, rx_packets BIGINT, tx_errors BIGINT, rx_errors BIGINT
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_switch_port_samples ON switch_port_samples(device_id, port, ts)")
     # --- schema v17: what a plugin reports about a guest (a container's image, health, published ports), JSON ---
     _add_column_if_missing(conn, "hypervisor_guests", "details", "TEXT NOT NULL DEFAULT '{}'")
     # --- schema v16: DNS registration (see app/dns) -------------------------------------------
