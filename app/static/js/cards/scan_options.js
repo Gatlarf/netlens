@@ -14,6 +14,10 @@ const PRESET_HINTS = {
   fastest: "Also no OS or version detection, no reverse DNS, quick scans check the top 50 ports, and slow hosts are abandoned after 1 minute (quick) or 2 minutes (deep). You lose OS names, service versions and DNS names.",
 };
 
+const GENTLE_KINDS = [["printer", "Printers"], ["iot", "Smart devices (IoT)"], ["camera", "Cameras"], ["tv", "TVs"], ["speaker", "Speakers"], ["console", "Game consoles"], ["appliance", "Appliances"],
+  ["phone", "Phones"], ["tablet", "Tablets"], ["nas", "NAS"], ["pc", "Computers"], ["server", "Servers"], ["router", "Routers"], ["switch", "Switches"], ["ap", "Access points"], ["vm", "Virtual machines"]];
+const gentleSet = (csv) => new Set(String(csv || "").split(",").filter(Boolean));
+
 function kvRow(label, value) {
   const row = h("div", { class: "kv" });
   row.appendChild(h("span", { class: "kv-label" }, label));
@@ -249,10 +253,25 @@ export async function buildScanOptionsCard() {
     form.appendChild(fieldRecheck);
 
     const fieldGentle = h("div", { class: "field" });
-    fieldGentle.appendChild(h("label", {}, "Gentle device types"));
-    const inputGentle = h("input", { type: "text", name: "gentle_types", placeholder: "printer,iot,camera,tv", value: options.gentle_types });
-    fieldGentle.appendChild(inputGentle);
-    fieldGentle.appendChild(h("p", { class: "hint" }, "Deep scans only check which ports are open on these kinds of device. They get no service detection, scripts or OS detection, which can make a printer print rubbish, hang a camera or smart plug, or make a TV ask for permission. Types: router, switch, ap, server, pc, phone, tablet, tv, speaker, console, appliance, printer, iot, camera, nas, vm. A single device can be changed on its own page. Service names and versions of these devices are no longer refreshed."));
+    fieldGentle.appendChild(h("label", {}, "Gentle scanning per kind of device"));
+    fieldGentle.appendChild(h("p", { class: "hint" }, "Deep scans only check which ports are open on the kinds ticked here. They get no service detection, scripts or OS detection, which can make a printer print rubbish, hang a camera or smart plug, or make a TV ask for permission. The cost: service names, versions and the OS of these devices are no longer refreshed. Quick scans never probe services, so they are not affected. A single device can be changed on its own page."));
+    const gentleBoxes = {};
+    const gentleGrid = h("div", { class: "checks" });
+    for (const [type, label] of GENTLE_KINDS) {
+      const box = h("input", { type: "checkbox", name: "gentle_" + type, checked: gentleSet(options.gentle_types).has(type) });
+      gentleBoxes[type] = box;
+      gentleGrid.appendChild(h("label", { style: "display:inline-block;margin-right:14px" }, box, " " + label));
+    }
+    fieldGentle.appendChild(gentleGrid);
+    const setGentle = (csv) => { const on = gentleSet(csv); for (const t in gentleBoxes) gentleBoxes[t].checked = on.has(t); };
+    const gentleButtons = h("div", {});
+    const recommended = h("button", { type: "button", class: "btn" }, "Recommended (printers, smart devices, cameras, TVs...)");
+    recommended.addEventListener("click", () => setGentle(defaults.gentle_types));
+    const nothing = h("button", { type: "button", class: "btn" }, "Scan everything fully (previous behaviour)");
+    nothing.addEventListener("click", () => setGentle(""));
+    gentleButtons.appendChild(recommended);
+    gentleButtons.appendChild(nothing);
+    fieldGentle.appendChild(gentleButtons);
     form.appendChild(fieldGentle);
 
     const fieldSkipDns = h("div", { class: "field" });
@@ -319,7 +338,7 @@ export async function buildScanOptionsCard() {
       inputRecheck.checked = preset.recheck_missing !== false;
       inputQuickHostTimeout.value = String(preset.quick_host_timeout);
       inputDeepHostTimeout.value = String(preset.deep_host_timeout);
-      inputGentle.value = preset.gentle_types ?? "";
+      setGentle(preset.gentle_types ?? "");
     }
 
     function collectValues() {
@@ -338,7 +357,7 @@ export async function buildScanOptionsCard() {
         recheck_missing: inputRecheck.checked,
         quick_host_timeout: Number(inputQuickHostTimeout.value),
         deep_host_timeout: Number(inputDeepHostTimeout.value),
-        gentle_types: inputGentle.value.trim(),
+        gentle_types: Object.keys(gentleBoxes).filter((t) => gentleBoxes[t].checked).join(","),
       };
     }
 
