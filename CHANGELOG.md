@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.147 — 2026-10-21
+
+### Added
+- ★ **Graphs per port for TP-Link Easy Smart switches**: every sync now records packets per second (sent and received), errors per second and the link state of each port as time series. They appear as graphs in the *Ports* card of the switch's page (click a port), with the period selector, and can be kept for as long as other measurements. A port that never had an error gets no error graph, and a port the administrator switched off is not shown as down. The *Switch ports* card keeps the link speed, errors in the last 24 hours and link changes.
+
 ## 0.4.146 — 2026-10-21
 
 ### Changed

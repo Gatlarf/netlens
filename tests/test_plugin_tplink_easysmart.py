@@ -189,3 +189,35 @@ def test_api_rates_errors_and_flaps(tmp_path):
     assert len(ports) == 16
     assert ports[0]["tx_pps"] == 2.0 and ports[0]["rx_pps"] == 4.0 and ports[0]["flaps"] == 1 and ports[0]["up"] == 0
     assert ports[1]["tx_errors_window"] == 0 and ports[1]["tx_packets_window"] == 600
+
+
+def test_packets_errors_and_link_state_become_time_series(tmp_path):
+    from app import tsdb
+    from app.db import connect, get_or_create_device, init_db
+    from app.plugins.enrich import record_switch_ports
+
+    conn = connect(tmp_path / "s.db")
+    init_db(conn)
+    d = get_or_create_device(conn, "aa:bb:cc:00:11:22", "192.168.0.250")
+    for step, (tx, bad) in enumerate(((1000, 0), (1600, 5))):
+        with FakeSwitch(pages={"/SystemInfoRpm.htm": info_page(), "/PortStatisticsRpm.htm": ports_page(tx)}) as sw:
+            data = validate_output("topology", plugin.fetch(config(sw.url)))
+        data["nodes"][0]["ports"][0]["tx_errors"] = bad
+        record_switch_ports(conn, "tplink-easysmart", data, now=f"2026-10-21T10:0{step * 5}:00Z")
+    store = tsdb.for_conn(conn)
+    assert store.latest("device", d, "net_tx_pps", "Port 1")[1] == 2.0           # 600 packets in 300 s
+    assert store.latest("device", d, "net_rx_pps", "Port 1")[1] == 4.0
+    assert store.latest("device", d, "if_up", "Port 1")[1] == 1.0 and store.latest("device", d, "if_up", "Port 3")[1] == 0.0
+    assert store.latest("device", d, "if_err_ps", "Port 1")[1] == pytest.approx(5 / 300)
+    assert store.latest("device", d, "if_err_ps", "Port 2") is None                # never had an error: no graph
+    assert store.latest("device", d, "net_tx_pps", "Port 3") is None               # no link, no traffic series
+    assert store.latest("device", d, "if_up", "Port 8") is None                    # switched off by the administrator (state 0): not reported as down
+
+
+def test_counter_wrap_and_reset():
+    from app.plugins.enrich import _counter_delta
+
+    assert _counter_delta(150, 100) == 50
+    assert _counter_delta(10, 2 ** 32 - 90) == 100             # wrapped around 32 bits
+    assert _counter_delta(10, 5000) is None                    # a restart
+    assert _counter_delta(None, 5) is None

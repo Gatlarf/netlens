@@ -4,7 +4,7 @@ import { formatValue, metricGraph, graphRangeTabs, savedGraphRange } from "../ti
 
 // The ports of a switch (or the interfaces of any device with many): link, traffic, how full the link is and errors.
 // Fewer than MIN interfaces are left to the ordinary performance graphs.
-export const PORT_METRICS = ["net_rx_bps", "net_tx_bps", "if_util_pct", "if_err_ps", "if_up"];
+export const PORT_METRICS = ["net_rx_bps", "net_tx_bps", "net_rx_pps", "net_tx_pps", "if_util_pct", "if_err_ps", "if_up"];
 const MIN = 3;
 const FRESH = 3600;
 
@@ -51,12 +51,19 @@ export async function buildDevicePortsCard(device) {
     const add = (metric, title, unit, extra = {}) => { if (p[`${metric}_seen`]) wrap.appendChild(metricGraph({ entity: "device", id: device.id, metric, label: p.label, title: `${title} · ${p.label}`, unit, range, ...extra })); };
     add("net_rx_bps", "Received", "bps");
     add("net_tx_bps", "Sent", "bps");
+    add("net_rx_pps", "Received packets", "pps");          // switches that only count packets (TP-Link Easy Smart)
+    add("net_tx_pps", "Sent packets", "pps");
     add("if_util_pct", "Port busy", "%", { fixedMax: 100, warn: limits.if_util_pct?.warn ?? null, crit: limits.if_util_pct?.crit ?? null });
     add("if_err_ps", "Errors", "/s");
     add("if_up", "Link", "state");
     cell.appendChild(wrap);
     return h("tr", { class: "port-detail" }, cell);
   }
+
+  const traffic = (p, way) => {
+    if (p[`net_${way}_bps`] != null) return formatValue(p[`net_${way}_bps`], "bps");
+    return p[`net_${way}_pps`] != null ? `${formatValue(p[`net_${way}_pps`], "pps")}` : "–";
+  };
 
   function draw() {
     body.replaceChildren();
@@ -66,8 +73,8 @@ export async function buildDevicePortsCard(device) {
       const util = p.if_util_pct;
       const tr = h("tr", { class: `port-row ${open.has(p.label) ? "open" : ""}`, tabindex: "0", title: "Show the graphs of this port" },
         h("td", {}, p.label), h("td", {}, link),
-        h("td", { class: "num" }, p.net_rx_bps == null ? "–" : formatValue(p.net_rx_bps, "bps")),
-        h("td", { class: "num" }, p.net_tx_bps == null ? "–" : formatValue(p.net_tx_bps, "bps")),
+        h("td", { class: "num" }, traffic(p, "rx")),
+        h("td", { class: "num" }, traffic(p, "tx")),
         h("td", { class: `num d-${level("if_util_pct", util) || "ok"}` }, util == null ? "–" : formatValue(util, "%")),
         h("td", { class: `num d-${level("if_err_ps", p.if_err_ps) || "ok"}` }, !p.if_err_ps_seen ? "" : p.if_err_ps == null ? "–" : `${Math.round(p.if_err_ps * 10) / 10}/s`));
       const toggle = () => {

@@ -188,6 +188,48 @@ def record_wifi(conn: sqlite3.Connection, data: dict, now: str | None = None) ->
 
 
 PORT_RETENTION_DAYS = 14
+COUNTER_WRAP = 2 ** 32
+
+
+def _counter_delta(new, old):
+    """Growth of a packet counter between two syncs. A counter that went back either wrapped around its 32 bits (it was near the top) or was reset (a restart): the latter gives None."""
+    if new is None or old is None:
+        return None
+    if new >= old:
+        return new - old
+    return new + COUNTER_WRAP - old if old > COUNTER_WRAP - 2 ** 26 else None
+
+
+def _record_port_series(conn, device_id, node_name, ports, before, now):
+    """Packets per second, errors per second and link state of every port as time series (they show up as graphs under Ports on the switch's page)."""
+    from datetime import datetime, timezone
+
+    from app import tsdb
+
+    store = tsdb.for_conn(conn)
+    if store is None:
+        return
+    stamp = lambda text: int(datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp())
+    points = []
+    for port in ports:
+        label = f"Port {port['port']}" + (f" {port['name']}" if port.get("name") else "")
+        if port["enabled"]:                                     # a port the administrator switched off is not reported as "down"
+            points.append(("device", device_id, "if_up", 1.0 if port["up"] else 0.0, label, "state"))
+        old = before.get(port["port"])
+        if old is None or not port["up"]:
+            continue
+        seconds = stamp(now) - stamp(old["updated"])
+        if seconds <= 0:
+            continue
+        for key, metric in (("tx_packets", "net_tx_pps"), ("rx_packets", "net_rx_pps")):
+            grown = _counter_delta(port.get(key), old[key])
+            if grown is not None:
+                points.append(("device", device_id, metric, grown / seconds, label, "pps"))
+        errors = [_counter_delta(port.get(k), old[k]) for k in ("tx_errors", "rx_errors")]
+        if None not in errors and (sum(errors) > 0 or store.latest("device", device_id, "if_err_ps", label) is not None):    # a port that never had an error gets no graph
+            points.append(("device", device_id, "if_err_ps", sum(errors) / seconds, label, "/s"))
+    if points:
+        store.record(points, ts=stamp(now))
 
 
 def record_switch_ports(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None) -> int:
@@ -203,11 +245,12 @@ def record_switch_ports(conn: sqlite3.Connection, plugin_id: str, data: dict, no
         device_id = next((by_mac[m] for m in node["macs"] if m in by_mac), None) or by_ip.get(node.get("ip") or "")
         if device_id is None or not ports:
             continue
-        before = {r["port"]: r["up"] for r in conn.execute("SELECT port, up FROM switch_ports WHERE device_id = ?", (device_id,))}
+        before = {r["port"]: r for r in conn.execute("SELECT port, up, tx_packets, rx_packets, tx_errors, rx_errors, updated FROM switch_ports WHERE device_id = ?", (device_id,))}
+        _record_port_series(conn, device_id, node.get("name"), ports, before, now)
         for port in ports:
             number, up = port["port"], 1 if port["up"] else 0
             label = f"port {number}" + (f" ({port['name']})" if port.get("name") else "")
-            if number in before and before[number] != up:
+            if number in before and before[number]["up"] != up:
                 add_event(conn, "link_up" if up else "link_down", f"{node.get('name') or node['mac']}: {label}" + (f" at {port['speed_mbps']:g} Mbit/s" if up and port.get("speed_mbps") else ""), device_id=device_id, now=now)
             counters = (port.get("tx_packets"), port.get("rx_packets"), port.get("tx_errors"), port.get("rx_errors"))
             conn.execute(

@@ -9,7 +9,6 @@ function speed(p) {
   return p.duplex ? `${text} ${p.duplex}` : text;
 }
 
-const count = (n) => (n === null || n === undefined ? "–" : fmtNumber(n));
 
 // The ports of a switch that a switch plugin (for example TP-Link Easy Smart) reports. Returns null for any other device.
 export async function buildSwitchPortsCard(deviceId) {
@@ -18,9 +17,9 @@ export async function buildSwitchPortsCard(deviceId) {
   const card = h("div", { class: "card switch-ports-card" });
   const up = data.ports.filter((p) => p.up).length;
   card.appendChild(h("h2", {}, "Switch ports"));
-  card.appendChild(h("p", { class: "hint" }, `${up} of ${data.ports.length} ports have a link. Packets per second are measured between the last two syncs; errors and link changes cover the last ${data.hours} hours.`));
+  card.appendChild(h("p", { class: "hint" }, `${up} of ${data.ports.length} ports have a link. Errors and link changes cover the last ${data.hours} hours. Packets per second and their graphs are under Ports.`));
   const table = h("table", { class: "table" });
-  table.appendChild(h("thead", {}, h("tr", {}, ...["Port", "Link", "Sending /s", "Receiving /s", "Errors (24 h)", "Link changes"].map((t) => h("th", {}, t)))));
+  table.appendChild(h("thead", {}, h("tr", {}, ...["Port", "Link", "Errors (24 h)", "Link changes"].map((t) => h("th", {}, t)))));
   const body = h("tbody", {});
   for (const p of data.ports) {
     const errors = (p.tx_errors_window || 0) + (p.rx_errors_window || 0);
@@ -28,8 +27,6 @@ export async function buildSwitchPortsCard(deviceId) {
     const row = h("tr", { title: p.enabled ? "" : "Disabled on the switch" },
       h("td", {}, p.enabled ? label : `${label} (disabled)`),
       h("td", { class: p.up ? "" : "muted" }, speed(p)),
-      h("td", {}, count(p.tx_pps)),
-      h("td", {}, count(p.rx_pps)),
       h("td", { class: errors ? "bad" : "" }, errors ? `${fmtNumber(errors)} (${fmtNumber(p.tx_errors_window || 0)} out, ${fmtNumber(p.rx_errors_window || 0)} in)` : "0"),
       h("td", { class: p.flaps > 2 ? "bad" : "" }, String(p.flaps)));
     body.appendChild(row);
