@@ -3,6 +3,10 @@ import json
 from dataclasses import dataclass, asdict, fields, replace
 from typing import Any
 
+# Device types whose firmware reacts badly to service detection (a printer prints the probe, a camera or smart plug hangs or
+# reboots, a TV asks its owner for permission). Deep scans only check which ports are open on these (see ScanOptions.gentle_types).
+GENTLE_TYPES_DEFAULT = "printer,iot,camera,tv,speaker,console,appliance"
+
 PRESETS: dict[str, dict] = {
     "default": {},
     "fast": {"timing": 4, "deep_top_ports": 200, "deep_version": "light", "quick_host_timeout": 60, "deep_host_timeout": 600},
@@ -26,6 +30,7 @@ class ScanOptions:
     recheck_missing: bool = True    # before marking a device offline, ask for it once more on its own (slow ARP answers are missed in a big sweep)
     quick_host_timeout: int = 120   # seconds nmap may spend on one host in a quick scan; 0 = no limit
     deep_host_timeout: int = 900    # same for a deep scan (stops one slow host from holding the scan for an hour)
+    gentle_types: str = GENTLE_TYPES_DEFAULT  # device types a deep scan only port-scans (no service detection, scripts, OS detection); "" = none
 
 
 def normalize_ports(spec: str) -> str:
@@ -66,6 +71,24 @@ def _check_host_timeout(key: str, value) -> int:
     if value != 0 and not (10 <= value <= 86400):
         raise ValueError(f"{key}: must be 0 or between 10 and 86400")
     return value
+
+
+def _check_gentle_types(value) -> str:
+    from app.scanner.classify import DEVICE_TYPES
+
+    if isinstance(value, list):
+        value = ",".join(str(v) for v in value)
+    if not isinstance(value, str):
+        raise ValueError("gentle_types: must be a comma-separated list of device types")
+    names = [v.strip().lower() for v in value.split(",") if v.strip()]
+    bad = [n for n in names if n not in DEVICE_TYPES or n == "unknown"]
+    if bad:
+        raise ValueError(f"gentle_types: unknown device type: {', '.join(bad)}")
+    return ",".join(dict.fromkeys(names))
+
+
+def gentle_type_list(opts: ScanOptions) -> list[str]:
+    return [t for t in opts.gentle_types.split(",") if t]
 
 
 def options_from_dict(data: dict, base: ScanOptions | None = None) -> ScanOptions:
@@ -145,6 +168,8 @@ def options_from_dict(data: dict, base: ScanOptions | None = None) -> ScanOption
             if not isinstance(value, bool):
                 raise ValueError(f"{key}: must be true or false")
             opts = replace(opts, skip_dns=value)
+        elif key == "gentle_types":
+            opts = replace(opts, gentle_types=_check_gentle_types(value))
         elif key in ("quick_host_timeout", "deep_host_timeout"):
             opts = replace(opts, **{key: _check_host_timeout(key, value)})
     return opts
@@ -247,3 +272,15 @@ def option_args(kind: str, opts: ScanOptions) -> list[str]:
 def command_preview(kind: str, opts: ScanOptions) -> str:
     target = "<host>" if kind == "full" else "<ranges>"
     return "nmap " + " ".join(option_args(kind, opts)) + f" -oX - {target}"
+
+
+def saved_gentle_types(conn) -> list[str]:
+    """The gentle device types as saved in the scan options (the default list when never changed)."""
+    from app.db import get_setting
+
+    try:
+        saved = json.loads(get_setting(conn, "scan_options") or "{}")
+    except ValueError:
+        saved = {}
+    value = saved.get("gentle_types", GENTLE_TYPES_DEFAULT) if isinstance(saved, dict) else GENTLE_TYPES_DEFAULT
+    return [t for t in str(value).split(",") if t]

@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.137 — 2026-10-21
+
+### Fixed
+- ★ **An update showed the old version** (seen with Portainer): editing or duplicating a container copies all its environment variables into the new one, including the `NETLENS_VERSION` the previous image had set, so the new image kept reporting, and serving the interface files of, the old version (the browser caches those per version). The version is now also written into the image as a file, and that file wins over the variable. A leftover variable is ignored and mentioned in the System log.
+
+### Changed
+- ★ **Gentle scanning is on by default for printers, smart devices (IoT), cameras, TVs, speakers, game consoles and appliances.** Deep scans only check which ports are open on these (no service detection, scripts or OS detection), because the probes made some printers print rubbish and can hang or reboot cheap cameras and smart plugs. Quick scans were never affected. Change the list under Settings → Scan performance → Gentle device types (empty = scan everything fully), or untick *Gentle scanning* on one device's page. Consequence: service names, versions and the OS of these devices are no longer refreshed; run a full scan on one when you want them.
+
 ## 0.4.136 — 2026-10-20
 
 ### Changed

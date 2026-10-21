@@ -26,7 +26,7 @@ from app.security import SecurityHeadersMiddleware
 from app.terminal.ssh import SSHBackend
 from app.terminal.telnet import TelnetBackend
 from app.services import service_loop
-from app.version import VERSION
+from app.version import FROM_ENV, STALE_ENV, VERSION
 
 
 
@@ -329,6 +329,8 @@ def main() -> None:
     syslog.setup(settings.data_dir)
     app = create_app(settings, scheduler=True)
     logging.getLogger("netlens").info("Netlens %s started", VERSION)
+    if STALE_ENV:
+        logging.getLogger("netlens").warning("The container has NETLENS_VERSION=%s set, but this image is %s. The variable is ignored; remove it from the container or stack settings (Portainer copies it from the old container when you edit one).", FROM_ENV, VERSION)
     uvicorn.run(app, host=settings.bind_host, port=settings.bind_port)
 
 

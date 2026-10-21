@@ -7,7 +7,7 @@ from typing import Any
 
 from app.scanner.errors import explain_scan_error, is_capability_error
 from app.scanner.nmap_runner import ScanError, _is_valid_target, run_nmap
-from app.scanner.options import ScanOptions
+from app.scanner.options import ScanOptions, gentle_type_list
 from app.scanner.nmap_parser import parse_nmap_xml
 from app.scanner.store import save_scan_results
 from app.uptime import record_checks
@@ -174,11 +174,19 @@ class ScanManager:
             logging.getLogger(__name__).info("the second look found %d of %d missing device(s)", len(found), len(candidates))
         return found
 
-    def _gentle_addresses(self) -> list[str]:
-        """Addresses of the devices that are never probed (device page: Gentle scanning), within the scan ranges' reach."""
+    def _gentle_addresses(self, kind: str = "deep") -> list[str]:
+        """Addresses of the devices that are never probed (device page: Gentle scanning), within the scan ranges' reach.
+
+        Devices ticked by hand are left out of quick and deep scans; devices whose type is in the gentle list (printers,
+        smart devices, cameras, TVs...) only of deep scans, because a quick scan does no service detection anyway.
+        """
+        types = gentle_type_list(self.options) if kind == "deep" else []
+        sql = "SELECT primary_ip FROM devices WHERE primary_ip IS NOT NULL AND (gentle = 1"
+        if types:
+            sql += " OR (gentle_off = 0 AND COALESCE(NULLIF(type_override, ''), NULLIF(device_type, ''), 'unknown') IN (%s))" % ",".join("?" * len(types))
         conn = connect(self.db_path)
         try:
-            rows = conn.execute("SELECT primary_ip FROM devices WHERE gentle = 1 AND primary_ip IS NOT NULL").fetchall()
+            rows = conn.execute(sql + ")", types).fetchall()
         finally:
             conn.close()
         return [r["primary_ip"] for r in rows if _is_single_private_host(r["primary_ip"])]
@@ -240,7 +248,7 @@ class ScanManager:
                 kwargs["progress"] = lambda update: self._set_progress(**update)
             if self._runner_accepts("options"):
                 kwargs["options"] = self.options
-            gentle_ips = self._gentle_addresses() if kind in ("quick", "deep") and self._runner_accepts("exclude") else []
+            gentle_ips = self._gentle_addresses(kind) if kind in ("quick", "deep") and self._runner_accepts("exclude") else []
             if gentle_ips:
                 kwargs["exclude"] = gentle_ips  # these are checked separately below, without probing their services
             xml = await self.runner(kind, targets, **kwargs)

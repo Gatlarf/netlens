@@ -46,6 +46,8 @@ COPY CHANGELOG.md ./CHANGELOG.md
 # Set at build time: NETLENS_VERSION=<major.minor>.<commits since VERSION changed> (contrib/version.sh, see README).
 ARG NETLENS_VERSION=dev
 ENV NETLENS_VERSION=$NETLENS_VERSION
+# Also as a file, which wins over the variable: a container form that pinned an old NETLENS_VERSION must not make a new image report it.
+RUN printf %s "$NETLENS_VERSION" > /app/app/BUILD_VERSION
 
 USER netlens
 

@@ -323,7 +323,7 @@ function buildEditCard(device, onSaved) {
 
   const gentleField = h("div", { class: "field" });
   const gentleInput = h("input", { type: "checkbox", name: "gentle", checked: device.gentle === true });
-  gentleField.appendChild(h("label", { title: "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself." }, gentleInput, " Gentle scanning (don't probe its services)"));
+  gentleField.appendChild(h("label", { title: "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself. It is on by default for printers, smart devices, cameras, TVs, speakers, consoles and appliances (some print the probe, hang or ask for permission); untick it here to scan this device normally, or change the list under Settings > Scan performance." }, gentleInput, " Gentle scanning (don't probe its services)"));
   form.appendChild(gentleField);
 
   const dnsField = h("div", { class: "field" });

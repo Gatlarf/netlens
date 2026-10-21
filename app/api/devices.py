@@ -54,6 +54,15 @@ def _parse_tags(value: str | None) -> list[str]:
     return [t.strip() for t in value.split(",") if t.strip()]
 
 
+def _gentle_by_type(conn: sqlite3.Connection, row: sqlite3.Row) -> bool:
+    """True when the device is scanned gently because of its type (printers, smart devices...) and nobody turned that off."""
+    from app.scanner.options import saved_gentle_types
+
+    if row["gentle_off"] or row["gentle"]:
+        return False
+    return (row["type_override"] or row["device_type"] or "unknown") in saved_gentle_types(conn)
+
+
 def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -179,6 +188,8 @@ def _parent_info(conn: sqlite3.Connection, device_id: int) -> dict[str, Any]:
 
 def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.Row) -> dict[str, Any]:
     result = _device_dict(row)
+    result["gentle_auto"] = _gentle_by_type(conn, row)
+    result["gentle"] = result["gentle"] or result["gentle_auto"]
     _add_group(conn, [result])
     result["identification"] = store.identification_report(conn, device_id)
     link = conn.execute("SELECT plugin_id, node_mac, node_name, port, medium, updated FROM client_links WHERE device_id = ?", (device_id,)).fetchone()
@@ -282,6 +293,7 @@ def list_devices(
             report_exclude,
             trusted,
             gentle,
+            gentle_off,
             dns_mode,
             dns_name,
             group_id,
@@ -408,6 +420,7 @@ def get_device(
             report_exclude,
             trusted,
             gentle,
+            gentle_off,
             dns_mode,
             dns_name,
             group_id,
@@ -456,6 +469,7 @@ def patch_device(
             report_exclude,
             trusted,
             gentle,
+            gentle_off,
             dns_mode,
             dns_name,
             group_id,
@@ -524,7 +538,10 @@ def patch_device(
         updates["dns_name"] = text or None
 
     if "gentle" in fields_set:
-        updates["gentle"] = 1 if body.gentle else 0
+        current = bool(row["gentle"]) or _gentle_by_type(conn, row)
+        if bool(body.gentle) != current:        # the form sends the box on every save; only a real change counts
+            updates["gentle"] = 1 if body.gentle else 0
+            updates["gentle_off"] = 0 if body.gentle else 1
 
     if "notify_offline" in fields_set:
         updates["notify_offline"] = 0 if body.notify_offline is False else 1
@@ -604,6 +621,7 @@ def patch_device(
             report_exclude,
             trusted,
             gentle,
+            gentle_off,
             dns_mode,
             dns_name,
             group_id,

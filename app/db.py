@@ -517,6 +517,7 @@ def init_db(conn: sqlite3.Connection) -> None:
     # --- schema v8: port baselines (baseline_at NULL = the device has none) ---------------------
     _add_column_if_missing(conn, "devices", "baseline_at", "TEXT")
     _add_column_if_missing(conn, "devices", "gentle", "INTEGER NOT NULL DEFAULT 0")  # v14: scans never probe this device's services
+    _add_column_if_missing(conn, "devices", "gentle_off", "INTEGER NOT NULL DEFAULT 0")  # 1 = the owner turned gentle scanning off although its type would have it on
     # --- schema v9: users, login sessions and API tokens ---------------------------------------
     cur.execute(
         """

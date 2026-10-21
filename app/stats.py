@@ -275,14 +275,17 @@ def _identification(conn) -> dict:
     """How well Netlens knows its devices: what is still unknown, hidden behind a private address, or decided by hand."""
     from app.scanner import vendor as vendor_db
 
+    from app.scanner.options import saved_gentle_types
+
     kinds = Counter()
-    for r in conn.execute(f"SELECT d.mac, d.vendor, d.custom_name, d.hostname, d.os_name, d.type_override, d.gentle, {TYPE} AS t FROM devices d"):
+    gentle_types = set(saved_gentle_types(conn))
+    for r in conn.execute(f"SELECT d.mac, d.vendor, d.custom_name, d.hostname, d.os_name, d.type_override, d.gentle, d.gentle_off, {TYPE} AS t FROM devices d"):
         kinds["unknown_type"] += 1 if r["t"] == "unknown" else 0
         mac_kind = vendor_db.mac_kind(r["mac"])
         kinds["private_mac"] += 1 if mac_kind == "randomized" else 0
         kinds["no_vendor"] += 1 if (not r["vendor"] and mac_kind == "universal") else 0
         kinds["manual_type"] += 1 if r["type_override"] else 0
-        kinds["gentle"] += 1 if r["gentle"] else 0
+        kinds["gentle"] += 1 if (r["gentle"] or (not r["gentle_off"] and r["t"] in gentle_types)) else 0
         kinds["nameless"] += 1 if not (r["custom_name"] or r["hostname"]) else 0
         kinds["no_os"] += 1 if not r["os_name"] else 0
     keys = ("unknown_type", "private_mac", "no_vendor", "manual_type", "gentle", "nameless", "no_os")

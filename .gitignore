@@ -9,6 +9,8 @@
 *.smbcredentials
 .git-credentials
 
+app/BUILD_VERSION
+
 # --- Python -----------------------------------------------------------------------------------
 __pycache__/
 *.py[cod]

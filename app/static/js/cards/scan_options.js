@@ -248,6 +248,13 @@ export async function buildScanOptionsCard() {
     fieldRecheck.appendChild(h("p", { class: "hint" }, "A device the scan did not see is asked for once more on its own before it is marked offline. Stops devices that answer slowly (some switches and access points) from flapping."));
     form.appendChild(fieldRecheck);
 
+    const fieldGentle = h("div", { class: "field" });
+    fieldGentle.appendChild(h("label", {}, "Gentle device types"));
+    const inputGentle = h("input", { type: "text", name: "gentle_types", placeholder: "printer,iot,camera,tv", value: options.gentle_types });
+    fieldGentle.appendChild(inputGentle);
+    fieldGentle.appendChild(h("p", { class: "hint" }, "Deep scans only check which ports are open on these kinds of device. They get no service detection, scripts or OS detection, which can make a printer print rubbish, hang a camera or smart plug, or make a TV ask for permission. Types: router, switch, ap, server, pc, phone, tablet, tv, speaker, console, appliance, printer, iot, camera, nas, vm. A single device can be changed on its own page. Service names and versions of these devices are no longer refreshed."));
+    form.appendChild(fieldGentle);
+
     const fieldSkipDns = h("div", { class: "field" });
     fieldSkipDns.appendChild(h("label", {}, "Skip reverse DNS lookups"));
     const inputSkipDns = h("input", {
@@ -312,6 +319,7 @@ export async function buildScanOptionsCard() {
       inputRecheck.checked = preset.recheck_missing !== false;
       inputQuickHostTimeout.value = String(preset.quick_host_timeout);
       inputDeepHostTimeout.value = String(preset.deep_host_timeout);
+      inputGentle.value = preset.gentle_types ?? "";
     }
 
     function collectValues() {
@@ -330,6 +338,7 @@ export async function buildScanOptionsCard() {
         recheck_missing: inputRecheck.checked,
         quick_host_timeout: Number(inputQuickHostTimeout.value),
         deep_host_timeout: Number(inputDeepHostTimeout.value),
+        gentle_types: inputGentle.value.trim(),
       };
     }
 

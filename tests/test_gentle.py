@@ -184,3 +184,90 @@ def test_the_second_look_can_be_switched_off_and_failures_are_harmless(tmp_path)
     conn = connect(path)
     assert conn.execute("SELECT status FROM scans ORDER BY id DESC LIMIT 1").fetchone()[0] == "done"
     conn.close()
+
+
+def _gentle_calls(tmp_path, kind, make):
+    path = tmp_path / "g.db"
+    conn = connect(path)
+    init_db(conn)
+    make(conn)
+    conn.commit()
+    conn.close()
+    calls = []
+
+    async def runner(kind, targets, *, nmap_path="nmap", progress=None, options=None, exclude=None):
+        calls.append((kind, exclude))
+        return XML.format(ip="10.0.0.10", n=10)
+
+    async def none():
+        return {}
+
+    async def ranges():
+        return ["10.0.0.0/24"]
+
+    async def gateway():
+        return None
+
+    manager = ScanManager(str(path), load_settings({"NETLENS_TOKEN": "x"}), runner=runner, names_provider=none, ranges_provider=ranges, gateway_provider=gateway, after_scan=[])
+
+    async def go():
+        await manager.start(kind)
+        await manager.wait()
+
+    asyncio.run(go())
+    return calls
+
+
+def _printer_and_pc(conn):
+    p = get_or_create_device(conn, "aa:bb:cc:00:00:20", "10.0.0.20")
+    q = get_or_create_device(conn, "aa:bb:cc:00:00:21", "10.0.0.21")
+    c = get_or_create_device(conn, "aa:bb:cc:00:00:22", "10.0.0.22")
+    conn.execute("UPDATE devices SET device_type = 'printer' WHERE id = ?", (p,))
+    conn.execute("UPDATE devices SET device_type = 'pc' WHERE id = ?", (q,))
+    conn.execute("UPDATE devices SET device_type = 'unknown', type_override = 'camera' WHERE id = ?", (c,))
+
+
+def test_printers_and_cameras_are_gentle_in_deep_scans_by_default(tmp_path):
+    calls = _gentle_calls(tmp_path, "deep", _printer_and_pc)
+    assert calls[0] == ("deep", ["10.0.0.20", "10.0.0.22"]) and calls[1] == ("gentle", None)
+
+
+def test_gentle_types_do_not_change_quick_scans(tmp_path):
+    assert [c for c in _gentle_calls(tmp_path, "quick", _printer_and_pc) if c[0] != "recheck"] == [("quick", None)]
+
+
+def test_gentle_by_type_can_be_turned_off_for_one_device(tmp_path):
+    def make(conn):
+        _printer_and_pc(conn)
+        conn.execute("UPDATE devices SET gentle_off = 1 WHERE primary_ip = '10.0.0.20'")
+
+    assert _gentle_calls(tmp_path, "deep", make)[0] == ("deep", ["10.0.0.22"])
+
+
+def test_gentle_types_validation():
+    from app.scanner.options import options_from_dict
+
+    assert options_from_dict({"gentle_types": "Printer, tv,printer"}).gentle_types == "printer,tv"
+    assert options_from_dict({"gentle_types": ""}).gentle_types == ""
+    with pytest.raises(ValueError):
+        options_from_dict({"gentle_types": "toaster"})
+
+
+def test_gentle_by_type_through_the_api(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    path = tmp_path / "a.db"
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=path)
+    with TestClient(app, headers={"Authorization": "Bearer secret"}) as c:
+        conn = connect(path)
+        d = get_or_create_device(conn, "aa:bb:cc:00:00:09", "10.0.0.9")
+        conn.execute("UPDATE devices SET device_type = 'printer' WHERE id = ?", (d,))
+        conn.commit()
+        conn.close()
+        body = c.get(f"/api/devices/{d}").json()
+        assert body["gentle"] is True and body["gentle_auto"] is True
+        assert c.patch(f"/api/devices/{d}", json={"gentle": True, "notes": "x"}).json()["gentle_auto"] is True   # no change: stays automatic
+        assert c.patch(f"/api/devices/{d}", json={"gentle": False}).json()["gentle"] is False
+        assert c.get("/api/stats/summary").status_code in (200, 404)
