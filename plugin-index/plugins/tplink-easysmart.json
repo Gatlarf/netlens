@@ -1,0 +1,25 @@
+{
+  "id": "tplink-easysmart",
+  "name": "TP-Link Easy Smart switch",
+  "kind": "topology",
+  "category": "network",
+  "description": "Reads a TP-Link Easy Smart switch (TL-SG105E, TL-SG108E, TL-SG1016PE, TL-SG1024DE and relatives) from its web page: the switch as a network node with the state, speed and packet counters of every port. Netlens shows them on the switch's device page and logs an event when a port goes down or comes back. These switches have no SNMP and no MAC address table, so the devices behind a port cannot be listed. Read-only: it only reads two status pages and logs out again.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/tplink-easysmart",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "TP-Link TL-SG1016PE hardware 3.0, firmware 1.0.0 Build 20210825 (tested on the real switch)",
+    "Other Easy Smart models (TL-SG105E, TL-SG108E, TL-SG1024DE...) use the same pages (not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-tplink-easysmart-v1.0.0/tplink-easysmart.zip",
+      "sha256": "daafcc815360c7f1b9c55bcdab6d8ca04678b4adb2aa835e7906c2e487b813e1",
+      "api_version": 1,
+      "min_netlens": "0.4.139",
+      "released": "2026-10-21",
+      "changelog": "First release. The switch as a node with the state, speed and packet counters of every port (needs Netlens 0.4.139 or newer for the Switch ports card and link events)."
+    }
+  ]
+}

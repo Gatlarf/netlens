@@ -1,0 +1,17 @@
+{
+  "id": "tplink-easysmart",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "daafcc815360c7f1b9c55bcdab6d8ca04678b4adb2aa835e7906c2e487b813e1",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-21",
+      "tested_on": [
+        "A real TP-Link TL-SG1016PE (hardware 3.0, firmware 1.0.0 Build 20210825 Rel.52031) on the maintainer's network: login, logout, system information (model, MAC, IP) and the statistics of all 16 ports (link speeds 100 and 1000 Mbit full duplex, packet counters) were read and passed the plugin contract.",
+        "Not tested on hardware: a refused login or full session list on the real switch (simulated), a port going down or up (link events, simulated), half-duplex and 10 Mbit links, other Easy Smart models and firmware."
+      ],
+      "notes": "Verified on 2026-10-21 on the maintainer's real switch; the code was written with the assistant Claude from the page format of two public projects (check_tplink, essstat) without copying code. Reads two pages and logs out; no writes."
+    }
+  ]
+}
