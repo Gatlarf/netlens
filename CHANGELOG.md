@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.146 — 2026-10-21
+
+### Changed
+- Documentation: the SNMP plugin's page (SNMPv3, Cisco per-VLAN tables, CDP), the plugin overview in the repository, and the README note on CDP are up to date.
+
 ## 0.4.144 — 2026-10-21
 
 ### Fixed
