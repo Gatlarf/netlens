@@ -2,7 +2,7 @@
 
 Asks your **managed switches** over SNMP which device is plugged into which port, and how the switches are connected to each other. Netlens then
 shows **"Connected to: SW_GARDEN · port gi1/0/5"** on every device's page and puts the switches and the devices behind them in the right place in
-the hierarchy and on the map. It works with any switch that offers SNMP v1 or v2c and the standard bridge MIB: TP-Link (JetStream / Smart),
+the hierarchy and on the map. It works with any switch that offers SNMP v1, v2c or v3 and the standard bridge MIB: TP-Link (JetStream / Smart),
 Netgear, HP / Aruba, Cisco, Zyxel, MikroTik, Ubiquiti and others. Read-only: it only ever sends SNMP *get* requests.
 
 > **Status: verified against a real device** (reported by the maintainer, 2026-10-16), after tests against simulated switches (a codec checked against a real SNMP packet, and a simulated network of two switches with LLDP). The Cisco parts of 1.2.0 (per-VLAN tables, CDP) follow Cisco's documentation and are tested against a simulated Catalyst only; a report from a real Catalyst is welcome. More switch models are still welcome: *Run diagnostic* makes a report.
@@ -39,8 +39,11 @@ A Cisco IOS switch keeps a separate BRIDGE-MIB for every VLAN and shows only VLA
    page, enter the switches' addresses (`192.168.1.2, 192.168.1.3`), the community and, if you like, the core switch.
 3. **Test connection**, **Save**, **Turn on**, **Sync now**. Netlens asks again after every scan.
 
-SNMP is not encrypted: the community string travels in clear text on your network, so use a read-only community and keep SNMP off the internet.
-SNMPv3 is not supported yet.
+SNMP v1 and v2c are not encrypted: the community string travels in clear text on your network, so use a read-only community and keep SNMP off the internet.
+
+### SNMPv3 (version 1.3.0)
+
+Choose *v3* as the SNMP version and fill in the *SNMPv3* section: a user name, an authentication protocol and password (SHA, SHA-224/256/384/512 or MD5) and an encryption protocol and password (AES-128 or DES). Passwords are at least 8 characters. On a Cisco switch, for example: `snmp-server group NETLENS v3 priv read ALL`, `snmp-server user netlens NETLENS v3 auth sha <password> priv aes 128 <password>`. The same user is used for every switch in the list. It also reads Cisco per-VLAN tables (through the context `vlan-<n>`). AES-192/256 is not supported. A refused user stops the automatic syncing (like any refused login) until you save the settings or press *Sync now*. The encryption is written in plain Python inside the plugin (plugins cannot install packages) and was checked against the FIPS test vectors and a reference implementation, and the whole client against a real net-snmp 5.9.3 agent with SHA/AES, MD5/DES, SHA-256/AES, SHA-512 without encryption and no authentication.
 
 ## Testing (what we would like to know)
 

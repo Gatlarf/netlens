@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.144 — 2026-10-21
+
+### Fixed
+- ★ **Device pages did not open** ("Cannot declare a const variable twice: 'portsSlot'") since 0.4.139, when the Switch ports card reused a variable name. A new test parses every interface script with Node, so a mistake like this fails the build instead of the page.
+
+### Added
+- ★ **SNMPv3 in the SNMP switch plugin (1.3.0, in the repository, not yet released in the plugin store)**: choose *v3* and enter a user, an authentication protocol (SHA, SHA-2, MD5) and an encryption protocol (AES-128 or DES), each with a password. Version v1 and v2c work as before. The ciphers are written in plain Python because plugins cannot use packages; they match the standard test vectors and a reference implementation, and the client was tested against a real net-snmp 5.9.3 agent with every combination. A wrong password or unknown user stops the automatic syncing until you correct it, and the error says which one it is.
+
 ## 0.4.143 — 2026-10-21
 
 ### Added

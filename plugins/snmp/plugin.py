@@ -20,11 +20,14 @@ into, not to every switch above it.
 """
 
 import copy
+import hashlib
+import hmac
 import ipaddress
 import os
 import re
 import socket
 import struct
+import time
 from collections import Counter, defaultdict
 
 # ----------------------------------------------------------------------------- OIDs
@@ -57,6 +60,11 @@ SAMPLES = 3
 
 class SnmpError(Exception):
     pass
+
+
+class AuthRefused(SnmpError):
+    """The device refused our SNMPv3 user (unknown user, wrong password or privacy settings): asking again would not help."""
+    auth_failed = True
 
 
 class Timeout(SnmpError):
@@ -313,6 +321,422 @@ def _resolve(host):
             raise SnmpError(f"cannot resolve {host}: {exc}")
 
 
+# ----------------------------------------------------------------------------- SNMPv3 (RFC 3414 user-based security, RFC 3826 AES)
+# Plugins may only use the standard library, so the two ciphers are written out here: AES-128 (CFB mode, what every modern device
+# offers) and DES (CBC mode, what older devices still default to). Messages are tiny, so speed does not matter; correctness is
+# checked in the tests against the FIPS test vectors and against a reference implementation.
+def _aes_tables():
+    sbox, p, q = [0] * 256, 1, 1
+    while True:
+        p = p ^ ((p << 1) & 0xFF) ^ (0x1B if p & 0x80 else 0)         # p times 3 in GF(2^8)
+        q ^= q << 1
+        q ^= q << 2
+        q ^= q << 4
+        q &= 0xFF
+        if q & 0x80:
+            q ^= 0x09                                                 # q divided by 3
+        rot = lambda x, n: ((x << n) | (x >> (8 - n))) & 0xFF
+        sbox[p] = q ^ rot(q, 1) ^ rot(q, 2) ^ rot(q, 3) ^ rot(q, 4) ^ 0x63
+        if p == 1:
+            break
+    sbox[0] = 0x63
+    return sbox
+
+
+_SBOX = _aes_tables()
+
+
+def _xtime(x):
+    return ((x << 1) ^ 0x1B) & 0xFF if x & 0x80 else x << 1
+
+
+def _aes_key_schedule(key):
+    if len(key) not in (16, 24, 32):
+        raise SnmpError("an AES key is 16, 24 or 32 bytes")
+    words = [list(key[i:i + 4]) for i in range(0, len(key), 4)]
+    n, rounds, rcon = len(key) // 4, len(key) // 4 + 6, 1
+    for i in range(n, 4 * (rounds + 1)):
+        word = list(words[i - 1])
+        if i % n == 0:
+            word = [_SBOX[b] for b in word[1:] + word[:1]]
+            word[0] ^= rcon
+            rcon = _xtime(rcon)
+        elif n > 6 and i % n == 4:
+            word = [_SBOX[b] for b in word]
+        words.append([a ^ b for a, b in zip(words[i - n], word)])
+    return [sum(words[4 * r:4 * r + 4], []) for r in range(rounds + 1)]
+
+
+def aes_encrypt_block(round_keys, block):
+    state = [b ^ k for b, k in zip(block, round_keys[0])]
+    for r in range(1, len(round_keys)):
+        state = [_SBOX[b] for b in state]
+        state = [state[(i + 4 * (i % 4)) % 16] for i in range(16)]    # ShiftRows (column-major state)
+        if r < len(round_keys) - 1:                                    # MixColumns, not in the last round
+            mixed = []
+            for c in range(0, 16, 4):
+                a = state[c:c + 4]
+                t = a[0] ^ a[1] ^ a[2] ^ a[3]
+                mixed += [a[i] ^ t ^ _xtime(a[i] ^ a[(i + 1) % 4]) for i in range(4)]
+            state = mixed
+        state = [b ^ k for b, k in zip(state, round_keys[r])]
+    return bytes(state)
+
+
+def aes_cfb(key, iv, data, decrypt=False):
+    """AES in 128-bit cipher feedback mode (the same block function encrypts and decrypts)."""
+    round_keys, out, feedback = _aes_key_schedule(key), bytearray(), bytes(iv)
+    for at in range(0, len(data), 16):
+        chunk = data[at:at + 16]
+        stream = aes_encrypt_block(round_keys, feedback)
+        piece = bytes(a ^ b for a, b in zip(chunk, stream))
+        out += piece
+        feedback = chunk if decrypt else piece
+    return bytes(out)
+
+
+_IP = (58, 50, 42, 34, 26, 18, 10, 2, 60, 52, 44, 36, 28, 20, 12, 4, 62, 54, 46, 38, 30, 22, 14, 6, 64, 56, 48, 40, 32, 24, 16, 8,
+       57, 49, 41, 33, 25, 17, 9, 1, 59, 51, 43, 35, 27, 19, 11, 3, 61, 53, 45, 37, 29, 21, 13, 5, 63, 55, 47, 39, 31, 23, 15, 7)
+_FP = (40, 8, 48, 16, 56, 24, 64, 32, 39, 7, 47, 15, 55, 23, 63, 31, 38, 6, 46, 14, 54, 22, 62, 30, 37, 5, 45, 13, 53, 21, 61, 29,
+       36, 4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11, 51, 19, 59, 27, 34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9, 49, 17, 57, 25)
+_E = (32, 1, 2, 3, 4, 5, 4, 5, 6, 7, 8, 9, 8, 9, 10, 11, 12, 13, 12, 13, 14, 15, 16, 17,
+      16, 17, 18, 19, 20, 21, 20, 21, 22, 23, 24, 25, 24, 25, 26, 27, 28, 29, 28, 29, 30, 31, 32, 1)
+_P = (16, 7, 20, 21, 29, 12, 28, 17, 1, 15, 23, 26, 5, 18, 31, 10, 2, 8, 24, 14, 32, 27, 3, 9, 19, 13, 30, 6, 22, 11, 4, 25)
+_PC1 = (57, 49, 41, 33, 25, 17, 9, 1, 58, 50, 42, 34, 26, 18, 10, 2, 59, 51, 43, 35, 27, 19, 11, 3, 60, 52, 44, 36,
+        63, 55, 47, 39, 31, 23, 15, 7, 62, 54, 46, 38, 30, 22, 14, 6, 61, 53, 45, 37, 29, 21, 13, 5, 28, 20, 12, 4)
+_PC2 = (14, 17, 11, 24, 1, 5, 3, 28, 15, 6, 21, 10, 23, 19, 12, 4, 26, 8, 16, 7, 27, 20, 13, 2,
+        41, 52, 31, 37, 47, 55, 30, 40, 51, 45, 33, 48, 44, 49, 39, 56, 34, 53, 46, 42, 50, 36, 29, 32)
+_SHIFTS = (1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1)
+_S = (
+    (14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7, 0, 15, 7, 4, 14, 2, 13, 1, 10, 6, 12, 11, 9, 5, 3, 8,
+     4, 1, 14, 8, 13, 6, 2, 11, 15, 12, 9, 7, 3, 10, 5, 0, 15, 12, 8, 2, 4, 9, 1, 7, 5, 11, 3, 14, 10, 0, 6, 13),
+    (15, 1, 8, 14, 6, 11, 3, 4, 9, 7, 2, 13, 12, 0, 5, 10, 3, 13, 4, 7, 15, 2, 8, 14, 12, 0, 1, 10, 6, 9, 11, 5,
+     0, 14, 7, 11, 10, 4, 13, 1, 5, 8, 12, 6, 9, 3, 2, 15, 13, 8, 10, 1, 3, 15, 4, 2, 11, 6, 7, 12, 0, 5, 14, 9),
+    (10, 0, 9, 14, 6, 3, 15, 5, 1, 13, 12, 7, 11, 4, 2, 8, 13, 7, 0, 9, 3, 4, 6, 10, 2, 8, 5, 14, 12, 11, 15, 1,
+     13, 6, 4, 9, 8, 15, 3, 0, 11, 1, 2, 12, 5, 10, 14, 7, 1, 10, 13, 0, 6, 9, 8, 7, 4, 15, 14, 3, 11, 5, 2, 12),
+    (7, 13, 14, 3, 0, 6, 9, 10, 1, 2, 8, 5, 11, 12, 4, 15, 13, 8, 11, 5, 6, 15, 0, 3, 4, 7, 2, 12, 1, 10, 14, 9,
+     10, 6, 9, 0, 12, 11, 7, 13, 15, 1, 3, 14, 5, 2, 8, 4, 3, 15, 0, 6, 10, 1, 13, 8, 9, 4, 5, 11, 12, 7, 2, 14),
+    (2, 12, 4, 1, 7, 10, 11, 6, 8, 5, 3, 15, 13, 0, 14, 9, 14, 11, 2, 12, 4, 7, 13, 1, 5, 0, 15, 10, 3, 9, 8, 6,
+     4, 2, 1, 11, 10, 13, 7, 8, 15, 9, 12, 5, 6, 3, 0, 14, 11, 8, 12, 7, 1, 14, 2, 13, 6, 15, 0, 9, 10, 4, 5, 3),
+    (12, 1, 10, 15, 9, 2, 6, 8, 0, 13, 3, 4, 14, 7, 5, 11, 10, 15, 4, 2, 7, 12, 9, 5, 6, 1, 13, 14, 0, 11, 3, 8,
+     9, 14, 15, 5, 2, 8, 12, 3, 7, 0, 4, 10, 1, 13, 11, 6, 4, 3, 2, 12, 9, 5, 15, 10, 11, 14, 1, 7, 6, 0, 8, 13),
+    (4, 11, 2, 14, 15, 0, 8, 13, 3, 12, 9, 7, 5, 10, 6, 1, 13, 0, 11, 7, 4, 9, 1, 10, 14, 3, 5, 12, 2, 15, 8, 6,
+     1, 4, 11, 13, 12, 3, 7, 14, 10, 15, 6, 8, 0, 5, 9, 2, 6, 11, 13, 8, 1, 4, 10, 7, 9, 5, 0, 15, 14, 2, 3, 12),
+    (13, 2, 8, 4, 6, 15, 11, 1, 10, 9, 3, 14, 5, 0, 12, 7, 1, 15, 13, 8, 10, 3, 7, 4, 12, 5, 6, 11, 0, 14, 9, 2,
+     7, 11, 4, 1, 9, 12, 14, 2, 0, 6, 10, 13, 15, 3, 5, 8, 2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11),
+)
+
+
+def _bits(data, width):
+    return [(data >> (width - 1 - i)) & 1 for i in range(width)]
+
+
+def _number(bits):
+    value = 0
+    for b in bits:
+        value = (value << 1) | b
+    return value
+
+
+def _des_subkeys(key):
+    bits = _bits(int.from_bytes(key, "big"), 64)
+    permuted = [bits[i - 1] for i in _PC1]
+    left, right, keys = permuted[:28], permuted[28:], []
+    for shift in _SHIFTS:
+        left, right = left[shift:] + left[:shift], right[shift:] + right[:shift]
+        merged = left + right
+        keys.append([merged[i - 1] for i in _PC2])
+    return keys
+
+
+def des_block(subkeys, block, decrypt=False):
+    bits = [b for b in _bits(int.from_bytes(block, "big"), 64)]
+    bits = [bits[i - 1] for i in _IP]
+    left, right = bits[:32], bits[32:]
+    for key in (reversed(subkeys) if decrypt else subkeys):
+        expanded = [right[i - 1] ^ k for i, k in zip(_E, key)]
+        out = []
+        for box in range(8):
+            chunk = expanded[box * 6:box * 6 + 6]
+            row, col = (chunk[0] << 1) | chunk[5], _number(chunk[1:5])
+            out += _bits(_S[box][row * 16 + col], 4)
+        mixed = [out[i - 1] for i in _P]
+        left, right = right, [a ^ b for a, b in zip(left, mixed)]
+    final = right + left
+    return _number([final[i - 1] for i in _FP]).to_bytes(8, "big")
+
+
+def des_cbc(key, iv, data, decrypt=False):
+    if len(data) % 8:
+        raise SnmpError("DES needs whole 8-byte blocks")
+    subkeys, out, previous = _des_subkeys(key), bytearray(), bytes(iv)
+    for at in range(0, len(data), 8):
+        chunk = data[at:at + 8]
+        if decrypt:
+            out += bytes(a ^ b for a, b in zip(des_block(subkeys, chunk, True), previous))
+            previous = chunk
+        else:
+            previous = des_block(subkeys, bytes(a ^ b for a, b in zip(chunk, previous)))
+            out += previous
+    return bytes(out)
+
+
+V3_AUTH = {          # name: (hash, length of the digest that is sent)
+    "MD5": ("md5", 12), "SHA": ("sha1", 12), "SHA224": ("sha224", 16), "SHA256": ("sha256", 24), "SHA384": ("sha384", 32), "SHA512": ("sha512", 48),
+}
+V3_PRIV = ("AES", "DES")
+REPORT = 0xA8
+MAX_MESSAGE = 65507
+_REPORT_TEXT = {
+    (1, 3, 6, 1, 6, 3, 15, 1, 1, 1, 0): "the device does not allow this security level (check the authentication and privacy settings)",
+    (1, 3, 6, 1, 6, 3, 15, 1, 1, 2, 0): "the clocks differ",
+    (1, 3, 6, 1, 6, 3, 15, 1, 1, 3, 0): "the user name is not known to the device",
+    (1, 3, 6, 1, 6, 3, 15, 1, 1, 4, 0): "the engine id is not known",
+    (1, 3, 6, 1, 6, 3, 15, 1, 1, 5, 0): "the authentication failed (wrong password or protocol)",
+    (1, 3, 6, 1, 6, 3, 15, 1, 1, 6, 0): "the device could not decrypt the request (wrong privacy password or protocol)",
+}
+NOT_IN_WINDOW = (1, 3, 6, 1, 6, 3, 15, 1, 1, 2, 0)
+UNKNOWN_ENGINE = (1, 3, 6, 1, 6, 3, 15, 1, 1, 4, 0)
+
+
+def password_to_key(password, algo):
+    """RFC 3414 A.2: the password repeated up to one megabyte and hashed."""
+    h = hashlib.new(algo)
+    h.update((password * (1048576 // len(password) + 1))[:1048576])
+    return h.digest()
+
+
+def localize(key, engine_id, algo):
+    return hashlib.new(algo, key + engine_id + key).digest()
+
+
+def _octets(value):
+    return _tlv(0x04, value)
+
+
+def _sequence(*parts):
+    return _tlv(0x30, b"".join(parts))
+
+
+class _Stale(Exception):
+    """An answer to an earlier request."""
+
+
+class AgentV3(Agent):
+    """The Agent interface (get, walk) over SNMPv3 with a user name, optional authentication and optional privacy."""
+
+    def __init__(self, host, user, auth_proto="", auth_password="", priv_proto="", priv_password="", timeout=3.0, retries=2):
+        super().__init__(host, "", "2c", timeout, retries)
+        if not user:
+            raise SnmpError("enter the SNMPv3 user name")
+        if auth_proto and auth_proto not in V3_AUTH:
+            raise SnmpError("the authentication protocol must be one of " + ", ".join(V3_AUTH))
+        if priv_proto and priv_proto not in V3_PRIV:
+            raise SnmpError("the privacy protocol must be AES or DES")
+        if priv_proto and not auth_proto:
+            raise SnmpError("encryption needs authentication as well")
+        if (auth_proto and len(auth_password) < 8) or (priv_proto and len(priv_password) < 8):
+            raise SnmpError("SNMPv3 passwords are at least 8 characters")
+        self.v1 = False
+        self.user = user.encode()
+        self.auth_proto, self.priv_proto = auth_proto, priv_proto
+        self._auth_pw, self._priv_pw = auth_password.encode(), priv_password.encode()
+        self._ku_auth = self._ku_priv = None
+        self._engine = None                      # (engine id, boots, time at learning, monotonic at learning)
+        self._auth_key = self._priv_key = None
+        self._salt = int.from_bytes(os.urandom(8), "big")
+        self.context = b""
+
+    def for_vlan(self, vlan):
+        """Cisco reaches the BRIDGE-MIB of one VLAN in SNMPv3 through the context "vlan-<n>"."""
+        other = copy.copy(self)
+        other.context = f"vlan-{vlan}".encode()
+        other.retries = min(self.retries, 1)
+        return other
+
+    # ------------------------------------------------------------------ keys and clock
+    def _keys(self, engine_id):
+        if not self.auth_proto:
+            return
+        algo = V3_AUTH[self.auth_proto][0]
+        if self._ku_auth is None:
+            self._ku_auth = password_to_key(self._auth_pw, algo)
+            self._ku_priv = password_to_key(self._priv_pw, algo) if self.priv_proto else None
+        self._auth_key = localize(self._ku_auth, engine_id, algo)
+        self._priv_key = localize(self._ku_priv, engine_id, algo) if self._ku_priv else None
+
+    def _now(self):
+        _eid, boots, learned, mono = self._engine
+        return boots, int(learned + (time.monotonic() - mono))
+
+    # ------------------------------------------------------------------ messages
+    def _message(self, pdu, discover=False):
+        msg_id = int.from_bytes(os.urandom(3), "big") + 1
+        if discover:
+            engine, boots, secs, flags, auth, priv_params, user = b"", 0, 0, 0x04, b"", b"", b""
+        else:
+            engine = self._engine[0]
+            boots, secs = self._now()
+            flags = 0x04 | (1 if self.auth_proto else 0) | (2 if self.priv_proto else 0)
+            auth = b"\x00" * V3_AUTH[self.auth_proto][1] if self.auth_proto else b""
+            priv_params, user = b"", self.user
+        scoped = _sequence(_octets(engine), _octets(b"" if discover else self.context), pdu)
+        if self.priv_proto and not discover:
+            if self.priv_proto == "AES":
+                self._salt = (self._salt + 1) % (1 << 64)
+                priv_params = struct.pack(">Q", self._salt)
+                data = aes_cfb(self._priv_key[:16], struct.pack(">II", boots, secs) + priv_params, scoped)
+            else:
+                self._salt = (self._salt + 1) % (1 << 32)
+                priv_params = struct.pack(">II", boots & 0xFFFFFFFF, self._salt)
+                iv = bytes(a ^ b for a, b in zip(self._priv_key[8:16], priv_params))
+                data = des_cbc(self._priv_key[:8], iv, scoped + b"\x00" * (-len(scoped) % 8))
+            payload = _octets(data)
+        else:
+            payload = scoped
+        usm = _sequence(_octets(engine), _int(boots), _int(secs), _octets(user), _octets(auth), _octets(priv_params))
+        header = _sequence(_int(msg_id), _int(MAX_MESSAGE), _octets(bytes([flags])), _int(3))
+        message = _sequence(_int(3), header, _octets(usm), payload)
+        if self.auth_proto and not discover:
+            algo, size = V3_AUTH[self.auth_proto]
+            digest = hmac.new(self._auth_key, message, algo).digest()[:size]
+            at = message.rfind(b"\x00" * size)
+            message = message[:at] + digest + message[at + size:]
+        return message, msg_id
+
+    def _parse(self, data, msg_id):
+        """(pdu tag, request id, error status, binds, (engine id, boots, time)) of an SNMPv3 answer."""
+        tag, start, end = _read(data, 0)
+        if tag != 0x30:
+            raise SnmpError("this is not an SNMP answer")
+        _t, a, b = _read(data, start)                     # version
+        if _decode_int(data[a:b]) != 3:
+            raise SnmpError("the device answered with another SNMP version")
+        _t, hs, he = _read(data, b)                       # global data: message id, max size, flags, security model
+        _t, a, b = _read(data, hs)
+        got_id = _decode_int(data[a:b])
+        _t, a, b = _read(data, b)
+        _t, a, b = _read(data, b)
+        flags = data[a] if b > a else 0
+        _t, a, b = _read(data, he)                        # security parameters: an octet string holding a sequence
+        pos = b
+        _t, q, _e = _read(data, a)
+        parts = []
+        for _ in range(6):
+            tt, x, y = _read(data, q)
+            parts.append((x, y))
+            q = y
+        engine = bytes(data[parts[0][0]:parts[0][1]])
+        boots, secs = _decode_int(data[parts[1][0]:parts[1][1]]), _decode_int(data[parts[2][0]:parts[2][1]])
+        auth_at, priv_params = parts[4], bytes(data[parts[5][0]:parts[5][1]])
+        if flags & 0x01 and self._auth_key is not None:
+            algo, size = V3_AUTH[self.auth_proto]
+            if auth_at[1] - auth_at[0] != size:
+                raise SnmpError("the answer could not be verified")
+            zeroed = data[:auth_at[0]] + b"\x00" * size + data[auth_at[1]:]
+            if not hmac.compare_digest(hmac.new(self._auth_key, zeroed, algo).digest()[:size], bytes(data[auth_at[0]:auth_at[1]])):
+                raise SnmpError("the answer failed its authentication check (wrong password?)")
+        tag, ps, pe = _read(data, pos)                    # the scoped PDU (plain) or an encrypted octet string
+        if tag == 0x04:
+            if not (flags & 0x02) or self._priv_key is None:
+                raise SnmpError("the device answered with an encrypted message we cannot read")
+            cipher_text = bytes(data[ps:pe])
+            if self.priv_proto == "AES":
+                scoped = aes_cfb(self._priv_key[:16], struct.pack(">II", boots, secs) + priv_params, cipher_text, decrypt=True)
+            else:
+                iv = bytes(x ^ y for x, y in zip(self._priv_key[8:16], priv_params))
+                scoped = des_cbc(self._priv_key[:8], iv, cipher_text[:len(cipher_text) // 8 * 8], decrypt=True)
+        else:
+            scoped = bytes(data[pos:pe])
+        tag, ss, se = _read(scoped, 0)
+        if tag != 0x30:
+            raise SnmpError("the answer could not be decrypted (wrong privacy password?)")
+        _t, x, y = _read(scoped, ss)                      # context engine id
+        _t, x, y = _read(scoped, y)                       # context name
+        pdu_tag, x, y = _read(scoped, y)
+        q, ids = x, []
+        for _ in range(3):
+            _t, a, b = _read(scoped, q)
+            ids.append(_decode_int(scoped[a:b]))
+            q = b
+        _t, a, b = _read(scoped, q)
+        binds, q = [], a
+        while q < b:
+            _t, vs, ve = _read(scoped, q)
+            _ot, os_, oe = _read(scoped, vs)
+            vt, v1, v2 = _read(scoped, oe)
+            binds.append((_decode_oid(scoped[os_:oe]), _decode_value(vt, scoped[v1:v2])))
+            q = ve
+        if got_id != msg_id and pdu_tag != REPORT:
+            raise _Stale()
+        return pdu_tag, ids[0], ids[1], binds, (engine, boots, secs)
+
+    def _discover(self):
+        request = _tlv(GET, _int(0) + _int(0) + _int(0) + _sequence())
+        last = None
+        for _ in range(self.retries + 1):
+            message, msg_id = self._message(request, discover=True)
+            try:
+                raw = SEND(self.address, message, self.timeout)
+                _tag, _rid, _st, _binds, (engine, boots, secs) = self._parse(raw, msg_id)
+            except _Stale:
+                continue
+            except Timeout as exc:
+                last = exc
+                continue
+            if not engine:
+                raise SnmpError(f"{self.host} did not tell its SNMPv3 engine id")
+            self._engine = (engine, boots, secs, time.monotonic())
+            self._keys(engine)
+            return
+        raise last or Timeout(f"no answer from {self.host}")
+
+    def _ask(self, pdu_type, oids, max_repetitions=20):
+        if self._engine is None:
+            self._discover()
+        binds = b"".join(_sequence(_oid(o), _tlv(0x05, b"")) for o in oids)
+        resynced, last = False, None
+        for _ in range(self.retries + 2):
+            self._next_id = (self._next_id + 1) % 0x7FFFFFFF
+            head = _int(self._next_id) + _int(0) + _int(max_repetitions if pdu_type == GETBULK else 0)
+            message, msg_id = self._message(_tlv(pdu_type, head + _sequence(binds)))
+            try:
+                raw = SEND(self.address, message, self.timeout)
+                tag, _rid, status, answer, _t = self._parse(raw, msg_id)
+            except _Stale:
+                continue
+            except Timeout as exc:
+                last = exc
+                continue
+            if tag == REPORT:
+                what = answer[0][0] if answer else None
+                if what in (NOT_IN_WINDOW, UNKNOWN_ENGINE) and not resynced:
+                    resynced, self._engine = True, None
+                    self._discover()
+                    continue
+                text = f"{self.host}: {_REPORT_TEXT.get(what, 'the device refused the request')}"
+                raise (AuthRefused if what in _AUTH_REPORTS else SnmpError)(text)
+            if status == 16:
+                raise AuthRefused(f"{self.host}: the user is not allowed to read (its security level or view on the device does not permit it)")
+            if status:
+                raise SnmpError(f"{self.host} answered with SNMP error {status}")
+            return answer
+        raise Timeout(f"no answer from {self.host} within {self.timeout:g} s. For SNMPv3 check the address, the user name and both passwords: a device does not answer at all when the encryption password is wrong")
+
+
+_AUTH_REPORTS = {k for k in _REPORT_TEXT if k[-2] in (1, 3, 5, 6)}   # unsupported level, unknown user, wrong password, cannot decrypt
+
+
+def make_agent(host, community, config, timeout):
+    """The right client for the plugin's SNMP version setting: v1 / v2c with a community, or v3 with a user."""
+    version = str(config.get("version") or "2c")
+    if version == "3":
+        auth, priv = (str(config.get(k) or "") for k in ("v3_auth", "v3_priv"))
+        return AgentV3(host, str(config.get("v3_user") or "").strip(), "" if auth == "none" else auth, str(config.get("v3_auth_password") or ""),
+                       "" if priv == "none" else priv, str(config.get("v3_priv_password") or ""), timeout)
+    return Agent(host, community, version, timeout)
+
+
 # ----------------------------------------------------------------------------- reading one switch
 def _mac(raw):
     """"aa:bb:..." for a 6-byte value; all-zero and broadcast addresses are not real ones."""
@@ -473,17 +897,18 @@ def read_switches(config):
     if not hosts:
         raise ValueError("enter the address of at least one switch")
     for host, community in hosts:
-        if not community:
+        if not community and str(config.get("version") or "2c") != "3":
             raise ValueError(f"{host}: enter the read community (on the switch's line or as the default one)")
     timeout = config.get("timeout") or 3
-    switches, problems = [], []
+    switches, problems, refused = [], [], []
     for host, community in hosts:
         try:
-            switches.append(Switch(Agent(host, community, config.get("version") or "2c", timeout), config.get("vlan_indexing") or "auto").read())
+            switches.append(Switch(make_agent(host, community, config, timeout), config.get("vlan_indexing") or "auto").read())
         except (SnmpError, ValueError) as exc:
             problems.append(f"{host}: {exc}")
+            refused.append(isinstance(exc, AuthRefused))
     if not switches:
-        raise SnmpError("; ".join(problems) or "no switch answered")
+        raise (AuthRefused if refused and all(refused) else SnmpError)("; ".join(problems) or "no switch answered")
     return switches, problems
 
 
@@ -596,7 +1021,7 @@ def diagnose(config):
         entry = {"steps": {}}
         report["switches"].append(entry)
         try:
-            agent = Agent(host, community, config.get("version") or "2c", config.get("timeout") or 3)
+            agent = make_agent(host, community, config, config.get("timeout") or 3)
         except (SnmpError, ValueError) as exc:
             entry["error"] = _problem(exc)
             continue

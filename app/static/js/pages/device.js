@@ -840,9 +840,9 @@ export async function render(container, params) {
     const wifiSlot = slot();
     nRight.appendChild(wifiSlot);
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
-    const portsSlot = slot();
-    nRight.appendChild(portsSlot);
-    buildSwitchPortsCard(device.id).then((c) => { if (c && !disposed) portsSlot.appendChild(c); }).catch(() => {});
+    const switchPortsSlot = slot();
+    nRight.appendChild(switchPortsSlot);
+    buildSwitchPortsCard(device.id).then((c) => { if (c && !disposed) switchPortsSlot.appendChild(c); }).catch(() => {});
     const virtualizationCard = buildVirtualizationCard(device);
     if (virtualizationCard) nRight.appendChild(virtualizationCard);
     const backupCard = buildBackupCard(device);
