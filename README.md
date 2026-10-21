@@ -1116,7 +1116,7 @@ and names are fictional (`192.168.42.0/24`, `home.example.net`).
 
 ## Not implemented / limitations
 
-- CDP neighbour discovery (planned); SNMP switches and LLDP are covered by the SNMP plugin
+- CDP neighbour discovery as a built-in scan feature (planned); the SNMP plugin already reads LLDP and Cisco CDP neighbours from your managed switches
 - Switch-to-device links come only from traceroute/heuristics/manual
 - Network health (Analysis → Network health) checks the IPv4 and IPv6 side of the network; IPv6 discovery is optional and limited: addresses of devices that the IPv4 scan found are shown (Settings → IPv6); devices that only have IPv6, IPv6 ranges and IPv6 in the map are not covered yet
 - No vulnerability scanning
