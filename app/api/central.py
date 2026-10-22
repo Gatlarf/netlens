@@ -20,6 +20,7 @@ class LinkBody(BaseModel):
     enabled: bool | None = None
     interval_s: int | None = None
     accept_config: bool | None = None
+    allow_view: bool | None = None             # let the central Netlens show this site's pages (read only, through app/relay.py)
     trust_certificate: bool | None = None       # True: trust the certificate the central Netlens shows now (self-signed); False: back to normal checking
 
 

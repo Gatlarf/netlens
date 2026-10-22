@@ -185,6 +185,10 @@ def devices_in_scope(conn, scope: tuple) -> set[int]:
 
 def identify(conn: HTTPConnection) -> Optional[Principal]:
     """Who is making this request (cookie or bearer token), or None."""
+    from app import relay
+
+    if relay.is_relay(conn):          # the central Netlens looking at this site: reads only (the relay refuses anything else), never the parts relay.DENIED lists
+        return Principal(username="central Netlens", role="admin")
     token = conn.app.state.settings.token
     cookie = conn.cookies.get(COOKIE_NAME)
     authorization = conn.headers.get("authorization")

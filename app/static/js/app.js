@@ -7,6 +7,7 @@ import { initTopbar } from "./topbar.js";
 import { maybeShowWhatsNew } from "./changelog.js";
 import { renderSetup } from "./setup.js";
 import { get, post, ApiError } from "./api.js";
+import { initSiteBar } from "./sitebar.js";
 import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
 
 const ROUTES = {
@@ -354,6 +355,7 @@ async function applySession() {
     }
   }
   showDemo(session.demo);
+  initSiteBar(session).catch(() => {});
   if (session.authenticated && !whatsNewChecked && !session.demo) {
     whatsNewChecked = true;
     maybeShowWhatsNew();

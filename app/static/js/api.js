@@ -6,9 +6,12 @@ export class ApiError extends Error {
   }
 }
 
+import { currentSite, routed } from "./site.js";
+
 export async function api(path, { method = "GET", body } = {}) {
+  if (method !== "GET" && currentSite() && routed(path) !== path) throw new ApiError(0, "A remote site is shown read-only through this Netlens. Go back to this site to change things.");
   try {
-    const res = await fetch(path, {
+    const res = await fetch(routed(path), {
       method,
       credentials: "same-origin",
       headers: body !== undefined ? { "Content-Type": "application/json" } : {},

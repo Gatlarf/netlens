@@ -21,7 +21,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app import tsdb
+from app import relay, tsdb
 from app.db import add_event, insert_id, utcnow
 
 log = logging.getLogger(__name__)
@@ -194,6 +194,7 @@ def present(conn: sqlite3.Connection, row: sqlite3.Row, now: float | None = None
         "devices": {"total": counts["total"], "online": counts["online"], "core_down": counts["core_down"]},
         "services": {"total": services["total"], "down": services["down"]},
         "problems": {"count": len(problems), "critical": sum(1 for p in problems if p.get("level") == "critical")},
+        "view": {"allowed": bool(summary.get("accepts_view")), "connected": relay.HUB.connected(row["id"])},
         "scan": summary.get("scan"), "skew_s": summary.get("skew_s"), "keep_days": row["keep_days"], "alert_mode": row["alert_mode"] or "auto", "muted": _muted(row["muted"]), "backups": summary.get("backups") or {"configured": False}, "vulns": _vulns_view(conn, summary),
     }
 
@@ -388,7 +389,7 @@ def ingest(conn: sqlite3.Connection, probe: sqlite3.Row, payload: dict, now: str
             events.append(("vuln_critical", f"{site}: {more} new critical vulnerabilit{'ies' if more != 1 else 'y'}" + (", at least one known to be exploited" if new_vulns["exploited"] > (old_vulns.get("exploited") or 0) else "")))
     summary = {"vulns": new_vulns, "problems": problems, "monitors": _monitors(payload.get("monitors")), "scan": _scan(payload.get("scan")), "backups": guestbackups.clean_report(payload.get("backups")),
                "counts": {"devices": len(devices), "services": len(services), "samples": recorded},
-               "accepts_config": bool(payload.get("accepts_config")), "skew_s": _skew(payload.get("sent"), now),
+               "accepts_config": bool(payload.get("accepts_config")), "accepts_view": bool(payload.get("accepts_view")), "skew_s": _skew(payload.get("sent"), now),
                "config_rev": payload.get("config_rev") if isinstance(payload.get("config_rev"), int) and not isinstance(payload.get("config_rev"), bool) else 0}
     conn.execute(
         "UPDATE probes SET last_seen = ?, last_ip = ?, version = ?, interval_s = ?, snapshot_ts = ?, summary = ?, offline_notified = 0 WHERE id = ?",

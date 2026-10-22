@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.165 — 2026-10-22
+
+### Added
+- ★ **Remote sites with the same pages as a local site.** A remote Netlens can allow the central one to show it (Settings > Report to a central Netlens > *Let the central Netlens show this site*, off by default). The central Netlens then has a site selector in the top bar: pick a site and every page shows that site's own data, live and read only (devices with their pages, graphs, ports, applications, statistics, map, uptime, events). Nothing is copied: the remote keeps one request open to the central one and answers the pages' requests from its own data, so the connection still always goes out from the remote site. Accounts, backups, the licence and other secrets are never shown. Only administrators of the central Netlens can use it; *Remote sites > Open this site* does the same.
+
 ## 0.4.161 — 2026-10-22
 
 ### Added

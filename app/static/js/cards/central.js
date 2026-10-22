@@ -28,8 +28,10 @@ export async function buildCentralCard() {
     trust.checked = !!info.pin;
     const accept = h("input", { type: "checkbox" });
     accept.checked = !!info.accept_config;
+    const view = h("input", { type: "checkbox" });
+    view.checked = !!info.allow_view;
     const body = () => {
-      const out = { url: url.value.trim(), enabled: enabled.checked, accept_config: accept.checked };
+      const out = { url: url.value.trim(), enabled: enabled.checked, accept_config: accept.checked, allow_view: view.checked };
       if (trust.checked !== !!info.pin || (trust.checked && url.value.trim() !== info.url)) out.trust_certificate = trust.checked;
       if (token.value.trim()) out.token = token.value.trim();
       return out;
@@ -80,6 +82,8 @@ export async function buildCentralCard() {
       h("label", {}, enabled, " Report to the central Netlens"),
       h("label", {}, accept, " Accept configuration and commands from the central Netlens"),
       h("p", { class: "hint" }, "When ticked, the central Netlens may set up service checks and health monitors here (they appear marked as managed from the central Netlens and cannot be changed here) and ask this Netlens to scan its network. Leave it off to keep all settings at this location. Logins it sends are stored encrypted."),
+      h("label", {}, view, " Let the central Netlens show this site"),
+      h("p", { class: "hint" }, "When ticked, an administrator of the central Netlens can open this site there and see the same pages as here (devices, graphs, statistics, ports...), live and read only. Nothing is copied: the pages ask this Netlens, which keeps the connection open from here, so nothing has to be reachable from outside. Accounts, backups, the licence and other secrets are never shown. While it is off, the central Netlens only sees what this site reports."),
       h("div", { class: "form-actions" }, save, send), result));
   }
 

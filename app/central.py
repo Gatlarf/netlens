@@ -24,7 +24,7 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
-from app import tsdb
+from app import relay, tsdb
 from app.db import connect, get_setting, set_setting, utcnow
 from app.version import VERSION
 
@@ -53,7 +53,7 @@ def get_link(conn) -> dict[str, Any]:
         data = {}
     return {"url": str(data.get("url") or ""), "token": str(data.get("token") or ""), "enabled": bool(data.get("enabled")),
             "interval_s": int(data.get("interval_s") or DEFAULT_INTERVAL), "accept_config": bool(data.get("accept_config")),
-            "pin": str(data.get("pin") or "")}
+            "allow_view": bool(data.get("allow_view")), "pin": str(data.get("pin") or "")}
 
 
 def public_link(conn) -> dict[str, Any]:
@@ -62,7 +62,7 @@ def public_link(conn) -> dict[str, Any]:
         status = json.loads(get_setting(conn, STATUS_KEY) or "{}")
     except ValueError:
         status = {}
-    return {"url": link["url"], "has_token": bool(link["token"]), "enabled": link["enabled"], "interval_s": link["interval_s"], "accept_config": link["accept_config"], "pin": link["pin"],
+    return {"url": link["url"], "has_token": bool(link["token"]), "enabled": link["enabled"], "interval_s": link["interval_s"], "accept_config": link["accept_config"], "allow_view": link["allow_view"], "pin": link["pin"],
             "config_rev": get_config_rev(conn), "status": status}
 
 
@@ -95,6 +95,7 @@ def set_link(conn, data: dict[str, Any]) -> dict[str, Any]:
         raise LinkError("the interval must be between 15 and 3600 seconds")
     enabled = bool(data.get("enabled", cur["enabled"]))
     accept = bool(data.get("accept_config", cur["accept_config"]))
+    allow_view = bool(data.get("allow_view", cur["allow_view"]))
     pin = cur["pin"] if url == cur["url"] else ""                  # a trusted certificate belongs to one address
     if data.get("trust_certificate") is True:
         if not url.startswith("https://"):
@@ -104,7 +105,7 @@ def set_link(conn, data: dict[str, Any]) -> dict[str, Any]:
         pin = ""
     if enabled and not (url and token):
         raise LinkError("enter the address of the central Netlens and the token it gave you")
-    set_setting(conn, LINK_KEY, json.dumps({"url": url, "token": token, "enabled": enabled, "interval_s": interval, "accept_config": accept, "pin": pin}))
+    set_setting(conn, LINK_KEY, json.dumps({"url": url, "token": token, "enabled": enabled, "interval_s": interval, "accept_config": accept, "allow_view": allow_view, "pin": pin}))
     return public_link(conn)
 
 
@@ -310,6 +311,7 @@ def push_once(db_path: str, now_ts: float | None = None, force: bool = False) ->
         payload = snapshot(conn, since, now_ts)
         payload["interval_s"] = link["interval_s"]
         payload["accepts_config"] = link["accept_config"]
+        payload["accepts_view"] = link["allow_view"]
         payload["config_rev"] = get_config_rev(conn)
         newest = max([s["ts"] for s in payload["samples"]] + [since])
         try:
@@ -364,3 +366,64 @@ async def loop(db_path: str, scan_manager=None) -> None:
         except Exception:  # noqa: BLE001 - a failing report must never stop the scans
             log.exception("report to the central Netlens failed")
         await asyncio.sleep(5)
+
+
+# ----------------------------------------------------------------------------- letting the central Netlens show this site (see app/relay.py)
+def _relay_request(link: dict[str, Any], path: str, body: dict[str, Any] | None, timeout: float) -> dict[str, Any]:
+    data = gzip.compress(json.dumps(body, separators=(",", ":")).encode()) if body is not None else None
+    headers = {"Authorization": f"Bearer {link['token']}", "User-Agent": f"Netlens/{VERSION}"}
+    if data is not None:
+        headers.update({"Content-Type": "application/json", "Content-Encoding": "gzip"})
+    request = urllib.request.Request(link["url"] + path, data=data, method="POST" if data is not None else "GET", headers=headers)
+    pin = link["pin"]
+    try:
+        opener = _opener(pin).open if pin and link["url"].startswith("https://") else urllib.request.urlopen
+        with opener(request, timeout=timeout) as resp:  # noqa: S310 - scheme checked when the link was saved
+            return json.loads(resp.read(1024 * 1024).decode("utf-8", "replace") or "{}")
+    except urllib.error.HTTPError as exc:
+        raise LinkError(f"the central Netlens answered with an error ({exc.code})") from None
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        raise LinkError(f"cannot reach the central Netlens: {getattr(exc, 'reason', exc)}") from None
+
+
+def relay_poll(link: dict[str, Any]) -> list[dict[str, Any]]:
+    """Wait (up to about 25 seconds) for requests the central Netlens wants answered."""
+    reply = _relay_request(link, f"/api/probe/relay?wait={int(relay.POLL_WAIT)}", None, relay.POLL_WAIT + 15)
+    items = reply.get("requests") if isinstance(reply, dict) else None
+    return [i for i in items if isinstance(i, dict)] if isinstance(items, list) else []
+
+
+async def relay_loop(app) -> None:
+    """Background task: while *Let the central Netlens show this site* is ticked, keep one poll open and answer what the central Netlens asks."""
+    await asyncio.sleep(25)
+    failures = 0
+    while True:
+        try:
+            conn = connect(app.state.db_path)
+            try:
+                link = get_link(conn)
+            finally:
+                conn.close()
+            if not (link["enabled"] and link["allow_view"] and link["url"] and link["token"]):
+                failures = 0
+                await asyncio.sleep(20)
+                continue
+
+            def answer(request_id: str, payload: dict[str, Any], link=link) -> None:
+                try:
+                    _relay_request(link, f"/api/probe/relay/{request_id}", payload, 20)
+                except LinkError:
+                    log.warning("could not hand an answer to the central Netlens")
+
+            items = await asyncio.to_thread(relay_poll, link)
+            failures = 0
+            for item in items:
+                asyncio.create_task(relay.serve(app, answer, item))
+        except asyncio.CancelledError:
+            raise
+        except LinkError:
+            failures += 1
+            await asyncio.sleep(min(60, 5 * failures))        # the report loop says what is wrong; here only wait
+        except Exception:  # noqa: BLE001 - never let this stop the application
+            log.exception("the connection for viewing this site failed")
+            await asyncio.sleep(30)

@@ -3,6 +3,7 @@ import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin, fmtTime } from
 import { pageHead, emptyState, previewHtml } from "../ui.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 import { snoozeMenu, wakeButton, untilText } from "../snooze.js";
+import { enterSite } from "../site.js";
 
 const REFRESH_MS = 30000;
 const STATE_TEXT = { connected: "Reporting", silent: "Not heard from", waiting: "Waiting for the first report" };
@@ -350,6 +351,10 @@ export async function render(container) {
     const admin = isAdmin();
     const tools = h("div", { class: "form-actions admin-only" });
     tools.append(
+      h("button", { class: "btn primary", type: "button", disabled: !(p.view && p.view.allowed && p.view.connected),
+        title: !(p.view && p.view.allowed) ? "This site has not allowed it: tick “Let the central Netlens show this site” in its Settings > Report to a central Netlens"
+          : !p.view.connected ? "This site is not connected right now (it keeps the connection open itself)" : "Open this site with the same pages as this Netlens has (read only)",
+        onclick: () => enterSite({ id: p.id, name: p.name }) }, "Open this site"),
       h("button", { class: "btn", type: "button", title: "Ask the remote Netlens to scan its network now (it must accept commands)", disabled: !p.enabled || p.state !== "connected",
         onclick: async () => {
           try { await post(`/api/probes/${id}/command`, { command: "scan" }); toast("Asked. The site starts the scan with its next report.", "success"); showDetail(id); } catch (err) { toast(err.message || "Could not send the command", "error"); }

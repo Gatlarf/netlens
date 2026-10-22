@@ -826,3 +826,10 @@ body[data-scoped] #scan-menu-wrap, body[data-scoped] #search-btn, body[data-scop
 @media (max-width: 1100px) { .db-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 520px) { .db-tool { grid-template-columns: minmax(0, 1fr); } .db-tool-buttons { justify-content: flex-start; } }
 .db-tables { max-height: 26rem; overflow: auto; }
+
+/* a remote site shown through this Netlens (app/relay.py): the banner, the switcher, and what cannot be done there */
+.site-banner { background: #dbeafe; color: #1e3a8a; border-bottom: 1px solid #60a5fa; padding: 6px 16px; text-align: center; font-size: 0.85rem; display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.site-switch { max-width: 11rem; }
+body.site-view .admin-only, body.site-view .act-only, body.site-view [data-route="settings"], body.site-view [data-route="remote_sites"], body.site-view [data-route="remote"], body.site-view #scan-menu-wrap { display: none !important; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .site-banner { background: #1e3a5f; color: #dbeafe; border-bottom-color: #3b82f6; } }
+:root[data-theme="dark"] .site-banner { background: #1e3a5f; color: #dbeafe; border-bottom-color: #3b82f6; }
