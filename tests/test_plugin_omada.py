@@ -92,6 +92,9 @@ class Fake(BaseHTTPRequestHandler):
             if url.path.startswith(prefix):
                 mac = url.path[len(prefix):]
                 s["app_calls"].append((mac, int(q["start"][0]), int(q["end"][0])))
+                if s.get("need_colons") and ":" not in mac:
+                    return self._send({"errorCode": 0, "result": []})            # a MAC written the wrong way finds nothing, without an error
+                mac = mac.replace(":", "-")
                 if mac == "11-22-33-44-55-03":
                     return self._send({"errorCode": -1, "msg": "General error."})     # one client that fails must not matter
                 return self._send({"errorCode": 0, "result": s["apps"].get(mac, [])})
@@ -333,7 +336,7 @@ def test_application_statistics_are_summed_per_application_and_per_client(server
     assert len(day["day"]) == 10
     # logged in with the Open API's own login, asked once per client in the site, with a window from midnight to now
     assert len(state["token_calls"]) == 1
-    asked = {mac for mac, _, _ in state["app_calls"]}
+    asked = {mac for mac, _, _ in state["app_calls"] if mac.count("-") == 5}
     assert asked == {"11-22-33-44-55-01", "11-22-33-44-55-02", "11-22-33-44-55-03", "11-22-33-44-55-05"}
     assert all(0 < end - start <= 86400 + 3600 for _, start, end in state["app_calls"])
 
@@ -395,12 +398,13 @@ def test_the_diagnostic_says_what_the_application_reads_answered(server):
     url, state = server
     shape = plugin.diagnose(with_api(url))["steps"]["application_traffic"]["shape"]
     assert shape["application_catalogue"] == {"type": "dict", "total": 120} and shape["window_that_worked"] == "today_seconds"
-    assert shape["clients_tried"] == 3 and len(shape["attempts"]) == 9 and all(a["window"] for a in shape["attempts"])
+    assert shape["clients_tried"] == 3 and len(shape["attempts"]) == 18 and all(a["window"] and a["mac_form"] for a in shape["attempts"])
+    assert shape["mac_form_that_worked"] == "dashes"
     # a controller that has DPI off answers an empty list for everything: the report then says so for each window instead of staying silent
     state["apps"] = {}
     shape = plugin.diagnose(with_api(url))["steps"]["application_traffic"]["shape"]
-    assert shape["rows"] == [] and {a["window"]: (a.get("type"), a.get("count")) for a in shape["attempts"] if "type" in a} == {
-        "today_seconds": ("list", 0), "24h_seconds": ("list", 0), "24h_milliseconds": ("list", 0)}
+    assert shape["rows"] == [] and {(a["mac_form"], a["window"]): (a.get("type"), a.get("count")) for a in shape["attempts"] if "type" in a} == {
+        (form, w): ("list", 0) for form in ("dashes", "colons") for w in ("today_seconds", "24h_seconds", "24h_milliseconds")}
 
 
 def test_the_busiest_clients_are_read_first(server):
@@ -411,3 +415,14 @@ def test_the_busiest_clients_are_read_first(server):
     controller.targets[0][1]["trafficDown"] = 1            # the first listed client moved the least
     controller.targets[-1][1]["trafficDown"] = 10 ** 9
     assert sorted(controller.targets, key=plugin._traffic_of)[0][1] is controller.targets[-1][1]
+
+
+def test_a_controller_that_wants_colons_in_the_mac_address_is_understood(server):
+    url, state = server
+    state["need_colons"] = True
+    (day,) = plugin.fetch(with_api(url))["usage"]
+    assert [a["name"] for a in day["applications"]] == ["YouTube", "Printing"]                 # found out by trying both ways of writing the address
+    later = [mac for mac, _, _ in state["app_calls"]][-4:]
+    assert all(":" in mac for mac in later)                                                        # and then used for every client
+    shape = plugin.diagnose(with_api(url))["steps"]["application_traffic"]["shape"]
+    assert shape["mac_form_that_worked"] == "colons"

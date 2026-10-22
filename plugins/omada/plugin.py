@@ -317,6 +317,30 @@ class Controller:
         rows = self.client_applications_raw(site_id, mac, start, end)
         return [r for r in (rows if isinstance(rows, list) else []) if isinstance(r, dict)]
 
+    @staticmethod
+    def _forms(mac):
+        """The same MAC address written the two ways the controller APIs use: AA-BB-... (the web interface) and AA:BB:... (the Open API's client list)."""
+        plain = mac.replace(":", "").replace("-", "").upper()
+        pairs = [plain[i:i + 2] for i in range(0, 12, 2)]
+        return {"dashes": "-".join(pairs), "colons": ":".join(pairs)}
+
+    def _pick_form(self, ids, names, start, end, targets):
+        """Which way of writing a MAC address the application read understands: the one that returns rows for one of the busiest clients (a wrong one
+        gives an empty list, not an error). Dashes when none returns anything."""
+        for site, client in targets[:3]:
+            site_id = ids.get(str(site["key"])) or names.get(str(site["name"]).lower())
+            if not site_id or not _mac(client.get("mac")):
+                continue
+            for form, text in self._forms(client["mac"]).items():
+                try:
+                    if self.client_applications(site_id, text, start, end):
+                        return form
+                except ConnectError:
+                    raise
+                except OmadaError:
+                    continue
+        return "dashes"
+
     def usage(self):
         """(today's traffic per application and per client as the contract wants it, a problem text or None). Never raises: the topology must not
         depend on the statistics. Each figure is the day's total so far."""
@@ -330,6 +354,7 @@ class Controller:
             start, end = int(midnight.timestamp()), int(now.timestamp())
             apps, per_client, per_client_apps, failed, deadline = {}, {}, {}, 0, time.monotonic() + USAGE_BUDGET
             targets = sorted(self.targets, key=_traffic_of)[:USAGE_MAX_CLIENTS]
+            form = self._pick_form(ids, names, start, end, targets)
             for site, client in targets:
                 site_id = ids.get(str(site["key"])) or names.get(str(site["name"]).lower())
                 mac = _mac(client.get("mac"))
@@ -338,7 +363,7 @@ class Controller:
                 if time.monotonic() > deadline:
                     return self._day(midnight, apps, per_client, per_client_apps), f"stopped after {USAGE_BUDGET} seconds; not every client was read (the busiest were read first)"
                 try:
-                    rows = self.client_applications(site_id, client["mac"], start, end)
+                    rows = self.client_applications(site_id, self._forms(client["mac"])[form], start, end)
                 except ConnectError:
                     raise
                 except OmadaError:
@@ -569,18 +594,20 @@ def diagnose(config):
                     if not site_id:
                         continue
                     shape["clients_tried"] += 1
-                    for label, start, end in variants:
-                        try:
-                            raw = controller.client_applications_raw(site_id, client["mac"], start, end)
-                        except OmadaError as exc:
-                            shape["attempts"].append({"window": label, "error": _problem(exc)})
-                            continue
-                        count = len(raw) if isinstance(raw, (list, dict)) else None
-                        shape["attempts"].append({"window": label, "type": type(raw).__name__, "count": count, **({"keys": sorted(raw)[:12]} if isinstance(raw, dict) else {})})
-                        if isinstance(raw, list) and raw and not shape["rows"]:
-                            shape["rows"] = [describe(r) for r in raw[:SAMPLES]]
-                            shape["row_count"] = len(raw)
-                            shape["window_that_worked"] = label
+                    for form, text in controller._forms(client["mac"]).items():
+                        for label, start, end in variants:
+                            try:
+                                raw = controller.client_applications_raw(site_id, text, start, end)
+                            except OmadaError as exc:
+                                shape["attempts"].append({"mac_form": form, "window": label, "error": _problem(exc)})
+                                continue
+                            count = len(raw) if isinstance(raw, (list, dict)) else None
+                            shape["attempts"].append({"mac_form": form, "window": label, "type": type(raw).__name__, "count": count, **({"keys": sorted(raw)[:12]} if isinstance(raw, dict) else {})})
+                            if isinstance(raw, list) and raw and not shape["rows"]:
+                                shape["rows"] = [describe(r) for r in raw[:SAMPLES]]
+                                shape["row_count"] = len(raw)
+                                shape["window_that_worked"] = label
+                                shape["mac_form_that_worked"] = form
                 return shape
 
             step("application_traffic", read_usage)
