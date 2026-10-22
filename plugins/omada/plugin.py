@@ -522,6 +522,28 @@ def describe(value, key=""):
     return f"<{type(value).__name__}>"
 
 
+DPI_WORDS = re.compile(r"dpi|appl|statis|logging|traffic|insight|analy", re.I)
+
+
+def dpi_flags(value, found=None, path="", depth=0):
+    """From a device's detail: every setting whose name mentions DPI, applications, statistics or logging, with its yes/no or number (never a text), so a report can show
+    whether the gateway supports and has switched on the recording of application traffic."""
+    found = {} if found is None else found
+    if depth > 6 or len(found) >= 60:
+        return found
+    if isinstance(value, dict):
+        for key, item in value.items():
+            here = f"{path}.{key}" if path else str(key)
+            if isinstance(item, (dict, list)):
+                dpi_flags(item, found, here, depth + 1)
+            elif isinstance(item, (bool, int, float)) and DPI_WORDS.search(str(key)):
+                found[here] = item
+    elif isinstance(value, list):
+        for item in value[:3]:
+            dpi_flags(item, found, path + "[]", depth + 1)
+    return found
+
+
 def _problem(exc):
     """The error text for a diagnostic report, without any server address (URL, IP address, host:port or host name)."""
     text = re.sub(r"https?://\S+", "<url>", str(exc))
@@ -556,6 +578,16 @@ def diagnose(config):
             return {"count": len(devices), "first": [describe(d) for d in devices[:SAMPLES]]}
 
         step("devices", read_devices)
+        gateway = next((d for d in devices if isinstance(d, dict) and d.get("type") == "gateway"), None)
+        if gateway:
+            def read_gateway():
+                detail = controller._api(f"sites/{site['key']}/gateways/{gateway['mac']}")
+                return {"model": detail.get("showModel") or detail.get("model"), "firmware": detail.get("firmwareVersion"),
+                        "dpi_related_settings": dpi_flags(detail)}
+
+            step("gateway_dpi", read_gateway)
+        else:
+            report["steps"]["gateway_dpi"] = {"ok": True, "shape": "no gateway among this site's devices: without one there is no application traffic to read"}
         for kind, path in (("switch", "switches"), ("ap", "eaps")):
             first = next((d for d in devices if isinstance(d, dict) and d.get("type") == kind), None)
             if first:

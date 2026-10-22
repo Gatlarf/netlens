@@ -114,6 +114,9 @@ class Fake(BaseHTTPRequestHandler):
                 {"port": 4, "name": "Port4", "disable": False, "portStatus": {"linkStatus": 0, "linkSpeed": 0, "duplex": 0, "tx": 0, "rx": 0}},
                 {"port": 5, "name": "off", "disable": True, "portStatus": {"linkStatus": 0}},
                 {"name": "no number"}]}})
+        if p == f"sites/site1/gateways/{GW}":
+            return self._send({"errorCode": 0, "result": {"mac": GW, "showModel": "ER605 v2", "firmwareVersion": "2.3.1", "dpiEnable": True, "dpiSetting": {"loggingTraffic": False, "name": "secret-name"},
+                                                           "devCap": {"supportDpi": True, "maxClients": 300}, "wan": {"ip": "203.0.113.9"}}})
         if p == f"sites/site1/eaps/{AP1}":
             return self._send({"errorCode": 0, "result": {"mac": AP1, "wiredUplink": {"uplinkMac": SW, "port": 5}}})
         if p == f"sites/site1/eaps/{AP2}":
@@ -261,7 +264,7 @@ def test_diagnose_describes_shapes_and_leaks_nothing(server):
     url, state = server
     report = plugin.diagnose(cfg(url))
     text = json.dumps(report)
-    for private in ("laptop", "192.168.0", "AA-BB-CC", "11-22-33", "secret", "127.0.0.1", "Living room", "ER605"):
+    for private in ("laptop", "192.168.0", "AA-BB-CC", "11-22-33", "secret", "127.0.0.1", "Living room", "Rack switch", "Garden"):      # device names; the gateway model (the fake uses it as the name too) is hardware information and is shown on purpose
         assert private not in text, private
     assert report["controller_version"] == "5.14.26.1" and report["steps"]["devices"]["shape"]["count"] == 4
     assert report["steps"]["clients"]["ok"] and report["steps"]["switch_detail"]["ok"]
@@ -426,3 +429,13 @@ def test_a_controller_that_wants_colons_in_the_mac_address_is_understood(server)
     assert all(":" in mac for mac in later)                                                        # and then used for every client
     shape = plugin.diagnose(with_api(url))["steps"]["application_traffic"]["shape"]
     assert shape["mac_form_that_worked"] == "colons"
+
+
+def test_the_diagnostic_reports_what_the_gateway_says_about_dpi_without_leaking_text(server):
+    url, state = server
+    report = plugin.diagnose(with_api(url))
+    gateway = report["steps"]["gateway_dpi"]["shape"]
+    assert gateway["model"] == "ER605 v2" and gateway["firmware"] == "2.3.1"
+    assert gateway["dpi_related_settings"] == {"dpiEnable": True, "dpiSetting.loggingTraffic": False, "devCap.supportDpi": True}
+    text = json.dumps(report)
+    assert "secret-name" not in text and "203.0.113.9" not in text
