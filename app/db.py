@@ -844,6 +844,11 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    # --- port map: a link can be set by hand, and knows which device (switch) it hangs on ---------------------------
+    _add_column_if_missing(conn, "client_links", "source", "TEXT NOT NULL DEFAULT 'plugin'")   # 'plugin' | 'manual' (manual is never overwritten)
+    _add_column_if_missing(conn, "client_links", "node_device_id", "INTEGER")                   # the switch as a device of its own
+    _add_column_if_missing(conn, "client_links", "seen_node", "TEXT")                           # manual links: what a plugin reports instead
+    _add_column_if_missing(conn, "client_links", "seen_port", "TEXT")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS service_checks (

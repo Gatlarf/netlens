@@ -9,6 +9,7 @@ import { buildHealthGlance } from "../cards/health_glance.js";
 import { buildDevicePortsCard, PORT_METRICS } from "../cards/device_ports.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildSwitchPortsCard } from "../cards/switch_ports.js";
+import { buildPortMapCard } from "../cards/port_map.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
 import { stateDot } from "./services.js";
 import { buildParentCard } from "../cards/device_parent.js";
@@ -77,7 +78,15 @@ function buildDetailsCard(device) {
   const link = device.connection;
   if (link && (link.node_name || link.node_mac || link.port)) {
     const where = h("span", { id: "connection-info" }, link.node_name || link.node_mac || "");
+    if (link.node_device_id) {
+      where.textContent = "";
+      where.appendChild(h("a", { href: `#/device/${link.node_device_id}` }, link.node_name || link.node_mac || `device ${link.node_device_id}`));
+    }
     if (link.port) where.appendChild(h("span", { class: "mono" }, `${link.node_name || link.node_mac ? " · " : ""}port ${link.port}`));
+    if (link.source === "manual") where.appendChild(h("span", { class: "pm-tag", title: "You set this connection by hand" }, "set by you"));
+    if (link.source === "manual" && link.seen_port && link.seen_port !== link.port) {
+      where.appendChild(h("span", { class: "pm-tag warn", title: "What the switch plugin reports differs from what you set" }, `the plugin reports port ${link.seen_port}`));
+    }
     card.appendChild(kvRow("Connected to", where));
   }
 
@@ -731,6 +740,22 @@ export async function render(container, params) {
     terminalHandle = null;
   };
 
+  // The cards fill in one by one after the swap (graphs, ports, plugins): while the page grows, keep the reader where they were,
+  // until they scroll themselves.
+  let scrollWatch = null;
+  function holdScroll(y) {
+    if (scrollWatch) scrollWatch();
+    if (!y || typeof ResizeObserver === "undefined") return;
+    let moved = false;
+    const stop = () => { observer.disconnect(); clearTimeout(timer); for (const ev of ["wheel", "touchmove", "keydown", "mousedown"]) window.removeEventListener(ev, onUser, true); scrollWatch = null; };
+    const onUser = () => { moved = true; stop(); };
+    const observer = new ResizeObserver(() => { if (!moved && !disposed && Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y); });
+    for (const ev of ["wheel", "touchmove", "keydown", "mousedown"]) window.addEventListener(ev, onUser, { capture: true, passive: true });
+    observer.observe(container);
+    const timer = setTimeout(stop, 4000);
+    scrollWatch = stop;
+  }
+
   // Builds the whole page off-screen and swaps it in, so a refresh never
   // leaves half a page or two copies of it in the container.
   async function show(device) {
@@ -843,6 +868,9 @@ export async function render(container, params) {
     const switchPortsSlot = slot();
     nRight.appendChild(switchPortsSlot);
     buildSwitchPortsCard(device.id).then((c) => { if (c && !disposed) switchPortsSlot.appendChild(c); }).catch(() => {});
+    const portMapSlot = slot();
+    nRight.appendChild(portMapSlot);
+    buildPortMapCard(device).then((c) => { if (c && !disposed) portMapSlot.appendChild(c); }).catch(() => {});
     const virtualizationCard = buildVirtualizationCard(device);
     if (virtualizationCard) nRight.appendChild(virtualizationCard);
     const backupCard = buildBackupCard(device);
@@ -910,6 +938,7 @@ export async function render(container, params) {
     clear(container);
     container.appendChild(page);
     window.scrollTo(0, scrollY);
+    holdScroll(scrollY);
     setTimeout(() => { if (!disposed) container.style.minHeight = ""; }, 4000);
 
     if (!isAdmin()) return; // the terminal is for administrators
@@ -994,6 +1023,7 @@ export async function render(container, params) {
 
   return () => {
     disposed = true;
+    if (scrollWatch) scrollWatch();
     clearInterval(interval);
     document.removeEventListener("netlens:scan-finished", onScanFinished);
     disposeTerminal();

@@ -579,7 +579,7 @@ export async function render(container, params) {
     if (node.parent_id != null) {
       const parent = currentNodes.find((n) => n.id === node.parent_id);
       const how = { manual: "set manually", hypervisor: "hypervisor host", route: "traceroute", gateway: "gateway", uplink: "uplink", guess: "guess" }[node.parent_source] || node.parent_source;
-      panel.appendChild(h("p", {}, "Parent: ", h("a", { href: `#/device/${node.parent_id}` }, parent ? shortName(parent.label) || parent.ip : `device ${node.parent_id}`), ` (${how})`));
+      panel.appendChild(h("p", {}, "Parent: ", h("a", { href: `#/device/${node.parent_id}` }, parent ? shortName(parent.label) || parent.ip : `device ${node.parent_id}`), ` (${how})`, node.parent_port ? ` · port ${node.parent_port}` : ""));
     } else {
       panel.appendChild(h("p", {}, "Parent: none (top level)"));
     }

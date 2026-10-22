@@ -2,6 +2,8 @@ import { get } from "../api.js";
 import { h } from "../util.js";
 import { formatValue, metricGraph, graphRangeTabs, savedGraphRange } from "../timegraph.js";
 
+const OPEN_PORTS = new Map();      // device id -> labels of the ports whose graphs are shown
+
 // The ports of a switch (or the interfaces of any device with many): link, traffic, how full the link is and errors.
 // Fewer than MIN interfaces are left to the ordinary performance graphs.
 export const PORT_METRICS = ["net_rx_bps", "net_tx_bps", "net_rx_pps", "net_tx_pps", "if_util_pct", "if_err_ps", "if_up"];
@@ -36,7 +38,8 @@ export async function buildDevicePortsCard(device) {
   const rows = [...ports.values()].sort((a, b) => natural(a.label, b.label));
   const body = h("tbody", {});
   let range = savedGraphRange();
-  const open = new Set();
+  if (!OPEN_PORTS.has(device.id)) OPEN_PORTS.set(device.id, new Set());
+  const open = OPEN_PORTS.get(device.id);      // the ports whose graphs are open stay open when the page refreshes itself
   const details = new Map();
 
   const level = (metric, v) => {

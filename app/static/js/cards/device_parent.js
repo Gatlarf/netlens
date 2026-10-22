@@ -1,4 +1,4 @@
-import { get, patch } from "../api.js";
+import { get, patch, put, del } from "../api.js";
 import { h, statusDot, typeBadge } from "../util.js";
 
 const SOURCE_NOTE = {
@@ -41,6 +41,16 @@ export async function buildParentCard(device, onSaved) {
     "Automatic uses your plugins (hypervisors, routers), the traceroute path and the default gateway. Pick a device to fix the parent yourself, " +
     "for example the switch or mesh node this device is connected to. Devices below this one are not listed."));
   form.appendChild(field);
+  // the port of that switch: for a switch that cannot tell what is plugged in (a TP-Link Easy Smart), this is how the link is known
+  const link = device.connection && device.connection.source === "manual" ? device.connection : null;
+  const portField = h("div", { class: "field" });
+  const portInput = h("input", { name: "port", type: "text", maxlength: "60", placeholder: "for example 5", list: `parent-ports-${device.id}`, value: link && link.port ? link.port : (device.connection && device.connection.port) || "" });
+  const portChoices = h("datalist", { id: `parent-ports-${device.id}` });
+  portField.appendChild(h("label", {}, "Port on that switch"));
+  portField.appendChild(portInput);
+  portField.appendChild(portChoices);
+  portField.appendChild(h("p", { class: "hint" }, "Optional. A connection you set here is never overwritten by a plugin. For a device behind a second switch, choose that switch here and set that switch's own connection on its page."));
+  form.appendChild(portField);
   form.appendChild(errorEl);
   const saveBtn = h("button", { type: "submit", class: "btn" }, "Save position");
   form.appendChild(saveBtn);
@@ -59,18 +69,35 @@ export async function buildParentCard(device, onSaved) {
   } catch (err) {
     errorEl.textContent = err.message || "Could not load the device list";
   }
+  const fillPorts = async () => {
+    portChoices.replaceChildren();
+    portField.hidden = !select.value.startsWith("device:");
+    if (portField.hidden) return;
+    try {
+      const map = await get(`/api/devices/${select.value.split(":")[1]}/port-map`);
+      for (const p of map.ports) portChoices.appendChild(h("option", { value: p.port }, p.name || ""));
+    } catch (err) { /* free text still works */ }
+  };
+  select.addEventListener("change", fillPorts);
   select.value = info.mode === "none" ? "none" : info.mode === "device" && info.device_id ? `device:${info.device_id}` : "auto";
 
+  fillPorts();
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     errorEl.textContent = "";
     const value = select.value;
+    const chosen = value.startsWith("device:") ? Number(value.split(":")[1]) : null;
     const body = value === "auto" ? { parent_mode: "auto" }
       : value === "none" ? { parent_mode: "none" }
       : { parent_mode: "device", parent_device_id: Number(value.split(":")[1]) };
     saveBtn.disabled = true;
     try {
-      await patch(`/api/devices/${device.id}`, body);
+      if (chosen !== null) {
+        await put(`/api/devices/${device.id}/connection`, { node_device_id: chosen, port: portInput.value.trim() || null });
+      } else {
+        await patch(`/api/devices/${device.id}`, body);
+        if (device.connection && device.connection.source === "manual") await del(`/api/devices/${device.id}/connection`);
+      }
     } catch (err) {
       errorEl.textContent = err.message || "Could not save";
       saveBtn.disabled = false;

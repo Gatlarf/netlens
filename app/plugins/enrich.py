@@ -125,23 +125,39 @@ def record_client_hints(conn: sqlite3.Connection, data: dict) -> int:
 
 
 def record_client_links(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None) -> int:
-    """Remember which node (switch, access point) and port each client is connected to; clients this plugin no longer reports are forgotten."""
+    """Remember which node (switch, access point) and port each client is connected to; clients this plugin no longer reports are forgotten.
+
+    A link the owner set by hand is never changed: what the plugin reports instead is kept beside it (seen_node, seen_port), so the page can say they differ."""
     now = now or utcnow()
     by_mac, by_ip = device_lookup(conn)
     node_name = {mac: n.get("name") for n in data.get("nodes", []) for mac in (n.get("macs") or [n["mac"]])}
+    node_device: dict[str, int] = {}                  # node MAC -> the node as a device of its own
+    for n in data.get("nodes", []):
+        found = next((by_mac[m] for m in (n.get("macs") or [n["mac"]]) if m in by_mac), None) or by_ip.get(n.get("ip") or "")
+        if found is not None:
+            for m in (n.get("macs") or [n["mac"]]):
+                node_device[m] = found
+    manual = {r["device_id"] for r in conn.execute("SELECT device_id FROM client_links WHERE source = 'manual'")}
     seen: set[int] = set()
     for client in data.get("clients", []):
         device_id = by_mac.get(client["mac"]) or by_ip.get(client.get("ip") or "")
         if device_id is None or device_id in seen or not (client.get("node_mac") or client.get("port")):
             continue
+        if device_id in manual:
+            conn.execute("UPDATE client_links SET seen_node = ?, seen_port = ? WHERE device_id = ?",
+                         (node_name.get(client.get("node_mac")) or client.get("node_mac"), client.get("port"), device_id))
+            continue
         seen.add(device_id)
         conn.execute(
             """
-            INSERT INTO client_links (device_id, plugin_id, node_mac, node_name, port, medium, updated) VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO client_links (device_id, plugin_id, node_mac, node_name, port, medium, updated, source, node_device_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'plugin', ?)
             ON CONFLICT(device_id) DO UPDATE SET plugin_id = excluded.plugin_id, node_mac = excluded.node_mac, node_name = excluded.node_name,
-                port = excluded.port, medium = excluded.medium, updated = excluded.updated
+                port = excluded.port, medium = excluded.medium, updated = excluded.updated, node_device_id = excluded.node_device_id
+            WHERE client_links.source != 'manual'
             """,
-            (device_id, plugin_id, client.get("node_mac"), node_name.get(client.get("node_mac")), client.get("port"), client.get("medium"), now),
+            (device_id, plugin_id, client.get("node_mac"), node_name.get(client.get("node_mac")), client.get("port"), client.get("medium"), now,
+             node_device.get(client.get("node_mac"))),
         )
     if seen:
         marks = ",".join("?" for _ in seen)

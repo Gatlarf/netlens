@@ -1,7 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.api.devices import get_conn
+from app import portmap
 from app.db import utcnow
+from app.hierarchy import device_name, load_hierarchy, would_loop
 from app.stats import _ago
 
 router = APIRouter(prefix="/api", tags=["switch ports"])
@@ -57,3 +61,41 @@ def device_switch_ports(device_id: int, hours: int = Query(24, ge=1, le=336), co
         port["rx_packets_window"] = _increase(rows, "rx_packets")
         port["flaps"] = sum(1 for a, b in zip(rows, rows[1:]) if a["up"] != b["up"])
     return {"ports": ports, "hours": hours}
+
+
+@router.get("/devices/{device_id}/port-map")
+def device_port_map(device_id: int, conn=Depends(get_conn)) -> dict:
+    """Which device sits behind which port of this switch (links from a plugin and links set by hand), and where the switch itself is connected."""
+    if conn.execute("SELECT 1 FROM devices WHERE id = ?", (device_id,)).fetchone() is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    return portmap.for_switch(conn, device_id)
+
+
+class ConnectionBody(BaseModel):
+    node_device_id: int            # the switch (or access point) this device hangs on
+    port: str | None = None        # its port, a number or the name the switch gives it; may be empty when only the switch is known
+
+
+@router.put("/devices/{device_id}/connection")
+def set_connection(device_id: int, body: ConnectionBody, request: Request, conn=Depends(get_conn)) -> dict:
+    """Say by hand which switch (and port) a device is connected to. A plugin never overwrites this; the device sits below the switch."""
+    devs, hierarchy = load_hierarchy(conn)
+    if device_id not in devs:
+        raise HTTPException(status_code=404, detail="device not found")
+    if body.node_device_id == device_id:
+        raise HTTPException(status_code=422, detail="a device cannot be connected to itself")
+    if body.node_device_id not in devs:
+        raise HTTPException(status_code=422, detail="switch not found")
+    if would_loop(hierarchy, device_id, body.node_device_id):
+        raise HTTPException(status_code=422, detail=f"{device_name(devs[body.node_device_id])} sits below this device; connecting it here would create a loop")
+    portmap.set_manual(conn, device_id, body.node_device_id, body.port, utcnow())
+    request.app.state.__dict__.get("stats_cache", {}).clear()
+    return {"device_id": device_id, "node_device_id": body.node_device_id, "port": (body.port or "").strip()[:60] or None}
+
+
+@router.delete("/devices/{device_id}/connection")
+def clear_connection(device_id: int, request: Request, conn=Depends(get_conn)) -> dict:
+    """Forget a connection set by hand (a connection a plugin reports stays)."""
+    removed = portmap.clear_manual(conn, device_id)
+    request.app.state.__dict__.get("stats_cache", {}).clear()
+    return {"removed": removed}

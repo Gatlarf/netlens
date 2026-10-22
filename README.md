@@ -579,6 +579,16 @@ Passwords and tokens that Netlens has to remember (plugin credentials, the SMTP 
 - The first start after the update encrypts passwords that were stored in plain text and keeps one copy of the database as `netlens.db.pre-encryption` in the data folder (it still holds the old plain-text values; delete it once you have checked that everything works).
 - What this protects against is a copy of the database or a backup falling into the wrong hands. It does not protect against someone who can read both the data folder and the key, or who is signed in as an administrator.
 
+### Which device is behind which switch port
+
+The device page of a switch (and of a router or access point) has a **Connected devices** card: a faceplate with one block per port (link, speed, the device on it) and a list of what is on the port you click. Where the links come from:
+
+* **A switch plugin that reads the MAC table** (SNMP, MikroTik, UniFi, Omada...) reports the port of every client. This works on its own.
+* **You say so**, for a switch that cannot tell (the TP-Link Easy Smart): open the device, *Settings → Network position*, choose the switch and type the port, or click a port on the switch's faceplate and connect a device to it. Several devices can share a port. A connection you set is never overwritten by a plugin; if the plugin reports something else, both are shown.
+* **A device behind a second switch**: connect that device to the second switch and the second switch to the first. The port that leads there lists everything behind it.
+
+The device also sits below the switch in the network map, and the map shows the port in the tooltip and side panel of the link.
+
 ### Known and unknown devices
 
 Every device is either **known** (you recognise it) or **unknown**. Devices that exist when you upgrade are all marked known, so nothing changes at first; every device found afterwards starts as unknown, is tagged *unknown* in the Devices list, and its "new device" alert says so. Tick **Known device** on a device's page, or use **Trust all unknown** on the Devices page (it asks first). The Devices page can filter on *Unknown only*, and the Statistics page, the summary API and Home Assistant count them. Netlens also logs an **IP reused** event when an address that another device used in the last day is now used by a different one.

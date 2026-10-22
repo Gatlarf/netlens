@@ -6,6 +6,7 @@ Monitors TP-Link **Easy Smart** switches (TL-SG105E, TL-SG108E, TL-SG1016PE, TL-
 
 * The switch as a node in the hierarchy and on the map (model, MAC address, IP address).
 * A **Switch ports** card on the switch's device page: link state and speed (10/100/1000, half/full), packets per second sent and received, bad packets in the last 24 hours, link changes.
+* The switch does not tell which device is on which port. Say so yourself: on the switch's page, the **Connected devices** card (or a device's *Network position*) connects a device to a port, and Netlens remembers it.
 * An event (`link_down` / `link_up`) when a port loses or gets its link between two syncs, so you can be notified about it.
 
 ## What you do not get

@@ -122,9 +122,13 @@ def get_map(guests: bool = False, conn: sqlite3.Connection = Depends(get_conn)) 
     # The chosen parent of every device as an edge parent -> child (the "hierarchy" view of the map)
     _, hierarchy = load_hierarchy(conn)
     by_id = {n["id"]: n for n in nodes}
+    ports = {r["device_id"]: (r["node_device_id"], r["port"]) for r in conn.execute("SELECT device_id, node_device_id, port FROM client_links WHERE port IS NOT NULL")}
     for dev_id, info in hierarchy.items():
         by_id[dev_id]["parent_id"] = info.parent_id
         by_id[dev_id]["parent_source"] = info.source
+        node, port = ports.get(dev_id, (None, None))
+        if port and info.parent_id is not None and node in (None, info.parent_id):      # the port of the switch the device hangs on
+            by_id[dev_id]["parent_port"] = port
 
     edges: list[dict[str, Any]] = []
     for dev_id, info in sorted(hierarchy.items()):
@@ -137,7 +141,7 @@ def get_map(guests: bool = False, conn: sqlite3.Connection = Depends(get_conn)) 
                 "source": info.source,
                 "confidence": 1.0,
                 "manual": info.locked,
-                "reason": info.reason,
+                "reason": info.reason + (f" · port {by_id[dev_id]['parent_port']}" if by_id[dev_id].get("parent_port") else ""),
             })
     for rel in list_relations(conn):
         edges.append({

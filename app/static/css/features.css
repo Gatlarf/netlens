@@ -698,3 +698,32 @@ input.is-locked { background: var(--bg); color: var(--muted); cursor: not-allowe
 .mcp-group summary::marker { color: var(--muted); }
 .mcp-tools { margin: 6px 0 2px 26px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8em; color: var(--muted); overflow-wrap: anywhere; }
 .mcp-connect h4 { margin: 14px 0 4px; }
+
+/* Connected devices: the front of a switch, one block per port */
+.faceplate { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); }
+.faceplate.two-rows { display: grid; grid-template-rows: repeat(2, auto); grid-auto-flow: column; grid-auto-columns: minmax(64px, 1fr); }
+.fp-port { display: flex; flex-direction: column; align-items: center; min-width: 64px; max-width: 110px; padding: 4px 4px 5px; font: inherit; font-size: 0.78rem; color: var(--text); background: var(--surface); border: 2px solid var(--border); border-radius: 5px; cursor: pointer; }
+.fp-port:hover, .fp-port.sel { border-color: var(--accent); }
+.fp-port .fp-num { font-weight: 600; }
+.fp-port .fp-speed { font-size: 0.7rem; color: var(--muted); }
+.fp-port .fp-dev { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.72rem; min-height: 1em; }
+.fp-port.st-up { border-left-color: var(--ok); border-bottom: 4px solid var(--ok); }
+.fp-port.st-down { border-bottom: 4px solid var(--border); }
+.fp-port.st-disabled { opacity: 0.55; border-style: dashed; }
+.fp-port.st-used { border-bottom: 4px solid var(--warn); }
+.fp-port.node { box-shadow: inset 0 0 0 1px var(--accent); }
+.fp-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.fp-key { display: inline-block; width: 12px; height: 8px; border: 1px solid var(--border); background: var(--surface); }
+.fp-key.st-up { border-bottom: 3px solid var(--ok); }
+.fp-key.st-disabled { border-style: dashed; }
+.fp-key.st-used { border-bottom: 3px solid var(--warn); }
+.fp-key.node { box-shadow: inset 0 0 0 1px var(--accent); }
+.pm-selected { margin-top: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); }
+.pm-devices { list-style: none; margin: 0; padding: 0; }
+.pm-device { padding: 4px 0; }
+.pm-tag { margin-left: 6px; padding: 0 6px; font-size: 0.72rem; color: var(--muted); border: 1px solid var(--border); border-radius: 10px; }
+.pm-tag.warn { color: var(--warn); border-color: var(--warn); }
+.pm-behind { margin: 2px 0 0 18px; font-size: 0.85rem; }
+.pm-behind ul { margin: 2px 0; padding-left: 18px; }
+.pm-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.pm-row input, .pm-row select { min-width: 0; }

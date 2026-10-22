@@ -192,7 +192,7 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
     result["gentle"] = result["gentle"] or result["gentle_auto"]
     _add_group(conn, [result])
     result["identification"] = store.identification_report(conn, device_id)
-    link = conn.execute("SELECT plugin_id, node_mac, node_name, port, medium, updated FROM client_links WHERE device_id = ?", (device_id,)).fetchone()
+    link = conn.execute("SELECT plugin_id, node_mac, node_name, port, medium, updated, source, node_device_id, seen_node, seen_port FROM client_links WHERE device_id = ?", (device_id,)).fetchone()
     result["connection"] = {k: link[k] for k in link.keys()} if link else None
     dns = conn.execute("SELECT state, reason, fqdn FROM dns_state WHERE device_id = ?", (device_id,)).fetchone()
     result["dns"] = {k: dns[k] for k in dns.keys()} if dns else None

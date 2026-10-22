@@ -2,6 +2,16 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.148 — 2026-10-22
+
+### Added
+- ★ **Which device is behind which switch port**: the switch's page has a new *Connected devices* card with a faceplate (one block per port: link, speed and the device on it), a list of what is on the chosen port, and devices that sit below the switch with no known port. A port that leads to a second switch lists the devices behind it. The *Switch ports* table has a *Connected* column, and the map shows the port of a device's link in its tooltip and side panel.
+- ★ **Set the connection by hand** for switches that cannot tell (TP-Link Easy Smart): choose the switch and the port in the *Network position* card of the device, or pick a device from the faceplate. Several devices can share a port, and a device behind a second switch is connected to that switch. The device also sits below the switch in the network map. A plugin never overwrites a connection you set; if the plugin reports something else, both are shown.
+- Links from switch plugins now remember the switch as a device of its own, so the port list of an SNMP switch works without a port inventory.
+
+### Fixed
+- On a device page, the refresh every 20 seconds closed the open port graphs and could throw the page back to the top. Open ports stay open and the page keeps its scroll position while cards fill in.
+
 ## 0.4.147 — 2026-10-21
 
 ### Added
