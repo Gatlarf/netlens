@@ -830,6 +830,14 @@ body[data-scoped] #scan-menu-wrap, body[data-scoped] #search-btn, body[data-scop
 /* a remote site shown through this Netlens (app/relay.py): the banner, the switcher, and what cannot be done there */
 .site-banner { background: #dbeafe; color: #1e3a8a; border-bottom: 1px solid #60a5fa; padding: 6px 16px; text-align: center; font-size: 0.85rem; display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
 .site-switch { max-width: 11rem; }
+/* on a phone the site selector gets a row of its own under the brand and buttons, so the burger stays on screen */
+@media (max-width: 700px) {
+  .topbar { flex-wrap: wrap; row-gap: 0; }
+  .topbar .brand { margin-right: auto; }
+  .topbar-actions { display: contents; }
+  .topbar-actions > * { order: 1; }
+  .topbar-actions > .site-switch { order: 2; flex: 1 0 100%; max-width: none; margin: 0 0 8px; }
+}
 body.site-view .admin-only, body.site-view .act-only, body.site-view [data-route="settings"], body.site-view [data-route="remote_sites"], body.site-view [data-route="remote"], body.site-view #scan-menu-wrap { display: none !important; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .site-banner { background: #1e3a5f; color: #dbeafe; border-bottom-color: #3b82f6; } }
 :root[data-theme="dark"] .site-banner { background: #1e3a5f; color: #dbeafe; border-bottom-color: #3b82f6; }
