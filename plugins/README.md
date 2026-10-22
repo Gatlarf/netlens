@@ -6,9 +6,9 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 | Folder | Plugin | Reads | Status |
 |---|---|---|---|
 | [`proxmox/`](proxmox/README.md) | Proxmox VE | VMs and containers and the host each runs on (a `hypervisor` plugin; was built into Netlens before 0.4.44) | in daily use on the maintainer's cluster |
-| [`asus/`](asus/README.md) | ASUS router (AiMesh) | which device is connected to which AiMesh node, with Wi-Fi signal and roaming (a `topology` plugin; was built in before 0.4.44) | tested on an ASUS RT-AX92U |
+| [`asus/`](asus/README.md) | ASUS router (AiMesh) | which device is connected to which AiMesh node, with Wi-Fi signal and roaming, and the router's Traffic Analyzer: traffic per application and device (a `topology` plugin; was built in before 0.4.44) | tested on an ASUS RT-AX92U |
 | [`homeassistant/`](homeassistant/README.md) | Home Assistant | the device registry: area, model, battery, availability (an `inventory` plugin) | tested on a real Home Assistant 2026.7.1 |
-| [`omada/`](omada/README.md) | TP-Link Omada | Omada controller 5.1 or newer: gateway, switches, access points, clients | written from the public API, **testing started** (1.0.1 fixes a first controller error) |
+| [`omada/`](omada/README.md) | TP-Link Omada | Omada controller 5.1 or newer: gateway, switches and their ports, access points, clients and the switch port of each wired client | written from the public API, **testing started** (1.0.1 fixes a first controller error) |
 | [`unifi/`](unifi/README.md) | Ubiquiti UniFi | UniFi Network on a UniFi OS console or a classic controller | written from the public API, **not yet tested on hardware** |
 | [`snmp/`](snmp/README.md) | SNMP switches | managed switches over SNMP v1, v2c or v3: the MAC address table (which device is on which port, for Cisco per VLAN) and LLDP or Cisco CDP (how the switches are connected) | verified against a real device (v3 also against a real net-snmp agent; the Cisco parts only against a simulated Catalyst) |
 | [`technitium/`](technitium/README.md) | Technitium DNS | registers devices in Technitium DNS (a `dns` plugin): A and PTR records, primary/secondary and cluster, never touches records it did not make | tested against a simulated Technitium server only |
