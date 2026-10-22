@@ -1,0 +1,24 @@
+{
+  "id": "checkpoint",
+  "name": "Check Point Management",
+  "kind": "topology",
+  "category": "network",
+  "description": "Reads a Check Point management server (R80.10 or newer) with a read-only administrator: every gateway, cluster, cluster member and server it manages, with address, model, version and operating system, as network nodes. It does not report the devices behind a gateway (the management API has none): use the SNMP plugin on the gateways for those. Read-only session. Not yet tested on a real management server.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/checkpoint",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Check Point R80.10 or newer Management API (tested against a simulator only)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-checkpoint-v1.0.0/checkpoint.zip",
+      "sha256": "58b74a150efdf1df90994222b6719dc92db8e67dca5021e69298f0f2da18beba",
+      "api_version": 1,
+      "min_netlens": "0.4.152",
+      "released": "2026-10-22",
+      "changelog": "First release. Written from the vendor's public API documentation and tested against a simulator only: please try it on a real firewall and send the Run diagnostic report if something is missing (needs Netlens 0.4.152 or newer for the Firewall card)."
+    }
+  ]
+}

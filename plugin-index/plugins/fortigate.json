@@ -1,0 +1,24 @@
+{
+  "id": "fortigate",
+  "name": "Fortinet FortiGate",
+  "kind": "topology",
+  "category": "network",
+  "description": "Reads a FortiGate firewall (FortiOS 6.4 or newer) with a read-only REST token: the firewall as the gateway with its interfaces, the devices behind it (DHCP leases, device identification, ARP), and its health: high availability, VPN tunnels, firmware and licence expiry. Netlens shows them on a Firewall card and logs events for failover, tunnels going down and licences about to expire. Read-only: only GET requests. Not yet tested on a real firewall.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/fortigate",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "FortiOS 6.4 or newer (tested against a simulator only)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-fortigate-v1.0.0/fortigate.zip",
+      "sha256": "26d5872f1bac5d53c5e986fcb1c8be3d35936b11fd0cf0257a1590a14a1f31a6",
+      "api_version": 1,
+      "min_netlens": "0.4.152",
+      "released": "2026-10-22",
+      "changelog": "First release. Written from the vendor's public API documentation and tested against a simulator only: please try it on a real firewall and send the Run diagnostic report if something is missing (needs Netlens 0.4.152 or newer for the Firewall card)."
+    }
+  ]
+}
