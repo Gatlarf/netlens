@@ -59,7 +59,7 @@ def test_cpe_names_from_nmap():
     assert cvecheck.parse_cpe("cpe:/a:nginx:nginx:1.18.0") == ("nginx", "nginx", "1.18.0", "")
     assert cvecheck.parse_cpe("cpe:/o:linux:linux_kernel:5.4") is None            # an operating system, not an application
     assert cvecheck.parse_cpe("cpe:/a:apache:http_server") is None                # no version
-    assert cvecheck.cpe23("openbsd", "openssh", "8.4", "p1") == r"cpe:2.3:a:openbsd:openssh:8.4:p1:*:*:*:*:*:*"
+    assert cvecheck.cpe23("openbsd", "openssh", "8.4", "p1") == r"cpe:2.3:a:*:openssh:8.4:*:*:*:*:*:*:*"
 
 
 def test_version_order_and_ranges():
@@ -68,6 +68,13 @@ def test_version_order_and_ranges():
     assert rng(versionStartIncluding="8.2", versionEndExcluding="8.5") is True
     assert rng(versionEndExcluding="8.4") is False and rng(versionEndIncluding="8.4") is True and rng(versionStartExcluding="8.4") is False
     assert rng() is None                                                            # all versions: says nothing
+
+
+def test_a_vendor_the_nvd_names_differently_is_followed_when_unambiguous():
+    f5 = [cve("CVE-2021-23017", [{"criteria": "cpe:2.3:a:f5:nginx:*:*:*:*:*:*:*:*", "versionStartIncluding": "0.6.18", "versionEndExcluding": "1.20.1"}], 7.7)]
+    assert [c["id"] for c in cvecheck.condense(f5, "nginx", "nginx", "1.18.0")["cves"]] == ["CVE-2021-23017"]
+    two = f5 + [cve("CVE-2000-1", [{"criteria": "cpe:2.3:a:someone:nginx:*:*:*:*:*:*:*:*", "versionEndExcluding": "9"}])]
+    assert cvecheck.condense(two, "nginx", "nginx", "1.18.0")["cves"] == []          # two vendors, none ours: too uncertain to say
 
 
 def test_only_ranges_that_contain_the_version_count():
@@ -80,7 +87,7 @@ def test_a_run_stores_findings_asks_once_and_uses_the_cache(conn):
     nvd = Nvd()
     last = cvecheck.run(conn, fetch=nvd, sleep=lambda s: None, now=NOW)
     assert last["ok"] and last["asked"] == 1 and last["findings"] == 2 and last["vague_cves_ignored"] == 1 and len(nvd.calls) == 1
-    assert "cpeName=cpe%3A2.3%3Aa%3Aopenbsd%3Aopenssh%3A8.4%3Ap1" in nvd.calls[0]
+    assert "virtualMatchString=cpe%3A2.3%3Aa%3A%2A%3Aopenssh%3A8.4%3A%2A" in nvd.calls[0]
     rows = conn.execute("SELECT * FROM vuln_findings WHERE plugin_id = 'cvecheck' ORDER BY score DESC").fetchall()
     assert [r["cves"] for r in rows] == ['["CVE-2021-28041"]', '["CVE-2020-0002"]']
     assert rows[0]["device_id"] == 1 and rows[0]["port"] == 22 and "OpenSSH 8.4p1 Debian 5" in rows[0]["title"] and "distribution package" in rows[0]["solution"]

@@ -104,8 +104,9 @@ def parse_cpe(cpe: str) -> tuple[str, str, str, str] | None:
 
 
 def cpe23(vendor: str, product: str, version: str, update: str) -> str:
+    """The question for the NVD. The update (the p1 of OpenSSH 8.4p1) is left out: the NVD matches ranges on the version. The vendor is a wildcard on purpose: nmap says nginx:nginx where the NVD says f5:nginx; condense() sorts the vendors out."""
     esc = lambda text: re.sub(r"([^A-Za-z0-9_.\-])", r"\\\1", text)
-    return f"cpe:2.3:a:{esc(vendor)}:{esc(product)}:{esc(version)}:{esc(update) if update else '*'}:*:*:*:*:*:*"
+    return f"cpe:2.3:a:*:{esc(product)}:{esc(version)}:*:*:*:*:*:*:*"
 
 
 def candidates(conn: sqlite3.Connection) -> list[dict]:
@@ -180,6 +181,12 @@ def _metric(cve: dict) -> tuple[float | None, str | None]:
 
 def condense(raw: list[dict], vendor: str, product: str, version: str) -> dict:
     """Keep the CVEs whose affected range really contains `version`; count the ones that only claim 'every version' (too vague to report)."""
+    vendors = {str(m.get("criteria", "")).split(":")[3] for item in raw for config in (item.get("cve") or item).get("configurations") or [] for node in config.get("nodes") or []
+               for m in node.get("cpeMatch") or [] if len(str(m.get("criteria", "")).split(":")) > 5 and str(m["criteria"]).split(":")[4] == product}
+    if vendor not in vendors:                       # the NVD names the vendor differently (nginx -> f5): fine when it is the only one for this product, too vague otherwise
+        if len(vendors) != 1:
+            return {"cves": [], "vague": 0}
+        vendor = next(iter(vendors))
     found, vague = [], 0
     for item in raw:
         cve = item.get("cve") or item
@@ -222,7 +229,7 @@ def http_json(url: str, api_key: str = "", timeout: float = 40.0) -> dict:
 def query(cpe_name: str, api_key: str = "", fetch: Callable[[str, str], dict] = http_json) -> list[dict]:
     out, start = [], 0
     while True:
-        url = f"{NVD_URL}?" + urllib.parse.urlencode({"cpeName": cpe_name, "resultsPerPage": 500, "startIndex": start})
+        url = f"{NVD_URL}?" + urllib.parse.urlencode({"virtualMatchString": cpe_name, "resultsPerPage": 500, "startIndex": start})
         page = fetch(url, api_key)
         rows = page.get("vulnerabilities") or []
         out.extend(rows)
