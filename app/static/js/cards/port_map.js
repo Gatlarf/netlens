@@ -17,16 +17,32 @@ function state(p) {
   return p.up ? "up" : "down";
 }
 
-// Save a connection. When the switch now sits below the device, the server says what would change; the owner decides.
+// Three answers to the question the server asks when the switch sits below the device: only the port, turn the tree around, or cancel.
+function askTree(message) {
+  return new Promise((resolve) => {
+    const dialog = h("dialog", { class: "whats-new" });
+    const done = (answer) => { dialog.close(); dialog.remove(); resolve(answer); };
+    dialog.appendChild(h("p", {}, message));
+    dialog.appendChild(h("div", { class: "pm-row" },
+      h("button", { class: "btn", type: "button", onclick: () => done("keep") }, "Only record the port"),
+      h("button", { class: "btn", type: "button", onclick: () => done("replace") }, "Turn the tree around"),
+      h("button", { class: "btn", type: "button", onclick: () => done(null) }, "Cancel")));
+    dialog.addEventListener("cancel", () => done(null));
+    document.body.appendChild(dialog);
+    dialog.showModal();
+  });
+}
+
+// Save a connection. When the switch already sits below the device, the server says so and the owner decides.
 export async function putConnection(deviceId, switchId, port) {
   const body = { node_device_id: switchId, port };
   try {
     return await put(`/api/devices/${deviceId}/connection`, body);
   } catch (err) {
-    if (err instanceof ApiError && err.status === 409 && window.confirm(`${err.message}\n\nContinue?`)) {
-      return put(`/api/devices/${deviceId}/connection`, { ...body, replace: true });
-    }
-    throw err;
+    if (!(err instanceof ApiError && err.status === 409)) throw err;
+    const answer = await askTree(err.message);
+    if (!answer) throw new ApiError(0, "Nothing changed");
+    return put(`/api/devices/${deviceId}/connection`, { ...body, [answer === "keep" ? "keep_parent" : "replace"]: true });
   }
 }
 
@@ -43,6 +59,7 @@ function deviceLine(d, onRemove) {
   line.appendChild(document.createTextNode(" "));
   line.appendChild(typeBadge(d.type));
   if (d.manual) line.appendChild(h("span", { class: "pm-tag", title: "You set this connection by hand; a plugin never overwrites it" }, "set by you"));
+  if (d.upstream) line.appendChild(h("span", { class: "pm-tag", title: "This device sits above the switch in the network tree: the way to the gateway" }, "towards the gateway"));
   if (d.differs) {
     const where = [d.differs.node, d.differs.port ? `port ${d.differs.port}` : ""].filter(Boolean).join(" ");
     line.appendChild(h("span", { class: "pm-tag warn", title: "What the switch plugin reports differs from what you set" }, `the plugin reports ${where}`));
@@ -102,7 +119,8 @@ export async function buildPortMapCard(device) {
         : "No device is linked to a port of this switch yet. Use the form below to say which device is connected where."));
     if (data.uplink) {
       const up = h("p", {}, "This switch is connected to ", h("a", { href: `#/device/${data.uplink.id}` }, data.uplink.name));
-      if (data.uplink.port) up.appendChild(h("span", { class: "mono" }, ` · port ${data.uplink.port}`));
+      if (data.uplink.port) up.appendChild(h("span", { class: "mono" }, ` · port ${data.uplink.port} there`));
+      if (data.uplink.local_port) up.appendChild(h("span", { class: "mono" }, ` · on port ${data.uplink.local_port} of this switch`));
       if (data.uplink.manual) up.appendChild(h("span", { class: "pm-tag" }, "set by you"));
       card.appendChild(up);
     }

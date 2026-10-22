@@ -61,7 +61,7 @@ def test_a_device_behind_a_second_switch_is_listed_under_the_port_that_leads_the
     client.put("/api/devices/5/connection", json={"node_device_id": 3, "port": "4"})
     uplink = port_map(client)["12"]["devices"][0]
     assert uplink["name"] == "office" and [b["name"] for b in uplink["behind"]] == ["pc"]
-    assert client.get("/api/devices/3/port-map").json()["uplink"] == {"id": 2, "name": "core", "port": "12", "manual": True}
+    assert client.get("/api/devices/3/port-map").json()["uplink"] == {"id": 2, "name": "core", "port": "12", "manual": True, "local_port": None}
 
 
 def test_a_port_can_be_given_by_the_name_the_switch_uses(client):
@@ -129,3 +129,15 @@ def test_connecting_a_device_to_a_switch_that_sits_below_it_asks_first_and_then_
     assert [d["name"] for d in port_map(client)["14"]["devices"]] == ["pc"]
     assert client.get("/api/devices/2").json()["parent"]["effective"]["name"] != "pc"
     assert client.get("/api/devices/5").json()["parent"]["effective"]["name"] == "core"
+
+
+def test_the_gateway_above_a_switch_can_be_plugged_into_a_port_without_changing_the_tree(client):
+    client.put("/api/devices/2/connection", json={"node_device_id": 1, "port": "16"})                 # core below router, set by hand
+    kept = client.put("/api/devices/1/connection", json={"node_device_id": 2, "port": "14", "keep_parent": True})
+    assert kept.status_code == 200
+    assert client.get("/api/devices/2").json()["parent"]["effective"]["name"] == "router"               # the tree is as it was
+    assert client.get("/api/devices/1").json()["parent"]["effective"] is None
+    gateway = port_map(client)["14"]["devices"][0]
+    assert gateway["name"] == "router" and gateway["upstream"] is True and gateway["behind"] == []
+    assert client.get("/api/devices/2/port-map").json()["uplink"]["local_port"] == "14"
+    assert client.get("/api/devices/1").json()["connection"]["port"] == "14"

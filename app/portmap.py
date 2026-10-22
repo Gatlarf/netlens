@@ -12,7 +12,7 @@ import re
 import sqlite3
 from typing import Any
 
-from app.hierarchy import children_map, descendants, device_name, load_hierarchy
+from app.hierarchy import ancestors, children_map, descendants, device_name, load_hierarchy
 from app.plugins.matching import norm_mac
 
 MAX_BEHIND = 200      # devices listed behind one port; the rest is only counted
@@ -56,11 +56,15 @@ def for_switch(conn: sqlite3.Connection, switch_id: int) -> dict[str, Any]:
             links[r["device_id"]] = dict(r)
 
     direct = set(links) | set(kids.get(switch_id, []))
+    upstream = set(ancestors(hierarchy, switch_id))
     by_port: dict[str, list[dict]] = {}
     no_port: list[dict] = []
     for device_id in sorted(direct, key=lambda i: device_name(devs[i]).lower()):
         entry = _entry(devs, device_id)
         behind_ids = sorted(descendants(hierarchy, device_id, kids) - direct - {switch_id}, key=lambda i: device_name(devs[i]).lower())
+        entry["upstream"] = device_id in upstream           # the way to the gateway: everything else hangs below the switch, so nothing is "behind" it
+        if entry["upstream"]:
+            behind_ids = []
         entry["behind"] = [_entry(devs, i) for i in behind_ids[:MAX_BEHIND]]
         entry["behind_total"] = len(behind_ids)
         link = links.get(device_id)
@@ -96,11 +100,13 @@ def for_switch(conn: sqlite3.Connection, switch_id: int) -> dict[str, Any]:
     if parent is not None:
         uplink = {"id": parent, "name": device_name(devs[parent]), "port": own["port"] if own and own["node_device_id"] in (None, parent) else None,
                   "manual": bool(own and own["source"] == "manual")}
+        uplink["local_port"] = links[parent]["port"] if parent in links else None      # the port of THIS switch the parent is plugged into
     return {"ports": ports, "no_port": no_port, "uplink": uplink}
 
 
-def set_manual(conn: sqlite3.Connection, device_id: int, switch_id: int, port: str | None, now: str) -> None:
-    """The owner says: this device is connected to this switch (on this port). It becomes the device's parent as well."""
+def set_manual(conn: sqlite3.Connection, device_id: int, switch_id: int, port: str | None, now: str, set_parent: bool = True) -> None:
+    """The owner says: this device is connected to this switch (on this port). It becomes the device's parent as well, unless the tree is to stay
+    as it is (the gateway that sits above the switch in the tree is still plugged into one of its ports)."""
     sw = conn.execute("SELECT mac, custom_name, hostname, primary_ip FROM devices WHERE id = ?", (switch_id,)).fetchone()
     name = sw["custom_name"] or sw["hostname"] or sw["primary_ip"] or f"device {switch_id}"
     conn.execute(
@@ -112,7 +118,8 @@ def set_manual(conn: sqlite3.Connection, device_id: int, switch_id: int, port: s
         """,
         (device_id, sw["mac"], name, (port or "").strip()[:60] or None, now, switch_id),
     )
-    conn.execute("UPDATE devices SET parent_mode = 'device', parent_device_id = ? WHERE id = ?", (switch_id, device_id))
+    if set_parent:
+        conn.execute("UPDATE devices SET parent_mode = 'device', parent_device_id = ? WHERE id = ?", (switch_id, device_id))
     conn.commit()
 
 

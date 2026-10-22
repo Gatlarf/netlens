@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.150 — 2026-10-22
+
+### Changed
+- When the switch already sits below a device in the network tree (the gateway, for example), connecting that device to a port now offers three choices: only record the port and leave the tree as it is, turn the tree around, or cancel. The gateway then shows on that port as *towards the gateway*, and the switch's card says which of its ports leads there.
+
 ## 0.4.149 — 2026-10-22
 
 ### Changed

@@ -74,7 +74,8 @@ def device_port_map(device_id: int, conn=Depends(get_conn)) -> dict:
 class ConnectionBody(BaseModel):
     node_device_id: int            # the switch (or access point) this device hangs on
     port: str | None = None        # its port, a number or the name the switch gives it; may be empty when only the switch is known
-    replace: bool = False          # the switch now sits below this device: turn that around (the answer to the question a 409 asks)
+    replace: bool = False          # the switch now sits below this device: turn that around (one answer to the question a 409 asks)
+    keep_parent: bool = False      # ... or only record the port and leave the tree as it is (the other answer)
 
 
 @router.put("/devices/{device_id}/connection")
@@ -87,7 +88,7 @@ def set_connection(device_id: int, body: ConnectionBody, request: Request, conn=
         raise HTTPException(status_code=422, detail="a device cannot be connected to itself")
     if body.node_device_id not in devs:
         raise HTTPException(status_code=422, detail="switch not found")
-    if would_loop(hierarchy, device_id, body.node_device_id):
+    if would_loop(hierarchy, device_id, body.node_device_id) and not body.keep_parent:
         # the switch sits below this device now (a parent you set, or one that was found): connecting the device to the switch turns that around
         chain = [body.node_device_id]
         for up in ancestors(hierarchy, body.node_device_id):
@@ -97,7 +98,8 @@ def set_connection(device_id: int, body: ConnectionBody, request: Request, conn=
         fix = [(c, p) for c, p in zip(chain, chain[1:]) if devs[c]["parent_mode"] == "device" and devs[c]["parent_device_id"] == p]
         if not body.replace:
             sw, dev = device_name(devs[body.node_device_id]), device_name(devs[device_id])
-            text = f"{sw} sits below {dev} now ({hierarchy[body.node_device_id].reason.lower()}). Connecting {dev} to {sw} turns that around: {dev} will sit below {sw}"
+            text = (f"{sw} sits below {dev} in the network tree now ({hierarchy[body.node_device_id].reason.lower()}). "
+                    f"You can only record that {dev} is plugged into this port and leave the tree as it is, or turn it around: {dev} will sit below {sw}")
             if fix:
                 text += " and the parent you set for " + ", ".join(device_name(devs[c]) for c, _ in fix) + " is removed (it becomes automatic)"
             raise HTTPException(status_code=409, detail=text + ".")
@@ -105,7 +107,7 @@ def set_connection(device_id: int, body: ConnectionBody, request: Request, conn=
             portmap.clear_manual(conn, c)
             conn.execute("UPDATE devices SET parent_mode = 'auto', parent_device_id = NULL WHERE id = ? AND parent_mode = 'device' AND parent_device_id = ?", (c, p))
         conn.commit()
-    portmap.set_manual(conn, device_id, body.node_device_id, body.port, utcnow())
+    portmap.set_manual(conn, device_id, body.node_device_id, body.port, utcnow(), set_parent=not body.keep_parent)
     request.app.state.__dict__.get("stats_cache", {}).clear()
     return {"device_id": device_id, "node_device_id": body.node_device_id, "port": (body.port or "").strip()[:60] or None}
 
