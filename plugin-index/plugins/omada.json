@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.3.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.3.2/omada.zip",
+      "sha256": "376db02dc269757e4a56634c2f1bb0b457a1184c47d63acff92d9e89eb68686a",
+      "api_version": 1,
+      "min_netlens": "0.4.161",
+      "released": "2026-10-22",
+      "changelog": "The application statistics read now tries the client's MAC address in both notations (AA-BB-... and AA:BB:...) and keeps the one the Open API answers with rows; the diagnostic shows both. README: DPI needs Logging Traffic switched on, otherwise nothing is recorded."
+    },
+    {
       "version": "1.3.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.3.1/omada.zip",
       "sha256": "a2d33d8dd2c324eb5b16c65b69cb3bfa466d69421d2b82f89b3af2127df0280c",
