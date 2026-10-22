@@ -130,6 +130,24 @@
    ],
    "releases": [
     {
+     "version": "1.2.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.2.0/asus.zip",
+     "sha256": "ec5b7aef3bc257778e6579b248a124f999799fd6ef0279e4aa8d57ccc3e37aa1",
+     "api_version": 1,
+     "min_netlens": "0.4.154",
+     "released": "2026-10-22",
+     "changelog": "Reads the router's Traffic Analyzer when it is on: bytes per application and per device for today and yesterday, shown in Statistics > Applications (needs Netlens 0.4.154 or newer). New setting Read the Traffic Analyzer statistics (on by default); models without the Traffic Analyzer pages are skipped. Nothing else changed.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-22",
+      "tested_on": [
+       "ASUS RT-AX92U running stock ASUSWRT (the maintainer's router): the new Traffic Analyzer reads were run against it and returned 45 applications and 24 devices for the day"
+      ],
+      "notes": "Written with the assistant Claude. The new part is read-only (two extra page reads per day and a clock read); the AiMesh part is unchanged from 1.1.0. Reviewed, not yet confirmed by the maintainer."
+     }
+    },
+    {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.1.0/asus.zip",
      "sha256": "388407480eb782ad907fe5937f2ac026a42ec3d7652f38f249e7ae755c1e7cd3",
@@ -1271,6 +1289,18 @@
     "OC200 / OC300 hardware controllers (not yet tested)"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.1.0/omada.zip",
+     "sha256": "39ddf282d8f1e5e63c6bbb16bba0506ab462a53f477cb48b065963fba57d4c71",
+     "api_version": 1,
+     "min_netlens": "0.4.154",
+     "released": "2026-10-22",
+     "changelog": "Reads the ports of every switch (link state, speed, duplex, byte counters) for the Switch ports card, the faceplate, traffic graphs and link events, and tells which switch port each wired client sits on (needs Netlens 0.4.154 or newer). Written from the controller's documented fields and tested against a simulated controller only; Run diagnostic shows whether the ports were understood.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.3",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.0.3/omada.zip",
