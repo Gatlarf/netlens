@@ -86,6 +86,8 @@ class Fake(BaseHTTPRequestHandler):
             q = parse_qs(url.query)
             if url.path == "/openapi/v1/ctl1/sites":
                 return self._send({"errorCode": 0, "result": {"data": [{"siteId": "site1", "name": "Home"}, {"siteId": "site2", "name": "Office"}], "totalRows": 2}})
+            if url.path == "/openapi/v1/ctl1/sites/site1/applicationControl/applications":
+                return self._send({"errorCode": 0, "result": {"data": [{"applicationId": 1, "applicationName": "YouTube"}], "totalRows": 120, "currentPage": 1}})
             prefix = "/openapi/v1/ctl1/sites/site1/dashboard/specificClientInfo/"
             if url.path.startswith(prefix):
                 mac = url.path[len(prefix):]
@@ -387,3 +389,25 @@ def test_netlens_switch_for_application_statistics_has_the_last_word(server):
     assert out["usage"] == [] and state["token_calls"] == [] and state["app_calls"] == []
     assert "switched off in Netlens" in plugin.test(with_api(url, collect_usage=False))["message"]
     assert plugin.fetch(with_api(url, collect_usage=True))["usage"] != []
+
+
+def test_the_diagnostic_says_what_the_application_reads_answered(server):
+    url, state = server
+    shape = plugin.diagnose(with_api(url))["steps"]["application_traffic"]["shape"]
+    assert shape["application_catalogue"] == {"type": "dict", "total": 120} and shape["window_that_worked"] == "today_seconds"
+    assert shape["clients_tried"] == 3 and len(shape["attempts"]) == 9 and all(a["window"] for a in shape["attempts"])
+    # a controller that has DPI off answers an empty list for everything: the report then says so for each window instead of staying silent
+    state["apps"] = {}
+    shape = plugin.diagnose(with_api(url))["steps"]["application_traffic"]["shape"]
+    assert shape["rows"] == [] and {a["window"]: (a.get("type"), a.get("count")) for a in shape["attempts"] if "type" in a} == {
+        "today_seconds": ("list", 0), "24h_seconds": ("list", 0), "24h_milliseconds": ("list", 0)}
+
+
+def test_the_busiest_clients_are_read_first(server):
+    url, state = server
+    controller = plugin.Controller(with_api(url))
+    controller.login()
+    controller.snapshot()
+    controller.targets[0][1]["trafficDown"] = 1            # the first listed client moved the least
+    controller.targets[-1][1]["trafficDown"] = 10 ** 9
+    assert sorted(controller.targets, key=plugin._traffic_of)[0][1] is controller.targets[-1][1]

@@ -80,6 +80,7 @@ answered: the controller version, which steps worked, and the **names and types 
 
 - **Application statistics** need DPI on the gateway and an Open API client (see above). They are read per client, so a network with hundreds of clients is read partly each sync (the busiest first).
   Only today is read; the day changes at midnight of the Netlens server's clock, not the controller's.
+- **Application statistics stay empty although the connection test says "working"?** The Open API login and the site match, but the controller returns no application rows. Check that **DPI is switched on** at the gateway and that the gateway model supports it (not every Omada router does), then wait a while for traffic to be counted. *Run diagnostic* then shows under *application_traffic* what the controller answered for three clients and three time windows (today in seconds, the last 24 hours in seconds and in milliseconds), whether its application list is known (`application_catalogue`), and which window returned rows. Send that report.
 - **Run diagnostic** has an *application_traffic* step that shows the field names the Open API answered with (never names or addresses) and whether the Open API's site ids match the ones the web interface uses.
 - Controllers older than 5.1 are refused with a clear message.
 - The uplink of a **mesh** access point (connected by radio) may not be reported; such a device then hangs below the gateway.

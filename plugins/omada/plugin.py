@@ -310,8 +310,11 @@ class Controller:
         names = {str(r.get("name") or "").lower(): str(r["siteId"]) for r in rows}
         return ids, names
 
+    def client_applications_raw(self, site_id, mac, start, end):
+        return self._open(f"sites/{site_id}/dashboard/specificClientInfo/{mac}", {"start": start, "end": end})
+
     def client_applications(self, site_id, mac, start, end):
-        rows = self._open(f"sites/{site_id}/dashboard/specificClientInfo/{mac}", {"start": start, "end": end})
+        rows = self.client_applications_raw(site_id, mac, start, end)
         return [r for r in (rows if isinstance(rows, list) else []) if isinstance(r, dict)]
 
     def usage(self):
@@ -326,7 +329,7 @@ class Controller:
             midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
             start, end = int(midnight.timestamp()), int(now.timestamp())
             apps, per_client, per_client_apps, failed, deadline = {}, {}, {}, 0, time.monotonic() + USAGE_BUDGET
-            targets = sorted(self.targets, key=lambda t: -(_number(t[1].get("activity")) or 0))[:USAGE_MAX_CLIENTS]
+            targets = sorted(self.targets, key=_traffic_of)[:USAGE_MAX_CLIENTS]
             for site, client in targets:
                 site_id = ids.get(str(site["key"])) or names.get(str(site["name"]).lower())
                 mac = _mac(client.get("mac"))
@@ -389,6 +392,12 @@ def _port(raw):
         if value is not None and value >= 0:
             out[key] = int(value)
     return out
+
+
+def _traffic_of(target):
+    """Sort key: the clients that moved the most data first (the totals the controller keeps per client; the current rate is zero for most)."""
+    client = target[1]
+    return -((_number(client.get("trafficDown")) or 0) + (_number(client.get("trafficUp")) or 0) + (_number(client.get("activity")) or 0))
 
 
 def _json_or_none(raw):
@@ -544,17 +553,34 @@ def diagnose(config):
                 controller.open_login()
                 ids, names = controller.open_sites()
                 now = datetime.now().astimezone()
-                start = int(now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
-                shape = {"sites_seen_by_open_api": len(ids), "site_ids_match_web_keys": all(str(s["key"]) in ids for s in sites), "clients_tried": 0, "rows": []}
-                for site, client in controller.targets[:5]:
+                now_s = int(now.timestamp())
+                today = int(now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+                shape = {"sites_seen_by_open_api": len(ids), "site_ids_match_web_keys": all(str(s["key"]) in ids for s in sites), "clients_tried": 0, "rows": [], "attempts": []}
+                first_site = next((ids.get(str(s["key"])) or names.get(str(s["name"]).lower()) for s in sites), None)
+                if first_site:
+                    try:   # does the gateway know any applications at all (DPI on)?
+                        catalogue = controller._open(f"sites/{first_site}/applicationControl/applications", {"page": 1, "pageSize": 1})
+                        shape["application_catalogue"] = {"type": type(catalogue).__name__, "total": catalogue.get("totalRows") if isinstance(catalogue, dict) else None}
+                    except OmadaError as exc:
+                        shape["application_catalogue"] = {"error": _problem(exc)}
+                variants = (("today_seconds", today, now_s), ("24h_seconds", now_s - 86400, now_s), ("24h_milliseconds", (now_s - 86400) * 1000, now_s * 1000))
+                for site, client in sorted(controller.targets, key=_traffic_of)[:3]:
                     site_id = ids.get(str(site["key"])) or names.get(str(site["name"]).lower())
-                    if site_id:
-                        rows = controller.client_applications(site_id, client["mac"], start, int(now.timestamp()))
-                        shape["clients_tried"] += 1
-                        if rows:
-                            shape["rows"] = [describe(r) for r in rows[:SAMPLES]]
-                            shape["row_count"] = len(rows)
-                            break
+                    if not site_id:
+                        continue
+                    shape["clients_tried"] += 1
+                    for label, start, end in variants:
+                        try:
+                            raw = controller.client_applications_raw(site_id, client["mac"], start, end)
+                        except OmadaError as exc:
+                            shape["attempts"].append({"window": label, "error": _problem(exc)})
+                            continue
+                        count = len(raw) if isinstance(raw, (list, dict)) else None
+                        shape["attempts"].append({"window": label, "type": type(raw).__name__, "count": count, **({"keys": sorted(raw)[:12]} if isinstance(raw, dict) else {})})
+                        if isinstance(raw, list) and raw and not shape["rows"]:
+                            shape["rows"] = [describe(r) for r in raw[:SAMPLES]]
+                            shape["row_count"] = len(raw)
+                            shape["window_that_worked"] = label
                 return shape
 
             step("application_traffic", read_usage)
