@@ -33,7 +33,7 @@ MAX_PATH = 2000
 # what the remote never relays, even to the central Netlens: everything that hands out secrets, accounts or the database itself
 DENIED = re.compile(
     r"^/api/(probe|probes|probes-search|site-view|central|users|me|tokens|api-tokens|vault|backup|restore|database|licence|license|sso|shares?|assistant|mcp|remote|export|"
-    r"setup|login|logout|session|siem|inbound|update|terminal|audit)(/|$|\?)")
+    r"setup|login|logout|session|siem|inbound|update|terminal|audit|notify-channels|engineer|ai|oidc|sso)(/|$|\?)")
 
 
 def allowed_path(path: str) -> bool:
