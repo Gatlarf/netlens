@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.3.3",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.3.3/omada.zip",
+      "sha256": "87d55453e3e93bf911f572d791bdc347223a92b5366989a7b5cb4980af8e4259",
+      "api_version": 1,
+      "min_netlens": "0.4.161",
+      "released": "2026-10-22",
+      "changelog": "Run diagnostic has a gateway_dpi step: the gateway model, its firmware and every yes/no or numeric setting whose name mentions DPI, applications, statistics or logging, to show whether the gateway records application traffic at all."
+    },
+    {
       "version": "1.3.2",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.3.2/omada.zip",
       "sha256": "376db02dc269757e4a56634c2f1bb0b457a1184c47d63acff92d9e89eb68686a",
