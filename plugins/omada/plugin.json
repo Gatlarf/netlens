@@ -1,12 +1,12 @@
 {
   "id": "omada",
   "name": "TP-Link Omada",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",
-  "description": "Reads the Omada controller (software controller, OC200/OC300 or Omada Cloud-less hardware, version 5.1 or newer): your gateway, switches and access points, which device hangs below which, and which switch or access point every client is connected to, with Wi-Fi signal and link rate, the switch port of every wired client, and the ports of every switch (link, speed, duplex, traffic). Read-only: one login, a few reads and a logout per sync.",
-  "timeout": 90,
+  "description": "Reads the Omada controller (software controller, OC200/OC300 or Omada Cloud-less hardware, version 5.1 or newer): your gateway, switches and access points, which device hangs below which, which switch or access point every client is connected to, with Wi-Fi signal and link rate, the switch port of every wired client, and the ports of every switch (link, speed, duplex, traffic). With an Open API client it also reads the application statistics (DPI) for Statistics. Read-only.",
+  "timeout": 150,
   "diagnose": true,
   "config": [
     {
@@ -36,6 +36,18 @@
       "label": "Site",
       "placeholder": "Default",
       "help": "The name of one site, exactly as shown in Omada. Leave empty to read every site the account may see."
+    },
+    {
+      "key": "client_id",
+      "type": "text",
+      "label": "Open API client ID (application statistics)",
+      "help": "Optional. Only needed for the Statistics > Network > Applications figures, which need DPI switched on at the gateway. Create a client in Omada: Settings > Platform Integration > Open API > Add New App, access mode Client Credentials, role Viewer. Leave empty to skip the statistics."
+    },
+    {
+      "key": "client_secret",
+      "type": "password",
+      "label": "Open API client secret",
+      "help": "The secret of that Open API client."
     },
     {
       "key": "verify_tls",

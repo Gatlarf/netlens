@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.159 — 2026-10-22
+
+### Added
+- ★ **Omada: application statistics.** The Omada plugin (1.2.0) can fill Statistics > Network > Applications with the controller's DPI figures. Omada only offers them through its Open API, so enter an Open API client ID and secret (Omada: Settings > Platform Integration > Open API, Client Credentials, Viewer) in the plugin's settings and switch DPI on at the gateway; leave them empty and nothing changes. The figures are read per client and added up, so Netlens shows applications and devices. Written from the API the Home Assistant Omada integration uses and tested against a simulated controller only: *Test connection* and *Run diagnostic* report whether it works on your controller.
+
 ## 0.4.154 — 2026-10-22
 
 ### Added

@@ -64,6 +64,11 @@ class Fake(BaseHTTPRequestHandler):
             if body == {"username": "viewer", "password": "secret"}:
                 return self._send({"errorCode": 0, "msg": "Log in successfully.", "result": {"token": "CSRF1"}}, headers={"Set-Cookie": "TPOMADA_SESSIONID=s1; Path=/"})
             return self._send({"errorCode": -30109, "msg": "Incorrect username or password."})
+        if self.path.startswith("/openapi/authorize/token"):
+            s["token_calls"].append((self.path, body))
+            if parse_qs(urlsplit(self.path).query).get("grant_type") == ["client_credentials"] and body == {"omadacId": "ctl1", "client_id": "cid", "client_secret": "csecret"}:
+                return self._send({"errorCode": 0, "msg": "Success.", "result": {"accessToken": "AT1", "tokenType": "bearer", "expiresIn": 7200, "refreshToken": "RT1"}})
+            return self._send({"errorCode": -44106, "msg": "The client id or secret is wrong."})
         if self.path == "/ctl1/api/v2/logout":
             s["logouts"] += 1
             return self._send({"errorCode": 0})
@@ -75,6 +80,20 @@ class Fake(BaseHTTPRequestHandler):
         s["calls"].append(("GET", url.path))
         if url.path == "/api/info":
             return self._send({"errorCode": 0, "result": {"controllerVer": s["version"], "omadacId": "ctl1", "apiVer": "3"}})
+        if url.path.startswith("/openapi/v1/ctl1/"):
+            if self.headers.get("Authorization") != "AccessToken=AT1":
+                return self._send({"errorCode": -44112, "msg": "The access token has expired or is invalid."})
+            q = parse_qs(url.query)
+            if url.path == "/openapi/v1/ctl1/sites":
+                return self._send({"errorCode": 0, "result": {"data": [{"siteId": "site1", "name": "Home"}, {"siteId": "site2", "name": "Office"}], "totalRows": 2}})
+            prefix = "/openapi/v1/ctl1/sites/site1/dashboard/specificClientInfo/"
+            if url.path.startswith(prefix):
+                mac = url.path[len(prefix):]
+                s["app_calls"].append((mac, int(q["start"][0]), int(q["end"][0])))
+                if mac == "11-22-33-44-55-03":
+                    return self._send({"errorCode": -1, "msg": "General error."})     # one client that fails must not matter
+                return self._send({"errorCode": 0, "result": s["apps"].get(mac, [])})
+            return self._send({"errorCode": -1, "msg": "unknown " + url.path})
         if not self._authed():
             return self._send(b"<html>login page</html>", ctype="text/html")  # what a lost session looks like
         p = url.path.removeprefix("/ctl1/api/v2/")
@@ -110,7 +129,11 @@ class Fake(BaseHTTPRequestHandler):
 
 @pytest.fixture
 def server():
-    Fake.state = {"version": "5.14.26.1", "sites": [{"name": "Home", "key": "site1"}, {"name": "Office", "key": "site2"}], "calls": [], "logins": 0, "logouts": 0, "pages": []}
+    Fake.state = {"version": "5.14.26.1", "sites": [{"name": "Home", "key": "site1"}, {"name": "Office", "key": "site2"}], "calls": [], "logins": 0, "logouts": 0, "pages": [], "token_calls": [], "app_calls": [],
+                  "apps": {"11-22-33-44-55-01": [{"applicationId": 1, "applicationName": "YouTube", "upload": 100, "download": 5000, "traffic": 5100},
+                                                 {"applicationId": 2, "applicationName": "DNS", "upload": 0, "download": 0}],
+                           "11-22-33-44-55-02": [{"applicationId": 1, "applicationName": "YouTube", "upload": 10, "download": 500},
+                                                 {"applicationId": 3, "applicationName": "Printing", "upload": 7, "download": 1}]}}
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), Fake)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{httpd.server_port}", Fake.state
@@ -290,3 +313,66 @@ def test_other_failures_name_their_step_too(server):
     state["sites"] = [{"name": "Home", "key": "siteX"}]  # a site the fake does not know: its devices request answers an error
     with pytest.raises(plugin.OmadaError, match=r"sites/<site>/devices: unknown sites/siteX/devices"):
         plugin.fetch(cfg(url, site=""))
+
+
+def with_api(url, **kw):
+    return cfg(url, client_id="cid", client_secret="csecret", **kw)
+
+
+def test_application_statistics_are_summed_per_application_and_per_client(server):
+    url, state = server
+    out = validate_output("topology", plugin.fetch(with_api(url)))
+    (day,) = out["usage"]
+    assert day["applications"] == [{"name": "YouTube", "tx_bytes": 110, "rx_bytes": 5500}, {"name": "Printing", "tx_bytes": 7, "rx_bytes": 1}]     # zero rows left out, biggest first
+    assert {c["mac"]: (c["tx_bytes"], c["rx_bytes"]) for c in day["clients"]} == {"11:22:33:44:55:01": (100, 5000), "11:22:33:44:55:02": (17, 501)}
+    assert len(day["day"]) == 10
+    # logged in with the Open API's own login, asked once per client in the site, with a window from midnight to now
+    assert len(state["token_calls"]) == 1
+    asked = {mac for mac, _, _ in state["app_calls"]}
+    assert asked == {"11-22-33-44-55-01", "11-22-33-44-55-02", "11-22-33-44-55-03", "11-22-33-44-55-05"}
+    assert all(0 < end - start <= 86400 + 3600 for _, start, end in state["app_calls"])
+
+
+def test_nothing_is_asked_without_an_open_api_client(server):
+    url, state = server
+    out = plugin.fetch(cfg(url))
+    assert out["usage"] == [] and state["token_calls"] == [] and state["app_calls"] == []
+
+
+def test_a_wrong_open_api_secret_costs_the_statistics_not_the_topology(server):
+    url, state = server
+    out = validate_output("topology", plugin.fetch(cfg(url, client_id="cid", client_secret="wrong")))
+    assert out["usage"] == [] and len(out["nodes"]) == 4 and len(out["clients"]) == 4
+    assert state["logins"] == 1 and state["app_calls"] == []
+
+
+def test_the_connection_test_says_whether_the_statistics_work(server):
+    url, state = server
+    assert "Application statistics: working" in plugin.test(with_api(url))["message"]
+    assert "not available" in plugin.test(cfg(url, client_id="cid", client_secret="wrong"))["message"]
+    assert "Application statistics" not in plugin.test(cfg(url))["message"]
+    state["apps"] = {}
+    assert "no application traffic" in plugin.test(with_api(url))["message"]
+
+
+def test_the_application_reads_stop_at_the_time_budget(server, monkeypatch):
+    url, state = server
+    monkeypatch.setattr(plugin, "USAGE_BUDGET", -1)
+    controller = plugin.Controller(with_api(url))
+    controller.login()
+    controller.snapshot()
+    days, problem = controller.usage()
+    assert days == [] and "not every client was read" in problem
+
+
+def test_diagnose_shows_the_application_reply_without_names(server):
+    url, state = server
+    report = plugin.diagnose(with_api(url))
+    step = report["steps"]["application_traffic"]
+    assert step["ok"] and step["shape"]["site_ids_match_web_keys"] is True and step["shape"]["row_count"] == 2
+    assert step["shape"]["rows"][0]["applicationName"] == "<text 7 chars>"
+    text = json.dumps(report)
+    for private in ("YouTube", "Printing", "csecret", "AT1", "11-22-33"):
+        assert private not in text, private
+    assert report["result"]["applications"] == 2 and report["result"]["clients_with_applications"] == 2
+    assert "not asked for" in plugin.diagnose(cfg(url))["steps"]["application_traffic"]["shape"]

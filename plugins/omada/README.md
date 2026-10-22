@@ -4,7 +4,7 @@ Reads an **Omada controller** (software controller, OC200 / OC300 or other hardw
 Netlens which switch or access point every device is connected to and which device hangs below which. Netlens then shows the real
 network position in the hierarchy and on the map, and the Wi-Fi signal, band and link rate of wireless clients.
 
-> **Status: not yet tested on real hardware.** It is written from the API the Omada web page itself uses (the same one the open-source
+> **Status: not yet tested on real hardware** (the application statistics of 1.2.0 least of all: they follow the Open API as used by the Home Assistant Omada integration). It is written from the API the Omada web page itself uses (the same one the open-source
 > `tplink-omada-client` library uses) and tested against a simulated controller. Please test it and report back, see *Testing* below.
 
 ## What it does (read-only)
@@ -20,6 +20,7 @@ The session is closed again afterwards, so no sessions pile up.
 | devices | `GET .../sites/<site>/devices`, then per switch `.../switches/<mac>` and per access point `.../eaps/<mac>` (their uplink; for a switch also its ports: link, speed, duplex, byte counters) |
 | clients | `GET .../sites/<site>/clients?currentPage=&currentPageSize=` (paged) |
 | logout | `POST .../logout` (best effort) |
+| application statistics (only with an Open API client, see below) | `POST /openapi/authorize/token?grant_type=client_credentials`, `GET /openapi/v1/<id>/sites`, then per client `GET /openapi/v1/<id>/sites/<site>/dashboard/specificClientInfo/<mac>?start=&end=` |
 
 ## Set-up
 
@@ -28,6 +29,23 @@ The session is closed again afterwards, so no sessions pile up.
    its page under *Integrations*, enter the address (`https://<controller>:8043` for the software controller, `https://<controller>` for an
    OC200/OC300), the account, the site name (empty = all sites) and leave *Verify TLS certificate* off unless you installed a real certificate.
 3. **Test connection**, **Save**, **Turn on**, **Sync now**.
+
+### Application statistics (optional, version 1.2.0)
+
+Statistics > Network > Applications shows which applications and which devices used the traffic. Omada only hands out these DPI figures
+through its **Open API**, which has its own login, so this part needs one extra step:
+
+1. On the gateway, switch on **DPI** (Omada: Settings > Network Settings > Application Traffic/Deep Packet Inspection, the wording differs per version). Without a gateway
+   that does DPI (an Omada router/ER-series gateway) there is nothing to read.
+2. In Omada: *Settings > Platform Integration > Open API > Add New App*. Choose access mode **Client Credentials**, the role **Viewer**, and the site(s) to read.
+   Copy the **Client ID** and **Client Secret**.
+3. In Netlens, enter both in the plugin's settings (*Open API client ID* and *Open API client secret*; the secret is stored encrypted), then **Test connection**.
+   The message ends with *Application statistics: working* when the login, the site and the DPI read all succeeded.
+
+Leave the two fields empty to skip the statistics; everything else works as before. The figures are today's totals so far (from midnight on the Netlens server),
+per application and per device. The controller has no list for the whole site, so Netlens asks once **per client** and adds the figures up: with many clients one
+sync takes longer (the busiest clients are read first, and the reads stop after 60 seconds). A failing statistics read never fails the topology sync; the reason is
+shown in the connection test and in *Run diagnostic*.
 
 A refused login stops automatic syncing until you save the settings or press *Sync now* again, so a wrong password cannot lock the account.
 
@@ -41,6 +59,9 @@ Please check after a sync, and tell us what is wrong:
 - [ ] A Wi-Fi client is shown below the right access point; its device page has a *Wi-Fi* card with signal, band and link rate (values plausible? the **link rate** unit is the part we are least sure about).
 - [ ] Access points connected **wirelessly (mesh)** and devices behind a router that is not Omada.
 - [ ] Several sites, if you have them.
+- [ ] With an Open API client entered: *Test connection* says *Application statistics: working*, and after a sync Statistics > Network > Applications lists applications and devices.
+  Are the **bytes** right (compare a big download with Omada's own client page; if the numbers are 8 times too big or too small the unit is the question), does *upload* mean what the
+  client sent, and does the list cover every client or only some?
 
 If something is off, press **Run diagnostic** on the plugin's page in Netlens (needs a Netlens version with the button, 0.2.67 or newer; update the image if you do not see it). It logs in once like a normal sync with the values in the form, and shows a report of what the controller
 answered: the controller version, which steps worked, and the **names and types of the fields** (not their content). Names, MAC and IP addresses and your settings are removed. Press **Copy** or **Download**, read it, and send it to whoever maintains the plugin.
@@ -54,7 +75,9 @@ answered: the controller version, which steps worked, and the **names and types 
 
 ## Known limits
 
-- **Application statistics** (the controller's DPI figures) are not read: the controller's API for them is not documented. A report from **Run diagnostic** on a controller with DPI switched on would show whether a safe way exists.
+- **Application statistics** need DPI on the gateway and an Open API client (see above). They are read per client, so a network with hundreds of clients is read partly each sync (the busiest first).
+  Only today is read; the day changes at midnight of the Netlens server's clock, not the controller's.
+- **Run diagnostic** has an *application_traffic* step that shows the field names the Open API answered with (never names or addresses) and whether the Open API's site ids match the ones the web interface uses.
 - Controllers older than 5.1 are refused with a clear message.
 - The uplink of a **mesh** access point (connected by radio) may not be reported; such a device then hangs below the gateway.
 - A client connected to a switch that is not an Omada device is shown below the gateway.

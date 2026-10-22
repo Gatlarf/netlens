@@ -11,6 +11,13 @@ Talks to the controller's web interface API (the one the Omada web page itself u
     GET  /<id>/api/v2/sites/<site>/clients?currentPage=   the connected clients (paged)
     POST /<id>/api/v2/logout                              best effort, so no session is left open
 
+Application statistics (optional, only when an Open API client id and secret are entered) come from the controller's Open API, which
+has its own login (OAuth client credentials) and needs DPI switched on at the gateway:
+
+    POST /openapi/authorize/token?grant_type=client_credentials     body: omadacId, client_id, client_secret
+    GET  /openapi/v1/<id>/sites                                     the site ids
+    GET  /openapi/v1/<id>/sites/<site>/dashboard/specificClientInfo/<client mac>?start=&end=    one read per client: its applications
+
 Standard library only. A refused login is reported with `auth_failed`, so Netlens stops retrying until the user acts
 (this protects the account from being locked).
 """
@@ -21,11 +28,15 @@ import re
 import ssl
 import urllib.error
 import urllib.parse
+import time
 import urllib.request
+from datetime import datetime
 
 PAGE_SIZE = 100
 MAX_PAGES = 200
 MIN_VERSION = (5, 1, 0)
+USAGE_BUDGET = 60       # seconds the per-client application reads may take in one sync
+USAGE_MAX_CLIENTS = 300
 BANDS = {0: "2.4 GHz", 1: "5 GHz", 2: "5 GHz", 3: "6 GHz"}  # Omada radioId
 ROLES = {"gateway": "gateway", "switch": "switch", "ap": "ap"}
 
@@ -81,6 +92,10 @@ class Controller:
         if not config.get("verify_tls"):
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
+        self.client_id = str(config.get("client_id") or "").strip()
+        self.client_secret = str(config.get("client_secret") or "").strip()
+        self.context = context
+        self.targets = []       # (site, client as the controller wrote it) for the application statistics
         self.opener = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
             urllib.request.HTTPSHandler(context=context),
@@ -90,18 +105,18 @@ class Controller:
         self.csrf = None
 
     # ---- plumbing ------------------------------------------------------------------------------------------
-    def _call(self, method, url, body=None, params=None):
+    def _call(self, method, url, body=None, params=None, headers=None, opener=None):
         if params:
             url += "?" + urllib.parse.urlencode(params)
         data = json.dumps(body).encode() if body is not None else None
-        headers = {"Accept": "application/json"}
+        headers = {"Accept": "application/json", **(headers or {})}
         if data is not None:
             headers["Content-Type"] = "application/json"
-        if self.csrf:
+        if self.csrf and opener is None:
             headers["Csrf-Token"] = self.csrf
         request = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            with self.opener.open(request, timeout=20) as response:
+            with (opener or self.opener).open(request, timeout=20) as response:
                 raw = response.read(8_000_000)
         except urllib.error.HTTPError as exc:
             payload = _json_or_none(exc.read(200_000))
@@ -260,7 +275,92 @@ class Controller:
                     continue
                 seen_clients.add(mac)
                 clients.append((client, mac))
+                self.targets.append((site, client))
         return nodes, clients
+
+    # ---- application statistics (Open API) -----------------------------------------------------------------
+    @property
+    def wants_usage(self):
+        return bool(self.client_id and self.client_secret)
+
+    def open_login(self):
+        """The Open API access token (a separate login from the web session: OAuth client credentials)."""
+        self.plain = urllib.request.build_opener(urllib.request.HTTPSHandler(context=self.context))
+        try:
+            result = self._call("POST", f"{self.base}/openapi/authorize/token", {"omadacId": self.controller_id, "client_id": self.client_id, "client_secret": self.client_secret},
+                                params={"grant_type": "client_credentials"}, opener=self.plain)
+        except ConnectError:
+            raise
+        except OmadaError as exc:
+            raise OmadaError(f"the Open API refused the client id and secret: {exc}") from None
+        token = result.get("accessToken") if isinstance(result, dict) else None
+        if not token:
+            raise OmadaError("the Open API returned no access token")
+        self.access = f"AccessToken={token}"
+
+    def _open(self, path, params=None):
+        return self._call("GET", f"{self.base}/openapi/v1/{self.controller_id}/{path}", params=params, headers={"Authorization": self.access}, opener=self.plain)
+
+    def open_sites(self):
+        """{site key in the web API: site id in the Open API}. The two are normally the same value; a name match is the fallback."""
+        result = self._open("sites", {"page": 1, "pageSize": 100})
+        rows = [r for r in (result.get("data") if isinstance(result, dict) else None) or [] if isinstance(r, dict) and r.get("siteId")]
+        ids = {str(r["siteId"]): str(r["siteId"]) for r in rows}
+        names = {str(r.get("name") or "").lower(): str(r["siteId"]) for r in rows}
+        return ids, names
+
+    def client_applications(self, site_id, mac, start, end):
+        rows = self._open(f"sites/{site_id}/dashboard/specificClientInfo/{mac}", {"start": start, "end": end})
+        return [r for r in (rows if isinstance(rows, list) else []) if isinstance(r, dict)]
+
+    def usage(self):
+        """(today's traffic per application and per client as the contract wants it, a problem text or None). Never raises: the topology must not
+        depend on the statistics. Each figure is the day's total so far."""
+        if not self.wants_usage:
+            return [], None
+        try:
+            self.open_login()
+            ids, names = self.open_sites()
+            now = datetime.now().astimezone()
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            start, end = int(midnight.timestamp()), int(now.timestamp())
+            apps, per_client, failed, deadline = {}, {}, 0, time.monotonic() + USAGE_BUDGET
+            targets = sorted(self.targets, key=lambda t: -(_number(t[1].get("activity")) or 0))[:USAGE_MAX_CLIENTS]
+            for site, client in targets:
+                site_id = ids.get(str(site["key"])) or names.get(str(site["name"]).lower())
+                mac = _mac(client.get("mac"))
+                if not site_id or not mac:
+                    continue
+                if time.monotonic() > deadline:
+                    return self._day(midnight, apps, per_client), f"stopped after {USAGE_BUDGET} seconds; not every client was read (the busiest were read first)"
+                try:
+                    rows = self.client_applications(site_id, client["mac"], start, end)
+                except ConnectError:
+                    raise
+                except OmadaError:
+                    failed += 1
+                    continue
+                for row in rows:
+                    name = row.get("applicationName")
+                    up, down = _number(row.get("upload")), _number(row.get("download"))
+                    if not isinstance(name, str) or not name or (not up and not down):
+                        continue
+                    for bucket, key in ((apps, name[:80]), (per_client, mac)):
+                        entry = bucket.setdefault(key, [0, 0])
+                        entry[0] += int(up or 0)
+                        entry[1] += int(down or 0)
+            problem = f"{failed} client(s) could not be read" if failed else None
+            return self._day(midnight, apps, per_client), problem
+        except (OmadaError, ValueError) as exc:
+            return [], str(exc)
+
+    @staticmethod
+    def _day(midnight, apps, per_client):
+        if not apps and not per_client:
+            return []
+        return [{"day": midnight.strftime("%Y-%m-%d"),
+                 "applications": [{"name": n, "tx_bytes": v[0], "rx_bytes": v[1]} for n, v in sorted(apps.items(), key=lambda i: -sum(i[1]))],
+                 "clients": [{"mac": m, "tx_bytes": v[0], "rx_bytes": v[1]} for m, v in sorted(per_client.items(), key=lambda i: -sum(i[1]))]}]
 
 
 SPEEDS = {1: 10, 2: 100, 3: 1000, 4: 2500, 5: 10000, 6: 25000}      # the controller's link speed codes, in Mbit/s
@@ -302,7 +402,7 @@ def _rate_mbps(value):
     return round(value / 1000, 1) if value > 20000 else float(value)
 
 
-def to_topology(nodes, raw_clients):
+def to_topology(nodes, raw_clients, usage=None):
     known = {n["mac"] for n in nodes}
     for n in nodes:
         if n["parent_mac"] not in known or n["parent_mac"] == n["mac"]:
@@ -325,7 +425,7 @@ def to_topology(nodes, raw_clients):
             "rx_mbps": _rate_mbps(client.get("rxRate")) if wireless else None,
             "port": str(client["port"]) if not wireless and node_mac in known and isinstance(client.get("port"), int) and client["port"] > 0 else None,
         })
-    return {"nodes": nodes, "clients": out_clients}
+    return {"nodes": nodes, "clients": out_clients, "usage": usage or []}
 
 
 def test(config):
@@ -336,7 +436,13 @@ def test(config):
         nodes, clients = controller.snapshot()
     finally:
         controller.logout()
-    return {"message": f"Connected to Omada controller {controller.version or '?'}: {len(sites)} site(s), {len(nodes)} device(s), {len(clients)} client(s)"}
+    message = f"Connected to Omada controller {controller.version or '?'}: {len(sites)} site(s), {len(nodes)} device(s), {len(clients)} client(s)"
+    if controller.wants_usage:
+        # one client is enough to prove the Open API login, the site ids and the DPI read
+        controller.targets = controller.targets[:1]
+        days, problem = controller.usage()
+        message += ". Application statistics: " + (f"not available ({problem})" if problem and not days else "working" if days else "the Open API works, but no application traffic was reported (is DPI switched on at the gateway?)")
+    return {"message": message}
 
 
 def fetch(config):
@@ -346,7 +452,8 @@ def fetch(config):
         nodes, clients = controller.snapshot()
     finally:
         controller.logout()
-    return to_topology(nodes, clients)
+    days, _problem_text = controller.usage()
+    return to_topology(nodes, clients, days)
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
@@ -426,7 +533,29 @@ def diagnose(config):
 
         step("clients", read_clients)
         nodes, clients = controller.snapshot()
-        out = to_topology(nodes, clients)
+        if controller.wants_usage:
+            def read_usage():
+                controller.open_login()
+                ids, names = controller.open_sites()
+                now = datetime.now().astimezone()
+                start = int(now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+                shape = {"sites_seen_by_open_api": len(ids), "site_ids_match_web_keys": all(str(s["key"]) in ids for s in sites), "clients_tried": 0, "rows": []}
+                for site, client in controller.targets[:5]:
+                    site_id = ids.get(str(site["key"])) or names.get(str(site["name"]).lower())
+                    if site_id:
+                        rows = controller.client_applications(site_id, client["mac"], start, int(now.timestamp()))
+                        shape["clients_tried"] += 1
+                        if rows:
+                            shape["rows"] = [describe(r) for r in rows[:SAMPLES]]
+                            shape["row_count"] = len(rows)
+                            break
+                return shape
+
+            step("application_traffic", read_usage)
+        else:
+            report["steps"]["application_traffic"] = {"ok": True, "shape": "not asked for: no Open API client entered"}
+        days, usage_problem = controller.usage()
+        out = to_topology(nodes, clients, days)
         report["result"] = {
             "nodes": len(out["nodes"]), "nodes_with_parent": sum(1 for n in out["nodes"] if n["parent_mac"]),
             "roles": sorted({n["role"] for n in out["nodes"]}),
@@ -436,6 +565,8 @@ def diagnose(config):
             "switches_with_ports": sum(1 for n in out["nodes"] if n.get("ports")), "ports": sum(len(n.get("ports") or []) for n in out["nodes"]),
             "ports_up": sum(1 for n in out["nodes"] for p in n.get("ports") or [] if p["up"]), "ports_with_counters": sum(1 for n in out["nodes"] for p in n.get("ports") or [] if p.get("rx_bytes") is not None),
             "wired_clients_with_port": sum(1 for c in out["clients"] if c.get("port")),
+            "application_days": len(days), "applications": sum(len(d["applications"]) for d in days), "clients_with_applications": sum(len(d["clients"]) for d in days),
+            "application_problem": _problem(OmadaError(usage_problem)) if usage_problem else None,
         }
     except LoginRefused:
         raise
