@@ -17,7 +17,7 @@ The session is closed again afterwards, so no sessions pile up.
 | version and id | `GET /api/info` (no login) |
 | login | `POST /<id>/api/v2/login` (cookie + `Csrf-Token`) |
 | sites | `GET .../users/current` |
-| devices | `GET .../sites/<site>/devices`, then per switch `.../switches/<mac>` and per access point `.../eaps/<mac>` (their uplink) |
+| devices | `GET .../sites/<site>/devices`, then per switch `.../switches/<mac>` and per access point `.../eaps/<mac>` (their uplink; for a switch also its ports: link, speed, duplex, byte counters) |
 | clients | `GET .../sites/<site>/clients?currentPage=&currentPageSize=` (paged) |
 | logout | `POST .../logout` (best effort) |
 
@@ -37,7 +37,7 @@ Please check after a sync, and tell us what is wrong:
 
 - [ ] *Test connection* says how many devices and clients it found, and the numbers are right.
 - [ ] *Hierarchy*: the gateway is at the top, switches below it, access points below the switch they are plugged into.
-- [ ] A wired client is shown below the right switch (device page → *Network position*).
+- [ ] A wired client is shown below the right switch, on the right **port** (device page → *Connected to*), and the switch's page lists its ports with link state, speed and traffic graphs (new in 1.1.0; the speed and duplex codes are the part we are least sure about).
 - [ ] A Wi-Fi client is shown below the right access point; its device page has a *Wi-Fi* card with signal, band and link rate (values plausible? the **link rate** unit is the part we are least sure about).
 - [ ] Access points connected **wirelessly (mesh)** and devices behind a router that is not Omada.
 - [ ] Several sites, if you have them.
@@ -54,6 +54,7 @@ answered: the controller version, which steps worked, and the **names and types 
 
 ## Known limits
 
+- **Application statistics** (the controller's DPI figures) are not read: the controller's API for them is not documented. A report from **Run diagnostic** on a controller with DPI switched on would show whether a safe way exists.
 - Controllers older than 5.1 are refused with a clear message.
 - The uplink of a **mesh** access point (connected by radio) may not be reported; such a device then hangs below the gateway.
 - A client connected to a switch that is not an Omada device is shown below the gateway.

@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.154 — 2026-10-22
+
+### Added
+- ★ **Statistics > Applications**: which applications and which devices used the traffic, as the router counts it. The ASUS plugin (1.2.0) reads the router's **Traffic Analyzer** (Adaptive QoS > Traffic Analyzer; switch it on in the router, the first figures appear after about an hour): bytes up and down per application (Netflix, DNS, Claude, BitTorrent ...) and per device, per day, with the day ending at the router's own midnight. Statistics shows the top applications, the top devices and the traffic per day for the chosen period. Plugin API: a topology plugin can report `usage` (a list of days with `applications` and `clients`, each with `rx_bytes` and `tx_bytes`).
+- ★ **Omada: switch ports and the port of every wired client.** The Omada plugin (1.1.0) now reads the ports of every switch (link up or down, speed, duplex, byte counters), so the switch's page gets the Switch ports card, the faceplate and traffic graphs per port, and a *link down* / *link up* event when a port changes. A wired client now shows which switch **port** it sits on. The controller's own application statistics (DPI) are not read: that part of its API is not documented.
+- ★ **Version check against the CVE list** (Vulnerabilities page, a licensed feature): a light first look without a scanner. Netlens takes the product and version of every service its deep scans found (deep scans now also record the CPE name nmap derives from the banner), asks the public NVD which known vulnerabilities affect that version, keeps those whose affected range really contains the version, and lists them as findings (plugin *cvecheck*) next to those of Greenbone and the other scanners, worst first. Off by default; once a day; results cached for a week; an optional free NVD API key (stored encrypted) makes the first run fast. Only the product name and version leave Netlens, nothing is sent to your devices. It judges the version number only, so a finding on a distribution package (Debian, Ubuntu, Red Hat ...) says that it may already be patched. Set it up on the Vulnerabilities page.
+- **Port byte counters in the plugin API**: a switch port can report `tx_bytes` and `rx_bytes`; they become traffic graphs in bits per second (before, only packet counters were possible).
+
 ## 0.4.152 — 2026-10-22
 
 ### Added

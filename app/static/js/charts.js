@@ -53,8 +53,8 @@ export function barList(items, { unit = "" } = {}) {
     const fill = h("span", { class: "bar-fill" });
     fill.style.width = `${Math.max(2, (item.count / max) * 100)}%`;
     fill.style.background = colors[idx % colors.length];
-    box.appendChild(h("div", { class: "bar-row", title: `${item.label}: ${item.count}${unit}` },
-      h("span", { class: "bar-label" }, label), h("span", { class: "bar-track" }, fill), h("span", { class: "bar-value" }, `${fmtNumber(item.count)}${unit}`)));
+    box.appendChild(h("div", { class: "bar-row", title: `${item.label}: ${item.text ?? `${item.count}${unit}`}` },
+      h("span", { class: "bar-label" }, label), h("span", { class: "bar-track" }, fill), h("span", { class: "bar-value" }, item.text ?? `${fmtNumber(item.count)}${unit}`)));
   });
   return box;
 }

@@ -37,6 +37,9 @@ const TIPS = [
   ["Most common open ports", "The ports found open on the most devices."],
   ["Most common services", "The services (web, SSH, SMB and so on) found on the most devices."],
   ["Devices with the most open ports", "Devices exposing the most ports. More open ports means a bigger surface to keep secure."],
+  ["Top applications", "The applications that used the most traffic in the chosen range, as the router's traffic analyser (for example ASUS Traffic Analyzer) counts them. Down is traffic towards your devices, up is traffic from them."],
+  ["Top devices by traffic", "The devices that used the most traffic in the chosen range, as the router counts it."],
+  ["Traffic per day", "The total traffic the router counted on each day."],
   ["Busiest parents", "The switches, access points or hosts with the most devices connected below them."],
   ["Where the hierarchy comes from", "Which source told Netlens how devices connect: a plugin, an LLDP neighbour, a hypervisor or your own choice."],
   ["Hypervisor hosts", "Each hypervisor host with the number of guests (VMs and containers) on it and how many are running."],
@@ -199,6 +202,18 @@ function build(s) {
     card("Most common open ports", barList(p.top_ports)), card("Most common services", barList(p.top_services)),
     card("Devices with the most open ports", barList(p.most_open.map((r) => dev({ id: r.id, label: r.name, count: r.count }))))));
 
+  // ------------------------------------------------------------------ applications (only when a router reports them)
+  const ap = s.applications;
+  if (ap && ap.available) {
+    const both = (r) => r.rx + r.tx;
+    const bytesItem = (r, extra = {}) => ({ label: r.name, count: both(r), text: `${fmtBytes(both(r))} (↓ ${fmtBytes(r.rx)}, ↑ ${fmtBytes(r.tx)})`, ...extra });
+    root.appendChild(section("applications", "Applications",
+      h("div", { class: "tiles inline" }, tile(fmtBytes(ap.rx), "downloaded"), tile(fmtBytes(ap.tx), "uploaded"), tile(fmtNumber(ap.applications_total), "applications seen"), tile(fmtNumber(ap.days), ap.days === 1 ? "day counted" : "days counted")),
+      card("Top applications", barList(ap.applications.map((r) => bytesItem(r)))),
+      card("Top devices by traffic", barList(ap.clients.map((r) => bytesItem(r, dev({ id: r.id, label: r.name }))))),
+      ap.per_day.length > 1 ? card("Traffic per day", columnChart(ap.per_day.map((r) => ({ x: r.day, v: both(r) })))) : null));
+  }
+
   // ------------------------------------------------------------------ structure
   root.appendChild(section("structure", "Network structure",
     h("div", { class: "tiles inline" }, tile(fmtNumber(st.max_depth), "levels deep"), tile(fmtNumber(c.top_level), "top-level devices"), tile(fmtNumber(c.with_parent), "devices with a parent")),
@@ -243,7 +258,7 @@ function build(s) {
 
 // The sections are grouped under tabs so one view holds a handful of cards, not forty.
 const TABS = [["overview", "Overview"], ["network", "Network"], ["infra", "Services & infrastructure"], ["activity", "Scans & events"], ["system", "System"]];
-const TAB_OF = { overview: "overview", history: "overview", availability: "overview", network: "network", wifi: "network", identification: "network", ports: "network", structure: "network",
+const TAB_OF = { overview: "overview", history: "overview", availability: "overview", network: "network", wifi: "network", identification: "network", ports: "network", applications: "network", structure: "network",
   guests: "infra", sites: "infra", services: "infra", speed: "infra", scans: "activity", events: "activity", system: "system" };
 
 export async function render(container) {

@@ -921,7 +921,7 @@ def _switch_ports(value: Any, path: str) -> list[dict]:
             "up": raw.get("up", False),
             "speed_mbps": _optional_number(raw.get("speed_mbps"), f"{p}.speed_mbps", 0, 1000000),
             "duplex": duplex,
-            **{k: _optional_number(raw.get(k), f"{p}.{k}", 0, 2**63 - 1, integer=True) for k in ("tx_packets", "rx_packets", "tx_errors", "rx_errors")},
+            **{k: _optional_number(raw.get(k), f"{p}.{k}", 0, 2**63 - 1, integer=True) for k in ("tx_packets", "rx_packets", "tx_errors", "rx_errors", "tx_bytes", "rx_bytes")},
         })
     return ports
 
@@ -1023,4 +1023,36 @@ def _topology(data: Any) -> dict:
             "device_type": _client_type(raw.get("device_type"), f"{path}.device_type"),
             "port": _text(raw.get("port"), f"{path}.port", max_len=60) or None,   # the switch port a wired client sits on ("Gi1/0/5")
         })
-    return {"nodes": nodes, "clients": clients}
+    return {"nodes": nodes, "clients": clients, "usage": _usage(data.get("usage"), "usage")}
+
+
+MAX_USAGE_DAYS = 8
+
+
+def _usage(value: Any, path: str) -> list[dict]:
+    """Traffic per application and per device for a few days (a router with a traffic analyser): bytes up (tx) and down (rx), the total so far for that day."""
+    out = []
+    for i, raw in enumerate(_list(value, path)[:MAX_USAGE_DAYS]):
+        p = f"{path}[{i}]"
+        raw = _dict(raw, p)
+        day = _text(raw.get("day"), f"{p}.day", required=True, max_len=10)
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", day):
+            _fail(f"{p}.day", "must be a date like 2026-10-22")
+        apps, seen = [], set()
+        for j, a in enumerate(_list(raw.get("applications"), f"{p}.applications")):
+            a = _dict(a, f"{p}.applications[{j}]")
+            name = _text(a.get("name"), f"{p}.applications[{j}].name", required=True, max_len=80)
+            if name in seen:
+                continue
+            seen.add(name)
+            apps.append({"name": name, **{k: _optional_number(a.get(k), f"{p}.applications[{j}].{k}", 0, 2**63 - 1, integer=True) or 0 for k in ("rx_bytes", "tx_bytes")}})
+        clients, seen = [], set()
+        for j, c in enumerate(_list(raw.get("clients"), f"{p}.clients")):
+            c = _dict(c, f"{p}.clients[{j}]")
+            mac = _mac(c.get("mac"), f"{p}.clients[{j}].mac", required=True)
+            if mac in seen:
+                continue
+            seen.add(mac)
+            clients.append({"mac": mac, **{k: _optional_number(c.get(k), f"{p}.clients[{j}].{k}", 0, 2**63 - 1, integer=True) or 0 for k in ("rx_bytes", "tx_bytes")}})
+        out.append({"day": day, "applications": apps, "clients": clients})
+    return out

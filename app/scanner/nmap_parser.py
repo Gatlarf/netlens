@@ -14,6 +14,7 @@ class ScanPort:
     product: Optional[str]
     version: Optional[str]
     extrainfo: Optional[str]
+    cpe: Optional[str] = None      # nmap's CPE name(s) for the service, space separated ("cpe:/a:openbsd:openssh:8.4p1")
 
 
 @dataclass
@@ -113,6 +114,7 @@ def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
                 product: Optional[str] = None
                 version: Optional[str] = None
                 extrainfo: Optional[str] = None
+                cpe: Optional[str] = None
 
                 service_elem = port_elem.find("service")
                 if service_elem is not None:
@@ -120,6 +122,7 @@ def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
                     product = service_elem.get("product")
                     version = service_elem.get("version")
                     extrainfo = service_elem.get("extrainfo")
+                    cpe = " ".join(c.text.strip() for c in service_elem.findall("cpe") if c.text and c.text.strip()) or None
 
                 ports.append(ScanPort(
                     proto=proto,
@@ -129,6 +132,7 @@ def parse_nmap_xml(xml_text: str) -> list[ScanHost]:
                     product=product,
                     version=version,
                     extrainfo=extrainfo,
+                    cpe=cpe,
                 ))
 
         # OS

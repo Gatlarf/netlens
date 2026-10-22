@@ -389,6 +389,30 @@ def _ports(conn, now: str) -> dict:
     }
 
 
+def _applications(conn, days: int) -> dict:
+    """Traffic per application and per device over the last `days` days, as the router's traffic analyser counted it (empty when no plugin reports it)."""
+    last = conn.execute("SELECT MAX(day) FROM app_usage").fetchone()[0]
+    if last is None:
+        return {"available": False}
+    first = (datetime.strptime(last, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    apps = conn.execute(
+        "SELECT name, SUM(rx_bytes) AS rx, SUM(tx_bytes) AS tx FROM app_usage WHERE day >= ? GROUP BY name ORDER BY SUM(rx_bytes) + SUM(tx_bytes) DESC", (first,)
+    ).fetchall()
+    per_day = conn.execute("SELECT day, SUM(rx_bytes) AS rx, SUM(tx_bytes) AS tx FROM app_usage WHERE day >= ? GROUP BY day ORDER BY day", (first,)).fetchall()
+    clients = conn.execute(
+        f"SELECT d.id, {NAME} AS n, SUM(u.rx_bytes) AS rx, SUM(u.tx_bytes) AS tx FROM client_usage u JOIN devices d ON d.id = u.device_id "
+        "WHERE u.day >= ? GROUP BY d.id ORDER BY SUM(u.rx_bytes) + SUM(u.tx_bytes) DESC LIMIT 10", (first,)
+    ).fetchall()
+    total = sum(r["rx"] + r["tx"] for r in apps)
+    return {
+        "available": True, "from": first, "to": last, "days": len(per_day),
+        "rx": sum(r["rx"] for r in apps), "tx": sum(r["tx"] for r in apps), "applications_total": len(apps),
+        "applications": [{"name": r["name"], "rx": r["rx"], "tx": r["tx"], "share": _pct(r["rx"] + r["tx"], total)} for r in apps[:15]],
+        "per_day": [{"day": r["day"], "rx": r["rx"], "tx": r["tx"]} for r in per_day],
+        "clients": [{"id": r["id"], "name": r["n"], "rx": r["rx"], "tx": r["tx"]} for r in clients],
+    }
+
+
 def _structure(conn, devs: dict, hierarchy: dict) -> dict:
     kids = children_map(hierarchy)
     names = {i: (d["custom_name"] or d["hostname"] or d["primary_ip"] or str(i)) for i, d in devs.items()}
@@ -552,6 +576,7 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
         "availability": _availability(conn, now),
         "history": _history(conn, now, days),
         "ports": _ports(conn, now),
+        "applications": _applications(conn, days),
         "structure": _structure(conn, devs, hierarchy),
         "scans": _scans(conn, now, days),
         "events": _events(conn, now, days),

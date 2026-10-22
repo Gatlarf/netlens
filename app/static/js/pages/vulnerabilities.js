@@ -3,6 +3,7 @@ import { get } from "../api.js";
 import { h, clear, timeAgo } from "../util.js";
 import { pageHead, tile, tileRow, emptyState } from "../ui.js";
 import { findingsTable, sevBadge, SEV_LABEL } from "../cards/vulns.js";
+import { buildCveCheckCard } from "../cards/cve_check.js";
 
 const SHOW = 25;
 
@@ -13,6 +14,7 @@ export async function render(container) {
   container.append(body);
   let sev = "", q = "", all = false;
   let data;
+  const cveCard = buildCveCheckCard(() => load());
 
   const draw = () => {
     clear(body);
@@ -22,8 +24,9 @@ export async function render(container) {
       return;
     }
     const s = data.summary;
+    body.append(cveCard);
     if (!s.configured) {
-      body.append(emptyState("No vulnerability scanner is connected yet", "Install a scanner plugin (Greenbone/OpenVAS, Tenable or Rapid7) from the Plugin store and turn it on. Netlens then lists what it finds next to each device and warns about new critical vulnerabilities.",
+      body.append(emptyState("No vulnerability scanner is connected yet", "Switch on the version check above for a first look, or install a scanner plugin (Greenbone/OpenVAS, Tenable or Rapid7) from the Plugin store and turn it on. Netlens then lists what it finds next to each device and warns about new critical vulnerabilities.",
         h("a", { class: "btn primary", href: "#/settings/plugin-browse" }, "Open the Plugin store")));
       return;
     }

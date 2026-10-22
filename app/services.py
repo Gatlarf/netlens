@@ -628,6 +628,11 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
 
                             await process_channels(db_path)
                     await asyncio.to_thread(_housekeeping_checks, conn, Path(db_path).resolve().parent)
+                    from app import cvecheck, licence
+                    from app.api import cvecheck as cvecheck_api
+
+                    if cvecheck.due(conn) and licence.allows(conn, "vulnerabilities"):       # a day of cached answers; it runs in its own thread
+                        cvecheck_api.run_in_background(db_path)
                     from app import speedtest
 
                     if speedtest.due(conn) and speedtest.PROGRESS.start("internet", "Cloudflare"):  # about 20 seconds: in its own thread, the checks go on

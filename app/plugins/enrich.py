@@ -241,6 +241,10 @@ def _record_port_series(conn, device_id, node_name, ports, before, now):
             grown = _counter_delta(port.get(key), old[key])
             if grown is not None:
                 points.append(("device", device_id, metric, grown / seconds, label, "pps"))
+        for key, metric in (("tx_bytes", "net_tx_bps"), ("rx_bytes", "net_rx_bps")):
+            grown = _counter_delta(port.get(key), old[key])
+            if grown is not None:
+                points.append(("device", device_id, metric, grown * 8 / seconds, label, "bps"))
         errors = [_counter_delta(port.get(k), old[k]) for k in ("tx_errors", "rx_errors")]
         if None not in errors and (sum(errors) > 0 or store.latest("device", device_id, "if_err_ps", label) is not None):    # a port that never had an error gets no graph
             points.append(("device", device_id, "if_err_ps", sum(errors) / seconds, label, "/s"))
@@ -261,7 +265,7 @@ def record_switch_ports(conn: sqlite3.Connection, plugin_id: str, data: dict, no
         device_id = next((by_mac[m] for m in node["macs"] if m in by_mac), None) or by_ip.get(node.get("ip") or "")
         if device_id is None or not ports:
             continue
-        before = {r["port"]: r for r in conn.execute("SELECT port, up, tx_packets, rx_packets, tx_errors, rx_errors, updated FROM switch_ports WHERE device_id = ?", (device_id,))}
+        before = {r["port"]: r for r in conn.execute("SELECT port, up, tx_packets, rx_packets, tx_errors, rx_errors, tx_bytes, rx_bytes, updated FROM switch_ports WHERE device_id = ?", (device_id,))}
         _record_port_series(conn, device_id, node.get("name"), ports, before, now)
         for port in ports:
             number, up = port["port"], 1 if port["up"] else 0
@@ -271,13 +275,14 @@ def record_switch_ports(conn: sqlite3.Connection, plugin_id: str, data: dict, no
             counters = (port.get("tx_packets"), port.get("rx_packets"), port.get("tx_errors"), port.get("rx_errors"))
             conn.execute(
                 """
-                INSERT INTO switch_ports (device_id, port, plugin_id, name, enabled, up, speed_mbps, duplex, tx_packets, rx_packets, tx_errors, rx_errors, updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO switch_ports (device_id, port, plugin_id, name, enabled, up, speed_mbps, duplex, tx_packets, rx_packets, tx_errors, rx_errors, tx_bytes, rx_bytes, updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(device_id, port) DO UPDATE SET plugin_id = excluded.plugin_id, name = excluded.name, enabled = excluded.enabled, up = excluded.up,
                     speed_mbps = excluded.speed_mbps, duplex = excluded.duplex, tx_packets = excluded.tx_packets, rx_packets = excluded.rx_packets,
-                    tx_errors = excluded.tx_errors, rx_errors = excluded.rx_errors, updated = excluded.updated
+                    tx_errors = excluded.tx_errors, rx_errors = excluded.rx_errors, tx_bytes = excluded.tx_bytes, rx_bytes = excluded.rx_bytes,
+                    updated = excluded.updated
                 """,
-                (device_id, number, plugin_id, port.get("name"), 1 if port["enabled"] else 0, up, port.get("speed_mbps"), port.get("duplex"), *counters, now),
+                (device_id, number, plugin_id, port.get("name"), 1 if port["enabled"] else 0, up, port.get("speed_mbps"), port.get("duplex"), *counters, port.get("tx_bytes"), port.get("rx_bytes"), now),
             )
             conn.execute(
                 "INSERT INTO switch_port_samples (device_id, port, ts, up, speed_mbps, tx_packets, rx_packets, tx_errors, rx_errors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -291,6 +296,40 @@ def record_switch_ports(conn: sqlite3.Connection, plugin_id: str, data: dict, no
     conn.execute("DELETE FROM switch_port_samples WHERE ts < ?", (old,))
     conn.commit()
     return recorded
+
+
+USAGE_RETENTION_DAYS = 400
+
+
+def record_usage(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None) -> int:
+    """Store the traffic per application and per device a router reports for a day (the figure is the total so far, so the latest one replaces the
+    earlier ones). Devices are found by MAC; traffic of a device Netlens does not know is left out. Returns the number of application rows written."""
+    from datetime import datetime, timedelta
+
+    now = now or utcnow()
+    by_mac, _ = device_lookup(conn)
+    written = 0
+    for entry in data.get("usage") or []:
+        for app in entry["applications"]:
+            conn.execute(
+                "INSERT INTO app_usage (day, source, name, rx_bytes, tx_bytes, updated) VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(day, source, name) DO UPDATE SET rx_bytes = excluded.rx_bytes, tx_bytes = excluded.tx_bytes, updated = excluded.updated",
+                (entry["day"], plugin_id, app["name"], app["rx_bytes"], app["tx_bytes"], now),
+            )
+            written += 1
+        for client in entry["clients"]:
+            device_id = by_mac.get(client["mac"])
+            if device_id is not None:
+                conn.execute(
+                    "INSERT INTO client_usage (day, source, device_id, rx_bytes, tx_bytes, updated) VALUES (?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(day, source, device_id) DO UPDATE SET rx_bytes = excluded.rx_bytes, tx_bytes = excluded.tx_bytes, updated = excluded.updated",
+                    (entry["day"], plugin_id, device_id, client["rx_bytes"], client["tx_bytes"], now),
+                )
+    cutoff = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ") - timedelta(days=USAGE_RETENTION_DAYS)).strftime("%Y-%m-%d")
+    conn.execute("DELETE FROM app_usage WHERE day < ?", (cutoff,))
+    conn.execute("DELETE FROM client_usage WHERE day < ?", (cutoff,))
+    conn.commit()
+    return written
 
 
 LICENCE_WARN_DAYS = 30

@@ -646,6 +646,37 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    _add_column_if_missing(conn, "ports", "cpe", "TEXT")          # the CPE name(s) nmap derived from the service banner (for the version-based CVE check)
+    cur.execute("CREATE TABLE IF NOT EXISTS cve_cache (cpe TEXT PRIMARY KEY, fetched TEXT NOT NULL, data TEXT NOT NULL)")
+    _add_column_if_missing(conn, "switch_ports", "tx_bytes", "BIGINT")
+    _add_column_if_missing(conn, "switch_ports", "rx_bytes", "BIGINT")
+    # how much traffic each application and each device used on a day, as a router or controller counts it (the latest figure of the day wins)
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_usage (
+            day TEXT NOT NULL,
+            source TEXT NOT NULL,
+            name TEXT NOT NULL,
+            rx_bytes BIGINT NOT NULL DEFAULT 0,
+            tx_bytes BIGINT NOT NULL DEFAULT 0,
+            updated TEXT NOT NULL,
+            PRIMARY KEY (day, source, name)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS client_usage (
+            day TEXT NOT NULL,
+            source TEXT NOT NULL,
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            rx_bytes BIGINT NOT NULL DEFAULT 0,
+            tx_bytes BIGINT NOT NULL DEFAULT 0,
+            updated TEXT NOT NULL,
+            PRIMARY KEY (day, source, device_id)
+        )
+        """
+    )
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS firewall_state (

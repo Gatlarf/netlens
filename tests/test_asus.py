@@ -42,6 +42,7 @@ class FakeTransport:
         self.calls = []
         self.login = login if login is not None else {"asus_token": "TOK"}
         self.fail_on = fail_on
+        self.apps = self.devices = None
 
     def __call__(self, method, url, headers, data):
         path = url.split("8443", 1)[-1]
@@ -50,6 +51,12 @@ class FakeTransport:
             raise AsusError("boom")
         if path == "/login.cgi":
             return 200, json.dumps(self.login).encode()
+        if path == "/appGet.cgi?hook=uptime()":
+            return 200, json.dumps({"uptime": "Thu, 22 Oct 2026 23:50:00 +0200(1 secs since boot)"}).encode()
+        if path.startswith("/getWanTraffic.asp") and "mode=detail" in path:
+            return (200, self.apps) if self.apps else (404, b"")
+        if path.startswith("/getAppTraffic.asp"):
+            return (200, self.devices) if self.devices else (404, b"")
         if path.startswith("/appGet.cgi"):
             return 200, json.dumps(CLIENTS).encode()
         if path == "/ajax_onboarding.asp":
@@ -90,7 +97,7 @@ def test_parse_onboarding_and_snapshot():
 
 def test_client_logs_in_reads_and_always_logs_out():
     t = FakeTransport()
-    snap = AsusClient(CFG, transport=t).snapshot()
+    snap = AsusClient(AsusConfig(url=CFG.url, username=CFG.username, password=CFG.password, traffic=False), transport=t).snapshot()
     assert len(snap["nodes"]) == 3
     assert [c[1] for c in t.calls] == ["/login.cgi", "/appGet.cgi?hook=get_clientlist()", "/ajax_onboarding.asp", "/Logout.asp"]
     assert t.calls[1][2] == "asus_token=TOK" and t.calls[0][2] is None
@@ -136,3 +143,33 @@ def test_a_node_wired_to_another_node_hangs_below_it():
 
 def test_auth_error_is_flagged_for_the_core():
     assert AsusAuthError.auth_failed is True
+
+
+def _answer(rows):
+    return ("\ufeffvar array_statistics = new Array();\narray_statistics = " + json.dumps(rows) + ";\n").encode()
+
+
+def test_traffic_analyzer_gives_usage_per_application_and_device():
+    from datetime import datetime, timezone
+
+    t = FakeTransport()
+    t.apps = _answer([["Netflix", 100, 5000], ["DNS", 0, 0], ["Claude", 20, 30]])
+    t.devices = _answer([["02:00:00:00:00:01".upper(), 10, 900], ["bad", 1, 1]])
+    snap = AsusClient(CFG, transport=t).snapshot()
+    days = [u["day"] for u in snap["usage"]]
+    assert days == ["2026-10-22", "2026-10-21"]                       # the router's own date, today first
+    today = snap["usage"][0]
+    assert today["applications"] == [{"name": "Netflix", "tx_bytes": 100, "rx_bytes": 5000}, {"name": "Claude", "tx_bytes": 20, "rx_bytes": 30}]
+    assert today["clients"] == [{"mac": "02:00:00:00:00:01", "tx_bytes": 10, "rx_bytes": 900}]
+    end = [c[1] for c in t.calls if c[1].startswith("/getWanTraffic")][0]
+    # the day that ends at the router's midnight (+02:00): 2026-10-23 00:00 +02:00
+    assert f"date={int(datetime(2026, 10, 22, 22, 0, tzinfo=timezone.utc).timestamp())}" in end
+    from app.plugins.contract import validate_output
+    out = validate_output("topology", to_topology(snap))
+    assert out["usage"][0]["applications"][0] == {"name": "Netflix", "rx_bytes": 5000, "tx_bytes": 100}
+
+
+def test_a_router_without_traffic_analyzer_still_syncs():
+    t = FakeTransport()          # both pages answer 404
+    snap = AsusClient(CFG, transport=t).snapshot()
+    assert snap["usage"] == [] and len(snap["nodes"]) == 3

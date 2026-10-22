@@ -195,16 +195,17 @@ def save_scan_results(
         for port in host.ports:
             conn.execute(
                 """
-                INSERT INTO ports (device_id, proto, port, state, service, product, version, updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO ports (device_id, proto, port, state, service, product, version, cpe, updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(device_id, proto, port) DO UPDATE SET
                     state = excluded.state,
                     service = excluded.service,
                     product = excluded.product,
                     version = excluded.version,
+                    cpe = excluded.cpe,
                     updated = excluded.updated
                 """,
-                (device_id, port.proto, port.port, port.state, port.service, port.product, port.version, now),
+                (device_id, port.proto, port.port, port.state, port.service, port.product, port.version, port.cpe, now),
             )
 
             # Port opened event for existing devices only

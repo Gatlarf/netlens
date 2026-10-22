@@ -84,7 +84,12 @@ class Fake(BaseHTTPRequestHandler):
         if p == "sites/site1/devices":
             return self._send({"errorCode": 0, "result": DEVICES})
         if p == f"sites/site1/switches/{SW}":
-            return self._send({"errorCode": 0, "result": {"mac": SW, "uplink": {"mac": GW, "port": 1, "type": "gateway"}}})
+            return self._send({"errorCode": 0, "result": {"mac": SW, "uplink": {"mac": GW, "port": 1, "type": "gateway"}, "ports": [
+                {"port": 1, "name": "Port1", "disable": False, "portStatus": {"linkStatus": 1, "linkSpeed": 3, "duplex": 2, "poe": False, "tx": 5000, "rx": 9000}},
+                {"port": 3, "name": "printer", "disable": False, "portStatus": {"linkStatus": 1, "linkSpeed": 2, "duplex": 1, "poe": True, "poePower": 4.5, "tx": 10, "rx": 20}},
+                {"port": 4, "name": "Port4", "disable": False, "portStatus": {"linkStatus": 0, "linkSpeed": 0, "duplex": 0, "tx": 0, "rx": 0}},
+                {"port": 5, "name": "off", "disable": True, "portStatus": {"linkStatus": 0}},
+                {"name": "no number"}]}})
         if p == f"sites/site1/eaps/{AP1}":
             return self._send({"errorCode": 0, "result": {"mac": AP1, "wiredUplink": {"uplinkMac": SW, "port": 5}}})
         if p == f"sites/site1/eaps/{AP2}":
@@ -139,6 +144,13 @@ def test_fetch_follows_the_contract_and_maps_everything(server):
     phone = clients["11:22:33:44:55:03"]
     assert phone["name"] == "phone" and phone["band"] == "2.4 GHz" and phone["tx_mbps"] == 144.0  # small values are already Mbps
     assert clients["11:22:33:44:55:05"]["node_mac"] is None  # a switch that is not in the device list
+    assert printer["port"] == "3" and laptop["port"] is None and clients["11:22:33:44:55:05"]["port"] is None   # only a wired client on a known switch has a port
+    ports = {p["port"]: p for p in nodes["Rack switch"]["ports"]}
+    assert sorted(ports) == [1, 3, 4, 5]
+    assert ports[1] == {**ports[1], "up": True, "enabled": True, "speed_mbps": 1000.0, "duplex": "full", "name": None, "tx_bytes": 5000, "rx_bytes": 9000}
+    assert ports[3]["name"] == "printer" and ports[3]["speed_mbps"] == 100.0 and ports[3]["duplex"] == "half"
+    assert ports[4]["up"] is False and ports[4]["speed_mbps"] is None and ports[5]["enabled"] is False
+    assert not nodes["ER605"]["ports"] and not nodes["Living room"]["ports"]
 
 
 def test_one_login_one_logout_and_paging(server, monkeypatch):

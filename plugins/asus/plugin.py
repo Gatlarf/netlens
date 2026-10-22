@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 import json
 import re
 import socket
@@ -80,6 +81,7 @@ class AsusConfig:
     verify_tls: bool = False  # ASUS routers ship a self-signed certificate
     username: str = ""
     password: str = ""
+    traffic: bool = True      # also read the Traffic Analyzer statistics (applications and devices)
 
 
 def normalize_url(url: str) -> str:
@@ -275,6 +277,60 @@ class AsusClient:
         finally:
             self._token = None
 
+    # --- Traffic Analyzer (Adaptive QoS / Traffic Analyzer > Statistic): bytes per application and per device ---
+    def router_now(self) -> datetime:
+        """The router's own clock with its UTC offset (so a day ends at the router's midnight)."""
+        status, text = self._send("/appGet.cgi?hook=uptime()")
+        match = re.search(r"\w{3}, (\d{1,2} \w{3} \d{4} \d{2}:\d{2}:\d{2}) ([+-])(\d{2})(\d{2})", text) if status == 200 else None
+        if not match:
+            return datetime.now(timezone.utc)
+        sign = 1 if match.group(2) == "+" else -1
+        zone = timezone(sign * timedelta(hours=int(match.group(3)), minutes=int(match.group(4))))
+        return datetime.strptime(match.group(1), "%d %b %Y %H:%M:%S").replace(tzinfo=zone)
+
+    def _statistics(self, page: str, client: str, mode: str, duration: int, end: datetime) -> list | None:
+        """One answer of the router's traffic pages: a script that sets `array_statistics` (None when the page is missing)."""
+        status, text = self._send(f"/{page}.asp?client={client}&mode={mode}&dura={duration}&date={int(end.timestamp())}")
+        if status != 200:
+            return None
+        match = re.search(r"array_statistics\s*=\s*(\[.*\])\s*;?\s*$", text.strip(), re.S)
+        if not match:
+            return None
+        try:
+            rows = json.loads(match.group(1))
+        except ValueError:
+            return None
+        return rows if isinstance(rows, list) else None
+
+    def usage(self, days: int = 2) -> list[dict]:
+        """Traffic per application and per client for today and the days before (each figure is the day's total so far). Empty when the Traffic
+        Analyzer is off or this model does not have it; never raises, because the rest of the sync must not depend on it."""
+        out: list[dict] = []
+        try:
+            now = self.router_now()
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            for back in range(days):
+                start = midnight - timedelta(days=back)
+                end = start + timedelta(days=1)
+                apps = self._statistics("getWanTraffic", "all", "detail", 24, end)       # (sic) the router calls the per-application list "WAN traffic"
+                clients = self._statistics("getAppTraffic", "all", "detail", 24, end)    # and the per-device list "app traffic"
+                if apps is None and clients is None:
+                    break
+                entry = {"day": start.strftime("%Y-%m-%d"), "applications": [], "clients": []}
+                for row in apps or []:
+                    if isinstance(row, list) and len(row) >= 3 and isinstance(row[0], str) and all(isinstance(v, (int, float)) for v in row[1:3]):
+                        if row[1] or row[2]:
+                            entry["applications"].append({"name": row[0], "tx_bytes": int(row[1]), "rx_bytes": int(row[2])})
+                for row in clients or []:
+                    mac = norm_mac(row[0]) if isinstance(row, list) and row and isinstance(row[0], str) else None
+                    if mac and len(row) >= 3 and all(isinstance(v, (int, float)) for v in row[1:3]) and (row[1] or row[2]):
+                        entry["clients"].append({"mac": mac, "tx_bytes": int(row[1]), "rx_bytes": int(row[2])})
+                if entry["applications"] or entry["clients"]:
+                    out.append(entry)
+        except (AsusError, ValueError):
+            return out
+        return out
+
     def snapshot(self) -> dict:
         self.login()
         try:
@@ -288,7 +344,9 @@ class AsusClient:
             status, text = self._send("/ajax_onboarding.asp")
             if status != 200:
                 raise AsusError(f"the router returned HTTP {status} for the AiMesh node list")
-            return build_snapshot(clientlist, parse_onboarding(text))
+            snapshot = build_snapshot(clientlist, parse_onboarding(text))
+            snapshot["usage"] = self.usage() if self.cfg.traffic else []
+            return snapshot
         finally:
             self.logout()
 
@@ -304,6 +362,7 @@ def _client(config: dict):
         verify_tls=bool(config.get("verify_tls", False)),
         username=config.get("username", ""),
         password=config.get("password", ""),
+        traffic=bool(config.get("traffic", True)),
     )
     if not (cfg.url and cfg.username and cfg.password):
         raise ValueError("enter the router address, username and password")
@@ -334,7 +393,7 @@ def to_topology(snapshot: dict) -> dict:
             "rssi": c.get("rssi"), "tx_mbps": c.get("tx_mbps"), "rx_mbps": c.get("rx_mbps"),
             "vendor": c.get("vendor"), "device_type": "printer" if c.get("printer") else None,
         })
-    return {"nodes": out_nodes, "clients": clients}
+    return {"nodes": out_nodes, "clients": clients, "usage": snapshot.get("usage") or []}
 
 
 def test(config: dict) -> dict:
@@ -376,6 +435,17 @@ def diagnose(config: dict) -> dict:
             onboarding = nodes
             report["steps"]["onboarding"]["nodes_parsed"] = len(nodes)
             report["steps"]["onboarding"]["first_node"] = [describe(n) for n in nodes[:SAMPLES]]
+        def read_traffic():
+            now = client.router_now()
+            end = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            apps = client._statistics("getWanTraffic", "all", "detail", 24, end)
+            devices = client._statistics("getAppTraffic", "all", "detail", 24, end)
+            return {"applications_page": apps is not None, "devices_page": devices is not None,
+                    "applications": len(apps or []), "devices": len(devices or []),
+                    "application_row": describe((apps or [None])[0]), "device_row": describe((devices or [None])[0]),
+                    "days_parsed": len(client.usage(1))}
+
+        step("traffic_analyzer", read_traffic)
         if clientlist is not None and onboarding is not None:
             snapshot = build_snapshot(clientlist, onboarding)
             report["result"] = {

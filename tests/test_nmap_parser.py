@@ -241,3 +241,13 @@ def test_closed_port_is_dropped() -> None:
 def test_empty_nmaprun_returns_empty_list() -> None:
     hosts = _parse("<nmaprun></nmaprun>")
     assert hosts == []
+
+def test_service_cpe_names_are_kept() -> None:
+    xml = (
+        '<nmaprun><host><status state="up"/><address addr="10.0.0.9" addrtype="ipv4"/><ports>'
+        '<port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH" version="8.4p1"><cpe>cpe:/a:openbsd:openssh:8.4p1</cpe></service></port>'
+        '<port protocol="tcp" portid="80"><state state="open"/><service name="http"/></port></ports></host></nmaprun>'
+    )
+    host = _parse(xml)[0]
+    assert _port_by_number(host, 22).cpe == "cpe:/a:openbsd:openssh:8.4p1"
+    assert _port_by_number(host, 80).cpe is None

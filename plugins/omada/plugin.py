@@ -210,26 +210,28 @@ class Controller:
                 return
             page += 1
 
-    def uplink_of(self, site, device):
-        """MAC of the device this switch or access point is plugged into (None when unknown; one small read)."""
+    def detail_of(self, site, device):
+        """(MAC of the device this switch or access point is plugged into, its ports) from one small read; (None, []) when it cannot be read."""
         kind = device.get("type")
         if kind == "switch":
             path, keys = f"sites/{site['key']}/switches/{device['mac']}", ("uplink",)
         elif kind == "ap":
             path, keys = f"sites/{site['key']}/eaps/{device['mac']}", ("wiredUplink", "uplink")
         else:
-            return None
+            return None, []
         try:
             detail = self._api(path)
         except OmadaError:
-            return None  # one device that cannot be read must not fail the whole sync
+            return None, []  # one device that cannot be read must not fail the whole sync
+        parent = None
         for key in keys:
             link = detail.get(key) if isinstance(detail, dict) else None
             if isinstance(link, dict):
-                mac = _mac(link.get("mac") or link.get("uplinkMac"))
-                if mac:
-                    return mac
-        return None
+                parent = _mac(link.get("mac") or link.get("uplinkMac"))
+                if parent:
+                    break
+        ports = detail.get("ports") if kind == "switch" and isinstance(detail, dict) else None
+        return parent, [p for p in (_port(raw) for raw in ports or []) if p]
 
     def snapshot(self):
         nodes, clients, have_gateway, seen_nodes, seen_clients = [], [], False, set(), set()
@@ -248,8 +250,10 @@ class Controller:
                     "mac": mac, "ip": device.get("ip") or None, "role": role,
                     "name": device.get("name") or device.get("showModel") or device.get("model") or mac,
                     "model": device.get("showModel") or device.get("model") or "",
-                    "parent_mac": self.uplink_of(site, device),  # asked for with the MAC exactly as the controller wrote it
                 })
+                nodes[-1]["parent_mac"], ports = self.detail_of(site, device)      # asked for with the MAC exactly as the controller wrote it
+                if ports:
+                    nodes[-1]["ports"] = ports
             for client in self.paged(f"sites/{site['key']}/clients", self.CLIENT_FILTERS):
                 mac = _mac(client.get("mac"))
                 if not mac or mac in seen_clients or client.get("active") is False:
@@ -257,6 +261,30 @@ class Controller:
                 seen_clients.add(mac)
                 clients.append((client, mac))
         return nodes, clients
+
+
+SPEEDS = {1: 10, 2: 100, 3: 1000, 4: 2500, 5: 10000, 6: 25000}      # the controller's link speed codes, in Mbit/s
+
+
+def _port(raw):
+    """One switch port as the contract wants it: link state, speed, duplex and the byte counters (None when the entry is unusable)."""
+    if not isinstance(raw, dict):
+        return None
+    number = raw.get("port")
+    if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+        return None
+    status = raw.get("portStatus") if isinstance(raw.get("portStatus"), dict) else {}
+    up = status.get("linkStatus") in (1, True)
+    out = {"port": number, "name": raw.get("name") if isinstance(raw.get("name"), str) and raw.get("name") != f"Port{number}" else None,
+           "enabled": not raw.get("disable", False), "up": bool(up)}
+    if up:
+        out["speed_mbps"] = SPEEDS.get(status.get("linkSpeed"))
+        out["duplex"] = {1: "half", 2: "full"}.get(status.get("duplex"))
+    for key, field in (("tx_bytes", "tx"), ("rx_bytes", "rx")):
+        value = _number(status.get(field))
+        if value is not None and value >= 0:
+            out[key] = int(value)
+    return out
 
 
 def _json_or_none(raw):
@@ -295,6 +323,7 @@ def to_topology(nodes, raw_clients):
             "rssi": int(rssi) if rssi is not None and -127 <= rssi <= 0 else None,
             "tx_mbps": _rate_mbps(client.get("txRate")) if wireless else None,
             "rx_mbps": _rate_mbps(client.get("rxRate")) if wireless else None,
+            "port": str(client["port"]) if not wireless and node_mac in known and isinstance(client.get("port"), int) and client["port"] > 0 else None,
         })
     return {"nodes": nodes, "clients": out_clients}
 
@@ -404,6 +433,9 @@ def diagnose(config):
             "clients": len(out["clients"]), "clients_with_node": sum(1 for c in out["clients"] if c["node_mac"]),
             "wifi_clients": sum(1 for c in out["clients"] if c["medium"] == "wifi"), "with_rssi": sum(1 for c in out["clients"] if c["rssi"] is not None),
             "with_rates": sum(1 for c in out["clients"] if c["tx_mbps"] is not None),
+            "switches_with_ports": sum(1 for n in out["nodes"] if n.get("ports")), "ports": sum(len(n.get("ports") or []) for n in out["nodes"]),
+            "ports_up": sum(1 for n in out["nodes"] for p in n.get("ports") or [] if p["up"]), "ports_with_counters": sum(1 for n in out["nodes"] for p in n.get("ports") or [] if p.get("rx_bytes") is not None),
+            "wired_clients_with_port": sum(1 for c in out["clients"] if c.get("port")),
         }
     except LoginRefused:
         raise
