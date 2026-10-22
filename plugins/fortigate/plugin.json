@@ -1,0 +1,47 @@
+{
+  "id": "fortigate",
+  "name": "Fortinet FortiGate",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads a FortiGate firewall (FortiOS 6.4+, REST API with a read-only token): the firewall as the gateway node with its interfaces, the devices behind it (DHCP leases, FortiGate device identification, ARP) with name, vendor, operating system and type, and its health: high availability, VPN tunnels, firmware and licence expiry. Read-only: only GET requests.",
+  "timeout": 90,
+  "diagnose": true,
+  "info": {
+    "title": "Set up the FortiGate (once)",
+    "text": "Create an administrator profile that can only read (System, Network and VPN read, nothing else), then a REST API administrator with that profile and a token, and trust only the machine that runs Netlens. In the web interface: System > Admin Profiles, then System > Administrators > Create New > REST API Admin. The token is shown once. Or in the CLI (change the address; the token is printed once):",
+    "code": "config system accprofile\n  edit netlens-ro\n    set secfabgrp read\n    set netgrp read\n    set sysgrp read\n    set vpngrp read\n    set utmgrp none\n  next\nend\nconfig system api-user\n  edit netlens\n    set accprofile netlens-ro\n    set vdom root\n    config trusthost\n      edit 1\n        set ipv4-trusthost 192.168.0.10 255.255.255.255\n      next\n    end\n  next\nend\nexecute api-user generate-key netlens"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "FortiGates",
+      "required": true,
+      "help": "One line per firewall (list both units of a high-availability pair only if you want both; the cluster answers on one address). A firewall with several VDOMs: one line per VDOM.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "https://192.168.1.99", "required": true},
+        {"key": "token", "label": "API token", "type": "password", "required": true},
+        {"key": "vdom", "label": "VDOM", "placeholder": "root", "optional": true},
+        {"key": "role", "label": "Role", "placeholder": "auto (gateway) or node", "help": "auto: the first firewall is the gateway of the network, any other one is shown as a node below it.", "optional": true}
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Untick it only when the firewall uses its factory certificate and you cannot install your own. The token travels in every request."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 20,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://www.codeshrimp.com/docs/netlens/using-netlens/plugins/fortinet-fortigate-plugin/"
+}

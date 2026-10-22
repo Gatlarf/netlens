@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.152 — 2026-10-22
+
+### Added
+- ★ **Firewall plugins: Fortinet FortiGate, Palo Alto Networks and Check Point** (Community; built from the public API documentation and tested against simulated firewalls, not yet against real ones). FortiGate and Palo Alto report the firewall as the gateway with its interfaces and the devices behind it (DHCP leases, ARP, and on FortiGate its own device inventory with vendor, operating system and kind of device). Check Point reads the gateways, clusters and servers a management server manages, with version and operating system. Read-only, with a read-only token, key or session.
+- ★ **Firewall card** on the device page: firmware version and serial number, high availability (which unit is primary, whether the pair is in sync), VPN tunnels up or down, and licences and support with days left. New events: *firewall failover*, *VPN down*, *VPN up* and *firewall licence ends soon*, which can go through the notification channels and the SIEM forwarding. Plugin API: a topology node can carry a `firewall` part, and a node without a MAC address can be given by its `ip`.
+
 ## 0.4.151 — 2026-10-22
 
 ### Fixed

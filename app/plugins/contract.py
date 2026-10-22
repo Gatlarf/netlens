@@ -926,13 +926,52 @@ def _switch_ports(value: Any, path: str) -> list[dict]:
     return ports
 
 
+def _firewall(value: Any, path: str) -> dict | None:
+    """What a firewall node tells besides its clients: version, high availability, VPN tunnels and licences."""
+    if not value:
+        return None
+    value = _dict(value, path)
+    ha = value.get("ha")
+    if ha:
+        ha = _dict(ha, f"{path}.ha")
+        in_sync = ha.get("in_sync")
+        if in_sync is not None and not isinstance(in_sync, bool):
+            _fail(f"{path}.ha.in_sync", "must be true or false")
+        ha = {"mode": _text(ha.get("mode"), f"{path}.ha.mode", max_len=30) or None, "state": _text(ha.get("state"), f"{path}.ha.state", max_len=20).lower() or None,
+              "peer_state": _text(ha.get("peer_state"), f"{path}.ha.peer_state", max_len=20).lower() or None, "in_sync": in_sync}
+    else:
+        ha = None
+    tunnels, names = [], set()
+    for i, raw in enumerate(_list(value.get("tunnels"), f"{path}.tunnels")[:200]):
+        raw = _dict(raw, f"{path}.tunnels[{i}]")
+        name = _text(raw.get("name"), f"{path}.tunnels[{i}].name", required=True, max_len=80)
+        if name in names or not isinstance(raw.get("up", False), bool):
+            continue
+        names.add(name)
+        tunnels.append({"name": name, "remote": _text(raw.get("remote"), f"{path}.tunnels[{i}].remote", max_len=80) or None, "up": raw.get("up", False)})
+    licences = []
+    for i, raw in enumerate(_list(value.get("licences"), f"{path}.licences")[:50]):
+        raw = _dict(raw, f"{path}.licences[{i}]")
+        expires = _text(raw.get("expires"), f"{path}.licences[{i}].expires", max_len=10) or None
+        if expires is not None and not re.match(r"^\d{4}-\d{2}-\d{2}$", expires):
+            _fail(f"{path}.licences[{i}].expires", "must be a date like 2027-01-31")
+        licences.append({"name": _text(raw.get("name"), f"{path}.licences[{i}].name", required=True, max_len=80), "expires": expires})
+    return {"version": _text(value.get("version"), f"{path}.version", max_len=60) or None, "serial": _text(value.get("serial"), f"{path}.serial", max_len=60) or None,
+            "model": _text(value.get("model"), f"{path}.model", max_len=80) or None, "ha": ha, "tunnels": tunnels, "licences": licences}
+
+
 def _topology(data: Any) -> dict:
     data = _dict(data, "output")
     nodes, node_macs = [], set()
     for i, raw in enumerate(_list(data.get("nodes"), "nodes")):
         path = f"nodes[{i}]"
         raw = _dict(raw, path)
-        mac = _mac(raw.get("mac"), f"{path}.mac", required=True)
+        mac = _mac(raw.get("mac"), f"{path}.mac")
+        if mac is None:      # a node that is only known by its address (a firewall managed from a controller): a placeholder derived from it; Netlens matches it by IP
+            node_ip = _ipv4(raw.get("ip"), f"{path}.ip")
+            if node_ip is None:
+                _fail(f"{path}.mac", "is required (or give the node an ip)")
+            mac = "02:00:" + ":".join(f"{int(part):02x}" for part in node_ip.split("."))
         if mac in node_macs:
             _fail(f"{path}.mac", f"{mac} is used twice")
         node_macs.add(mac)
@@ -949,6 +988,7 @@ def _topology(data: Any) -> dict:
             "role": role,
             "parent_mac": _mac(raw.get("parent_mac"), f"{path}.parent_mac"),
             "ports": _switch_ports(raw.get("ports"), f"{path}.ports"),
+            "firewall": _firewall(raw.get("firewall"), f"{path}.firewall"),
         })
     known = {m for n in nodes for m in n["macs"]}
     for i, n in enumerate(nodes):

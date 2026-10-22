@@ -118,3 +118,20 @@ def clear_connection(device_id: int, request: Request, conn=Depends(get_conn)) -
     removed = portmap.clear_manual(conn, device_id)
     request.app.state.__dict__.get("stats_cache", {}).clear()
     return {"removed": removed}
+
+
+@router.get("/devices/{device_id}/firewall")
+def device_firewall(device_id: int, conn=Depends(get_conn)) -> dict:
+    """What a firewall plugin reports about this device: version, high availability, VPN tunnels and licences (days left worked out now)."""
+    import json
+    from datetime import date
+
+    row = conn.execute("SELECT data, updated, plugin_id FROM firewall_state WHERE device_id = ?", (device_id,)).fetchone()
+    if row is None:
+        return {"firewall": None}
+    data = json.loads(row["data"])
+    data.pop("warned", None)
+    today = date.fromisoformat(utcnow()[:10])
+    for lic in data.get("licences") or []:
+        lic["days_left"] = (date.fromisoformat(lic["expires"]) - today).days if lic.get("expires") else None
+    return {"firewall": data, "updated": row["updated"], "plugin": row["plugin_id"]}

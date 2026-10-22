@@ -291,3 +291,54 @@ def record_switch_ports(conn: sqlite3.Connection, plugin_id: str, data: dict, no
     conn.execute("DELETE FROM switch_port_samples WHERE ts < ?", (old,))
     conn.commit()
     return recorded
+
+
+LICENCE_WARN_DAYS = 30
+
+
+def record_firewall(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None) -> int:
+    """Store what a firewall node reports (version, high availability, VPN tunnels, licences) and raise events when it changes between two syncs:
+    `firewall_ha` (the state changed, for example a failover), `vpn_down` / `vpn_up` (a tunnel), `firewall_licence` (a licence ends within 30 days, once per end date)."""
+    import json
+    from datetime import date, datetime
+
+    now = now or utcnow()
+    by_mac, by_ip = device_lookup(conn)
+    today = datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ").date()
+    count = 0
+    for node in data.get("nodes", []):
+        fw = node.get("firewall")
+        device_id = next((by_mac[m] for m in node["macs"] if m in by_mac), None) or by_ip.get(node.get("ip") or "")
+        if not fw or device_id is None:
+            continue
+        name = node.get("name") or node["mac"]
+        row = conn.execute("SELECT data FROM firewall_state WHERE device_id = ?", (device_id,)).fetchone()
+        try:
+            before = json.loads(row["data"]) if row else None
+        except ValueError:
+            before = None
+        warned = dict((before or {}).get("warned") or {})
+        if before is not None:
+            old_ha, new_ha = (before.get("ha") or {}).get("state"), (fw.get("ha") or {}).get("state")
+            if old_ha and new_ha and old_ha != new_ha:
+                add_event(conn, "firewall_ha", f"{name}: high availability {old_ha} -> {new_ha}", device_id=device_id, now=now)
+            was = {t["name"]: t["up"] for t in before.get("tunnels") or []}
+            for t in fw["tunnels"]:
+                if t["name"] in was and was[t["name"]] != t["up"]:
+                    add_event(conn, "vpn_up" if t["up"] else "vpn_down", f"{name}: tunnel {t['name']}" + (f" to {t['remote']}" if t.get("remote") else ""), device_id=device_id, now=now)
+        for lic in fw["licences"]:
+            if not lic["expires"]:
+                continue
+            days = (date.fromisoformat(lic["expires"]) - today).days
+            if days <= LICENCE_WARN_DAYS and warned.get(lic["name"]) != lic["expires"]:
+                warned[lic["name"]] = lic["expires"]
+                add_event(conn, "firewall_licence", f"{name}: {lic['name']} " + (f"ended {-days} day(s) ago" if days < 0 else f"ends in {days} day(s)"), device_id=device_id, now=now)
+        stored = {**fw, "warned": warned}
+        conn.execute(
+            "INSERT INTO firewall_state (device_id, plugin_id, data, updated) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(device_id) DO UPDATE SET plugin_id = excluded.plugin_id, data = excluded.data, updated = excluded.updated",
+            (device_id, plugin_id, json.dumps(stored), now),
+        )
+        count += 1
+    conn.commit()
+    return count

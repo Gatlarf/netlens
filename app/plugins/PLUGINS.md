@@ -390,7 +390,7 @@ Return `{"nodes": [...], "clients": [...]}`. A *node* is a router, switch, acces
 
 | Node field | Required | Meaning |
 | :--- | :--- | :--- |
-| `mac` | yes | Unique. |
+| `mac` | yes, or give an `ip` | Unique. A node without a MAC (a firewall known only from its management server) gets a placeholder made from its `ip`, and is matched to a device by IP. |
 | `macs` | no | Extra MAC addresses of the same device (for example other radios). |
 | `ip` | no | IPv4 address. |
 | `name` | no | Default: the MAC. |
@@ -398,6 +398,7 @@ Return `{"nodes": [...], "clients": [...]}`. A *node* is a router, switch, acces
 | `role` | no | `gateway`, `switch`, `ap` or `node` (default). **At most one** node may be the `gateway` (the main router). |
 | `parent_mac` | no | The `mac` (or one of the `macs`) of the node this one is connected to. Without it, the node hangs below the gateway. |
 | `ports` | no | For a switch: its ports (up to 128), see below. Needs Netlens 0.4.139. |
+| `firewall` | no | For a firewall: `version`, `serial`, `model`, `ha` (`mode`, `state`, `peer_state`, `in_sync`), `tunnels` (`name`, `remote`, `up`) and `licences` (`name`, `expires` as `YYYY-MM-DD`). Shown in a *Firewall* card; Netlens raises `firewall_ha`, `vpn_down`, `vpn_up` and `firewall_licence` events when it changes between two syncs. Needs Netlens 0.4.152. |
 
 A *port* (in a node's `ports`): `port` (1-1024, required, unique), `up` (a link, `true`/`false`, default `false`), `enabled` (not switched off by the administrator, default `true`), `speed_mbps`, `duplex` (`full` or `half`), `name` (up to 40 characters), and the counters `tx_packets`, `rx_packets`, `tx_errors`, `rx_errors` (whole numbers that only grow; a counter that goes back is taken as a restart). Netlens keeps the latest state and one counter sample per sync for 14 days, shows them in a *Switch ports* card on the switch's device page (packets per second, errors in the last 24 hours, link changes) and logs a `link_down` / `link_up` event when a port changes state between two syncs. The switch must be a device Netlens has scanned (matched by MAC, then IP).
 

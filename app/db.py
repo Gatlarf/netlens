@@ -648,6 +648,16 @@ def init_db(conn: sqlite3.Connection) -> None:
     )
     cur.execute(
         """
+        CREATE TABLE IF NOT EXISTS firewall_state (
+            device_id INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
+            plugin_id TEXT NOT NULL,
+            data TEXT NOT NULL,
+            updated TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
         CREATE TABLE IF NOT EXISTS switch_port_samples (
             id INTEGER PRIMARY KEY,
             device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,

@@ -1,0 +1,46 @@
+{
+  "id": "paloalto",
+  "name": "Palo Alto Networks PAN-OS",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads a Palo Alto Networks firewall (PAN-OS 9.0+, XML API with a read-only API key): the firewall as the gateway node with its interfaces, the devices behind it (DHCP leases and ARP table) with name and address, and its health: high availability, IPsec tunnels, firmware and licence expiry. Read-only: only operational 'show' commands.",
+  "timeout": 90,
+  "diagnose": true,
+  "info": {
+    "title": "Set up the firewall (once)",
+    "text": "Create an administrator role that can only use the XML API for operational requests and read the system, then an administrator with that role, and generate its API key. Device > Admin Roles > Add: tick only XML API > Operational Requests (and Configuration: off), plus Web UI / CLI: none. Device > Administrators > Add, with that role. Then get the key once (change the password and address); keep it out of shared documents:",
+    "code": "curl -k -G 'https://192.168.1.1/api/' --data-urlencode 'type=keygen' --data-urlencode 'user=netlens' --data-urlencode 'password=CHANGE-ME'"
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Firewalls",
+      "required": true,
+      "help": "One line per firewall. For a high-availability pair, list the active unit's management address or each unit by itself. Point it at the firewall, not at Panorama.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "https://192.168.1.1", "required": true},
+        {"key": "api_key", "label": "API key", "type": "password", "required": true},
+        {"key": "role", "label": "Role", "placeholder": "auto (gateway) or node", "help": "auto: the first firewall is the gateway of the network, any other one is shown as a node below it.", "optional": true}
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Untick it only when the firewall still uses its self-signed certificate. The key travels in a request header."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://www.codeshrimp.com/docs/netlens/using-netlens/plugins/palo-alto-networks-pan-os-plugin/"
+}

@@ -10,6 +10,7 @@ import { buildDevicePortsCard, PORT_METRICS } from "../cards/device_ports.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildSwitchPortsCard } from "../cards/switch_ports.js";
 import { buildPortMapCard, isPortMapBusy } from "../cards/port_map.js";
+import { buildFirewallCard } from "../cards/firewall.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
 import { stateDot } from "./services.js";
 import { buildParentCard } from "../cards/device_parent.js";
@@ -868,6 +869,9 @@ export async function render(container, params) {
     const switchPortsSlot = slot();
     nRight.appendChild(switchPortsSlot);
     buildSwitchPortsCard(device.id).then((c) => { if (c && !disposed) switchPortsSlot.appendChild(c); }).catch(() => {});
+    const firewallSlot = slot();
+    nRight.appendChild(firewallSlot);
+    buildFirewallCard(device.id).then((c) => { if (c && !disposed) firewallSlot.appendChild(c); }).catch(() => {});
     const portMapSlot = slot();
     nRight.appendChild(portMapSlot);
     buildPortMapCard(device).then((c) => { if (c && !disposed) portMapSlot.appendChild(c); }).catch(() => {});

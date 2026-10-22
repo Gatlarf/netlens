@@ -1,0 +1,47 @@
+{
+  "id": "checkpoint",
+  "name": "Check Point Management",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "topology",
+  "author": "Netlens",
+  "description": "Reads a Check Point management server (R80.10+, Management API with a read-only administrator): every security gateway, cluster, cluster member and server it manages, with address, model, version and operating system, shown as network nodes with their firmware. It does not report the devices behind a gateway (the management API has no ARP or DHCP tables): read those and the cluster state from the gateways with the SNMP plugin. Read-only: a read-only session, only 'show' commands.",
+  "timeout": 90,
+  "diagnose": true,
+  "info": {
+    "title": "Set up the management server (once)",
+    "text": "In SmartConsole create an administrator with a permission profile that is read-only (Read Only All is enough), generate an API key for it (Manage & Settings > Permissions & Administrators > Administrators > the administrator > Authentication Method: API Key) or use a password, and allow the machine that runs Netlens under Manage & Settings > Blades > Management API > Advanced Settings (accept API calls from: specific IP addresses). Publish the session. Netlens only logs in with a read-only session and logs out again."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Management servers",
+      "required": true,
+      "help": "One line per management server (or per domain on a Multi-Domain Server). Give either an API key, or a user name and password.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "https://192.168.1.10", "required": true},
+        {"key": "api_key", "label": "API key", "type": "password", "optional": true},
+        {"key": "username", "label": "User name", "optional": true},
+        {"key": "password", "label": "Password", "type": "password", "optional": true},
+        {"key": "domain", "label": "Domain", "placeholder": "only on a Multi-Domain Server", "optional": true}
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Untick it only when the management server still uses the certificate it was installed with."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://www.codeshrimp.com/docs/netlens/using-netlens/plugins/check-point-management-plugin/"
+}
