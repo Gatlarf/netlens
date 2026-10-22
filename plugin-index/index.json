@@ -138,7 +138,13 @@
      "released": "2026-10-22",
      "changelog": "Application statistics per device: the 25 busiest devices of today also get their own application list (one extra request each), shown on the device's Network tab. Honours the new switch Settings > Traffic statistics in Netlens 0.4.161 (off by default; while off the router is not asked). Needs Netlens 0.4.161.",
      "review": {
-      "level": "community"
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-22",
+      "tested_on": [
+       "ASUS RT-AX92U running stock ASUSWRT (the maintainer's router): the per-device application read was run against it (26 applications for the busiest device)"
+      ],
+      "notes": "Written with the assistant Claude. New in this version: one extra read-only page request per busy device, and it obeys Netlens' own switch for application statistics. Reviewed, not yet confirmed by the maintainer."
      }
     },
     {

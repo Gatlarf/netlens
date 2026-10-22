@@ -2,6 +2,17 @@
   "id": "asus",
   "reviews": [
     {
+      "version": "1.3.0",
+      "sha256": "fd6ec666e39eec8b738cd4a848fdfc0896db43d6b4bee84d820e1870a159602e",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-22",
+      "tested_on": [
+        "ASUS RT-AX92U running stock ASUSWRT (the maintainer's router): the per-device application read was run against it (26 applications for the busiest device)"
+      ],
+      "notes": "Written with the assistant Claude. New in this version: one extra read-only page request per busy device, and it obeys Netlens' own switch for application statistics. Reviewed, not yet confirmed by the maintainer."
+    },
+    {
       "version": "1.2.0",
       "sha256": "ec5b7aef3bc257778e6579b248a124f999799fd6ef0279e4aa8d57ccc3e37aa1",
       "level": "reviewed",
