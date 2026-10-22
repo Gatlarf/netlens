@@ -2,7 +2,7 @@
   "id": "omada",
   "name": "TP-Link Omada",
   "kind": "topology",
-  "description": "Reads an Omada controller (5.1 or newer): gateway, switches and access points, which device hangs below which, and which switch or access point each client is connected to, with Wi-Fi signal, band and link rate. Read-only. Not yet tested on real hardware.",
+  "description": "Reads an Omada controller (5.1 or newer): gateway, switches and access points, which device hangs below which, which switch or access point each client is connected to, with Wi-Fi signal, band and link rate, switch ports and, with an Open API client, application statistics (DPI). Read-only. Not yet tested on real hardware.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/omada",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -11,6 +11,15 @@
     "OC200 / OC300 hardware controllers (not yet tested)"
   ],
   "releases": [
+    {
+      "version": "1.2.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.2.0/omada.zip",
+      "sha256": "ae5b3a777cd3fb2bd87ce6cc767fc26ee378377c1b4f6e61d0fd9003cd21ed2e",
+      "api_version": 1,
+      "min_netlens": "0.4.154",
+      "released": "2026-10-22",
+      "changelog": "Application statistics for Statistics > Network > Applications: enter an Open API client ID and secret (Omada: Settings > Platform Integration > Open API, Client Credentials, Viewer) and switch DPI on at the gateway. Read per client through the Open API and added up. Optional: without the client nothing changes. Tested against a simulated controller only; Test connection and Run diagnostic say whether it works."
+    },
     {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.1.0/omada.zip",
