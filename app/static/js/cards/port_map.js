@@ -1,4 +1,4 @@
-import { get, put, del } from "../api.js";
+import { ApiError, get, put, del } from "../api.js";
 import { h, clear, toast, statusDot, typeBadge } from "../util.js";
 
 const SWITCHY = new Set(["switch", "router", "ap"]);
@@ -15,6 +15,24 @@ function state(p) {
   if (p.up === null || p.up === undefined) return p.devices.length ? "used" : "unknown";
   if (p.enabled === false) return "disabled";
   return p.up ? "up" : "down";
+}
+
+// Save a connection. When the switch now sits below the device, the server says what would change; the owner decides.
+export async function putConnection(deviceId, switchId, port) {
+  const body = { node_device_id: switchId, port };
+  try {
+    return await put(`/api/devices/${deviceId}/connection`, body);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409 && window.confirm(`${err.message}\n\nContinue?`)) {
+      return put(`/api/devices/${deviceId}/connection`, { ...body, replace: true });
+    }
+    throw err;
+  }
+}
+
+// True while someone is filling in the connection forms (here or under Settings): the page must not refresh itself then
+export function isPortMapBusy() {
+  return [...document.querySelectorAll(".port-map-card form, .parent-section form")].some((f) => f.dataset.dirty === "1" || f.contains(document.activeElement));
 }
 
 function deviceLine(d, onRemove) {
@@ -153,6 +171,8 @@ export async function buildPortMapCard(device) {
       "For a switch that cannot say what is plugged in. The device also sits below this switch in the network map. For a device behind a second switch, connect it to that switch " +
       "and connect that switch to this one. A plugin never overwrites what you set here."));
     form.appendChild(err);
+    form.addEventListener("input", () => { form.dataset.dirty = "1"; });
+    form.addEventListener("change", () => { form.dataset.dirty = "1"; });
 
     const fill = (list) => {
       clear(pick);
@@ -173,7 +193,7 @@ export async function buildPortMapCard(device) {
       if (!pick.value) { err.textContent = "Choose a device"; return; }
       btn.disabled = true;
       try {
-        await put(`/api/devices/${pick.value}/connection`, { node_device_id: device.id, port: portInput.value.trim() || null });
+        await putConnection(pick.value, device.id, portInput.value.trim() || null);
         toast("Connection saved");
         if (portInput.value.trim()) selected = data.ports.find((p) => p.port === portInput.value.trim())?.port || selected;
         await reload();

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.api.devices import get_conn
 from app import portmap
 from app.db import utcnow
-from app.hierarchy import device_name, load_hierarchy, would_loop
+from app.hierarchy import ancestors, device_name, load_hierarchy, would_loop
 from app.stats import _ago
 
 router = APIRouter(prefix="/api", tags=["switch ports"])
@@ -74,6 +74,7 @@ def device_port_map(device_id: int, conn=Depends(get_conn)) -> dict:
 class ConnectionBody(BaseModel):
     node_device_id: int            # the switch (or access point) this device hangs on
     port: str | None = None        # its port, a number or the name the switch gives it; may be empty when only the switch is known
+    replace: bool = False          # the switch now sits below this device: turn that around (the answer to the question a 409 asks)
 
 
 @router.put("/devices/{device_id}/connection")
@@ -87,7 +88,23 @@ def set_connection(device_id: int, body: ConnectionBody, request: Request, conn=
     if body.node_device_id not in devs:
         raise HTTPException(status_code=422, detail="switch not found")
     if would_loop(hierarchy, device_id, body.node_device_id):
-        raise HTTPException(status_code=422, detail=f"{device_name(devs[body.node_device_id])} sits below this device; connecting it here would create a loop")
+        # the switch sits below this device now (a parent you set, or one that was found): connecting the device to the switch turns that around
+        chain = [body.node_device_id]
+        for up in ancestors(hierarchy, body.node_device_id):
+            chain.append(up)
+            if up == device_id:
+                break
+        fix = [(c, p) for c, p in zip(chain, chain[1:]) if devs[c]["parent_mode"] == "device" and devs[c]["parent_device_id"] == p]
+        if not body.replace:
+            sw, dev = device_name(devs[body.node_device_id]), device_name(devs[device_id])
+            text = f"{sw} sits below {dev} now ({hierarchy[body.node_device_id].reason.lower()}). Connecting {dev} to {sw} turns that around: {dev} will sit below {sw}"
+            if fix:
+                text += " and the parent you set for " + ", ".join(device_name(devs[c]) for c, _ in fix) + " is removed (it becomes automatic)"
+            raise HTTPException(status_code=409, detail=text + ".")
+        for c, p in fix:
+            portmap.clear_manual(conn, c)
+            conn.execute("UPDATE devices SET parent_mode = 'auto', parent_device_id = NULL WHERE id = ? AND parent_mode = 'device' AND parent_device_id = ?", (c, p))
+        conn.commit()
     portmap.set_manual(conn, device_id, body.node_device_id, body.port, utcnow())
     request.app.state.__dict__.get("stats_cache", {}).clear()
     return {"device_id": device_id, "node_device_id": body.node_device_id, "port": (body.port or "").strip()[:60] or None}

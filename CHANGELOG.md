@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.149 — 2026-10-22
+
+### Changed
+- Connecting a device to a port of a switch that currently sits below that device (for example to refine "below the server" into "on port 14 of the switch") now asks first, and then turns it around in one go: the switch is no longer placed below the device, the parent you had set for it is removed, and the device is connected to the port.
+
+### Fixed
+- The device page no longer refreshes itself while you fill in the connection forms (*Connected devices* and *Network position*), so what you type is not lost.
+
 ## 0.4.148 — 2026-10-22
 
 ### Added

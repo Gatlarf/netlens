@@ -1,4 +1,5 @@
-import { get, patch, put, del } from "../api.js";
+import { get, patch, del } from "../api.js";
+import { putConnection } from "./port_map.js";
 import { h, statusDot, typeBadge } from "../util.js";
 
 const SOURCE_NOTE = {
@@ -82,6 +83,8 @@ export async function buildParentCard(device, onSaved) {
   select.value = info.mode === "none" ? "none" : info.mode === "device" && info.device_id ? `device:${info.device_id}` : "auto";
 
   fillPorts();
+  form.addEventListener("input", () => { form.dataset.dirty = "1"; });
+  form.addEventListener("change", () => { form.dataset.dirty = "1"; });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     errorEl.textContent = "";
@@ -93,7 +96,7 @@ export async function buildParentCard(device, onSaved) {
     saveBtn.disabled = true;
     try {
       if (chosen !== null) {
-        await put(`/api/devices/${device.id}/connection`, { node_device_id: chosen, port: portInput.value.trim() || null });
+        await putConnection(device.id, chosen, portInput.value.trim() || null);
       } else {
         await patch(`/api/devices/${device.id}`, body);
         if (device.connection && device.connection.source === "manual") await del(`/api/devices/${device.id}/connection`);

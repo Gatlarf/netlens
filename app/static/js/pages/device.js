@@ -9,7 +9,7 @@ import { buildHealthGlance } from "../cards/health_glance.js";
 import { buildDevicePortsCard, PORT_METRICS } from "../cards/device_ports.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildSwitchPortsCard } from "../cards/switch_ports.js";
-import { buildPortMapCard } from "../cards/port_map.js";
+import { buildPortMapCard, isPortMapBusy } from "../cards/port_map.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
 import { stateDot } from "./services.js";
 import { buildParentCard } from "../cards/device_parent.js";
@@ -1009,13 +1009,13 @@ export async function render(container, params) {
     if (terminalSlot && isTerminalActive(terminalSlot)) return;
     if (isStabilityOpen()) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
-    if (deleteOpen || isMonitorFormOpen()) return;     // never wipe a form someone is filling in
+    if (deleteOpen || isMonitorFormOpen() || isPortMapBusy()) return;     // never wipe a form someone is filling in
     load();
   }, 20000);
 
   // show the result of a (full) scan as soon as it is done
   const onScanFinished = () => {
-    if (deleteOpen || isMonitorFormOpen() || isStabilityOpen() || (terminalSlot && isTerminalActive(terminalSlot))) return;
+    if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isStabilityOpen() || (terminalSlot && isTerminalActive(terminalSlot))) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
     load();
   };

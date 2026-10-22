@@ -88,7 +88,7 @@ def test_removing_it_gives_the_parent_back_to_automatic(client):
 
 def test_a_loop_and_unknown_devices_are_refused(client):
     client.put("/api/devices/3/connection", json={"node_device_id": 2, "port": "1"})
-    assert client.put("/api/devices/2/connection", json={"node_device_id": 3}).status_code == 422       # core cannot hang below office
+    assert client.put("/api/devices/2/connection", json={"node_device_id": 3}).status_code == 409       # core cannot hang below office without turning it around
     assert client.put("/api/devices/2/connection", json={"node_device_id": 2}).status_code == 422
     assert client.put("/api/devices/2/connection", json={"node_device_id": 99}).status_code == 422
     assert client.put("/api/devices/99/connection", json={"node_device_id": 2}).status_code == 404
@@ -116,3 +116,16 @@ def test_links_from_a_plugin_find_the_switch_as_a_device(client):
     conn.close()
     ports = client.get("/api/devices/3/port-map").json()["ports"]
     assert [(p["port"], [d["name"] for d in p["devices"]], d["manual"]) for p in ports for d in p["devices"]] == [("Gi1/0/5", ["pc"], False)]
+
+
+def test_connecting_a_device_to_a_switch_that_sits_below_it_asks_first_and_then_turns_it_around(client):
+    client.put("/api/devices/4/connection", json={"node_device_id": 2, "port": "3"})                # nas below core, set by hand
+    client.patch("/api/devices/2", json={"parent_mode": "device", "parent_device_id": 5})            # core below pc (a parent you set)
+    asked = client.put("/api/devices/5/connection", json={"node_device_id": 2, "port": "14"})
+    assert asked.status_code == 409 and "core sits below pc" in asked.json()["detail"] and "removed" in asked.json()["detail"]
+    assert client.get("/api/devices/2").json()["parent"]["effective"]["name"] == "pc"                # nothing changed yet
+    done = client.put("/api/devices/5/connection", json={"node_device_id": 2, "port": "14", "replace": True})
+    assert done.status_code == 200
+    assert [d["name"] for d in port_map(client)["14"]["devices"]] == ["pc"]
+    assert client.get("/api/devices/2").json()["parent"]["effective"]["name"] != "pc"
+    assert client.get("/api/devices/5").json()["parent"]["effective"]["name"] == "core"
