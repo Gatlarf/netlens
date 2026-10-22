@@ -9,6 +9,7 @@ import { buildHealthGlance } from "../cards/health_glance.js";
 import { buildDevicePortsCard, PORT_METRICS } from "../cards/device_ports.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildSwitchPortsCard } from "../cards/switch_ports.js";
+import { buildDeviceApplicationsCard } from "../cards/device_apps.js";
 import { buildPortMapCard, isPortMapBusy } from "../cards/port_map.js";
 import { buildFirewallCard } from "../cards/firewall.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
@@ -839,11 +840,9 @@ export async function render(container, params) {
     const health = h("div", { class: "dev-health" });
     const performanceSlot = slot();
     health.appendChild(performanceSlot);
-    const portsSlot = slot();
-    health.insertBefore(portsSlot, performanceSlot);
-    // a switch with many ports gets a table of ports; its per-port graphs are then left out of the general graphs
-    buildDevicePortsCard(device).catch(() => null).then((ports) => {
-      if (ports && !disposed) portsSlot.appendChild(ports);
+    // a switch with many ports gets a table of ports with a graph per port: that card is on the Network tab, so its graphs are left out of the general ones
+    const portsCardPromise = buildDevicePortsCard(device).catch(() => null);
+    portsCardPromise.then((ports) => {
       return buildPerformanceCard("device", device.id, { unlessOnly: ["up", "rtt_ms"], skip: ports ? ["up", "storage_status", "service_stopped", ...PORT_METRICS] : ["up", "storage_status", "service_stopped"] });
     }).then((c) => { if (c && !disposed) performanceSlot.appendChild(c); }).catch(() => {});
     const hLeft = column();
@@ -860,12 +859,19 @@ export async function render(container, params) {
     panels.health = health;
 
     // Network: ports, names, Wi-Fi, virtual machines, proxied sites
+    const network = h("div", { class: "dev-network" });
+    const portsSlot = slot();
+    network.appendChild(portsSlot);
+    portsCardPromise.then((ports) => { if (ports && !disposed) portsSlot.appendChild(ports); });
     const nLeft = column();
     nLeft.appendChild(buildPortsCard(device, () => load()));
     const nRight = column();
     const wifiSlot = slot();
     nRight.appendChild(wifiSlot);
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
+    const appsSlot = slot();
+    nRight.appendChild(appsSlot);
+    buildDeviceApplicationsCard(device).then((c) => { if (c && !disposed) appsSlot.appendChild(c); }).catch(() => {});
     const switchPortsSlot = slot();
     nRight.appendChild(switchPortsSlot);
     buildSwitchPortsCard(device.id).then((c) => { if (c && !disposed) switchPortsSlot.appendChild(c); }).catch(() => {});
@@ -883,7 +889,8 @@ export async function render(container, params) {
     if (smartCard) nRight.appendChild(smartCard);
     for (const siteCard of buildDeviceSitesCards(device)) nRight.appendChild(siteCard);
     nRight.appendChild(buildNamesCard(device));
-    panels.network = twoColumns(nLeft, nRight);
+    network.appendChild(twoColumns(nLeft, nRight));
+    panels.network = network;
 
     // Console (administrators)
     // a console that is in use is moved into the new page as it is: a refresh must not drop the session

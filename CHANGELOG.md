@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.161 — 2026-10-22
+
+### Added
+- ★ **Application statistics are optional and off by default** (Settings > Traffic statistics). In some countries this data may not be collected, so nothing is read from a router and nothing is stored until an administrator ticks the box; switching it off again deletes everything stored. The router plugins are told, so the ASUS router is not even asked while it is off. If you used the statistics before this version, tick the box once.
+- ★ **Applications per device.** A device's Network tab has an Applications card: which applications that device used (today, 7 or 30 days) and the traffic per day. The ASUS plugin (1.3.0) reads this for the 25 busiest devices, the Omada plugin (1.3.0) for every client it reads; only administrators see it.
+- ★ **Port graphs on the Network tab.** The Ports card (traffic in and out, how full the link is, errors, and a graph per port) moved from the Health tab to the Network tab of a switch, next to the Switch ports and the faceplate. Ports a plugin reads now also get a Busy figure (the busier direction against the negotiated link speed).
+- Traffic figures are shown in GB and TB where they were MB.
+
 ## 0.4.159 — 2026-10-22
 
 ### Added

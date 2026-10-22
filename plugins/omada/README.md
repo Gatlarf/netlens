@@ -42,6 +42,9 @@ through its **Open API**, which has its own login, so this part needs one extra 
 3. In Netlens, enter both in the plugin's settings (*Open API client ID* and *Open API client secret*; the secret is stored encrypted), then **Test connection**.
    The message ends with *Application statistics: working* when the login, the site and the DPI read all succeeded.
 
+Besides the Open API client, **Settings > Traffic statistics in Netlens must be switched on** (it is off by default: in some countries this kind of data may not be collected; switching it off deletes what was stored, and while it is off nothing is asked from the controller).
+Since 1.3.0 the applications are also kept per device and shown on the device's **Network** tab.
+
 Leave the two fields empty to skip the statistics; everything else works as before. The figures are today's totals so far (from midnight on the Netlens server),
 per application and per device. The controller has no list for the whole site, so Netlens asks once **per client** and adds the figures up: with many clients one
 sync takes longer (the busiest clients are read first, and the reads stop after 60 seconds). A failing statistics read never fails the topology sync; the reason is

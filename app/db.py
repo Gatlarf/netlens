@@ -679,6 +679,21 @@ def init_db(conn: sqlite3.Connection) -> None:
     )
     cur.execute(
         """
+        CREATE TABLE IF NOT EXISTS client_app_usage (
+            day TEXT NOT NULL,
+            source TEXT NOT NULL,
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            rx_bytes BIGINT NOT NULL DEFAULT 0,
+            tx_bytes BIGINT NOT NULL DEFAULT 0,
+            updated TEXT NOT NULL,
+            PRIMARY KEY (day, source, device_id, name)
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_client_app_usage_device ON client_app_usage (device_id, day)")
+    cur.execute(
+        """
         CREATE TABLE IF NOT EXISTS firewall_state (
             device_id INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
             plugin_id TEXT NOT NULL,

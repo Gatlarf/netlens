@@ -9,6 +9,7 @@ import json
 import re
 import socket
 import ssl
+import time
 from typing import Any, Callable
 import urllib.error
 from urllib.parse import urlparse
@@ -105,6 +106,8 @@ def normalize_url(url: str) -> str:
 USER_AGENT = "asusrouter-Android-DUTUtil-1.0.0.245"
 MAC_RE = re.compile(r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
 # error_status values of login.cgi that mean "stop trying" rather than "wrong password"
+CLIENT_APPS_MAX = 25         # devices whose applications are read (the busiest); one request each
+CLIENT_APPS_BUDGET = 40      # seconds those requests may take
 LOCKED_STATUS = {"7", "8", "9", "10"}
 
 Transport = Callable[[str, str, dict, bytes | None], tuple[int, bytes]]
@@ -324,12 +327,31 @@ class AsusClient:
                 for row in clients or []:
                     mac = norm_mac(row[0]) if isinstance(row, list) and row and isinstance(row[0], str) else None
                     if mac and len(row) >= 3 and all(isinstance(v, (int, float)) for v in row[1:3]) and (row[1] or row[2]):
-                        entry["clients"].append({"mac": mac, "tx_bytes": int(row[1]), "rx_bytes": int(row[2])})
+                        entry["clients"].append({"mac": mac, "tx_bytes": int(row[1]), "rx_bytes": int(row[2]), "_raw": row[0]})
+                if back == 0:
+                    self._client_applications(entry, end)
+                for client in entry["clients"]:
+                    client.pop("_raw", None)
                 if entry["applications"] or entry["clients"]:
                     out.append(entry)
         except (AsusError, ValueError):
             return out
         return out
+
+    def _client_applications(self, entry: dict, end: datetime) -> None:
+        """The applications each of the busiest devices used (today only; one read per device, within a time budget)."""
+        deadline = time.monotonic() + CLIENT_APPS_BUDGET
+        for client in sorted(entry["clients"], key=lambda c: -(c["tx_bytes"] + c["rx_bytes"]))[:CLIENT_APPS_MAX]:
+            if time.monotonic() > deadline:
+                break
+            try:
+                rows = self._statistics("getWanTraffic", client["_raw"], "detail", 24, end)       # the same page with one device's address instead of "all"
+            except AsusError:
+                continue
+            apps = [{"name": r[0], "tx_bytes": int(r[1]), "rx_bytes": int(r[2])} for r in rows or []
+                    if isinstance(r, list) and len(r) >= 3 and isinstance(r[0], str) and all(isinstance(v, (int, float)) for v in r[1:3]) and (r[1] or r[2])]
+            if rows is not None:
+                client["applications"] = apps
 
     def snapshot(self) -> dict:
         self.login()
@@ -362,7 +384,7 @@ def _client(config: dict):
         verify_tls=bool(config.get("verify_tls", False)),
         username=config.get("username", ""),
         password=config.get("password", ""),
-        traffic=bool(config.get("traffic", True)),
+        traffic=bool(config.get("traffic", True)) and bool(config.get("collect_usage", True)),     # Netlens' own switch (Settings > Statistics) has the last word
     )
     if not (cfg.url and cfg.username and cfg.password):
         raise ValueError("enter the router address, username and password")

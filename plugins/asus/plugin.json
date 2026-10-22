@@ -1,7 +1,7 @@
 {
   "id": "asus",
   "name": "ASUS router (AiMesh)",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "api_version": 1,
   "diagnose": true,
   "kind": "topology",
@@ -9,13 +9,39 @@
   "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) for the hierarchy and the map, and the router's Traffic Analyzer when it is on: traffic per application and per device (Statistics > Applications). Read-only, never SSH: one login, a few reads and a logout per sync. A refused login pauses automatic syncing so the router does not lock the account.",
   "timeout": 60,
   "config": [
-    {"key": "url", "type": "text", "label": "Router address", "placeholder": "https://192.168.0.1:8443", "required": true,
-     "help": "The router's web interface. HTTPS defaults to port 8443."},
-    {"key": "verify_tls", "type": "bool", "label": "Verify TLS certificate", "default": false,
-     "help": "Leave off: ASUS routers use a self-signed certificate."},
-    {"key": "username", "type": "text", "label": "Username", "required": true},
-    {"key": "password", "type": "password", "label": "Password", "required": true},
-    {"key": "traffic", "type": "bool", "label": "Read the Traffic Analyzer statistics", "default": true,
-     "help": "Needs Traffic Analyzer switched on in the router (Adaptive QoS > Traffic Analyzer > Statistic). The first figures appear about an hour after switching it on."}
+    {
+      "key": "url",
+      "type": "text",
+      "label": "Router address",
+      "placeholder": "https://192.168.0.1:8443",
+      "required": true,
+      "help": "The router's web interface. HTTPS defaults to port 8443."
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Leave off: ASUS routers use a self-signed certificate."
+    },
+    {
+      "key": "username",
+      "type": "text",
+      "label": "Username",
+      "required": true
+    },
+    {
+      "key": "password",
+      "type": "password",
+      "label": "Password",
+      "required": true
+    },
+    {
+      "key": "traffic",
+      "type": "bool",
+      "label": "Read the Traffic Analyzer statistics",
+      "default": true,
+      "help": "Needs Traffic Analyzer switched on in the router (Adaptive QoS > Traffic Analyzer > Statistic). The first figures appear about an hour after switching it on."
+    }
   ]
 }

@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from app import containers, imageupdates
+from app import containers, imageupdates, usagecfg
 from app.db import Error as db_Error, add_event, connect, delete_setting, get_setting, set_setting, utcnow
 from app.plugins.contract import ContractError, clean_config, default_config, migrate_servers, missing_required, validate_output
 from app.plugins import enrich, runs
@@ -320,8 +320,17 @@ class PluginService:
         return discover(self.data_dir)
 
     def _with_extras(self, plugin: Plugin, config: dict) -> dict:
-        """A DNS plugin also gets the zones to read and the marker, from the DNS settings."""
-        if (plugin.manifest or {}).get("kind") != "dns":
+        """A DNS plugin also gets the zones to read and the marker, from the DNS settings; a topology plugin is told whether application statistics may be collected."""
+        kind = (plugin.manifest or {}).get("kind")
+        if kind == "topology":
+            from app import usagecfg
+
+            conn = connect(self.db_path)
+            try:
+                return {**config, "collect_usage": usagecfg.enabled(conn)}
+            finally:
+                conn.close()
+        if kind != "dns":
             return config
         from app.dns.service import plugin_config_extra
 
@@ -408,7 +417,8 @@ class PluginService:
                     summary.update(record_wifi(conn, data))
                     record_switch_ports(conn, plugin.id, data)
                     record_firewall(conn, plugin.id, data)
-                    record_usage(conn, plugin.id, data)
+                    if usagecfg.enabled(conn):
+                        record_usage(conn, plugin.id, data)
                 except db_Error:
                     log.exception("could not store the router's names and Wi-Fi samples")
             set_status(conn, plugin.id, ok=True, **summary)

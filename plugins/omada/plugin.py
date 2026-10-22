@@ -94,6 +94,7 @@ class Controller:
             context.verify_mode = ssl.CERT_NONE
         self.client_id = str(config.get("client_id") or "").strip()
         self.client_secret = str(config.get("client_secret") or "").strip()
+        self.allowed = bool(config.get("collect_usage", True))      # Netlens' own switch (Settings > Statistics) has the last word
         self.context = context
         self.targets = []       # (site, client as the controller wrote it) for the application statistics
         self.opener = urllib.request.build_opener(
@@ -281,7 +282,7 @@ class Controller:
     # ---- application statistics (Open API) -----------------------------------------------------------------
     @property
     def wants_usage(self):
-        return bool(self.client_id and self.client_secret)
+        return bool(self.allowed and self.client_id and self.client_secret)
 
     def open_login(self):
         """The Open API access token (a separate login from the web session: OAuth client credentials)."""
@@ -324,7 +325,7 @@ class Controller:
             now = datetime.now().astimezone()
             midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
             start, end = int(midnight.timestamp()), int(now.timestamp())
-            apps, per_client, failed, deadline = {}, {}, 0, time.monotonic() + USAGE_BUDGET
+            apps, per_client, per_client_apps, failed, deadline = {}, {}, {}, 0, time.monotonic() + USAGE_BUDGET
             targets = sorted(self.targets, key=lambda t: -(_number(t[1].get("activity")) or 0))[:USAGE_MAX_CLIENTS]
             for site, client in targets:
                 site_id = ids.get(str(site["key"])) or names.get(str(site["name"]).lower())
@@ -332,7 +333,7 @@ class Controller:
                 if not site_id or not mac:
                     continue
                 if time.monotonic() > deadline:
-                    return self._day(midnight, apps, per_client), f"stopped after {USAGE_BUDGET} seconds; not every client was read (the busiest were read first)"
+                    return self._day(midnight, apps, per_client, per_client_apps), f"stopped after {USAGE_BUDGET} seconds; not every client was read (the busiest were read first)"
                 try:
                     rows = self.client_applications(site_id, client["mac"], start, end)
                 except ConnectError:
@@ -345,22 +346,25 @@ class Controller:
                     up, down = _number(row.get("upload")), _number(row.get("download"))
                     if not isinstance(name, str) or not name or (not up and not down):
                         continue
-                    for bucket, key in ((apps, name[:80]), (per_client, mac)):
+                    for bucket, key in ((apps, name[:80]), (per_client, mac), (per_client_apps, (mac, name[:80]))):
                         entry = bucket.setdefault(key, [0, 0])
                         entry[0] += int(up or 0)
                         entry[1] += int(down or 0)
             problem = f"{failed} client(s) could not be read" if failed else None
-            return self._day(midnight, apps, per_client), problem
+            return self._day(midnight, apps, per_client, per_client_apps), problem
         except (OmadaError, ValueError) as exc:
             return [], str(exc)
 
     @staticmethod
-    def _day(midnight, apps, per_client):
+    def _day(midnight, apps, per_client, per_client_apps):
         if not apps and not per_client:
             return []
+        by_client = {}
+        for (mac, name), v in per_client_apps.items():
+            by_client.setdefault(mac, []).append({"name": name, "tx_bytes": v[0], "rx_bytes": v[1]})
         return [{"day": midnight.strftime("%Y-%m-%d"),
                  "applications": [{"name": n, "tx_bytes": v[0], "rx_bytes": v[1]} for n, v in sorted(apps.items(), key=lambda i: -sum(i[1]))],
-                 "clients": [{"mac": m, "tx_bytes": v[0], "rx_bytes": v[1]} for m, v in sorted(per_client.items(), key=lambda i: -sum(i[1]))]}]
+                 "clients": [{"mac": m, "tx_bytes": v[0], "rx_bytes": v[1], "applications": by_client.get(m, [])} for m, v in sorted(per_client.items(), key=lambda i: -sum(i[1]))]}]
 
 
 SPEEDS = {1: 10, 2: 100, 3: 1000, 4: 2500, 5: 10000, 6: 25000}      # the controller's link speed codes, in Mbit/s
@@ -442,6 +446,8 @@ def test(config):
         controller.targets = controller.targets[:1]
         days, problem = controller.usage()
         message += ". Application statistics: " + (f"not available ({problem})" if problem and not days else "working" if days else "the Open API works, but no application traffic was reported (is DPI switched on at the gateway?)")
+    elif controller.client_id and controller.client_secret and not controller.allowed:
+        message += ". Application statistics are switched off in Netlens (Settings > Statistics), so none are read"
     return {"message": message}
 
 

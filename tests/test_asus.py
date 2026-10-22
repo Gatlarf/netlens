@@ -160,7 +160,11 @@ def test_traffic_analyzer_gives_usage_per_application_and_device():
     assert days == ["2026-10-22", "2026-10-21"]                       # the router's own date, today first
     today = snap["usage"][0]
     assert today["applications"] == [{"name": "Netflix", "tx_bytes": 100, "rx_bytes": 5000}, {"name": "Claude", "tx_bytes": 20, "rx_bytes": 30}]
-    assert today["clients"] == [{"mac": "02:00:00:00:00:01", "tx_bytes": 10, "rx_bytes": 900}]
+    # today's applications per device: one read per device, with the device's address as the router wrote it
+    assert today["clients"] == [{"mac": "02:00:00:00:00:01", "tx_bytes": 10, "rx_bytes": 900,
+                                 "applications": [{"name": "Netflix", "tx_bytes": 100, "rx_bytes": 5000}, {"name": "Claude", "tx_bytes": 20, "rx_bytes": 30}]}]
+    assert any("getWanTraffic.asp?client=02:00:00:00:00:01&" in c[1] for c in t.calls)
+    assert "applications" not in snap["usage"][1]["clients"][0] if snap["usage"][1]["clients"] else True      # only today is read per device
     end = [c[1] for c in t.calls if c[1].startswith("/getWanTraffic")][0]
     # the day that ends at the router's midnight (+02:00): 2026-10-23 00:00 +02:00
     assert f"date={int(datetime(2026, 10, 22, 22, 0, tzinfo=timezone.utc).timestamp())}" in end
@@ -173,3 +177,16 @@ def test_a_router_without_traffic_analyzer_still_syncs():
     t = FakeTransport()          # both pages answer 404
     snap = AsusClient(CFG, transport=t).snapshot()
     assert snap["usage"] == [] and len(snap["nodes"]) == 3
+
+
+def test_netlens_switch_for_application_statistics_has_the_last_word(monkeypatch):
+    t = FakeTransport()
+    t.apps = _answer([["Netflix", 100, 5000]])
+    t.devices = _answer([["02:00:00:00:00:01", 10, 900]])
+    monkeypatch.setattr(_asus, "CLIENT_FACTORY", lambda cfg: AsusClient(cfg, transport=t))
+    base = {"url": "10.0.0.1", "username": "u", "password": "pw", "traffic": True}
+    assert _asus.fetch({**base, "collect_usage": True})["usage"] != []
+    t.calls.clear()
+    assert _asus.fetch({**base, "collect_usage": False})["usage"] == []
+    assert not [c for c in t.calls if "Traffic" in c[1]]          # nothing was even asked
+    assert _asus.fetch(base)["usage"] != []                      # an older Netlens does not send the flag: unchanged

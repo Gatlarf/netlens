@@ -391,9 +391,13 @@ def _ports(conn, now: str) -> dict:
 
 def _applications(conn, days: int) -> dict:
     """Traffic per application and per device over the last `days` days, as the router's traffic analyser counted it (empty when no plugin reports it)."""
+    from app import usagecfg
+
+    if not usagecfg.enabled(conn):
+        return {"available": False, "enabled": False}
     last = conn.execute("SELECT MAX(day) FROM app_usage").fetchone()[0]
     if last is None:
-        return {"available": False}
+        return {"available": False, "enabled": True}
     first = (datetime.strptime(last, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
     apps = conn.execute(
         "SELECT name, SUM(rx_bytes) AS rx, SUM(tx_bytes) AS tx FROM app_usage WHERE day >= ? GROUP BY name ORDER BY SUM(rx_bytes) + SUM(tx_bytes) DESC", (first,)
@@ -405,7 +409,7 @@ def _applications(conn, days: int) -> dict:
     ).fetchall()
     total = sum(r["rx"] + r["tx"] for r in apps)
     return {
-        "available": True, "from": first, "to": last, "days": len(per_day),
+        "available": True, "enabled": True, "from": first, "to": last, "days": len(per_day),
         "rx": sum(r["rx"] for r in apps), "tx": sum(r["tx"] for r in apps), "applications_total": len(apps),
         "applications": [{"name": r["name"], "rx": r["rx"], "tx": r["tx"], "share": _pct(r["rx"] + r["tx"], total)} for r in apps[:15]],
         "per_day": [{"day": r["day"], "rx": r["rx"], "tx": r["tx"]} for r in per_day],

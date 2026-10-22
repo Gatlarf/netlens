@@ -18,6 +18,7 @@ import { buildSsoCard } from "../cards/sso.js";
 import { buildSiemCard } from "../cards/siem.js";
 import { buildInboundCard } from "../cards/inbound.js";
 import { buildOncallCard } from "../cards/oncall.js";
+import { buildUsageCard } from "../cards/usage.js";
 import { buildUpdateCard } from "../update.js";
 import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
@@ -272,6 +273,7 @@ const STATIC_GROUPS = [
     items: [
       { key: "backup", label: "Backup & restore", build: buildBackupCard },
       { key: "database", label: "Database", build: buildDatabaseCard },
+      { key: "usage", label: "Traffic statistics", build: buildUsageCard },
       { key: "export", label: "Export", build: buildExportCard },
       { key: "shares", label: "Share links", build: buildSharesCard },
     ],

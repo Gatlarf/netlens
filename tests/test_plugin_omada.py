@@ -325,6 +325,9 @@ def test_application_statistics_are_summed_per_application_and_per_client(server
     (day,) = out["usage"]
     assert day["applications"] == [{"name": "YouTube", "tx_bytes": 110, "rx_bytes": 5500}, {"name": "Printing", "tx_bytes": 7, "rx_bytes": 1}]     # zero rows left out, biggest first
     assert {c["mac"]: (c["tx_bytes"], c["rx_bytes"]) for c in day["clients"]} == {"11:22:33:44:55:01": (100, 5000), "11:22:33:44:55:02": (17, 501)}
+    by_mac = {c["mac"]: c["applications"] for c in day["clients"]}      # and the same figures per device
+    assert by_mac["11:22:33:44:55:01"] == [{"name": "YouTube", "tx_bytes": 100, "rx_bytes": 5000}]
+    assert by_mac["11:22:33:44:55:02"] == [{"name": "YouTube", "tx_bytes": 10, "rx_bytes": 500}, {"name": "Printing", "tx_bytes": 7, "rx_bytes": 1}]
     assert len(day["day"]) == 10
     # logged in with the Open API's own login, asked once per client in the site, with a window from midnight to now
     assert len(state["token_calls"]) == 1
@@ -376,3 +379,11 @@ def test_diagnose_shows_the_application_reply_without_names(server):
         assert private not in text, private
     assert report["result"]["applications"] == 2 and report["result"]["clients_with_applications"] == 2
     assert "not asked for" in plugin.diagnose(cfg(url))["steps"]["application_traffic"]["shape"]
+
+
+def test_netlens_switch_for_application_statistics_has_the_last_word(server):
+    url, state = server
+    out = plugin.fetch(with_api(url, collect_usage=False))
+    assert out["usage"] == [] and state["token_calls"] == [] and state["app_calls"] == []
+    assert "switched off in Netlens" in plugin.test(with_api(url, collect_usage=False))["message"]
+    assert plugin.fetch(with_api(url, collect_usage=True))["usage"] != []

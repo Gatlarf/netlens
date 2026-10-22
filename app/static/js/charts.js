@@ -39,7 +39,9 @@ export function fmtBytes(n) {
   if (n === null || n === undefined) return "–";
   if (n < 1024) return `${n} B`;
   if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1048576).toFixed(1)} MB`;
+  if (n < 1073741824) return `${(n / 1048576).toFixed(1)} MB`;
+  if (n < 1099511627776) return `${(n / 1073741824).toFixed(1)} GB`;
+  return `${(n / 1099511627776).toFixed(2)} TB`;
 }
 
 // Horizontal bars: items = [{label, count, href?}]

@@ -241,10 +241,14 @@ def _record_port_series(conn, device_id, node_name, ports, before, now):
             grown = _counter_delta(port.get(key), old[key])
             if grown is not None:
                 points.append(("device", device_id, metric, grown / seconds, label, "pps"))
+        rates = []
         for key, metric in (("tx_bytes", "net_tx_bps"), ("rx_bytes", "net_rx_bps")):
             grown = _counter_delta(port.get(key), old[key])
             if grown is not None:
+                rates.append(grown * 8 / seconds)
                 points.append(("device", device_id, metric, grown * 8 / seconds, label, "bps"))
+        if rates and port.get("speed_mbps"):                    # how full the link is: the busier direction against the negotiated speed
+            points.append(("device", device_id, "if_util_pct", min(100.0, max(rates) / (port["speed_mbps"] * 1_000_000) * 100), label, "%"))
         errors = [_counter_delta(port.get(k), old[k]) for k in ("tx_errors", "rx_errors")]
         if None not in errors and (sum(errors) > 0 or store.latest("device", device_id, "if_err_ps", label) is not None):    # a port that never had an error gets no graph
             points.append(("device", device_id, "if_err_ps", sum(errors) / seconds, label, "/s"))
@@ -325,9 +329,18 @@ def record_usage(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str 
                     "ON CONFLICT(day, source, device_id) DO UPDATE SET rx_bytes = excluded.rx_bytes, tx_bytes = excluded.tx_bytes, updated = excluded.updated",
                     (entry["day"], plugin_id, device_id, client["rx_bytes"], client["tx_bytes"], now),
                 )
+                if client.get("applications"):          # an empty list means "not read this time": what was stored stays
+                    # the day's figures replace what was stored for this device and day (an application that no longer appears is dropped)
+                    conn.execute("DELETE FROM client_app_usage WHERE day = ? AND source = ? AND device_id = ?", (entry["day"], plugin_id, device_id))
+                    for app in client["applications"]:
+                        conn.execute(
+                            "INSERT INTO client_app_usage (day, source, device_id, name, rx_bytes, tx_bytes, updated) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (entry["day"], plugin_id, device_id, app["name"], app["rx_bytes"], app["tx_bytes"], now),
+                        )
     cutoff = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ") - timedelta(days=USAGE_RETENTION_DAYS)).strftime("%Y-%m-%d")
     conn.execute("DELETE FROM app_usage WHERE day < ?", (cutoff,))
     conn.execute("DELETE FROM client_usage WHERE day < ?", (cutoff,))
+    conn.execute("DELETE FROM client_app_usage WHERE day < ?", (cutoff,))
     conn.commit()
     return written
 

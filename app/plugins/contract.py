@@ -1027,6 +1027,21 @@ def _topology(data: Any) -> dict:
 
 
 MAX_USAGE_DAYS = 8
+MAX_CLIENT_APPS = 40
+
+
+def _client_apps(value: Any, path: str) -> list[dict]:
+    """The applications one device used that day (optional; the biggest MAX_CLIENT_APPS are kept)."""
+    out, seen = [], set()
+    for i, a in enumerate(_list(value, path)):
+        a = _dict(a, f"{path}[{i}]")
+        name = _text(a.get("name"), f"{path}[{i}].name", required=True, max_len=80)
+        if name in seen:
+            continue
+        seen.add(name)
+        out.append({"name": name, **{k: _optional_number(a.get(k), f"{path}[{i}].{k}", 0, 2**63 - 1, integer=True) or 0 for k in ("rx_bytes", "tx_bytes")}})
+    out.sort(key=lambda a: -(a["rx_bytes"] + a["tx_bytes"]))
+    return out[:MAX_CLIENT_APPS]
 
 
 def _usage(value: Any, path: str) -> list[dict]:
@@ -1053,6 +1068,8 @@ def _usage(value: Any, path: str) -> list[dict]:
             if mac in seen:
                 continue
             seen.add(mac)
-            clients.append({"mac": mac, **{k: _optional_number(c.get(k), f"{p}.clients[{j}].{k}", 0, 2**63 - 1, integer=True) or 0 for k in ("rx_bytes", "tx_bytes")}})
+            entry = {"mac": mac, **{k: _optional_number(c.get(k), f"{p}.clients[{j}].{k}", 0, 2**63 - 1, integer=True) or 0 for k in ("rx_bytes", "tx_bytes")}}
+            entry["applications"] = _client_apps(c.get("applications"), f"{p}.clients[{j}].applications")
+            clients.append(entry)
         out.append({"day": day, "applications": apps, "clients": clients})
     return out

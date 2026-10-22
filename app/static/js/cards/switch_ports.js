@@ -23,7 +23,7 @@ export async function buildSwitchPortsCard(deviceId) {
   const card = h("div", { class: "card switch-ports-card" });
   const up = data.ports.filter((p) => p.up).length;
   card.appendChild(h("h2", {}, "Switch ports"));
-  card.appendChild(h("p", { class: "hint" }, `${up} of ${data.ports.length} ports have a link. Errors and link changes cover the last ${data.hours} hours. Packets per second and their graphs are under Ports.`));
+  card.appendChild(h("p", { class: "hint" }, `${up} of ${data.ports.length} ports have a link. Errors and link changes cover the last ${data.hours} hours. The traffic of each port, with a graph per port, is in the Ports card above.`));
   const table = h("table", { class: "table" });
   table.appendChild(h("thead", {}, h("tr", {}, ...["Port", "Link", "Connected", "Errors (24 h)", "Link changes"].map((t) => h("th", {}, t)))));
   const body = h("tbody", {});
