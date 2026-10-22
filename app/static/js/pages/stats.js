@@ -206,7 +206,8 @@ function build(s) {
   const ap = s.applications;
   if (ap && ap.available) {
     const both = (r) => r.rx + r.tx;
-    const bytesItem = (r, extra = {}) => ({ label: r.name, count: both(r), text: `${fmtBytes(both(r))} (↓ ${fmtBytes(r.rx)}, ↑ ${fmtBytes(r.tx)})`, ...extra });
+    const fmtBytes = (n) => (n >= 1e12 ? `${(n / 1e12).toFixed(2)} TB` : n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : n >= 1e3 ? `${Math.round(n / 1e3)} kB` : `${n} B`);
+    const bytesItem = (r, extra = {}) => ({ label: r.name, count: both(r), text: fmtBytes(both(r)), ...extra });
     root.appendChild(section("applications", "Applications",
       h("div", { class: "tiles inline" }, tile(fmtBytes(ap.rx), "downloaded"), tile(fmtBytes(ap.tx), "uploaded"), tile(fmtNumber(ap.applications_total), "applications seen"), tile(fmtNumber(ap.days), ap.days === 1 ? "day counted" : "days counted")),
       card("Top applications", barList(ap.applications.map((r) => bytesItem(r)))),

@@ -5,7 +5,7 @@ import { h, toast, timeAgo } from "../util.js";
 const SEVERITIES = [["critical", "Critical only"], ["high", "High and critical"], ["medium", "Medium and above"], ["low", "Everything, also low"]];
 
 export function buildCveCheckCard(onChange = () => {}) {
-  const card = h("div", { class: "card cve-check" });
+  const card = h("div", { class: "card cve-check", style: "margin-bottom:16px" });
   let state = null;
   let timer = null;
 
