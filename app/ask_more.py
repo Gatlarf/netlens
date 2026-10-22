@@ -620,7 +620,67 @@ def route(conn, q: str, names: list[str]) -> tuple[str, dict] | None:
     return None
 
 
-RENDERERS = {"search_devices": r_search_devices, "counts": r_counts, "ports": r_ports, "guests": r_guests, "backups": r_backups, "certificates": r_certificates, "speedtest": r_speedtest,
+DOMAIN = re.compile(r"[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+")
+
+
+def site_needles(text: Any) -> list[str]:
+    """The names to look for in a question about a website: the domains in it ("biekes. be" counts as biekes.be), else the text itself."""
+    text = re.sub(r"\.\s+(?=[a-z]{2,}\b)", ".", str(text or "").strip().lower())
+    found = [d for d in DOMAIN.findall(text) if not d.endswith((".local", ".lan"))] or []
+    return found or ([text] if text else [])
+
+
+def t_site(conn, args, now=None) -> dict:
+    """What is known about a website or a service by its name or domain: its checks, and the reverse-proxy entries (is the site switched off there?)."""
+    from app import sites as sites_mod
+
+    needles = site_needles(args.get("name") or args.get("domain"))
+    if not needles:
+        return {"error": "give a domain or the name of a service"}
+    services, seen = [], set()
+    for r in conn.execute("SELECT id, name, kind, host, port, enabled, last_up, last_ms, last_detail, source FROM service_checks ORDER BY LOWER(name)"):
+        hay = f"{r['name']} {r['host']}".lower()
+        if r["id"] not in seen and any(n in hay for n in needles):
+            seen.add(r["id"])
+            services.append({"name": r["name"], "kind": r["kind"], "host": r["host"], "monitoring": "on" if r["enabled"] else "paused",
+                             "state": "unknown" if r["last_up"] is None else "up" if r["last_up"] else "down", "detail": (r["last_detail"] or "")[:160], "made_by_proxy_plugin": bool(r["source"])})
+    proxy_rows = []
+    for s in sites_mod.list_sites(conn):
+        if any(n in d.lower() for d in s["domains"] for n in needles):
+            proxy_rows.append(s)
+    proxy = []
+    for s in proxy_rows[:LIMIT]:
+        item = {"domains": s["domains"], "proxy": s["proxy"], "enabled_on_the_proxy": s["enabled"], "type": s["type"], "forwards_to": f"{s['scheme']}://{s['forward_host']}:{s['forward_port']}" if s["forward_host"] else None,
+                "target_device": s["target_device"] or s["target_name"] or None, "check": s["check_state"], "certificate_days_left": s["cert_days"]}
+        if s["target_device_id"]:
+            row = conn.execute("SELECT online, last_seen FROM devices WHERE id = ?", (s["target_device_id"],)).fetchone()
+            if row:
+                item["target_online"] = bool(row["online"])
+        proxy.append(item)
+    why = []
+    for p in proxy:
+        if not p["enabled_on_the_proxy"]:
+            why.append(f"The site {', '.join(p['domains'])} is DISABLED on the reverse proxy {p['proxy']}: it was switched off there on purpose or by hand, so it does not answer. Enable it on the proxy to bring it back.")
+        elif p.get("target_online") is False:
+            why.append(f"The reverse proxy {p['proxy']} forwards {', '.join(p['domains'])} to {p['target_device']}, which is offline.")
+    if not services and not proxy:
+        return {"error": f"no service check or proxy site matches {', '.join(needles)}"}
+    return {"searched": needles, "services": services[:LIMIT], "proxy_sites": proxy, "reasons_found": why}
+
+
+def r_site(r: dict) -> str:
+    if r.get("error"):
+        return r["error"]
+    parts = list(r["reasons_found"])
+    for s in r["services"]:
+        parts.append(f"The check {s['name']} is {s['state']}" + (f" ({s['detail']})" if s["state"] == "down" and s["detail"] else "") + ("; monitoring is paused." if s["monitoring"] == "paused" else "."))
+    for p in r["proxy_sites"]:
+        if p["enabled_on_the_proxy"] and not any(p["proxy"] in w for w in r["reasons_found"]):
+            parts.append(f"On the reverse proxy {p['proxy']}, {', '.join(p['domains'])} is enabled" + (f" and forwards to {p['forwards_to']}" if p["forwards_to"] else "") + ".")
+    return " ".join(parts) or "Nothing is known about it."
+
+
+RENDERERS = {"site": r_site, "search_devices": r_search_devices, "counts": r_counts, "ports": r_ports, "guests": r_guests, "backups": r_backups, "certificates": r_certificates, "speedtest": r_speedtest,
              "network_services": r_network_services, "remote_sites": r_remote_sites, "smart_home": r_smart_home, "security": r_security, "audit": r_audit, "connections": r_connections,
              "wifi": r_wifi, "maintenance": r_maintenance, "system": r_system, "updates": r_updates, "changes": r_changes, "ipv6": r_ipv6}
 
@@ -643,6 +703,7 @@ TOOLS = {
     "system": (t_system, "Netlens itself: version, whether a newer version exists (only trust it when update.answer_is_current is true), last scans, installed plugins, number of monitors. args: none"),
     "updates": (t_updates, "software updates that are waiting: containers and guests, smart-home devices, Netlens. args: none"),
     "changes": (t_changes, "what changed on the network and in the settings in a period, by category. args: days (1, 7 or 30)"),
+    "site": (t_site, "a website or service by its domain or name: its checks and whether the site is enabled or DISABLED on the reverse proxy (nginx proxy manager), and where it forwards to. Use it for 'why is <domain> down/offline'. args: name (a domain such as example.com, or a service name)"),
     "ipv6": (t_ipv6, "devices that have IPv6 addresses. args: none"),
 }
 

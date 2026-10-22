@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.151 — 2026-10-22
+
+### Fixed
+- ★ **Insights: "Why is example.com offline?"** now finds the website (also when it is typed as "example. com" or without the word *service*) and looks at the reverse proxy: when the site is **disabled in the proxy** (nginx proxy manager), that is the answer, instead of the TLS or 502 error the check sees as a result. It also says when the proxy forwards to a device that is offline. New question tool `site`, also available to the model.
+
 ## 0.4.150 — 2026-10-22
 
 ### Changed

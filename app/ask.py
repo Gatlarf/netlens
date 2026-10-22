@@ -200,6 +200,9 @@ def t_device(conn, args, now=None) -> dict:
                                                "outages_7d": rep[r["id"]]["outages"] if r["id"] in rep else None} for r in rows]}
     rows = [r for r in conn.execute("SELECT * FROM devices") if needle in (_name(r) or "").lower() or needle == (r["primary_ip"] or "")]
     if not rows:
+        found = ask_more.TOOLS["site"][0](conn, {"name": needle}, now)       # not a device: perhaps a website or a service ("why is example.com down")
+        if not found.get("error"):
+            return found
         return {"error": f"no device matches {needle!r}"}
     r = rows[0]
     end = now or datetime.now(timezone.utc)
@@ -260,6 +263,10 @@ def route(question: str, known_names: list[str], conn=None) -> tuple[str, dict]:
         if more:
             return more
     days = 1 if re.search(r"today|24 ?h|yesterday|last night|day\b", q) else 30 if "month" in q else 7
+    if conn is not None and re.search(r"\b(why|how come|reason)\b", q):         # "why is example.com offline": a website, which may be switched off on the proxy
+        for needle in ask_more.site_needles(q):
+            if "." in needle and not ask_more.TOOLS["site"][0](conn, {"name": needle}).get("error"):
+                return "site", {"name": needle}
     for name in sorted(known_names, key=len, reverse=True):
         if len(name) > 2 and re.search(r"(?<![\w.-])" + re.escape(name.lower()) + r"(?![\w-])", q):
             return "device", {"name": name}
@@ -342,6 +349,8 @@ def render(tool: str, r: dict) -> str:
         if not r["total"]:
             return "There are no service checks."
         return f"{r['total']} service checks. " + ("Down: " + ", ".join(r["down"]) + "." if r["down"] else "All of them are up.")
+    if tool == "device" and "proxy_sites" in r:                # a website, found through the device tool
+        return RENDERERS["site"](r)
     if tool == "device" and "devices" in r:
         return "\n".join(f"{d['name']}: {'online' if d['online'] else 'offline (last seen ' + d['last_seen'] + ')'}" + (f", up {d['availability_7d_pct']}% over 7 days with {d['outages_7d']} outage(s)" if d["availability_7d_pct"] is not None else "") for d in r["devices"])
     if tool == "device":
@@ -378,6 +387,7 @@ def system_prompt() -> str:
             "- Always look at the data with a tool first. Never answer about the network from memory.\n"
             "- Use at most four tool calls. Pick the tool that fits the question. If the first result does not help, you may try one other tool that fits.\n"
             "- For a list or a count of devices with some property (a kind, a manufacturer, an operating system, online or offline, an open port) use search_devices or ports. For one named device use device. For a kind of device (printer, switch, nas, camera ...) use search_devices with type, or device with that word.\n"
+            "- For a website or domain (example.com) use site, also for 'why is it down': it shows whether the site is disabled on the reverse proxy, which is often the real reason; say so plainly when it is.\n"
             "- Current readings (memory, processor, disk, temperature, battery) are in health. Forecasts (a disk that will fill up) are in disks.\n"
             "- Copy names and numbers exactly as they appear in the results. If a result is a list, mention every item that matters; say \"only\" only when the list has one item. Round long numbers to one decimal.\n"
             "- The user cares about problems that matter: always-on devices (servers, routers, switches, NAS, cameras ...), services and network faults. The tools already leave out phones, tablets and other devices that come and go; never bring them up yourself.\n"
