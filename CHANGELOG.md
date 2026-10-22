@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.167 — 2026-10-22
+
+### Added
+- **Open a remote device in the site's own interface.** On a remote site's page every device has an *Open* button (when the site allows viewing and is connected) that opens that device's page, with all its tabs, in the site view.
+- **The Network tab of a device arranges its cards itself**: they flow over two columns, so the Applications card sits at the top left and short cards no longer leave holes.
+
 ## 0.4.165 — 2026-10-22
 
 ### Added

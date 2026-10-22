@@ -484,7 +484,21 @@ export async function render(container) {
           const next = muted ? p.muted.filter((k) => k !== d.key) : [...(p.muted || []), d.key];
           try { await patch(`/api/probes/${id}`, { muted: next }); toast(muted ? "Alerts back on" : "Muted: no offline alerts for this device", "success"); showDetail(id); } catch (err) { toast(err.message || "Could not change", "error"); }
         });
-        row.appendChild(h("td", {}, btn, " ", admin ? mute : null));
+        const canOpen = admin && p.view && p.view.allowed && p.view.connected;
+        const open = h("button", { class: "btn", type: "button", disabled: !canOpen,
+          title: canOpen ? "Open this device in the site's own interface (same pages as a local device)" : "Needs the site to allow viewing and be connected (see Open this site)" }, "Open");
+        open.addEventListener("click", async () => {
+          open.disabled = true;
+          try {
+            // the site numbers its devices itself: find this one in the site's own list by MAC address or address
+            const list = await get(`/api/site-view/${p.id}/api/devices`);
+            const mac = (d.mac || "").toLowerCase();
+            const found = list.find((x) => (mac && (x.mac || "").toLowerCase() === mac) || (!mac && d.ip && x.primary_ip === d.ip));
+            if (!found) throw new Error("The site does not list this device (any more).");
+            enterSite({ id: p.id, name: p.name }, `#/device/${found.id}`);
+          } catch (err) { toast(err.message || "Could not open the device", "error"); open.disabled = false; }
+        });
+        row.appendChild(h("td", {}, btn, " ", canOpen ? open : null, canOpen ? " " : null, admin ? mute : null));
         tb.append(row, graphRow);
       }
       table.appendChild(tb);

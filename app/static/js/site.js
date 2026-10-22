@@ -10,9 +10,9 @@ export function currentSite() {
   }
 }
 
-export function enterSite(site) {
+export function enterSite(site, page = "#/dashboard") {
   try { sessionStorage.setItem(KEY, JSON.stringify({ id: site.id, name: site.name })); } catch (e) { /* the tab cannot remember it */ }
-  location.hash = "#/dashboard";
+  location.hash = page;
   location.reload();
 }
 

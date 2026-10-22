@@ -833,3 +833,9 @@ body[data-scoped] #scan-menu-wrap, body[data-scoped] #search-btn, body[data-scop
 body.site-view .admin-only, body.site-view .act-only, body.site-view [data-route="settings"], body.site-view [data-route="remote_sites"], body.site-view [data-route="remote"], body.site-view #scan-menu-wrap { display: none !important; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .site-banner { background: #1e3a5f; color: #dbeafe; border-bottom-color: #3b82f6; } }
 :root[data-theme="dark"] .site-banner { background: #1e3a5f; color: #dbeafe; border-bottom-color: #3b82f6; }
+
+/* the Network tab of a device: cards flow over two columns, each card whole */
+.dev-flow { column-count: 2; column-gap: 16px; }
+.dev-flow > * { break-inside: avoid; margin-bottom: 16px; }
+.dev-flow > .card, .dev-flow > div > .card { margin-top: 0; }
+@media (max-width: 900px) { .dev-flow { column-count: 1; } }
