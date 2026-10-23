@@ -1,0 +1,16 @@
+{
+  "id": "ceph",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "0b27b376bd7243e660b9237dafced283800322262060d714b40857dbcde59790",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "verified",
+      "tested_on": [
+        "Ceph 19.2.7 (cephadm, 3 OSDs, replicated/RBD/CephFS pools): login with right and wrong password and a read-only dashboard user, health checks, hosts, monitors, OSDs, pools, CephFS, RBD, diagnostic"
+      ],
+      "notes": "Written and lab-tested on 2026-10-23 with the assistant Claude. Read-only. CephFS clients that really mounted a file system, erasure-coded pools and multi-host clusters were covered by unit tests only."
+    }
+  ]
+}

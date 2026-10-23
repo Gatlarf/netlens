@@ -1,0 +1,16 @@
+{
+  "id": "redfish",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "eb324005f7045b61ea60c1068ad38256d0038b4eb3f385699bcce41851430b2c",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "verified",
+      "tested_on": [
+        "DMTF Redfish Mockup Server (official DMTF emulator) with the public-rackmount1 mockup, Redfish 1.22: service root, system, manager, chassis, network interfaces, SimpleStorage drives, power and thermal; the Storage/Volumes collections by a unit test only"
+      ],
+      "notes": "Written and tested on 2026-10-23 with the assistant Claude. Marked verified by the maintainer because it ran against the official DMTF emulator; vendor-specific BMC behaviour (Dell, HPE, Lenovo ...) was not run on real hardware. Read-only (GET only, HTTP Basic)."
+    }
+  ]
+}

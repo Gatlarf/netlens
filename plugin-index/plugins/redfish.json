@@ -1,0 +1,24 @@
+{
+  "id": "redfish",
+  "name": "Redfish (server BMC)",
+  "kind": "storage",
+  "category": "hardware",
+  "description": "Shows servers and storage systems through their management controller (BMC) using the DMTF Redfish standard: Dell iDRAC, HPE iLO, Lenovo XClarity, Supermicro, Cisco CIMC and others. Health of the server, power supplies, fans and temperatures, drives and RAID volumes, and the BMC and network cards matched to the devices on your network by address and MAC. Read-only.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/redfish",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Any DMTF Redfish 1.x BMC (Dell iDRAC, HPE iLO, Lenovo XClarity, Supermicro, Cisco CIMC ...); run against the official DMTF Redfish Mockup Server (public-rackmount1), not yet on a vendor BMC"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-redfish-v1.0.0/redfish.zip",
+      "sha256": "eb324005f7045b61ea60c1068ad38256d0038b4eb3f385699bcce41851430b2c",
+      "api_version": 1,
+      "min_netlens": "0.4.178",
+      "released": "2026-10-23",
+      "changelog": "First release. Needs Netlens 0.4.178 or newer (kind storage)."
+    }
+  ]
+}

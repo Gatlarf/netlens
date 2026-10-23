@@ -1,0 +1,24 @@
+{
+  "id": "ceph",
+  "name": "Ceph",
+  "kind": "storage",
+  "category": "storage",
+  "description": "Shows a Ceph cluster (cephadm, Rook, Proxmox VE, MicroCeph with the dashboard enabled): health and its checks, hosts and monitors, pools with their fill level, OSDs (a down or out OSD raises an event), CephFS file systems with the hosts that mounted them, and RBD images. Read-only, through the Ceph dashboard's REST API.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/ceph",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Ceph 19.2 (squid) through the dashboard REST API, tested on a real cephadm cluster; Rook, Proxmox VE and MicroCeph use the same dashboard API"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ceph-v1.0.0/ceph.zip",
+      "sha256": "0b27b376bd7243e660b9237dafced283800322262060d714b40857dbcde59790",
+      "api_version": 1,
+      "min_netlens": "0.4.178",
+      "released": "2026-10-23",
+      "changelog": "First release. Needs Netlens 0.4.178 or newer (kind storage)."
+    }
+  ]
+}

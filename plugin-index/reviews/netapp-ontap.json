@@ -1,0 +1,16 @@
+{
+  "id": "netapp-ontap",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "e560ae178c1ed50bfec572c19266f300028bf0b2d5339170ef2a8a0ee0c2384b",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "reviewed",
+      "tested_on": [
+        "Fake ONTAP REST cluster built from the documented shapes"
+      ],
+      "notes": "Written 2026-10-23 with the assistant Claude from NetApp's REST API reference. Read-only. Not tested on a real cluster or the ONTAP simulator."
+    }
+  ]
+}

@@ -285,6 +285,39 @@
    ]
   },
   {
+   "id": "ceph",
+   "name": "Ceph",
+   "kind": "storage",
+   "category": "storage",
+   "description": "Shows a Ceph cluster (cephadm, Rook, Proxmox VE, MicroCeph with the dashboard enabled): health and its checks, hosts and monitors, pools with their fill level, OSDs (a down or out OSD raises an event), CephFS file systems with the hosts that mounted them, and RBD images. Read-only, through the Ceph dashboard's REST API.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/ceph",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Ceph 19.2 (squid) through the dashboard REST API, tested on a real cephadm cluster; Rook, Proxmox VE and MicroCeph use the same dashboard API"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ceph-v1.0.0/ceph.zip",
+     "sha256": "0b27b376bd7243e660b9237dafced283800322262060d714b40857dbcde59790",
+     "api_version": 1,
+     "min_netlens": "0.4.178",
+     "released": "2026-10-23",
+     "changelog": "First release. Needs Netlens 0.4.178 or newer (kind storage).",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "tested_on": [
+       "Ceph 19.2.7 (cephadm, 3 OSDs, replicated/RBD/CephFS pools): login with right and wrong password and a read-only dashboard user, health checks, hosts, monitors, OSDs, pools, CephFS, RBD, diagnostic"
+      ],
+      "notes": "Written and lab-tested on 2026-10-23 with the assistant Claude. Read-only. CephFS clients that really mounted a file system, erasure-coded pools and multi-host clusters were covered by unit tests only."
+     }
+    }
+   ]
+  },
+  {
    "id": "checkpoint",
    "name": "Check Point Management",
    "kind": "topology",
@@ -1136,6 +1169,39 @@
    ]
   },
   {
+   "id": "netapp-ontap",
+   "name": "NetApp ONTAP",
+   "kind": "storage",
+   "category": "storage",
+   "description": "Shows a NetApp ONTAP cluster (AFF, FAS, ASA, ONTAP Select, Cloud Volumes ONTAP) with its nodes, aggregates and their fill level, volumes and LUNs, disks, the hosts that mount a volume over NFS, and the open health events. Read-only, through the ONTAP REST API (ONTAP 9.8 or newer).",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/netapp-ontap",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "ONTAP 9.8 and newer (written from the published REST API reference; simulator only, not tested on a real cluster)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netapp-ontap-v1.0.0/netapp-ontap.zip",
+     "sha256": "e560ae178c1ed50bfec572c19266f300028bf0b2d5339170ef2a8a0ee0c2384b",
+     "api_version": 1,
+     "min_netlens": "0.4.178",
+     "released": "2026-10-23",
+     "changelog": "First release. Needs Netlens 0.4.178 or newer (kind storage).",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "tested_on": [
+       "Fake ONTAP REST cluster built from the documented shapes"
+      ],
+      "notes": "Written 2026-10-23 with the assistant Claude from NetApp's REST API reference. Read-only. Not tested on a real cluster or the ONTAP simulator."
+     }
+    }
+   ]
+  },
+  {
    "id": "netbox",
    "name": "NetBox",
    "kind": "topology",
@@ -1913,6 +1979,39 @@
      "changelog": "First release. Needs Netlens 0.3.157 or newer.",
      "review": {
       "level": "community"
+     }
+    }
+   ]
+  },
+  {
+   "id": "redfish",
+   "name": "Redfish (server BMC)",
+   "kind": "storage",
+   "category": "hardware",
+   "description": "Shows servers and storage systems through their management controller (BMC) using the DMTF Redfish standard: Dell iDRAC, HPE iLO, Lenovo XClarity, Supermicro, Cisco CIMC and others. Health of the server, power supplies, fans and temperatures, drives and RAID volumes, and the BMC and network cards matched to the devices on your network by address and MAC. Read-only.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/redfish",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Any DMTF Redfish 1.x BMC (Dell iDRAC, HPE iLO, Lenovo XClarity, Supermicro, Cisco CIMC ...); run against the official DMTF Redfish Mockup Server (public-rackmount1), not yet on a vendor BMC"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-redfish-v1.0.0/redfish.zip",
+     "sha256": "eb324005f7045b61ea60c1068ad38256d0038b4eb3f385699bcce41851430b2c",
+     "api_version": 1,
+     "min_netlens": "0.4.178",
+     "released": "2026-10-23",
+     "changelog": "First release. Needs Netlens 0.4.178 or newer (kind storage).",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "tested_on": [
+       "DMTF Redfish Mockup Server (official DMTF emulator) with the public-rackmount1 mockup, Redfish 1.22: service root, system, manager, chassis, network interfaces, SimpleStorage drives, power and thermal; the Storage/Volumes collections by a unit test only"
+      ],
+      "notes": "Written and tested on 2026-10-23 with the assistant Claude. Marked verified by the maintainer because it ran against the official DMTF emulator; vendor-specific BMC behaviour (Dell, HPE, Lenovo ...) was not run on real hardware. Read-only (GET only, HTTP Basic)."
      }
     }
    ]
