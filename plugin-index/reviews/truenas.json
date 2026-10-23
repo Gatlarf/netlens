@@ -2,6 +2,17 @@
   "id": "truenas",
   "reviews": [
     {
+      "version": "1.4.0",
+      "sha256": "2c0f1a23360e5578a1f0fcd8610e9c3eba32737e9edf26f56bf12072f115e368",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "reviewed",
+      "tested_on": [
+        "Netlens 0.4.180 with the storage part: simulator only (pool.query, disk.query, alert.list, sharing.nfs/smb.query follow the middleware API); the earlier parts are unchanged."
+      ],
+      "notes": "Storage part added 2026-10-23 with the assistant Claude; not run on a real TrueNAS. Read-only."
+    },
+    {
       "version": "1.3.1",
       "sha256": "a1081cc91dc84588837c1bf61be79905e1233705f9a9a830b0abb44b3dc584f3",
       "level": "reviewed",

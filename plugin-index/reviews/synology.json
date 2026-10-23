@@ -2,6 +2,17 @@
   "id": "synology",
   "reviews": [
     {
+      "version": "1.1.0",
+      "sha256": "5c3434b0358f458d735332bd111c8a6e291022ce9ceb981d9f2e15391544413d",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "verified",
+      "tested_on": [
+        "Virtual DSM 7.2.2-72806: login, volumes (SYNO.Storage.CGI.Storage load_info) and shared folders (SYNO.Core.Share) read live; storage pools and physical disks by simulator only (a virtual DSM has none)"
+      ],
+      "notes": "Storage part added and lab-tested on 2026-10-23 with the assistant Claude; the earlier parts are unchanged. Read-only."
+    },
+    {
       "version": "1.0.2",
       "sha256": "2ca0853e29e34e28437fcc9ff7f151501fb67aeb94c8f97f336cefc8a45b6856",
       "level": "verified",

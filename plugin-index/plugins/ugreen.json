@@ -3,7 +3,7 @@
   "name": "UGREEN",
   "kind": "hypervisor",
   "category": "storage",
-  "description": "Shows a UGREEN NAS (UGOS or UGOS Pro) as a host with its Docker containers as guests: state, image and published ports. UGREEN has no public API: this uses the web API of the UGOS web page itself (port 9443), as documented by the community, so a firmware update can change it. Read-only; the password is encrypted with the NAS' own public key before it is sent.",
+  "description": "Shows a UGREEN NAS (UGOS or UGOS Pro) as a host with its Docker containers as guests: state, image and published ports. UGREEN has no public API: this uses the web API of the UGOS web page itself (port 9443), as documented by the community, so a firmware update can change it. Read-only; the password is encrypted with the NAS' own public key before it is sent. Also fills the Storage page (Netlens 0.4.180).",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/ugreen",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -11,6 +11,15 @@
     "UGOS / UGOS Pro (community-documented web API, confirmed there on a DH4300 Plus; simulator only here, not tested on a real UGREEN)"
   ],
   "releases": [
+    {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ugreen-v1.1.0/ugreen.zip",
+      "sha256": "eac23fe4a34722974aa7fa892ef49243a46175bc4be76d3b56cbc8bc732b2816",
+      "api_version": 1,
+      "min_netlens": "0.4.180",
+      "released": "2026-10-23",
+      "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer."
+    },
     {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ugreen-v1.0.0/ugreen.zip",

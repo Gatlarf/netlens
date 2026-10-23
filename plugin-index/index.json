@@ -1512,7 +1512,7 @@
    "name": "OpenMediaVault",
    "kind": "hypervisor",
    "category": "storage",
-   "description": "Shows an OpenMediaVault NAS (version 6, 7 or 8) as a host with its Docker containers (from the openmediavault-compose plugin) and its virtual machines (from the openmediavault-kvm plugin) as guests: state, health, image and the ports containers publish, matched to the devices on your network. Reads through OpenMediaVault's own web interface API, read-only.",
+   "description": "Shows an OpenMediaVault NAS (version 6, 7 or 8) as a host with its Docker containers (from the openmediavault-compose plugin) and its virtual machines (from the openmediavault-kvm plugin) as guests: state, health, image and the ports containers publish, matched to the devices on your network. Also fills the Storage page (Netlens 0.4.180). Read-only, through OMV's web API.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/openmediavault",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -1522,6 +1522,24 @@
     "openmediavault-kvm virtual machines (simulator only)"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openmediavault-v1.1.0/openmediavault.zip",
+     "sha256": "7a86e964ee4e9fcfedb732c3792489b96b4f422a6bd740c7593694f3256c4476",
+     "api_version": 1,
+     "min_netlens": "0.4.180",
+     "released": "2026-10-23",
+     "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "tested_on": [
+       "OpenMediaVault 8.5.12 (Debian 13): the storage RPC calls answer (file systems, disks, S.M.A.R.T., shares), but the lab has no disks, so the field mapping is simulator-tested"
+      ],
+      "notes": "Storage part added 2026-10-23 with the assistant Claude; the container part is unchanged and verified earlier, the VM part and the storage mapping are simulator-tested. Read-only."
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openmediavault-v1.0.0/openmediavault.zip",
@@ -1961,7 +1979,7 @@
    "name": "QNAP",
    "kind": "hypervisor",
    "category": "storage",
-   "description": "Shows a QNAP NAS (QTS 5 or QuTS hero with Container Station 3) as a host with its Container Station containers as guests: state, image, compose project, the ports they publish, and the address of a container that has its own IP on your network. Reads through Container Station's web API, read-only. Needs an account in the administrators group (Container Station offers no read-only role).",
+   "description": "Shows a QNAP NAS (QTS 5 or QuTS hero with Container Station 3) as a host with its Container Station containers as guests: state, image, compose project, the ports they publish, and the address of a container that has its own IP on your network. Reads through Container Station's web API, read-only. Needs an account in the administrators group (Container Station offers no read-only role). Also fills the Storage page (Netlens 0.4.180).",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/qnap",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -1969,6 +1987,18 @@
     "QTS 5 / QuTS hero with Container Station 3 (written from public documentation and an open-source client; simulator only, not tested on a real QNAP)"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-qnap-v1.1.0/qnap.zip",
+     "sha256": "cb101644a56e87952ff60bd04479f74107d8b4932de0893deff237ab980c718b",
+     "api_version": 1,
+     "min_netlens": "0.4.180",
+     "released": "2026-10-23",
+     "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-qnap-v1.0.0/qnap.zip",
@@ -2021,7 +2051,7 @@
    "name": "Rockstor",
    "kind": "hypervisor",
    "category": "storage",
-   "description": "Shows a Rockstor NAS (version 5 and newer) as a host with the Docker containers of its installed Rock-ons as guests: state, version and the ports each container publishes, matched to the devices on your network. Reads through Rockstor's REST API over HTTPS, read-only.",
+   "description": "Shows a Rockstor NAS (version 5 and newer) as a host with the Docker containers of its installed Rock-ons as guests: state, version and the ports each container publishes, matched to the devices on your network. Reads through Rockstor's REST API over HTTPS, read-only. Also fills the Storage page (Netlens 0.4.180).",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/rockstor",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -2029,6 +2059,18 @@
     "Rockstor 5 (written from the source code; simulator only, not tested on a real Rockstor)"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-rockstor-v1.1.0/rockstor.zip",
+     "sha256": "6a0b32a30dd8310cbc82d492fb80281bcf6571545997a04287df3618cb9cd08e",
+     "api_version": 1,
+     "min_netlens": "0.4.180",
+     "released": "2026-10-23",
+     "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-rockstor-v1.0.0/rockstor.zip",
@@ -2155,7 +2197,7 @@
    "name": "Synology",
    "kind": "hypervisor",
    "category": "storage",
-   "description": "Shows a Synology NAS (DiskStation Manager 7) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, matched to your network devices by IP or MAC. Read-only, over the DSM web API with HTTPS; needs a dedicated administrator account (DSM has no read-only API role). Tested on a virtual DSM 7.2.2 and confirmed on real Synology hardware; Virtual Machine Manager is only tested against a simulator.",
+   "description": "Shows a Synology NAS (DiskStation Manager 7, 6.2 works too) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, each matched to the device Netlens found by MAC address (then IP). Reads through the DSM web API over HTTPS, read-only. Needs a dedicated user in the administrators group (DSM offers no read-only API role); see the settings page. Also fills the Storage page (Netlens 0.4.180).",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/synology",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -2165,6 +2207,24 @@
     "Synology DSM 6.2 (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.1.0/synology.zip",
+     "sha256": "5c3434b0358f458d735332bd111c8a6e291022ce9ceb981d9f2e15391544413d",
+     "api_version": 1,
+     "min_netlens": "0.4.180",
+     "released": "2026-10-23",
+     "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "tested_on": [
+       "Virtual DSM 7.2.2-72806: login, volumes (SYNO.Storage.CGI.Storage load_info) and shared folders (SYNO.Core.Share) read live; storage pools and physical disks by simulator only (a virtual DSM has none)"
+      ],
+      "notes": "Storage part added and lab-tested on 2026-10-23 with the assistant Claude; the earlier parts are unchanged. Read-only."
+     }
+    },
     {
      "version": "1.0.2",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.0.2/synology.zip",
@@ -2407,7 +2467,7 @@
    "name": "TrueNAS",
    "kind": "hypervisor",
    "category": "storage",
-   "description": "Shows a TrueNAS (Community Edition 25.04 or newer) as a host with its containers, virtual machines and apps as guests, matched to your network devices by IP or MAC. Read-only, with an API key over TLS. Tested on TrueNAS 25.10.6 (VMs with simulated data).",
+   "description": "Reads a TrueNAS (Community Edition 25.04 or newer) and shows it as a host with what runs on it: containers and virtual machines (matched to the devices on your network by IP or MAC address) and apps. Also reports the Storage page (needs Netlens 0.4.180): pools with their fill level and health, their disks, NFS and SMB shares and open alerts. Read-only: one login with an API key, a few reads, then it disconnects.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/truenas",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -2416,6 +2476,24 @@
     "TrueNAS 25.04 (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.4.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.4.0/truenas.zip",
+     "sha256": "2c0f1a23360e5578a1f0fcd8610e9c3eba32737e9edf26f56bf12072f115e368",
+     "api_version": 1,
+     "min_netlens": "0.4.180",
+     "released": "2026-10-23",
+     "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "tested_on": [
+       "Netlens 0.4.180 with the storage part: simulator only (pool.query, disk.query, alert.list, sharing.nfs/smb.query follow the middleware API); the earlier parts are unchanged."
+      ],
+      "notes": "Storage part added 2026-10-23 with the assistant Claude; not run on a real TrueNAS. Read-only."
+     }
+    },
     {
      "version": "1.3.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.3.1/truenas.zip",
@@ -2507,7 +2585,7 @@
    "name": "UGREEN",
    "kind": "hypervisor",
    "category": "storage",
-   "description": "Shows a UGREEN NAS (UGOS or UGOS Pro) as a host with its Docker containers as guests: state, image and published ports. UGREEN has no public API: this uses the web API of the UGOS web page itself (port 9443), as documented by the community, so a firmware update can change it. Read-only; the password is encrypted with the NAS' own public key before it is sent.",
+   "description": "Shows a UGREEN NAS (UGOS or UGOS Pro) as a host with its Docker containers as guests: state, image and published ports. UGREEN has no public API: this uses the web API of the UGOS web page itself (port 9443), as documented by the community, so a firmware update can change it. Read-only; the password is encrypted with the NAS' own public key before it is sent. Also fills the Storage page (Netlens 0.4.180).",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/ugreen",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -2515,6 +2593,18 @@
     "UGOS / UGOS Pro (community-documented web API, confirmed there on a DH4300 Plus; simulator only here, not tested on a real UGREEN)"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ugreen-v1.1.0/ugreen.zip",
+     "sha256": "eac23fe4a34722974aa7fa892ef49243a46175bc4be76d3b56cbc8bc732b2816",
+     "api_version": 1,
+     "min_netlens": "0.4.180",
+     "released": "2026-10-23",
+     "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ugreen-v1.0.0/ugreen.zip",
@@ -2592,7 +2682,7 @@
    "name": "Unraid",
    "kind": "hypervisor",
    "category": "storage",
-   "description": "Shows an Unraid server as a host with its Docker containers (image, state, published ports, and the address of a container that has its own IP on your network) and its virtual machines as guests, each matched to the device Netlens found. Reads through the Unraid API (GraphQL, built into Unraid 7.2 and newer) with a read-only API key.",
+   "description": "Shows an Unraid server as a host with its Docker containers (image, state, published ports, and the address of a container that has its own IP on your network) and its virtual machines as guests, each matched to the device Netlens found. Reads through the Unraid API (GraphQL, built into Unraid 7.2 and newer) with a read-only API key. Also fills the Storage page (Netlens 0.4.180).",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unraid",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -2600,6 +2690,18 @@
     "Unraid 7.2 and newer (written from the published API schema; simulator only, not tested on a real Unraid)"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unraid-v1.1.0/unraid.zip",
+     "sha256": "6957a304a9a05b6b210b9ef9504e5097157f2c83eaf60ceac2f35f9831419ddc",
+     "api_version": 1,
+     "min_netlens": "0.4.180",
+     "released": "2026-10-23",
+     "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unraid-v1.0.0/unraid.zip",

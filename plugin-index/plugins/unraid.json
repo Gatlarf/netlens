@@ -3,7 +3,7 @@
   "name": "Unraid",
   "kind": "hypervisor",
   "category": "storage",
-  "description": "Shows an Unraid server as a host with its Docker containers (image, state, published ports, and the address of a container that has its own IP on your network) and its virtual machines as guests, each matched to the device Netlens found. Reads through the Unraid API (GraphQL, built into Unraid 7.2 and newer) with a read-only API key.",
+  "description": "Shows an Unraid server as a host with its Docker containers (image, state, published ports, and the address of a container that has its own IP on your network) and its virtual machines as guests, each matched to the device Netlens found. Reads through the Unraid API (GraphQL, built into Unraid 7.2 and newer) with a read-only API key. Also fills the Storage page (Netlens 0.4.180).",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unraid",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -11,6 +11,15 @@
     "Unraid 7.2 and newer (written from the published API schema; simulator only, not tested on a real Unraid)"
   ],
   "releases": [
+    {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unraid-v1.1.0/unraid.zip",
+      "sha256": "6957a304a9a05b6b210b9ef9504e5097157f2c83eaf60ceac2f35f9831419ddc",
+      "api_version": 1,
+      "min_netlens": "0.4.180",
+      "released": "2026-10-23",
+      "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer."
+    },
     {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unraid-v1.0.0/unraid.zip",

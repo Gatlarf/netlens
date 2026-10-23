@@ -2,6 +2,17 @@
   "id": "openmediavault",
   "reviews": [
     {
+      "version": "1.1.0",
+      "sha256": "7a86e964ee4e9fcfedb732c3792489b96b4f422a6bd740c7593694f3256c4476",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "verified",
+      "tested_on": [
+        "OpenMediaVault 8.5.12 (Debian 13): the storage RPC calls answer (file systems, disks, S.M.A.R.T., shares), but the lab has no disks, so the field mapping is simulator-tested"
+      ],
+      "notes": "Storage part added 2026-10-23 with the assistant Claude; the container part is unchanged and verified earlier, the VM part and the storage mapping are simulator-tested. Read-only."
+    },
+    {
       "version": "1.0.0",
       "sha256": "683739bc5732414391e03d3870a3c85e1932392f793a0dac851f97598fa2af19",
       "reviewer": "Gatlarf",

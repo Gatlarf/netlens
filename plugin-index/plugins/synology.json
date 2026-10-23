@@ -3,7 +3,7 @@
   "name": "Synology",
   "kind": "hypervisor",
   "category": "storage",
-  "description": "Shows a Synology NAS (DiskStation Manager 7) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, matched to your network devices by IP or MAC. Read-only, over the DSM web API with HTTPS; needs a dedicated administrator account (DSM has no read-only API role). Tested on a virtual DSM 7.2.2 and confirmed on real Synology hardware; Virtual Machine Manager is only tested against a simulator.",
+  "description": "Shows a Synology NAS (DiskStation Manager 7, 6.2 works too) as a host with its Container Manager containers, Virtual Machine Manager machines and installed packages as guests, each matched to the device Netlens found by MAC address (then IP). Reads through the DSM web API over HTTPS, read-only. Needs a dedicated user in the administrators group (DSM offers no read-only API role); see the settings page. Also fills the Storage page (Netlens 0.4.180).",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/synology",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -13,6 +13,15 @@
     "Synology DSM 6.2 (not tested)"
   ],
   "releases": [
+    {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.1.0/synology.zip",
+      "sha256": "5c3434b0358f458d735332bd111c8a6e291022ce9ceb981d9f2e15391544413d",
+      "api_version": 1,
+      "min_netlens": "0.4.180",
+      "released": "2026-10-23",
+      "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer."
+    },
     {
       "version": "1.0.2",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.0.2/synology.zip",

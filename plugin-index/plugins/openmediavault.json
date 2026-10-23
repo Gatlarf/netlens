@@ -3,7 +3,7 @@
   "name": "OpenMediaVault",
   "kind": "hypervisor",
   "category": "storage",
-  "description": "Shows an OpenMediaVault NAS (version 6, 7 or 8) as a host with its Docker containers (from the openmediavault-compose plugin) and its virtual machines (from the openmediavault-kvm plugin) as guests: state, health, image and the ports containers publish, matched to the devices on your network. Reads through OpenMediaVault's own web interface API, read-only.",
+  "description": "Shows an OpenMediaVault NAS (version 6, 7 or 8) as a host with its Docker containers (from the openmediavault-compose plugin) and its virtual machines (from the openmediavault-kvm plugin) as guests: state, health, image and the ports containers publish, matched to the devices on your network. Also fills the Storage page (Netlens 0.4.180). Read-only, through OMV's web API.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/openmediavault",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -13,6 +13,15 @@
     "openmediavault-kvm virtual machines (simulator only)"
   ],
   "releases": [
+    {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openmediavault-v1.1.0/openmediavault.zip",
+      "sha256": "7a86e964ee4e9fcfedb732c3792489b96b4f422a6bd740c7593694f3256c4476",
+      "api_version": 1,
+      "min_netlens": "0.4.180",
+      "released": "2026-10-23",
+      "changelog": "Also fills the Storage page (pools, volumes, disks, shares). Needs Netlens 0.4.180 or newer."
+    },
     {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openmediavault-v1.0.0/openmediavault.zip",
