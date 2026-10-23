@@ -129,7 +129,8 @@ class FakeTrueNAS:
         errors = o.get("errors", {})
         if method in errors:
             return send(error=errors[method])
-        table = {"interface.query": o["interfaces"], "virt.instance.query": o["instances"], "vm.query": o["vms"], "app.query": o["apps"]}
+        table = {"interface.query": o["interfaces"], "virt.instance.query": o["instances"], "vm.query": o["vms"], "app.query": o["apps"],
+                 "pool.query": o.get("pools", []), "disk.query": o.get("disks", []), "alert.list": o.get("alerts", []), "sharing.nfs.query": o.get("nfs", []), "sharing.smb.query": o.get("smb", [])}
         if method in table:
             return send(table[method])
         send(error={"code": -32601, "message": "Method does not exist"})
@@ -212,7 +213,8 @@ def test_one_login_and_the_expected_calls_then_disconnect(fake):
     server = fake()
     run(server)
     assert server.methods[:2] == ["auth.login_with_api_key", "system.info"] and server.methods.count("auth.login_with_api_key") == 1
-    assert set(server.methods) == {"auth.login_with_api_key", "system.info", "interface.query", "virt.instance.query", "vm.query", "app.query"}
+    assert set(server.methods) == {"auth.login_with_api_key", "system.info", "interface.query", "virt.instance.query", "vm.query", "app.query",
+                                  "pool.query", "disk.query", "alert.list", "sharing.nfs.query", "sharing.smb.query"}
 
 
 def test_a_wrong_key_is_auth_failed(fake):
@@ -341,3 +343,41 @@ def test_several_systems_are_read_one_by_one_and_name_clashes_are_kept_apart(mon
     with pytest.raises(ValueError, match="at least one"):
         plugin._servers({"servers": []})
     assert plugin._servers({"url": "https://old", "api_key": "k"}) == [{"url": "https://old", "api_key": "k"}]       # an older Netlens
+
+
+POOLS = [
+    {"name": "tank", "status": "DEGRADED", "healthy": False, "size": 1000, "allocated": 900, "free": 100,
+     "topology": {"data": [{"type": "RAIDZ1", "status": "DEGRADED", "children": [{"type": "DISK", "disk": "sda", "status": "ONLINE"}, {"type": "DISK", "disk": "sdb", "status": "FAULTED"}]}],
+                  "cache": [{"type": "DISK", "disk": "nvme0n1", "status": "ONLINE", "children": []}], "log": [], "spare": [], "special": [], "dedup": []}},
+    {"name": "fast", "status": "ONLINE", "healthy": True, "size": 500, "allocated": 10, "free": 490, "topology": {"data": [{"type": "MIRROR", "children": [{"type": "DISK", "disk": "sdc", "status": "ONLINE"}]}]}},
+]
+DISKS = [{"name": "sda", "model": "WDC WD40", "size": 4000}, {"name": "sdb", "model": "WDC WD40", "size": 4000}]
+ALERTS = [{"uuid": "a1", "level": "CRITICAL", "formatted": "Pool tank is degraded", "dismissed": False}, {"uuid": "a2", "level": "INFO", "formatted": "just info"},
+          {"uuid": "a3", "level": "WARNING", "formatted": "old", "dismissed": True}]
+SHARES_NFS = [{"id": 1, "path": "/mnt/tank/media", "enabled": True}]
+SHARES_SMB = [{"id": 2, "name": "docs", "path": "/mnt/fast/docs", "enabled": True}, {"id": 3, "name": "off", "path": "/mnt/fast/off", "enabled": False}]
+
+
+def test_storage_part_has_pools_disks_shares_and_alerts(fake):
+    out = validate_output("hypervisor", run(fake(pools=POOLS, disks=DISKS, alerts=ALERTS, nfs=SHARES_NFS, smb=SHARES_SMB)))
+    st = out["storage"]
+    assert st["systems"][0]["vendor"] == "TrueNAS" and st["systems"][0]["health"] == "critical"
+    pools = {p["name"]: p for p in st["pools"]}
+    assert pools["tank"]["health"] == "warning" and pools["tank"]["total"] == 1000 and pools["tank"]["raid"] == "raidz1" and pools["fast"]["health"] == "ok"
+    disks = {d["name"]: d for d in st["disks"]}
+    assert disks["sdb"]["state"] == "failed" and disks["sdb"]["size"] == 4000 and disks["sda"]["state"] == "ok" and disks["sdc"]["state"] == "ok" and "nvme0n1" in disks
+    shares = {v["name"]: v for v in st["volumes"]}
+    assert set(shares) == {"/mnt/tank/media", "docs"} and shares["docs"]["pool_id"] == "pool:fast" and shares["/mnt/tank/media"]["protocol"] == "nfs"
+    texts = {a["text"] for a in st["alerts"]}
+    assert {"Pool tank is degraded", "Disk sdb of pool tank: failed"} <= texts and "just info" not in texts and "old" not in texts
+
+
+def test_without_pools_there_is_no_storage_part(fake):
+    assert "storage" not in run(fake())
+
+
+def test_diagnose_reports_the_storage_steps_without_content(fake):
+    report = run(fake(pools=POOLS, disks=DISKS, alerts=ALERTS), plugin.diagnose)
+    assert report["steps"]["pools"]["ok"] and report["result"]["storage"]["pools"] == 2 and report["result"]["storage"]["disk_states"]["failed"] == 1
+    text = json.dumps(report)
+    assert "Pool tank is degraded" not in text and "/mnt/tank" not in text and "tank" not in text

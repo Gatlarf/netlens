@@ -446,6 +446,15 @@ def _client_type(value: Any, path: str) -> str | None:
 
 
 def validate_output(kind: str, data: Any) -> dict:
+    """The plugin's output for its kind. A plugin of any other kind may also return a `storage` object (the lists of kind storage): a NAS or a
+    hyperconverged system that is a hypervisor and a storage system at once reports both in one answer."""
+    result = _validate_kind(kind, data)
+    if kind != "storage" and isinstance(data, dict) and data.get("storage") is not None:
+        result["storage"] = _storage(data["storage"])
+    return result
+
+
+def _validate_kind(kind: str, data: Any) -> dict:
     if kind == "hypervisor":
         return _hypervisor(data)
     if kind == "topology":

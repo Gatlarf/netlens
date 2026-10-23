@@ -34,6 +34,9 @@ CONTAINER_FIELDS = "id names image state status autoStart ports { ip privatePort
 Q_CONTAINERS = "{ docker { containers { %s } } }" % CONTAINER_FIELDS
 Q_CONTAINERS_OLD = "{ dockerContainers { %s } }" % CONTAINER_FIELDS
 Q_VMS = "{ vms { domains { id name state } } }"
+DISK_FIELDS = "id idx name device size status temp type fsSize fsFree fsUsed fsType numErrors"
+Q_ARRAY = "{ array { state capacity { kilobytes { free used total } } parities { %s } disks { %s } caches { %s } } }" % ((DISK_FIELDS,) * 3)
+Q_SHARES = "{ shares { name free used size } }"
 Q_VMS_OLD = "{ vms { domain { id name state } } }"
 
 
@@ -153,9 +156,12 @@ class Unraid:
         network = self.optional(notes, "network", Q_NETWORK, Q_NETWORK_SIMPLE) or {}
         containers = self.optional(notes, "containers", Q_CONTAINERS, Q_CONTAINERS_OLD)
         machines = self.optional(notes, "virtual machines", Q_VMS, Q_VMS_OLD)
+        array = self.optional(notes, "array", Q_ARRAY) or {}
+        shares = self.optional(notes, "shares", Q_SHARES) or {}
         if containers is None and machines is None and not info:
             raise UnraidError("the server answered, but none of the queries worked: " + "; ".join(notes))
-        return {"info": info, "server": server, "network": network, "containers": containers or {}, "machines": machines or {}, "notes": notes}
+        return {"info": info, "server": server, "network": network, "containers": containers or {}, "machines": machines or {}, "array": array.get("array") if isinstance(array.get("array"), dict) else {},
+                "shares": shares.get("shares") if isinstance(shares.get("shares"), list) else [], "notes": notes}
 
 
 # ----------------------------------------------------------------------------- turning Unraid's answers into Netlens' format
@@ -283,6 +289,75 @@ def to_hypervisor(snapshot, connect_host=""):
     return {"hosts": [host], "guests": unique}
 
 
+# ----------------------------------------------------------------------------- storage (array, cache, shares)
+RANK = {"unknown": 0, "ok": 1, "warning": 2, "critical": 3}
+ARRAY_OK = {"STARTED"}
+ARRAY_WARN = {"STOPPED", "NEW_ARRAY", "RECON_DISK", "NO_DATA_DISKS"}
+DISK_STATE = {"DISK_OK": "ok", "DISK_NEW": "ok", "DISK_DSBL": "failed", "DISK_INVALID": "failed", "DISK_NP_MISSING": "failed", "DISK_WRONG": "degraded", "DISK_DSBL_NEW": "degraded"}
+
+
+def _kb(value):
+    try:
+        number = int(str(value)) * 1024
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def _big(value):
+    try:
+        number = int(str(value))
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def to_storage(snapshot, connect_host=""):
+    """The storage part of the output: the array and the cache disks as pools, every disk with its state and the shares (the Storage page)."""
+    host = _host(snapshot, connect_host)
+    sid = host["id"]
+    array = snapshot.get("array") or {}
+    if not array:
+        return {"systems": [], "controllers": [], "pools": [], "volumes": [], "disks": [], "alerts": []}
+    pools, disks, volumes, alerts = [], [], [], []
+    state = str(array.get("state") or "")
+    level = "ok" if state in ARRAY_OK else "warning" if state in ARRAY_WARN else "critical"
+    kb = (array.get("capacity") or {}).get("kilobytes") or {}
+    if _kb(kb.get("total")):
+        pools.append({"id": "array", "system_id": sid, "name": "Array", "total": _kb(kb.get("total")), "used": _kb(kb.get("used")), "avail": _kb(kb.get("free")), "health": level, "raid": "parity" if array.get("parities") else "no parity"})
+    if level != "ok":
+        alerts.append({"id": f"array:{state}", "system_id": sid, "severity": level, "text": f"The array is {state.lower().replace('_', ' ') or 'in an unknown state'}"})
+    for group in ("parities", "disks", "caches"):
+        for d in array.get(group) or []:
+            if not isinstance(d, dict) or not (d.get("device") or d.get("name")):
+                continue
+            status = str(d.get("status") or "")
+            if status in ("DISK_NP", "DISK_NP_DSBL"):
+                continue                                                  # an empty slot
+            mapped = DISK_STATE.get(status, "unknown")
+            if mapped == "ok" and (_big(d.get("numErrors")) or 0) > 0:
+                mapped = "degraded"
+            name = str(d.get("name") or d.get("device"))
+            disks.append({"id": f"disk:{d.get('id') or name}", "system_id": sid, "name": name[:100], "slot": str(d.get("device") or "")[:40], "model": str(d.get("type") or "").lower()[:100],
+                          "size": _big(d.get("size")) and _big(d.get("size")) * 1024, "state": mapped})
+            if mapped in ("failed", "degraded"):
+                alerts.append({"id": f"disk:{d.get('id') or name}:{mapped}", "system_id": sid, "severity": "critical" if mapped == "failed" else "warning", "text": f"Disk {name}: {mapped}" + (f" ({d.get('numErrors')} errors)" if (_big(d.get("numErrors")) or 0) else "")})
+                level = max(level, "critical" if mapped == "failed" else "warning", key=lambda x: RANK[x])
+            if group == "caches" and _big(d.get("fsSize")):
+                size, used = _big(d.get("fsSize")) * 1024, (_big(d.get("fsUsed")) or 0) * 1024
+                pools.append({"id": f"cache:{d.get('id') or name}", "system_id": sid, "name": name[:100], "total": size, "used": used, "avail": (_big(d.get("fsFree")) or 0) * 1024,
+                              "health": "ok" if mapped == "ok" else "critical" if mapped == "failed" else "warning", "raid": str(d.get("fsType") or "")[:60]})
+    for share in snapshot.get("shares") or []:
+        if isinstance(share, dict) and share.get("name"):
+            used, free = _kb(share.get("used")), _kb(share.get("free"))
+            volumes.append({"id": f"share:{share['name']}", "system_id": sid, "pool_id": "array" if pools and pools[0]["id"] == "array" else None, "name": str(share["name"])[:200], "kind": "share", "protocol": "",
+                            "size": used + free if used is not None and free is not None else None, "used": used, "health": "ok", "clients": []})
+    os_info = ((snapshot.get("info") or {}).get("info") or {}).get("os") or {}
+    system = {"id": sid, "name": host["name"], "ip": host.get("ip"), "vendor": "Unraid", "model": "", "version": str(os_info.get("release") or "")[:60], "serial": "", "online": True, "health": level, "warnings": []}
+    controllers = [{"id": f"{sid}:host", "system_id": sid, "name": host["name"], "ip": host.get("ip"), "mac": host.get("mac"), "online": True, "health": "unknown"}] if host.get("ip") or host.get("mac") else []
+    return {"systems": [system], "controllers": controllers, "pools": pools, "volumes": volumes, "disks": disks, "alerts": alerts[:200]}
+
+
 # ----------------------------------------------------------------------------- settings and entry points
 def _servers(config):
     rows = config.get("servers")
@@ -312,7 +387,11 @@ def _each(config, work):
 def _fetch_one(one):
     client = Unraid(one)
     snapshot = client.snapshot()
-    return to_hypervisor(snapshot, client.host), snapshot
+    out = to_hypervisor(snapshot, client.host)
+    storage = to_storage(snapshot, client.host)
+    if storage["systems"]:
+        out["storage"] = storage
+    return out, snapshot
 
 
 def test(config):
@@ -335,18 +414,24 @@ def fetch(config):
     if len(results) == 1:
         return results[0]
     hosts, guests, taken = [], [], set()
+    storage = {k: [] for k in ("systems", "controllers", "pools", "volumes", "disks", "alerts")}
     for out in results:
+        for key in storage:
+            storage[key] += (out.get("storage") or {}).get(key, [])
         hosts += out["hosts"]
         for g in out["guests"]:
             if g["id"] in taken:
                 g = {**g, "id": f"{g['host_id']}/{g['id']}"}
             taken.add(g["id"])
             guests.append(g)
-    return {"hosts": hosts, "guests": guests}
+    out = {"hosts": hosts, "guests": guests}
+    if storage["systems"]:
+        out["storage"] = storage
+    return out
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
-KEEP_WORDS = {"state", "status", "type", "networkMode", "distro", "release", "virtual", "internal", "autoStart"}
+KEEP_WORDS = {"state", "status", "type", "networkMode", "distro", "release", "virtual", "internal", "autoStart", "fsType"}
 
 
 def describe(value, key=""):
@@ -389,7 +474,8 @@ def diagnose(config):
     client = Unraid(_servers(config)[0])
     report = {"steps": {}}
     for name, queries in (("info", (Q_INFO,)), ("server", (Q_SERVER,)), ("network", (Q_NETWORK, Q_NETWORK_SIMPLE)),
-                          ("containers", (Q_CONTAINERS, Q_CONTAINERS_OLD)), ("virtual_machines", (Q_VMS, Q_VMS_OLD))):
+                          ("containers", (Q_CONTAINERS, Q_CONTAINERS_OLD)), ("virtual_machines", (Q_VMS, Q_VMS_OLD)),
+                          ("array", (Q_ARRAY,)), ("shares", (Q_SHARES,))):
         for attempt, text in enumerate(queries):
             try:
                 result = client.query(text)
@@ -408,6 +494,9 @@ def diagnose(config):
             "by_kind": {k: sum(1 for g in out["guests"] if g["kind"] == k) for k in ("container", "qemu")},
             "guests_with_mac": sum(1 for g in out["guests"] if g["macs"]), "not_available": [_problem(RuntimeError(n), client) for n in snapshot["notes"]],
         }
+        st = to_storage(snapshot, client.host)
+        report["result"]["storage"] = {"pools": len(st["pools"]), "disks": len(st["disks"]), "shares": len(st["volumes"]), "alerts": len(st["alerts"]),
+                                       "health": st["systems"][0]["health"] if st["systems"] else None}
     except Exception as exc:  # noqa: BLE001
         report["error"] = _problem(exc, client)
     return report

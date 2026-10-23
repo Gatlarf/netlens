@@ -398,6 +398,8 @@ Return `{"systems": [...], "controllers": [...], "pools": [...], "volumes": [...
 
 Netlens matches a system or controller to the device with that address, links the `clients` of a volume to their devices (the device page then says which volumes it uses) and raises events when a system, pool or disk becomes unhealthy or recovers, when a pool passes 85 and 95 percent, and when a new critical alert appears. The first sync after switching a plugin on is not news.
 
+**Storage from other kinds** (Netlens 0.4.180): a plugin of any other kind, typically a `hypervisor` plugin for a NAS or a hyperconverged system (Synology, TrueNAS, Unraid, Nutanix ...), may add a `storage` object to its output with the same lists (`systems`, `controllers`, `pools`, `volumes`, `disks`, `alerts`). Netlens shows them on the Storage page next to the guests; leave the key out (or `null`) when there is nothing to report. A mistake in the `storage` part fails the whole answer like any other part of the contract.
+
 ## Output for kind `topology`
 
 Return `{"nodes": [...], "clients": [...]}`. A *node* is a router, switch, access point or mesh node; a *client* is a device connected to one.

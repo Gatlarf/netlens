@@ -7,6 +7,8 @@ Talks to the NAS over HTTP(S), read-only:
     PUT  /container-station/api/v1/logout
     POST /cgi-bin/authLogin.cgi               QTS' own login (password base64 encoded, answer is XML) for the name and model of the NAS
     GET  /cgi-bin/management/manaRequest.cgi  ?subfunc=sysinfo (XML): host name, model, firmware
+    GET  /cgi-bin/management/chartReq.cgi     ?chart_func=disk_usage (XML): volumes with size and free space (the Storage page)
+    GET  /cgi-bin/disk/qsmart.cgi             ?func=all_hd_data (XML): disks with their S.M.A.R.T. health (the Storage page)
 
 Standard library only. A refused login is reported with `auth_failed` so Netlens stops retrying until the user acts. The QTS part
 is optional: without it the NAS is shown under the address Netlens connects to.
@@ -124,11 +126,22 @@ class Qnap:
         status, raw = self._send("GET", "/cgi-bin/management/manaRequest.cgi?" + urllib.parse.urlencode({"subfunc": "sysinfo", "hd": "no", "multicpu": "1", "sid": sid}), accept="text/xml")
         if status != 200:
             raise QnapError(f"system information: HTTP {status}")
+        storage = {}
+        for key, path, query in (("volumes_xml", "/cgi-bin/management/chartReq.cgi", {"chart_func": "disk_usage", "disk_select": "all", "include": "all", "sid": sid}),
+                                 ("disks_xml", "/cgi-bin/disk/qsmart.cgi", {"func": "all_hd_data", "sid": sid})):
+            try:
+                code, body = self._send("GET", path + "?" + urllib.parse.urlencode(query), accept="text/xml")
+                storage[key] = body if code == 200 else b""
+            except QnapError:
+                storage[key] = b""
         try:
             self._send("GET", "/cgi-bin/authLogout.cgi?" + urllib.parse.urlencode({"sid": sid}))
         except QnapError:
             pass
+        self.storage_xml = storage
         return {"hostname": _xml_text(raw, "sysHostName") or _xml_text(raw, "hostname"), "model": _xml_text(raw, "modelName"), "firmware": _xml_text(raw, "version")}
+
+    storage_xml = {}
 
     def snapshot(self):
         notes = []
@@ -141,7 +154,7 @@ class Qnap:
             notes.append(f"system information: {exc}")
         listing = self._json("GET", "/container")
         containers = listing if isinstance(listing, list) else (listing.get("containers") or listing.get("data") or []) if isinstance(listing, dict) else []
-        return {"system": system, "containers": [c for c in containers if isinstance(c, dict)], "notes": notes}
+        return {"system": system, "containers": [c for c in containers if isinstance(c, dict)], "storage_xml": dict(self.storage_xml), "notes": notes}
 
 
 def _xml_text(raw, tag):
@@ -219,6 +232,80 @@ def to_hypervisor(snapshot, connect_host=""):
 
 
 # ----------------------------------------------------------------------------- settings and entry points
+
+
+# ----------------------------------------------------------------------------- storage (volumes and disks from QTS' XML)
+RANK = {"unknown": 0, "ok": 1, "warning": 2, "critical": 3}
+
+
+def _children(node):
+    return {c.tag.lower(): (c.text or "").strip() for c in node if len(c) == 0}
+
+
+def _num(value):
+    try:
+        number = int(float(str(value).replace(",", "")))
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def _pick(fields, *words):
+    for tag, text in fields.items():
+        if any(w in tag for w in words) and text:
+            return text
+    return ""
+
+
+def _iter_xml(raw):
+    try:
+        return list(ET.fromstring((raw or b"").decode("utf-8", "replace").strip()).iter())
+    except ET.ParseError:
+        return []
+
+
+def _xml_records(raw, wanted):
+    """Every element whose own children (text only) contain all the wanted words in some tag name: a record with its fields. Tolerant of QTS versions."""
+    try:
+        root = ET.fromstring((raw or b"").decode("utf-8", "replace").strip())
+    except ET.ParseError:
+        return []
+    out = []
+    for node in root.iter():
+        fields = _children(node)
+        if fields and all(any(w in tag for tag in fields) for w in wanted):
+            out.append(fields)
+    return out
+
+
+def to_storage(snapshot, connect_host=""):
+    """The storage part of the output, read tolerantly from QTS' XML: volumes (size and free space) and disks (S.M.A.R.T. health)."""
+    host = _host(snapshot, connect_host)
+    sid = host["id"]
+    xml = snapshot.get("storage_xml") or {}
+    pools, disks, alerts, level = [], [], [], "ok"
+    for rec in _xml_records(xml.get("volumes_xml"), ("total", "free")):
+        total, free = _num(_pick(rec, "total_size", "totalsize", "total")), _num(_pick(rec, "free_size", "freesize", "free"))
+        name = _pick(rec, "label", "folder", "name", "vol") or f"volume {len(pools) + 1}"
+        if not total:
+            continue
+        pools.append({"id": f"volume:{name}"[:100], "system_id": sid, "name": name[:100], "total": total, "used": total - free if free is not None and free <= total else None,
+                      "avail": free, "health": "ok", "raid": ""})
+    for rec in _xml_records(xml.get("disks_xml"), ("model",)):
+        name = _pick(rec, "hdno", "hd_no", "slot", "name", "dev") or f"disk {len(disks) + 1}"
+        health = _pick(rec, "health", "smart", "status").lower()
+        state = "ok" if health in ("good", "normal", "ok", "ready", "healthy", "pass", "passed") else "failed" if any(w in health for w in ("fail", "error", "bad", "abnormal", "critical")) else "unknown"
+        disks.append({"id": f"disk:{name}:{_pick(rec, 'serial')}"[:100], "system_id": sid, "name": name[:100], "slot": name[:40], "model": _pick(rec, "model")[:100], "size": _num(_pick(rec, "capacity", "size")), "state": state})
+        if state == "failed":
+            alerts.append({"id": f"disk:{name}", "system_id": sid, "severity": "critical", "text": f"Disk {name}: {health}"})
+            level = "critical"
+    system_info = snapshot.get("system") or {}
+    system = {"id": sid, "name": host["name"], "ip": host.get("ip"), "vendor": "QNAP", "model": str(system_info.get("model") or "")[:100], "version": str(system_info.get("firmware") or "")[:60], "serial": "",
+              "online": True, "health": level if pools or disks else "unknown", "warnings": []}
+    controllers = [{"id": f"{sid}:host", "system_id": sid, "name": host["name"], "ip": host.get("ip"), "mac": host.get("mac"), "online": True, "health": "unknown"}] if host.get("ip") or host.get("mac") else []
+    return {"systems": [system], "controllers": controllers, "pools": pools, "volumes": [], "disks": disks, "alerts": alerts}
+
+
 def _servers(config):
     rows = config.get("servers")
     if not isinstance(rows, list):
@@ -251,7 +338,11 @@ def _fetch_one(one):
         snapshot = client.snapshot()
     finally:
         client.close()
-    return to_hypervisor(snapshot, client.host), snapshot
+    out = to_hypervisor(snapshot, client.host)
+    storage = to_storage(snapshot, client.host)
+    if storage["pools"] or storage["disks"]:
+        out["storage"] = storage
+    return out, snapshot
 
 
 def test(config):
@@ -272,14 +363,20 @@ def fetch(config):
     if len(results) == 1:
         return results[0]
     hosts, guests, taken = [], [], set()
+    storage = {k: [] for k in ("systems", "controllers", "pools", "volumes", "disks", "alerts")}
     for out in results:
+        for key in storage:
+            storage[key] += (out.get("storage") or {}).get(key, [])
         hosts += out["hosts"]
         for g in out["guests"]:
             if g["id"] in taken:
                 g = {**g, "id": f"{g['host_id']}/{g['id']}"}
             taken.add(g["id"])
             guests.append(g)
-    return {"hosts": hosts, "guests": guests}
+    out = {"hosts": hosts, "guests": guests}
+    if storage["systems"]:
+        out["storage"] = storage
+    return out
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
@@ -339,6 +436,10 @@ def diagnose(config):
             out = to_hypervisor(snapshot, client.host)
             report["result"] = {"guests": len(out["guests"]), "guests_with_ip": sum(1 for g in out["guests"] if g["ips"]),
                                 "guests_with_ports": sum(1 for g in out["guests"] if g["details"].get("ports")), "not_available": [_problem(RuntimeError(n), client) for n in snapshot["notes"]]}
+            st = to_storage(snapshot, client.host)
+            report["result"]["storage"] = {"volumes": len(st["pools"]), "disks": len(st["disks"]), "alerts": len(st["alerts"]),
+                                           "volumes_xml_bytes": len(snapshot["storage_xml"].get("volumes_xml") or b""), "disks_xml_bytes": len(snapshot["storage_xml"].get("disks_xml") or b""),
+                                           "xml_tags": sorted({n.tag for raw in snapshot["storage_xml"].values() for n in _iter_xml(raw)})[:60]}
         except Exception as exc:  # noqa: BLE001
             report["error"] = _problem(exc, client)
     finally:

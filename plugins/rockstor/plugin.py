@@ -8,6 +8,7 @@ Talks to Rockstor's REST API over HTTPS, read-only (HTTP Basic authentication, w
     GET /api/rockons               Rock-ons: name, version, state (installed, ...) and status (started, stopped, ...)
     GET /api/rockons/docker/containers/<id>   the Docker containers of one Rock-on
     GET /api/rockons/ports/<id>               the ports it publishes
+    GET /api/pools, /api/disks, /api/shares   Btrfs pools with their health, disks and shares (the Storage page)
 
 Standard library only. A refused login is reported with `auth_failed` so Netlens stops retrying until the user acts.
 """
@@ -108,6 +109,7 @@ class Rockstor:
         devices = self.optional(notes, "network cards", "/api/network/devices")
         connections = self.optional(notes, "network addresses", "/api/network/connections")
         rockons = self.optional(notes, "Rock-ons", "/api/rockons")
+        storage = {"pools": self.optional(notes, "pools", "/api/pools"), "disks": self.optional(notes, "disks", "/api/disks"), "shares": self.optional(notes, "shares", "/api/shares")}
         containers, ports, failed = {}, {}, 0
         for rockon in [r for r in rockons if str(r.get("state") or "") == "installed"][:MAX_ROCKONS]:
             rid = rockon.get("id")
@@ -122,7 +124,7 @@ class Rockstor:
                 failed += 1
                 if failed == 1:
                     notes.append(f"Rock-on details: {exc}")
-        return {"appliances": appliances, "devices": devices, "connections": connections, "rockons": rockons, "containers": containers, "ports": ports, "notes": notes}
+        return {"appliances": appliances, "devices": devices, "connections": connections, "rockons": rockons, "containers": containers, "ports": ports, "storage": storage, "notes": notes}
 
 
 # ----------------------------------------------------------------------------- turning Rockstor's answers into Netlens' format
@@ -192,6 +194,70 @@ def to_hypervisor(snapshot, connect_host=""):
     return {"hosts": [host], "guests": unique}
 
 
+# ----------------------------------------------------------------------------- storage (pools, disks, shares)
+RANK = {"unknown": 0, "ok": 1, "warning": 2, "critical": 3}
+
+
+def _kb(value):
+    """Rockstor sizes are in KiB."""
+    try:
+        number = int(float(str(value))) * 1024
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def to_storage(snapshot, connect_host=""):
+    """The storage part of the output: Btrfs pools, their disks and the shares (the Storage page)."""
+    host = _host(snapshot, connect_host)
+    sid = host["id"]
+    data = snapshot.get("storage") or {}
+    pools, disks, volumes, alerts, level = [], [], [], [], "ok"
+    for pool in data.get("pools") or []:
+        name = str(pool.get("name") or "")
+        if not name:
+            continue
+        problems = []
+        if pool.get("is_mounted") is False:
+            problems.append("not mounted")
+        if pool.get("has_missing_dev") or (_kb(pool.get("dev_missing_count")) or 0):
+            problems.append("a disk is missing")
+        if pool.get("redundancy_exceeded"):
+            problems.append("more disks failed than the RAID level survives")
+        health = "critical" if problems else "warning" if pool.get("dev_stats_ok") is False else "ok"
+        if health == "warning":
+            problems.append("disk errors were counted")
+        total = _kb(pool.get("size"))
+        free = _kb(pool.get("free"))
+        pools.append({"id": f"pool:{pool.get('uuid') or name}", "system_id": sid, "name": name[:100], "total": total, "used": total - free if total is not None and free is not None else None,
+                      "avail": free, "health": health, "raid": str(pool.get("data_raid") or pool.get("raid") or "")[:60]})
+        for text in problems:
+            alerts.append({"id": f"pool:{name}:{text}", "system_id": sid, "severity": "critical" if health == "critical" else "warning", "text": f"Pool {name}: {text}"})
+        level = max(level, health, key=lambda x: RANK[x])
+    for disk in data.get("disks") or []:
+        name = str(disk.get("name") or "")
+        if not name:
+            continue
+        state = "failed" if disk.get("offline") else "ok"
+        disks.append({"id": f"disk:{disk.get('serial') or name}", "system_id": sid, "name": name[:100], "slot": str(disk.get("pool_name") or "")[:40], "model": str(disk.get("model") or disk.get("vendor") or "")[:100],
+                      "size": _kb(disk.get("size")), "state": state})
+        if state == "failed":
+            alerts.append({"id": f"disk:{disk.get('serial') or name}", "system_id": sid, "severity": "critical", "text": f"Disk {name} is offline"})
+            level = "critical"
+    pool_ids = {p["name"]: p["id"] for p in pools}
+    for share in data.get("shares") or []:
+        name = str(share.get("name") or "")
+        if not name:
+            continue
+        pool_name = (share.get("pool") or {}).get("name") if isinstance(share.get("pool"), dict) else share.get("pool_name")
+        exports = share.get("nfs_exports") or []
+        volumes.append({"id": f"share:{share.get('id', name)}", "system_id": sid, "pool_id": pool_ids.get(pool_name), "name": name[:200], "kind": "share", "protocol": "nfs" if exports else "",
+                        "size": _kb(share.get("size")), "used": _kb(share.get("r_usage")), "health": "ok" if share.get("is_mounted") is not False else "warning", "clients": []})
+    system = {"id": sid, "name": host["name"], "ip": host.get("ip"), "vendor": "Rockstor", "model": "", "version": "", "serial": "", "online": True, "health": level if pools or disks else "unknown", "warnings": []}
+    controllers = [{"id": f"{sid}:host", "system_id": sid, "name": host["name"], "ip": host.get("ip"), "mac": host.get("mac"), "online": True, "health": "unknown"}] if host.get("ip") or host.get("mac") else []
+    return {"systems": [system], "controllers": controllers, "pools": pools, "volumes": volumes, "disks": disks, "alerts": alerts[:200]}
+
+
 # ----------------------------------------------------------------------------- settings and entry points
 def _servers(config):
     rows = config.get("servers")
@@ -221,7 +287,11 @@ def _each(config, work):
 def _fetch_one(one):
     client = Rockstor(one)
     snapshot = client.snapshot()
-    return to_hypervisor(snapshot, client.host), snapshot
+    out = to_hypervisor(snapshot, client.host)
+    storage = to_storage(snapshot, client.host)
+    if storage["pools"] or storage["disks"]:
+        out["storage"] = storage
+    return out, snapshot
 
 
 def test(config):
@@ -241,18 +311,24 @@ def fetch(config):
     if len(results) == 1:
         return results[0]
     hosts, guests, taken = [], [], set()
+    storage = {k: [] for k in ("systems", "controllers", "pools", "volumes", "disks", "alerts")}
     for out in results:
+        for key in storage:
+            storage[key] += (out.get("storage") or {}).get(key, [])
         hosts += out["hosts"]
         for g in out["guests"]:
             if g["id"] in taken:
                 g = {**g, "id": f"{g['host_id']}/{g['id']}"}
             taken.add(g["id"])
             guests.append(g)
-    return {"hosts": hosts, "guests": guests}
+    out = {"hosts": hosts, "guests": guests}
+    if storage["systems"]:
+        out["storage"] = storage
+    return out
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
-KEEP_WORDS = {"state", "status", "protocol", "publish", "current_appliance", "dtype", "ctype", "ipv4_method"}
+KEEP_WORDS = {"state", "status", "protocol", "publish", "current_appliance", "dtype", "ctype", "ipv4_method", "raid", "data_raid", "metadata_raid", "is_mounted", "offline", "has_missing_dev", "dev_stats_ok", "redundancy_exceeded"}
 
 
 def describe(value, key=""):
@@ -295,7 +371,8 @@ def diagnose(config):
     client = Rockstor(_servers(config)[0])
     report = {"steps": {}}
     first_rockon = None
-    for name, path in (("appliances", "/api/appliances"), ("network_devices", "/api/network/devices"), ("network_connections", "/api/network/connections"), ("rockons", "/api/rockons")):
+    for name, path in (("appliances", "/api/appliances"), ("network_devices", "/api/network/devices"), ("network_connections", "/api/network/connections"), ("rockons", "/api/rockons"),
+                       ("pools", "/api/pools"), ("disks", "/api/disks"), ("shares", "/api/shares")):
         try:
             data = client.get(path)
             report["steps"][name] = {"ok": True, "shape": describe(data)}
@@ -317,6 +394,8 @@ def diagnose(config):
         out = to_hypervisor(snapshot, client.host)
         report["result"] = {"host_has_ip": "ip" in out["hosts"][0], "host_has_mac": "mac" in out["hosts"][0], "guests": len(out["guests"]),
                             "rockons": len(snapshot["rockons"]), "not_available": [_problem(RuntimeError(n), client) for n in snapshot["notes"]]}
+        st = to_storage(snapshot, client.host)
+        report["result"]["storage"] = {"pools": len(st["pools"]), "disks": len(st["disks"]), "shares": len(st["volumes"]), "alerts": len(st["alerts"]), "health": st["systems"][0]["health"]}
     except Exception as exc:  # noqa: BLE001
         report["error"] = _problem(exc, client)
     return report

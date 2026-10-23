@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.180 — 2026-10-23
+
+### Added
+- ★ **NAS plugins can fill the Storage page too.** A plugin of any kind (for example a hypervisor plugin for a NAS or a hyperconverged system) may now add a `storage` part to its answer, so a NAS shows its containers and virtual machines *and* its pools, volumes, disks and shares. Updated plugins: TrueNAS 1.4.0 (pools, their disks, NFS and SMB shares, open alerts), Synology 1.1.0 (storage pools, volumes, disks, shared folders; the volumes were read from a real DSM 7.2.2), OpenMediaVault 1.1.0 (file systems, S.M.A.R.T. status, shares), Unraid 1.1.0 (array, cache, disks, shares), Rockstor 1.1.0 (Btrfs pools, disks, shares), QNAP 1.1.0 (volumes, disk health) and UGREEN 1.1.0 (volumes, disk health). Same read-only access as before. Everything but the Synology volumes was tested against simulators, so send a *Run diagnostic* report if a Storage page stays empty. The contract is described in `app/plugins/PLUGINS.md`.
+
 ## 0.4.178 — 2026-10-23
 
 ### Added

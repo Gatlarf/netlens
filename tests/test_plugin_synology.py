@@ -100,7 +100,8 @@ class FakeDSM:
                         return self._answer({"success": False, "error": {"code": 105}})
                     return self._answer({"success": True, "data": {"details": INSPECT[p.get("name")]}})
                 data = {"SYNO.DSM.Info": INFO, "SYNO.Core.Network": NETWORK, "SYNO.Core.Network.Interface": INTERFACES, "SYNO.Docker.Container": CONTAINERS,
-                        "SYNO.Virtualization.API.Guest": MACHINES, "SYNO.Core.Package": PACKAGES}.get(api)
+                        "SYNO.Virtualization.API.Guest": MACHINES, "SYNO.Core.Package": PACKAGES, "SYNO.Storage.CGI.Storage": fake.options.get("storage"),
+                        "SYNO.Core.Share": fake.options.get("shares")}.get(api)
                 if data is None:
                     return self._answer({"success": False, "error": {"code": 102}})
                 return self._answer({"success": True, "data": data})
@@ -262,3 +263,41 @@ def dsm_missing_get():
     fake = FakeDSM(missing={"get"})
     yield fake
     fake.close()
+
+
+STORAGE = {
+    "storagePools": [{"id": "reuse_1", "num_id": 1, "desc": "Storage Pool 1", "status": "degraded", "raidType": "raid_5", "pool_path": "reuse_1", "size": {"total": "8000000000000", "used": "6000000000000"}},
+                     {"id": "reuse_2", "desc": "Pool 2", "status": "normal", "pool_path": "reuse_2", "size": {"total": "1000", "used": "10"}}],
+    "volumes": [{"id": "volume_1", "vol_path": "/volume1", "fs_type": "btrfs", "status": "normal", "pool_path": "reuse_1", "size": {"total": "7000000000000", "used": "6000000000000"}},
+                {"id": "volume_2", "vol_path": "/volume2", "fs_type": "ext4", "status": "crashed", "pool_path": "reuse_2", "size": {"total": "1000", "used": "10"}}],
+    "disks": [{"id": "sata1", "name": "Drive 1", "vendor": "WDC", "model": "WD40EFRX", "size_total": "4000787030016", "status": "normal", "smart_status": "normal", "slot_id": 1},
+              {"id": "sata2", "name": "Drive 2", "model": "ST4000", "size_total": "4000787030016", "status": "crashed", "smart_status": "normal"},
+              {"id": "sata3", "name": "Drive 3", "model": "ST4000", "size_total": "4000787030016", "status": "normal", "smart_status": "failing"}]}
+SHARES = {"shares": [{"name": "docker", "vol_path": "/volume1"}, {"name": "media"}], "total": 2}
+
+
+def test_storage_part_has_pools_volumes_disks_and_shares():
+    server = FakeDSM(storage=STORAGE, shares=SHARES)
+    try:
+        out = validate_output("hypervisor", plugin.fetch(server.config()))
+    finally:
+        server.close()
+    st = out["storage"]
+    pools = {p["name"]: p for p in st["pools"]}
+    assert pools["Storage Pool 1"]["health"] == "warning" and pools["Storage Pool 1"]["avail"] == 2000000000000 and pools["Storage Pool 1"]["raid"] == "raid_5"
+    volumes = {v["name"]: v for v in st["volumes"]}
+    assert volumes["/volume1"]["pool_id"] == "pool:reuse_1" and volumes["/volume1"]["protocol"] == "btrfs" and volumes["/volume2"]["health"] == "critical"
+    assert volumes["docker"]["kind"] == "share" and "media" in volumes
+    disks = {d["name"]: d for d in st["disks"]}
+    assert disks["Drive 1"]["state"] == "ok" and disks["Drive 1"]["model"] == "WDC WD40EFRX" and disks["Drive 2"]["state"] == "failed" and disks["Drive 3"]["state"] == "degraded"
+    assert st["systems"][0]["vendor"] == "Synology" and st["systems"][0]["health"] == "critical"
+    texts = {a["text"] for a in st["alerts"]}
+    assert {"Storage pool Storage Pool 1 is degraded", "Volume /volume2 is crashed", "Disk Drive 2: failed"} <= texts
+
+
+def test_a_nas_without_storage_answers_reports_no_storage_part():
+    server = FakeDSM()
+    try:
+        assert "storage" not in plugin.fetch(server.config())
+    finally:
+        server.close()

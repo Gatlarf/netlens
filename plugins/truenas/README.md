@@ -28,11 +28,18 @@ A refused login (wrong, revoked or expired key) stops automatic syncing until yo
 Press **Run diagnostic** on the plugin's page (Netlens 0.2.67 or newer, plugin 1.0.1 or newer). It logs in once with the values in the form and shows a report of what TrueNAS answered: which steps worked
 (system, interfaces, containers, virtual machines, apps) and the **names and types of the fields**, not their content. Names, addresses, MAC addresses and your settings are removed. **Copy** or **Download** it and send it to whoever maintains the plugin.
 
+## Storage page
+
+Since version 1.4.0 (Netlens 0.4.180 or newer) the plugin also fills the **Storage** page with pools with their fill level and health (events at 85 and 95 percent), the disks of each pool with their state, the NFS and SMB shares, and the open alerts of TrueNAS (warnings and worse). Events: *Storage problem*, *Storage recovered* and *Disk filling up* go through the usual notification channels. Nothing extra is needed on the NAS; the same user and the same read-only calls.
+
 ## What was tested
 
 Written against and tested on a real **TrueNAS 25.10.6** (a LXC container under *Instances/Containers*, one app) and against a simulated TrueNAS (WebSocket frames, pings, large messages, an old version
 without containers, a failing Apps service, a revoked key). **Virtual machines** were tested with simulated data only: if you run VMs, please check that they show up with the right MAC address and
 tell us if not. Network cards of a VM only get a MAC address when TrueNAS has assigned one.
+
+**Storage page:** The storage part (`pool.query`, `disk.query`, `alert.list`, `sharing.nfs.query`, `sharing.smb.query`) follows the middleware's documented API and is tested against a simulator only; it was not run on a real TrueNAS.
+
 
 ## Notes for reviewers
 

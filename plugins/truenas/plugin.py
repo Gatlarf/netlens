@@ -9,6 +9,10 @@ read-only:
     virt.instance.query       containers and VMs of the Instances / Containers feature
     vm.query                  classic virtual machines (with their network cards' MAC addresses)
     app.query                 the apps
+    pool.query                pools: health, size and free space, and the disks of each pool
+    disk.query                disk sizes and models
+    alert.list                the open alerts
+    sharing.nfs.query / sharing.smb.query   the shares
 
 Standard library only (a small WebSocket client is included). The key is only sent over TLS: TrueNAS revokes an API key that
 is used over an unencrypted connection. A refused login is reported with `auth_failed`, so Netlens stops retrying until the user
@@ -235,6 +239,11 @@ class TrueNAS:
             "instances": self.optional("virt.instance.query", notes, "containers"),
             "vms": self.optional("vm.query", notes, "virtual machines"),
             "apps": self.optional("app.query", notes, "apps"),
+            "pools": self.optional("pool.query", notes, "pools"),
+            "disks": self.optional("disk.query", notes, "disks"),
+            "alerts": self.optional("alert.list", notes, "alerts"),
+            "nfs": self.optional("sharing.nfs.query", notes, "NFS shares"),
+            "smb": self.optional("sharing.smb.query", notes, "SMB shares"),
             "notes": notes,
         }
 
@@ -364,6 +373,84 @@ def to_hypervisor(snapshot, connect_host=""):
             unique.append(g)
     return {"hosts": [host], "guests": unique}
 
+# ----------------------------------------------------------------------------- storage (pools, disks, shares, alerts)
+POOL_HEALTH = {"ONLINE": "ok", "DEGRADED": "warning", "FAULTED": "critical", "UNAVAIL": "critical", "OFFLINE": "critical", "REMOVED": "critical", "SUSPENDED": "critical"}
+DISK_STATE = {"ONLINE": "ok", "DEGRADED": "degraded", "FAULTED": "failed", "UNAVAIL": "failed", "OFFLINE": "degraded", "REMOVED": "failed"}
+ALERT_LEVEL = {"WARNING": "warning", "ERROR": "critical", "CRITICAL": "critical", "ALERT": "critical", "EMERGENCY": "critical"}
+RANK = {"unknown": 0, "ok": 1, "warning": 2, "critical": 3}
+
+
+def _vdev_disks(node, out):
+    """The disk leaves of a pool topology (data, cache, log, spare, special, dedup groups)."""
+    if not isinstance(node, dict):
+        return
+    children = node.get("children") or []
+    if str(node.get("type") or "").upper() == "DISK" or not children:
+        if node.get("disk") or node.get("name"):
+            out.append(node)
+        return
+    for child in children:
+        _vdev_disks(child, out)
+
+
+def to_storage(snapshot, connect_host=""):
+    """The storage part of the output: pools, their disks, shares and alerts (the Storage page)."""
+    host = _host(snapshot, connect_host)
+    sid = host["id"]
+    sizes = {str(d.get("name")): d for d in snapshot.get("disks") or [] if isinstance(d, dict)}
+    pools, disks, volumes, alerts, level = [], [], [], [], "ok"
+    for pool in snapshot.get("pools") or []:
+        if not isinstance(pool, dict) or not pool.get("name"):
+            continue
+        status = str(pool.get("status") or "").upper()
+        health = POOL_HEALTH.get(status, "unknown")
+        if health == "ok" and pool.get("healthy") is False:
+            health = "warning"
+        topology = pool.get("topology") if isinstance(pool.get("topology"), dict) else {}
+        kinds = [str(v.get("type") or "") for v in topology.get("data") or [] if isinstance(v, dict)]
+        raid = ", ".join(sorted({k for k in kinds if k})).lower()
+        size, used, free = _int(pool.get("size")), _int(pool.get("allocated")), _int(pool.get("free"))
+        pools.append({"id": f"pool:{pool['name']}", "system_id": sid, "name": str(pool["name"]), "total": size, "used": used, "avail": free, "health": health, "raid": raid[:60]})
+        level = max(level, health, key=lambda x: RANK[x])
+        if health != "ok":
+            alerts.append({"id": f"pool:{pool['name']}:{status}", "system_id": sid, "severity": "critical" if health == "critical" else "warning", "text": f"Pool {pool['name']} is {status.lower() or 'not healthy'}"})
+        leaves = []
+        for group in ("data", "cache", "log", "spare", "special", "dedup"):
+            for vdev in topology.get(group) or []:
+                _vdev_disks(vdev, leaves)
+        for leaf in leaves:
+            name = str(leaf.get("disk") or leaf.get("name"))
+            state = DISK_STATE.get(str(leaf.get("status") or "").upper(), "unknown")
+            info = sizes.get(name, {})
+            disks.append({"id": f"{pool['name']}:{name}", "system_id": sid, "name": name, "slot": str(pool["name"])[:40], "model": str(info.get("model") or "")[:100],
+                          "size": _int(info.get("size")), "state": state})
+            if state in ("failed", "degraded"):
+                alerts.append({"id": f"disk:{pool['name']}:{name}", "system_id": sid, "severity": "critical" if state == "failed" else "warning", "text": f"Disk {name} of pool {pool['name']}: {state}"})
+    names = [p["name"] for p in pools]
+
+    def pool_of(path):
+        for name in names:
+            if str(path or "").startswith(f"/mnt/{name}"):
+                return f"pool:{name}"
+        return None
+    for kind, items in (("nfs", snapshot.get("nfs")), ("smb", snapshot.get("smb"))):
+        for share in items or []:
+            if isinstance(share, dict) and share.get("path") and share.get("enabled", True) is not False:
+                label = str(share.get("name") or share["path"])
+                volumes.append({"id": f"{kind}:{share.get('id', share['path'])}", "system_id": sid, "pool_id": pool_of(share["path"]), "name": label[:200], "kind": "share", "protocol": kind, "size": None, "used": None, "health": "ok", "clients": []})
+    for alert in snapshot.get("alerts") or []:
+        if not isinstance(alert, dict) or alert.get("dismissed"):
+            continue
+        severity = ALERT_LEVEL.get(str(alert.get("level") or "").upper())
+        if severity:
+            alerts.append({"id": f"alert:{alert.get('uuid') or alert.get('id') or alert.get('klass')}", "system_id": sid, "severity": severity, "text": str(alert.get("formatted") or alert.get("klass") or "")[:300]})
+            level = max(level, severity, key=lambda x: RANK[x])
+    system = {"id": sid, "name": snapshot["hostname"], "ip": host.get("ip"), "vendor": "TrueNAS", "model": "", "version": snapshot["version"][:60], "serial": "", "online": True,
+              "health": level if (pools or snapshot.get("alerts")) else "unknown", "warnings": []}
+    controllers = [{"id": f"{sid}:host", "system_id": sid, "name": snapshot["hostname"], "ip": host.get("ip"), "mac": host.get("mac"), "online": True, "health": "unknown"}] if host.get("ip") or host.get("mac") else []
+    return {"systems": [system], "controllers": controllers, "pools": pools, "volumes": volumes, "disks": disks, "alerts": alerts[:200]}
+
+
 
 def _servers(config):
     """One flat config per TrueNAS: the rows of the server list, or the single url and key of an older Netlens."""
@@ -427,7 +514,10 @@ def _fetch_one(config):
         snapshot = truenas.snapshot()
     finally:
         truenas.close()
-    return to_hypervisor(snapshot, truenas.host)
+    out = to_hypervisor(snapshot, truenas.host)
+    if snapshot["pools"] or snapshot["alerts"]:
+        out["storage"] = to_storage(snapshot, truenas.host)
+    return out
 
 
 def fetch(config):
@@ -435,18 +525,24 @@ def fetch(config):
     if len(results) == 1:
         return results[0]
     hosts, guests, taken = [], [], set()
+    storage = {k: [] for k in ("systems", "controllers", "pools", "volumes", "disks", "alerts")}
     for out in results:
+        for key in storage:
+            storage[key] += (out.get("storage") or {}).get(key, [])
         hosts += out["hosts"]
         for g in out["guests"]:
             if g["id"] in taken:                      # the same name on two systems: keep both apart
                 g = {**g, "id": f"{g['host_id']}/{g['id']}"}
             taken.add(g["id"])
             guests.append(g)
-    return {"hosts": hosts, "guests": guests}
+    out = {"hosts": hosts, "guests": guests}
+    if storage["systems"]:
+        out["storage"] = storage
+    return out
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
-KEEP_WORDS = {"version", "type", "status", "state", "dev_type", "dtype", "nic_type", "link_state", "autostart", "model"}
+KEEP_WORDS = {"version", "type", "status", "state", "dev_type", "dtype", "nic_type", "link_state", "autostart", "model", "healthy", "level", "dismissed", "scan_function", "klass"}
 SAMPLES = 2
 
 
@@ -503,6 +599,11 @@ def diagnose(config):
         instances = step("instances", "virt.instance.query")
         step("vms", "vm.query")
         step("apps", "app.query")
+        step("pools", "pool.query")
+        step("disks", "disk.query")
+        step("alerts", "alert.list")
+        step("nfs_shares", "sharing.nfs.query")
+        step("smb_shares", "sharing.smb.query")
         first = next((i for i in instances or [] if isinstance(i, dict) and i.get("id")), None)
         if first:
             step("instance_devices", "virt.instance.device_list", first["id"])
@@ -514,6 +615,10 @@ def diagnose(config):
             "guests_with_ip": sum(1 for g in out["guests"] if g["ips"]), "guests_with_mac": sum(1 for g in out["guests"] if g["macs"]),
             "not_available": snapshot["notes"],
         }
+        if snapshot["pools"] or snapshot["alerts"]:
+            st = to_storage(snapshot, truenas.host)
+            report["result"]["storage"] = {"pools": len(st["pools"]), "disks": len(st["disks"]), "shares": len(st["volumes"]), "alerts": len(st["alerts"]), "health": st["systems"][0]["health"],
+                                           "disk_states": {k: sum(1 for d in st["disks"] if d["state"] == k) for k in ("ok", "degraded", "failed", "spare", "unknown")}}
     except Exception as exc:  # noqa: BLE001
         report["error"] = _problem(exc)
     finally:

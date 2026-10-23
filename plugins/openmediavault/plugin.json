@@ -1,11 +1,11 @@
 {
   "id": "openmediavault",
   "name": "OpenMediaVault",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
-  "description": "Shows an OpenMediaVault NAS (version 6, 7 or 8) as a host with its Docker containers (from the openmediavault-compose plugin) and its virtual machines (from the openmediavault-kvm plugin) as guests: state, health, image and the ports containers publish, matched to the devices on your network. Reads through OpenMediaVault's own web interface API, read-only.",
+  "description": "Shows an OpenMediaVault NAS (version 6, 7 or 8) as a host with its Docker containers (from the openmediavault-compose plugin) and its virtual machines (from the openmediavault-kvm plugin) as guests: state, health, image and the ports containers publish, matched to the devices on your network. Also fills the Storage page (Netlens 0.4.180). Read-only, through OMV's web API.",
   "info": {
     "title": "Set up a user for Netlens on the OpenMediaVault",
     "text": "OpenMediaVault's web interface API only answers its administrators, so Netlens needs a web administrator account of its own: in the OMV web page open Users > Users > Create, name it netlens with a long random password, and under Groups tick openmediavault-admin (and nothing else). Do not use the 'admin' account, and do not switch on 2-step verification for this user. Enter the address you open OMV with in your browser (http://<NAS address> or https://...); Netlens signs in for a few seconds at each sync and signs out again. The Docker list needs the openmediavault-compose plugin (OMV-Extras) and the virtual machine list the openmediavault-kvm plugin; without them the NAS is shown with what is available. Only the machines and containers are read; nothing is changed.",

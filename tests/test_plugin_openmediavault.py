@@ -37,6 +37,17 @@ VMS = {"total": 2, "data": [
 NICS = {"win11": [{"mac": "52:54:00:aa:bb:cc", "description": "network - default (52:54:00:aa:bb:cc)"}], "box": []}
 
 
+STORAGE_CALLS = {
+    ("FileSystemMgmt", "getList"): {"total": 2, "data": [
+        {"uuid": "u1", "devicefile": "/dev/sda1", "label": "data", "type": "ext4", "size": "4000000000000", "used": "3800000000000", "available": "200000000000", "percentage": 95, "mounted": True, "status": 1},
+        {"uuid": "u2", "devicefile": "/dev/sdb1", "label": "", "type": "btrfs", "size": 1000, "used": 10, "available": 990, "mounted": False, "status": 1}]},
+    ("DiskMgmt", "enumerateDevices"): [{"devicefile": "/dev/sda", "model": "WDC WD40", "size": "4000787030016"}, {"devicefile": "/dev/sdb", "model": "ST1000", "size": 1000204886016}],
+    ("Smart", "getList"): {"total": 2, "data": [{"devicefile": "/dev/sda", "overallstatus": "GOOD", "temperature": 35}, {"devicefile": "/dev/sdb", "overallstatus": "BAD_SECTOR", "temperature": 40}]},
+    ("Smb", "getShareList"): {"total": 1, "data": [{"uuid": "s1", "name": "media", "comment": ""}]},
+    ("Nfs", "getShareList"): {"total": 1, "data": [{"uuid": "n1", "client": "192.168.0.0/24", "mntentref": "u1"}]},
+}
+
+
 class FakeOmv:
     def __init__(self, kvm=True, compose=True, broken_compose=False):
         self.kvm, self.compose, self.broken_compose = kvm, compose, broken_compose
@@ -87,6 +98,8 @@ class FakeOmv:
                     return self._send(200, VMS)
                 if (service, method) == ("Kvm", "enumerateVmNic"):
                     return self._send(200, NICS[params["vmname"]])
+                if (service, method) in STORAGE_CALLS:
+                    return self._send(200, STORAGE_CALLS[(service, method)])
                 self._send(500, None, {"code": 0, "message": f"unknown {service}.{method}"})
 
         self.server = HTTPServer(("127.0.0.1", 0), Handler)
@@ -191,3 +204,27 @@ def test_diagnostic_never_contains_names_or_addresses(omv):
     for leak in ("nl-snmpd", "dsm", "nas-omv", "win11", "192.168", "bc:24", "52:54", "127.0.0.1", "good-pass"):
         assert leak not in report, leak
     assert '"ok": true' in report
+
+
+def test_storage_part_has_file_systems_disks_and_shares(omv):
+    st = validate_output("hypervisor", plugin.fetch(omv.config()))["storage"]
+    pools = {p["name"]: p for p in st["pools"]}
+    assert pools["data"]["total"] == 4000000000000 and pools["data"]["avail"] == 200000000000 and pools["data"]["raid"] == "ext4" and pools["data"]["health"] == "ok"
+    assert pools["/dev/sdb1"]["health"] == "warning"                                  # not mounted
+    disks = {d["name"]: d for d in st["disks"]}
+    assert disks["/dev/sda"]["state"] == "ok" and disks["/dev/sdb"]["state"] == "degraded" and disks["/dev/sda"]["size"] == 4000787030016
+    assert {v["name"] for v in st["volumes"]} == {"media", "192.168.0.0/24"}
+    assert st["systems"][0]["vendor"] == "OpenMediaVault" and st["systems"][0]["health"] == "warning"
+    assert any("S.M.A.R.T." in a["text"] for a in st["alerts"])
+
+
+def test_storage_part_is_left_out_when_there_is_nothing():
+    fake = FakeOmv()
+    try:
+        saved = dict(STORAGE_CALLS)
+        for key in STORAGE_CALLS:
+            STORAGE_CALLS[key] = {"total": 0, "data": []} if key[0] != "DiskMgmt" else []
+        assert "storage" not in plugin.fetch(fake.config())
+    finally:
+        STORAGE_CALLS.update(saved)
+        fake.close()

@@ -8,6 +8,8 @@ Talks to OpenMediaVault's JSON-RPC interface, read-only. OMV 6, 7 and 8 use the 
     Network.enumerateDevices       network cards with address and MAC
     Compose.getContainerList       Docker containers (plugin openmediavault-compose, also with Podman)
     Kvm.getVmList / Kvm.enumerateVmNic   virtual machines and their MAC addresses (plugin openmediavault-kvm)
+    FileSystemMgmt.getList, DiskMgmt.enumerateDevices, Smart.getList, Smb.getShareList, Nfs.getShareList   file systems, disks with their S.M.A.R.T.
+                          status and the shares (the Storage page)
     Session.logout
 
 Standard library only. A refused login is reported with `auth_failed` so Netlens stops retrying until the user acts. The two
@@ -159,13 +161,24 @@ class Omv:
                 raise
             except OmvError:
                 pass
-        return {"info": info, "devices": devices if isinstance(devices, list) else [], "containers": _rows(containers), "machines": rows, "nics": nics, "notes": notes}
+        storage = {
+            "filesystems": _rows(self.optional(notes, "file systems", "FileSystemMgmt", "getList", LIST)),
+            "disks": _list(self.optional(notes, "disks", "DiskMgmt", "enumerateDevices")),
+            "smart": _rows(self.optional(notes, "S.M.A.R.T. status", "Smart", "getList", LIST)),
+            "smb": _rows(self.optional(notes, "SMB shares", "Smb", "getShareList", LIST)),
+            "nfs": _rows(self.optional(notes, "NFS shares", "Nfs", "getShareList", LIST)),
+        }
+        return {"info": info, "devices": devices if isinstance(devices, list) else [], "containers": _rows(containers), "machines": rows, "nics": nics, "storage": storage, "notes": notes}
 
 
 def _rows(data):
     """OMV's lists come as {"total": n, "data": [...]}."""
     items = data.get("data") if isinstance(data, dict) else data
     return [x for x in items if isinstance(x, dict)] if isinstance(items, list) else []
+
+
+def _list(data):
+    return [x for x in data if isinstance(x, dict)] if isinstance(data, list) else []
 
 
 # ----------------------------------------------------------------------------- turning OMV's answers into Netlens' format
@@ -256,6 +269,69 @@ def to_hypervisor(snapshot, connect_host=""):
     return {"hosts": [host], "guests": unique}
 
 
+# ----------------------------------------------------------------------------- storage (file systems, disks, shares)
+RANK = {"unknown": 0, "ok": 1, "warning": 2, "critical": 3}
+
+
+def _num(value):
+    """OMV gives sizes as numbers or as text."""
+    try:
+        number = int(float(str(value)))
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def _smart_state(text):
+    status = str(text or "").upper()
+    if status in ("", "GOOD", "OK"):
+        return "ok"
+    return "failed" if status in ("BAD", "BAD_STATUS", "FAILED") else "degraded"
+
+
+def to_storage(snapshot, connect_host=""):
+    """The storage part of the output: file systems (as pools), disks with their S.M.A.R.T. status and the shares (the Storage page)."""
+    host = _host(snapshot, connect_host)
+    sid = host["id"]
+    data = snapshot.get("storage") or {}
+    pools, disks, volumes, alerts, level = [], [], [], [], "ok"
+    for fs in data.get("filesystems") or []:
+        device = str(fs.get("devicefile") or fs.get("uuid") or "")
+        if not device:
+            continue
+        status = fs.get("status")
+        health = "critical" if status == 3 else "warning" if fs.get("mounted") is False else "ok"
+        name = str(fs.get("label") or device)
+        pools.append({"id": f"fs:{fs.get('uuid') or device}", "system_id": sid, "name": name[:100], "total": _num(fs.get("size")), "used": _num(fs.get("used")), "avail": _num(fs.get("available")),
+                      "health": health, "raid": str(fs.get("type") or "")[:60]})
+        if health != "ok":
+            alerts.append({"id": f"fs:{fs.get('uuid') or device}", "system_id": sid, "severity": health, "text": f"File system {name} is {'missing' if status == 3 else 'not mounted'}"})
+        level = max(level, health, key=lambda x: RANK[x])
+    smart = {str(x.get("devicefile")): x for x in data.get("smart") or []}
+    seen = set()
+    for d in list(data.get("disks") or []) + list(data.get("smart") or []):
+        device = str(d.get("devicefile") or "")
+        if not device or device in seen:
+            continue
+        seen.add(device)
+        info = smart.get(device, {})
+        state = _smart_state(info.get("overallstatus"))
+        disks.append({"id": f"disk:{device}", "system_id": sid, "name": device[:100], "slot": "", "model": str(d.get("model") or info.get("model") or "")[:100],
+                      "size": _num(d.get("size") or info.get("size")), "state": state})
+        if state != "ok":
+            alerts.append({"id": f"disk:{device}:{state}", "system_id": sid, "severity": "critical" if state == "failed" else "warning", "text": f"Disk {device}: S.M.A.R.T. status {info.get('overallstatus')}"})
+            level = max(level, "critical" if state == "failed" else "warning", key=lambda x: RANK[x])
+    for kind, rows, label in (("smb", data.get("smb"), "name"), ("nfs", data.get("nfs"), "client")):
+        for share in rows or []:
+            name = str(share.get("name") or share.get(label) or share.get("mntentref") or "")
+            if name:
+                volumes.append({"id": f"{kind}:{share.get('uuid') or name}", "system_id": sid, "pool_id": None, "name": name[:200], "kind": "share", "protocol": kind, "size": None, "used": None, "health": "ok", "clients": []})
+    system = {"id": sid, "name": host["name"], "ip": host.get("ip"), "vendor": "OpenMediaVault", "model": "", "version": str(snapshot["info"].get("version") or "")[:60], "serial": "",
+              "online": True, "health": level if pools or disks else "unknown", "warnings": []}
+    controllers = [{"id": f"{sid}:host", "system_id": sid, "name": host["name"], "ip": host.get("ip"), "mac": host.get("mac"), "online": True, "health": "unknown"}] if host.get("ip") or host.get("mac") else []
+    return {"systems": [system], "controllers": controllers, "pools": pools, "volumes": volumes, "disks": disks, "alerts": alerts[:200]}
+
+
 # ----------------------------------------------------------------------------- settings and entry points
 def _servers(config):
     rows = config.get("servers")
@@ -289,7 +365,11 @@ def _fetch_one(one):
         snapshot = client.snapshot()
     finally:
         client.close()
-    return to_hypervisor(snapshot, client.host), snapshot
+    out = to_hypervisor(snapshot, client.host)
+    storage = to_storage(snapshot, client.host)
+    if storage["pools"] or storage["disks"]:
+        out["storage"] = storage
+    return out, snapshot
 
 
 def test(config):
@@ -311,18 +391,24 @@ def fetch(config):
     if len(results) == 1:
         return results[0]
     hosts, guests, taken = [], [], set()
+    storage = {k: [] for k in ("systems", "controllers", "pools", "volumes", "disks", "alerts")}
     for out in results:
+        for key in storage:
+            storage[key] += (out.get("storage") or {}).get(key, [])
         hosts += out["hosts"]
         for g in out["guests"]:
             if g["id"] in taken:
                 g = {**g, "id": f"{g['host_id']}/{g['id']}"}
             taken.add(g["id"])
             guests.append(g)
-    return {"hosts": hosts, "guests": guests}
+    out = {"hosts": hosts, "guests": guests}
+    if storage["systems"]:
+        out["storage"] = storage
+    return out
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
-KEEP_WORDS = {"state", "type", "virttype", "link", "status_code", "authenticated", "status"}
+KEEP_WORDS = {"state", "type", "virttype", "link", "status_code", "authenticated", "status", "overallstatus", "mounted"}
 
 
 def describe(value, key=""):
@@ -367,7 +453,9 @@ def diagnose(config):
     report = {"steps": {}}
     try:
         for name, service, method, params in (("system", "System", "getInformation", None), ("network", "Network", "enumerateDevices", None),
-                                              ("containers", "Compose", "getContainerList", LIST), ("virtual_machines", "Kvm", "getVmList", LIST)):
+                                              ("containers", "Compose", "getContainerList", LIST), ("virtual_machines", "Kvm", "getVmList", LIST),
+                                              ("file_systems", "FileSystemMgmt", "getList", LIST), ("disks", "DiskMgmt", "enumerateDevices", None), ("smart", "Smart", "getList", LIST),
+                                              ("smb_shares", "Smb", "getShareList", LIST), ("nfs_shares", "Nfs", "getShareList", LIST)):
             try:
                 report["steps"][name] = {"ok": True, "shape": describe(client._rpc(service, method, params))}
             except Exception as exc:  # noqa: BLE001 - the point is to record what failed
@@ -379,6 +467,8 @@ def diagnose(config):
                                 "by_kind": {k: sum(1 for g in out["guests"] if g["kind"] == k) for k in ("container", "qemu", "lxc")},
                                 "guests_with_ports": sum(1 for g in out["guests"] if g["details"].get("ports")), "guests_with_mac": sum(1 for g in out["guests"] if g["macs"]),
                                 "not_available": [_problem(RuntimeError(n), client) for n in snapshot["notes"]]}
+            st = to_storage(snapshot, client.host)
+            report["result"]["storage"] = {"file_systems": len(st["pools"]), "disks": len(st["disks"]), "shares": len(st["volumes"]), "alerts": len(st["alerts"]), "health": st["systems"][0]["health"]}
         except Exception as exc:  # noqa: BLE001
             report["error"] = _problem(exc, client)
     finally:

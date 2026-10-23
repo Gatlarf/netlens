@@ -1,11 +1,11 @@
 {
   "id": "qnap",
   "name": "QNAP",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
-  "description": "Shows a QNAP NAS (QTS 5 or QuTS hero with Container Station 3) as a host with its Container Station containers as guests: state, image, compose project, the ports they publish, and the address of a container that has its own IP on your network. Reads through Container Station's web API, read-only. Needs an account in the administrators group (Container Station offers no read-only role).",
+  "description": "Shows a QNAP NAS (QTS 5 or QuTS hero with Container Station 3) as a host with its Container Station containers as guests: state, image, compose project, the ports they publish, and the address of a container that has its own IP on your network. Reads through Container Station's web API, read-only. Needs an account in the administrators group (Container Station offers no read-only role). Also fills the Storage page (Netlens 0.4.180).",
   "info": {
     "title": "Set up a user for Netlens on the QNAP",
     "text": "Container Station's web API only lets administrators in, so Netlens needs an account of its own in the administrators group. Keep it dedicated and small: in QTS open Control Panel > Privilege > Users > Create, name it netlens with a long random password, put it in the administrators group, and deny it every shared folder. Do not switch on 2-step verification for this account (a program cannot answer it). In Control Panel > Security > Security Level allow access only from the machine Netlens runs on. The address is the QTS web address: https://<NAS address>:443 (or http://<NAS address>:8080); leave 'Verify TLS certificate' off while the NAS uses its self-signed certificate. Netlens signs in for a few seconds at each sync and signs out again.",

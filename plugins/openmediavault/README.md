@@ -23,11 +23,18 @@ Press **Run diagnostic** on the plugin's page. It signs in once and shows which 
 
 A NAS without the *compose* or *kvm* plugin is shown with what it has; the test message names what is missing.
 
+## Storage page
+
+Since version 1.1.0 (Netlens 0.4.180 or newer) the plugin also fills the **Storage** page with file systems (as pools, with size and free space and a warning when one is not mounted), disks with their S.M.A.R.T. status, and the SMB and NFS shares. Events: *Storage problem*, *Storage recovered* and *Disk filling up* go through the usual notification channels. Nothing extra is needed on the NAS; the same user and the same read-only calls.
+
 ## What was tested
 
 Tested on a **real OpenMediaVault 8.5.12** (Debian 13) with the openmediavault-compose plugin 8.2.3: login (right and wrong password), system information, network cards, and the Docker container list (35 real containers, with the real port strings). The container list is read with OMV's own Docker view, so the plugin sees the same containers as the OMV web page.
 
 **Not tested on a real system:** the *openmediavault-kvm* part (virtual machines, LXC and their MAC addresses) was written from that plugin's source code and tested against a simulator only; OpenMediaVault 6 and 7 use the same calls but were not run. A tester with KVM on OMV is welcome.
+
+**Storage page:** The storage calls (`FileSystemMgmt.getList`, `DiskMgmt.enumerateDevices`, `Smart.getList`, `Smb.getShareList`, `Nfs.getShareList`) answer on a real OMV 8.5.12, but its lab container has no disks, so the field mapping is tested against a simulator.
+
 
 ## Notes for reviewers
 

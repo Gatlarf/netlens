@@ -234,6 +234,21 @@ def _insert_links(conn: sqlite3.Connection, plugin_id: str, kind: str, pairs: li
 
 
 def apply_plugin(conn: sqlite3.Connection, plugin: Plugin) -> dict:
+    """(Re)build what the plugin's last stored output says; a `storage` part of any plugin kind goes to the Storage page."""
+    summary = _apply_kind(conn, plugin)
+    if plugin.manifest["kind"] == "storage":
+        return summary
+    from app import storage
+
+    data = _load_json(conn, _key(plugin.id, "data"))
+    if isinstance(data, dict) and data.get("storage"):
+        summary = {**(summary or {}), "storage": storage.apply_storage(conn, plugin.id, data["storage"], get_state(conn, plugin)["config"])}
+    elif isinstance(data, dict):
+        storage.remove_plugin(conn, plugin.id)             # the plugin no longer reports storage
+    return summary
+
+
+def _apply_kind(conn: sqlite3.Connection, plugin: Plugin) -> dict:
     """(Re)build the plugin's guests and links from its last stored output. Call after every relation re-inference.
 
     Links the user deleted (manual = -1) stay hidden and manual links are never touched.

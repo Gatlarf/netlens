@@ -25,9 +25,16 @@ A refused login stops automatic syncing until you save the settings or press *Sy
 
 Press **Run diagnostic** on the plugin's page. It signs in once and shows which calls worked and the **names and types of the fields**, not their content; names, addresses and MAC addresses are removed. **Copy** or **Download** it and send it to whoever maintains the plugin.
 
+## Storage page
+
+Since version 1.1.0 (Netlens 0.4.180 or newer) the plugin also fills the **Storage** page with the volumes with their size and free space, and the disks with their S.M.A.R.T. health. Events: *Storage problem*, *Storage recovered* and *Disk filling up* go through the usual notification channels. Nothing extra is needed on the NAS; the same user and the same read-only calls.
+
 ## What was tested
 
 **Written from QNAP's published QTS login documentation and the open-source `qnap-containerstation-mcp` client** (it uses `/container-station/api/v1/login`, `/container`, `/apps`) and tested against a **simulated QNAP only**. QNAP has no free image, so **nothing has been run against a real QNAP yet**. Container Station's container list is not documented: the shape of the published ports (`tcpPort`) and of `externalIP` is a best guess that accepts several forms, and the QTS system information (host name, model, firmware) is optional. A diagnostic report from a real NAS will show what to adjust. Virtual machines of *Virtualization Station* are not read (no documented API).
+
+**Storage page:** The storage part reads QTS' XML tolerantly (volume and disk records are found by their field names), because the exact format differs between QTS versions and could not be checked on a real QNAP. If the Storage page stays empty, press **Run diagnostic** and send the report: it lists the XML tag names that were found.
+
 
 ## Notes for reviewers
 

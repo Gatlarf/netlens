@@ -120,3 +120,24 @@ def test_api_and_device_detail(tmp_path):
     body = client.get("/api/storage").json()
     assert body["summary"]["systems"] == 1 and body["pools"][0]["percent"] == 50.0
     assert client.get(f"/api/devices/{device_id}").json()["storage"]["systems"][0]["vendor"] == "NetApp"
+
+
+def test_a_hypervisor_plugin_can_also_report_storage(conn):
+    import json
+
+    from app.db import set_setting
+    from app.plugins.registry import discover
+    from app.plugins.service import _key, apply_plugin
+
+    out = validate_output("hypervisor", {"hosts": [{"id": "h", "name": "nas", "ip": "10.0.0.5"}], "guests": [], "storage": json.loads(json.dumps(doc()))})
+    assert out["storage"]["systems"][0]["name"] == "ontap1"
+    assert "storage" not in validate_output("hypervisor", {"hosts": [], "guests": []})
+    with pytest.raises(ContractError):
+        validate_output("hypervisor", {"hosts": [], "guests": [], "storage": {"pools": [{"id": "p", "system_id": "missing"}]}})
+    plugin = discover(None)["proxmox"]
+    set_setting(conn, _key("proxmox", "data"), json.dumps(out))
+    assert apply_plugin(conn, plugin)["storage"]["systems"] == 1
+    assert storage.overview(conn)["systems"][0]["plugin_id"] == "proxmox"
+    set_setting(conn, _key("proxmox", "data"), json.dumps({"hosts": [], "guests": []}))
+    apply_plugin(conn, plugin)
+    assert storage.overview(conn)["systems"] == []                      # the plugin stopped reporting storage

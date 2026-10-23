@@ -1,11 +1,11 @@
 {
   "id": "truenas",
   "name": "TrueNAS",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
-  "description": "Reads a TrueNAS (Community Edition 25.04 or newer) and shows it as a host with what runs on it: containers and virtual machines (matched to the devices on your network by IP or MAC address) and apps. Read-only: one login with an API key, a few reads, then it disconnects.",
+  "description": "Reads a TrueNAS (Community Edition 25.04 or newer) and shows it as a host with what runs on it: containers and virtual machines (matched to the devices on your network by IP or MAC address) and apps. Also reports the Storage page (needs Netlens 0.4.180): pools with their fill level and health, their disks, NFS and SMB shares and open alerts. Read-only: one login with an API key, a few reads, then it disconnects.",
   "timeout": 60,
   "diagnose": true,
   "config": [

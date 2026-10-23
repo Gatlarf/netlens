@@ -27,6 +27,13 @@ SYSINFO = "<?xml version='1.0'?><QDocRoot><func><ownContent><root><sysHostName>q
 LOGIN = "<?xml version='1.0'?><QDocRoot><authPassed><![CDATA[1]]></authPassed><authSid><![CDATA[sid42]]></authSid><isAdmin><![CDATA[1]]></isAdmin></QDocRoot>"
 
 
+VOLUMES_XML = """<?xml version="1.0"?><QDocRoot><volumeList><volumeUse><volumeLabel>DataVol1</volumeLabel><total_size>4000000000000</total_size><free_size>1000000000000</free_size></volumeUse>
+<volumeUse><volumeLabel>Empty</volumeLabel><total_size>0</total_size><free_size>0</free_size></volumeUse></volumeList></QDocRoot>"""
+DISKS_XML = """<?xml version="1.0"?><QDocRoot><Disk_Info><entry><HDNo>1</HDNo><Model>WDC WD40EFRX</Model><Capacity>4000787030016</Capacity><Health>GOOD</Health><Serial>S1</Serial></entry>
+<entry><HDNo>2</HDNo><Model>ST4000</Model><Capacity>4000787030016</Capacity><Health>Abnormal</Health><Serial>S2</Serial></entry>
+<entry><HDNo>3</HDNo><Model>ST4000</Model><Capacity>4000</Capacity><Health>7</Health><Serial>S3</Serial></entry></Disk_Info></QDocRoot>"""
+
+
 class FakeQnap:
     def __init__(self, qts=True, no_station=False):
         self.qts, self.no_station, self.calls = qts, no_station, []
@@ -79,6 +86,10 @@ class FakeQnap:
                     if self.path.endswith("/container"):
                         return self._send(200, CONTAINERS)
                     return self._send(200, {} if self.path.endswith("/apps") else [])
+                if self.path.startswith("/cgi-bin/management/chartReq.cgi") and "sid=sid42" in self.path:
+                    return self._send(200, VOLUMES_XML, "text/xml")
+                if self.path.startswith("/cgi-bin/disk/qsmart.cgi") and "sid=sid42" in self.path:
+                    return self._send(200, DISKS_XML, "text/xml")
                 if self.path.startswith("/cgi-bin/management/manaRequest.cgi") and "sid=sid42" in self.path:
                     return self._send(200, SYSINFO, "text/xml")
                 self._send(200, "")
@@ -176,3 +187,20 @@ def test_diagnostic_never_contains_names_or_addresses(qnap):
     for leak in ("nginx", "unifi", "qnap-kelder", "TS-464", "192.168", "127.0.0.1", "good-pass"):
         assert leak not in report, leak
     assert '"ok": true' in report
+
+
+def test_storage_part_is_read_tolerantly_from_qts_xml(qnap):
+    st = validate_output("hypervisor", plugin.fetch(qnap.config()))["storage"]
+    pools = {p["name"]: p for p in st["pools"]}
+    assert set(pools) == {"DataVol1"} and pools["DataVol1"]["total"] == 4000000000000 and pools["DataVol1"]["avail"] == 1000000000000 and pools["DataVol1"]["used"] == 3000000000000
+    disks = {d["name"]: d for d in st["disks"]}
+    assert disks["1"]["state"] == "ok" and disks["2"]["state"] == "failed" and disks["3"]["state"] == "unknown" and disks["1"]["model"] == "WDC WD40EFRX"
+    assert st["systems"][0]["vendor"] == "QNAP" and st["systems"][0]["health"] == "critical"
+
+
+def test_without_qts_there_is_no_storage_part():
+    server = FakeQnap(qts=False) if "FakeQnap" in globals() else None
+    try:
+        assert "storage" not in plugin.fetch(server.config())
+    finally:
+        server.close()

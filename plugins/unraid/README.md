@@ -21,9 +21,16 @@ The key travels in a request header only. If your server redirects http to https
 
 Press **Run diagnostic** on the plugin's page. It asks the server the plugin's questions once and shows which worked and the **names and types of the fields**, not their content; names, addresses and MAC addresses are removed. **Copy** or **Download** it and send it to whoever maintains the plugin. The plugin tries the current query names and the older ones (`dockerContainers`), and names what the server could not answer.
 
+## Storage page
+
+Since version 1.1.0 (Netlens 0.4.180 or newer) the plugin also fills the **Storage** page with the array and the cache disks as pools (events when a pool fills up), every disk with its state and error count, and the shares. Events: *Storage problem*, *Storage recovered* and *Disk filling up* go through the usual notification channels. Nothing extra is needed on the NAS; the same user and the same read-only calls.
+
 ## What was tested
 
 **Written from the published GraphQL schema** (`unraid/api`, `generated-schema.graphql`) and tested against a **simulated Unraid API only**. Unraid has no free image to run in a lab, so **nothing has been run against a real Unraid server yet**. Please send a diagnostic report when you try it. Things to watch: whether `networkSettings` carries MAC addresses for containers on `br0`, and whether virtual machines can be matched (the API gives them no MAC address, so they are listed under the server but matched by name only).
+
+**Storage page:** Written from the published GraphQL schema (`array`, `shares`) and tested against a simulator only.
+
 
 ## Notes for reviewers
 

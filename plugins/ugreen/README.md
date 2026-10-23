@@ -19,9 +19,16 @@ The password is encrypted with the NAS' own public key (RSA) before it is sent, 
 
 Press **Run diagnostic** on the plugin's page. It signs in once and shows which calls worked and the **names and types of the fields**, not their content; names, addresses and MAC addresses are removed. **Copy** or **Download** it and send it to whoever maintains the plugin.
 
+## Storage page
+
+Since version 1.1.0 (Netlens 0.4.180 or newer) the plugin also fills the **Storage** page with the volumes (as pools, with the RAID level and state) and the disks with their health. Events: *Storage problem*, *Storage recovered* and *Disk filling up* go through the usual notification channels. Nothing extra is needed on the NAS; the same user and the same read-only calls.
+
 ## What was tested
 
 **Written from the community's API notes** (confirmed there on a UGREEN DH4300 Plus, firmware 1.13.1.0105) and tested against a **simulated UGOS only**, including the RSA encryption (checked by decrypting with the matching private key). It has **not been run against a real UGREEN NAS**. The shape of the published ports in the container list is not documented, so several forms are accepted. Please send a diagnostic report when you try it.
+
+**Storage page:** Written from the published UGOS API notes (`/ugreen/v1/storage/disks`, `/storage/volumes`) and tested against a simulator only.
+
 
 ## Notes for reviewers
 

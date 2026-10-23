@@ -80,6 +80,13 @@ class FakeUgos:
                     return self._send({"code": 200, "data": MACHINE})
                 if self.path == "/ugreen/v1/ShowContainerDetailListV2":
                     return self._send({"code": 200, "data": CONTAINERS})
+                if self.path == "/ugreen/v1/storage/disks":
+                    return self._send({"code": 200, "data": [{"slot": 1, "name": "Hard Drive 1", "model": "WDC WD100", "serial": "S1", "capacity": 9771050598400, "health": "Good"},
+                                                              {"slot": 2, "name": "Hard Drive 2", "model": "ST4000", "serial": "S2", "capacity": 4000, "health": "Failed"},
+                                                              {"slot": 3, "name": "Hard Drive 3", "serial": "S3", "capacity": 4000, "health": "Warning"}]})
+                if self.path == "/ugreen/v1/storage/volumes":
+                    return self._send({"code": 200, "data": [{"name": "VOLUME1", "raid_level": "RAID5", "total": 26321794252800, "used": 2555053056000, "status": "healthy"},
+                                                              {"name": "VOLUME2", "raid_level": "RAID1", "total": 1000, "used": 10, "status": "degraded"}]})
                 self._send({"code": 200, "data": []})
 
         self.server = HTTPServer(("127.0.0.1", 0), Handler)
@@ -175,3 +182,13 @@ def test_diagnostic_never_contains_names_or_addresses(ugos):
     for leak in ("pihole", "grafana", "Nyx", "H43001", "192.168", "AA:BB", "127.0.0.1", "good-pass"):
         assert leak not in report, leak
     assert '"ok": true' in report
+
+
+def test_storage_part_has_volumes_and_disks(ugos):
+    st = validate_output("hypervisor", plugin.fetch(ugos.config()))["storage"]
+    pools = {p["name"]: p for p in st["pools"]}
+    assert pools["VOLUME1"]["raid"] == "RAID5" and pools["VOLUME1"]["health"] == "ok" and pools["VOLUME1"]["avail"] == 26321794252800 - 2555053056000
+    assert pools["VOLUME2"]["health"] == "warning"
+    disks = {d["name"]: d for d in st["disks"]}
+    assert disks["Hard Drive 1"]["state"] == "ok" and disks["Hard Drive 2"]["state"] == "failed" and disks["Hard Drive 3"]["state"] == "degraded"
+    assert st["systems"][0]["vendor"] == "UGREEN" and st["systems"][0]["health"] == "critical"

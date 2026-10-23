@@ -11,6 +11,8 @@ Talks to the DSM web API over HTTPS, read-only:
     SYNO.Docker.Container         containers of Container Manager (Docker on older DSM)
     SYNO.Virtualization.API.Guest virtual machines of Virtual Machine Manager
     SYNO.Core.Package             installed packages and whether they run
+    SYNO.Storage.CGI.Storage      storage pools, volumes and disks with their status
+    SYNO.Core.Share               shared folders
 
 Standard library only. A refused login is reported with `auth_failed` so Netlens stops retrying until the user acts (that
 protects the account from being blocked by DSM's auto-block). Every list is optional: a NAS without Virtual Machine Manager
@@ -26,7 +28,7 @@ import urllib.parse
 import urllib.request
 
 MAX_INSPECT = 60                  # containers whose details are read (one request each)
-APIS = ("SYNO.DSM.Info", "SYNO.Core.Network", "SYNO.Core.Network.Interface", "SYNO.Docker.Container", "SYNO.Virtualization.API.Guest", "SYNO.Core.Package")
+APIS = ("SYNO.DSM.Info", "SYNO.Core.Network", "SYNO.Core.Network.Interface", "SYNO.Docker.Container", "SYNO.Virtualization.API.Guest", "SYNO.Core.Package", "SYNO.Storage.CGI.Storage", "SYNO.Core.Share")
 SESSION = "Netlens"
 
 AUTH_ERRORS = {
@@ -198,8 +200,10 @@ class DSM:
         self.inspect_containers(containers, notes)
         machines = self.optional(notes, "virtual machines", "SYNO.Virtualization.API.Guest", "list", 1)
         packages = self.optional(notes, "packages", "SYNO.Core.Package", "list", 1, additional=json.dumps(["status"]))
+        storage = self.optional(notes, "storage", "SYNO.Storage.CGI.Storage", "load_info", 1)
+        shares = self.optional(notes, "shared folders", "SYNO.Core.Share", "list", 1)
         return {"info": info, "network": network if isinstance(network, dict) else {}, "interfaces": interfaces, "containers": containers,
-                "machines": machines, "packages": packages, "notes": notes}
+                "machines": machines, "packages": packages, "storage": storage if isinstance(storage, dict) else {}, "shares": shares, "notes": notes}
 
 
 # ----------------------------------------------------------------------------- turning DSM's answers into Netlens' format
@@ -349,6 +353,74 @@ def to_hypervisor(snapshot, connect_host=""):
 
 
 # ----------------------------------------------------------------------------- settings and entry points
+
+
+# ----------------------------------------------------------------------------- storage (pools, volumes, disks, shares)
+POOL_HEALTH = {"normal": "ok", "background": "ok", "scrubbing": "ok", "expanding": "ok", "degraded": "warning", "repairing": "warning", "attention": "warning", "warning": "warning",
+               "crashed": "critical", "failed": "critical", "critical": "critical"}
+DISK_STATE = {"normal": "ok", "initialized": "ok", "not_use": "spare", "warning": "degraded", "attention": "degraded", "critical": "failed", "crashed": "failed", "failing": "failed"}
+RANK = {"unknown": 0, "ok": 1, "warning": 2, "critical": 3}
+
+
+def _big(value):
+    """DSM gives sizes as text (bytes)."""
+    try:
+        number = int(str(value))
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def to_storage(snapshot, connect_host=""):
+    """The storage part of the output: storage pools, volumes, disks and shared folders (the Storage page)."""
+    host = _host(snapshot, connect_host)
+    sid = host["id"]
+    data = snapshot.get("storage") or {}
+    pools, disks, volumes, alerts, level = [], [], [], [], "ok"
+    for pool in _listing(data.get("storagePools"), "storagePools"):
+        status = str(pool.get("status") or "").lower()
+        health = POOL_HEALTH.get(status, "unknown")
+        size = pool.get("size") if isinstance(pool.get("size"), dict) else {}
+        total, used = _big(size.get("total")), _big(size.get("used"))
+        pid = str(pool.get("id") or pool.get("num_id") or pool.get("desc") or "")
+        pools.append({"id": f"pool:{pid}", "system_id": sid, "name": str(pool.get("desc") or pool.get("id") or "Storage pool")[:100], "total": total, "used": used,
+                      "avail": total - used if total is not None and used is not None else None, "health": health, "raid": str(pool.get("raidType") or pool.get("device_type") or "")[:60]})
+        if health in ("warning", "critical"):
+            alerts.append({"id": f"pool:{pid}:{status}", "system_id": sid, "severity": health, "text": f"Storage pool {pool.get('desc') or pid} is {status}"})
+        level = max(level, health, key=lambda x: RANK[x])
+    pool_of = {str(p.get("pool_path") or ""): f"pool:{p.get('id') or p.get('num_id')}" for p in _listing(data.get("storagePools"), "storagePools") if p.get("pool_path")}
+    for vol in _listing(data.get("volumes"), "volumes"):
+        status = str(vol.get("status") or "").lower()
+        health = POOL_HEALTH.get(status, "unknown")
+        size = vol.get("size") if isinstance(vol.get("size"), dict) else {}
+        vid = str(vol.get("id") or vol.get("num_id") or vol.get("vol_path") or "")
+        total, used = _big(size.get("total")), _big(size.get("used"))
+        volumes.append({"id": f"volume:{vid}", "system_id": sid, "pool_id": pool_of.get(str(vol.get("pool_path") or "")), "name": str(vol.get("vol_path") or vol.get("desc") or vid)[:200],
+                        "kind": "filesystem", "protocol": str(vol.get("fs_type") or "")[:20], "size": total, "used": used, "health": health, "clients": []})
+        if health in ("warning", "critical"):
+            alerts.append({"id": f"volume:{vid}:{status}", "system_id": sid, "severity": health, "text": f"Volume {vol.get('vol_path') or vid} is {status}"})
+        level = max(level, health, key=lambda x: RANK[x])
+    for d in _listing(data.get("disks"), "disks"):
+        state = DISK_STATE.get(str(d.get("status") or "").lower(), "unknown")
+        smart = str(d.get("smart_status") or "normal").lower()
+        if state == "ok" and smart not in ("normal", ""):
+            state = "degraded"
+        name = str(d.get("name") or d.get("id") or "")
+        disks.append({"id": f"disk:{d.get('id') or name}", "system_id": sid, "name": name[:100], "slot": str(d.get("slot_id") or d.get("num_id") or "")[:40],
+                      "model": " ".join(x for x in (str(d.get("vendor") or "").strip(), str(d.get("model") or "").strip()) if x)[:100], "size": _big(d.get("size_total")), "state": state})
+        if state in ("failed", "degraded"):
+            alerts.append({"id": f"disk:{d.get('id') or name}:{state}", "system_id": sid, "severity": "critical" if state == "failed" else "warning", "text": f"Disk {name}: {state}"})
+    for share in _listing(snapshot.get("shares"), "shares"):
+        name = str(share.get("name") or "")
+        if name:
+            volumes.append({"id": f"share:{name}", "system_id": sid, "pool_id": None, "name": name[:200], "kind": "share", "protocol": "", "size": None, "used": None, "health": "ok", "clients": []})
+    info = snapshot["info"]
+    system = {"id": sid, "name": host["name"], "ip": host.get("ip"), "vendor": "Synology", "model": str(info.get("model") or "")[:100], "version": str(info.get("version_string") or "")[:60],
+              "serial": str(info.get("serial") or "")[:60], "online": True, "health": level if pools or volumes or disks else "unknown", "warnings": []}
+    controllers = [{"id": f"{sid}:host", "system_id": sid, "name": host["name"], "ip": host.get("ip"), "mac": host.get("mac"), "online": True, "health": "unknown"}] if host.get("ip") or host.get("mac") else []
+    return {"systems": [system], "controllers": controllers, "pools": pools, "volumes": volumes, "disks": disks, "alerts": alerts[:200]}
+
+
 def _servers(config):
     rows = config.get("servers")
     if not isinstance(rows, list):
@@ -407,7 +479,11 @@ def _fetch_one(one):
         snapshot = dsm.snapshot()
     finally:
         dsm.close()
-    return to_hypervisor(snapshot, dsm.host)
+    out = to_hypervisor(snapshot, dsm.host)
+    storage = to_storage(snapshot, dsm.host)
+    if storage["pools"] or storage["volumes"] or storage["disks"]:
+        out["storage"] = storage
+    return out
 
 
 def fetch(config):
@@ -415,14 +491,20 @@ def fetch(config):
     if len(results) == 1:
         return results[0]
     hosts, guests, taken = [], [], set()
+    storage = {k: [] for k in ("systems", "controllers", "pools", "volumes", "disks", "alerts")}
     for out in results:
+        for key in storage:
+            storage[key] += (out.get("storage") or {}).get(key, [])
         hosts += out["hosts"]
         for g in out["guests"]:
             if g["id"] in taken:
                 g = {**g, "id": f"{g['host_id']}/{g['id']}"}
             taken.add(g["id"])
             guests.append(g)
-    return {"hosts": hosts, "guests": guests}
+    out = {"hosts": hosts, "guests": guests}
+    if storage["systems"]:
+        out["storage"] = storage
+    return out
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
@@ -481,6 +563,8 @@ def diagnose(config):
         step("containers", "SYNO.Docker.Container", "list", 1, limit=-1, offset=0, type="all")
         step("virtual_machines", "SYNO.Virtualization.API.Guest", "list", 1)
         step("packages", "SYNO.Core.Package", "list", 1, additional=json.dumps(["status"]))
+        step("storage", "SYNO.Storage.CGI.Storage", "load_info", 1)
+        step("shares", "SYNO.Core.Share", "list", 1)
         snapshot = dsm.snapshot()
         out = to_hypervisor(snapshot, dsm.host)
         report["result"] = {
@@ -488,6 +572,10 @@ def diagnose(config):
             "by_kind": {k: sum(1 for g in out["guests"] if g["kind"] == k) for k in ("container", "qemu", "app")},
             "guests_with_mac": sum(1 for g in out["guests"] if g["macs"]), "not_available": snapshot["notes"],
         }
+        st = to_storage(snapshot, dsm.host)
+        report["result"]["storage"] = {"pools": len(st["pools"]), "volumes": len([v for v in st["volumes"] if v["kind"] == "filesystem"]), "shares": len([v for v in st["volumes"] if v["kind"] == "share"]),
+                                       "disks": len(st["disks"]), "alerts": len(st["alerts"]), "health": st["systems"][0]["health"],
+                                       "disk_states": {k: sum(1 for d in st["disks"] if d["state"] == k) for k in ("ok", "degraded", "failed", "spare", "unknown")}}
     except Exception as exc:  # noqa: BLE001
         report["error"] = _problem(exc)
     finally:

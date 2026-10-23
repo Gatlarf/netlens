@@ -8,6 +8,7 @@ home-assistant_ugreen-nas). Read-only:
     POST /ugreen/v1/verify/login             the password encrypted with that key (RSA, PKCS#1 v1.5, base64) -> a token
     GET  /ugreen/v1/sysinfo/machine          model, host name, serial, firmware, network cards with MAC addresses
     GET  /ugreen/v1/ShowContainerDetailListV2   Docker containers
+    GET  /ugreen/v1/storage/disks, /ugreen/v1/storage/volumes   disks with their health and the volumes (the Storage page)
 
 Requests carry `Authorization: Bearer <token>` and `App-Id: com.ugreen.nas`. Standard library only: the RSA encryption is done here.
 Because the API is not official, a firmware update can change it; the plugin says what it could not read instead of failing.
@@ -184,7 +185,19 @@ class Ugreen:
         containers = self.data("/ugreen/v1/ShowContainerDetailListV2")
         if isinstance(containers, dict):
             containers = containers.get("list") or containers.get("containers") or containers.get("data") or []
-        return {"machine": machine if isinstance(machine, dict) else {}, "containers": [c for c in containers or [] if isinstance(c, dict)], "notes": notes}
+        storage = {}
+        for key, label, path in (("disks", "disks", "/ugreen/v1/storage/disks"), ("volumes", "volumes", "/ugreen/v1/storage/volumes")):
+            try:
+                rows = self.data(path)
+            except LoginRefused:
+                raise
+            except UgreenError as exc:
+                notes.append(f"{label}: {exc}")
+                rows = None
+            if isinstance(rows, dict):
+                rows = rows.get("list") or rows.get(key) or rows.get("data") or []
+            storage[key] = [r for r in rows or [] if isinstance(r, dict)]
+        return {"machine": machine if isinstance(machine, dict) else {}, "containers": [c for c in containers or [] if isinstance(c, dict)], "storage": storage, "notes": notes}
 
 
 # ----------------------------------------------------------------------------- turning UGOS' answers into Netlens' format
@@ -262,6 +275,62 @@ def to_hypervisor(snapshot, connect_host=""):
 
 
 # ----------------------------------------------------------------------------- settings and entry points
+
+
+# ----------------------------------------------------------------------------- storage (volumes, disks)
+RANK = {"unknown": 0, "ok": 1, "warning": 2, "critical": 3}
+
+
+def _num(value):
+    try:
+        number = int(float(str(value)))
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def _level(text):
+    word = str(text or "").strip().lower()
+    if word in ("", "good", "healthy", "normal", "ok", "online"):
+        return "ok"
+    return "critical" if any(w in word for w in ("fail", "error", "crash", "bad", "critical", "offline", "lost")) else "warning"
+
+
+def to_storage(snapshot, connect_host=""):
+    """The storage part of the output: the volumes (as pools) and the disks with their health (the Storage page)."""
+    host = _host(snapshot, connect_host)
+    sid = host["id"]
+    data = snapshot.get("storage") or {}
+    pools, disks, alerts, level = [], [], [], "ok"
+    for vol in data.get("volumes") or []:
+        name = str(vol.get("name") or "")
+        if not name:
+            continue
+        health = _level(vol.get("status"))
+        total, used = _num(vol.get("total")), _num(vol.get("used"))
+        pools.append({"id": f"volume:{name}", "system_id": sid, "name": name[:100], "total": total, "used": used, "avail": total - used if total is not None and used is not None else None,
+                      "health": health, "raid": str(vol.get("raid_level") or "")[:60]})
+        if health != "ok":
+            alerts.append({"id": f"volume:{name}:{vol.get('status')}", "system_id": sid, "severity": health, "text": f"Volume {name} is {str(vol.get('status') or 'not healthy').lower()}"})
+        level = max(level, health, key=lambda x: RANK[x])
+    for d in data.get("disks") or []:
+        name = str(d.get("name") or d.get("slot") or "")
+        if not name:
+            continue
+        health = _level(d.get("health"))
+        state = "ok" if health == "ok" else "failed" if health == "critical" else "degraded"
+        disks.append({"id": f"disk:{d.get('serial') or name}", "system_id": sid, "name": name[:100], "slot": str(d.get("slot") or "")[:40], "model": str(d.get("model") or "")[:100],
+                      "size": _num(d.get("capacity")), "state": state})
+        if state != "ok":
+            alerts.append({"id": f"disk:{d.get('serial') or name}:{state}", "system_id": sid, "severity": health, "text": f"Disk {name}: {str(d.get('health')).lower()}"})
+            level = max(level, health, key=lambda x: RANK[x])
+    machine = snapshot["machine"]
+    system = {"id": sid, "name": host["name"], "ip": host.get("ip"), "vendor": "UGREEN", "model": str(machine.get("model") or "")[:100], "version": str(machine.get("firmware_version") or "")[:60],
+              "serial": str(machine.get("serial_number") or "")[:60], "online": True, "health": level if pools or disks else "unknown", "warnings": []}
+    controllers = [{"id": f"{sid}:host", "system_id": sid, "name": host["name"], "ip": host.get("ip"), "mac": host.get("mac"), "online": True, "health": "unknown"}] if host.get("ip") or host.get("mac") else []
+    return {"systems": [system], "controllers": controllers, "pools": pools, "volumes": [], "disks": disks, "alerts": alerts[:200]}
+
+
 def _servers(config):
     rows = config.get("servers")
     if not isinstance(rows, list):
@@ -291,7 +360,11 @@ def _fetch_one(one):
     client = Ugreen(one)
     client.open()
     snapshot = client.snapshot()
-    return to_hypervisor(snapshot, client.host), snapshot
+    out = to_hypervisor(snapshot, client.host)
+    storage = to_storage(snapshot, client.host)
+    if storage["pools"] or storage["disks"]:
+        out["storage"] = storage
+    return out, snapshot
 
 
 def test(config):
@@ -312,18 +385,24 @@ def fetch(config):
     if len(results) == 1:
         return results[0]
     hosts, guests, taken = [], [], set()
+    storage = {k: [] for k in ("systems", "controllers", "pools", "volumes", "disks", "alerts")}
     for out in results:
+        for key in storage:
+            storage[key] += (out.get("storage") or {}).get(key, [])
         hosts += out["hosts"]
         for g in out["guests"]:
             if g["id"] in taken:
                 g = {**g, "id": f"{g['host_id']}/{g['id']}"}
             taken.add(g["id"])
             guests.append(g)
-    return {"hosts": hosts, "guests": guests}
+    out = {"hosts": hosts, "guests": guests}
+    if storage["systems"]:
+        out["storage"] = storage
+    return out
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)
-KEEP_WORDS = {"code", "status", "state", "protocol", "type", "cpu_arch"}
+KEEP_WORDS = {"code", "status", "state", "protocol", "type", "cpu_arch", "health", "raid_level"}
 
 
 def describe(value, key=""):
@@ -366,7 +445,8 @@ def diagnose(config):
     client = Ugreen(_servers(config)[0])
     client.open()                          # a refused login is reported as such (and stops automatic syncing), like test()
     report = {"steps": {}}
-    for name, path in (("machine", "/ugreen/v1/sysinfo/machine"), ("containers", "/ugreen/v1/ShowContainerDetailListV2"), ("network", "/ugreen/v1/network/interfaces")):
+    for name, path in (("machine", "/ugreen/v1/sysinfo/machine"), ("containers", "/ugreen/v1/ShowContainerDetailListV2"), ("network", "/ugreen/v1/network/interfaces"),
+                       ("disks", "/ugreen/v1/storage/disks"), ("volumes", "/ugreen/v1/storage/volumes")):
         try:
             report["steps"][name] = {"ok": True, "shape": describe(client._json("GET", path)[1])}
         except Exception as exc:  # noqa: BLE001 - the point is to record what failed
@@ -376,6 +456,8 @@ def diagnose(config):
         out = to_hypervisor(snapshot, client.host)
         report["result"] = {"host_has_ip": "ip" in out["hosts"][0], "host_has_mac": "mac" in out["hosts"][0], "guests": len(out["guests"]),
                             "guests_with_ports": sum(1 for g in out["guests"] if g["details"].get("ports")), "not_available": [_problem(RuntimeError(n), client) for n in snapshot["notes"]]}
+        st = to_storage(snapshot, client.host)
+        report["result"]["storage"] = {"volumes": len(st["pools"]), "disks": len(st["disks"]), "alerts": len(st["alerts"]), "health": st["systems"][0]["health"]}
     except Exception as exc:  # noqa: BLE001
         report["error"] = _problem(exc, client)
     return report

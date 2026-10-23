@@ -27,6 +27,10 @@ A refused login stops automatic syncing until you save the settings or press *Sy
 
 Press **Run diagnostic** on the plugin's page. It signs in once with the values in the form and shows a report of what DSM answered: which APIs exist and which steps worked (DSM info, network, containers, virtual machines, packages), and the **names and types of the fields**, not their content. Names, addresses and MAC addresses are removed. **Copy** or **Download** it and send it to whoever maintains the plugin.
 
+## Storage page
+
+Since version 1.1.0 (Netlens 0.4.180 or newer) the plugin also fills the **Storage** page with storage pools, volumes with their fill level and state, the disks with their health, and the shared folders. Events: *Storage problem*, *Storage recovered* and *Disk filling up* go through the usual notification channels. Nothing extra is needed on the NAS; the same user and the same read-only calls.
+
 ## What was tested
 
 **Confirmed on real Synology hardware** by the maintainer (2026-10-20; model and DSM version were not recorded). Written from the public DSM web API and first tested against a **simulated DSM**. Since then it has also run against a **real DSM 7.2.2 (a virtual DSM, `virtual-dsm`) with Container Manager 24.0.2**: login, DSM info, network, containers and packages all work. What that showed, and what the plugin does about it:
@@ -35,6 +39,9 @@ Press **Run diagnostic** on the plugin's page. It signs in once with the values 
 - DSM's network card list has **no MAC addresses**, so the NAS itself is matched by its IP address.
 - A container on Docker's own bridge (`02:42:...`) is internal and is not offered as a device; a container on a **macvlan** network (its own MAC and IP on your network) is, so it is matched to the device Netlens found.
 - **Virtual Machine Manager** is not installed on a virtual DSM, so the VM list is only tested against the simulator. A tester with a **DS923+** or similar is welcome.
+
+**Storage page:** The volumes and shared folders were read from a real **DSM 7.2.2 (virtual DSM)**. Storage pools and physical disks do not exist on a virtual DSM, so those two parts follow DSM's API shape and are tested against a simulator only.
+
 
 ## Notes for reviewers
 

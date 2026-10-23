@@ -1,11 +1,11 @@
 {
   "id": "ugreen",
   "name": "UGREEN",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
-  "description": "Shows a UGREEN NAS (UGOS or UGOS Pro) as a host with its Docker containers as guests: state, image and published ports. UGREEN has no public API: this uses the web API of the UGOS web page itself (port 9443), as documented by the community, so a firmware update can change it. Read-only; the password is encrypted with the NAS' own public key before it is sent.",
+  "description": "Shows a UGREEN NAS (UGOS or UGOS Pro) as a host with its Docker containers as guests: state, image and published ports. UGREEN has no public API: this uses the web API of the UGOS web page itself (port 9443), as documented by the community, so a firmware update can change it. Read-only; the password is encrypted with the NAS' own public key before it is sent. Also fills the Storage page (Netlens 0.4.180).",
   "info": {
     "title": "Set up a user for Netlens on the UGREEN NAS",
     "text": "UGREEN publishes no API, so Netlens uses the one the UGOS web page uses (https://<NAS address>:9443). Make a user of its own: in UGOS open Control Panel > Users > Add, name it netlens with a long random password, and give it administrator rights (the Docker list needs them); allow it no shared folders. Keep two-step verification off for this user. UGOS locks an account for a few minutes after wrong passwords, so Netlens stops retrying by itself after a refused login. Leave 'Verify TLS certificate' off while the NAS uses its self-signed certificate.",

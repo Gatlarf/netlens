@@ -21,9 +21,16 @@ A refused login stops automatic syncing until you save the settings or press *Sy
 
 Press **Run diagnostic** on the plugin's page. It asks the NAS the plugin's questions once and shows which worked and the **names and types of the fields**, not their content; names, addresses and MAC addresses are removed. **Copy** or **Download** it and send it to whoever maintains the plugin.
 
+## Storage page
+
+Since version 1.1.0 (Netlens 0.4.180 or newer) the plugin also fills the **Storage** page with Btrfs pools with their fill level and health (a missing disk, an unmounted pool or exceeded redundancy is critical), the disks, and the shares. Events: *Storage problem*, *Storage recovered* and *Disk filling up* go through the usual notification channels. Nothing extra is needed on the NAS; the same user and the same read-only calls.
+
 ## What was tested
 
 **Written from Rockstor's source code** (`rockstor-core`: the URL routes, models and serializers; HTTP Basic authentication is accepted by every API view) and tested against a **simulated Rockstor only**. Rockstor 5 is an openSUSE-based installer with no container image, so **nothing has been run against a real Rockstor yet**. Please send a diagnostic report when you try it. Things to watch: the paging of the lists (the plugin asks for 1000 per page), and whether a Rock-on's containers show up in the container list.
+
+**Storage page:** Written from Rockstor's published REST serializers (`/api/pools`, `/api/disks`, `/api/shares`) and tested against a simulator only.
+
 
 ## Notes for reviewers
 

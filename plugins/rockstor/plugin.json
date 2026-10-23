@@ -1,11 +1,11 @@
 {
   "id": "rockstor",
   "name": "Rockstor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
-  "description": "Shows a Rockstor NAS (version 5 and newer) as a host with the Docker containers of its installed Rock-ons as guests: state, version and the ports each container publishes, matched to the devices on your network. Reads through Rockstor's REST API over HTTPS, read-only.",
+  "description": "Shows a Rockstor NAS (version 5 and newer) as a host with the Docker containers of its installed Rock-ons as guests: state, version and the ports each container publishes, matched to the devices on your network. Reads through Rockstor's REST API over HTTPS, read-only. Also fills the Storage page (Netlens 0.4.180).",
   "info": {
     "title": "Set up a user for Netlens on the Rockstor",
     "text": "Rockstor's REST API takes the user name and password of a Rockstor web user (HTTP Basic over HTTPS). Create a user of its own: in the Rockstor web page open System > Users > Add a new user, name it netlens with a long random password, and keep its other rights minimal; the plugin only reads. Enter the address (https://<NAS address>; Rockstor uses a self-signed certificate until you install your own, so leave 'Verify TLS certificate' off) and the credentials in Netlens. Rock-ons that are not installed are ignored.",

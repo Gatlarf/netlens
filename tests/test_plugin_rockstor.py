@@ -29,6 +29,10 @@ ROUTES = {
         {"id": 1, "name": "Plex", "version": "1.0", "state": "installed", "status": "started", "ui": True},
         {"id": 2, "name": "Syncthing", "version": "2.1", "state": "installed", "status": "stopped"},
         {"id": 3, "name": "Nextcloud", "version": "1.0", "state": "available", "status": "stopped"}],
+    "/api/pools": [{"id": 1, "name": "main", "uuid": "pu1", "size": 4000000, "free": 1000000, "data_raid": "raid1", "is_mounted": True, "has_missing_dev": False, "dev_stats_ok": True, "redundancy_exceeded": False},
+                   {"id": 2, "name": "bad", "uuid": "pu2", "size": 1000, "free": 10, "data_raid": "single", "is_mounted": True, "has_missing_dev": True, "dev_stats_ok": False, "redundancy_exceeded": False}],
+    "/api/disks": [{"name": "sda", "serial": "S1", "size": 2000000, "offline": False, "pool_name": "main", "model": "WDC"}, {"name": "sdb", "serial": "S2", "size": 2000000, "offline": True, "pool_name": "main"}],
+    "/api/shares": [{"id": 5, "name": "media", "pool": {"name": "main"}, "size": 1000000, "r_usage": 400000, "nfs_exports": [{"id": 1}], "is_mounted": True}, {"id": 6, "name": "docs", "pool": {"name": "bad"}, "size": 100, "r_usage": 1}],
     "/api/rockons/docker/containers/1": [{"id": 11, "rockon": 1, "dimage": 1, "name": "plex", "launch_order": 1}],
     "/api/rockons/ports/1": [{"id": 21, "hostp": 32400, "containerp": 32400, "container": 11, "container_name": "plex", "protocol": "tcp", "uiport": True, "publish": True},
                              {"id": 22, "hostp": 1900, "containerp": 1900, "container": 11, "container_name": "plex", "protocol": "udp", "publish": False}],
@@ -151,3 +155,17 @@ def test_diagnostic_never_contains_names_or_addresses(rockstor):
     for leak in ("plex", "Plex", "syncthing", "rockstor", "192.168", "AA:BB", "127.0.0.1", "good-pass"):
         assert leak not in report, leak
     assert '"ok": true' in report
+
+
+def test_storage_part_has_pools_disks_and_shares(rockstor):
+    st = validate_output("hypervisor", plugin.fetch(rockstor.config()))["storage"]
+    pools = {p["name"]: p for p in st["pools"]}
+    assert pools["main"]["total"] == 4000000 * 1024 and pools["main"]["avail"] == 1000000 * 1024 and pools["main"]["used"] == 3000000 * 1024 and pools["main"]["raid"] == "raid1" and pools["main"]["health"] == "ok"
+    assert pools["bad"]["health"] == "critical"
+    disks = {d["name"]: d for d in st["disks"]}
+    assert disks["sda"]["state"] == "ok" and disks["sdb"]["state"] == "failed"
+    shares = {v["name"]: v for v in st["volumes"]}
+    assert shares["media"]["pool_id"] == "pool:pu1" and shares["media"]["protocol"] == "nfs" and shares["media"]["used"] == 400000 * 1024 and shares["docs"]["protocol"] == ""
+    texts = {a["text"] for a in st["alerts"]}
+    assert "Pool bad: a disk is missing" in texts and "Disk sdb is offline" in texts
+    assert st["systems"][0]["health"] == "critical" and st["systems"][0]["vendor"] == "Rockstor"
