@@ -10,6 +10,7 @@ read-only:
     vm.query                  classic virtual machines (with their network cards' MAC addresses)
     app.query                 the apps
     pool.query                pools: health, size and free space, and the disks of each pool
+    boot.get_state            the boot pool (the disks the operating system lives on)
     disk.query                disk sizes and models
     alert.list                the open alerts
     sharing.nfs.query / sharing.smb.query   the shares
@@ -228,6 +229,18 @@ class TrueNAS:
             return []
         return result if isinstance(result, list) else []
 
+    def boot_state(self, notes):
+        """The boot pool as a dict (it is not part of pool.query), or {}."""
+        try:
+            result = self.call("boot.get_state")
+        except MethodMissing:
+            notes.append("boot pool: not available on this version")
+            return {}
+        except TruenasError as exc:
+            notes.append(f"boot pool: {exc}")
+            return {}
+        return result if isinstance(result, dict) else {}
+
     def snapshot(self):
         info = self.call("system.info")
         if not isinstance(info, dict):
@@ -250,6 +263,7 @@ class TrueNAS:
             "iscsi_targets": self.optional("iscsi.target.query", notes, "iSCSI targets"),
             "targetextents": self.optional("iscsi.targetextent.query", notes, "iSCSI LUN mappings"),
             "sessions": self.optional("iscsi.global.sessions", notes, "iSCSI sessions"),
+            "boot": self.boot_state(notes),
             "zvols": self.optional("pool.dataset.query", notes, "zvols", [["type", "=", "VOLUME"]]),
             "notes": notes,
         }
@@ -465,8 +479,13 @@ def to_storage(snapshot, connect_host=""):
     sid = host["id"]
     sizes = {str(d.get("name")): d for d in snapshot.get("disks") or [] if isinstance(d, dict)}
     pools, disks, volumes, alerts, level = [], [], [], [], "ok"
-    for pool in snapshot.get("pools") or []:
-        if not isinstance(pool, dict) or not pool.get("name"):
+    boot = snapshot.get("boot") if isinstance(snapshot.get("boot"), dict) else {}
+    listed = [p for p in snapshot.get("pools") or [] if isinstance(p, dict)]
+    if boot.get("name") and boot["name"] not in {p.get("name") for p in listed}:
+        listed.append(boot)                                         # the pool the operating system lives on
+    in_pool = set()
+    for pool in listed:
+        if not pool.get("name"):
             continue
         status = str(pool.get("status") or "").upper()
         health = POOL_HEALTH.get(status, "unknown")
@@ -486,12 +505,16 @@ def to_storage(snapshot, connect_host=""):
                 _vdev_disks(vdev, leaves)
         for leaf in leaves:
             name = str(leaf.get("disk") or leaf.get("name"))
+            in_pool.add(name)
             state = DISK_STATE.get(str(leaf.get("status") or "").upper(), "unknown")
             info = sizes.get(name, {})
             disks.append({"id": f"{pool['name']}:{name}", "system_id": sid, "name": name, "slot": str(pool["name"])[:40], "model": str(info.get("model") or "")[:100],
                           "size": _int(info.get("size")), "state": state})
             if state in ("failed", "degraded"):
                 alerts.append({"id": f"disk:{pool['name']}:{name}", "system_id": sid, "severity": "critical" if state == "failed" else "warning", "text": f"Disk {name} of pool {pool['name']}: {state}"})
+    for name, info in sorted(sizes.items()):                          # disks that belong to no pool (an unused disk, or the boot disk when TrueNAS does not say)
+        if name not in in_pool and not info.get("pool"):
+            disks.append({"id": f"unassigned:{name}", "system_id": sid, "name": name, "slot": "not in a pool", "model": str(info.get("model") or "")[:100], "size": _int(info.get("size")), "state": "ok"})
     names = [p["name"] for p in pools]
 
     def pool_of(path):
@@ -667,6 +690,7 @@ def diagnose(config):
         step("vms", "vm.query")
         step("apps", "app.query")
         step("pools", "pool.query")
+        step("boot", "boot.get_state")
         step("disks", "disk.query")
         step("alerts", "alert.list")
         step("nfs_shares", "sharing.nfs.query")

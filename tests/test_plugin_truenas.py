@@ -132,7 +132,7 @@ class FakeTrueNAS:
         table = {"interface.query": o["interfaces"], "virt.instance.query": o["instances"], "vm.query": o["vms"], "app.query": o["apps"],
                  "pool.query": o.get("pools", []), "disk.query": o.get("disks", []), "alert.list": o.get("alerts", []), "sharing.nfs.query": o.get("nfs", []), "sharing.smb.query": o.get("smb", []),
                  "iscsi.extent.query": o.get("extents", []), "iscsi.target.query": o.get("iscsi_targets", []), "iscsi.targetextent.query": o.get("targetextents", []),
-                 "iscsi.global.sessions": o.get("sessions", []), "pool.dataset.query": o.get("zvols", [])}
+                 "iscsi.global.sessions": o.get("sessions", []), "pool.dataset.query": o.get("zvols", []), "boot.get_state": o.get("boot", {})}
         if method in table:
             return send(table[method])
         send(error={"code": -32601, "message": "Method does not exist"})
@@ -217,7 +217,7 @@ def test_one_login_and_the_expected_calls_then_disconnect(fake):
     assert server.methods[:2] == ["auth.login_with_api_key", "system.info"] and server.methods.count("auth.login_with_api_key") == 1
     assert set(server.methods) == {"auth.login_with_api_key", "system.info", "interface.query", "virt.instance.query", "vm.query", "app.query",
                                   "pool.query", "disk.query", "alert.list", "sharing.nfs.query", "sharing.smb.query",
-                                  "iscsi.extent.query", "iscsi.target.query", "iscsi.targetextent.query", "iscsi.global.sessions", "pool.dataset.query"}
+                                  "iscsi.extent.query", "iscsi.target.query", "iscsi.targetextent.query", "iscsi.global.sessions", "pool.dataset.query", "boot.get_state"}
 
 
 def test_a_wrong_key_is_auth_failed(fake):
@@ -412,3 +412,19 @@ def test_iscsi_luns_with_their_size_and_the_hosts_logged_in(fake):
 def test_iscsi_without_pools_still_gives_a_storage_part_when_there_are_luns(fake):
     out = run(fake(**ISCSI))
     assert "storage" in out and any(v["kind"] == "lun" for v in out["storage"]["volumes"])
+
+
+BOOT = {"name": "boot-pool", "status": "ONLINE", "healthy": True, "size": 200, "allocated": 20, "free": 180,
+        "topology": {"data": [{"type": "MIRROR", "children": [{"type": "DISK", "disk": "nvme1n1", "status": "ONLINE"}]}], "cache": [], "log": [], "spare": [], "special": [], "dedup": []}}
+
+
+def test_the_boot_pool_and_unassigned_disks_are_listed(fake):
+    disks = DISKS + [{"name": "nvme1n1", "model": "Samsung", "size": 200}, {"name": "sdz", "model": "Spare drive", "size": 100, "pool": None}]
+    st = validate_output("hypervisor", run(fake(pools=POOLS, disks=disks, boot=BOOT)))["storage"]
+    pools = {p["name"]: p for p in st["pools"]}
+    assert pools["boot-pool"]["total"] == 200 and pools["boot-pool"]["raid"] == "mirror"
+    by_name = {d["name"]: d for d in st["disks"]}
+    assert by_name["nvme1n1"]["slot"] == "boot-pool" and by_name["nvme1n1"]["model"] == "Samsung"
+    assert by_name["sdz"]["slot"] == "not in a pool" and by_name["sdz"]["state"] == "ok"
+    assert by_name["sda"]["slot"] == "tank"                                   # a pool disk is not listed twice
+    assert len([d for d in st["disks"] if d["name"] == "sda"]) == 1
