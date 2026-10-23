@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.175 — 2026-10-23
+
+### Added
+- ★ **A side menu replaces the top menu.** The pages sit in a menu at the left, grouped (Overview and Dashboard, Network, Monitoring, Analysis, Automation, Configuration); the top bar keeps the Scan menu, search, the light/dark switch and the account menu. The button at the left of the top bar folds the menu away (remembered), and on iPad and phone it slides over the page.
+- ★ **Overview (beta).** A new first page in the menu with tabs of widgets: device counts, devices over time, availability, ports, Wi-Fi quality, speed tests and traffic (about 30 widgets). Use the gear to choose the widgets of a tab, drag the grip of a widget to move it, the arrow button to make it 1, 2 or 3 columns wide, and 1D / 1W / 1M for the period. You can add tabs of your own. It is a first version: the layout is kept in the browser.
+
 ## 0.4.174 — 2026-10-22
 
 ### Fixed

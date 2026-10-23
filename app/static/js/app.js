@@ -14,6 +14,7 @@ const ROUTES = {
   "": "dashboard",
   "#/": "dashboard",
   "#/dashboard": "dashboard",
+  "#/overview": "overview",
   "#/map": "map",
   "#/devices": "devices",
   "#/hierarchy": "hierarchy",
@@ -63,11 +64,7 @@ function parseRoute() {
 
 function updateNav(name) {
   document.querySelectorAll(".nav-link").forEach((link) => {
-    link.classList.toggle("active", link.dataset.route === name);
-  });
-  // a group button lights up while one of its pages is open
-  document.querySelectorAll(".topnav-group").forEach((group) => {
-    group.querySelector(".nav-group-btn").classList.toggle("active", !!group.querySelector(".nav-link.active"));
+    link.classList.toggle("active", link.dataset.route === (name === "device" ? "devices" : name));
   });
 }
 
@@ -363,13 +360,13 @@ async function applySession() {
   return session;
 }
 
-// A customer view (a viewer limited to some groups): the top bar offers only the pages it may open, and other addresses lead back to the devices.
+// A customer view (a viewer limited to some groups): the menu offers only the pages it may open, and other addresses lead back to the devices.
 let scopedUser = {};
 function restrictToOwnDevices() {
   document.body.dataset.scoped = "1";
   const pages = [...(scopedUser.devices ? [["#/devices", "Devices", "devices"], ["#/uptime", "Uptime", "uptime"]] : []), ...(scopedUser.sites ? [["#/remote-sites", "Remote sites", "remote_sites"]] : [])];
   const SCOPED_ROUTES = pages.map((p) => p[0]);
-  const nav = el("#nav");
+  const nav = el("#side-links");
   if (nav && !nav.dataset.scoped) {
     nav.dataset.scoped = "1";
     nav.textContent = "";

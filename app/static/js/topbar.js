@@ -1,6 +1,6 @@
-// The top bar: pop-up menus (Scan, account), the page menu on narrow screens, hiding on scroll on a phone,
+// The top bar and the side menu: pop-up menus (Scan, account), the page menu (side menu, a slide-over on narrow screens), hiding on scroll on a phone,
 // and publishing its height for the sticky bars below it.
-const COMPACT = "(max-width: 1040px)";  // the page links move into a menu
+const COMPACT = "(max-width: 1040px)";  // the side menu becomes a slide-over
 const PHONE = "(max-width: 700px)";     // the bar also slides away while scrolling down
 
 export function initTopbar() {
@@ -10,28 +10,35 @@ export function initTopbar() {
   const navToggle = document.getElementById("nav-toggle");
   const userMenu = document.getElementById("user-menu");
   const userWrap = document.getElementById("user-menu-wrap");
+  const body = document.body;
   const menus = [
     { btn: document.getElementById("scan-menu-btn"), panel: document.getElementById("scan-menu") },
     { btn: document.getElementById("user-menu-btn"), panel: userMenu },
-    // the page groups (Network, Monitoring): pop-up menus on a wide screen, plain headings above their links on a narrow one
-    ...[...document.querySelectorAll(".topnav-group")].map((g) => ({ btn: g.querySelector(".nav-group-btn"), panel: g.querySelector(".nav-popmenu"), group: true })),
   ];
-  const inPageMenu = (m) => compact.matches && (m.panel === userMenu || m.group);
-
   const compact = window.matchMedia(COMPACT);
+  const inPageMenu = (m) => compact.matches && m.panel === userMenu;
+  const HIDE_KEY = "netlens.menu.hidden";
+
+  // the side menu: always there on a wide screen (the button folds it away, remembered), a slide-over on a narrow one
+  const syncToggle = () => {
+    const shown = compact.matches ? body.classList.contains("side-open") : !body.classList.contains("side-hidden");
+    navToggle.setAttribute("aria-expanded", String(shown));
+  };
+  let wasHidden = false;
+  try { wasHidden = localStorage.getItem(HIDE_KEY) === "1"; } catch (e) { /* private window */ }
+  body.classList.toggle("side-hidden", wasHidden);
+  syncToggle();
+
   const closeMenus = (except) => {
     for (const m of menus) {
       if (!m.btn || m === except) continue;
-      if (inPageMenu(m)) continue;  // on a narrow screen these are part of the page menu
+      if (inPageMenu(m)) continue;  // on a narrow screen the account menu is part of the side menu
       m.panel.hidden = true;
       m.btn.setAttribute("aria-expanded", "false");
     }
   };
-  const closeNav = () => {
-    bar.classList.remove("nav-open");
-    navToggle.setAttribute("aria-expanded", "false");
-  };
-  const anythingOpen = () => bar.classList.contains("nav-open") || menus.some((m) => m.panel && !m.panel.hidden && !inPageMenu(m));
+  const closeNav = () => { body.classList.remove("side-open"); syncToggle(); };
+  const anythingOpen = () => body.classList.contains("side-open") || menus.some((m) => m.panel && !m.panel.hidden && !inPageMenu(m));
   const closeAll = () => { closeMenus(); closeNav(); };
 
   for (const m of menus) {
@@ -53,27 +60,31 @@ export function initTopbar() {
   }
   navToggle.addEventListener("click", (event) => {
     event.stopPropagation();
-    const open = !bar.classList.contains("nav-open");
     closeMenus();
-    bar.classList.toggle("nav-open", open);
-    navToggle.setAttribute("aria-expanded", String(open));
+    if (compact.matches) body.classList.toggle("side-open");
+    else {
+      const hide = !body.classList.contains("side-hidden");
+      body.classList.toggle("side-hidden", hide);
+      try { localStorage.setItem(HIDE_KEY, hide ? "1" : "0"); } catch (e) { /* ignore */ }
+    }
+    syncToggle();
     showBar();
   });
   nav.addEventListener("click", (event) => {
-    if (event.target.closest("a")) closeAll();
+    if (compact.matches && event.target.closest("a")) closeAll();
   });
   document.addEventListener("click", (event) => {
-    if (!bar.contains(event.target)) closeAll();
+    if (!bar.contains(event.target) && !nav.contains(event.target)) closeAll();
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || !anythingOpen()) return;
-    const focusBtn = menus.find((m) => m.panel && !m.panel.hidden)?.btn || (bar.classList.contains("nav-open") ? navToggle : null);
+    const focusBtn = menus.find((m) => m.panel && !m.panel.hidden)?.btn || (body.classList.contains("side-open") ? navToggle : null);
     closeAll();
     if (focusBtn) focusBtn.focus();
   });
   window.addEventListener("hashchange", closeAll);
 
-  // on a narrow screen the account menu lives inside the page menu: one button, one panel
+  // on a narrow screen the account menu lives at the end of the side menu: one place for everything
   const place = () => {
     if (compact.matches) {
       nav.appendChild(userMenu);
@@ -82,9 +93,9 @@ export function initTopbar() {
       userWrap.appendChild(userMenu);
       userMenu.hidden = true;
       menus[1].btn.setAttribute("aria-expanded", "false");
-      for (const m of menus) if (m.group) { m.panel.hidden = true; m.btn.setAttribute("aria-expanded", "false"); }
-      closeNav();
+      body.classList.remove("side-open");
     }
+    syncToggle();
   };
   compact.addEventListener("change", place);
   place();
