@@ -1,0 +1,55 @@
+{
+  "id": "unraid",
+  "name": "Unraid",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows an Unraid server as a host with its Docker containers (image, state, published ports, and the address of a container that has its own IP on your network) and its virtual machines as guests, each matched to the device Netlens found. Reads through the Unraid API (GraphQL, built into Unraid 7.2 and newer) with a read-only API key.",
+  "info": {
+    "title": "Make a read-only API key on the Unraid server",
+    "text": "Netlens reads Unraid through its API, which is built into Unraid 7.2 and newer (on 7.0 and 7.1 install the Unraid Connect plugin from Community Applications; the API then comes with it). In the Unraid web page open Settings > Management Access > API Keys > Create key, name it netlens, give it the Viewer role (read only), and copy the key. Enter the address of the server (http://tower, http://192.168.0.10 or https://...) and the key in Netlens. The key is only ever sent to that address. If your server forces https with a certificate for a myunraid.net name, enter that address and leave 'Verify TLS certificate' off while Netlens reaches it by IP.",
+    "code": "# Settings > Management Access > API Keys > Create key\n#   Name: netlens\n#   Role: Viewer (read only)\n# or on the Unraid console:\nunraid-api apikey --create --name netlens --roles VIEWER"
+  },
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Unraid servers",
+      "required": true,
+      "help": "One line per Unraid server: its address (http://tower or https://192.168.0.10) and an API key with the Viewer role.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "http://192.168.0.10", "required": true},
+        {"key": "api_key", "label": "API key", "type": "password", "required": true}
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Leave this off while the server uses a self-signed certificate or is reached by IP address."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "guests",
+      "title": "Unraid containers and VMs",
+      "about": "Running and stopped containers and virtual machines on your Unraid server.",
+      "href": "#/hierarchy",
+      "rows": [
+        {"label": "Running", "count": "guests", "where": {"status": "running"}},
+        {"label": "Stopped", "count": "guests", "where": {"status": ["stopped"]}, "tone_if_positive": "warn"},
+        {"label": "Last sync", "value": "status.ts"}
+      ]
+    }
+  ]
+}

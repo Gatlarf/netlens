@@ -1,0 +1,89 @@
+{
+  "id": "rockstor",
+  "name": "Rockstor",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows a Rockstor NAS (version 5 and newer) as a host with the Docker containers of its installed Rock-ons as guests: state, version and the ports each container publishes, matched to the devices on your network. Reads through Rockstor's REST API over HTTPS, read-only.",
+  "info": {
+    "title": "Set up a user for Netlens on the Rockstor",
+    "text": "Rockstor's REST API takes the user name and password of a Rockstor web user (HTTP Basic over HTTPS). Create a user of its own: in the Rockstor web page open System > Users > Add a new user, name it netlens with a long random password, and keep its other rights minimal; the plugin only reads. Enter the address (https://<NAS address>; Rockstor uses a self-signed certificate until you install your own, so leave 'Verify TLS certificate' off) and the credentials in Netlens. Rock-ons that are not installed are ignored.",
+    "code": "# Rockstor web page: System > Users > Add a new user\n#   Username: netlens   (a long, random password)\n# In Netlens: address https://<NAS address>, that user name and password"
+  },
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Rockstor NAS systems",
+      "required": true,
+      "help": "One line per Rockstor: its address (https://192.168.0.30) and the user name and password of the Netlens user.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.0.30",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Leave this off while the NAS uses its own self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "guests",
+      "title": "Rockstor Rock-ons",
+      "about": "Running and stopped containers of the Rock-ons installed on your Rockstor NAS.",
+      "href": "#/hierarchy",
+      "rows": [
+        {
+          "label": "Running",
+          "count": "guests",
+          "where": {
+            "status": "running"
+          }
+        },
+        {
+          "label": "Stopped",
+          "count": "guests",
+          "where": {
+            "status": [
+              "stopped"
+            ]
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Last sync",
+          "value": "status.ts"
+        }
+      ]
+    }
+  ]
+}

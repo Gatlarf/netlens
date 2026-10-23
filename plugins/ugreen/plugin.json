@@ -1,0 +1,89 @@
+{
+  "id": "ugreen",
+  "name": "UGREEN",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows a UGREEN NAS (UGOS or UGOS Pro) as a host with its Docker containers as guests: state, image and published ports. UGREEN has no public API: this uses the web API of the UGOS web page itself (port 9443), as documented by the community, so a firmware update can change it. Read-only; the password is encrypted with the NAS' own public key before it is sent.",
+  "info": {
+    "title": "Set up a user for Netlens on the UGREEN NAS",
+    "text": "UGREEN publishes no API, so Netlens uses the one the UGOS web page uses (https://<NAS address>:9443). Make a user of its own: in UGOS open Control Panel > Users > Add, name it netlens with a long random password, and give it administrator rights (the Docker list needs them); allow it no shared folders. Keep two-step verification off for this user. UGOS locks an account for a few minutes after wrong passwords, so Netlens stops retrying by itself after a refused login. Leave 'Verify TLS certificate' off while the NAS uses its self-signed certificate.",
+    "code": "# UGOS: Control Panel > Users > Add\n#   Name: netlens   (a long, random password)\n#   Role: administrator, no shared folders, no 2-step verification\n# In Netlens: address https://<NAS address>:9443, user netlens, that password"
+  },
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "UGREEN NAS systems",
+      "required": true,
+      "help": "One line per UGREEN NAS: its UGOS address with port 9443 (https://192.168.0.50:9443) and the user name and password of the Netlens user.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.0.50:9443",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Leave this off while the NAS uses its own self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "guests",
+      "title": "UGREEN containers",
+      "about": "Running and stopped Docker containers on your UGREEN NAS.",
+      "href": "#/hierarchy",
+      "rows": [
+        {
+          "label": "Running",
+          "count": "guests",
+          "where": {
+            "status": "running"
+          }
+        },
+        {
+          "label": "Stopped",
+          "count": "guests",
+          "where": {
+            "status": [
+              "stopped"
+            ]
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Last sync",
+          "value": "status.ts"
+        }
+      ]
+    }
+  ]
+}

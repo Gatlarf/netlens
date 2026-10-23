@@ -1,0 +1,89 @@
+{
+  "id": "qnap",
+  "name": "QNAP",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows a QNAP NAS (QTS 5 or QuTS hero with Container Station 3) as a host with its Container Station containers as guests: state, image, compose project, the ports they publish, and the address of a container that has its own IP on your network. Reads through Container Station's web API, read-only. Needs an account in the administrators group (Container Station offers no read-only role).",
+  "info": {
+    "title": "Set up a user for Netlens on the QNAP",
+    "text": "Container Station's web API only lets administrators in, so Netlens needs an account of its own in the administrators group. Keep it dedicated and small: in QTS open Control Panel > Privilege > Users > Create, name it netlens with a long random password, put it in the administrators group, and deny it every shared folder. Do not switch on 2-step verification for this account (a program cannot answer it). In Control Panel > Security > Security Level allow access only from the machine Netlens runs on. The address is the QTS web address: https://<NAS address>:443 (or http://<NAS address>:8080); leave 'Verify TLS certificate' off while the NAS uses its self-signed certificate. Netlens signs in for a few seconds at each sync and signs out again.",
+    "code": "# Control Panel > Privilege > Users > Create\n#   Name: netlens   (a long, random password)\n#   Groups: administrators, no shared folders\n# Control Panel > Security > Security Level: allow only the Netlens machine\n# In Netlens: address https://<NAS address>:443, user netlens, that password"
+  },
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "QNAP systems",
+      "required": true,
+      "help": "One line per QNAP: its address (the QTS web address, for example https://192.168.0.40:443) and the user name and password of the Netlens user.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.0.40:443",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Leave this off while the NAS uses its own self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "guests",
+      "title": "QNAP containers",
+      "about": "Running and stopped Container Station containers on your QNAP.",
+      "href": "#/hierarchy",
+      "rows": [
+        {
+          "label": "Running",
+          "count": "guests",
+          "where": {
+            "status": "running"
+          }
+        },
+        {
+          "label": "Stopped",
+          "count": "guests",
+          "where": {
+            "status": [
+              "stopped"
+            ]
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Last sync",
+          "value": "status.ts"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "id": "openmediavault",
+  "name": "OpenMediaVault",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Shows an OpenMediaVault NAS (version 6, 7 or 8) as a host with its Docker containers (from the openmediavault-compose plugin) and its virtual machines (from the openmediavault-kvm plugin) as guests: state, health, image and the ports containers publish, matched to the devices on your network. Reads through OpenMediaVault's own web interface API, read-only.",
+  "info": {
+    "title": "Set up a user for Netlens on the OpenMediaVault",
+    "text": "OpenMediaVault's web interface API only answers its administrators, so Netlens needs a web administrator account of its own: in the OMV web page open Users > Users > Create, name it netlens with a long random password, and under Groups tick openmediavault-admin (and nothing else). Do not use the 'admin' account, and do not switch on 2-step verification for this user. Enter the address you open OMV with in your browser (http://<NAS address> or https://...); Netlens signs in for a few seconds at each sync and signs out again. The Docker list needs the openmediavault-compose plugin (OMV-Extras) and the virtual machine list the openmediavault-kvm plugin; without them the NAS is shown with what is available. Only the machines and containers are read; nothing is changed.",
+    "code": "# OMV web page: Users > Users > Create\n#   Name: netlens   (a long, random password)\n#   Groups: openmediavault-admin\n# In Netlens: address http://<NAS address>, user netlens, that password"
+  },
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "OpenMediaVault systems",
+      "required": true,
+      "help": "One line per OpenMediaVault: the address of its web page and the user name and password of the Netlens user.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "http://192.168.0.60",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Only used for https:// addresses. Leave this off while the NAS uses a self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "guests",
+      "title": "OpenMediaVault containers and VMs",
+      "about": "Running and stopped containers and virtual machines on your OpenMediaVault.",
+      "href": "#/hierarchy",
+      "rows": [
+        {
+          "label": "Running",
+          "count": "guests",
+          "where": {
+            "status": "running"
+          }
+        },
+        {
+          "label": "Stopped",
+          "count": "guests",
+          "where": {
+            "status": [
+              "stopped"
+            ]
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Last sync",
+          "value": "status.ts"
+        }
+      ]
+    }
+  ]
+}
