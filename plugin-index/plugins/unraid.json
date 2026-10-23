@@ -1,0 +1,24 @@
+{
+  "id": "unraid",
+  "name": "Unraid",
+  "kind": "hypervisor",
+  "category": "storage",
+  "description": "Shows an Unraid server as a host with its Docker containers (image, state, published ports, and the address of a container that has its own IP on your network) and its virtual machines as guests, each matched to the device Netlens found. Reads through the Unraid API (GraphQL, built into Unraid 7.2 and newer) with a read-only API key.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unraid",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Unraid 7.2 and newer (written from the published API schema; simulator only, not tested on a real Unraid)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unraid-v1.0.0/unraid.zip",
+      "sha256": "f382532947a0fad350536ae273049296e511d12cef9a4858cca20b8cfe732689",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-23",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

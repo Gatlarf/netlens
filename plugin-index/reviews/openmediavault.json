@@ -1,0 +1,16 @@
+{
+  "id": "openmediavault",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "683739bc5732414391e03d3870a3c85e1932392f793a0dac851f97598fa2af19",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "verified",
+      "tested_on": [
+        "OpenMediaVault 8.5.12 (Debian 13) with openmediavault-compose 8.2.3: login with right and wrong password, system information, network cards and the Docker container list (35 containers)"
+      ],
+      "notes": "Written and lab-tested on 2026-10-23 with the assistant Claude, confirmed by the maintainer. Read-only. The openmediavault-kvm part (virtual machines) is tested against a simulator only; OpenMediaVault 6 and 7 were not run."
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "rockstor",
+  "name": "Rockstor",
+  "kind": "hypervisor",
+  "category": "storage",
+  "description": "Shows a Rockstor NAS (version 5 and newer) as a host with the Docker containers of its installed Rock-ons as guests: state, version and the ports each container publishes, matched to the devices on your network. Reads through Rockstor's REST API over HTTPS, read-only.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/rockstor",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "Rockstor 5 (written from the source code; simulator only, not tested on a real Rockstor)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-rockstor-v1.0.0/rockstor.zip",
+      "sha256": "c007049b493da171afd3bb110e6666018e203292d311288ecacfa589846e0654",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-23",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

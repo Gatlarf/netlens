@@ -1,0 +1,24 @@
+{
+  "id": "qnap",
+  "name": "QNAP",
+  "kind": "hypervisor",
+  "category": "storage",
+  "description": "Shows a QNAP NAS (QTS 5 or QuTS hero with Container Station 3) as a host with its Container Station containers as guests: state, image, compose project, the ports they publish, and the address of a container that has its own IP on your network. Reads through Container Station's web API, read-only. Needs an account in the administrators group (Container Station offers no read-only role).",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/qnap",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "QTS 5 / QuTS hero with Container Station 3 (written from public documentation and an open-source client; simulator only, not tested on a real QNAP)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-qnap-v1.0.0/qnap.zip",
+      "sha256": "9acc5ef2cf57026441cdde0bae3e1adb698a62750ca1926fd7e17bf245912d20",
+      "api_version": 1,
+      "min_netlens": "0.3.157",
+      "released": "2026-10-23",
+      "changelog": "First release. Needs Netlens 0.3.157 or newer."
+    }
+  ]
+}

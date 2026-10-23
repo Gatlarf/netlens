@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.177 — 2026-10-23
+
+### Added
+- ★ **Five NAS plugins in the Plugin store: OpenMediaVault, Unraid, Rockstor, QNAP and UGREEN.** Each shows the NAS as a host with its Docker containers (state, image, published ports, and the address of a container with its own IP) as guests; OpenMediaVault and Unraid also show virtual machines, QNAP its LXD containers, Rockstor the containers of its Rock-ons. Read-only. OpenMediaVault is verified on a real system (containers); the other four were written from published schemas, source code and community API notes and are tested against simulators only, so they show as Community: please send a *Run diagnostic* report from a real NAS.
+
 ## 0.4.175 — 2026-10-23
 
 ### Added
