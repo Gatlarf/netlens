@@ -2,15 +2,26 @@
   "id": "truenas",
   "reviews": [
     {
-      "version": "1.4.0",
-      "sha256": "2c0f1a23360e5578a1f0fcd8610e9c3eba32737e9edf26f56bf12072f115e368",
+      "version": "1.5.0",
+      "sha256": "a818b618041c5a2e09a2c77315a8b9ed0fed109563fc2ef4057c128a1516cc20",
       "reviewer": "Gatlarf",
       "date": "2026-10-23",
       "level": "reviewed",
       "tested_on": [
+        "Simulator for the iSCSI calls (iscsi.extent/target/targetextent.query, iscsi.global.sessions, zvol sizes); the rest as in 1.4.0, verified on a real TrueNAS"
+      ],
+      "notes": "iSCSI added 2026-10-23 with the assistant Claude from the middleware's documented API; not yet run on a real TrueNAS with iSCSI."
+    },
+    {
+      "version": "1.4.0",
+      "sha256": "2c0f1a23360e5578a1f0fcd8610e9c3eba32737e9edf26f56bf12072f115e368",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "verified",
+      "tested_on": [
         "Netlens 0.4.180 with the storage part: simulator only (pool.query, disk.query, alert.list, sharing.nfs/smb.query follow the middleware API); the earlier parts are unchanged."
       ],
-      "notes": "Storage part added 2026-10-23 with the assistant Claude; not run on a real TrueNAS. Read-only."
+      "notes": "Confirmed working on a real TrueNAS by the maintainer on 2026-10-23 (containers, VMs, apps and the Storage page: pools, disks, shares)."
     },
     {
       "version": "1.3.1",
