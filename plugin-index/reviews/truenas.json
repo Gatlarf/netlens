@@ -2,15 +2,26 @@
   "id": "truenas",
   "reviews": [
     {
+      "version": "1.5.1",
+      "sha256": "d0f907c5fba930df92ce02aed24619d2b8941b5389d01eefff52bb1ee7aacf2f",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "verified",
+      "tested_on": [
+        "As 1.5.0 (real TrueNAS 25.10.6); the only change is the file size of a file-backed LUN, covered by a unit test"
+      ],
+      "notes": "Patch of the verified 1.5.0."
+    },
+    {
       "version": "1.5.0",
       "sha256": "a818b618041c5a2e09a2c77315a8b9ed0fed109563fc2ef4057c128a1516cc20",
       "reviewer": "Gatlarf",
       "date": "2026-10-23",
-      "level": "reviewed",
+      "level": "verified",
       "tested_on": [
-        "Simulator for the iSCSI calls (iscsi.extent/target/targetextent.query, iscsi.global.sessions, zvol sizes); the rest as in 1.4.0, verified on a real TrueNAS"
+        "Real TrueNAS 25.10.6 (Celeron N5105, two pools): pools, disks, NFS and SMB shares, alerts and an iSCSI LUN on a zvol with the PC logged in to it; diagnostic report reviewed"
       ],
-      "notes": "iSCSI added 2026-10-23 with the assistant Claude from the middleware's documented API; not yet run on a real TrueNAS with iSCSI."
+      "notes": "Confirmed working on a real TrueNAS by the maintainer on 2026-10-23."
     },
     {
       "version": "1.4.0",
