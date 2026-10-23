@@ -2477,6 +2477,24 @@
    ],
    "releases": [
     {
+     "version": "1.6.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.6.0/truenas.zip",
+     "sha256": "67f45484aa88e9471b6e7a3d784faea5ca9e3fe31add466e5f870a62e2c5cd9d",
+     "api_version": 1,
+     "min_netlens": "0.4.180",
+     "released": "2026-10-23",
+     "changelog": "Shows the boot pool and disks that belong to no pool.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "tested_on": [
+       "Simulator for boot.get_state and the unassigned-disk listing; the rest as in 1.5.1 (real TrueNAS 25.10.6)"
+      ],
+      "notes": "Boot pool and unassigned disks added 2026-10-23 with the assistant Claude; not yet run on a real TrueNAS."
+     }
+    },
+    {
      "version": "1.5.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.5.1/truenas.zip",
      "sha256": "d0f907c5fba930df92ce02aed24619d2b8941b5389d01eefff52bb1ee7aacf2f",
