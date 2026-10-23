@@ -14,6 +14,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.2.0/synology.zip",
+      "sha256": "3229354d33525622f46f0678f0fb920eee216cd9b42e6e6af9f5e56197cec678",
+      "api_version": 1,
+      "min_netlens": "0.4.180",
+      "released": "2026-10-23",
+      "changelog": "iSCSI: LUNs of SAN Manager with size, space used and the hosts logged in."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.1.0/synology.zip",
       "sha256": "5c3434b0358f458d735332bd111c8a6e291022ce9ceb981d9f2e15391544413d",

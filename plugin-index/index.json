@@ -1182,6 +1182,24 @@
    ],
    "releases": [
     {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netapp-ontap-v1.1.0/netapp-ontap.zip",
+     "sha256": "7307982fde8ae54f78c2fb3f6aa6fc9abdf009ba3a5e78dbeb88bdc3d0049722",
+     "api_version": 1,
+     "min_netlens": "0.4.178",
+     "released": "2026-10-23",
+     "changelog": "iSCSI: the hosts logged in to a LUN (sessions and LUN mappings).",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "tested_on": [
+       "Fake ONTAP REST cluster with the documented session and LUN-map shapes"
+      ],
+      "notes": "iSCSI client part written from NetApp's REST reference; simulator only."
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netapp-ontap-v1.0.0/netapp-ontap.zip",
      "sha256": "e560ae178c1ed50bfec572c19266f300028bf0b2d5339170ef2a8a0ee0c2384b",
@@ -2208,6 +2226,24 @@
    ],
    "releases": [
     {
+     "version": "1.2.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.2.0/synology.zip",
+     "sha256": "3229354d33525622f46f0678f0fb920eee216cd9b42e6e6af9f5e56197cec678",
+     "api_version": 1,
+     "min_netlens": "0.4.180",
+     "released": "2026-10-23",
+     "changelog": "iSCSI: LUNs of SAN Manager with size, space used and the hosts logged in.",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "tested_on": [
+       "Virtual DSM 7.2.2 with SAN Manager: a real LUN, target and an iSCSI login from a second host; the contract-validated output was checked"
+      ],
+      "notes": "iSCSI added and lab-tested 2026-10-23 with the assistant Claude. Read-only."
+     }
+    },
+    {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.1.0/synology.zip",
      "sha256": "5c3434b0358f458d735332bd111c8a6e291022ce9ceb981d9f2e15391544413d",
@@ -2476,6 +2512,24 @@
     "TrueNAS 25.04 (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.6.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.6.1/truenas.zip",
+     "sha256": "85251de2791d46ab5d765dfd5fa6642c87f1e15bc6cfa18019ab477e74a75f23",
+     "api_version": 1,
+     "min_netlens": "0.4.188",
+     "released": "2026-10-23",
+     "changelog": "Alert texts are no longer cut at 300 characters (needs Netlens 0.4.188 or newer).",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "tested_on": [
+       "As 1.6.0; the change only stops cutting the alert text, covered by unit tests"
+      ],
+      "notes": "Patch of 1.6.0."
+     }
+    },
     {
      "version": "1.6.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.6.0/truenas.zip",

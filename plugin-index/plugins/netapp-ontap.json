@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netapp-ontap-v1.1.0/netapp-ontap.zip",
+      "sha256": "7307982fde8ae54f78c2fb3f6aa6fc9abdf009ba3a5e78dbeb88bdc3d0049722",
+      "api_version": 1,
+      "min_netlens": "0.4.178",
+      "released": "2026-10-23",
+      "changelog": "iSCSI: the hosts logged in to a LUN (sessions and LUN mappings)."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netapp-ontap-v1.0.0/netapp-ontap.zip",
       "sha256": "e560ae178c1ed50bfec572c19266f300028bf0b2d5339170ef2a8a0ee0c2384b",

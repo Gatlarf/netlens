@@ -2,6 +2,17 @@
   "id": "truenas",
   "reviews": [
     {
+      "version": "1.6.1",
+      "sha256": "85251de2791d46ab5d765dfd5fa6642c87f1e15bc6cfa18019ab477e74a75f23",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "reviewed",
+      "tested_on": [
+        "As 1.6.0; the change only stops cutting the alert text, covered by unit tests"
+      ],
+      "notes": "Patch of 1.6.0."
+    },
+    {
       "version": "1.6.0",
       "sha256": "67f45484aa88e9471b6e7a3d784faea5ca9e3fe31add466e5f870a62e2c5cd9d",
       "reviewer": "Gatlarf",

@@ -13,6 +13,15 @@
   ],
   "releases": [
     {
+      "version": "1.6.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.6.1/truenas.zip",
+      "sha256": "85251de2791d46ab5d765dfd5fa6642c87f1e15bc6cfa18019ab477e74a75f23",
+      "api_version": 1,
+      "min_netlens": "0.4.188",
+      "released": "2026-10-23",
+      "changelog": "Alert texts are no longer cut at 300 characters (needs Netlens 0.4.188 or newer)."
+    },
+    {
       "version": "1.6.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.6.0/truenas.zip",
       "sha256": "67f45484aa88e9471b6e7a3d784faea5ca9e3fe31add466e5f870a62e2c5cd9d",

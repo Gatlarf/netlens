@@ -2,6 +2,17 @@
   "id": "netapp-ontap",
   "reviews": [
     {
+      "version": "1.1.0",
+      "sha256": "7307982fde8ae54f78c2fb3f6aa6fc9abdf009ba3a5e78dbeb88bdc3d0049722",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-23",
+      "level": "reviewed",
+      "tested_on": [
+        "Fake ONTAP REST cluster with the documented session and LUN-map shapes"
+      ],
+      "notes": "iSCSI client part written from NetApp's REST reference; simulator only."
+    },
+    {
       "version": "1.0.0",
       "sha256": "e560ae178c1ed50bfec572c19266f300028bf0b2d5339170ef2a8a0ee0c2384b",
       "reviewer": "Gatlarf",
