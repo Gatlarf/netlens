@@ -388,7 +388,7 @@ def test_diagnose_reports_the_storage_steps_without_content(fake):
 
 ISCSI = dict(
     extents=[{"id": 1, "name": "illusion-disk", "type": "DISK", "disk": "zvol/tank/illusion", "enabled": True},
-             {"id": 2, "name": "file-lun", "type": "FILE", "path": "/mnt/fast/luns/f1", "filesize": 5000, "enabled": True},
+             {"id": 2, "name": "file-lun", "type": "FILE", "path": "/mnt/fast/luns/f1", "filesize": "5000", "enabled": True},
              {"id": 3, "name": "off", "type": "DISK", "disk": "zvol/tank/off", "enabled": False}],
     iscsi_targets=[{"id": 10, "name": "illusion", "groups": []}, {"id": 11, "name": "other", "groups": []}],
     targetextents=[{"id": 1, "target": 10, "extent": 1, "lunid": 0}, {"id": 2, "target": 11, "extent": 2, "lunid": 0}],

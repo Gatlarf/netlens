@@ -444,7 +444,7 @@ def _iscsi_luns(snapshot, sid, pool_ids):
         disk = str(extent.get("disk") or "")
         zname = disk[len("zvol/"):] if disk.startswith("zvol/") else ""
         zvol = zvols.get(zname, {})
-        size = _parsed(zvol.get("volsize")) or _int(extent.get("filesize")) or None
+        size = _parsed(zvol.get("volsize")) or _parsed(extent.get("filesize")) or None          # the file size of a file extent comes as text
         path = zname or str(extent.get("path") or "")
         clients, names = [], []
         for tid in by_extent.get(extent.get("id"), []):

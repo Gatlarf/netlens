@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.184 — 2026-10-23
+
+### Fixed
+- **TrueNAS plugin 1.5.1:** the size of a file-backed iSCSI LUN is read when TrueNAS sends it as text (a LUN on a zvol was already right). Confirmed on a real TrueNAS 25.10.6: pools, disks, shares, alerts and an iSCSI LUN with the PC that is logged in to it.
+
 ## 0.4.182 — 2026-10-23
 
 ### Added
