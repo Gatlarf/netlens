@@ -130,7 +130,9 @@ class FakeTrueNAS:
         if method in errors:
             return send(error=errors[method])
         table = {"interface.query": o["interfaces"], "virt.instance.query": o["instances"], "vm.query": o["vms"], "app.query": o["apps"],
-                 "pool.query": o.get("pools", []), "disk.query": o.get("disks", []), "alert.list": o.get("alerts", []), "sharing.nfs.query": o.get("nfs", []), "sharing.smb.query": o.get("smb", [])}
+                 "pool.query": o.get("pools", []), "disk.query": o.get("disks", []), "alert.list": o.get("alerts", []), "sharing.nfs.query": o.get("nfs", []), "sharing.smb.query": o.get("smb", []),
+                 "iscsi.extent.query": o.get("extents", []), "iscsi.target.query": o.get("iscsi_targets", []), "iscsi.targetextent.query": o.get("targetextents", []),
+                 "iscsi.global.sessions": o.get("sessions", []), "pool.dataset.query": o.get("zvols", [])}
         if method in table:
             return send(table[method])
         send(error={"code": -32601, "message": "Method does not exist"})
@@ -214,7 +216,8 @@ def test_one_login_and_the_expected_calls_then_disconnect(fake):
     run(server)
     assert server.methods[:2] == ["auth.login_with_api_key", "system.info"] and server.methods.count("auth.login_with_api_key") == 1
     assert set(server.methods) == {"auth.login_with_api_key", "system.info", "interface.query", "virt.instance.query", "vm.query", "app.query",
-                                  "pool.query", "disk.query", "alert.list", "sharing.nfs.query", "sharing.smb.query"}
+                                  "pool.query", "disk.query", "alert.list", "sharing.nfs.query", "sharing.smb.query",
+                                  "iscsi.extent.query", "iscsi.target.query", "iscsi.targetextent.query", "iscsi.global.sessions", "pool.dataset.query"}
 
 
 def test_a_wrong_key_is_auth_failed(fake):
@@ -381,3 +384,31 @@ def test_diagnose_reports_the_storage_steps_without_content(fake):
     assert report["steps"]["pools"]["ok"] and report["result"]["storage"]["pools"] == 2 and report["result"]["storage"]["disk_states"]["failed"] == 1
     text = json.dumps(report)
     assert "Pool tank is degraded" not in text and "/mnt/tank" not in text and "tank" not in text
+
+
+ISCSI = dict(
+    extents=[{"id": 1, "name": "illusion-disk", "type": "DISK", "disk": "zvol/tank/illusion", "enabled": True},
+             {"id": 2, "name": "file-lun", "type": "FILE", "path": "/mnt/fast/luns/f1", "filesize": 5000, "enabled": True},
+             {"id": 3, "name": "off", "type": "DISK", "disk": "zvol/tank/off", "enabled": False}],
+    iscsi_targets=[{"id": 10, "name": "illusion", "groups": []}, {"id": 11, "name": "other", "groups": []}],
+    targetextents=[{"id": 1, "target": 10, "extent": 1, "lunid": 0}, {"id": 2, "target": 11, "extent": 2, "lunid": 0}],
+    sessions=[{"target": "iqn.2005-10.org.freenas.ctl:illusion", "initiator": "iqn.1991-05.com.microsoft:illusion-265k", "initiator_addr": "192.168.0.50"},
+              {"target": "iqn.2005-10.org.freenas.ctl:illusion", "initiator": "iqn.1991-05.com.microsoft:illusion-265k", "initiator_addr": "192.168.0.50:3260"},
+              {"target": "iqn.2005-10.org.freenas.ctl:nosuch", "initiator": "x", "initiator_addr": "192.168.0.99"}],
+    zvols=[{"name": "tank/illusion", "type": "VOLUME", "volsize": {"parsed": 500000000000}, "used": {"parsed": 120000000000}}],
+)
+
+
+def test_iscsi_luns_with_their_size_and_the_hosts_logged_in(fake):
+    st = validate_output("hypervisor", run(fake(pools=POOLS, **ISCSI)))["storage"]
+    luns = {v["name"]: v for v in st["volumes"] if v["kind"] == "lun"}
+    assert set(luns) == {"illusion-disk", "file-lun", "off"}
+    d = luns["illusion-disk"]
+    assert d["protocol"] == "iscsi" and d["size"] == 500000000000 and d["used"] == 120000000000 and d["clients"] == ["192.168.0.50"] and d["pool_id"] == "pool:tank"
+    assert luns["file-lun"]["size"] == 5000 and luns["file-lun"]["clients"] == [] and luns["file-lun"]["pool_id"] == "pool:fast"
+    assert luns["off"]["health"] == "warning"
+
+
+def test_iscsi_without_pools_still_gives_a_storage_part_when_there_are_luns(fake):
+    out = run(fake(**ISCSI))
+    assert "storage" in out and any(v["kind"] == "lun" for v in out["storage"]["volumes"])

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.182 — 2026-10-23
+
+### Added
+- ★ **TrueNAS plugin 1.5.0 shows iSCSI.** Every iSCSI LUN (extent) appears on the Storage page with its size, how much is used and the pool it lives in, and the hosts that are logged in to its target are linked to their devices, so a PC that boots from or uses a TrueNAS disk shows "uses iSCSI <LUN> on <NAS>" on its device page. Needs the *Run diagnostic* report from a real TrueNAS if a LUN or its client does not show: the iSCSI calls were written from the middleware's documented API.
+
 ## 0.4.180 — 2026-10-23
 
 ### Added

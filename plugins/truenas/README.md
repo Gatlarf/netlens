@@ -30,7 +30,7 @@ Press **Run diagnostic** on the plugin's page (Netlens 0.2.67 or newer, plugin 1
 
 ## Storage page
 
-Since version 1.4.0 (Netlens 0.4.180 or newer) the plugin also fills the **Storage** page with pools with their fill level and health (events at 85 and 95 percent), the disks of each pool with their state, the NFS and SMB shares, and the open alerts of TrueNAS (warnings and worse). Events: *Storage problem*, *Storage recovered* and *Disk filling up* go through the usual notification channels. Nothing extra is needed on the NAS; the same user and the same read-only calls.
+Since version 1.4.0 (Netlens 0.4.180 or newer) the plugin also fills the **Storage** page with pools with their fill level and health (events at 85 and 95 percent), the disks of each pool with their state, the NFS and SMB shares, and the open alerts of TrueNAS (warnings and worse). Events: *Storage problem*, *Storage recovered* and *Disk filling up* go through the usual notification channels. **iSCSI** (1.5.0): every LUN with its size and use, and the hosts logged in to its target, linked to their devices. Nothing extra is needed on the NAS; the same user and the same read-only calls.
 
 ## What was tested
 

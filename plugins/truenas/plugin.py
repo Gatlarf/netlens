@@ -13,6 +13,8 @@ read-only:
     disk.query                disk sizes and models
     alert.list                the open alerts
     sharing.nfs.query / sharing.smb.query   the shares
+    iscsi.extent.query / iscsi.target.query / iscsi.targetextent.query / iscsi.global.sessions   iSCSI LUNs, their targets and the hosts logged in
+    pool.dataset.query        zvol sizes (the size of an iSCSI LUN on a zvol)
 
 Standard library only (a small WebSocket client is included). The key is only sent over TLS: TrueNAS revokes an API key that
 is used over an unencrypted connection. A refused login is reported with `auth_failed`, so Netlens stops retrying until the user
@@ -214,10 +216,10 @@ class TrueNAS:
             return message.get("result")
         raise TruenasError(f"TrueNAS did not answer {method} in time")
 
-    def optional(self, method, notes, label):
+    def optional(self, method, notes, label, *params):
         """A list from a feature the box may not have (no apps pool, no virtualization): empty, with a note, when unavailable."""
         try:
-            result = self.call(method)
+            result = self.call(method, *params)
         except MethodMissing:
             notes.append(f"{label}: not available on this version")
             return []
@@ -244,6 +246,11 @@ class TrueNAS:
             "alerts": self.optional("alert.list", notes, "alerts"),
             "nfs": self.optional("sharing.nfs.query", notes, "NFS shares"),
             "smb": self.optional("sharing.smb.query", notes, "SMB shares"),
+            "extents": self.optional("iscsi.extent.query", notes, "iSCSI extents"),
+            "iscsi_targets": self.optional("iscsi.target.query", notes, "iSCSI targets"),
+            "targetextents": self.optional("iscsi.targetextent.query", notes, "iSCSI LUN mappings"),
+            "sessions": self.optional("iscsi.global.sessions", notes, "iSCSI sessions"),
+            "zvols": self.optional("pool.dataset.query", notes, "zvols", [["type", "=", "VOLUME"]]),
             "notes": notes,
         }
 
@@ -393,6 +400,65 @@ def _vdev_disks(node, out):
         _vdev_disks(child, out)
 
 
+def _parsed(value):
+    """ZFS properties come as {"parsed": n, "rawvalue": "..."}."""
+    if isinstance(value, dict):
+        value = value.get("parsed", value.get("rawvalue"))
+    try:
+        number = int(float(str(value)))
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None
+
+
+def _client_ip(text):
+    """'192.168.0.50' or '192.168.0.50:3260' or '[::1]' -> an IPv4 address or None."""
+    host = str(text or "").strip().rsplit(":", 1)[0] if str(text or "").count(":") == 1 else str(text or "").strip()
+    return host if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", host) else None
+
+
+def _iscsi_luns(snapshot, sid, pool_ids):
+    """iSCSI LUNs: one volume per extent, with the hosts that are logged in to a target that holds it."""
+    zvols = {str(z.get("name")): z for z in snapshot.get("zvols") or [] if isinstance(z, dict)}
+    targets = {t.get("id"): t for t in snapshot.get("iscsi_targets") or [] if isinstance(t, dict)}
+    by_extent = {}
+    for link in snapshot.get("targetextents") or []:
+        if isinstance(link, dict):
+            by_extent.setdefault(link.get("extent"), []).append(link.get("target"))
+    clients_of_target = {}
+    for session in snapshot.get("sessions") or []:
+        if not isinstance(session, dict):
+            continue
+        ip = _client_ip(session.get("initiator_addr"))
+        name = str(session.get("target") or "")
+        for target in targets.values():
+            short = str(target.get("name") or "")
+            if short and (name == short or name.endswith(":" + short)) and ip:
+                clients_of_target.setdefault(target.get("id"), [])
+                if ip not in clients_of_target[target.get("id")]:
+                    clients_of_target[target.get("id")].append(ip)
+    out = []
+    for extent in snapshot.get("extents") or []:
+        if not isinstance(extent, dict) or not extent.get("name"):
+            continue
+        disk = str(extent.get("disk") or "")
+        zname = disk[len("zvol/"):] if disk.startswith("zvol/") else ""
+        zvol = zvols.get(zname, {})
+        size = _parsed(zvol.get("volsize")) or _int(extent.get("filesize")) or None
+        path = zname or str(extent.get("path") or "")
+        clients, names = [], []
+        for tid in by_extent.get(extent.get("id"), []):
+            names.append(str((targets.get(tid) or {}).get("name") or ""))
+            for ip in clients_of_target.get(tid, []):
+                if ip not in clients:
+                    clients.append(ip)
+        pool = zname.split("/")[0] if zname else path.removeprefix("/mnt/").split("/")[0]
+        out.append({"id": f"iscsi:extent:{extent.get('id', extent['name'])}", "system_id": sid, "pool_id": pool_ids.get(pool), "name": f"{extent['name']}"[:200], "kind": "lun", "protocol": "iscsi",
+                    "size": size, "used": _parsed(zvol.get("used")), "health": "ok" if extent.get("enabled", True) is not False else "warning", "clients": clients})
+    return out
+
+
+
 def to_storage(snapshot, connect_host=""):
     """The storage part of the output: pools, their disks, shares and alerts (the Storage page)."""
     host = _host(snapshot, connect_host)
@@ -438,6 +504,7 @@ def to_storage(snapshot, connect_host=""):
             if isinstance(share, dict) and share.get("path") and share.get("enabled", True) is not False:
                 label = str(share.get("name") or share["path"])
                 volumes.append({"id": f"{kind}:{share.get('id', share['path'])}", "system_id": sid, "pool_id": pool_of(share["path"]), "name": label[:200], "kind": "share", "protocol": kind, "size": None, "used": None, "health": "ok", "clients": []})
+    volumes += _iscsi_luns(snapshot, sid, {p["name"]: p["id"] for p in pools})
     for alert in snapshot.get("alerts") or []:
         if not isinstance(alert, dict) or alert.get("dismissed"):
             continue
@@ -446,7 +513,7 @@ def to_storage(snapshot, connect_host=""):
             alerts.append({"id": f"alert:{alert.get('uuid') or alert.get('id') or alert.get('klass')}", "system_id": sid, "severity": severity, "text": str(alert.get("formatted") or alert.get("klass") or "")[:300]})
             level = max(level, severity, key=lambda x: RANK[x])
     system = {"id": sid, "name": snapshot["hostname"], "ip": host.get("ip"), "vendor": "TrueNAS", "model": "", "version": snapshot["version"][:60], "serial": "", "online": True,
-              "health": level if (pools or snapshot.get("alerts")) else "unknown", "warnings": []}
+              "health": level if (pools or snapshot.get("alerts") or snapshot.get("extents")) else "unknown", "warnings": []}
     controllers = [{"id": f"{sid}:host", "system_id": sid, "name": snapshot["hostname"], "ip": host.get("ip"), "mac": host.get("mac"), "online": True, "health": "unknown"}] if host.get("ip") or host.get("mac") else []
     return {"systems": [system], "controllers": controllers, "pools": pools, "volumes": volumes, "disks": disks, "alerts": alerts[:200]}
 
@@ -515,7 +582,7 @@ def _fetch_one(config):
     finally:
         truenas.close()
     out = to_hypervisor(snapshot, truenas.host)
-    if snapshot["pools"] or snapshot["alerts"]:
+    if snapshot["pools"] or snapshot["alerts"] or snapshot["extents"]:
         out["storage"] = to_storage(snapshot, truenas.host)
     return out
 
@@ -604,6 +671,11 @@ def diagnose(config):
         step("alerts", "alert.list")
         step("nfs_shares", "sharing.nfs.query")
         step("smb_shares", "sharing.smb.query")
+        step("iscsi_extents", "iscsi.extent.query")
+        step("iscsi_targets", "iscsi.target.query")
+        step("iscsi_lun_mappings", "iscsi.targetextent.query")
+        step("iscsi_sessions", "iscsi.global.sessions")
+        step("zvols", "pool.dataset.query", [["type", "=", "VOLUME"]])
         first = next((i for i in instances or [] if isinstance(i, dict) and i.get("id")), None)
         if first:
             step("instance_devices", "virt.instance.device_list", first["id"])
@@ -615,9 +687,10 @@ def diagnose(config):
             "guests_with_ip": sum(1 for g in out["guests"] if g["ips"]), "guests_with_mac": sum(1 for g in out["guests"] if g["macs"]),
             "not_available": snapshot["notes"],
         }
-        if snapshot["pools"] or snapshot["alerts"]:
+        if snapshot["pools"] or snapshot["alerts"] or snapshot["extents"]:
             st = to_storage(snapshot, truenas.host)
-            report["result"]["storage"] = {"pools": len(st["pools"]), "disks": len(st["disks"]), "shares": len(st["volumes"]), "alerts": len(st["alerts"]), "health": st["systems"][0]["health"],
+            report["result"]["storage"] = {"pools": len(st["pools"]), "disks": len(st["disks"]), "shares": len([v for v in st["volumes"] if v["kind"] == "share"]), "luns": len([v for v in st["volumes"] if v["kind"] == "lun"]),
+                                           "luns_with_clients": len([v for v in st["volumes"] if v["kind"] == "lun" and v["clients"]]), "alerts": len(st["alerts"]), "health": st["systems"][0]["health"],
                                            "disk_states": {k: sum(1 for d in st["disks"] if d["state"] == k) for k in ("ok", "degraded", "failed", "spare", "unknown")}}
     except Exception as exc:  # noqa: BLE001
         report["error"] = _problem(exc)
