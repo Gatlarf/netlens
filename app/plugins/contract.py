@@ -6,6 +6,7 @@ returns is validated here, with messages that tell the plugin author exactly wha
 
 from __future__ import annotations
 
+import html
 import ipaddress
 import re
 from typing import Any
@@ -819,6 +820,14 @@ def _unique(items: list, key: str, path: str) -> set[str]:
     return seen
 
 
+def _plain(text: str, limit: int) -> str:
+    """Alert texts of some systems carry HTML (<br>, <b>): plain text, one line, cut at `limit` characters."""
+    text = re.sub(r"<\s*br\s*/?\s*>", " ", text, flags=re.IGNORECASE)
+    text = html.unescape(re.sub(r"<[^>]{1,200}>", "", text))
+    text = re.sub(r"\s+", " ", text).strip()
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
 def _storage(data: Any) -> dict:
     """A storage plugin's snapshot of a storage system (NetApp, Dell, Pure, Ceph ...): the system itself, its controllers (found on the network
     by IP or MAC), pools, volumes with the hosts that use them, disks and the open alerts."""
@@ -897,7 +906,7 @@ def _storage(data: Any) -> dict:
             continue
         alert_ids.add(alert_id)
         alerts.append({"id": alert_id, "system_id": owner(raw, path), "severity": _choice(raw.get("severity"), f"{path}.severity", ("warning", "critical"), "warning"),
-                       "text": _text(raw.get("text"), f"{path}.text", max_len=300), "at": _stamp(raw.get("at"), f"{path}.at")})
+                       "text": _plain(_text(raw.get("text"), f"{path}.text", max_len=5000), 600), "at": _stamp(raw.get("at"), f"{path}.at")})
     return {"systems": systems, "controllers": controllers, "pools": pools, "volumes": volumes, "disks": disks, "alerts": alerts}
 
 

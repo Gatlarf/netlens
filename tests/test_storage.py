@@ -141,3 +141,12 @@ def test_a_hypervisor_plugin_can_also_report_storage(conn):
     set_setting(conn, _key("proxmox", "data"), json.dumps({"hosts": [], "guests": []}))
     apply_plugin(conn, plugin)
     assert storage.overview(conn)["systems"] == []                      # the plugin stopped reporting storage
+
+
+def test_alert_texts_lose_their_html_and_are_not_cut_short():
+    long = "The deprecated REST API was used 6774 times from the following IP addresses:<br>192.168.0.232.<br>" + "Migrate any remaining integrations to the JSON-RPC 2.0 API. " * 5 + "END &amp; done"
+    out = validate_output("storage", {"systems": [{"id": "a"}], "alerts": [{"id": "x", "system_id": "a", "severity": "warning", "text": long},
+                                                                             {"id": "y", "system_id": "a", "severity": "warning", "text": "x" * 2000}]})
+    text = out["alerts"][0]["text"]
+    assert "<br>" not in text and "192.168.0.232. Migrate" in text and text.endswith("END & done") and len(text) > 300
+    assert len(out["alerts"][1]["text"]) == 600 and out["alerts"][1]["text"].endswith("…")

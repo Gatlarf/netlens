@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.188 — 2026-10-23
+
+### Added
+- ★ **iSCSI for Synology and NetApp ONTAP.** Synology plugin 1.2.0 lists the LUNs of SAN Manager (size, space used, volume) and links the hosts that are logged in to their target to their devices; tested on a virtual DSM 7.2 with a real iSCSI login. NetApp ONTAP plugin 1.1.0 does the same through the iSCSI sessions and LUN mappings (simulator only). QNAP is not done yet: its iSCSI calls are not documented well enough to write without a QNAP to test on.
+
+### Fixed
+- **Open alerts on the Storage page are no longer cut short or full of HTML.** Alert texts such as TrueNAS's "deprecated REST API" warning were cut at 300 characters and showed `<br>` tags. Netlens now turns the markup into plain text and keeps up to 600 characters; TrueNAS plugin 1.6.1 stops cutting the text before it arrives.
+
 ## 0.4.186 — 2026-10-23
 
 ### Added

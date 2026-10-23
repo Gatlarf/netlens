@@ -101,7 +101,8 @@ class FakeDSM:
                     return self._answer({"success": True, "data": {"details": INSPECT[p.get("name")]}})
                 data = {"SYNO.DSM.Info": INFO, "SYNO.Core.Network": NETWORK, "SYNO.Core.Network.Interface": INTERFACES, "SYNO.Docker.Container": CONTAINERS,
                         "SYNO.Virtualization.API.Guest": MACHINES, "SYNO.Core.Package": PACKAGES, "SYNO.Storage.CGI.Storage": fake.options.get("storage"),
-                        "SYNO.Core.Share": fake.options.get("shares")}.get(api)
+                        "SYNO.Core.Share": fake.options.get("shares"), "SYNO.Core.ISCSI.LUN": fake.options.get("luns"),
+                        "SYNO.Core.ISCSI.Target": fake.options.get("targets")}.get(api)
                 if data is None:
                     return self._answer({"success": False, "error": {"code": 102}})
                 return self._answer({"success": True, "data": data})
@@ -301,3 +302,21 @@ def test_a_nas_without_storage_answers_reports_no_storage_part():
         assert "storage" not in plugin.fetch(server.config())
     finally:
         server.close()
+
+
+LUNS = {"luns": [{"name": "netlens-lun", "uuid": "u1", "lun_id": 1, "size": 2147483648, "allocated_size": 1000, "location": "/volume1", "type_str": "BLUN"},
+                 {"name": "idle", "uuid": "u2", "lun_id": 2, "size": 5, "location": "/volume9"}]}
+TARGETS = {"targets": [{"name": "t1", "iqn": "iqn.x:t1", "mapped_luns": [{"lun_uuid": "u1", "mapping_index": 1}],
+                        "connected_sessions": [{"ip": "192.168.0.232", "iqn": "iqn.2026:pc"}, {"ip": "192.168.0.232", "iqn": "iqn.2026:pc"}]},
+                       {"name": "t2", "mapped_luns": [{"lun_uuid": "u2"}], "connected_sessions": []}]}
+
+
+def test_iscsi_luns_with_their_clients():
+    server = FakeDSM(storage=STORAGE, shares=SHARES, luns=LUNS, targets=TARGETS)
+    try:
+        st = validate_output("hypervisor", plugin.fetch(server.config()))["storage"]
+    finally:
+        server.close()
+    luns = {v["name"]: v for v in st["volumes"] if v["kind"] == "lun"}
+    assert luns["netlens-lun"]["size"] == 2147483648 and luns["netlens-lun"]["used"] == 1000 and luns["netlens-lun"]["clients"] == ["192.168.0.232"] and luns["netlens-lun"]["protocol"] == "iscsi"
+    assert luns["netlens-lun"]["pool_id"] == "pool:reuse_1" and luns["idle"]["clients"] == [] and luns["idle"]["pool_id"] is None

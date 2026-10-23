@@ -533,7 +533,7 @@ def to_storage(snapshot, connect_host=""):
             continue
         severity = ALERT_LEVEL.get(str(alert.get("level") or "").upper())
         if severity:
-            alerts.append({"id": f"alert:{alert.get('uuid') or alert.get('id') or alert.get('klass')}", "system_id": sid, "severity": severity, "text": str(alert.get("formatted") or alert.get("klass") or "")[:300]})
+            alerts.append({"id": f"alert:{alert.get('uuid') or alert.get('id') or alert.get('klass')}", "system_id": sid, "severity": severity, "text": str(alert.get("formatted") or alert.get("klass") or "")[:3000]})
             level = max(level, severity, key=lambda x: RANK[x])
     system = {"id": sid, "name": snapshot["hostname"], "ip": host.get("ip"), "vendor": "TrueNAS", "model": "", "version": snapshot["version"][:60], "serial": "", "online": True,
               "health": level if (pools or snapshot.get("alerts") or snapshot.get("extents")) else "unknown", "warnings": []}

@@ -35,6 +35,10 @@ DATA = {
     "/api/storage/disks": {"records": [{"name": "1.0.1", "uuid": "d1", "state": "present", "container_type": "aggregate", "usable_size": 900, "bay": 1, "shelf": {"uid": "5"}},
                                        {"name": "1.0.2", "uuid": "d2", "state": "broken", "container_type": "broken", "bay": 2}, {"name": "1.0.3", "uuid": "d3", "state": "present", "container_type": "spare", "bay": 3}]},
     "/api/protocols/nfs/connected-clients": {"records": [{"client_ip": "10.0.0.20", "svm": {"name": "svm1"}, "volume": {"name": "data"}}, {"client_ip": "10.0.0.20", "svm": {"name": "svm1"}, "volume": {"name": "data"}}]},
+    "/api/protocols/san/iscsi/sessions": {"records": [{"svm": {"name": "svm1"}, "igroups": [{"name": "pc"}], "initiator": {"name": "iqn.1991-05.com.microsoft:pc"},
+                                                       "connections": [{"initiator_address": {"address": "10.0.0.50", "port": 49152}}, {"initiator_address": {"address": "10.0.0.50", "port": 49153}}]},
+                                                      {"svm": {"name": "svm1"}, "igroups": [{"name": "other"}], "connections": [{"initiator_address": {"address": "10.0.0.51"}}]}]},
+    "/api/protocols/san/lun-maps": {"records": [{"lun": {"name": "/vol/data/lun1", "uuid": "l1"}, "igroup": {"name": "pc"}, "svm": {"name": "svm1"}}]},
     "/api/support/ems/events": {"records": [{"message": {"name": "disk.failed", "severity": "alert"}, "time": "2999-01-01T00:00:00+00:00", "log_message": "Disk 1.0.2 failed"},
                                             {"message": {"name": "old.event", "severity": "error"}, "time": "2020-01-01T00:00:00+00:00", "log_message": "ancient"}]},
 }
@@ -114,7 +118,7 @@ def test_missing_nfs_clients_is_a_note_not_an_error():
     c = Cluster(data)
     try:
         assert "NFS clients" in plugin.test(c.config())["message"]
-        assert all(v["clients"] == [] for v in plugin.fetch(c.config())["volumes"])
+        assert all(v["clients"] == [] for v in plugin.fetch(c.config())["volumes"] if v["kind"] != "lun")
     finally:
         c.server.shutdown()
 
@@ -130,3 +134,18 @@ def test_diagnose_is_private(cluster):
     for secret in ("SER1", "00:a0", "00:A0", "192.168.0", "127.0.0.1", "10.0.0.20", "cl1-01", "svm1"):
         assert secret not in text
     assert '"ok": true' in text
+
+
+def test_iscsi_lun_clients_come_from_sessions_through_the_lun_maps(cluster):
+    luns = {v["name"]: v for v in plugin.fetch(cluster.config())["volumes"] if v["kind"] == "lun"}
+    assert luns["/vol/data/lun1"]["clients"] == ["10.0.0.50"]
+
+
+def test_without_iscsi_calls_luns_have_no_clients():
+    data = {k: v for k, v in DATA.items() if "san" not in k}
+    c = Cluster(data)
+    try:
+        assert all(v["clients"] == [] for v in plugin.fetch(c.config())["volumes"] if v["kind"] == "lun")
+        assert "iSCSI sessions" in plugin.test(c.config())["message"]
+    finally:
+        c.server.shutdown()

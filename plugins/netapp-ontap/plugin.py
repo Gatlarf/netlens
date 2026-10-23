@@ -11,6 +11,8 @@ Talks to the ONTAP REST API (ONTAP 9.8 or newer; the client list needs 9.8, ever
     GET /api/storage/luns                         LUNs
     GET /api/storage/disks                        disks: state, container (aggregate, spare, broken)
     GET /api/protocols/nfs/connected-clients      the hosts that have a volume mounted over NFS
+    GET /api/protocols/san/iscsi/sessions         the hosts logged in over iSCSI (address, igroups)
+    GET /api/protocols/san/lun-maps               which igroup sees which LUN
     GET /api/support/ems/events                   emergency, alert and error events of the last day
 
 Standard library only. A refused login is reported with `auth_failed`. Everything but the cluster and the nodes is optional.
@@ -127,6 +129,8 @@ class Ontap:
             "volumes": self.optional("volumes", "/api/storage/volumes", "name,uuid,svm.name,state,type,style,space,nas.path,aggregates"),
             "luns": self.optional("LUNs", "/api/storage/luns", "name,uuid,svm.name,status.state,space,location"),
             "disks": self.optional("disks", "/api/storage/disks", "name,uuid,state,model,bay,shelf,usable_size,container_type,node.name"),
+            "iscsi_sessions": self.optional("iSCSI sessions", "/api/protocols/san/iscsi/sessions", "igroups,initiator,connections.initiator_address,svm.name"),
+            "lun_maps": self.optional("LUN mappings", "/api/protocols/san/lun-maps", "lun.name,lun.uuid,igroup.name,svm.name"),
             "clients": self.optional("NFS clients", "/api/protocols/nfs/connected-clients", "client_ip,svm.name,volume.name"),
             "events": self.optional("health events", "/api/support/ems/events", "message.name,message.severity,time,log_message", **{"message.severity": "emergency|alert|error", "order_by": "time desc"}),
             "notes": self.notes,
@@ -233,11 +237,26 @@ def to_storage(snapshot, connect_host=""):
         volumes.append({"id": f"vol/{_text(vol.get('uuid') or name)}", "system_id": cid, "pool_id": pool_ids.get(aggs[0]) if len(aggs) == 1 else None, "name": f"{svm}:{name}" if svm else name,
                         "kind": "volume", "protocol": "nas" if _get(vol, "nas", "path") else "", "size": _int(space.get("size")), "used": _int(space.get("used")),
                         "health": "ok" if state in ("online", "") else "warning", "clients": clients.get((svm, vol.get("name")), [])})
+    igroup_ips = {}
+    for session in snapshot["iscsi_sessions"]:
+        ips = [ip for ip in (_ip(_get(c, "initiator_address", "address")) for c in session.get("connections") or [] if isinstance(c, dict)) if ip]
+        for group in session.get("igroups") or []:
+            name = (_get(session, "svm", "name"), group.get("name") if isinstance(group, dict) else None)
+            for ip in ips:
+                if ip not in igroup_ips.setdefault(name, []):
+                    igroup_ips[name].append(ip)
+    lun_ips = {}
+    for mapping in snapshot["lun_maps"]:
+        key = _get(mapping, "lun", "uuid") or _get(mapping, "lun", "name")
+        for ip in igroup_ips.get((_get(mapping, "svm", "name"), _get(mapping, "igroup", "name")), []):
+            if ip not in lun_ips.setdefault(key, []):
+                lun_ips[key].append(ip)
     for lun in snapshot["luns"]:
         space = lun.get("space") if isinstance(lun.get("space"), dict) else {}
         state = str(_get(lun, "status", "state") or "").lower()
         volumes.append({"id": f"lun/{_text(lun.get('uuid') or lun.get('name'))}", "system_id": cid, "pool_id": None, "name": _text(lun.get("name"), 200), "kind": "lun", "protocol": "iscsi/fc",
-                        "size": _int(space.get("size")), "used": _int(space.get("used")), "health": "ok" if state in ("online", "") else "warning", "clients": []})
+                        "size": _int(space.get("size")), "used": _int(space.get("used")), "health": "ok" if state in ("online", "") else "warning",
+                        "clients": lun_ips.get(lun.get("uuid")) or lun_ips.get(lun.get("name")) or []})
     disks = []
     for d in snapshot["disks"]:
         state, container = str(d.get("state") or "").lower(), str(d.get("container_type") or "").lower()
@@ -368,6 +387,8 @@ def diagnose(config):
                                ("volumes", "/api/storage/volumes", "name,uuid,svm.name,state,type,style,space,nas.path,aggregates"),
                                ("disks", "/api/storage/disks", "name,uuid,state,model,bay,shelf,usable_size,container_type,node.name"),
                                ("nfs_clients", "/api/protocols/nfs/connected-clients", "client_ip,svm.name,volume.name"),
+                               ("iscsi_sessions", "/api/protocols/san/iscsi/sessions", "igroups,initiator,connections.initiator_address,svm.name"),
+                               ("lun_maps", "/api/protocols/san/lun-maps", "lun.name,lun.uuid,igroup.name,svm.name"),
                                ("events", "/api/support/ems/events", "message.name,message.severity,time,log_message")):
         try:
             data = client.get(path, fields=fields, max_records=2)
@@ -381,7 +402,7 @@ def diagnose(config):
         snapshot = client.snapshot()
         out = to_storage(snapshot, client.host)
         report["result"] = {"nodes": len(out["controllers"]), "nodes_with_mac": sum(1 for c in out["controllers"] if c["mac"]), "nodes_with_ip": sum(1 for c in out["controllers"] if c["ip"]),
-                            "aggregates": len(out["pools"]), "volumes": len(out["volumes"]), "volumes_with_clients": sum(1 for v in out["volumes"] if v["clients"]),
+                            "aggregates": len(out["pools"]), "volumes": len(out["volumes"]), "volumes_with_clients": sum(1 for v in out["volumes"] if v["clients"]), "luns_with_clients": sum(1 for v in out["volumes"] if v["kind"] == "lun" and v["clients"]),
                             "disks": len(out["disks"]), "alerts": len(out["alerts"]), "health": out["systems"][0]["health"], "not_available": [_problem(RuntimeError(n), client) for n in snapshot["notes"]]}
     except Exception as exc:  # noqa: BLE001
         report["error"] = _problem(exc, client)

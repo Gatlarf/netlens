@@ -13,6 +13,7 @@ Talks to the DSM web API over HTTPS, read-only:
     SYNO.Core.Package             installed packages and whether they run
     SYNO.Storage.CGI.Storage      storage pools, volumes and disks with their status
     SYNO.Core.Share               shared folders
+    SYNO.Core.ISCSI.LUN / .Target iSCSI LUNs (SAN Manager), their targets and the hosts logged in
 
 Standard library only. A refused login is reported with `auth_failed` so Netlens stops retrying until the user acts (that
 protects the account from being blocked by DSM's auto-block). Every list is optional: a NAS without Virtual Machine Manager
@@ -28,7 +29,7 @@ import urllib.parse
 import urllib.request
 
 MAX_INSPECT = 60                  # containers whose details are read (one request each)
-APIS = ("SYNO.DSM.Info", "SYNO.Core.Network", "SYNO.Core.Network.Interface", "SYNO.Docker.Container", "SYNO.Virtualization.API.Guest", "SYNO.Core.Package", "SYNO.Storage.CGI.Storage", "SYNO.Core.Share")
+APIS = ("SYNO.DSM.Info", "SYNO.Core.Network", "SYNO.Core.Network.Interface", "SYNO.Docker.Container", "SYNO.Virtualization.API.Guest", "SYNO.Core.Package", "SYNO.Storage.CGI.Storage", "SYNO.Core.Share", "SYNO.Core.ISCSI.LUN", "SYNO.Core.ISCSI.Target")
 SESSION = "Netlens"
 
 AUTH_ERRORS = {
@@ -202,8 +203,10 @@ class DSM:
         packages = self.optional(notes, "packages", "SYNO.Core.Package", "list", 1, additional=json.dumps(["status"]))
         storage = self.optional(notes, "storage", "SYNO.Storage.CGI.Storage", "load_info", 1)
         shares = self.optional(notes, "shared folders", "SYNO.Core.Share", "list", 1)
+        luns = self.optional(notes, "iSCSI LUNs", "SYNO.Core.ISCSI.LUN", "list", 1, additional=json.dumps(["allocated_size"]))
+        targets = self.optional(notes, "iSCSI targets", "SYNO.Core.ISCSI.Target", "list", 1, additional=json.dumps(["mapped_lun", "connected_sessions"]))
         return {"info": info, "network": network if isinstance(network, dict) else {}, "interfaces": interfaces, "containers": containers,
-                "machines": machines, "packages": packages, "storage": storage if isinstance(storage, dict) else {}, "shares": shares, "notes": notes}
+                "machines": machines, "packages": packages, "storage": storage if isinstance(storage, dict) else {}, "shares": shares, "luns": luns, "targets": targets, "notes": notes}
 
 
 # ----------------------------------------------------------------------------- turning DSM's answers into Netlens' format
@@ -371,6 +374,38 @@ def _big(value):
     return number if number >= 0 else None
 
 
+def _client_ip(text):
+    value = str(text or "").strip()
+    return value if re.fullmatch(r"\d{1,3}(\.\d{1,3}){3}", value) else None
+
+
+def _iscsi_luns(snapshot, sid, volume_ids):
+    """One volume of kind lun per iSCSI LUN of SAN Manager, with the hosts that are logged in to a target that maps it."""
+    clients_of = {}
+    for target in _listing(snapshot.get("targets"), "targets"):
+        ips = []
+        for session in target.get("connected_sessions") or []:
+            ip = _client_ip(session.get("ip")) if isinstance(session, dict) else None
+            if ip and ip not in ips:
+                ips.append(ip)
+        for mapped in target.get("mapped_luns") or []:
+            uuid = mapped.get("lun_uuid") if isinstance(mapped, dict) else None
+            if uuid:
+                for ip in ips:
+                    clients_of.setdefault(uuid, [])
+                    if ip not in clients_of[uuid]:
+                        clients_of[uuid].append(ip)
+    out = []
+    for lun in _listing(snapshot.get("luns"), "luns"):
+        name = str(lun.get("name") or "")
+        if not name:
+            continue
+        uuid = str(lun.get("uuid") or lun.get("lun_id") or name)
+        out.append({"id": f"iscsi:{uuid}", "system_id": sid, "pool_id": volume_ids.get(str(lun.get("location") or "")), "name": name[:200], "kind": "lun", "protocol": "iscsi",
+                    "size": _big(lun.get("size")), "used": _big(lun.get("allocated_size")), "health": "ok", "clients": clients_of.get(uuid, [])})
+    return out
+
+
 def to_storage(snapshot, connect_host=""):
     """The storage part of the output: storage pools, volumes, disks and shared folders (the Storage page)."""
     host = _host(snapshot, connect_host)
@@ -414,6 +449,7 @@ def to_storage(snapshot, connect_host=""):
         name = str(share.get("name") or "")
         if name:
             volumes.append({"id": f"share:{name}", "system_id": sid, "pool_id": None, "name": name[:200], "kind": "share", "protocol": "", "size": None, "used": None, "health": "ok", "clients": []})
+    volumes += _iscsi_luns(snapshot, sid, {v["name"]: v["pool_id"] for v in volumes if v["kind"] == "filesystem" and v["pool_id"]})
     info = snapshot["info"]
     system = {"id": sid, "name": host["name"], "ip": host.get("ip"), "vendor": "Synology", "model": str(info.get("model") or "")[:100], "version": str(info.get("version_string") or "")[:60],
               "serial": str(info.get("serial") or "")[:60], "online": True, "health": level if pools or volumes or disks else "unknown", "warnings": []}
@@ -565,6 +601,8 @@ def diagnose(config):
         step("packages", "SYNO.Core.Package", "list", 1, additional=json.dumps(["status"]))
         step("storage", "SYNO.Storage.CGI.Storage", "load_info", 1)
         step("shares", "SYNO.Core.Share", "list", 1)
+        step("iscsi_luns", "SYNO.Core.ISCSI.LUN", "list", 1, additional=json.dumps(["allocated_size"]))
+        step("iscsi_targets", "SYNO.Core.ISCSI.Target", "list", 1, additional=json.dumps(["mapped_lun", "connected_sessions"]))
         snapshot = dsm.snapshot()
         out = to_hypervisor(snapshot, dsm.host)
         report["result"] = {
@@ -573,7 +611,8 @@ def diagnose(config):
             "guests_with_mac": sum(1 for g in out["guests"] if g["macs"]), "not_available": snapshot["notes"],
         }
         st = to_storage(snapshot, dsm.host)
-        report["result"]["storage"] = {"pools": len(st["pools"]), "volumes": len([v for v in st["volumes"] if v["kind"] == "filesystem"]), "shares": len([v for v in st["volumes"] if v["kind"] == "share"]),
+        report["result"]["storage"] = {"pools": len(st["pools"]), "volumes": len([v for v in st["volumes"] if v["kind"] == "filesystem"]), "shares": len([v for v in st["volumes"] if v["kind"] == "share"]), "luns": len([v for v in st["volumes"] if v["kind"] == "lun"]),
+                                       "luns_with_clients": len([v for v in st["volumes"] if v["kind"] == "lun" and v["clients"]]),
                                        "disks": len(st["disks"]), "alerts": len(st["alerts"]), "health": st["systems"][0]["health"],
                                        "disk_states": {k: sum(1 for d in st["disks"] if d["state"] == k) for k in ("ok", "degraded", "failed", "spare", "unknown")}}
     except Exception as exc:  # noqa: BLE001
