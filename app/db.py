@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 33
+SCHEMA_VERSION = 34
 
 
 def utcnow() -> str:
@@ -834,6 +834,32 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+
+    # --- schema v34: what a storage plugin (NetApp, Dell, Pure, Ceph ...) reports: systems, controllers, pools, volumes, disks, alerts -----------
+    for sql in (
+        """CREATE TABLE IF NOT EXISTS storage_systems (
+            plugin_id TEXT NOT NULL, system_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', ip TEXT, vendor TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '',
+            version TEXT NOT NULL DEFAULT '', serial TEXT NOT NULL DEFAULT '', online INTEGER NOT NULL DEFAULT 1, health TEXT NOT NULL DEFAULT 'unknown',
+            device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL, warnings TEXT NOT NULL DEFAULT '[]', updated TEXT NOT NULL, PRIMARY KEY (plugin_id, system_id))""",
+        """CREATE TABLE IF NOT EXISTS storage_controllers (
+            plugin_id TEXT NOT NULL, controller_id TEXT NOT NULL, system_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', ip TEXT, mac TEXT, online INTEGER NOT NULL DEFAULT 1,
+            health TEXT NOT NULL DEFAULT 'unknown', device_id INTEGER REFERENCES devices(id) ON DELETE SET NULL, updated TEXT NOT NULL, PRIMARY KEY (plugin_id, controller_id))""",
+        """CREATE TABLE IF NOT EXISTS storage_pools (
+            plugin_id TEXT NOT NULL, pool_id TEXT NOT NULL, system_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', total INTEGER, used INTEGER, avail INTEGER,
+            health TEXT NOT NULL DEFAULT 'unknown', raid TEXT NOT NULL DEFAULT '', level TEXT NOT NULL DEFAULT 'ok', updated TEXT NOT NULL, PRIMARY KEY (plugin_id, pool_id))""",
+        """CREATE TABLE IF NOT EXISTS storage_volumes (
+            plugin_id TEXT NOT NULL, volume_id TEXT NOT NULL, system_id TEXT NOT NULL, pool_id TEXT, name TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL DEFAULT 'volume',
+            protocol TEXT NOT NULL DEFAULT '', size INTEGER, used INTEGER, health TEXT NOT NULL DEFAULT 'unknown', clients TEXT NOT NULL DEFAULT '[]', updated TEXT NOT NULL,
+            PRIMARY KEY (plugin_id, volume_id))""",
+        """CREATE TABLE IF NOT EXISTS storage_disks (
+            plugin_id TEXT NOT NULL, disk_id TEXT NOT NULL, system_id TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', slot TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '',
+            size INTEGER, state TEXT NOT NULL DEFAULT 'unknown', updated TEXT NOT NULL, PRIMARY KEY (plugin_id, disk_id))""",
+        """CREATE TABLE IF NOT EXISTS storage_alerts (
+            plugin_id TEXT NOT NULL, alert_id TEXT NOT NULL, system_id TEXT NOT NULL, severity TEXT NOT NULL DEFAULT 'warning', text TEXT NOT NULL DEFAULT '', at TEXT,
+            PRIMARY KEY (plugin_id, alert_id))""",
+    ):
+        cur.execute(sql)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_storage_controllers_device ON storage_controllers(device_id)")
 
     # --- schema v21: "always on" devices (the core devices the availability can be limited to) ----------------
     _add_column_if_missing(conn, "devices", "always_on", "INTEGER NOT NULL DEFAULT 0")

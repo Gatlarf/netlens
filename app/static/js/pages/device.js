@@ -482,6 +482,22 @@ function buildBackupCard(device) {
   return card;
 }
 
+// The storage array or controller this device is, and the volumes it uses (from a storage plugin)
+function buildStorageCard(device) {
+  const s = device.storage;
+  if (!s) return null;
+  const card = h("div", { class: "card" }, h("h2", {}, "Storage"));
+  const tone = (x) => (x === "critical" ? "error" : x === "warning" ? "warn-text" : "run-ok");
+  for (const x of s.systems) {
+    card.appendChild(kvRow(x.name, h("span", { class: tone(x.health) }, `${x.health === "ok" ? "healthy" : x.health}${x.failed_disks ? ` · ${x.failed_disks} failed disk${x.failed_disks === 1 ? "" : "s"}` : ""}`)));
+    const model = [x.vendor, x.model, x.version].filter(Boolean).join(" ");
+    if (model) card.appendChild(kvRow("Model", h("span", {}, model)));
+  }
+  for (const u of s.uses) card.appendChild(kvRow(`Uses ${u.protocol || u.kind}`, h("span", {}, `${u.volume} on ${u.system}`)));
+  card.appendChild(h("p", { class: "hint" }, h("a", { href: "#/storage" }, "All storage")));
+  return card;
+}
+
 function buildSmartHomeCard(device) {
   const d = device.smarthome;
   if (!d) return null;
@@ -885,6 +901,8 @@ export async function render(container, params) {
     if (virtualizationCard) flow.appendChild(virtualizationCard);
     const backupCard = buildBackupCard(device);
     if (backupCard) flow.appendChild(backupCard);
+    const storageCard = buildStorageCard(device);
+    if (storageCard) flow.appendChild(storageCard);
     const smartCard = buildSmartHomeCard(device);
     if (smartCard) flow.appendChild(smartCard);
     for (const siteCard of buildDeviceSitesCards(device)) flow.appendChild(siteCard);

@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.178 — 2026-10-23
+
+### Added
+- ★ **Storage: a new plugin kind and a Storage page.** A storage plugin reports a storage system with its controllers, pools, volumes, disks and open alerts. Netlens finds the array and its controllers on the network by address or MAC, shows the pools with their fill level, and links the hosts that use a volume (NFS clients, iSCSI initiators) to their devices, so a device page tells which volumes it uses and a volume tells who depends on it. Events: a system, pool or disk becomes unhealthy or recovers, a pool passes 85 and 95 percent, a new critical alert (Storage problem, Storage recovered). The contract is in `app/plugins/PLUGINS.md` (kind `storage`).
+- ★ **Three storage plugins in the Plugin store: Redfish, NetApp ONTAP and Ceph.** *Redfish* reads servers and arrays through their management controller (Dell iDRAC, HPE iLO, Lenovo XClarity, Supermicro, Cisco CIMC ...): health, power supplies, fans, drives and RAID volumes, with the BMC and the network cards matched to your devices by address and MAC; it was run against the official DMTF Redfish mockup server. *NetApp ONTAP* shows nodes, aggregates, volumes, LUNs, disks and the NFS clients of every volume (simulator only, so Community level). *Ceph* shows health and its checks, hosts, pools, OSDs, CephFS with its clients and RBD images; it was tested on a real Ceph 19.2.7 cluster. The new plugin category *Server hardware* holds Redfish.
+
 ## 0.4.177 — 2026-10-23
 
 ### Added

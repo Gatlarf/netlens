@@ -26,7 +26,7 @@ RECOVERS = {v: k for k, v in RECOVERY.items()}
 REMEDIATION = {"remediation_pending", "remediation_ran", "remediation_failed", "remediation_recovered"}
 WORDS = {"device_offline": "went offline", "service_down": "a service went down", "metric_critical": "a health reading went critical", "metric_warning": "a health reading went past its warning limit",
          "anomaly": "a reading was unusual", "capacity_warning": "a disk is filling up", "capacity_critical": "a disk is almost full", "remote_offline": "a remote device went offline",
-         "probe_offline": "a remote site went silent", "central_unreachable": "the central Netlens could not be reached", "guest_backup_failed": "a backup failed", "backup_failed": "a backup failed", "container_unhealthy": "a container was unhealthy",
+         "probe_offline": "a remote site went silent", "central_unreachable": "the central Netlens could not be reached", "guest_backup_failed": "a backup failed", "storage_degraded": "a storage system had a problem", "backup_failed": "a backup failed", "container_unhealthy": "a container was unhealthy",
          "container_restarting": "a container kept restarting", "container_stopped": "a container stopped", "inventory_unavailable": "a smart-home device became unavailable"}
 SYSTEM = ("You write one short paragraph (at most four sentences) for the administrator of a home or small-business network about an incident. "
           "Use only the facts in the JSON. Say what happened, the probable cause if one is given, whether it is over and whether an automatic fix ran. "

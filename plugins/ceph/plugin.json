@@ -1,0 +1,58 @@
+{
+  "id": "ceph",
+  "name": "Ceph",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "storage",
+  "author": "Netlens",
+  "description": "Shows a Ceph cluster (cephadm, Rook, Proxmox VE, MicroCeph with the dashboard enabled): health and its checks, hosts and monitors, pools with their fill level, OSDs (a down or out OSD raises an event), CephFS file systems with the hosts that mounted them, and RBD images. Read-only, through the Ceph dashboard's REST API.",
+  "info": {
+    "title": "Set up a read-only user on the Ceph dashboard",
+    "text": "The dashboard module must be enabled (cephadm enables it by default; check with 'ceph mgr services'). Create a user with the read-only role: put the password in a file and run the first command below on a node with the admin keyring. Enter the dashboard address with its port, for example https://<manager address>:8443 (a standby manager redirects to the active one; use the address of the active one or a load balancer). Netlens signs in for a few seconds at each sync and signs out again, and only reads. A self-signed dashboard certificate is normal: leave 'Verify TLS certificate' off until you installed a proper one.",
+    "code": "echo -n 'a-long-random-password' > /tmp/pw && ceph dashboard ac-user-create netlens -i /tmp/pw read-only && rm /tmp/pw"
+  },
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Ceph clusters",
+      "required": true,
+      "help": "One line per cluster: the address of the dashboard (with its port) and the user name and password of the read-only user.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.0.90:8443",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Only used for https:// addresses. Leave this off while the dashboard uses a self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ]
+}

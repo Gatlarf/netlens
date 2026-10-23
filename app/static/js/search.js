@@ -21,6 +21,7 @@ const PAGES = [
   ["Health", "#/health", "cpu memory disk temperature limits snmp ssh winrm monitoring"],
   ["Remote sites", "#/remote-sites", "probes branch offices central sites"],
   ["Services", "#/services", "service checks http tcp dns certificate process"],
+  ["Storage", "#/storage", "storage array netapp dell pure ceph pool volume lun disk raid nas san capacity"],
   ["Backups", "#/backups", "backup proxmox backup server pbs guests vm snapshot datastore failed late"],
   ["Statistics", "#/stats", "charts numbers vendors types"],
   ["Reports", "#/reports", "weekly monthly availability csv"],

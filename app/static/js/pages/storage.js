@@ -1,0 +1,99 @@
+import { get } from "../api.js";
+import { h, clear, timeAgo } from "../util.js";
+import { pageHead, tile as uiTile, tileRow, emptyState } from "../ui.js";
+import { bytes } from "./backups.js";
+
+const TONE = { critical: "error", warning: "warn-text", ok: "run-ok", unknown: "hint" };
+const HEALTH = { critical: "Critical", warning: "Warning", ok: "Healthy", unknown: "Unknown" };
+const DISK = { failed: "Failed", degraded: "Degraded", spare: "Spare", ok: "OK", unknown: "Unknown" };
+
+const health = (x) => h("span", { class: TONE[x] || "hint" }, HEALTH[x] || x);
+const deviceLink = (id, name, fallback) => (id ? h("a", { href: `#/device/${id}` }, name || "device") : h("span", { class: "hint" }, fallback || ""));
+
+function bar(percent, level) {
+  return h("div", { class: "usage-bar", role: "img", "aria-label": `${percent ?? "?"} percent used` }, h("div", { class: `usage-fill ${level === "critical" ? "bad" : level === "warning" ? "warn" : ""}`, style: `width:${Math.min(100, percent || 0)}%` }));
+}
+
+function table(heads, rows) {
+  const t = h("table", { class: "data" });
+  t.appendChild(h("thead", {}, h("tr", {}, ...heads.map((c) => h("th", {}, c)))));
+  const body = h("tbody");
+  for (const r of rows) body.appendChild(h("tr", {}, ...r.map((c) => h("td", {}, c))));
+  t.appendChild(body);
+  return h("div", { class: "table-wrap" }, t);
+}
+
+function systemCard(sys, data) {
+  const mine = (list) => list.filter((x) => x.plugin_id === sys.plugin_id && x.system_id === sys.id);
+  const subtitle = [sys.vendor, sys.model, sys.version].filter(Boolean).join(" ");
+  const card = h("div", { class: "card" }, h("h3", {}, sys.name, subtitle ? h("span", { class: "hint" }, ` · ${subtitle}`) : null));
+  card.appendChild(h("p", {}, health(sys.health), sys.online ? "" : h("span", { class: "error" }, " · not reachable"), sys.device_id ? h("span", {}, " · ", deviceLink(sys.device_id, sys.device)) : sys.ip ? h("span", { class: "hint" }, ` · ${sys.ip}` ) : null));
+  for (const w of sys.warnings) card.appendChild(h("p", { class: "warn-text" }, w));
+  const pools = mine(data.pools);
+  for (const p of pools) {
+    card.appendChild(h("div", {}, h("strong", {}, p.name), h("span", { class: "hint" }, p.raid ? ` · ${p.raid}` : ""), " ", p.health === "ok" || p.health === "unknown" ? null : health(p.health),
+      bar(p.percent, p.level), h("p", {}, `${bytes(p.used)} of ${bytes(p.total)} used${p.percent !== null ? ` (${p.percent}%)` : ""}`)));
+  }
+  const controllers = mine(data.controllers);
+  if (controllers.length) {
+    card.appendChild(h("h4", {}, "Controllers"));
+    card.appendChild(table(["Name", "Address", "State", "Device"], controllers.map((c) => [c.name, [c.ip, c.mac].filter(Boolean).join(" · "), c.online ? health(c.health) : h("span", { class: "error" }, "Offline"), deviceLink(c.device_id, c.device, "not on the network list")])));
+  }
+  const disks = mine(data.disks);
+  if (disks.length) {
+    const bad = disks.filter((d) => d.state === "failed" || d.state === "degraded");
+    card.appendChild(h("p", {}, `${disks.length} disk${disks.length === 1 ? "" : "s"}`, bad.length ? h("span", { class: "error" }, ` · ${bad.length} need attention`) : h("span", { class: "run-ok" }, " · all OK")));
+    if (bad.length) card.appendChild(table(["Disk", "Slot", "Model", "Size", "State"], bad.map((d) => [d.name, d.slot, d.model, bytes(d.size), h("span", { class: d.state === "failed" ? "error" : "warn-text" }, DISK[d.state])])));
+  }
+  return card;
+}
+
+export async function render(container) {
+  let destroyed = false;
+  const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
+  container.append(pageHead("Storage", "Your storage systems: pools, volumes, disks and who uses what. It comes from a storage plugin (Plugin store)."), body);
+
+  async function load() {
+    let data;
+    try {
+      data = await get("/api/storage");
+    } catch (err) {
+      if (!destroyed) { clear(body); body.appendChild(h("p", { class: "error" }, err.message || "Could not load the storage systems.")); }
+      return;
+    }
+    if (destroyed) return;
+    clear(body);
+    if (!data.systems.length) {
+      body.appendChild(emptyState("No storage system is connected yet", "Install a storage plugin from the Plugin store and turn it on. Netlens then shows pools, volumes and disks, tells you which hosts use which volume, and warns when a system, pool or disk becomes unhealthy or a pool fills up.", h("a", { class: "btn primary", href: "#/settings/plugin-browse" }, "Open the Plugin store")));
+      return;
+    }
+    const s = data.summary;
+    const tiles = tileRow();
+    tiles.append(uiTile("systems", s.systems, "", s.unhealthy ? "bad" : ""), uiTile("pools filling up or unhealthy", s.pools_filling, "", s.pools_filling ? "warn" : ""),
+      uiTile("failed disks", s.failed_disks, "", s.failed_disks ? "bad" : ""), uiTile("open alerts", s.alerts, "", s.alerts ? "warn" : ""));
+    body.appendChild(tiles);
+    for (const sys of data.systems) body.appendChild(systemCard(sys, data));
+
+    if (data.volumes.length) {
+      const systems = Object.fromEntries(data.systems.map((x) => [`${x.plugin_id}/${x.id}`, x.name]));
+      const card = h("div", { class: "card" }, h("h3", {}, `Volumes and shares (${data.volumes.length})`),
+        h("p", { class: "hint" }, "The hosts that use a volume come from the storage system (NFS clients, iSCSI initiators). A host Netlens has scanned links to its device."));
+      const rows = data.volumes.map((v) => [v.name, systems[`${v.plugin_id}/${v.system_id}`] || v.system_id, [v.kind, v.protocol].filter(Boolean).join(" · "),
+        v.size ? `${bytes(v.used)} / ${bytes(v.size)}${v.percent !== null ? ` (${v.percent}%)` : ""}` : "", health(v.health),
+        h("span", {}, ...v.clients.slice(0, 8).flatMap((c, i) => [i ? ", " : "", c.device_id ? deviceLink(c.device_id, c.device) : h("span", { class: "hint" }, c.ip)]), v.clients.length > 8 ? ` +${v.clients.length - 8} more` : "")]);
+      card.appendChild(table(["Name", "System", "Type", "Used", "State", "Used by"], rows));
+      body.appendChild(card);
+    }
+    if (data.alerts.length) {
+      const card = h("div", { class: "card" }, h("h3", {}, `Open alerts (${data.alerts.length})`));
+      const list = h("ul", {});
+      for (const a of data.alerts.slice(0, 50)) list.appendChild(h("li", {}, h("span", { class: a.severity === "critical" ? "error" : "warn-text" }, a.severity === "critical" ? "Critical " : "Warning "), a.at ? `${timeAgo(a.at)}: ` : "", a.text));
+      card.appendChild(list);
+      body.appendChild(card);
+    }
+  }
+
+  await load();
+  const timer = setInterval(() => { if (!document.hidden) load(); }, 60000);
+  return () => { destroyed = true; clearInterval(timer); };
+}

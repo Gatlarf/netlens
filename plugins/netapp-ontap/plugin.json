@@ -1,0 +1,58 @@
+{
+  "id": "netapp-ontap",
+  "name": "NetApp ONTAP",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "storage",
+  "author": "Netlens",
+  "description": "Shows a NetApp ONTAP cluster (AFF, FAS, ASA, ONTAP Select, Cloud Volumes ONTAP) with its nodes, aggregates and their fill level, volumes and LUNs, disks, the hosts that mount a volume over NFS, and the open health events. Read-only, through the ONTAP REST API (ONTAP 9.8 or newer).",
+  "info": {
+    "title": "Set up a read-only user on the cluster",
+    "text": "Create a cluster user for Netlens with the readonly role and the http application, with password authentication: on the cluster shell run the first command below (it asks for the password). Enter the cluster management address (https://<cluster address>). Netlens only reads. The hosts that use a volume over NFS come from ONTAP 9.8 and newer; older clusters show everything else. Many clusters have a self-signed certificate: leave 'Verify TLS certificate' off until you installed a proper one.",
+    "code": "security login create -user-or-group-name netlens -application http -authentication-method password -role readonly"
+  },
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Clusters",
+      "required": true,
+      "help": "One line per cluster: the address of the cluster management interface and the user name and password of the read-only user.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.0.80",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Only used for https:// addresses. Leave this off while the cluster uses a self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ]
+}

@@ -40,7 +40,7 @@ CURSOR = "remediation.cursor"
 PAUSED = "remediation.paused"
 HOURLY_LIMIT = 10
 RECOVERY = {"service_down": "service_up", "device_offline": "device_online", "metric_critical": "metric_ok", "metric_warning": "metric_ok", "remote_offline": "remote_online",
-            "remote_service_down": "remote_service_up", "inventory_unavailable": "inventory_available", "guest_backup_failed": "guest_backup_recovered",
+            "remote_service_down": "remote_service_up", "inventory_unavailable": "inventory_available", "guest_backup_failed": "guest_backup_recovered", "storage_degraded": "storage_recovered",
             "probe_offline": "probe_online", "central_unreachable": "central_reachable", "remote_metric_critical": "remote_metric_ok", "remote_metric_warning": "remote_metric_ok"}
 RECOVERY_WINDOW = timedelta(minutes=60)
 

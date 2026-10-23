@@ -60,6 +60,8 @@ export const EVENT_LABELS = {
   guest_backup_failed: "Guest backup failed",
   guest_backup_late: "Guest backup late",
   guest_backup_recovered: "Guest backup recovered",
+  storage_degraded: "Storage problem",
+  storage_recovered: "Storage recovered",
   dns_registered: "Added to DNS",
   dns_failed: "DNS registration failed",
   inventory_available: "Smart-home device back",

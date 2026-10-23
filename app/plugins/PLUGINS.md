@@ -9,6 +9,7 @@ Netlens can learn about your network from other systems through **plugins**. A p
 | `dns` | a DNS server that Netlens writes device names and addresses to | Technitium DNS (more welcome: BIND with RFC 2136, Pi-hole, AdGuard Home, dnsmasq) |
 | `topology` | network nodes (router, switch, access point, mesh node) and the clients connected to them | ASUS AiMesh, Omada, UniFi, Fritz!Box, MikroTik |
 | `proxy` | a reverse proxy and the sites it publishes (domain → upstream host and port, certificate) | Nginx Proxy Manager (more welcome: Traefik, Caddy, HAProxy) |
+| `storage` | a storage system (array, NAS, Ceph): health, pools, volumes with the hosts that use them, disks and alerts | NetApp ONTAP, Ceph |
 | `backup` | a backup server: what is backed up (per guest), how old, whether it worked, and how full its stores are | Proxmox Backup Server |
 
 Plugin API version: **1**.
@@ -55,7 +56,7 @@ my-router/            (the folder is optional)
 | `name` | yes | Shown in the menu and plugin list (max 60). |
 | `version` | yes | Like `1.0.0`. |
 | `api_version` | yes | Must be `1`. |
-| `kind` | yes | `hypervisor`, `topology`, `dns`, `proxy` or `backup`. |
+| `kind` | yes | `hypervisor`, `topology`, `dns`, `proxy`, `backup` or `storage`. |
 | `description` | no | A sentence or two (max 500). |
 | `author`, `homepage` | no | Shown in the plugin list. |
 | `info` | no | A collapsed box at the top of the plugin's settings page: `{"title": ..., "text": ..., "code": ...}`. `code` is shown in a block with a Copy button, for example the docker-compose lines the plugin needs on the other side. Needs Netlens 0.3.115; older versions ignore it. |
@@ -383,6 +384,19 @@ Return `{"servers": [...], "stores": [...], "targets": [...], "problems": [...]}
 - **problems**: recent failed or warning jobs: `id`, `server_id`, `kind` (`backup`, `prune`, `gc`, `verify`, `sync`, `other`), `state` (`warning`, `failed`), `at`, `text`, `target_id`.
 
 Netlens matches a `vm` or `ct` target to the guest of a hypervisor plugin with the same id (type-aware: a container 100 is not the VM 100), shows the state on that guest's device page and raises events when a backup starts failing, when it is late, and when a store is on course to fill up. Guests of the hypervisor plugins that no target matches are listed as *without a backup* (only once a backup plugin has reported).
+
+## Output for kind `storage`
+
+Return `{"systems": [...], "controllers": [...], "pools": [...], "volumes": [...], "disks": [...], "alerts": [...]}`. Sizes are bytes, times UTC text like `2026-10-16T03:01:05Z`. Every list is optional; `health` is `ok`, `warning`, `critical` or `unknown`.
+
+- **systems**: `id`, `name`, `ip` (to find the device), `vendor`, `model`, `version`, `serial`, `online`, `health`, `warnings` (short texts).
+- **controllers** (nodes, storage processors, heads): `id`, `system_id`, `name`, `ip`, `mac` (matched to the devices Netlens found), `online`, `health`.
+- **pools** (aggregate, storage pool, RAID group): `id`, `system_id`, `name`, `total`, `used`, `avail`, `health`, `raid`.
+- **volumes** (volume, LUN, share, file system, bucket): `id`, `system_id`, `pool_id`, `name`, `kind` (`volume`, `lun`, `share`, `filesystem`, `bucket`, `other`), `protocol` (`nfs`, `smb`, `iscsi`, `fc`, `s3` ...), `size`, `used`, `health`, `clients` (IPv4 addresses of the hosts that use it: NFS clients, iSCSI initiators).
+- **disks**: `id`, `system_id`, `name`, `slot`, `model`, `size`, `state` (`ok`, `degraded`, `failed`, `spare`, `unknown`).
+- **alerts**: open alarms: `id`, `system_id`, `severity` (`warning`, `critical`), `text`, `at`.
+
+Netlens matches a system or controller to the device with that address, links the `clients` of a volume to their devices (the device page then says which volumes it uses) and raises events when a system, pool or disk becomes unhealthy or recovers, when a pool passes 85 and 95 percent, and when a new critical alert appears. The first sync after switching a plugin on is not news.
 
 ## Output for kind `topology`
 

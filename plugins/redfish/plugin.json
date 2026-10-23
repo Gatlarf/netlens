@@ -1,0 +1,58 @@
+{
+  "id": "redfish",
+  "name": "Redfish (server BMC)",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "storage",
+  "author": "Netlens",
+  "description": "Shows servers and storage systems through their management controller (BMC) using the DMTF Redfish standard: Dell iDRAC, HPE iLO, Lenovo XClarity, Supermicro, Cisco CIMC and others. Health of the server, power supplies, fans and temperatures, drives and RAID volumes, and the BMC and network cards matched to the devices on your network by address and MAC. Read-only.",
+  "info": {
+    "title": "Set up a read-only user on the BMC",
+    "text": "Create a user for Netlens on the BMC with the ReadOnly role (iDRAC: Configuration > Users; iLO: Administration > User Administration; XClarity and Supermicro: Account Security / Users) and give it a long random password. Enter the address of the BMC's web page (https://<BMC address>). Netlens sends the user name and password with each request (HTTP Basic authentication, no session is left open) and only reads. Add one line per BMC. Many BMCs have a self-signed certificate: leave 'Verify TLS certificate' off until you installed a proper one.",
+    "code": "# BMC web page: create user netlens, role ReadOnly (a long random password)\n# In Netlens: address https://<BMC address>, user netlens, that password"
+  },
+  "timeout": 90,
+  "diagnose": true,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "BMCs",
+      "required": true,
+      "help": "One line per BMC: the address of its web page and the user name and password of the read-only user.",
+      "columns": [
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://192.168.0.70",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "netlens",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": false,
+      "help": "Only used for https:// addresses. Leave this off while the BMC uses a self-signed certificate."
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30
+    }
+  ]
+}

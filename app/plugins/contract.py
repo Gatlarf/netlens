@@ -11,7 +11,7 @@ import re
 from typing import Any
 
 API_VERSION = 1
-KINDS = ("hypervisor", "topology", "dns", "proxy", "backup", "inventory", "vulnerability")
+KINDS = ("hypervisor", "topology", "dns", "proxy", "backup", "inventory", "vulnerability", "storage")
 DNS_CAPABILITIES = ("marker", "delete")   # what a DNS plugin can do besides adding and updating records
 DNS_TYPES = ("A", "AAAA", "PTR", "CNAME")
 MAX_DNS_RECORDS = 50000
@@ -460,6 +460,8 @@ def validate_output(kind: str, data: Any) -> dict:
         return _inventory(data)
     if kind == "vulnerability":
         return _vulnerability(data)
+    if kind == "storage":
+        return _storage(data)
     raise ContractError(f"unknown plugin kind {kind!r}")
 
 
@@ -792,6 +794,102 @@ def _backup(data: Any) -> dict:
                          "state": _choice(raw.get("state"), f"{path}.state", ("warning", "failed"), "failed"), "at": _stamp(raw.get("at"), f"{path}.at"),
                          "text": _text(raw.get("text"), f"{path}.text", max_len=300), "target_id": _id(target_id, f"{path}.target_id") if target_id not in (None, "") else None})
     return {"servers": servers, "stores": stores, "targets": targets, "problems": problems}
+
+
+STORAGE_HEALTH = ("ok", "warning", "critical", "unknown")
+VOLUME_KINDS = ("volume", "lun", "share", "filesystem", "bucket", "other")
+DISK_STATES = ("ok", "degraded", "failed", "spare", "unknown")
+
+
+def _unique(items: list, key: str, path: str) -> set[str]:
+    seen: set[str] = set()
+    for i, item in enumerate(items):
+        if item[key] in seen:
+            _fail(f"{path}[{i}].{key}", f"{item[key]!r} is used twice")
+        seen.add(item[key])
+    return seen
+
+
+def _storage(data: Any) -> dict:
+    """A storage plugin's snapshot of a storage system (NetApp, Dell, Pure, Ceph ...): the system itself, its controllers (found on the network
+    by IP or MAC), pools, volumes with the hosts that use them, disks and the open alerts."""
+    data = _dict(data, "output")
+    systems = []
+    for i, raw in enumerate(_list(data.get("systems"), "systems")):
+        path = f"systems[{i}]"
+        raw = _dict(raw, path)
+        system_id = _id(raw.get("id"), f"{path}.id")
+        systems.append({
+            "id": system_id, "name": _text(raw.get("name"), f"{path}.name", default=system_id), "ip": _ipv4(raw.get("ip"), f"{path}.ip"),
+            "vendor": _text(raw.get("vendor"), f"{path}.vendor", max_len=60), "model": _text(raw.get("model"), f"{path}.model", max_len=100),
+            "version": _text(raw.get("version"), f"{path}.version", max_len=60), "serial": _text(raw.get("serial"), f"{path}.serial", max_len=60),
+            "online": bool(raw.get("online", True)), "health": _choice(raw.get("health"), f"{path}.health", STORAGE_HEALTH, "unknown"),
+            "warnings": [_text(w, f"{path}.warnings[{j}]", required=True, max_len=300) for j, w in enumerate(_list(raw.get("warnings"), f"{path}.warnings")[:10])],
+        })
+    system_ids = _unique(systems, "id", "systems")
+
+    def owner(raw: dict, path: str) -> str:
+        system_id = _id(raw.get("system_id"), f"{path}.system_id")
+        if system_id not in system_ids:
+            _fail(f"{path}.system_id", f"{system_id!r} is not the id of any entry in systems")
+        return system_id
+
+    controllers = []
+    for i, raw in enumerate(_list(data.get("controllers"), "controllers")):
+        path = f"controllers[{i}]"
+        raw = _dict(raw, path)
+        controllers.append({"id": _id(raw.get("id"), f"{path}.id"), "system_id": owner(raw, path), "name": _text(raw.get("name"), f"{path}.name", max_len=100),
+                            "ip": _ipv4(raw.get("ip"), f"{path}.ip"), "mac": _mac(raw.get("mac"), f"{path}.mac"), "online": bool(raw.get("online", True)),
+                            "health": _choice(raw.get("health"), f"{path}.health", STORAGE_HEALTH, "unknown")})
+    _unique(controllers, "id", "controllers")
+    pools = []
+    for i, raw in enumerate(_list(data.get("pools"), "pools")):
+        path = f"pools[{i}]"
+        raw = _dict(raw, path)
+        pool_id = _id(raw.get("id"), f"{path}.id")
+        pools.append({"id": pool_id, "system_id": owner(raw, path), "name": _text(raw.get("name"), f"{path}.name", default=pool_id, max_len=100),
+                      "total": _byte_count(raw.get("total"), f"{path}.total"), "used": _byte_count(raw.get("used"), f"{path}.used"), "avail": _byte_count(raw.get("avail"), f"{path}.avail"),
+                      "health": _choice(raw.get("health"), f"{path}.health", STORAGE_HEALTH, "unknown"), "raid": _text(raw.get("raid"), f"{path}.raid", max_len=60)})
+    pool_ids = _unique(pools, "id", "pools")
+    volumes = []
+    for i, raw in enumerate(_list(data.get("volumes"), "volumes")):
+        path = f"volumes[{i}]"
+        raw = _dict(raw, path)
+        pool_id = raw.get("pool_id")
+        pool_id = _id(pool_id, f"{path}.pool_id") if pool_id not in (None, "") else None
+        if pool_id is not None and pool_id not in pool_ids:
+            _fail(f"{path}.pool_id", f"{pool_id!r} is not the id of any entry in pools")
+        clients = []
+        for j, ip in enumerate(_list(raw.get("clients"), f"{path}.clients")[:200]):
+            ip = _ipv4(ip, f"{path}.clients[{j}]")
+            if ip and ip not in clients:
+                clients.append(ip)
+        volume_id = _id(raw.get("id"), f"{path}.id")
+        volumes.append({"id": volume_id, "system_id": owner(raw, path), "pool_id": pool_id, "name": _text(raw.get("name"), f"{path}.name", default=volume_id, max_len=200),
+                        "kind": _choice(raw.get("kind"), f"{path}.kind", VOLUME_KINDS, "volume"), "protocol": _text(raw.get("protocol"), f"{path}.protocol", max_len=20).lower(),
+                        "size": _byte_count(raw.get("size"), f"{path}.size"), "used": _byte_count(raw.get("used"), f"{path}.used"),
+                        "health": _choice(raw.get("health"), f"{path}.health", STORAGE_HEALTH, "unknown"), "clients": clients})
+    _unique(volumes, "id", "volumes")
+    disks = []
+    for i, raw in enumerate(_list(data.get("disks"), "disks")):
+        path = f"disks[{i}]"
+        raw = _dict(raw, path)
+        disk_id = _id(raw.get("id"), f"{path}.id")
+        disks.append({"id": disk_id, "system_id": owner(raw, path), "name": _text(raw.get("name"), f"{path}.name", default=disk_id, max_len=100), "slot": _text(raw.get("slot"), f"{path}.slot", max_len=40),
+                      "model": _text(raw.get("model"), f"{path}.model", max_len=100), "size": _byte_count(raw.get("size"), f"{path}.size"),
+                      "state": _choice(raw.get("state"), f"{path}.state", DISK_STATES, "unknown")})
+    _unique(disks, "id", "disks")
+    alerts, alert_ids = [], set()
+    for i, raw in enumerate(_list(data.get("alerts"), "alerts")[:200]):
+        path = f"alerts[{i}]"
+        raw = _dict(raw, path)
+        alert_id = _id(raw.get("id"), f"{path}.id")
+        if alert_id in alert_ids:
+            continue
+        alert_ids.add(alert_id)
+        alerts.append({"id": alert_id, "system_id": owner(raw, path), "severity": _choice(raw.get("severity"), f"{path}.severity", ("warning", "critical"), "warning"),
+                       "text": _text(raw.get("text"), f"{path}.text", max_len=300), "at": _stamp(raw.get("at"), f"{path}.at")})
+    return {"systems": systems, "controllers": controllers, "pools": pools, "volumes": volumes, "disks": disks, "alerts": alerts}
 
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
