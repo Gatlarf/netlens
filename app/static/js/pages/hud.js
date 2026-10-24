@@ -75,11 +75,33 @@ export async function render(container) {
   tick();
   const clockTimer = setInterval(tick, 1000);
 
-  function addEvent(e, fresh) {
-    const li = h("li", { class: `${level(e.kind)}${fresh ? " new" : ""}` }, h("time", {}, (e.ts || "").slice(11, 19)), `${e.device ? e.device + " · " : ""}${e.detail || e.kind.replace(/_/g, " ")}`);
-    feed.prepend(li);
-    while (feed.children.length > 60) feed.lastChild.remove();
+  // the lists keep their data and draw only as many lines as fit the panel, so the page never scrolls
+  const evs = [];
+  let attnItems = [];
+  function fit(list, make, items) {
+    clear(list);
+    for (let i = 0; i < items.length; i++) {
+      list.appendChild(make(items[i], i));
+      if (list.scrollHeight > list.clientHeight + 1) {
+        list.lastChild.remove();
+        if (attnItems === items && i > 0) { list.lastChild.remove(); list.appendChild(h("li", {}, `+${items.length - i + 1} more`)); if (list.scrollHeight > list.clientHeight + 1) list.lastChild.remove(); }
+        break;
+      }
+    }
   }
+  const eventLine = (e, i) => h("li", { class: `${level(e.kind)}${e.fresh && i === 0 ? " new" : ""}` }, h("time", {}, (e.ts || "").slice(11, 19)), `${e.device ? e.device + " · " : ""}${e.detail || e.kind.replace(/_/g, " ")}`);
+  const drawFeed = () => fit(feed, eventLine, evs);
+  const drawAttn = () => { if (!attnItems.length) { clear(attn); attn.appendChild(h("li", { class: "ok" }, "All systems nominal")); } else fit(attn, (a) => h("li", { class: a.level === "bad" ? "bad" : a.level === "warn" ? "warn" : "" }, h("a", { href: a.href || "#/dashboard" }, a.text)), attnItems); };
+  function addEvent(e, fresh) {
+    evs.unshift({ ...e, fresh });
+    evs.length = Math.min(evs.length, 80);
+    drawFeed();
+    if (evs[0]) evs[0].fresh = false;          // only the newest line flashes, once
+  }
+
+  // the page fills the window exactly: from where it starts to the bottom edge
+  const size = () => { root.style.height = `${Math.max(360, window.innerHeight - root.getBoundingClientRect().top - 30)}px`; drawFeed(); drawAttn(); };
+  window.addEventListener("resize", size);
 
   async function events(first) {
     try {
@@ -100,9 +122,8 @@ export async function render(container) {
       gauges.append(gauge("Devices online", dv.total ? 100 * dv.online / dv.total : 0, dv.offline > 3 ? COLOUR.warn : COLOUR.ok, `${dv.online}/${dv.total}`),
         gauge("Services up", services.length ? 100 * up / services.length : 100, up === services.length ? COLOUR.ok : COLOUR.bad, `${up}/${services.length}`),
         gauge("Availability 30d", rel ? rel.availability : null, rel && rel.meets_target ? COLOUR.ok : COLOUR.warn));
-      clear(attn);
-      for (const a of (dash.attention || []).slice(0, 8)) attn.appendChild(h("li", { class: a.level === "bad" ? "bad" : a.level === "warn" ? "warn" : "" }, h("a", { href: a.href || "#/dashboard" }, a.text)));
-      if (!attn.children.length) attn.appendChild(h("li", { class: "ok" }, "All systems nominal"));
+      attnItems = dash.attention || [];
+      drawAttn();
       clear(radarBox);
       radarBox.appendChild(radar(list));
       clear(stats);
@@ -113,8 +134,10 @@ export async function render(container) {
     } catch (err) { /* keep the last picture */ }
   }
 
+  size();
   await Promise.all([events(true), overview()]);
+  size();
   const evTimer = setInterval(() => events(false), 4000);
   const ovTimer = setInterval(overview, 15000);
-  return () => { disposed = true; clearInterval(clockTimer); clearInterval(evTimer); clearInterval(ovTimer); };
+  return () => { disposed = true; window.removeEventListener("resize", size); clearInterval(clockTimer); clearInterval(evTimer); clearInterval(ovTimer); };
 }
