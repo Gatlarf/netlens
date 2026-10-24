@@ -76,7 +76,18 @@ function radar() {
 
 export async function render(container) {
   let disposed = false, lastId = 0;
+  let scope = "all", coreIds = new Set();            // "core": only the always-on devices
+  try { scope = localStorage.getItem("netlens.hud.scope") === "core" ? "core" : "all"; } catch (e) { /* not remembered */ }
+  let lastList = null, lastDash = null, lastRel = null;
   const clock = h("span", { class: "hud-clock" });
+  const scopeBtns = {};
+  const scopeSwitch = h("div", { class: "hud-scope", role: "group", "aria-label": "Which devices" },
+    ...[["all", "All devices"], ["core", "Always-on"]].map(([key, label]) => (scopeBtns[key] = h("button", { type: "button", "aria-pressed": String(key === scope), onclick: () => {
+      scope = key;
+      try { localStorage.setItem("netlens.hud.scope", key); } catch (e) { /* only this page remembers it */ }
+      for (const [k, b] of Object.entries(scopeBtns)) b.setAttribute("aria-pressed", String(k === scope));
+      if (lastDash) paint();
+    } }, label))));
   const gauges = h("div", { class: "hud-gauges" });
   const attn = h("ol", { class: "hud-attn" });
   const radarBox = h("div", { class: "hud-radar" });
@@ -90,7 +101,7 @@ export async function render(container) {
   const ticker = h("div", { class: "hud-ticker" });
 
   const root = h("div", { class: "hud" },
-    h("div", { class: "hud-top" }, h("span", { class: "hud-title" }, h("i", { class: "hud-live" }), "Netlens // situation"), clock),
+    h("div", { class: "hud-top" }, h("span", { class: "hud-title" }, h("i", { class: "hud-live" }), "Netlens // situation"), scopeSwitch, clock),
     h("div", { class: "hud-left" }, h("section", { class: "hud-panel" }, h("h3", {}, "Vitals"), gauges), h("section", { class: "hud-panel", style: "flex:1" }, h("h3", {}, "Needs attention"), attn)),
     h("div", { class: "hud-mid" }, h("section", { class: "hud-panel hud-radar-panel", style: "flex:1;display:flex;flex-direction:column" }, h("h3", {}, "Network scope"), radarBox), h("section", { class: "hud-panel" }, stats)),
     h("div", { class: "hud-right" }, h("section", { class: "hud-panel hud-feed", style: "flex:1" }, h("h3", {}, "Live event stream"), feed)),
@@ -117,7 +128,8 @@ export async function render(container) {
     }
   }
   const eventLine = (e, i) => h("li", { class: `${level(e.kind)}${e.fresh && i === 0 ? " new" : ""}` }, h("time", {}, (e.ts || "").slice(11, 19)), `${e.device ? e.device + " · " : ""}${e.detail || e.kind.replace(/_/g, " ")}`);
-  const drawFeed = () => fit(feed, eventLine, evs);
+  const shown = () => (scope === "core" ? evs.filter((e) => e.device_id == null || coreIds.has(e.device_id)) : evs);
+  const drawFeed = () => fit(feed, eventLine, shown());
   let attnSig = "";
   const drawAttn = (force = false) => { const sig = JSON.stringify(attnItems); if (sig === attnSig && !force) return; attnSig = sig; if (!attnItems.length) { clear(attn); attn.appendChild(h("li", { class: "ok" }, "All systems nominal")); } else fit(attn, (a) => h("li", { class: a.level === "bad" ? "bad" : a.level === "warn" ? "warn" : "" }, h("a", { href: a.href || "#/dashboard" }, a.text)), attnItems); };
   function addEvent(e, fresh) {
@@ -143,11 +155,26 @@ export async function render(container) {
     try {
       const [dash, devices, rel] = await Promise.all([get("/api/dashboard"), get("/api/devices?limit=1000"), get("/api/reliability").catch(() => null)]);
       if (disposed) return;
-      const list = Array.isArray(devices) ? devices : devices.devices || [];
-      const dv = dash.summary.devices, services = dash.service_checks || [];
+      lastList = Array.isArray(devices) ? devices : devices.devices || [];
+      lastDash = dash;
+      lastRel = rel;
+      paint();
+    } catch (err) { /* keep the last picture */ }
+  }
+
+  // draws what the last fetch brought, for the chosen set of devices
+  function paint() {
+    try {
+      const dash = lastDash, rel = lastRel;
+      coreIds = new Set(lastList.filter((d) => d.always_on).map((d) => d.id));
+      const list = scope === "core" ? lastList.filter((d) => d.always_on) : lastList;
+      const dv = { ...dash.summary.devices, total: list.length, online: list.filter((d) => d.online).length };
+      dv.offline = dv.total - dv.online;
+      const services = dash.service_checks || [];
       const up = services.filter((s) => s.state === "up").length;
       gDevices.set(dv.total ? 100 * dv.online / dv.total : 0, dv.offline > 3 ? COLOUR.warn : COLOUR.ok, `${dv.online}/${dv.total}`);
       gServices.set(services.length ? 100 * up / services.length : 100, up === services.length ? COLOUR.ok : COLOUR.bad, `${up}/${services.length}`);
+      drawFeed();
       gAvail.set(rel ? rel.availability : null, rel && rel.meets_target ? COLOUR.ok : COLOUR.warn);
       attnItems = dash.attention || [];
       drawAttn();

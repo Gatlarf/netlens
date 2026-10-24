@@ -5,7 +5,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ## 0.4.229 — 2026-10-24
 
 ### Added
-- ★ **A HUD look and a live HUD page.** The theme button now goes light, dark, HUD. The HUD look puts neon colours, cut corners, glow and scanlines on the dark theme for every page. The new HUD page (menu) fills the window without scrolling: ring gauges for devices, services and availability, a radar with every device as a blip (offline ones pulse red, critical ones sit near the centre), the events as they arrive, what needs attention, and a ticker of service response times.
+- ★ **A HUD look and a live HUD page.** The theme button now goes light, dark, HUD. The HUD look puts neon colours, cut corners, glow and scanlines on the dark theme for every page. The new HUD page (menu) fills the window without scrolling: ring gauges for devices, services and availability, a radar with every device as a blip (offline ones pulse red, critical ones sit near the centre), the events as they arrive, what needs attention, and a ticker of service response times. A switch at the top shows all devices or only the always-on ones (remembered in the browser).
 
 ### Changed
 - ★ **Pages no longer flicker when they refresh.** A refresh used to empty a page and build it again, which restarted animations, repainted graphs and could lose a hovered or opened item. Now only what changed is replaced: the Dashboard, Uptime, Devices, Health, Services and Scans pages update in place, and Storage, Backups, Statistics, Smart home, Remediation, What changed, Hierarchy, Remote sites and the device page leave the screen alone when nothing changed. The radar and ticker of the HUD keep running.

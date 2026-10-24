@@ -129,3 +129,7 @@
 .hud-live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 10px var(--ok); margin-right: 8px; animation: hud-pulse 1.6s infinite; }
 @media (max-width: 760px) { .hud { grid-template-columns: 1fr; overflow: auto; height: auto !important; } .hud-radar { min-height: 60vw; } }
 @media (prefers-reduced-motion: reduce) { .hud *, .hud-live { animation: none !important; } }
+
+.hud-scope { display: inline-flex; border: 1px solid var(--border); margin-left: auto; margin-right: 16px; }
+.hud-scope button { background: transparent; color: var(--muted); border: 0; padding: 3px 12px; font: inherit; font-size: 0.78em; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; }
+.hud-scope button[aria-pressed="true"] { background: rgba(0, 229, 255, 0.18); color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }

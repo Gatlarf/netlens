@@ -146,7 +146,7 @@ export async function render(container) {
       return;
     }
     if (destroyed) return;
-    const sig = JSON.stringify(data);
+    const sig = JSON.stringify(data, (k, v) => (k === "age_s" && typeof v === "number" ? Math.floor(v / 300) : v));      // ages count up every second: redraw when one moves five minutes
     if (sig === lastSig) return;               // nothing changed: leave the page as it is (an opened row stays open)
     lastSig = sig;
     clear(body);
