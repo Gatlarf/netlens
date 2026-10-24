@@ -32,7 +32,9 @@ The rules every page follows, so a new page does not need a review round. Most a
 - Settings cards are at most 1500 px wide.
 
 ## Layouts (cards the user can arrange)
-- The device page has cards with `data-card` and `data-title`; layouts are saved on the server per user and per device type, admins can push templates (`app/layouts.py`). New cards on that page need an id and a title (`tag()` in `device.js`).
+- Every page of cards uses the editing kit of the Overview beta page: a Customize button, a grip to drag (touch too), a width button (narrow, wide, full) and a remove button on each card, and a drawer on the right with a tick box and a small picture per card (`js/board.js`).
+- A new card page: put its cards in a `.dev-flow` grid (or call `gatherCards(root)`), tag each card (`data-card`, `data-title`, `data-kind`, `data-size`), create `boardPage("<page>", "<label>")` (add the page to `PAGES` in `app/layouts.py`), call `board.apply({tab: flow})` after every draw, put `board.button()` in the page head, do not redraw while `board.editing`, and call `board.close()` when the page is left.
+- Layouts are saved on the server per user (per device type on the device page); administrators can push a template. The dashboard keeps its own order/custom/sizes but uses the same kit.
 
 ## Checklist for a new page
 1. Screenshot at 820, 1400 and 3440 px (see `docs/` or memory: playwright with a bearer token) and look for empty space, sideways scroll, stretched buttons.
