@@ -1,14 +1,16 @@
 // Vulnerabilities: what the vulnerability scanners (Greenbone, Tenable, Rapid7 ...) found on your devices, worst first.
 import { get } from "../api.js";
-import { h, clear, timeAgo } from "../util.js";
+import { h, clear, timeAgo, isAdmin } from "../util.js";
 import { pageHead, tile, tileRow, emptyState } from "../ui.js";
+import { boardPage, gatherCards } from "../layout_cards.js";
 import { findingsTable, sevBadge, SEV_LABEL } from "../cards/vulns.js";
 
 const SHOW = 25;
 
 export async function render(container) {
   clear(container);
-  container.append(pageHead("Vulnerabilities", "What your vulnerability scanner found on the devices of this network, the most serious first."));
+  const board = boardPage("vulns", "Vulnerabilities", [["main", "Vulnerabilities"]], "*", isAdmin);
+  container.append(pageHead("Vulnerabilities", "What your vulnerability scanner found on the devices of this network, the most serious first.", board.button()));
   const body = h("div", {}, h("p", { class: "hint" }, "Loading…"));
   container.append(body);
   let sev = "", q = "", all = false;
@@ -48,6 +50,7 @@ export async function render(container) {
     body.append(h("div", { class: "card" }, h("h2", {}, `Findings (${list.length})`), bar,
       list.length ? findingsTable(shown) : h("p", { class: "hint" }, "Nothing matches."),
       list.length > SHOW ? h("button", { class: "btn", type: "button", onclick: () => { all = !all; draw(); } }, all ? "Show fewer" : `Show all ${list.length}`) : null));
+    board.apply({ main: gatherCards(body) });
   };
 
   async function load() {
@@ -64,4 +67,5 @@ export async function render(container) {
     }
   }
   await load();
+  return () => board.close();
 }

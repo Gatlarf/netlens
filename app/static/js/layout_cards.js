@@ -155,3 +155,51 @@ export function startBoard({ page, panels, tabs, getTab, typeKey, typeLabel, isA
   paint();
   return { close: () => drawer.close(), setTab(t) { pickTab = t; paint(); } };
 }
+
+// A page of cards in one or a few sections: tag the cards (data-card, data-title, data-kind, data-size), then
+//   const board = boardPage("insights", "Insights");   // once, at the top of render()
+//   await board.apply({ main: flowElement });           // after every (re)draw
+//   header.append(board.button(() => "main"));          // the Customize button
+// While editing, the page should not redraw itself: check board.editing.
+export function boardPage(page, label, tabs = [["main", "This page"]], typeKey = "*", isAdmin = () => false) {
+  const state = { doc: null, set(l) { if (this.doc) this.doc.effective = l; } };
+  let api = null, panels = {};
+  return {
+    get editing() { return !!api; },
+    async apply(next) {
+      panels = next;
+      if (!state.doc) state.doc = await loadLayout(page, typeKey);
+      applyLayout(panels, state.doc.effective);
+    },
+    button(getTab = () => tabs[0][0]) {
+      return h("button", { class: "btn", type: "button", title: "Choose which cards this page shows, their order and width", onclick: () => {
+        if (api) { api.close(); return; }
+        api = startBoard({ page, panels, tabs, getTab, typeKey, typeLabel: label, isAdmin: isAdmin(), state, onClose: () => { api = null; } });
+      } }, "Customize");
+    },
+    close() { if (api) api.close(); },
+  };
+}
+
+// For a page that appends its cards one after the other: moves the cards that have a title (an h2) into one grid and tags them, so the page can
+// be arranged without being rewritten. Returns the grid; call it when the page is drawn, then board.apply({ main: grid }).
+export function gatherCards(root, size = "f") {
+  const flow = h("div", { class: "dev-flow" });
+  const seen = new Set();
+  for (const card of [...root.children]) {
+    if (!card.classList || !card.classList.contains("card")) continue;
+    const title = card.querySelector(":scope > h2, :scope > .card-head h2");
+    if (!title) continue;
+    const text = title.textContent.replace(/\s*\(\d+\)\s*$/, "").trim();
+    let id = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "card";
+    while (seen.has(id)) id += "x";
+    seen.add(id);
+    card.dataset.card = id;
+    card.dataset.title = text;
+    card.dataset.kind = card.querySelector("table") ? "table" : card.querySelector("ul") ? "list" : "tiles";
+    card.dataset.size = size;
+    flow.appendChild(card);
+  }
+  root.appendChild(flow);
+  return flow;
+}

@@ -1,6 +1,7 @@
 import { get, post, put, patch } from "../api.js";
-import { h, clear, toast, timeAgo, fmtTime } from "../util.js";
+import { h, clear, toast, timeAgo, fmtTime, isAdmin } from "../util.js";
 import { pageHead } from "../ui.js";
+import { boardPage } from "../layout_cards.js";
 
 const TYPES = ["router", "switch", "ap", "server", "pc", "phone", "tablet", "tv", "speaker", "console", "appliance", "printer", "iot", "camera", "nas", "vm"];
 
@@ -16,8 +17,9 @@ export async function render(container) {
     return h("label", { class: "check", title: "Off: only the devices that should always be on (servers, routers, switches, NAS, cameras, anything marked always-on), services and network problems. On: phones, tablets and the like count too." },
       box, " Include phones, tablets and other devices that come and go");
   }
+  const board = boardPage("insights", "Insights", [["main", "Insights"]], "*", isAdmin);
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
-  container.append(pageHead("Insights", "Questions, incidents, unusual readings and predictions, worked out from your own data. The AI report is under Reports."), body);
+  container.append(pageHead("Insights", "Questions, incidents, unusual readings and predictions, worked out from your own data. The AI report is under Reports.", board.button()), body);
 
   async function load() {
     try { data = await get(`/api/insights${everything ? "?include_all=1" : ""}`); } catch (err) { if (!destroyed) { clear(body); body.appendChild(h("p", { class: "error" }, err.message || "Could not load.")); } return; }
@@ -182,10 +184,14 @@ export async function render(container) {
         h("p", {}, h("a", { class: "btn primary", href: "#/settings/licence" }, "Open the licence page"))));
       return;
     }
-    const side = h("div", { class: "col-left" }, unusualCard(), predictionsCard(), unknownCard());
-    body.append(askCard(), h("div", { class: "grid-2 ins-grid" }, incidentsCard(), side));
+    const tag = (el, id, title, kind, size) => { el.dataset.card = id; el.dataset.title = title; el.dataset.kind = kind; if (size) el.dataset.size = size; return el; };
+    const flow = h("div", { class: "dev-flow" },
+      tag(askCard(), "ask", "Ask your network", "tiles", "f"), tag(incidentsCard(), "incidents", "Incidents", "list", "w"), tag(unusualCard(), "unusual", "Unusual right now", "list"),
+      tag(predictionsCard(), "predictions", "Predictions", "list"), tag(unknownCard(), "unknown", "Devices without a type", "list"));
+    body.append(flow);
+    board.apply({ main: flow });
   }
 
   await load();
-  return () => { destroyed = true; };
+  return () => { destroyed = true; board.close(); };
 }

@@ -11,7 +11,7 @@ import re
 import sqlite3
 from typing import Any
 
-PAGES = ("device", "stats")
+PAGES = ("device", "stats", "insights", "nethealth", "site")
 SIZES = ("s", "w", "f")      # one column, two columns, the whole row
 ID = re.compile(r"^[a-z0-9_.-]{1,48}$")
 TYPE = re.compile(r"^(\*|[a-z0-9_-]{1,30})$")

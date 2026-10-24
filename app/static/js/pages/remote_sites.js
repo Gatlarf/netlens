@@ -4,6 +4,7 @@ import { pageHead, emptyState, previewHtml } from "../ui.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 import { snoozeMenu, wakeButton, untilText } from "../snooze.js";
 import { enterSite } from "../site.js";
+import { boardPage, gatherCards } from "../layout_cards.js";
 
 const REFRESH_MS = 30000;
 const STATE_TEXT = { connected: "Reporting", silent: "Not heard from", waiting: "Waiting for the first report" };
@@ -231,6 +232,7 @@ async function buildManagedCard(probe, devices, state) {
 
 export async function render(container) {
   let disposed = false, timer = null;
+  const board = boardPage("site", "Remote site", [["main", "This site"]], "*", isAdmin);
   const top = h("div", {});
   const body = h("div", {});
   const form = h("div", {});
@@ -512,6 +514,8 @@ export async function render(container) {
       body.appendChild(h("div", { class: "card" }, h("h2", {}, "Recent events"),
         h("ul", { class: "d-attention" }, data.events.map((e) => h("li", {}, h("span", { class: "hint" }, `${fmtTime(e.ts)} `), e.detail || e.kind, e.maintenance ? h("span", { class: "hint" }, ` (${e.maintenance})`) : null)))));
     }
+    board.apply({ main: gatherCards(body) });
+    top.append(h("div", { class: "form-actions" }, board.button()));
   }
 
   async function refresh() {
@@ -526,6 +530,6 @@ export async function render(container) {
   const onSnoozed = () => { if (!disposed && queryId()) showDetail(queryId()); };
   document.addEventListener("netlens:snoozed", onSnoozed);
   await showList();
-  timer = setInterval(() => { if (!disposed && !form.firstChild && !managedDirty && !body.querySelector(".rs-add :focus") && !body.querySelector("tr.rs-graph:not([hidden])")) refresh(); }, REFRESH_MS);
-  return () => { disposed = true; if (timer) clearInterval(timer); document.removeEventListener("netlens:snoozed", onSnoozed); };
+  timer = setInterval(() => { if (!disposed && !board.editing && !form.firstChild && !managedDirty && !body.querySelector(".rs-add :focus") && !body.querySelector("tr.rs-graph:not([hidden])")) refresh(); }, REFRESH_MS);
+  return () => { disposed = true; board.close(); if (timer) clearInterval(timer); document.removeEventListener("netlens:snoozed", onSnoozed); };
 }

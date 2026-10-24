@@ -6,6 +6,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 
 ### Changed
 - ★ **One way to arrange cards on every page that has them.** The dashboard, the device page (each tab) and Statistics now work like the Overview beta page did: Customize opens a drawer on the right with a tick box and a small picture for every card (tick one to show it, untick to hide it), and in editing mode every card has a grip to drag it anywhere (also by touch), a ↔ button that makes it narrow, wide or full width, and a ✕ to remove it. Changes are saved on the server as you make them, per user (and per device type on the device page). Administrators can push the arrangement as the starting point for everybody (the dashboard default, or a template for a device type or all devices); everybody can still change it for themselves and go back with Reset.
+- The same arrangement is on **Insights, Network health, Vulnerabilities and each Remote site page** (a Customize button in the page header).
 - Device and Statistics cards are laid out in a grid of up to four columns instead of flowing columns, so the order you choose is the order you see.
 
 ## 0.4.209 — 2026-10-24

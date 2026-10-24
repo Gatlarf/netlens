@@ -770,11 +770,11 @@ button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background:
 .bd-drawer { position: fixed; z-index: 40; top: var(--topbar-h, 52px); right: 0; bottom: 0; width: min(360px, 92vw); display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18); }
 .bd-drawer header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; }
 .bd-drawer h2 { margin: 0; font-size: 1.05rem; }
-.bd-drawer .bd-pick { margin: 0 14px 8px; }
+.bd-drawer .bd-pick, .bd-drawer .hint.bd-pick { margin: 0 14px 8px; }
 .bd-drawer .hint { margin: 0 0 6px; }
 .bd-drawer footer { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-top: 1px solid var(--border); }
 .bd-drawer .mk-opts { flex: 1; overflow-y: auto; }
-@media (min-width: 1100px) { body.bd-open .view { margin-right: 372px; } }
+@media (min-width: 1100px) { body.bd-open .app-main { margin-right: 372px; } }
 .mk-ghost { position: fixed; z-index: 100; pointer-events: none; opacity: 0.92; box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35); transform: rotate(0.8deg); margin: 0; }
 .mk-moving { opacity: 0.25; outline: 2px dashed var(--accent); }
 
