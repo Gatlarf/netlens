@@ -823,3 +823,4 @@ body.side-hidden .sidenav { display: none; }
 }
 #side-links [hidden], .side-group[hidden] { display: none !important; }
 .chg-list { overflow-wrap: anywhere; }
+button[hidden], .btn[hidden] { display: none !important; }
