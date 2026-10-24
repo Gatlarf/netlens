@@ -122,7 +122,7 @@ export async function render(container) {
     const tb = h("tbody");
     for (const sys of data.systems) for (const r of systemRows(sys, data)) tb.appendChild(r);
     t.appendChild(tb);
-    body.appendChild(h("div", { class: "card" }, h("p", { class: "hint" }, "Click a system to see its pools, controllers, volumes, disks and alerts."), h("div", { class: "table-wrap" }, t)));
+    body.append(h("p", { class: "hint" }, "Click a system to see its pools, controllers, volumes, disks and alerts."), h("div", { class: "table-wrap" }, t));
   }
 
   await load();

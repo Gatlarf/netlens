@@ -163,7 +163,7 @@ export async function render(container) {
     const sb = h("tbody");
     for (const v of data.servers) for (const r of serverRows(v, data)) sb.appendChild(r);
     st.appendChild(sb);
-    body.appendChild(h("div", { class: "card" }, h("p", { class: "hint" }, "Click a backup server to see its stores, what it holds for each guest and its recent problems."), h("div", { class: "table-wrap" }, st)));
+    body.append(h("p", { class: "hint" }, "Click a backup server to see its stores, what it holds for each guest and its recent problems."), h("div", { class: "table-wrap" }, st));
 
     if (data.unprotected.length) {
       const card = h("div", { class: "card" }, h("h3", {}, `Guests without a backup (${data.unprotected.length})`),
