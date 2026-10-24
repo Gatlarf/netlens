@@ -109,6 +109,18 @@ export async function render(container) {
   clear(container);
   container.appendChild(root);
 
+  // The ticker shows the text as many times as needed to be wider than the screen and scrolls by exactly one copy, so it loops without a gap.
+  function fillTicker(spans) {
+    const group = () => h("div", {}, ...spans.map((x) => x.cloneNode(true)));
+    ticker.replaceChildren(group());
+    const one = ticker.firstChild.getBoundingClientRect().width;
+    if (!one) return;
+    const copies = Math.max(2, Math.ceil(ticker.parentElement.clientWidth / one) + 1);
+    for (let i = 1; i < copies; i++) ticker.appendChild(group());
+    ticker.style.setProperty("--w", `${one}px`);
+    ticker.style.animationDuration = `${Math.max(20, one / 55)}s`;       // about 55 pixels a second
+  }
+
   const tick = () => { const d = new Date(); clock.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
   tick();
   const clockTimer = setInterval(tick, 1000);
@@ -185,7 +197,7 @@ export async function render(container) {
       // the ticker keeps scrolling: its text is only replaced when a figure changed, and then the scroll carries on from where it is
       const spans = services.map((s) => h("span", {}, `${s.name} `, h("b", { class: s.state === "up" ? "" : "bad" }, s.state === "up" ? `${s.ms != null ? Math.round(s.ms) + " ms" : "OK"}` : "DOWN")));
       const text = spans.map((x) => x.textContent).join("|");
-      if (text !== tickerText) { tickerText = text; ticker.replaceChildren(...spans); }
+      if (text !== tickerText) { tickerText = text; fillTicker(spans); }
     } catch (err) { /* keep the last picture */ }
   }
 

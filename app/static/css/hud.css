@@ -121,11 +121,12 @@
 .hud-feed li time { color: var(--muted); margin-right: 8px; }
 .hud-attn li { white-space: normal; overflow: visible; }
 .hud-bottom { grid-column: 1 / -1; overflow: hidden; white-space: nowrap; border-top: 1px solid var(--border); padding-top: 6px; font-size: 0.78em; color: var(--muted); }
-.hud-ticker { display: inline-block; padding-left: 100%; animation: hud-tick 70s linear -22s infinite; }
+.hud-ticker { display: inline-flex; animation: hud-tick 60s linear infinite; }       /* the text is repeated, and the scroll moves by exactly one copy (--w), so it never runs empty */
+.hud-ticker > div { display: inline-flex; flex: none; }
 .hud-ticker span { margin-right: 36px; }
 .hud-ticker b { color: var(--ok); font-weight: 600; }
 .hud-ticker b.bad { color: var(--bad); }
-@keyframes hud-tick { to { transform: translateX(-100%); } }
+@keyframes hud-tick { to { transform: translateX(calc(-1 * var(--w, 100%))); } }
 .hud-live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 10px var(--ok); margin-right: 8px; animation: hud-pulse 1.6s infinite; }
 @media (max-width: 760px) { .hud { grid-template-columns: 1fr; overflow: auto; height: auto !important; } .hud-radar { min-height: 60vw; } }
 @media (prefers-reduced-motion: reduce) { .hud *, .hud-live { animation: none !important; } }

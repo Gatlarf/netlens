@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.231 — 2026-10-24
+
+### Fixed
+- The ticker at the bottom of the HUD page no longer runs empty for a while before it starts again: the text is repeated and loops without a gap.
+
 ## 0.4.229 — 2026-10-24
 
 ### Added
