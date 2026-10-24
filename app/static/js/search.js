@@ -49,6 +49,7 @@ const SETTINGS = [
   ["Groups", "groups", "colours labels tags organise", ""],
   ["Network checks", "netchecks", "dhcp servers rogue gateway", ""],
   ["DHCP servers", "netchecks", "rogue dhcp look for", "DHCP servers"],
+  ["Interface", "interface", "look theme hud futuristic scanline flash pulse red green default new users light dark appearance effects", ""],
   ["Ignored devices", "ignored", "hide exclude ignore list", ""],
   ["IPv6 discovery", "ipv6", "neighbours addresses scan ipv6 find", ""],
   ["Single sign-on", "sso", "sso oidc openid login azure entra google keycloak authentik", ""],
@@ -155,7 +156,7 @@ function search(query, devs, plugs = []) {
 
 function sectionName(key) {
   const names = { ranges: "Scan ranges", nmap: "Scan performance", schedule: "Scan schedule", map: "Map", groups: "Groups", netchecks: "Network checks", dns: "DNS registration",
-    ignored: "Ignored devices", ipv6: "IPv6", sso: "Single sign-on", escalation: "Escalation", oncall: "On-call schedule", siem: "Log forwarding", inbound: "Device messages", engineer: "AI", licence: "Licence", wizard: "Setup guide", central: "Central Netlens", users: "Users & tokens", terminal: "Web terminal", channels: "Alert channels & quiet hours", maintenance: "Maintenance windows",
+    ignored: "Ignored devices", interface: "Interface", ipv6: "IPv6", sso: "Single sign-on", escalation: "Escalation", oncall: "On-call schedule", siem: "Log forwarding", inbound: "Device messages", engineer: "AI", licence: "Licence", wizard: "Setup guide", central: "Central Netlens", users: "Users & tokens", terminal: "Web terminal", channels: "Alert channels & quiet hours", maintenance: "Maintenance windows",
     backup: "Backup & restore", export: "Export", shares: "Share links", audit: "Audit log", about: "About", session: "Account", plugins: "Plugin manager", "plugin-browse": "Plugin store" };
   return names[key] || key;
 }

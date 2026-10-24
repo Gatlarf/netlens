@@ -64,7 +64,8 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Vulnerabilities and the version check](#vulnerabilities-and-the-version-check)
   - [Plugins](#plugins)
   - [Network hierarchy](#network-hierarchy)
-  - [Dark mode](#dark-mode)
+  - [Interface settings](#interface-settings)
+  - [Dark mode](#dark-mode-and-the-hud-look)
   - [Deleting a device and ignoring devices](#deleting-a-device-and-ignoring-devices)
   - [Full scan of a single host](#full-scan-of-a-single-host)
   - [Backup and restore](#backup-and-restore)
@@ -999,6 +1000,10 @@ On the dashboard and on the Health page every problem has a **Snooze…** menu (
 ### Start page
 
 Under **Settings → Account → Start page** each user chooses the page Netlens opens on (the map, Health, Devices, Reports and so on instead of the dashboard). It is kept on the server per user, so it follows you to every browser, and it only applies when you open Netlens without a link to a page: a bookmark, a reload and the back button are left alone.
+
+### Interface settings
+
+**Settings → Interface** sets the look for everybody: the **look new users start with** (follow the device, light, dark or HUD; a user who has used the top-right button keeps their own choice, and the sign-in page follows the default), and the HUD options. In the HUD look the scanline that runs down the screen **flashes red when a device goes offline and green when it comes back**: choose how long it lasts (0 switches it off), whether it shows only on the HUD page or on every page, and for which devices (all, always-on and critical, or critical only). Buttons try both flashes. The slow scanline and the fine scanline texture can each be switched off. The same options are in `GET`/`PUT /api/interface`.
 
 ### Dark mode and the HUD look
 

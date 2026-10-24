@@ -31,6 +31,7 @@ import { buildNetchecksCard } from "../cards/netchecks.js";
 import { buildCveCheckCard } from "../cards/cve_check.js";
 import { buildDnsCard } from "../cards/dns.js";
 import { buildReliabilityCard } from "../cards/reliability_settings.js";
+import { buildInterfaceCard } from "../cards/interface_settings.js";
 import { buildGroupsCard } from "../cards/groups.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 import { buildPassiveCard } from "../cards/passive.js";
@@ -243,6 +244,7 @@ const STATIC_GROUPS = [
   {
     title: "Display",
     items: [
+      { key: "interface", label: "Interface", build: buildInterfaceCard },
       { key: "map", label: "Map", build: buildMapCard },
       { key: "groups", label: "Groups", build: buildGroupsCard },
     ],

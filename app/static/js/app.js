@@ -7,6 +7,7 @@ import { initUpdateBadge } from "./update.js";
 import { initTopbar } from "./topbar.js";
 import { maybeShowWhatsNew } from "./changelog.js";
 import { renderSetup } from "./setup.js";
+import { applyInterface } from "./interface.js";
 import { get, post, ApiError } from "./api.js";
 import { initSiteBar } from "./sitebar.js";
 import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
@@ -334,6 +335,7 @@ function showDemo(demo) {
 
 async function applySession() {
   const session = await get("/api/session");
+  if (session.interface) applyInterface(session.interface);
   setSessionUser(session.authenticated ? session.user : null);
   // the coffee button in the top bar is for free and open-source use; a licensed install keeps it in the account menu only
   get("/api/licence").then((lic) => document.body.classList.toggle("licensed", lic.state === "active" || lic.state === "grace")).catch(() => {});

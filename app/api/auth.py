@@ -142,6 +142,19 @@ def _demo_info(request: Request) -> dict:
     return {"demo": {"username": DEMO_USER, "password": DEMO_PASSWORD, "reset": settings.demo_reset}}
 
 
+def _interface(request: Request) -> dict:
+    """The look the administrator chose (Settings → Interface): even the sign-in page applies it."""
+    from app import interface_settings
+
+    db = connect(request.app.state.db_path)
+    try:
+        return interface_settings.get(db)
+    except Exception:  # noqa: BLE001 - the page works with its built-in look
+        return dict(interface_settings.DEFAULTS)
+    finally:
+        db.close()
+
+
 def _audit(request: Request, user: str, role: str, action: str, status: int) -> None:
     try:
         from app import audit
@@ -184,6 +197,7 @@ async def session(request: Request) -> JSONResponse:
             "token_login": bool(request.app.state.settings.token),  # False: only user name and password sign in
             "oidc": _oidc_public(request),
             **_demo_info(request),
+            "interface": _interface(request),
         })
     from app import preferences
 
@@ -197,6 +211,7 @@ async def session(request: Request) -> JSONResponse:
         "user": {"username": principal.username, "role": principal.role, "builtin": principal.builtin, **({"scoped": True, "sites": bool(principal.sites), "devices": bool(principal.scope)} if principal.scope is not None else {})},
         "start_page": (("#/remote-sites" if principal.sites and not principal.scope else "#/devices") if principal.scope is not None else start_page),
         **_demo_info(request),
+        "interface": _interface(request),
     })
 
 

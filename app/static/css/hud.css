@@ -158,3 +158,16 @@
 .hud-radar .blip { cursor: pointer; pointer-events: all; stroke: rgba(0, 0, 0, 0); stroke-width: 9; }
 .hud-radar .blip.crit { stroke: #fff; stroke-width: 1.2; }
 .hud-radar .blip:hover, .hud-radar .blip:focus-visible { stroke: #fff; stroke-width: 2; outline: none; }
+
+/* the options of Settings → Interface */
+:root[data-skin="hud"][data-no-sweep] body::before { display: none; }
+:root[data-skin="hud"][data-no-lines] body::after { display: none; }
+
+/* the scanline that flashes when a device goes offline (red) or comes back (green); js/interface.js starts it */
+#hud-pulse { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 9997; --pc: rgba(255, 59, 92, 0.6); }
+#hud-pulse[data-kind="good"] { --pc: rgba(0, 255, 163, 0.55); }
+:root[data-skin="hud"] #hud-pulse.go { display: block; animation: hud-edge var(--pulse-s, 2s) ease-out 1 both; }
+#hud-pulse::before { content: ""; position: absolute; left: 0; right: 0; top: -220px; height: 220px; background: linear-gradient(to bottom, transparent, var(--pc) 70%, transparent); box-shadow: 0 0 70px var(--pc);
+  animation: hud-pass var(--pulse-s, 2s) cubic-bezier(0.4, 0, 0.6, 1) 1 both; }
+@keyframes hud-pass { to { transform: translateY(calc(100vh + 440px)); } }
+@keyframes hud-edge { 0% { box-shadow: inset 0 0 0 0 transparent; } 20% { box-shadow: inset 0 0 160px 6px var(--pc); } 100% { box-shadow: inset 0 0 0 0 transparent; } }

@@ -4,7 +4,12 @@
   try {
     var saved = localStorage.getItem("netlens.theme");
     if (saved === "dark" || saved === "light") document.documentElement.setAttribute("data-theme", saved);
-    if (localStorage.getItem("netlens.skin") === "hud") document.documentElement.setAttribute("data-skin", "hud");      // the HUD look sits on top of the dark theme
+    else {                                                      // no choice of the user: the look the administrator set, as it was when this browser last asked
+      var look = localStorage.getItem("netlens.default-look");
+      if (look === "light" || look === "dark") document.documentElement.setAttribute("data-theme", look);
+      if (look === "hud") { document.documentElement.setAttribute("data-theme", "dark"); document.documentElement.setAttribute("data-skin", "hud"); }
+    }
+    if (saved && localStorage.getItem("netlens.skin") === "hud") document.documentElement.setAttribute("data-skin", "hud");      // the HUD look sits on top of the dark theme
   } catch (e) {
     // storage unavailable: follow the system setting
   }

@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.233 — 2026-10-24
+
+### Added
+- ★ **The HUD scanline flashes when a device goes offline or comes back.** A red pass and glow for a device that goes offline, a green one when it returns. By default it shows on the HUD page; the new **Settings → Interface** can show it on every page (while the HUD look is on), set how long it lasts (0 switches it off), limit it to always-on or critical devices, and try both flashes with a preview button.
+- ★ **Settings → Interface.** The look of Netlens for everybody: the **look new users start with** (follow the device, light, dark or HUD; a user's own choice with the top-right button always wins, and the sign-in page uses it too), the flash options, and switches for the slow scanline and the fine scanline texture of the HUD look. More options will go here.
+- `GET`/`PUT /api/interface`; `/api/session` carries the options; `/api/events` now tells the importance (`tier`) and `always_on` of each event's device.
+
 ## 0.4.232 — 2026-10-24
 
 ### Added

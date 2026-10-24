@@ -49,6 +49,15 @@ export function setTheme(theme) {
   announce();
 }
 
+// What a user sees until they choose a look themselves: the administrator's default (Settings → Interface). A choice made with the button always wins.
+export function applyDefaultLook(look) {
+  try { if (localStorage.getItem(KEY)) return; } catch (e) { /* no storage: the default applies */ }
+  const root = document.documentElement;
+  if (look === "hud") root.setAttribute("data-skin", "hud"); else root.removeAttribute("data-skin");
+  if (look === "light" || look === "dark" || look === "hud") root.setAttribute("data-theme", look === "hud" ? "dark" : look); else root.removeAttribute("data-theme");
+  announce();
+}
+
 export function initThemeToggle() {
   const btn = document.getElementById("theme-toggle");
   if (!btn) return;
