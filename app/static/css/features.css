@@ -761,3 +761,7 @@ button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background:
 .remote-dev { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
 .remote-list { max-height: calc(100vh - 230px); }
 .dev-flow > [data-card]:empty { display: none; }
+/* a card in the flowing columns never lets its table run over the neighbouring column: the table scrolls inside the card */
+.dev-flow > * { min-width: 0; }
+.dev-flow .card { overflow-x: auto; }
+.dev-flow .card td .btn { white-space: nowrap; }

@@ -149,7 +149,7 @@ function fillPluginCard(card, plugin, onChange) {
   const banner = h("div", { class: `plugin-state ${plugin.enabled ? "on" : "off"}`, id: "plugin-state" });
   banner.appendChild(h("strong", {}, plugin.enabled ? "This plugin is ON" : "This plugin is OFF"));
   banner.appendChild(h("span", {}, plugin.enabled
-    ? " It syncs after every scan."
+    ? " It syncs now and after every scan. Turning it off removes its links from the map and keeps these settings."
     : plugin.configured ? " It does nothing until you turn it on." : " Fill in the settings below, save, then turn it on."));
   const stateBtn = h("button", { type: "button", class: "btn", id: "plugin-state-toggle" }, plugin.enabled ? "Turn off" : "Turn on");
   stateBtn.addEventListener("click", async () => {
@@ -168,11 +168,6 @@ function fillPluginCard(card, plugin, onChange) {
   card.appendChild(banner);
 
   const form = h("form", { class: "edit-form" });
-  const enabledField = h("div", { class: "field" });
-  enabledField.appendChild(h("label", {}, "Enabled"));
-  enabledField.appendChild(h("input", { type: "checkbox", name: "__enabled", checked: plugin.enabled }));
-  enabledField.appendChild(h("p", { class: "hint" }, "When on, it syncs now and after every scan. Turning it off removes its links from the map and keeps these settings."));
-  form.appendChild(enabledField);
 
   // Tests one line of a server list with the other settings of the form; the answer is shown on that line
   const serversField = manifest.config.find((f) => f.type === "servers");
@@ -303,7 +298,7 @@ function fillPluginCard(card, plugin, onChange) {
     saveBtn.disabled = true;
     try {
       const updated = await put(`/api/plugins/${plugin.id}`, {
-        enabled: form.querySelector('[name="__enabled"]').checked,
+        enabled: plugin.enabled,
         config: readConfig(form, manifest),
       });
       toast(`${manifest.name} saved`, "success");

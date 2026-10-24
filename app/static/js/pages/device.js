@@ -891,7 +891,7 @@ export async function render(container, params) {
     const appsSlot = slot("apps", "Applications");
     flow.appendChild(appsSlot);
     buildDeviceApplicationsCard(device).then((c) => { if (c && !disposed) appsSlot.appendChild(c); }).catch(() => {});
-    flow.appendChild(tag(buildPortsCard(device, () => load()), "openports", "Open ports"));
+    flow.appendChild(tag(buildPortsCard(device, () => load()), "openports", "Open ports", true));
     const wifiSlot = slot("wifi", "Wi-Fi");
     flow.appendChild(wifiSlot);
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});

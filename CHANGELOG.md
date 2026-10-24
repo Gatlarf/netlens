@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.208 — 2026-10-24
+
+### Fixed
+- **Open ports on the device page** no longer runs over the card next to it: the card is full width by default and its table scrolls inside the card when it is still too wide.
+- **Plugin pages have one switch.** The "Enabled" tick box next to the ON/OFF banner is gone; the banner's Turn on / Turn off button is the only way, so there is no way to get them out of step.
+
 ## 0.4.204 — 2026-10-24
 
 ### Changed
