@@ -37,12 +37,17 @@ CLIENTS = {"get_clientlist": {
 }}
 
 
+NETDEV = {"netdev": {"BRIDGE_rx": "0x2094588f9", "BRIDGE_tx": "0x16b900fbbe", "INTERNET_rx": "0x168c4afc2e", "INTERNET_tx": "0x203cf8d7d", "WIRED_rx": "0x23dfe321d", "WIRED_tx": "0x16ec0cfaa8",
+                    "WIRELESS0_rx": "0x56a36a2", "WIRELESS0_tx": "0xa7cccf2", "WIRELESS1_rx": "0x0", "WIRELESS1_tx": "0x7776f07", "WIRELESS2_rx": "0xb8a836", "WIRELESS2_tx": "0x92fb135"}}
+
+
 class FakeTransport:
     def __init__(self, login=None, fail_on=None):
         self.calls = []
         self.login = login if login is not None else {"asus_token": "TOK"}
         self.fail_on = fail_on
         self.apps = self.devices = None
+        self.netdev = True
 
     def __call__(self, method, url, headers, data):
         path = url.split("8443", 1)[-1]
@@ -57,6 +62,8 @@ class FakeTransport:
             return (200, self.apps) if self.apps else (404, b"")
         if path.startswith("/getAppTraffic.asp"):
             return (200, self.devices) if self.devices else (404, b"")
+        if path == "/appGet.cgi?hook=netdev(appobj)":
+            return (200, json.dumps(NETDEV).encode()) if self.netdev else (404, b"")
         if path.startswith("/appGet.cgi"):
             return 200, json.dumps(CLIENTS).encode()
         if path == "/ajax_onboarding.asp":
@@ -99,7 +106,7 @@ def test_client_logs_in_reads_and_always_logs_out():
     t = FakeTransport()
     snap = AsusClient(AsusConfig(url=CFG.url, username=CFG.username, password=CFG.password, traffic=False), transport=t).snapshot()
     assert len(snap["nodes"]) == 3
-    assert [c[1] for c in t.calls] == ["/login.cgi", "/appGet.cgi?hook=get_clientlist()", "/ajax_onboarding.asp", "/Logout.asp"]
+    assert [c[1] for c in t.calls] == ["/login.cgi", "/appGet.cgi?hook=get_clientlist()", "/ajax_onboarding.asp", "/appGet.cgi?hook=netdev(appobj)", "/Logout.asp"]
     assert t.calls[1][2] == "asus_token=TOK" and t.calls[0][2] is None
 
     t = FakeTransport(fail_on="ajax_onboarding")
@@ -190,3 +197,27 @@ def test_netlens_switch_for_application_statistics_has_the_last_word(monkeypatch
     assert _asus.fetch({**base, "collect_usage": False})["usage"] == []
     assert not [c for c in t.calls if "Traffic" in c[1]]          # nothing was even asked
     assert _asus.fetch(base)["usage"] != []                      # an older Netlens does not send the flag: unchanged
+
+
+def test_the_router_interfaces_become_ports_with_byte_counters():
+    from app.plugins.contract import validate_output
+
+    client = AsusClient(CFG, transport=FakeTransport())
+    ports = client.interfaces()
+    assert [p["name"] for p in ports] == ["WAN", "LAN", "Wi-Fi radio 1", "Wi-Fi radio 2", "Wi-Fi radio 3"]
+    wan = ports[0]
+    assert wan["rx_bytes"] == 0x168C4AFC2E and wan["tx_bytes"] == 0x203CF8D7D and wan["port"] == 1
+    snap = client.snapshot()
+    out = validate_output("topology", to_topology(snap))
+    gateway = next(n for n in out["nodes"] if n["role"] == "gateway")
+    assert [p["name"] for p in gateway["ports"]][:2] == ["WAN", "LAN"] and all("ports" not in n or not n["ports"] for n in out["nodes"] if n["role"] != "gateway")
+
+
+def test_a_router_that_does_not_say_still_syncs_and_the_switch_can_turn_it_off():
+    transport = FakeTransport()
+    transport.netdev = False
+    snap = AsusClient(CFG, transport=transport).snapshot()
+    assert snap["interfaces"] == [] and "ports" not in to_topology(snap)["nodes"][0]
+    off = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", interfaces=False)
+    quiet = FakeTransport()
+    assert AsusClient(off, transport=quiet).snapshot()["interfaces"] == [] and not any("netdev" in c[1] for c in quiet.calls)

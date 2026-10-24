@@ -1,12 +1,12 @@
 {
   "id": "asus",
   "name": "ASUS router (AiMesh)",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "api_version": 1,
   "diagnose": true,
   "kind": "topology",
   "author": "Netlens",
-  "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) for the hierarchy and the map, and the router's Traffic Analyzer when it is on: traffic per application and per device (Statistics > Applications). Read-only, never SSH: one login, a few reads and a logout per sync. A refused login pauses automatic syncing so the router does not lock the account.",
+  "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) for the hierarchy and the map, the router's Traffic Analyzer (traffic per application and per device) and the speed of its own interfaces: internet (WAN), wired LAN and Wi-Fi radios. Read-only, never SSH: one login, a few reads and a logout per sync. A refused login pauses automatic syncing so the router does not lock the account.",
   "timeout": 60,
   "config": [
     {
@@ -42,6 +42,13 @@
       "label": "Read the Traffic Analyzer statistics",
       "default": true,
       "help": "Needs Traffic Analyzer switched on in the router (Adaptive QoS > Traffic Analyzer > Statistic). The first figures appear about an hour after switching it on."
+    },
+    {
+      "key": "interfaces",
+      "type": "bool",
+      "label": "Record the speed of the router's interfaces",
+      "default": true,
+      "help": "The internet connection (WAN), the wired LAN and the Wi-Fi radios, as graphs of bits per second. One extra read per sync; nothing to switch on in the router."
     }
   ]
 }

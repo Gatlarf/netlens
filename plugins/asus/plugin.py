@@ -83,6 +83,7 @@ class AsusConfig:
     username: str = ""
     password: str = ""
     traffic: bool = True      # also read the Traffic Analyzer statistics (applications and devices)
+    interfaces: bool = True   # also read the byte counters of the router's interfaces (internet, wired, Wi-Fi), for the speed graphs
 
 
 def normalize_url(url: str) -> str:
@@ -353,6 +354,28 @@ class AsusClient:
             if rows is not None:
                 client["applications"] = apps
 
+    # --- the interface counters: what the router has sent and received since it started, per interface ---
+    NETDEV = (("INTERNET", 1, "WAN"), ("WIRED", 2, "LAN"), ("WIRELESS0", 3, "Wi-Fi radio 1"), ("WIRELESS1", 4, "Wi-Fi radio 2"), ("WIRELESS2", 5, "Wi-Fi radio 3"))
+
+    def interfaces(self) -> list[dict]:
+        """The router's interfaces as ports with byte counters (`INTERNET` is the internet connection). [] when the router does not say; never an error:
+        the sync is about the topology and this is an extra."""
+        try:
+            status, text = self._send("/appGet.cgi?hook=netdev(appobj)")
+            data = json.loads(text).get("netdev") if status == 200 else None
+        except (AsusError, ValueError, AttributeError):
+            return []
+        if not isinstance(data, dict):
+            return []
+        ports = []
+        for key, number, name in self.NETDEV:
+            try:
+                rx, tx = int(str(data[f"{key}_rx"]), 16), int(str(data[f"{key}_tx"]), 16)
+            except (KeyError, ValueError):
+                continue
+            ports.append({"port": number, "name": name, "up": True, "enabled": True, "rx_bytes": rx, "tx_bytes": tx})
+        return ports
+
     def snapshot(self) -> dict:
         self.login()
         try:
@@ -368,6 +391,7 @@ class AsusClient:
                 raise AsusError(f"the router returned HTTP {status} for the AiMesh node list")
             snapshot = build_snapshot(clientlist, parse_onboarding(text))
             snapshot["usage"] = self.usage() if self.cfg.traffic else []
+            snapshot["interfaces"] = self.interfaces() if self.cfg.interfaces else []
             return snapshot
         finally:
             self.logout()
@@ -385,6 +409,7 @@ def _client(config: dict):
         username=config.get("username", ""),
         password=config.get("password", ""),
         traffic=bool(config.get("traffic", True)) and bool(config.get("collect_usage", True)),     # Netlens' own switch (Settings > Statistics) has the last word
+        interfaces=bool(config.get("interfaces", True)),
     )
     if not (cfg.url and cfg.username and cfg.password):
         raise ValueError("enter the router address, username and password")
@@ -404,6 +429,7 @@ def to_topology(snapshot: dict) -> dict:
         out_nodes.append({
             "mac": n["mac"], "macs": n["macs"], "ip": n["ip"], "name": n["name"], "model": n["model"],
             "role": "gateway" if n is main else "node", "parent_mac": parent,
+            **({"ports": snapshot["interfaces"]} if n is main and snapshot.get("interfaces") else {}),        # the router's own interfaces; Netlens turns the counters into speeds
         })
     known = {m for n in nodes for m in n["macs"]}
     clients = []
@@ -468,6 +494,7 @@ def diagnose(config: dict) -> dict:
                     "days_parsed": len(client.usage(1))}
 
         step("traffic_analyzer", read_traffic)
+        step("interfaces", lambda: client.interfaces(), lambda ports: {"ports": [p["name"] for p in ports], "counters_ok": all(isinstance(p["rx_bytes"], int) and isinstance(p["tx_bytes"], int) for p in ports)})
         if clientlist is not None and onboarding is not None:
             snapshot = build_snapshot(clientlist, onboarding)
             report["result"] = {

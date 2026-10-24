@@ -299,7 +299,7 @@ def test_state_defaults_and_secret_handling(tmp_path):
     conn = connect(path)
     init_db(conn)
     plugin = discover(None)["asus"]
-    assert get_state(conn, plugin) == {"enabled": False, "config": {"url": "", "verify_tls": False, "username": "", "password": "", "traffic": True}}
+    assert get_state(conn, plugin) == {"enabled": False, "config": {"url": "", "verify_tls": False, "username": "", "password": "", "traffic": True, "interfaces": True}}
     cfg = merge_config(plugin, {}, {"url": "10.0.0.1", "username": "u", "password": "pw", "junk": 1})
     save_state(conn, "asus", True, cfg)
     again = merge_config(plugin, get_state(conn, plugin)["config"], {"username": "v", "password": ""})  # empty secret keeps the old one
