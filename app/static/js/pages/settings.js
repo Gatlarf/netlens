@@ -30,6 +30,7 @@ import { buildSharesCard } from "../cards/shares.js";
 import { buildNetchecksCard } from "../cards/netchecks.js";
 import { buildCveCheckCard } from "../cards/cve_check.js";
 import { buildDnsCard } from "../cards/dns.js";
+import { buildReliabilityCard } from "../cards/reliability_settings.js";
 import { buildGroupsCard } from "../cards/groups.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 import { buildPassiveCard } from "../cards/passive.js";
@@ -234,6 +235,7 @@ const STATIC_GROUPS = [
       { key: "netchecks", label: "Network checks", build: buildNetchecksCard },
       { key: "ipv6", label: "IPv6", build: buildIpv6Card },
       { key: "dns", label: "DNS registration", build: () => buildDnsCard("settings") },
+      { key: "reliability", label: "Reliability target", build: buildReliabilityCard },
       { key: "cvecheck", label: "Version check (CVE)", build: () => buildCveCheckCard() },
       { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
     ],

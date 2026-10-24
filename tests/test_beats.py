@@ -179,3 +179,19 @@ def test_events_carry_the_importance_and_critical_problems_lead_the_attention_li
     assert [r[0] for r in conn.execute("SELECT tier FROM events ORDER BY id")] == ["critical", "low"]
     tiers = dashboard._tiers(conn)
     assert tiers == {f"device:{ids['10.0.0.5']}": "critical", f"device:{ids['10.0.0.6']}": "low"}
+
+
+def test_reliability_pairs_outages_and_reports_recovery_time_and_alert_quality(conn):
+    from app import reliability
+    from app.db import add_event
+
+    did = conn.execute("SELECT id FROM devices WHERE primary_ip = '10.0.0.5'").fetchone()[0]
+    for kind, minute in (("device_offline", 1), ("device_online", 3), ("device_offline", 10), ("device_online", 40)):    # 2 min and 30 min
+        add_event(conn, kind, "x", device_id=did, now=stamp(minute))
+    add_event(conn, "device_offline", "x", device_id=did, now=stamp(50))                                               # still down
+    doc = reliability.build(conn, 7, now="2026-10-24T13:00:00Z")
+    d = doc["devices"]
+    assert d["outages"] == 3 and d["ongoing"] == 1 and d["longest_seconds"] == 1800
+    assert doc["mttr_seconds"] == (120 + 1800) // 2 and doc["alerts"]["cleared_within_5_min"] == 1
+    assert doc["alerts"]["problems"] == 3 and doc["watching"]["devices"] == 3 and doc["meets_target"] in (True, False)
+    assert reliability.set_target(conn, 99.9) == 99.9 and reliability.target(conn) == 99.9

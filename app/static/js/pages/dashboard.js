@@ -53,6 +53,17 @@ const CARDS = [
       return big(core.flapping, core.flapping === 1 ? "always-on device flaps (24 hours)" : "always-on devices flap (24 hours)", { extra: [
         h("div", { class: "d-mini" }, `${others} other ${others === 1 ? "device flaps" : "devices flap"}`), lowest] });
     } },
+  { id: "reliability", title: "Reliability", href: "#/insights", size: "w", def: true, about: "Outages of the things that matter (always-on and critical), the time it took to recover, availability against your target and how good the alerts were.",
+    show: (d) => !!(d.reliability && d.reliability.watching && d.reliability.watching.devices + d.reliability.watching.services > 0),
+    tone: (d) => (d.reliability.meets_target === false ? "bad" : d.reliability.devices.ongoing || d.reliability.services.ongoing ? "warn" : "ok"),
+    build: ({ reliability: r }) => {
+      const span = (sec) => (sec === null || sec === undefined ? "–" : sec < 90 ? `${sec} s` : sec < 5400 ? `${Math.round(sec / 60)} min` : `${(sec / 3600).toFixed(1)} h`);
+      const outages = r.devices.outages + r.services.outages;
+      const det = r.detection.device_seconds;
+      return big(r.availability === null ? "–" : `${r.availability}%`, `availability of ${plural(r.watching.devices, "device")}, last ${r.days} days (target ${r.target}%)`, { extra: [
+        h("div", { class: "d-three" }, [["outages", String(outages)], ["to recover (average)", span(r.mttr_seconds)], ["longest", span(Math.max(r.devices.longest_seconds || 0, r.services.longest_seconds || 0) || null)]].map(([label, v]) => h("div", {}, h("small", {}, label), h("strong", {}, v)))),
+        h("div", { class: "d-mini" }, `Noticed within ${det ? span(det) : "the next scan"} · ${r.alerts.noise_percent === null ? "no alerts cleared yet" : `${r.alerts.noise_percent}% of the outages cleared within 5 minutes`}`)] });
+    } },
   { id: "services", title: "Services", href: "#/services", size: "s", def: true, about: "Your HTTP, port and DNS checks.",
     show: (d) => d.summary.services.total > 0, tone: (d) => (d.summary.services.down ? "bad" : "ok"),
     build: ({ summary: s, services_down: down }) => big(`${s.services.up} / ${s.services.up + s.services.down}`, s.services.down ? `down: ${down.slice(0, 2).join(", ")}${down.length > 2 ? "…" : ""}` : "all up") },
@@ -201,7 +212,7 @@ for (const w of STAT_WIDGETS) {
     show: (d) => !!d.stats, build: (d) => h("div", { class: "mk-body" }, w.draw(d.stats)) });
 }
 const TYPE_ABOUT = { value: "A value from your data", device: "A device", group: "A group of devices", service: "A service check", notes: "Notes and links" };
-const FIRST_VIEW = ["attention", "devices", "uptime", "services", "health", "flapping", "storage", "guestbackups", "vulns", "events", "worst", "trend", "capacity"];   // the order a new installation starts with
+const FIRST_VIEW = ["attention", "devices", "uptime", "services", "reliability", "health", "flapping", "storage", "guestbackups", "vulns", "events", "worst", "trend", "capacity"];   // the order a new installation starts with
 const DEFAULT_ORDER = [...FIRST_VIEW.filter((id) => CARDS.some((c) => c.id === id && c.def)), ...CARDS.filter((c) => c.def && !FIRST_VIEW.includes(c.id)).map((c) => c.id)];
 
 // ---------- the chosen layout (per user, kept on the server so every browser and device shows the same dashboard) ----------
@@ -576,16 +587,18 @@ export async function render(container) {
   async function refresh() {
     try {
       // everything the cards need, asked for at the same time; the extras may fail without hiding the dashboard
-      const [main, health, capacity] = await Promise.all([
+      const [main, health, capacity, reliability] = await Promise.all([
         get("/api/dashboard"),
         Promise.all([get("/api/monitors"), get("/api/monitoring/limits")]).then(([m, l]) => ({ monitors: m.monitors || [], problems: m.problems || [], rules: l.rules || {} }), () => null),   // an older server or no access: the card simply does not show
         get("/api/forecast").catch(() => null),
+        get("/api/reliability?days=30").catch(() => null),
       ]);
       const keepStats = data && data.stats;
       data = main;
       if (keepStats) data.stats = keepStats;
       data.health = health;
       data.capacity = capacity;
+      data.reliability = reliability;
       if (!disposed && !(editing && grid.children.length)) draw();
     } catch (err) {
       if (!data && !disposed) clear(grid), grid.append(h("p", { class: "error" }, err.message || "The dashboard could not be loaded."));
