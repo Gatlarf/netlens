@@ -651,7 +651,7 @@ body.setup-mode .app-shell { display: block; }
 .dash-status { margin: 2px 0 0; font-weight: 600; }
 .dash-status .hint { font-weight: 400; }
 .dash-tools { display: flex; gap: 8px; }
-.dash-grid { grid-auto-flow: dense; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.dash-grid { grid-auto-flow: dense; display: grid; grid-template-columns: repeat(auto-fill, minmax(max(260px, calc((100% - 60px) / 6)), 1fr)); gap: 12px; align-items: stretch; }
 .dcard { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--radius); }
 .dcard.size-w { grid-column: span 2; }
 .dcard.size-f { grid-column: 1 / -1; }
@@ -822,6 +822,4 @@ body.side-hidden .sidenav { display: none; }
   .sidenav .nav-link { padding: 12px; font-size: 1rem; }
 }
 #side-links [hidden], .side-group[hidden] { display: none !important; }
-/* a long host name must wrap instead of pushing a table out of its card */
-.card table.data td { overflow-wrap: anywhere; }
 .chg-list { overflow-wrap: anywhere; }

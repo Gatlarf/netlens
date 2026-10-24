@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.200 — 2026-10-24
+
+### Changed
+- **Better use of wide and ultra-wide screens.** The dashboard fills the width with up to six columns instead of four stretched ones, the device page shows three or four columns of cards, the Uptime list runs in two or three columns, Statistics cards get more room for their tables, and form fields on the Settings pages no longer stretch across the whole screen.
+
 ## 0.4.199 — 2026-10-24
 
 ### Changed
