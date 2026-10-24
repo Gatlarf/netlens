@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.221 — 2026-10-24
+
+### Changed
+- ★ **The AI analysis knows the newer parts of Netlens.** The AI report now has findings for storage (unhealthy systems, full pools, failed disks, open alerts), reliability against your target (outages, time to recover), always-on devices that keep going up and down (real outages, not single lost answers), failed or late backups and guests without one, exploited vulnerabilities and gaps in what is watched; an incident on a device you marked critical is strong and says so. Storage and backup problems now count as incidents too. In Insights you can ask about storage ("how is my storage doing?"), reliability ("what was the mttr?", "did we meet the target?"), coverage ("what is not monitored yet?") and flapping ("which devices keep going up and down?"), with the built-in logic and with a language model. The MCP server has four new read tools (storage, guest backups, reliability, coverage) and can set a device's importance; the assistant guide describes all of it.
+
 ## 0.4.220 — 2026-10-24
 
 ### Added

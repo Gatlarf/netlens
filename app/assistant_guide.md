@@ -65,11 +65,20 @@ Each workflow lists the calls to look at and the ones that change things. Fetch 
 ### Backups and updates
 * `GET /api/backups` lists backups and the schedule; the person makes, restores and downloads them in the interface. `GET /api/update` says whether a newer Netlens exists.
 
+### What Netlens watches besides the network
+* Storage systems (NAS, SAN, Ceph, server hardware): `GET /api/storage` (health, pools and how full they are, volumes and the hosts that use them, disks, open alerts). Backups of virtual machines and containers: `GET /api/guest-backups`.
+* How reliable things are: `GET /api/reliability?days=30` (outages, average time to recover, availability against the target, alert quality) and `GET /api/coverage` (devices marked always-on or critical that no check, monitor or backup watches yet). Offer these before suggesting new checks.
+* Importance: a device (`PATCH /api/devices/{id}` with `tier`) and a service check (`tier` in its body) can be `critical`, `normal` or `low`. Critical problems lead the dashboard; an alert channel can be limited to critical or not-low ones (`min_tier` in the channel's filters).
+* Quick checks: always-on devices are pinged about once a minute between scans (`GET/PUT /api/config/general`: `presence_interval` seconds, `presence_misses`, `presence_scope` core or all); a device is offline after that many missed answers in a row. Service checks have their own interval.
+* Which pages show up depends on what is set up: `GET /api/features`.
+* Pages of cards (dashboard, device page, statistics, insights) can be arranged per user, and administrators can set templates: `GET/PUT /api/layouts/{page}`.
+
 ### Something is wrong (diagnosis, works in both modes)
 * A device is red or unknown: `GET /api/devices` (find it), `GET /api/devices/{id}`, `GET /api/events?device_id={id}` (recent events), `GET /api/devices/{id}/uptime`.
 * A service is down: `GET /api/service-checks`, `GET /api/service-checks/{id}/results`.
 * A plugin fails: `GET /api/plugins` (status and error per plugin). A timeout now and then is normal behind a reverse proxy; the dashboard reports a plugin only after several failures in a row.
 * Everything at once: `GET /api/stats/summary`, `GET /api/insights` if available, and the attention list in `GET /api/dashboard`.
+* Devices behind a device that is offline are unreachable, not broken: look at the one cause first (`GET /api/hierarchy`).
 * Explain what you found in plain words, name the most likely cause, and suggest the smallest next step.
 
 ## Errors you may meet

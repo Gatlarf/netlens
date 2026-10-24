@@ -573,6 +573,10 @@ def route(conn, q: str, names: list[str]) -> tuple[str, dict] | None:
     if typed and re.search(r"online|offline|\bdown\b|\bup\b|which|list|show|how many|any |are there|do i have", q) and not re.search(r"slowest|fastest|highest|lowest|most |least |worst|best|reliab|unreliab|response|latency|availab", q):
         return "search_devices", {"type": typed, "online": online}
     rules = [
+        ("reliability", r"mttr|reliability (report|figures?|numbers?|kpis?|score)|how reliable (was|is|has been) (my|the|our) (network|setup|infrastructure|environment)|time to (recover|repair|restore|fix)|recover(y)? time|(meet|meets|meeting|miss|missed) (the |my |our )?(target|slo|sla)|availability target|alert quality|noisy alerts?|false (alarms?|positives?)|how (fast|quickly) .* (notice|detect)"),
+        ("coverage", r"coverage|not (being )?monitored|unmonitored|blind spots?|what am i missing|gaps? in (my |the )?monitoring|no service check|without (a )?(service )?check"),
+        ("flapping", r"flapping|unstable|going up and down|keeps? (going|dropping) (offline|down)|up and down"),
+        ("storage", r"\bstorage\b|\bpools?\b|\braid\b|\bzfs\b|\bceph\b|iscsi|\bluns?\b|disk (failed|failure|health|degraded)|failed disks?|\bsmart (status|errors?)\b|volume"),
         ("backups", r"backup|back-up"), ("certificates", r"certificat|\bcerts?\b|\bssl\b|\btls\b|expir"), ("speedtest", r"speed ?test|internet speed|bandwidth|mbit|mbps|download speed|upload speed|how fast is (my|the) internet"),
         ("remote_sites", r"remote sites?|branch|other (site|location)|probe"), ("wifi", r"wi-?fi|wireless|\bsignal\b|rssi"), ("maintenance", r"maintenance|snooze|planned (downtime|work)|scheduled downtime"),
         ("audit", r"who (changed|did|edited|deleted|added)|audit|changed (the )?settings|logged in|who logged"), ("ipv6", r"ipv6"),
@@ -680,7 +684,114 @@ def r_site(r: dict) -> str:
     return " ".join(parts) or "Nothing is known about it."
 
 
-RENDERERS = {"site": r_site, "search_devices": r_search_devices, "counts": r_counts, "ports": r_ports, "guests": r_guests, "backups": r_backups, "certificates": r_certificates, "speedtest": r_speedtest,
+# ----------------------------------------------------------------------------- storage, reliability, coverage and flapping
+def _span(seconds) -> str:
+    if seconds is None:
+        return "unknown"
+    seconds = int(seconds)
+    return f"{seconds} s" if seconds < 90 else f"{round(seconds / 60)} min" if seconds < 5400 else f"{seconds / 3600:.1f} h"
+
+
+def t_storage(conn, args, now=None) -> dict:
+    from app import storage
+
+    o = storage.overview(conn)
+    s = o["summary"]
+    if not s["configured"]:
+        return {"configured": False}
+    systems = [{"name": x["name"], "vendor": x["vendor"], "model": x["model"], "health": x["health"], "online": x["online"]} for x in o["systems"]]
+    pools = sorted(({"system": next((x["name"] for x in o["systems"] if x["id"] == p["system_id"] and x["plugin_id"] == p["plugin_id"]), ""), "pool": p["name"], "used_pct": p["percent"], "health": p["health"], "level": p["level"]}
+                    for p in o["pools"]), key=lambda x: -(x["used_pct"] or 0))
+    bad_disks = [{"name": d["name"], "state": d["state"], "model": d["model"]} for d in o["disks"] if d["state"] in ("failed", "degraded")]
+    return {"configured": True, "summary": {k: s[k] for k in ("systems", "unhealthy", "pools", "pools_filling", "disks", "failed_disks", "alerts", "volumes")}, "systems": systems[:LIMIT],
+            "fullest_pools": pools[:6], "disks_needing_attention": bad_disks[:LIMIT], "open_alerts": [a["text"][:160] for a in o["alerts"][:6]]}
+
+
+def r_storage(r: dict) -> str:
+    if not r.get("configured"):
+        return "No storage system is connected (install a storage plugin, for example TrueNAS, Synology, NetApp or Ceph)."
+    s = r["summary"]
+    lines = [f"{s['systems']} storage system{'s' if s['systems'] != 1 else ''}: {s['systems'] - s['unhealthy']} healthy, {s['unhealthy']} not. {s['pools']} pool(s), {s['disks']} disk(s), {s['failed_disks']} failed, {s['alerts']} open alert(s)."]
+    for p in r["fullest_pools"][:3]:
+        lines.append(f"Pool {p['pool']} on {p['system']} is {p['used_pct']}% full ({p['health']}).")
+    for d in r["disks_needing_attention"][:3]:
+        lines.append(f"Disk {d['name']} is {d['state']}.")
+    for a in r["open_alerts"][:3]:
+        lines.append(f"Alert: {a}")
+    return " ".join(lines)
+
+
+def t_reliability(conn, args, now=None) -> dict:
+    from app import reliability
+
+    days = _days_in_arg(args.get("days"), 30)
+    r = reliability.build(conn, 90 if days > 30 else 30 if days > 7 else 7)
+    return {"days": r["days"], "watching": r["watching"], "availability_pct": r["availability"], "target_pct": r["target"], "meets_target": r["meets_target"],
+            "devices": r["devices"], "services": r["services"], "mttr": _span(r["mttr_seconds"]), "median_recovery": _span(r["median_seconds"]),
+            "worst_case_detection": {"devices": _span(r["detection"]["device_seconds"]), "services": _span(r["detection"]["service_seconds"])}, "alerts": r["alerts"],
+            "longest_outages": [{"name": o["name"], "length": _span(o["seconds"]), "since": o["start"], "ongoing": o["ongoing"]} for o in r["longest"][:5]]}
+
+
+def _days_in_arg(value, default: int) -> int:
+    try:
+        return max(1, min(90, int(value)))
+    except (TypeError, ValueError):
+        return default
+
+
+def r_reliability(r: dict) -> str:
+    av = "no availability figure yet" if r["availability_pct"] is None else f"availability {r['availability_pct']}% against a target of {r['target_pct']}% ({'met' if r['meets_target'] else 'NOT met'})"
+    n = r["devices"]["outages"] + r["services"]["outages"]
+    line = f"Last {r['days']} days: {av}; {n} outage(s), average time to recover {r['mttr']}, median {r['median_recovery']}."
+    if r["longest_outages"]:
+        o = r["longest_outages"][0]
+        line += f" The longest was {o['name']} ({o['length']}{', still going on' if o['ongoing'] else ''})."
+    a = r["alerts"]
+    line += f" A problem is noticed within {r['worst_case_detection']['devices']} for always-on devices. {a['problems']} alert(s) were raised"
+    line += f", {a['noise_percent']}% of the outages cleared within 5 minutes." if a.get("noise_percent") is not None else "."
+    return line
+
+
+def t_coverage(conn, args, now=None) -> dict:
+    from app import coverage
+
+    c = coverage.build(conn)
+    return {"watching": c["watching"], "with_gaps": c["with_gaps"], "gaps_by_kind": c["gaps_by_kind"], "no_alert_channel": c["no_channel"],
+            "devices": [{"name": d["name"], "tier": d["tier"], "missing": [m["what"] for m in d["missing"]]} for d in c["devices"][:LIMIT]]}
+
+
+def r_coverage(r: dict) -> str:
+    if not r["watching"]:
+        return "No device is marked always-on or critical yet, so there is nothing to check coverage for."
+    if r.get("no_alert_channel"):
+        head = "No alert channel is switched on, so nobody is told when something goes down. "
+    else:
+        head = ""
+    if not r["with_gaps"]:
+        return head + f"All {r['watching']} devices that matter are covered."
+    items = "; ".join(f"{d['name']}: no {', no '.join(d['missing'])}" for d in r["devices"][:5])
+    return head + f"{r['with_gaps']} of {r['watching']} devices that matter have a gap ({', '.join(f'{v} without {k}' for k, v in r['gaps_by_kind'].items())}). {items}."
+
+
+def t_flapping(conn, args, now=None) -> dict:
+    from app import stats
+    from app.db import utcnow
+
+    stamp = utcnow()
+    since = (datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ") - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    names = {r["id"]: _name(r) for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices")}
+    core = {r[0] for r in conn.execute("SELECT id FROM devices WHERE always_on = 1")}
+    flaps = sorted(((d, n) for d, n in stats._flaps(conn, since).items() if n >= stats.FLAP_TRANSITIONS), key=lambda x: -x[1])
+    return {"limit": stats.FLAP_TRANSITIONS, "devices": [{"name": names.get(d), "changes_24h": n, "always_on": d in core} for d, n in flaps[:LIMIT]]}
+
+
+def r_flapping(r: dict) -> str:
+    if not r["devices"]:
+        return f"No device went up and down {r['limit']} times or more in the last 24 hours."
+    return "Going up and down (last 24 hours): " + ", ".join(f"{d['name']} ({d['changes_24h']} changes{', always-on' if d['always_on'] else ''})" for d in r["devices"][:8]) + "."
+
+
+RENDERERS = {"storage": r_storage, "reliability": r_reliability, "coverage": r_coverage, "flapping": r_flapping, "site": r_site, "search_devices": r_search_devices, "counts": r_counts, "ports": r_ports, "guests": r_guests, "backups": r_backups, "certificates": r_certificates, "speedtest": r_speedtest,
              "network_services": r_network_services, "remote_sites": r_remote_sites, "smart_home": r_smart_home, "security": r_security, "audit": r_audit, "connections": r_connections,
              "wifi": r_wifi, "maintenance": r_maintenance, "system": r_system, "updates": r_updates, "changes": r_changes, "ipv6": r_ipv6}
 
@@ -705,6 +816,10 @@ TOOLS = {
     "changes": (t_changes, "what changed on the network and in the settings in a period, by category. args: days (1, 7 or 30)"),
     "site": (t_site, "a website or service by its domain or name: its checks and whether the site is enabled or DISABLED on the reverse proxy (nginx proxy manager), and where it forwards to. Use it for 'why is <domain> down/offline'. args: name (a domain such as example.com, or a service name)"),
     "ipv6": (t_ipv6, "devices that have IPv6 addresses. args: none"),
+    "storage": (t_storage, "storage systems (NAS, SAN, Ceph ...) from the storage plugins: health, the fullest pools, failed disks and open alerts. args: none"),
+    "reliability": (t_reliability, "reliability of the devices and services that matter: outages, average time to recover (MTTR), availability against the target, how fast a problem is noticed and how noisy the alerts were. args: days (7, 30 or 90)"),
+    "coverage": (t_coverage, "monitoring gaps: devices marked always-on or critical that have no service check, health monitor, backup or alerts. args: none"),
+    "flapping": (t_flapping, "devices that keep going up and down (counted from outages, not single lost answers) in the last 24 hours. args: none"),
 }
 
 PRESETS = [
@@ -714,6 +829,10 @@ PRESETS = [
     {"id": "rdp", "text": "Which devices have remote desktop (RDP) open?", "tool": "ports", "args": {"port": 3389, "service": "rdp"}},
     {"id": "stopped", "text": "Which virtual machines or containers are stopped?", "tool": "guests", "args": {"status": "stopped"}},
     {"id": "backups", "text": "Are my backups healthy?", "tool": "backups", "args": {}},
+    {"id": "storage", "text": "How is my storage doing?", "tool": "storage", "args": {}},
+    {"id": "reliability", "text": "How reliable was my network this month?", "tool": "reliability", "args": {"days": 30}},
+    {"id": "coverage", "text": "What is not monitored yet?", "tool": "coverage", "args": {}},
+    {"id": "flapping", "text": "Which devices keep going up and down?", "tool": "flapping", "args": {}},
     {"id": "certs", "text": "Which certificates expire soonest?", "tool": "certificates", "args": {}},
     {"id": "speed", "text": "How fast is my internet?", "tool": "speedtest", "args": {"days": 30}},
     {"id": "security", "text": "Is there anything suspicious on the network?", "tool": "security", "args": {"days": 7}},

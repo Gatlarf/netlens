@@ -229,3 +229,47 @@ def test_devices_behind_a_down_device_are_one_problem(conn):
     assert "switch should always be online but is not answering" in texts
     assert any("so 1 always-on device behind it cannot be reached: nas" in t for t in texts)
     assert not any(t.startswith("nas should") for t in texts)
+
+
+def test_the_assistant_answers_about_storage_reliability_coverage_and_flapping(conn):
+    from app import ask, storage
+    from app.plugins.contract import validate_output
+
+    for question, tool in (("how reliable was my network this month?", "reliability"), ("what is not monitored yet?", "coverage"), ("which devices keep going up and down?", "flapping"),
+                           ("how is my storage doing?", "storage"), ("what is the mttr", "reliability"), ("any failed disks?", "storage")):
+        got = ask.answer(conn, question, mode="rules")
+        assert got["tools"] == [tool], (question, got)
+    assert "No storage system" in ask.answer(conn, "how is my storage doing?", mode="rules")["answer"]
+    storage.apply_storage(conn, "ontap", validate_output("storage", {
+        "systems": [{"id": "a1", "name": "ontap1", "health": "warning"}],
+        "pools": [{"id": "p1", "system_id": "a1", "name": "aggr1", "total": 1000, "used": 920, "health": "ok"}],
+        "disks": [{"id": "d1", "system_id": "a1", "name": "disk 1", "state": "failed"}]}))
+    text = ask.answer(conn, "how is my storage doing?", mode="rules")["answer"]
+    assert "aggr1" in text and "92" in text and "failed" in text
+    assert "target" in ask.answer(conn, "how reliable was my network?", mode="rules")["answer"]
+
+
+def test_the_ai_report_knows_storage_reliability_flapping_and_critical_devices(conn):
+    from datetime import datetime, timezone
+
+    from app import aireport, storage
+    from app.db import add_event
+    from app.plugins.contract import validate_output
+
+    now = datetime.now(timezone.utc)
+    from datetime import timedelta
+
+    from app import reliability
+
+    t = (now - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    reliability.set_target(conn, 99.99)
+    did = conn.execute("SELECT id FROM devices WHERE primary_ip = '10.0.0.5'").fetchone()[0]
+    conn.execute("UPDATE devices SET tier = 'critical' WHERE id = ?", (did,))
+    add_event(conn, "device_offline", "10.0.0.5", device_id=did, now=t)
+    storage.apply_storage(conn, "ontap", validate_output("storage", {"systems": [{"id": "a1", "name": "ontap1", "health": "critical"}],
+                                                                     "disks": [{"id": "d1", "system_id": "a1", "name": "disk 1", "state": "failed"}]}))
+    doc = aireport.collect(conn, "24h", now=now)
+    types = {f["type"]: f for f in doc["findings"]}
+    assert types["incident"]["strength"] == "strong" and types["incident"]["text"].startswith("Marked critical")
+    assert "ontap1" in types["storage"]["text"] and types["storage"]["strength"] == "strong"
+    assert types["reliability"]["strength"] == "strong" and "below the target" in types["reliability"]["text"]

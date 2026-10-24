@@ -67,6 +67,7 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
     made = [c for c in made if c["category"] == "settings" or c["kind"] in CHANGE_KINDS]
 
     always_on = {r["id"] for r in conn.execute("SELECT id FROM devices WHERE always_on = 1")}
+    critical = {r["id"] for r in conn.execute("SELECT id FROM devices WHERE tier = 'critical'")}      # devices the user said must work
     shared: dict[int, dict[str, Any]] = {}
     pending: list[dict[str, Any]] = []
     for inc in incs[:40]:
@@ -76,9 +77,12 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
         who = ", ".join(names[:5]) + (f" and {len(names) - 5} more" if len(names) > 5 else "")
         when = _ts(inc["start"]).strftime("%H:%M" if hours <= 24 else "%m-%d %H:%M")
         minor = not inc["cause"] and len(ids) < 3 and not (set(ids) & always_on) and set(kinds) <= {"went offline"}
-        strength = "strong" if inc["cause"] else "info" if minor else "likely"
+        marked = bool(set(ids) & critical)
+        strength = "strong" if inc["cause"] or marked else "info" if minor else "likely"
         said = "; ".join(inc.get("notes") or [])
         head = f"{who}: {', '.join(kinds)}" if who else (f"{', '.join(kinds).capitalize()} ({said})" if said else ", ".join(kinds).capitalize())
+        if marked:
+            head = f"Marked critical: {head}"
         group = {"inc": {"type": "incident", "strength": strength, "ts": inc["start"], "devices": names[:6],
                          "text": head + f" at {when} UTC. {inc['summary']}"}, "ids": ids, "changes": [],
                  "blip": (tuple(kinds), re.sub(r"[\d.,:]+", "#", (inc.get("notes") or [""])[0])) if not ids and inc.get("notes") else None, "when": when,
@@ -138,13 +142,98 @@ def collect(conn: sqlite3.Connection, period: str = "24h", now: datetime | None 
             shown += 1
         raw.append(f)
         raw += group["changes"]
-    if not raw:
+    extra = _monitoring_findings(conn, period, hours, only)
+    if not raw and not extra:
         raw.append({"type": "quiet", "strength": "info", "ts": utcnow(), "devices": [], "text": f"No problems were recorded in {PERIODS[period]}."})
     raw.sort(key=lambda f: f["ts"], reverse=True)
     raw.sort(key=lambda f: STRENGTH[f["strength"]])           # stable: strongest first, newest first within a strength
-    found = [{"id": f"F{n}", **f} for n, f in enumerate(raw[:MAX_FINDINGS], 1)]
+    extra.sort(key=lambda f: STRENGTH[f["strength"]])         # the state of storage, reliability, backups ... come after what happened in the period
+    found = [{"id": f"F{n}", **f} for n, f in enumerate(raw[:MAX_FINDINGS] + extra[:6], 1)]
     return {"period": period, "scope": "important" if only is not None else "all", "label": PERIODS[period], "since": since, "until": now.strftime(changes.STAMP), "findings": found,
             "counts": {"incidents": len(incs), "changes": len(made), "findings": len(found)}}
+
+
+def _monitoring_findings(conn: sqlite3.Connection, period: str, hours: int, only: set[int] | None) -> list[dict[str, Any]]:
+    """What the newer parts of Netlens know: storage, reliability against the target, devices that keep going up and down, backups, vulnerabilities and gaps in what is watched.
+    Each is a plain fact from the database, written as a finding so the model can only repeat it."""
+    out: list[dict[str, Any]] = []
+    now = utcnow()
+    try:
+        from app import storage
+
+        s = storage.summary(conn)
+        if s.get("configured") and (s["unhealthy"] or s["failed_disks"] or s["pools_filling"] or s["alerts"]):
+            o = storage.overview(conn)
+            bits = []
+            for x in o["systems"]:
+                if x["health"] in ("warning", "critical") or not x["online"]:
+                    bits.append(f"{x['name']} is {'not reachable' if not x['online'] else x['health']}")
+            for p in o["pools"]:
+                if p["level"] != "ok":
+                    bits.append(f"pool {p['name']} is {p['percent']}% full")
+            bits += [f"disk {d['name']} is {d['state']}" for d in o["disks"] if d["state"] == "failed"][:3]
+            bits += [a["text"][:100] for a in o["alerts"][:2]]
+            out.append({"type": "storage", "strength": "strong" if s["failed_disks"] or s["unhealthy"] else "likely", "ts": now, "devices": [],
+                        "text": "Storage: " + "; ".join(bits[:6]) + "."})
+    except Exception:  # noqa: BLE001 - a missing part never stops the report
+        pass
+    try:
+        from app import reliability
+
+        r = reliability.build(conn, 7 if hours <= 168 else 30)
+        if r["watching"]["devices"] + r["watching"]["services"]:
+            outages = r["devices"]["outages"] + r["services"]["outages"]
+            if r["meets_target"] is False:
+                out.append({"type": "reliability", "strength": "strong", "ts": now, "devices": [],
+                            "text": f"Availability of the devices that matter was {r['availability']}% in the last {r['days']} days, below the target of {r['target']}% ({outages} outage(s), average recovery {_age((r['mttr_seconds'] or 0) / 60)})."})
+            elif outages:
+                longest = r["longest"][0] if r["longest"] else None
+                out.append({"type": "reliability", "strength": "info", "ts": now, "devices": [longest["name"]] if longest else [],
+                            "text": f"{outages} outage(s) of the devices and services that matter in the last {r['days']} days, average recovery {_age((r['mttr_seconds'] or 0) / 60)}, availability {r['availability']}% (target {r['target']}%)"
+                                    + (f"; the longest was {longest['name']} ({_age(longest['seconds'] / 60)})." if longest else ".")})
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from app import stats
+
+        since = (datetime.now(timezone.utc) - timedelta(hours=min(hours, 24))).strftime(changes.STAMP)
+        names = {r["id"]: r["name"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name FROM devices WHERE always_on = 1")}
+        flapping = [names[d] for d, n in stats._flaps(conn, since).items() if d in names and n >= stats.FLAP_TRANSITIONS and (only is None or d in only)]
+        if flapping:
+            out.append({"type": "flapping", "strength": "likely", "ts": now, "devices": flapping[:6],
+                        "text": f"Always-on devices that keep going up and down (real outages, not single lost answers): {', '.join(flapping[:6])}."})
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from app import guestbackups
+
+        g = guestbackups.summary(conn)
+        if g.get("configured") and (g["failed"] or g["late"] or g["stores_at_risk"]):
+            out.append({"type": "backups", "strength": "likely" if g["failed"] else "possible", "ts": now, "devices": [],
+                        "text": f"Backups: {g['failed']} failed, {g['late']} late, {g['stores_at_risk']} backup store(s) filling up, {g['unprotected']} guest(s) without a backup."})
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from app import vulns
+
+        v = vulns.summary(conn)
+        if v.get("configured") and (v["exploited"] or v["counts"].get("critical")):
+            out.append({"type": "vulnerabilities", "strength": "likely" if v["exploited"] else "possible", "ts": now, "devices": [],
+                        "text": f"Vulnerabilities: {v['counts'].get('critical', 0)} critical, {v['exploited']} known to be exploited, on {v['devices']} device(s)."})
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from app import coverage
+
+        c = coverage.build(conn)
+        if c["watching"] and (c["with_gaps"] or c["no_channel"]):
+            what = ", ".join(f"{n} without {k}" for k, n in c["gaps_by_kind"].items())
+            out.append({"type": "coverage", "strength": "info", "ts": now, "devices": [],
+                        "text": ("No alert channel is switched on, so nobody is told about problems. " if c["no_channel"] else "")
+                                + (f"{c['with_gaps']} of {c['watching']} devices that matter have a monitoring gap ({what})." if c["with_gaps"] else "")})
+    except Exception:  # noqa: BLE001
+        pass
+    return out
 
 
 def _merge_blips(pending: list[dict[str, Any]]) -> list[dict[str, Any]]:

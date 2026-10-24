@@ -102,6 +102,11 @@ tool("get_uptime", "overview", "Uptime of every device over a range, with the ba
 tool("get_availability_report", "overview", "Availability report for a month: per device or service, outages, target met or not.", "GET", "/api/reports/availability",
      {"month": s("YYYY-MM"), "scope": s("devices or services"), "group": i("Only this group id"), "only_outages": b("Only rows with outages"), "target": i("Target percentage"),
       "ignore_maintenance": b("Do not count maintenance windows as downtime")}, query=("month", "scope", "group", "only_outages", "target", "ignore_maintenance"))
+tool("get_storage", "overview", "Storage systems from the storage plugins (NAS, SAN, Ceph, BMC): health, pools with their fill level, volumes and who uses them, disks and open alerts.", "GET", "/api/storage")
+tool("get_guest_backups", "overview", "Backups of virtual machines and containers from the backup plugins: servers, stores, the newest backup of each guest, failures and guests without a backup.", "GET", "/api/guest-backups")
+tool("get_reliability", "overview", "Reliability of the devices and services that matter: outages, average time to recover (MTTR), availability against the target, how fast a problem is noticed, alert quality.", "GET", "/api/reliability",
+     {"days": i("7, 30 or 90")}, query=("days",))
+tool("get_coverage", "overview", "Monitoring gaps: devices marked always-on or critical that have no service check, health monitor, backup or alerts.", "GET", "/api/coverage")
 tool("get_weekly_report", "overview", "The weekly report as it would be sent now.", "GET", "/api/reports/weekly")
 
 # devices
@@ -159,7 +164,7 @@ tool("run_speedtest", "scans", "Run an internet speed test now.", "POST", "/api/
 # devices and groups
 tool("update_device", "devices_edit", "Change a device: name, notes, tags, type, group, always-on, trusted, whether it alerts when offline. Only send the fields to change.", "PATCH", "/api/devices/{device_id}",
      {**DEV, "custom_name": s("Name shown instead of the host name"), "notes": s("Free text"), "tags": a("Tags", s("tag")), "type_override": s("Device type"), "notify_offline": b("Alert when it goes offline"),
-      "report_exclude": b("Leave out of reports"), "always_on": b("Should be online all the time"), "trusted": b("Known and trusted"), "group_id": i("Group id, or 0 for none")}, ("device_id",))
+      "report_exclude": b("Leave out of reports"), "always_on": b("Should be online all the time"), "tier": s("How much a problem with it matters", ["critical", "normal", "low"]), "trusted": b("Known and trusted"), "group_id": i("Group id, or 0 for none")}, ("device_id",))
 tool("set_devices_group", "devices_edit", "Put several devices in a group.", "POST", "/api/devices/group", {"ids": a("Device ids", i("id")), "group_id": i("Group id, or 0 to remove from groups")}, ("ids", "group_id"))
 tool("trust_devices", "devices_edit", "Mark several devices as trusted or untrusted. Ask the person which ones; never trust everything.", "POST", "/api/devices/trust", {"ids": a("Device ids", i("id")), "trusted": b("true to trust")}, ("ids", "trusted"))
 tool("create_group", "devices_edit", "Create a device group.", "POST", "/api/groups", {"name": s("Group name"), "color": s("Colour as #rrggbb")}, ("name",))
