@@ -161,7 +161,7 @@ export function startBoard({ page, panels, tabs, getTab, typeKey, typeLabel, isA
 //   await board.apply({ main: flowElement });           // after every (re)draw
 //   header.append(board.button(() => "main"));          // the Customize button
 // While editing, the page should not redraw itself: check board.editing.
-export function boardPage(page, label, tabs = [["main", "This page"]], typeKey = "*", isAdmin = () => false) {
+export function boardPage(page, label, tabs = [["main", "This page"]], typeKey = "*", adminCheck = () => false) {
   const state = { doc: null, set(l) { if (this.doc) this.doc.effective = l; } };
   let api = null, panels = {};
   return {
@@ -174,7 +174,7 @@ export function boardPage(page, label, tabs = [["main", "This page"]], typeKey =
     button(getTab = () => tabs[0][0]) {
       return h("button", { class: "btn", type: "button", title: "Choose which cards this page shows, their order and width", onclick: () => {
         if (api) { api.close(); return; }
-        api = startBoard({ page, panels, tabs, getTab, typeKey, typeLabel: label, isAdmin: isAdmin(), state, onClose: () => { api = null; } });
+        api = startBoard({ page, panels, tabs, getTab, typeKey, typeLabel: label, isAdmin: adminCheck(), state, onClose: () => { api = null; } });
       } }, "Customize");
     },
     close() { if (api) api.close(); },

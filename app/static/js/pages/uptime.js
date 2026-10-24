@@ -185,7 +185,7 @@ export async function render(container) {
 
   clear(container);
   container.append(
-    pageHead("Uptime", "Every scan records whether each device answered and how fast. Green = up, red = down. Point at a bar or the line for the time and the response time; the newest is on the right.",
+    pageHead("Uptime", "Every scan, and a quick check every minute for the always-on devices, records whether a device answered and how fast. A bar is green when every check in it passed, red when none did, and in between (yellow, orange) when some were missed. Point at a bar for the time, the number of missed checks and the response time; the newest is on the right.",
       h("div", { class: "up-pickers" },
         scopeTabs(),
         rangeTabs(range, (key) => { range = key; data = null; clear(list); list.append(h("p", { class: "hint" }, "Loading…")); load(); }))),
