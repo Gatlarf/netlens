@@ -227,8 +227,8 @@ function trafficChart() {
     paths[key] = svg("path", { fill: "none", stroke: colour, "stroke-width": 1.6, "vector-effect": "non-scaling-stroke", "stroke-dasharray": dash, "stroke-linejoin": "round" });
     s.appendChild(paths[key]);
   }
-  const top = svg("text", { class: "lbl", x: L + 2, y: 9 }), from = svg("text", { class: "lbl", x: L + 2, y: H - 3 }), to = svg("text", { class: "lbl", x: W - 2, y: H - 3, "text-anchor": "end" });
-  s.append(top, from, to);
+  const top = h("span", { class: "tmax" }), from = h("span", { class: "tfrom" }), to = h("span", { class: "tto" }, "now");      // written in HTML: text inside a stretched drawing would be squashed
+  s.labels = [top, from, to];
   s.update = (data) => {
     const series = { drx: data.devices.rx, dtx: data.devices.tx, wrx: data.wan ? data.wan.rx : [], wtx: data.wan ? data.wan.tx : [] };
     const max = niceMax(Math.max(0, ...Object.values(series).flat().map((p) => p[1])));
@@ -240,7 +240,6 @@ function trafficChart() {
     top.textContent = bps(max);
     const fmt = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
     from.textContent = fmt(t0);
-    to.textContent = "now";
   };
   return s;
 }
@@ -296,7 +295,7 @@ export async function render(container) {
       for (const [k, b] of Object.entries(tBtns)) b.setAttribute("aria-pressed", String(k === tRange));
       traffic();
     } }, key))));
-  const trafficPanel = h("section", { class: "hud-panel hud-traffic" }, h("div", { class: "hud-panel-head" }, h("h3", {}, "Traffic"), tModeSwitch, tSwitch), tLegend, h("div", { class: "hud-tchart" }, tChart), tNote);
+  const trafficPanel = h("section", { class: "hud-panel hud-traffic" }, h("div", { class: "hud-panel-head" }, h("h3", {}, "Traffic"), tModeSwitch, tSwitch), tLegend, h("div", { class: "hud-tchart" }, tChart, ...tChart.labels), tNote);
   const radarBox = h("div", { class: "hud-radar" });
   const radarSvg = radar();
   radarBox.appendChild(radarSvg);
