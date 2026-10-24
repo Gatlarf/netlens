@@ -1,12 +1,14 @@
 // Light / dark switch. The choice is remembered in this browser; without one the system setting applies.
 const KEY = "netlens.theme";
-const ICON = { dark: "☀", light: "☾" }; // shows the mode a click switches to: sun / moon
+const ICON = { dark: "☀", light: "☾", hud: "◈" }; // shows what a click switches to: light is followed by dark, dark by the HUD look, the HUD by light
 
 export function currentTheme() {
   const attr = document.documentElement.getAttribute("data-theme");
   if (attr === "dark" || attr === "light") return attr;
   return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
+
+export const isHud = () => document.documentElement.getAttribute("data-skin") === "hud";
 
 export function isDark() {
   return currentTheme() === "dark";
@@ -20,9 +22,9 @@ export function cssVar(name, fallback = "") {
 function updateButton() {
   const btn = document.getElementById("theme-toggle");
   if (!btn) return;
-  const dark = isDark();
-  btn.textContent = dark ? ICON.dark : ICON.light;
-  const label = dark ? "Switch to light mode" : "Switch to dark mode";
+  const next = isHud() ? "light" : isDark() ? "hud" : "dark";
+  btn.textContent = ICON[next === "light" ? "dark" : next === "dark" ? "light" : "hud"];
+  const label = { light: "Switch to light mode", dark: "Switch to dark mode", hud: "Switch to the HUD look (experiment)" }[next];
   btn.setAttribute("aria-label", label);
   btn.title = label;
 }
@@ -33,9 +35,14 @@ function announce() {
 }
 
 export function setTheme(theme) {
+  const hud = theme === "hud";
+  if (hud) document.documentElement.setAttribute("data-skin", "hud");
+  else document.documentElement.removeAttribute("data-skin");
+  theme = hud ? "dark" : theme;
   document.documentElement.setAttribute("data-theme", theme);
   try {
     localStorage.setItem(KEY, theme);
+    localStorage.setItem("netlens.skin", hud ? "hud" : "");
   } catch (e) {
     // storage unavailable: the choice lasts until the page is closed
   }
@@ -46,7 +53,7 @@ export function initThemeToggle() {
   const btn = document.getElementById("theme-toggle");
   if (!btn) return;
   updateButton();
-  btn.addEventListener("click", () => setTheme(isDark() ? "light" : "dark"));
+  btn.addEventListener("click", () => setTheme(isHud() ? "light" : isDark() ? "hud" : "dark"));
   // while the user has not chosen, follow the system when it changes
   if (window.matchMedia) {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
