@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.193 — 2026-10-24
+
+### Changed
+- ★ **Faster start, especially from the home screen of an iPad.** The scripts and style sheets of the installed app now come from the device itself instead of from the server (they never change within a version), so opening the shortcut no longer waits for dozens of requests; files of older versions are cleaned up automatically. The loading screen also shows a progress bar under the spinner while the files come in.
+
 ## 0.4.192 — 2026-10-24
 
 ### Changed

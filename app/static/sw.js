@@ -17,6 +17,7 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== self.location.origin || NEVER.some((p) => url.pathname.startsWith(BASE + p))) return;
+  if (url.pathname.startsWith(BASE + "v/")) return event.respondWith(immutable(req, url));
   event.respondWith(
     fetch(req)
       .then((res) => {
@@ -29,3 +30,20 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(req).then((hit) => hit || (req.mode === "navigate" ? caches.match("./") : undefined) || Response.error()))
   );
 });
+
+// The files below v/<version>/ never change (a new version has a new address), so they come from the device without asking the server: the
+// app starts without a single request for scripts and styles. Files of older versions are dropped when a new one is stored.
+async function immutable(req, url) {
+  const cache = await caches.open(CACHE);
+  const hit = await cache.match(req);
+  if (hit) return hit;
+  const res = await fetch(req);
+  if (res.ok && res.type === "basic") {
+    const version = url.pathname.slice(BASE.length).split("/")[1];
+    cache.put(req, res.clone()).then(() => cache.keys()).then((keys) => Promise.all(keys.filter((k) => {
+      const p = new URL(k.url).pathname;
+      return p.startsWith(BASE + "v/") && p.slice(BASE.length).split("/")[1] !== version;
+    }).map((k) => cache.delete(k)))).catch(() => {});
+  }
+  return res;
+}
