@@ -14,7 +14,7 @@ const ROUTES = {
   "": "dashboard",
   "#/": "dashboard",
   "#/dashboard": "dashboard",
-  "#/overview": "overview",
+  "#/overview": "dashboard",
   "#/map": "map",
   "#/devices": "devices",
   "#/hierarchy": "hierarchy",

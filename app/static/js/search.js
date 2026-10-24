@@ -4,6 +4,7 @@ import { get } from "./api.js";
 import { h, clear, isAdmin, shortName } from "./util.js";
 
 const PAGES = [
+  ["Version check (CVE)", "#/settings/cvecheck", "vulnerabilities cve nvd versions check settings"],
   ["Dashboard", "#/dashboard", "overview home summary problems attention"],
   ["Map", "#/map", "network map topology layout"],
   ["Devices", "#/devices", "list hosts computers inventory table"],

@@ -82,7 +82,7 @@ def test_start_page_and_menu_groups_are_wired():
         assert f'data-route="{route}"' in index, route
     assert index.count('class="side-group') == 6                       # the side menu: start pages, Network, Monitoring, Analysis, Automation, Configuration
     assert 'class="side-group admin-only"' in index                    # Automation and Configuration are for administrators
-    assert 'data-route="overview"' in index and '"#/overview": "overview"' in app_js
+    assert 'data-route="overview"' not in index and '"#/overview": "dashboard"' in app_js      # the Overview widgets are dashboard cards now
     # the coffee link stays reachable on a small screen: it is in the account menu
     assert index.count("buymeacoffee.com") == 2
 

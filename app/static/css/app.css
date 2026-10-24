@@ -822,3 +822,6 @@ body.side-hidden .sidenav { display: none; }
   .sidenav .nav-link { padding: 12px; font-size: 1rem; }
 }
 #side-links [hidden], .side-group[hidden] { display: none !important; }
+/* a long host name must wrap instead of pushing a table out of its card */
+.card table.data td { overflow-wrap: anywhere; }
+.chg-list { overflow-wrap: anywhere; }

@@ -1,12 +1,8 @@
-// Overview (beta): tabs of widgets, a period switch and a right-hand drawer to add, remove, resize and drag widgets.
-// It reads /api/stats; the layout is kept in this browser (localStorage) for now.
-import { get } from "../api.js";
+// The statistic widgets of the former Overview page: the dashboard offers each of them as a card (ids "ov-<id>"). They draw from /api/stats.
 import { h, timeAgo } from "../util.js";
 import { fmtDuration } from "../charts.js";
 import { barList, columnChart, donut, emptyNote, fmtBytes, fmtNumber, fmtPct, lineChart, tile } from "../charts.js";
 
-const PERIODS = [["1D", "24h"], ["1W", "7d"], ["1M", "30d"]];
-const KEY = "netlens.overview.v1";
 
 
 const devLink = (r) => h("a", { href: `#/device/${r.id}` }, r.name || String(r.id));
@@ -17,7 +13,7 @@ function tbl(headers, rows) {
 const relTable = (list) => tbl(["Device", "Uptime", "Outages"], list.map((r) => [devLink(r), fmtPct(r.uptime), String(r.outages)]));
 
 // every widget: id, title, a hint for the preview in the drawer (line/bars/donut/tiles/table), and how to draw it from /api/stats
-const WIDGETS = [
+export const WIDGETS = [
   { id: "overview", title: "Devices at a glance", kind: "tiles", span: 3, draw: (s) => h("div", { class: "tiles inline" },
     tile(fmtNumber(s.overview.total), "devices"), tile(fmtNumber(s.overview.online), "online", { tone: "good" }), tile(fmtNumber(s.overview.offline), "offline", { tone: s.overview.offline ? "warn" : "" }),
     tile(fmtNumber(s.overview.new_7d), "new in 7 days"), tile(fmtPct(s.overview.online_pct), "online now")) },
@@ -66,144 +62,3 @@ const WIDGETS = [
     : emptyNote("No hypervisor or Docker plugin reports guests.")) },
   { id: "scans", title: "Scans", kind: "tiles", span: 3, draw: (s) => (s.scans ? h("div", { class: "tiles inline" }, ...Object.entries({ total: "scans", ok: "completed", failed: "failed" }).filter(([k]) => s.scans[k] !== undefined).map(([k, l]) => tile(fmtNumber(s.scans[k]), l))) : emptyNote())},
 ];
-const BY_ID = Object.fromEntries(WIDGETS.map((w) => [w.id, w]));
-
-const DEFAULT_TABS = [
-  { id: "summary", name: "Summary", widgets: ["overview", "online", "type", "events", "conn"] },
-  { id: "network", name: "Network", widgets: ["subnet", "vendor", "os", "nodes"] },
-  { id: "wireless", name: "Wireless", widgets: ["signal", "bands", "weakest"] },
-  { id: "apps", name: "Applications", widgets: ["app-tiles", "apps", "app-devices", "traffic-day"] },
-];
-
-function load() {
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) || "null");
-    if (v && Array.isArray(v.tabs) && v.tabs.length) return v;
-  } catch (e) { /* private window */ }
-  return { tabs: DEFAULT_TABS.map((t) => ({ ...t, widgets: [...t.widgets] })), active: "summary", period: "1W" };
-}
-function save(state) {
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
-}
-
-// a tiny sketch of a widget for the drawer, so the choice is visual
-function thumb(kind) {
-  const bars = (n) => h("div", { class: "mk-th mk-th-bars" }, ...Array.from({ length: n }, (_, i) => h("i", { style: `height:${25 + ((i * 37) % 60)}%` })));
-  if (kind === "donut") return h("div", { class: "mk-th mk-th-donut" }, h("i", {}), h("b", {}));
-  if (kind === "list") return h("div", { class: "mk-th mk-th-list" }, ...[90, 70, 45, 30].map((w) => h("i", { style: `width:${w}%` })));
-  if (kind === "table") return h("div", { class: "mk-th mk-th-table" }, ...Array.from({ length: 4 }, () => h("i", {})));
-  if (kind === "tiles") return h("div", { class: "mk-th mk-th-tiles" }, ...Array.from({ length: 4 }, () => h("i", {})));
-  return kind === "line" ? h("div", { class: "mk-th mk-th-line" }, h("i", {})) : bars(14);
-}
-
-export async function render(container) {
-  if (!document.getElementById("overview-css")) {
-    document.head.appendChild(h("link", { id: "overview-css", rel: "stylesheet", href: "css/overview.css" }));
-  }
-  const state = load();
-  let stats = null, drawerOpen = false, loadedPeriod = null;
-  const shell = h("div", { class: "mk" });
-  container.appendChild(shell);
-  const tab = () => state.tabs.find((t) => t.id === state.active) || state.tabs[0];
-
-  async function fetchStats() {
-    const range = PERIODS.find(([k]) => k === state.period)[1];
-    if (loadedPeriod === range && stats) return;
-    stats = await get(`/api/stats?range=${range}`);
-    loadedPeriod = range;
-  }
-
-  const spanOf = (w) => (tab().sizes && tab().sizes[w.id]) || w.span;
-
-  function widgetBox(w) {
-    const body = h("div", { class: "mk-body" });
-    try { body.appendChild(w.draw(stats)); } catch (e) { body.appendChild(emptyNote("Nothing to show yet.")); }
-    const remove = h("button", { class: "mk-x", type: "button", title: "Remove from this tab", "aria-label": "Remove", onclick: () => { tab().widgets = tab().widgets.filter((i) => i !== w.id); save(state); paint(); } }, "\u00d7");
-    const size = h("button", { class: "mk-x", type: "button", title: "Change the width (1, 2 or 3 columns)", "aria-label": "Change the width", onclick: () => {
-      const t = tab(); t.sizes = t.sizes || {}; t.sizes[w.id] = (spanOf(w) % 3) + 1; save(state); paintGrid(); } }, "\u2194");
-    const handle = h("span", { class: "mk-handle", title: "Drag to move", "aria-label": "Drag to move" }, "\u22ee\u22ee");
-    const box = h("section", { class: `mk-card span${spanOf(w)}`, dataset: { id: w.id } }, h("header", {}, handle, h("h3", {}, w.title), size, remove), body);
-    handle.addEventListener("pointerdown", (e) => startDrag(e, box));
-    return box;
-  }
-
-  // drag a widget by its handle (mouse and touch): it follows the pointer, the others make room, the order is saved on release
-  function startDrag(e, box) {
-    if (e.button !== undefined && e.button !== 0) return;
-    e.preventDefault();
-    const rect = box.getBoundingClientRect();
-    const offX = e.clientX - rect.left, offY = e.clientY - rect.top;
-    const ghost = box.cloneNode(true);
-    ghost.classList.add("mk-ghost");
-    ghost.style.width = `${rect.width}px`; ghost.style.height = `${rect.height}px`;
-    document.body.appendChild(ghost);
-    box.classList.add("mk-moving");
-    const place = (x, y) => { ghost.style.left = `${x - offX}px`; ghost.style.top = `${y - offY}px`; };
-    place(e.clientX, e.clientY);
-    const move = (ev) => {
-      place(ev.clientX, ev.clientY);
-      if (ev.clientY < 70) window.scrollBy(0, -18); else if (ev.clientY > innerHeight - 70) window.scrollBy(0, 18);
-      ghost.style.display = "none";
-      const under = document.elementFromPoint(ev.clientX, ev.clientY);
-      ghost.style.display = "";
-      const over = under && under.closest(".mk-card");
-      if (!over || over === box || !grid.contains(over)) return;
-      const kids = [...grid.children];
-      if (kids.indexOf(box) < kids.indexOf(over)) over.after(box); else over.before(box);   // swap places with the widget under the pointer
-    };
-    const up = () => {
-      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
-      ghost.remove(); box.classList.remove("mk-moving");
-      const ids = [...grid.querySelectorAll(".mk-card")].map((c) => c.dataset.id);
-      const rest = tab().widgets.filter((i) => !ids.includes(i));
-      tab().widgets = [...ids, ...rest]; save(state);
-    };
-    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
-  }
-
-  function drawer() {
-    const t = tab();
-    const close = () => { drawerOpen = false; paint(); };
-    const rows = [...WIDGETS].sort((a, b) => Number(t.widgets.includes(b.id)) - Number(t.widgets.includes(a.id))).map((w) => {
-      const box = h("input", { type: "checkbox", id: `mk-w-${w.id}` });
-      box.checked = t.widgets.includes(w.id);
-      box.addEventListener("change", () => {
-        t.widgets = box.checked ? [...t.widgets.filter((i) => i !== w.id), w.id] : t.widgets.filter((i) => i !== w.id);
-        save(state); paintGrid();
-      });
-      return h("label", { class: "mk-opt", for: `mk-w-${w.id}` }, h("span", { class: "mk-opt-title" }, box, w.title), thumb(w.kind));
-    });
-    const del = state.tabs.length > 1 ? h("button", { class: "btn", type: "button", onclick: () => {
-      state.tabs = state.tabs.filter((x) => x.id !== t.id); state.active = state.tabs[0].id; drawerOpen = false; save(state); paint(); } }, "Delete this tab") : null;
-    const reset = h("button", { class: "btn", type: "button", onclick: () => { const d = DEFAULT_TABS.find((x) => x.id === t.id); if (d) { t.widgets = [...d.widgets]; save(state); paint(); } } }, "Defaults");
-    return h("aside", { class: "mk-drawer", "aria-label": "Edit tab" },
-      h("header", {}, h("h2", {}, `Edit ${t.name}`), h("button", { class: "mk-x", type: "button", "aria-label": "Close", onclick: close }, "×")),
-      h("div", { class: "mk-opts" }, ...rows), h("footer", {}, h("button", { class: "btn primary", type: "button", onclick: close }, "Done"), reset, del));
-  }
-
-  let grid = null;
-  function paintGrid() {
-    if (!grid || !stats) return;
-    const ids = tab().widgets.filter((i) => BY_ID[i]);
-    grid.replaceChildren(...(ids.length ? ids.map((i) => widgetBox(BY_ID[i])) : [h("p", { class: "hint mk-empty" }, "This tab is empty. Open the gear and tick the widgets you want.")]));
-  }
-
-  function paint() {
-    const tabs = h("div", { class: "mk-tabs", role: "tablist" }, ...state.tabs.map((t) => h("button", { class: `mk-tab${t.id === state.active ? " on" : ""}`, role: "tab", type: "button", onclick: () => { state.active = t.id; save(state); paint(); } }, t.name)),
-      h("button", { class: "mk-icon", type: "button", title: "Add a tab", "aria-label": "Add a tab", onclick: () => {
-        const name = (prompt("Name of the new tab") || "").trim(); if (!name) return;
-        const id = `t${Date.now()}`; state.tabs.push({ id, name: name.slice(0, 24), widgets: [] }); state.active = id; drawerOpen = true; save(state); paint(); } }, "+"),
-      h("button", { class: "mk-icon", type: "button", title: "Choose the widgets of this tab", "aria-label": "Edit tab", onclick: () => { drawerOpen = !drawerOpen; paint(); } }, "⚙"));
-    const period = h("div", { class: "mk-period", role: "group", "aria-label": "Period" }, ...PERIODS.map(([k]) => h("button", { class: k === state.period ? "on" : "", type: "button", onclick: async () => { state.period = k; save(state); await fetchStats().catch(() => {}); paint(); } }, k)));
-
-    grid = h("div", { class: "mk-grid" });
-    const main = h("div", { class: "mk-main" }, h("div", { class: "mk-bar" }, tabs, period), h("p", { class: "mk-note" }, "Beta: drag the grip of a widget to move it, use \u2194 to change its width. Your tabs and widgets are kept in this browser only."), grid);
-    shell.className = `mk${drawerOpen ? " with-drawer" : ""}`;
-    shell.replaceChildren(main, ...(drawerOpen ? [drawer()] : []));
-    paintGrid();
-  }
-
-  shell.appendChild(h("p", { class: "hint" }, "Loading…"));
-  try { await fetchStats(); } catch (e) { shell.replaceChildren(h("p", { class: "error" }, e.message || "Could not load")); return; }
-  paint();
-}

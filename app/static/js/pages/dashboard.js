@@ -10,6 +10,7 @@ import { layoutHorizontal } from "../layout_horizontal.js";
 import { buildHealthCard, healthTone } from "../cards/health_map.js";
 import { buildCapacityCard, capacityTone } from "../cards/capacity.js";
 import { snoozeMenu, snoozedList } from "../snooze.js";
+import { WIDGETS as STAT_WIDGETS } from "./overview.js";
 
 const REFRESH_MS = 30000;
 const KINDS = {
@@ -40,9 +41,9 @@ const CARDS = [
         pair(core.uptime),
         h("div", { class: "d-mini" }, `All devices: ${fmtPct(all["24h"])} · ${fmtPct(all["7d"])} · ${fmtPct(all["30d"])}`)] });
     } },
-  { id: "speed", title: "Internet speed", href: "#/speedtest", size: "s", def: true, about: "The latest internet speed test: download, upload and delay.", show: (d) => !!d.speed,
+  { id: "speed", title: "Internet speed", href: "#/speedtest", size: "s", about: "The latest internet speed test: download, upload and delay.", show: (d) => !!d.speed,
     build: ({ speed: s }) => big(s.down_mbps >= 1000 ? `${(s.down_mbps / 1000).toFixed(2)} Gbps` : `${Math.round(s.down_mbps)} Mbps`, `down · up ${Math.round(s.up_mbps)} Mbps · ping ${Math.round(s.latency_ms)} ms`, { extra: h("div", { class: "d-mini" }, timeAgo(s.ts)) }) },
-  { id: "flapping", title: "Unstable devices", href: "#/uptime", size: "s", about: "Devices that keep going up and down: the always-on ones and the others apart, and the least reliable ones.",
+  { id: "flapping", title: "Unstable devices", href: "#/uptime", size: "s", def: true, about: "Devices that keep going up and down: the always-on ones and the others apart, and the least reliable ones.",
     tone: (d) => ((d.summary.core && d.summary.core.devices ? d.summary.core.flapping : d.summary.devices.flapping) ? "warn" : "ok"),
     build: ({ summary: s, worst }) => {
       const core = s.core && s.core.devices ? s.core : null, others = s.devices.flapping - (core ? core.flapping : 0);
@@ -66,13 +67,19 @@ const CARDS = [
       return big(`${ctr.running} / ${ctr.total}`, `containers running on ${plural(s.guests.hosts, "host")}`, {
         extra: [h("div", { class: "d-mini" }, `${vms.running} / ${vms.total} virtual machines and LXCs running`), warn] });
     } },
-  { id: "guestbackups", title: "Guest backups", href: "#/backups", size: "s", about: "Which guests have a backup, and whether the newest ones worked (needs a backup plugin).",
+  { id: "guestbackups", title: "Guest backups", href: "#/backups", size: "s", def: true, about: "Which guests have a backup, and whether the newest ones worked (needs a backup plugin).",
     show: (d) => !!(d.summary.guest_backups && d.summary.guest_backups.configured),
     tone: (d) => { const g = d.summary.guest_backups; return g.failed ? "bad" : g.late || g.unprotected || g.stores_at_risk ? "warn" : "ok"; },
     build: ({ summary: s }) => { const g = s.guest_backups;
       const notes = [g.failed ? `${g.failed} failed` : null, g.late ? `${g.late} late` : null, g.unprotected ? `${g.unprotected} without a backup` : null, g.stores_at_risk ? `${g.stores_at_risk} store filling up` : null].filter(Boolean);
       return big(`${g.protected} / ${g.guests}`, "guests have a backup", { extra: [h("div", { class: `d-mini${notes.length ? " d-warn" : ""}` }, notes.length ? notes.join(" · ") : "all up to date"),
         g.newest ? h("div", { class: "d-mini" }, `newest backup ${timeAgo(g.newest)}`) : null] }); } },
+  { id: "storage", title: "Storage", href: "#/storage?focus=problems", size: "s", def: true, about: "Your storage systems: health, the fullest pool, failed disks and open alerts (needs a storage plugin).",
+    show: (d) => !!(d.summary.storage && d.summary.storage.configured),
+    tone: (d) => { const g = d.summary.storage; return g.unhealthy || g.failed_disks ? "bad" : g.pools_filling || g.alerts ? "warn" : "ok"; },
+    build: ({ summary: s }) => { const g = s.storage;
+      const notes = [g.unhealthy ? `${g.unhealthy} not healthy` : null, g.failed_disks ? `${g.failed_disks} failed disk${g.failed_disks === 1 ? "" : "s"}` : null, g.pools_filling ? `${g.pools_filling} pool${g.pools_filling === 1 ? "" : "s"} filling up` : null, g.alerts ? `${g.alerts} alert${g.alerts === 1 ? "" : "s"}` : null].filter(Boolean);
+      return big(`${g.systems - g.unhealthy} / ${g.systems}`, `storage system${g.systems === 1 ? "" : "s"} healthy`, { extra: [h("div", { class: `d-mini${notes.length ? " d-warn" : ""}` }, notes.length ? notes.join(" · ") : `${g.pools} pools · ${g.disks} disks · all fine`)] }); } },
   { id: "sites", title: "Sites & certificates", href: "#/stats", size: "s", about: "Reverse-proxy sites and when their certificates end.",
     show: (d) => d.summary.sites.total > 0,
     tone: (d) => (d.summary.sites.down || d.summary.sites.certificates_expired ? "bad" : d.summary.sites.certificates_expiring ? "warn" : "ok"),
@@ -108,7 +115,7 @@ const CARDS = [
       ["Failed sign-in bursts (24 h)", lf, lf ? "warn" : ""], ["Unknown devices", s.devices.unknown, s.devices.unknown ? "warn" : ""],
       ["New devices (7 days)", s.devices.new_7d], ["Update", s.update.available ? s.update.latest : "up to date", s.update.available ? "warn" : ""],
     ]) },
-  { id: "infra", title: "Infrastructure", href: "#/devices", size: "s", def: true, about: "Containers, virtual machines, proxy sites and certificates, plugins and backups in one card.",
+  { id: "infra", title: "Infrastructure", href: "#/devices", size: "s", about: "Containers, virtual machines, proxy sites and certificates, plugins and backups in one card.",
     show: (d) => d.summary.containers.total + d.summary.guests.total + d.summary.sites.total > 0 || d.summary.plugins.some((p) => p.enabled),
     tone: (d) => { const s = d.summary, g = s.guest_backups, on = s.plugins.filter((p) => p.enabled);
       return s.sites.down || s.sites.certificates_expired || on.some((p) => p.ok === false) || (g && g.failed) || s.backup.last_ok === false ? "bad"
@@ -150,12 +157,12 @@ const CARDS = [
     build: ({ events }) => (events.length ? h("ul", { class: "d-events" }, events.slice(0, 8).map((e) => h("li", {},
       h("span", { class: "d-time" }, timeAgo(e.ts)), h("span", { class: "d-kind" }, kindText(e.kind)),
       e.device_id ? h("a", { href: `#/device/${e.device_id}` }, shortName(e.device) || `device ${e.device_id}`) : null))) : emptyNote("No events yet.")) },
-  { id: "minimap", title: "Map", href: "#/map", size: "f", def: true, about: "A small picture of your network. Click it to open the full map.", tall: true, build: null },
+  { id: "minimap", title: "Map", href: "#/map", size: "f", about: "A small picture of your network. Click it to open the full map.", tall: true, build: null },
 
   // not on the default dashboard, added by the user
-  { id: "worst", title: "Least reliable devices", href: "#/uptime", size: "s", about: "The five devices that were down most in the last 7 days.",
+  { id: "worst", title: "Least reliable devices", href: "#/uptime", size: "s", def: true, about: "The five devices that were down most in the last 7 days.",
     build: ({ worst }) => (worst.length ? barList(worst.map((w) => ({ label: shortName(w.name), count: Math.round(100 - w.pct), href: `#/device/${w.id}` })), { unit: "% down" }) : emptyNote("Every device was up all week.")) },
-  { id: "trend", title: "Devices online, 14 days", href: "#/stats", size: "w", about: "How many devices were online, day by day.",
+  { id: "trend", title: "Devices online, 14 days", href: "#/stats", size: "w", def: true, about: "How many devices were online, day by day.",
     build: ({ trend }) => lineChart(trend.map((t) => ({ x: t.day.slice(5), online: t.online, total: t.devices })), [{ key: "online", label: "Online" }, { key: "total", label: "Known" }], { height: 130 }) },
   { id: "eventsday", title: "Events per day", href: "#/scans", size: "w", about: "How busy the network was, 14 days.",
     build: ({ trend }) => (trend.length ? columnChart(trend.map((t) => ({ x: t.day.slice(5), v: t.events })), { height: 90 }) : emptyNote()) },
@@ -187,8 +194,13 @@ const CARDS = [
       h("button", { class: "btn primary", type: "button", onclick: () => document.getElementById("scan-quick")?.click() }, "Quick scan"),
       h("button", { class: "btn", type: "button", onclick: () => document.getElementById("scan-deep")?.click() }, "Deep scan")) },
 ];
+// The statistic widgets of the former Overview page are cards too (last 7 days, drawn from /api/stats); they are not on the default dashboard.
+for (const w of STAT_WIDGETS) {
+  CARDS.push({ id: `ov-${w.id}`, title: w.title, size: w.span >= 3 ? "f" : w.span === 2 ? "w" : "s", about: "A statistic over the last 7 days.", stat: true,
+    show: (d) => !!d.stats, build: (d) => h("div", { class: "mk-body" }, w.draw(d.stats)) });
+}
 const TYPE_ABOUT = { value: "A value from your data", device: "A device", group: "A group of devices", service: "A service check", notes: "Notes and links" };
-const FIRST_VIEW = ["devices", "uptime", "services", "speed", "attention", "health", "infra", "vulns", "capacity", "events", "minimap"];   // the order a new installation starts with
+const FIRST_VIEW = ["attention", "devices", "uptime", "services", "health", "flapping", "storage", "guestbackups", "vulns", "events", "worst", "trend", "capacity"];   // the order a new installation starts with
 const DEFAULT_ORDER = [...FIRST_VIEW.filter((id) => CARDS.some((c) => c.id === id && c.def)), ...CARDS.filter((c) => c.def && !FIRST_VIEW.includes(c.id)).map((c) => c.id)];
 
 // ---------- the chosen layout (per user, kept on the server so every browser and device shows the same dashboard) ----------
@@ -561,8 +573,17 @@ export async function render(container) {
     pool.append(h("h2", {}, "Add a card"), free.length ? h("div", { class: "pool-list" }, free.map((c) => poolItem(c))) : h("p", { class: "hint" }, "All cards are on your dashboard."));
   }
 
+  let statsLoading = false;
+  function needStats() {
+    if (data.stats || statsLoading || !order.some((id) => id.startsWith("ov-"))) return;
+    statsLoading = true;
+    if (!document.getElementById("overview-css")) document.head.appendChild(h("link", { id: "overview-css", rel: "stylesheet", href: "css/overview.css" }));
+    get("/api/stats?range=7d").then((st) => { data.stats = st; if (!disposed) draw(); }).catch(() => {}).finally(() => { statsLoading = false; });
+  }
+
   function draw() {
     if (!data) return;
+    needStats();
     drawHeader();
     clear(grid);
     grid.classList.toggle("editing", editing);
@@ -586,7 +607,9 @@ export async function render(container) {
         Promise.all([get("/api/monitors"), get("/api/monitoring/limits")]).then(([m, l]) => ({ monitors: m.monitors || [], problems: m.problems || [], rules: l.rules || {} }), () => null),   // an older server or no access: the card simply does not show
         get("/api/forecast").catch(() => null),
       ]);
+      const keepStats = data && data.stats;
       data = main;
+      if (keepStats) data.stats = keepStats;
       data.health = health;
       data.capacity = capacity;
       if (!disposed && !(editing && grid.children.length)) draw();

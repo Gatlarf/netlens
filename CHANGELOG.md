@@ -2,6 +2,16 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.199 — 2026-10-24
+
+### Changed
+- ★ **A dashboard that is about monitoring.** The default dashboard now starts with what needs attention, then devices online, uptime, services, health, unstable devices, your storage and backups (when you have them), vulnerabilities, recent events, the least reliable devices, the 14-day trend and the capacity forecast. The map, the internet speed and the infrastructure summary are still available as cards but are no longer there by default; a layout you arranged yourself is not touched. A new Storage card shows the health of your storage systems and links to the problems.
+- **The Overview page is part of the dashboard.** All its statistics (devices by type, vendors, Wi-Fi, applications, traffic, availability, internet speed and more) are cards you can add to the dashboard with Customize, and the separate Overview page and its menu item are gone (an old link opens the dashboard).
+- **Settings in one place.** The setting of the version check against the CVE list moved from the Vulnerabilities page to Settings → Version check; the Vulnerabilities page starts with the results and links to it.
+
+### Fixed
+- Long host names no longer push tables and the "What changed" list out of their frame (a sideways scroll bar on Statistics and What changed).
+
 ## 0.4.197 — 2026-10-24
 
 ### Added

@@ -28,6 +28,7 @@ import { buildAuditCard } from "../cards/audit.js";
 import { buildUsersCard } from "../cards/users.js";
 import { buildSharesCard } from "../cards/shares.js";
 import { buildNetchecksCard } from "../cards/netchecks.js";
+import { buildCveCheckCard } from "../cards/cve_check.js";
 import { buildGroupsCard } from "../cards/groups.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 import { buildPassiveCard } from "../cards/passive.js";
@@ -231,6 +232,7 @@ const STATIC_GROUPS = [
       { key: "schedule", label: "Scan schedule", build: buildScheduleCard },
       { key: "netchecks", label: "Network checks", build: buildNetchecksCard },
       { key: "ipv6", label: "IPv6", build: buildIpv6Card },
+      { key: "cvecheck", label: "Version check (CVE)", build: () => buildCveCheckCard() },
       { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
     ],
   },
