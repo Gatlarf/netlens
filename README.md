@@ -30,6 +30,11 @@ Self-hosted LAN scanner and network map. Runs as a single Docker container.
   - [Cancelling a scan](#cancelling-a-scan)
   - [Version](#version)
   - [Uptime history](#uptime-history)
+  - [Quick checks between scans](#quick-checks-between-scans)
+  - [Importance: critical, normal or low](#importance-critical-normal-or-low)
+  - [Reliability and monitoring coverage](#reliability-and-monitoring-coverage)
+  - [Storage systems](#storage-systems)
+  - [Arranging the pages](#arranging-the-pages)
   - [E-mail notifications](#e-mail-notifications)
   - [Known and unknown devices](#known-and-unknown-devices)
   - [Device identification](#device-identification)
@@ -117,6 +122,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - **Performance graphs** (response time and availability for up to a year) and **health monitoring** of switches, NAS boxes, printers, UPS units, Windows (SNMP) and Linux (SSH): processor, memory, disks, traffic, temperature, supplies and battery, with limits that raise warnings
 - **IPv6 (optional)**: the IPv6 addresses of your devices, found without sweeping, shown on the device page; **Network health** (Analysis) says in plain words whether IPv4 and IPv6 work: gateway, DNS, DHCP, duplicate addresses, full ranges, prefixes, router, internet, which devices answer
 - **Remote sites**: several locations in one overview; a Netlens at each location reports to a central one (outgoing connection only), with devices, checks, health, graphs and alerts per site
+- Quick checks every minute between the scans for the always-on devices, so an outage shows in about three minutes; bars that turn from green to red by how much of their time was missed; importance (critical, normal, low) for devices and services; reliability figures (outages, time to recover, availability against a target) and a monitoring coverage report; storage systems (NAS, SAN, Ceph, server hardware) from plugins; every page of cards can be arranged and given templates.
 - Uptime history like Uptime Kuma: heartbeat bars with a response-time line, 24 h / 7 d / 30 d, hover details, and **always-on (core) devices** whose availability is shown apart from phones and tablets
 - Alerts by e-mail, ntfy, Telegram, Discord, Pushover or webhook, each channel with its own events and an on/off switch per device
 - Plugins for hypervisors and routers, each switchable on and off, with an upload for your own: nothing is built in: Proxmox VE, ASUS AiMesh, Home Assistant, TP-Link Omada, UniFi and many more are installed from the plugin store (which VM runs on which host, which device is connected to which mesh node, which smart-home devices exist)
@@ -557,6 +563,39 @@ The header shows the running version. It is `<major.minor from the VERSION file>
 
 After every scan Netlens records, for each device inside the scanned ranges, whether it answered (and its response time when nmap reports one). The **Uptime** page shows a heartbeat bar per device (green = up, red = down, newest on the right) with 24 hour and 7 day uptime, like Uptime Kuma. Each device page has a larger bar, 24 h / 7 d / 30 d uptime, average response time, how long the current state has lasted, and a response-time graph. History is kept for 90 days. The resolution is your scan interval (15 minutes by default); shorten it under Settings for finer detail.
 
+### Quick checks between scans
+
+A scan (every 15 minutes by default) finds and describes devices, and it is slow. If it were the only thing that says whether a device is up, an outage could go unnoticed for a quarter of an hour. So Netlens also asks the **always-on devices** whether they are still there, about **once a minute**: one nmap host discovery for all of them (ARP on the local network, ICMP and TCP probes behind a router). Every answer is recorded like a scan result, so the uptime figures, the bars and the response-time graphs get one measurement a minute.
+
+- **Offline after a few misses.** One lost answer is not an outage. A device is marked offline after **three missed answers in a row** (about three minutes) and back online at its first answer; both raise the usual events and alerts.
+- **Settings → Scan schedule:** the time between quick checks (15 to 3600 seconds, 0 switches them off), the number of misses, and whether only the always-on devices or every device on the network is asked. By default a phone that sleeps for ten minutes is left to the scans.
+- **Only devices inside the scanned ranges** are asked, and no quick check runs while a scan is running.
+- **Service checks** (web, port, DNS, certificate) already had their own interval, one minute by default (15 seconds at the shortest). They are not part of this.
+- **Storage.** The rows of quick checks are kept for three days; the hourly roll-up keeps their counts for good, so 30 day and 7 day percentages stay exact. The flapping detection, the monthly report and the scan statistics keep working on scans.
+- **Partly missed bars.** A bar that stands for several checks (a slice of 15 minutes, or of a day) is coloured on a scale from green to red by the share that failed, so one lost check in fifteen is yellow-green, half is orange and all is red. The tooltip says how many failed. The service bars show the last 24 hours in 60 slices the same way.
+
+### Importance: critical, normal or low
+
+Every device (its Settings tab, *Importance*) and every service check can be marked **critical**, **normal** (the default) or **low**. A critical problem leads the *Needs attention* list on the dashboard with a "Critical:" label; a low-importance problem is shown as a warning instead of an alarm. Each **alert channel** has a *How important* filter (every device and service, not the ones marked low, or only the critical ones), so a critical outage can wake a phone while the rest goes to e-mail. The importance is stored with each event, so the history shows what mattered at the time.
+
+### Reliability and monitoring coverage
+
+The **Reliability** card on the dashboard (and `GET /api/reliability`) answers the questions an operations team reports on, for the devices that matter (always-on or critical) and your service checks: how many outages in the last 30 days, the **average time to recover (MTTR)** and the longest outage, the **availability against a target** (Settings → Reliability target, 99.5% by default), how long a problem can go unnoticed (the quick-check interval times the number of misses) and the quality of the alerts: the share of outages that cleared within five minutes (noise), how many were held back by maintenance windows and how many escalations were acknowledged.
+
+**Insights → Monitoring coverage** (`GET /api/coverage`) lists, for every device marked always-on or critical, what does not watch it yet: a quick check, a service check, a health monitor, a backup (virtual machines and containers) or alerts for it going offline, and warns when no alert channel is switched on. Nothing changes by itself: it tells you where an outage would go unnoticed.
+
+When a switch or host is offline, the always-on devices behind it are **one problem, not many**: the dashboard says that the device is not answering and how many always-on devices behind it cannot be reached, and the Uptime page marks them "unreachable · behind ...". Alert messages group them the same way.
+
+### Storage systems
+
+A **storage plugin** (TrueNAS, Synology, QNAP, OpenMediaVault, Unraid, Rockstor, UGREEN, NetApp ONTAP, Ceph, Redfish for server hardware) reports a storage system with its controllers, pools, volumes, disks and open alerts, and any other kind of plugin can add the same data next to what it reports. The **Storage** page lists the systems on one line each (state, fullest pool, pools, volumes, disks, alerts); click a line for its details. Netlens finds the system and its controllers on the network by address or MAC, links the hosts that use a volume (NFS clients, iSCSI initiators) to their devices, shows who uses which volume on the device page, and raises events when a system, pool or disk becomes unhealthy or a pool reaches 85% and 95% (the first sync is silent). Problems on the dashboard lead to the affected system, already expanded.
+
+### Arranging the pages
+
+Every page of cards can be arranged: the **dashboard**, the **device page** (each tab), **Statistics**, **Insights**, **Network health**, **Vulnerabilities** and the page of a **remote site**. Press **Customize**: a drawer on the right lists every card with a tick box and a small picture (tick to show, untick to hide), and each card gets a grip to drag it anywhere (touch works too), a **↔** button that makes it narrow, wide or full width, and a **✕** to remove it. Changes are saved on the server as you make them, per user (so every browser and iPad shows the same), and on the device page per device type, so Windows devices can look different from switches. An administrator can use the arrangement as the starting point for everybody (the dashboard default, or a **template** for one device type or for all devices); everybody can still change it for themselves and press *Reset* to go back.
+
+**The menu shows what you use.** Backups, Storage, Smart home, Vulnerabilities, DNS and Remote sites appear in the menu once a plugin of that kind is switched on or the page already has data; an administrator gets a *+ More features* link to the Plugin store. Direct links and search keep working.
+
 ### E-mail notifications
 
 E-mail is a notification channel like the others.
@@ -784,6 +823,7 @@ Safety is the point of the design: Netlens only changes records it created itsel
 
 - **Ask your network**: type a question ("what is wrong right now?", "which disks are filling up?") or pick a ready-made one. *Answer with* chooses the built-in logic, the language model or automatic. The language model can only read Netlens's data through fixed read-only tools; it cannot change anything. At the bottom of the card are the note on the connected model, **Check the model** (six small exams) and the switch that lets the model word answers and incident summaries.
 - **Only what matters, by default.** Answers, incidents and unusual readings are about the devices you marked **always-on** (and about services and network problems), so a phone or tablet going offline does not make the network look worse. The tick box **Include phones, tablets and other devices that come and go** brings everything back (the choice is remembered in your browser). Asking about a device by name or kind always works, and new devices are always shown. If no device is marked always-on yet, the infrastructure kinds (routers, switches, servers, NAS, VMs, cameras, printers) stand in until you mark some.
+- **Questions it can answer** now include storage ("how is my storage doing?"), reliability ("what was the mttr?", "did we meet the target?"), monitoring coverage ("what is not monitored yet?") and flapping ("which devices keep going up and down?"), with the built-in logic and with a language model.
 - **Incidents** of the last seven days: alerts that belong together, with the probable cause from the network hierarchy.
 - **Predictions.** A disk gets a "full in about N days" date from a straight-line estimate. Memory is only called a leak when the daily medians of the last 60 days follow a steady straight line for at least a week; memory that levels off (a cache that fills), is given back now and then (restarts, clean-ups) or moves irregularly gets no date and is only mentioned when it is nearly full.
 
@@ -798,6 +838,8 @@ A larger model from one of the big providers writes clearly better answers and r
 ### AI report
 
 **Reports → AI report** answers "what happened, and how does it hang together?" for the last 6 hours, 24 hours, 3 days or 7 days. Netlens finds the connections itself and numbers them as findings (F1, F2 ...), strongest first:
+
+The report also covers the state of the newer parts of Netlens: **storage** (unhealthy systems, full pools, failed disks, open alerts), **reliability** against your target, always-on devices that really **flap** (outages, not lost packets), failed or late **backups**, exploited **vulnerabilities** and **gaps in what is watched**; an incident on a device marked **critical** is always a strong finding and says so. These come after what happened in the period.
 
 - **Strong**: alerts that belong to one incident, where a device higher in the network hierarchy went wrong first and the devices behind it followed.
 - **Likely**: several devices that went wrong together and all sit behind the same switch or host, which itself reported nothing (a possible cause); a problem that came back three times or more, with the hour it usually happens.
@@ -998,7 +1040,7 @@ While a scan runs, the header shows what it is doing, for example `Deep scan · 
 
 ### Quick scans
 
-- Runs every 15 minutes (`NETLENS_QUICK_INTERVAL`)
+- Runs every 15 minutes (`NETLENS_QUICK_INTERVAL`); between two quick scans the always-on devices are pinged about once a minute
 - Uses `nmap -T3` with top 100 TCP ports
 - Host discovery via ARP and ping
 
@@ -1029,6 +1071,8 @@ While a scan runs, the header shows what it is doing, for example `Deep scan · 
 A device that flaps is not always faulty: it may only stop answering Netlens. The **Stability** section of the Uptime card on the device page (administrators; click the arrow to expand it, the page stops refreshing while it is open) has an **Investigate** button that reads the scan history of the last 1-30 days and reports how often and for how long the device is missed, whether the devices behind it stayed online during its gaps (then it is running and merely not answering the probes; this needs the devices behind it to have it as their *Network position* parent), whether other devices were missed at the same moments (a scan problem rather than a device problem), whether it drops at a regular interval or at a certain time of day, and whether it slows down before it drops. **Run live test** then asks the device 8 times by ARP, ping and TCP, runs a real quick scan of just that device, and shows which probe goes unanswered: a device that answers ARP only now and then is the typical cause of a switch or access point that seems to flap while traffic through it is fine. It also checks the **address**: a device that keeps changing its address, or that answers on two addresses with the same MAC at the same time (a fixed address plus a DHCP lease, or a container or VM that shares a MAC), is flagged with the likely cause, because Netlens keeps one entry per MAC and would otherwise show it switching addresses at every scan.
 
 ### Offline marking
+
+Between scans the always-on devices are asked about once a minute (see *Quick checks between scans*); such a device is marked offline after three missed answers in a row and online again at its first answer.
 
 A device that was online and is not seen by a scan is asked for once more on its own (a short `nmap -sn` with retries) before it is marked offline, because a big sweep gives up on devices that answer late. *Settings → Scan performance → Look again before marking a device offline* switches this off.
 

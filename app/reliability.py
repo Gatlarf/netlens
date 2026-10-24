@@ -13,7 +13,7 @@ import sqlite3
 import statistics
 from datetime import datetime, timedelta, timezone
 
-from app.db import get_setting, set_setting, utcnow
+from app.db import Error as db_Error, get_setting, set_setting, utcnow
 
 TARGET_KEY = "reliability.target"
 DEFAULT_TARGET = 99.5
@@ -121,7 +121,7 @@ def build(conn: sqlite3.Connection, days: int = 30, now: str | None = None) -> d
     try:
         acked = conn.execute("SELECT COUNT(*) FROM escalation_state WHERE acked_at IS NOT NULL AND acked_at >= ?", (since,)).fetchone()[0]
         escalated = conn.execute("SELECT COUNT(*) FROM escalation_state WHERE sent_at IS NOT NULL AND sent_at >= ?", (since,)).fetchone()[0]
-    except sqlite3.Error:
+    except db_Error:
         acked = escalated = 0
     return {
         "days": days, "target": target(conn), "watching": {"devices": len(matter), "services": len(svc_names)},
