@@ -20,6 +20,9 @@ function scan(root) {
   for (const b of root.querySelectorAll("button.btn, a.btn")) fix(b);
 }
 
+// The same touch-up for freshly built content that is not on the page yet (util.js patch() compares it with what is on screen).
+export function decorate(root) { scan(root); }
+
 export function initActions() {
   scan(document.body);
   new MutationObserver((records) => {

@@ -268,9 +268,9 @@ function openLoginDialog() {
   if (dialog && !dialog.open) {
     dialog.showModal();
   }
-  const tokenInput = el("#login-token");
-  if (tokenInput) {
-    tokenInput.focus();
+  const first = el(loginByUser ? "#login-user" : "#login-token");
+  if (first) {
+    first.focus();
   }
 }
 
@@ -297,7 +297,7 @@ function clearLoginError() {
   }
 }
 
-let loginByUser = false;
+let loginByUser = true;                 // a user name and password is the normal way in; the access token stays as the second choice
 
 function setLoginMode(byUser) {
   loginByUser = byUser;

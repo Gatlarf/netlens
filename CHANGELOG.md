@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.229 — 2026-10-24
+
+### Added
+- ★ **A HUD look and a live HUD page.** The theme button now goes light, dark, HUD. The HUD look puts neon colours, cut corners, glow and scanlines on the dark theme for every page. The new HUD page (menu) fills the window without scrolling: ring gauges for devices, services and availability, a radar with every device as a blip (offline ones pulse red, critical ones sit near the centre), the events as they arrive, what needs attention, and a ticker of service response times.
+
+### Changed
+- ★ **Pages no longer flicker when they refresh.** A refresh used to empty a page and build it again, which restarted animations, repainted graphs and could lose a hovered or opened item. Now only what changed is replaced: the Dashboard, Uptime, Devices, Health, Services and Scans pages update in place, and Storage, Backups, Statistics, Smart home, Remediation, What changed, Hierarchy, Remote sites and the device page leave the screen alone when nothing changed. The radar and ticker of the HUD keep running.
+- The sign-in screen asks for a user name and password first; the access token is the second choice behind a link.
+
 ## 0.4.225 — 2026-10-24
 
 ### Changed

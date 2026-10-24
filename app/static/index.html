@@ -140,12 +140,12 @@
   <dialog id="login-dialog">
     <form id="login-form" method="dialog">
       <h2>Sign in</h2>
-      <div id="login-token-fields">
+      <div id="login-token-fields" hidden>
         <p>Enter the access token configured in NETLENS_TOKEN.</p>
         <label for="login-token">Access token</label>
         <input id="login-token" type="password" autocomplete="current-password">
       </div>
-      <div id="login-user-fields" hidden>
+      <div id="login-user-fields">
         <label for="login-user">User name</label>
         <input id="login-user" type="text" autocomplete="username">
         <label for="login-password">Password</label>
@@ -155,7 +155,7 @@
       <p id="login-demo" class="hint" hidden></p>
       <p id="login-error" class="error" hidden></p>
       <button class="btn primary" type="submit">Sign in</button>
-      <button id="login-switch" class="btn ghost" type="button">Sign in with a user name instead</button>
+      <button id="login-switch" class="btn ghost" type="button">Sign in with the access token instead</button>
     </form>
   </dialog>
 

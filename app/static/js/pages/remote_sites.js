@@ -238,11 +238,15 @@ export async function render(container) {
   const form = h("div", {});
   container.append(top, form, body);
 
-  async function showList() {
+  let listSig = "";
+  async function showList(quiet = false) {
     const id = queryId();
     if (id) return showDetail(id);
     const probes = await get("/api/probes");
     if (disposed) return;
+    const sig = JSON.stringify(probes);
+    if (quiet && sig === listSig) return;               // nothing changed: the page stays as it is
+    listSig = sig;
     clear(top); clear(body);
     const add = h("button", { class: "btn primary admin-only", type: "button" }, "Add a remote site");
     add.addEventListener("click", () => newSiteForm());
@@ -521,7 +525,7 @@ export async function render(container) {
   async function refresh() {
     if (disposed || form.firstChild) return;      // a form or token that is open is left alone
     try {
-      await showList();
+      await showList(true);
     } catch (err) {
       if (!disposed) toast("Failed to load the remote sites", "error");
     }

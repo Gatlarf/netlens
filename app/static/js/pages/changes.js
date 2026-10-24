@@ -117,7 +117,7 @@ export async function render(container) {
   async function load() {
     try {
       const next = await get(`/api/changes?period=${period}${category ? `&category=${category}` : ""}${core ? "&always_on=1" : ""}`);
-      const sig = `${period}|${category}|${core}|${JSON.stringify(next)}`;      // the choices are part of it: a click on a chip always redraws
+      const sig = `${period}|${category}|${core}|${JSON.stringify(next, (k, v) => (k === "since" ? undefined : v))}`;      // the choices are part of it: a click on a chip always redraws
       if (sig === lastSig && data) return;          // nothing new since the last look
       lastSig = sig;
       data = next;

@@ -391,10 +391,14 @@ export async function render(container, params) {
   });
   const groupLegend = h("div", { class: "legend group-legend" });
   // the group choices and the colour key follow the groups that are in use
+  let groupKey = "";
   function fillGroups(nodes) {
     const seen = new Map();
     for (const n of nodes) if (n.group_id != null) seen.set(n.group_id, { name: n.group, color: n.group_color });
     const keep = groupFilter;
+    const key = JSON.stringify([...seen]);
+    if (key === groupKey) return;                    // the same groups: the choices are left alone
+    groupKey = key;
     clear(groupSelect);
     groupSelect.appendChild(h("option", { value: "All" }, "All groups"));
     for (const [id, g] of [...seen].sort((a, b) => a[1].name.localeCompare(b[1].name))) groupSelect.appendChild(h("option", { value: String(id) }, g.name));

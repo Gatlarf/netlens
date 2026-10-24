@@ -1,3 +1,5 @@
+import { decorate } from "./actions.js";
+
 export function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
 
@@ -50,17 +52,21 @@ export function patch(parent, ...nodes) {
     if (node instanceof DocumentFragment) incoming.push(...node.childNodes); else incoming.push(node);
   }
   // what an element looks like, leaving out what fills in later by itself (marked data-live: a graph that loads when a row is opened)
+  // (and what the page adds to tables by itself afterwards: the grips to resize a column and the widths that go with them)
+  const DECO = [[/<span class="col-grip"[^>]*><\/span>/g, ""], [/<(table|th)\b[^>]*>/g, (tag) => tag.replace(/ style="[^"]*"/, "").replace(/ resizable/, "")]];
+  const plain = (html) => DECO.reduce((t, [re, to]) => t.replace(re, to), html);
   const sig = (el) => {
-    if (!el.querySelector || !el.querySelector("[data-live]")) return el.outerHTML;
+    if (!el.querySelector || !el.querySelector("[data-live]")) return plain(el.outerHTML);
     const copy = el.cloneNode(true);
     for (const live of copy.querySelectorAll("[data-live]")) live.textContent = "";
-    return copy.outerHTML;
+    return plain(copy.outerHTML);
   };
+  const KEEP = (el, name) => name === "data-action-checked" || ((el.tagName === "TABLE" || el.tagName === "TH") && (name === "style" || name === "class"));
   // inside an element marked data-morph (a table of readings, for instance) a change is made in place: the same rows and cells stay, only the text or attribute that differs changes
   const morph = (a, b) => {
-    for (const at of [...a.attributes]) if (!b.hasAttribute(at.name)) a.removeAttribute(at.name);
-    for (const at of [...b.attributes]) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
-    const old = [...a.childNodes], fresh = [...b.childNodes];
+    for (const at of [...a.attributes]) if (!b.hasAttribute(at.name) && !KEEP(a, at.name)) a.removeAttribute(at.name);
+    for (const at of [...b.attributes]) if (a.getAttribute(at.name) !== at.value && !KEEP(a, at.name)) a.setAttribute(at.name, at.value);
+    const old = [...a.childNodes].filter((n) => !(n.nodeType === 1 && n.classList.contains("col-grip"))), fresh = [...b.childNodes];
     fresh.forEach((nb, i) => {
       const na = old[i];
       if (!na) a.appendChild(nb);
@@ -68,9 +74,10 @@ export function patch(parent, ...nodes) {
         if (na.nodeType === 1) { if (sig(na) !== sig(nb)) morph(na, nb); } else if (na.textContent !== nb.textContent) na.textContent = nb.textContent;
       } else a.replaceChild(nb, na);
     });
-    while (a.childNodes.length > fresh.length) a.removeChild(a.lastChild);
+    for (const extra of old.slice(fresh.length)) a.removeChild(extra);
   };
   const alike = (a, b) => a.nodeType === b.nodeType && (a.nodeType === 1 ? sig(a) === sig(b) : a.textContent === b.textContent);
+  for (const node of incoming) if (node.nodeType === 1 && node.parentNode !== parent) decorate(node);
   incoming.forEach((node, i) => {
     const cur = parent.childNodes[i];
     if (cur === node) return;
