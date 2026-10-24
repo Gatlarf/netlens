@@ -223,3 +223,12 @@
 /* a form field is a grid: do not let its buttons and single-line inputs stretch across a wide card */
 .field > button, .field > .btn { justify-self: start; }
 .field input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .field select { max-width: 36rem; }
+
+/* the device Edit card: always open, in labelled groups; every explanation is visible text */
+.edit-section { border: 0; margin: 0 0 14px; padding: 0; min-width: 0; }
+.edit-section > legend { padding: 0; margin-bottom: 8px; font-size: 1.05rem; font-weight: 600; }
+.edit-form.compact .edit-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.edit-section input[type="checkbox"] { width: auto; margin-right: 4px; }
+.check-field { margin-bottom: 10px; }
+.check-field > .hint { margin: 2px 0 0 1.6rem; max-width: 80ch; }
+.edit-section :focus-visible, .edit-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

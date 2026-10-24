@@ -264,94 +264,89 @@ function buildPortsCard(device, onChanged) {
 
 let groupChoices = []; // the groups to pick from, read before the page is built
 
-let editOpen = false; // the Edit card stays open (or closed) when the page refreshes itself
+// A labelled field: the label is tied to the control (for/id), the explanation is text on the page (not a tooltip) and tied to it with aria-describedby.
+let fieldSeq = 0;
+function labelled(label, control, hint) {
+  const id = `edit-f${++fieldSeq}`;
+  control.id = id;
+  const field = h("div", { class: "field" }, h("label", { for: id }, label), control);
+  if (hint) {
+    const note = h("p", { class: "hint", id: `${id}-hint` }, hint);
+    control.setAttribute("aria-describedby", note.id);
+    field.appendChild(note);
+  }
+  return field;
+}
+
+function checkRow(input, label, hint) {
+  const id = `edit-f${++fieldSeq}`;
+  input.id = id;
+  const row = h("div", { class: "field check-field" }, h("label", { for: id, class: "check" }, input, ` ${label}`));
+  if (hint) {
+    const note = h("p", { class: "hint", id: `${id}-hint` }, hint);
+    input.setAttribute("aria-describedby", note.id);
+    row.appendChild(note);
+  }
+  return row;
+}
+
+function section(title, ...children) {
+  return h("fieldset", { class: "edit-section" }, h("legend", {}, title), ...children);
+}
 
 function buildEditCard(device, onSaved) {
   const card = h("div", { class: "card edit-card" });
-  const details = h("details", { class: "edit-details", open: editOpen });
-  details.appendChild(h("summary", {}, h("h2", {}, "Edit"), h("span", { class: "hint" }, "name, type, group, notes, scanning, network position")));
-  details.addEventListener("toggle", () => { editOpen = details.open; });
-  card.appendChild(details);
+  card.appendChild(h("h2", {}, "Edit this device"));
+  card.appendChild(h("p", { class: "hint" }, "Name, type, group, notes, how Netlens scans and reports on it, and where it sits in the network."));
 
   const form = h("form", { class: "edit-form compact" });
-  const grid = h("div", { class: "edit-grid" });
 
-  const nameField = h("div", { class: "field" });
-  nameField.appendChild(h("label", {}, "Custom name"));
   const nameInput = h("input", { type: "text", name: "custom_name", value: device.custom_name || "" });
-  nameField.appendChild(nameInput);
-  grid.appendChild(nameField);
-
-  const typeField = h("div", { class: "field" });
-  typeField.appendChild(h("label", {}, "Type override"));
   const typeSelect = h("select", { name: "type_override" });
-  const autoOption = h("option", { value: "" }, "(automatic)");
-  typeSelect.appendChild(autoOption);
+  typeSelect.appendChild(h("option", { value: "" }, "(automatic)"));
   for (const key of Object.keys(TYPE_LABELS)) {
     const opt = h("option", { value: key }, TYPE_LABELS[key]);
     if (device.type_override === key) opt.selected = true;
     typeSelect.appendChild(opt);
   }
-  typeField.appendChild(typeSelect);
-  grid.appendChild(typeField);
-
-  const groupField = h("div", { class: "field" });
-  groupField.appendChild(h("label", {}, "Group (room, floor, owner...)"));
   const groupSelect = h("select", { name: "group_id" });
   groupSelect.appendChild(h("option", { value: "" }, "(none)"));
   for (const g of groupChoices) groupSelect.appendChild(h("option", { value: String(g.id) }, g.name));
   groupSelect.value = device.group_id != null ? String(device.group_id) : "";
-  groupField.appendChild(groupSelect);
-  groupSelect.title = groupChoices.length ? "Groups are managed under Settings → Groups." : "No groups yet: create them under Settings → Groups.";
-  grid.appendChild(groupField);
-
-  const tagsField = h("div", { class: "field" });
-  tagsField.appendChild(h("label", {}, "Tags"));
   const tagsInput = h("input", { type: "text", name: "tags", value: (device.tags || []).join(", ") });
-  tagsField.appendChild(tagsInput);
-  grid.appendChild(tagsField);
-  form.appendChild(grid);
-
-  const notesField = h("div", { class: "field" });
-  notesField.appendChild(h("label", {}, "Notes"));
-  const notesTextarea = h("textarea", { name: "notes", rows: "2" });
+  const notesTextarea = h("textarea", { name: "notes", rows: "3" });
   notesTextarea.value = device.notes || "";
-  notesField.appendChild(notesTextarea);
-  form.appendChild(notesField);
+  form.appendChild(section("Identity",
+    h("div", { class: "edit-grid" },
+      labelled("Custom name", nameInput, "Shown instead of the name Netlens found."),
+      labelled("Type", typeSelect, "Leave on automatic unless Netlens guesses wrong."),
+      labelled("Group (room, floor, owner...)", groupSelect, groupChoices.length ? "Groups are managed under Settings → Groups." : "No groups yet: create them under Settings → Groups."),
+      labelled("Tags", tagsInput, "Separate several with commas.")),
+    labelled("Notes", notesTextarea)));
 
-  const notifyField = h("div", { class: "field" });
+  const trustInput = h("input", { type: "checkbox", name: "trusted", checked: device.trusted === true });
   const notifyInput = h("input", { type: "checkbox", name: "notify_offline", checked: device.notify_offline !== false });
-  notifyField.appendChild(h("label", { title: "Needs an alert channel (for example e-mail) under Settings." }, notifyInput, " Alert me when it goes offline"));
-  form.appendChild(notifyField);
-
-  const alwaysField = h("div", { class: "field" });
   const alwaysInput = h("input", { type: "checkbox", name: "always_on", checked: device.always_on === true });
-  alwaysField.appendChild(h("label", { title: "Tick it for devices that should be on all the time (router, switch, server, NAS, camera). The Uptime page and the dashboard can then show the availability of these core devices separately from phones, tablets and laptops that come and go." }, alwaysInput, " Always-on device (should always be online)"));
-  form.appendChild(alwaysField);
-
-  const excludeField = h("div", { class: "field" });
   const excludeInput = h("input", { type: "checkbox", name: "report_exclude", checked: device.report_exclude === true });
-  excludeField.appendChild(h("label", { title: "The weekly and monthly reports leave this device out: its outages and availability do not count. Use it for a test machine or a phone that comes and goes." }, excludeInput, " Leave out of reports"));
-  form.appendChild(excludeField);
-
-  const gentleField = h("div", { class: "field" });
   const gentleInput = h("input", { type: "checkbox", name: "gentle", checked: device.gentle === true });
-  gentleField.appendChild(h("label", { title: "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself. It is on by default for printers, smart devices, cameras, TVs, speakers, consoles and appliances (some print the probe, hang or ask for permission); untick it here to scan this device normally, or change the list under Settings > Scan performance." }, gentleInput, " Gentle scanning (don't probe its services)"));
-  form.appendChild(gentleField);
+  form.appendChild(section("Monitoring and reports",
+    checkRow(trustInput, "Known device", "Tick it for devices you recognise. Devices that appear later start as unknown, so you can spot newcomers."),
+    checkRow(alwaysInput, "Always-on device (should always be online)", "For devices that should be on all the time (router, switch, server, NAS, camera). The Uptime page and the dashboard then show the availability of these core devices separately from phones, tablets and laptops that come and go."),
+    checkRow(notifyInput, "Alert me when it goes offline", "Needs an alert channel (for example e-mail) under Settings → Alert channels."),
+    checkRow(excludeInput, "Leave out of reports", "The weekly and monthly reports leave this device out: its outages and availability do not count. Use it for a test machine or a phone that comes and goes.")));
 
-  const dnsField = h("div", { class: "field" });
-  const dnsMode = h("select", { name: "dns_mode", title: "Automatic follows the DNS settings. Always registers the device even when it would be skipped (a Windows machine, a unknown device). Never keeps it out of DNS." },
+  form.appendChild(section("Scanning",
+    checkRow(gentleInput, "Gentle scanning (don't probe its services)",
+      "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself. It is on by default for printers, smart devices, cameras, TVs, speakers, consoles and appliances (some print the probe, hang or ask for permission); untick it to scan this device normally, or change the list under Settings → Scan performance.")));
+
+  const dnsMode = h("select", { name: "dns_mode" },
     h("option", { value: "auto" }, "Automatic"), h("option", { value: "always" }, "Always register"), h("option", { value: "never" }, "Never register"));
   dnsMode.value = device.dns_mode || "auto";
-  const dnsName = h("input", { type: "text", name: "dns_name", value: device.dns_name || "", placeholder: "(automatic)", maxlength: "100", title: "The host name Netlens registers for this device. Leave empty for the automatic name." });
-  dnsField.appendChild(h("label", {}, "DNS registration"));
-  dnsField.appendChild(h("div", { class: "edit-grid" }, dnsMode, dnsName));
-  form.appendChild(dnsField);
-
-  const trustField = h("div", { class: "field" });
-  const trustInput = h("input", { type: "checkbox", name: "trusted", checked: device.trusted === true });
-  trustField.appendChild(h("label", { title: "Tick it for devices you recognise. Devices that appear later start as unknown, so you can spot newcomers." }, trustInput, " Known device"));
-  form.appendChild(trustField);
+  const dnsName = h("input", { type: "text", name: "dns_name", value: device.dns_name || "", placeholder: "(automatic)", maxlength: "100" });
+  form.appendChild(section("DNS registration",
+    h("div", { class: "edit-grid" },
+      labelled("Register in DNS", dnsMode, "Automatic follows the DNS settings. Always registers the device even when it would be skipped (a Windows machine, an unknown device). Never keeps it out of DNS."),
+      labelled("DNS name", dnsName, "The host name Netlens registers for this device. Leave empty for the automatic name."))));
 
   const saveBtn = h("button", { type: "submit", class: "btn primary" }, "Save");
   form.appendChild(saveBtn);
@@ -394,9 +389,9 @@ function buildEditCard(device, onSaved) {
     onSaved();
   });
 
-  details.appendChild(form);
+  card.appendChild(form);
   const parentSlot = h("div", { class: "parent-slot" });  // "Network position", filled in by the page
-  details.appendChild(parentSlot);
+  card.appendChild(parentSlot);
 
   return { card, parentSlot, isDirty: () => dirty, isFocused: () => focused };
 }
@@ -928,7 +923,7 @@ export async function render(container, params) {
     newEdit.card.classList.add("admin-only");
     if (isAdmin()) {
       const sLeft = column();
-      sLeft.appendChild(tag(newEdit.card, "edit", "Edit this device"));
+      sLeft.appendChild(tag(newEdit.card, "edit", "Edit this device", true));
       const sRight = column();
       const deleteCard = buildDeleteCard(device, (open) => { deleteOpen = open; });
       deleteCard.classList.add("admin-only");
