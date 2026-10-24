@@ -1,4 +1,5 @@
 import { get, patch, post, del, ApiError } from "../api.js";
+import { applyLayout, loadLayout, openCustomizer } from "../layout_cards.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { eventLabel } from "../event_labels.js";
 import { mountTerminal, isTerminalActive } from "../terminal.js";
@@ -737,7 +738,13 @@ function buildNotFound() {
   return card;
 }
 
+// the device type as it is used in layout names (lower case, no odd characters)
+const deviceType = (device) => String(device.type || "unknown").toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 30) || "unknown";
+
 export async function render(container, params) {
+  let customizing = false;       // the layout drawer is open: the page must not rebuild itself under it
+  let closeCustomizer = null;
+  const layoutState = { doc: null, set(l) { if (this.doc) this.doc.effective = l; } };
   let disposed = false;
   let loading = false;
   let failing = false;
@@ -826,16 +833,18 @@ export async function render(container, params) {
     // instead of far down a long page. `panels` keeps every section in the page; only one is visible.
     const panels = {};
     const column = () => h("div", { class: "col-left" });
-    const twoColumns = (a, b) => h("div", { class: "grid-2" }, a, b);
-    const slot = () => h("div", {});
+    // every panel is one flowing container of cards; a card has an id and a title so a layout can hide, move and widen it
+    const flowOf = (...parts) => h("div", { class: "dev-flow" }, ...parts.flatMap((p) => (p.classList.contains("col-left") ? [...p.children] : [p])));
+    const tag = (el, id, title, full) => { if (el) { el.dataset.card = id; el.dataset.title = title; if (full) el.dataset.full = "1"; } return el; };
+    const slot = (id, title, full) => tag(h("div", {}), id, title, full);
 
     // Overview: who it is, whether it is up, what happened lately
     const ovLeft = column();
-    ovLeft.appendChild(buildDetailsCard(device));
+    ovLeft.appendChild(tag(buildDetailsCard(device), "details", "Details"));
     const why = buildWhyCard(device);
-    if (why) ovLeft.appendChild(why);
+    if (why) ovLeft.appendChild(tag(why, "why", "Why this device is shown as it is"));
     const ovRight = column();
-    const uptimeSlot = slot();
+    const uptimeSlot = slot("uptime", "Uptime");
     ovRight.appendChild(uptimeSlot);
     buildDeviceUptimeCard(device.id).then((c) => {
       if (disposed) return;
@@ -846,16 +855,15 @@ export async function render(container, params) {
       }
       uptimeSlot.appendChild(c);
     }).catch(() => {});
-    const vulnSlot = slot();
+    const vulnSlot = slot("vulns", "Vulnerabilities");
     ovRight.appendChild(vulnSlot);
     buildDeviceVulnCard(device).then((c) => { if (c && !disposed) vulnSlot.appendChild(c); }).catch(() => {});
-    ovRight.appendChild(buildEventsCard(device));
-    panels.overview = twoColumns(ovLeft, ovRight);
+    ovRight.appendChild(tag(buildEventsCard(device), "events", "Events"));
+    panels.overview = flowOf(ovLeft, ovRight);
 
     // Health: the graphs first, then how it is read and the service checks
     const health = h("div", { class: "dev-health" });
-    const performanceSlot = slot();
-    health.appendChild(performanceSlot);
+    const performanceSlot = slot("performance", "Graphs", true);
     // a switch with many ports gets a table of ports with a graph per port: that card is on the Network tab, so its graphs are left out of the general ones
     const portsCardPromise = buildDevicePortsCard(device).catch(() => null);
     portsCardPromise.then((ports) => {
@@ -864,49 +872,48 @@ export async function render(container, params) {
     const hLeft = column();
     const hRight = column();
     if (isAdmin()) {
-      const monitorSlot = slot();
+      const monitorSlot = slot("monitor", "Health monitoring");
       hLeft.appendChild(monitorSlot);
       buildDeviceMonitorCard(device, { onChange: () => load() }).then((c) => { if (c && !disposed) monitorSlot.appendChild(c); }).catch(() => {});
     }
-    const servicesSlot = slot();
+    const servicesSlot = slot("services", "Service checks");
     hRight.appendChild(servicesSlot);
     buildDeviceServicesCard(device).then((c) => { if (!disposed) servicesSlot.appendChild(c); }).catch(() => {});
-    health.appendChild(twoColumns(hLeft, hRight));
+    health.appendChild(flowOf(performanceSlot, hLeft, hRight));
     panels.health = health;
 
     // Network: ports, names, Wi-Fi, virtual machines, proxied sites
     const network = h("div", { class: "dev-network" });
-    const portsSlot = slot();
-    network.appendChild(portsSlot);
+    const portsSlot = slot("portstable", "Ports and traffic", true);
     portsCardPromise.then((ports) => { if (ports && !disposed) portsSlot.appendChild(ports); });
     // the cards flow over two columns by themselves (CSS columns), so a short card does not leave a hole beside a tall one
-    const flow = h("div", { class: "dev-flow" });
-    const appsSlot = slot();
+    const flow = flowOf(portsSlot);
+    const appsSlot = slot("apps", "Applications");
     flow.appendChild(appsSlot);
     buildDeviceApplicationsCard(device).then((c) => { if (c && !disposed) appsSlot.appendChild(c); }).catch(() => {});
-    flow.appendChild(buildPortsCard(device, () => load()));
-    const wifiSlot = slot();
+    flow.appendChild(tag(buildPortsCard(device, () => load()), "openports", "Open ports"));
+    const wifiSlot = slot("wifi", "Wi-Fi");
     flow.appendChild(wifiSlot);
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
-    const switchPortsSlot = slot();
+    const switchPortsSlot = slot("switchports", "Switch ports", true);
     flow.appendChild(switchPortsSlot);
     buildSwitchPortsCard(device.id).then((c) => { if (c && !disposed) switchPortsSlot.appendChild(c); }).catch(() => {});
-    const firewallSlot = slot();
+    const firewallSlot = slot("firewall", "Firewall");
     flow.appendChild(firewallSlot);
     buildFirewallCard(device.id).then((c) => { if (c && !disposed) firewallSlot.appendChild(c); }).catch(() => {});
-    const portMapSlot = slot();
+    const portMapSlot = slot("portmap", "Port map");
     flow.appendChild(portMapSlot);
     buildPortMapCard(device).then((c) => { if (c && !disposed) portMapSlot.appendChild(c); }).catch(() => {});
     const virtualizationCard = buildVirtualizationCard(device);
-    if (virtualizationCard) flow.appendChild(virtualizationCard);
+    if (virtualizationCard) flow.appendChild(tag(virtualizationCard, "virtualization", "Virtual machines and containers"));
     const backupCard = buildBackupCard(device);
-    if (backupCard) flow.appendChild(backupCard);
+    if (backupCard) flow.appendChild(tag(backupCard, "backup", "Backup"));
     const storageCard = buildStorageCard(device);
-    if (storageCard) flow.appendChild(storageCard);
+    if (storageCard) flow.appendChild(tag(storageCard, "storage", "Storage"));
     const smartCard = buildSmartHomeCard(device);
-    if (smartCard) flow.appendChild(smartCard);
-    for (const siteCard of buildDeviceSitesCards(device)) flow.appendChild(siteCard);
-    flow.appendChild(buildNamesCard(device));
+    if (smartCard) flow.appendChild(tag(smartCard, "smarthome", "Smart home"));
+    buildDeviceSitesCards(device).forEach((siteCard, i) => flow.appendChild(tag(siteCard, `sites${i || ""}`, "Proxied sites")));
+    flow.appendChild(tag(buildNamesCard(device), "names", "Names"));
     network.appendChild(flow);
     panels.network = network;
 
@@ -921,12 +928,12 @@ export async function render(container, params) {
     newEdit.card.classList.add("admin-only");
     if (isAdmin()) {
       const sLeft = column();
-      sLeft.appendChild(newEdit.card);
+      sLeft.appendChild(tag(newEdit.card, "edit", "Edit this device"));
       const sRight = column();
       const deleteCard = buildDeleteCard(device, (open) => { deleteOpen = open; });
       deleteCard.classList.add("admin-only");
-      sRight.appendChild(deleteCard);
-      panels.settings = twoColumns(sLeft, sRight);
+      sRight.appendChild(tag(deleteCard, "delete", "Delete this device"));
+      panels.settings = flowOf(sLeft, sRight);
       buildParentCard(device, (message) => { toast(message, "success"); load(); })
         .then((c) => { if (!disposed) newEdit.parentSlot.appendChild(c); })
         .catch(() => {});
@@ -953,6 +960,16 @@ export async function render(container, params) {
     for (const [key, el] of Object.entries(panels)) {
       el.classList.add("dev-panel");
       page.appendChild(el);
+    }
+    if (!layoutState.doc) layoutState.doc = await loadLayout(deviceType(device));
+    applyLayout(panels, layoutState.doc.effective);
+    if (!document.body.dataset.scoped) {
+      tabBar.appendChild(h("button", { type: "button", class: "btn ghost dev-customize", title: "Choose which cards this page shows, their order and width", onclick: () => {
+        if (closeCustomizer) closeCustomizer();
+        customizing = true;
+        closeCustomizer = openCustomizer({ panels, tabs: TABS, activeTab, deviceType: deviceType(device), typeLabel: (TYPE_LABELS[device.type] || deviceType(device)), isAdmin: isAdmin(), state: layoutState,
+          onClose: () => { customizing = false; closeCustomizer = null; } });
+      } }, "Customize"));
     }
     select(activeTab);
     buildHealthGlance(device, () => select("health")).then((el) => { if (el && !disposed) strip.appendChild(el); }).catch(() => {});
@@ -1036,7 +1053,7 @@ export async function render(container, params) {
   const interval = setInterval(() => {
     if (document.hidden) return;
     if (terminalSlot && isTerminalActive(terminalSlot)) return;
-    if (isStabilityOpen()) return;
+    if (isStabilityOpen() || customizing) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
     if (deleteOpen || isMonitorFormOpen() || isPortMapBusy()) return;     // never wipe a form someone is filling in
     load();
@@ -1044,6 +1061,7 @@ export async function render(container, params) {
 
   // show the result of a (full) scan as soon as it is done
   const onScanFinished = () => {
+    if (customizing) return;
     if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isStabilityOpen() || (terminalSlot && isTerminalActive(terminalSlot))) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
     load();
@@ -1055,6 +1073,7 @@ export async function render(container, params) {
     if (scrollWatch) scrollWatch();
     clearInterval(interval);
     document.removeEventListener("netlens:scan-finished", onScanFinished);
+    if (closeCustomizer) closeCustomizer();
     disposeTerminal();
   };
 }

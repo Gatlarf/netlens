@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.197 — 2026-10-24
+
+### Added
+- ★ **Customize the device page.** A Customize button on every device page opens a drawer where you hide cards, change their order and make them full width, per section (Overview, Health, Network, Settings). Your layout is saved on the server (so every browser and iPad shows it) per device type, so Windows devices can look different from switches. An administrator can save the current arrangement as the template for a device type, or for all devices; everybody starts from it and can still change it for themselves, with a button to go back.
+
 ## 0.4.196 — 2026-10-24
 
 ### Changed
