@@ -55,7 +55,9 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
             text = f"Critical: {text}"
         elif tier == "low" and level == "bad":
             level = "warn"
-        item = {"level": level, "text": text, "href": href, "critical": tier == "critical"}
+        item = {"level": level, "text": text, "href": href}
+        if tier == "critical":
+            item["critical"] = True
         if snooze:
             item["snooze"] = snooze          # the subject someone can acknowledge (see app/snooze.py)
         items.append(item)
@@ -146,7 +148,7 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
     if s["update"]["plugin_updates"]:
         add("info", f"{s['update']['plugin_updates']} plugin update{'s' if s['update']['plugin_updates'] != 1 else ''} available", "#/settings/plugin-browse")
     order = {"bad": 0, "warn": 1, "info": 2}
-    return sorted(items, key=lambda i: (order[i["level"]], not i["critical"]))
+    return sorted(items, key=lambda i: (order[i["level"]], not i.get("critical")))
 
 
 def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
