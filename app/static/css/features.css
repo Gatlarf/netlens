@@ -748,3 +748,4 @@ tr.has-problem > td:first-child { box-shadow: inset 3px 0 0 var(--warn, #d97706)
 .lay-list li { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .lay-tools { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .lay-actions { display: grid; gap: 6px; margin-top: 10px; }
+.dev-panel.dev-flow { display: block; }
