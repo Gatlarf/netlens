@@ -757,3 +757,6 @@ tr.has-problem > td:first-child { box-shadow: inset 3px 0 0 var(--warn, #d97706)
 @media (min-width: 2800px) { .dev-flow { column-count: 4; } .up-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background: var(--surface); color: inherit; }
 .dns-chip.active { box-shadow: 0 0 0 2px var(--accent); }
+/* remote access: one line per device, the session buttons on the right */
+.remote-dev { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+.remote-list { max-height: calc(100vh - 230px); }

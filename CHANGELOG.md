@@ -8,6 +8,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 - **The AI settings are two pages**, each with one Save button: "AI language model" and "AI agents (assistant, MCP)".
 - **Hierarchy starts without the containers**, so the tree shows your devices; the "Show containers" box brings them back and remembers the choice.
 - **Share links**: the options of a new link sit side by side in groups; every create or add button is blue like the save buttons. Delete buttons inside a table row are outlined so a column of them does not shout.
+- **Remote access** lists the devices one per line. The design rules for every page are written down in docs/UI-RULES.md.
 - **Backup list** shows the newest six, with a button for the older ones. The summary figures on pages like Smart home fit one row when they can.
 
 ### Fixed
