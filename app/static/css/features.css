@@ -727,3 +727,9 @@ input.is-locked { background: var(--bg); color: var(--muted); cursor: not-allowe
 .pm-behind ul { margin: 2px 0; padding-left: 18px; }
 .pm-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .pm-row input, .pm-row select { min-width: 0; }
+
+/* Storage page: one line per system, click to expand */
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: var(--border); }
+.storage-more[hidden] { display: none; }
+.storage-detail { padding: 6px 4px 10px 22px; }

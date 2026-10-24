@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.190 — 2026-10-24
+
+### Changed
+- **Storage page: one line per storage system.** The page now lists every system in a compact table (state, fullest pool, number of pools, volumes, disks and open alerts); click a line to open its pools, controllers, volumes, disks and alerts. The open lines are kept when the page refreshes.
+
 ## 0.4.188 — 2026-10-23
 
 ### Added

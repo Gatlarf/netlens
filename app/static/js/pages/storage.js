@@ -23,29 +23,74 @@ function table(heads, rows) {
   return h("div", { class: "table-wrap" }, t);
 }
 
-function systemCard(sys, data) {
+const open = new Set();
+
+function detail(sys, data) {
   const mine = (list) => list.filter((x) => x.plugin_id === sys.plugin_id && x.system_id === sys.id);
-  const subtitle = [sys.vendor, sys.model, sys.version].filter(Boolean).join(" ");
-  const card = h("div", { class: "card" }, h("h3", {}, sys.name, subtitle ? h("span", { class: "hint" }, ` · ${subtitle}`) : null));
-  card.appendChild(h("p", {}, health(sys.health), sys.online ? "" : h("span", { class: "error" }, " · not reachable"), sys.device_id ? h("span", {}, " · ", deviceLink(sys.device_id, sys.device)) : sys.ip ? h("span", { class: "hint" }, ` · ${sys.ip}` ) : null));
-  for (const w of sys.warnings) card.appendChild(h("p", { class: "warn-text" }, w));
-  const pools = mine(data.pools);
-  for (const p of pools) {
-    card.appendChild(h("div", {}, h("strong", {}, p.name), h("span", { class: "hint" }, p.raid ? ` · ${p.raid}` : ""), " ", p.health === "ok" || p.health === "unknown" ? null : health(p.health),
+  const box = h("div", { class: "storage-detail" });
+  for (const w of sys.warnings) box.appendChild(h("p", { class: "warn-text" }, w));
+  for (const p of mine(data.pools)) {
+    box.appendChild(h("div", {}, h("strong", {}, p.name), h("span", { class: "hint" }, p.raid ? ` · ${p.raid}` : ""), " ", p.health === "ok" || p.health === "unknown" ? null : health(p.health),
       bar(p.percent, p.level), h("p", {}, `${bytes(p.used)} of ${bytes(p.total)} used${p.percent !== null ? ` (${p.percent}%)` : ""}`)));
   }
   const controllers = mine(data.controllers);
   if (controllers.length) {
-    card.appendChild(h("h4", {}, "Controllers"));
-    card.appendChild(table(["Name", "Address", "State", "Device"], controllers.map((c) => [c.name, [c.ip, c.mac].filter(Boolean).join(" · "), c.online ? health(c.health) : h("span", { class: "error" }, "Offline"), deviceLink(c.device_id, c.device, "not on the network list")])));
+    box.appendChild(h("h4", {}, "Controllers"));
+    box.appendChild(table(["Name", "Address", "State", "Device"], controllers.map((c) => [c.name, [c.ip, c.mac].filter(Boolean).join(" · "), c.online ? health(c.health) : h("span", { class: "error" }, "Offline"), deviceLink(c.device_id, c.device, "not on the network list")])));
+  }
+  const volumes = mine(data.volumes);
+  if (volumes.length) {
+    box.appendChild(h("h4", {}, `Volumes and shares (${volumes.length})`));
+    box.appendChild(h("p", { class: "hint" }, "The hosts that use a volume come from the storage system (NFS clients, iSCSI initiators). A host Netlens has scanned links to its device."));
+    box.appendChild(table(["Name", "Type", "Used", "State", "Used by"], volumes.map((v) => [v.name, [v.kind, v.protocol].filter(Boolean).join(" · "),
+      v.size ? `${bytes(v.used)} / ${bytes(v.size)}${v.percent !== null ? ` (${v.percent}%)` : ""}` : "", health(v.health),
+      h("span", {}, ...v.clients.slice(0, 8).flatMap((c, i) => [i ? ", " : "", c.device_id ? deviceLink(c.device_id, c.device) : h("span", { class: "hint" }, c.ip)]), v.clients.length > 8 ? ` +${v.clients.length - 8} more` : "")])));
   }
   const disks = mine(data.disks);
   if (disks.length) {
     const bad = disks.filter((d) => d.state === "failed" || d.state === "degraded");
-    card.appendChild(h("p", {}, `${disks.length} disk${disks.length === 1 ? "" : "s"}`, bad.length ? h("span", { class: "error" }, ` · ${bad.length} need attention`) : h("span", { class: "run-ok" }, " · all OK")));
-    if (bad.length) card.appendChild(table(["Disk", "Slot", "Model", "Size", "State"], bad.map((d) => [d.name, d.slot, d.model, bytes(d.size), h("span", { class: d.state === "failed" ? "error" : "warn-text" }, DISK[d.state])])));
+    box.appendChild(h("p", {}, `${disks.length} disk${disks.length === 1 ? "" : "s"}`, bad.length ? h("span", { class: "error" }, ` · ${bad.length} need attention`) : h("span", { class: "run-ok" }, " · all OK")));
+    if (bad.length) box.appendChild(table(["Disk", "Slot", "Model", "Size", "State"], bad.map((d) => [d.name, d.slot, d.model, bytes(d.size), h("span", { class: d.state === "failed" ? "error" : "warn-text" }, DISK[d.state])])));
   }
-  return card;
+  const alerts = mine(data.alerts);
+  if (alerts.length) {
+    box.appendChild(h("h4", {}, `Open alerts (${alerts.length})`));
+    const list = h("ul", {});
+    for (const a of alerts.slice(0, 50)) list.appendChild(h("li", {}, h("span", { class: a.severity === "critical" ? "error" : "warn-text" }, a.severity === "critical" ? "Critical " : "Warning "), a.at ? `${timeAgo(a.at)}: ` : "", a.text));
+    box.appendChild(list);
+  }
+  if (sys.device_id) box.appendChild(h("p", {}, "Device: ", deviceLink(sys.device_id, sys.device)));
+  return box;
+}
+
+function systemRows(sys, data) {
+  const mine = (list) => list.filter((x) => x.plugin_id === sys.plugin_id && x.system_id === sys.id);
+  const key = `${sys.plugin_id}/${sys.id}`;
+  const pools = mine(data.pools), volumes = mine(data.volumes), disks = mine(data.disks), alerts = mine(data.alerts);
+  const failed = disks.filter((d) => d.state === "failed" || d.state === "degraded").length;
+  const top = pools.reduce((m, p) => (p.percent !== null && (m === null || p.percent > m.percent) ? p : m), null);
+  const subtitle = [sys.vendor, sys.model, sys.version].filter(Boolean).join(" ");
+  const expanded = open.has(key);
+  const row = h("tr", { class: "clickable", tabindex: "0", role: "button", "aria-expanded": String(expanded) },
+    h("td", {}, expanded ? "▾" : "▸"),
+    h("td", {}, health(sys.health), sys.online ? "" : h("span", { class: "error" }, " · offline")),
+    h("td", {}, h("strong", {}, sys.name), subtitle ? h("span", { class: "hint" }, ` · ${subtitle}`) : null),
+    h("td", {}, top ? h("span", {}, `${top.percent}%`, bar(top.percent, top.level)) : h("span", { class: "hint" }, "–")),
+    h("td", {}, String(pools.length)), h("td", {}, String(volumes.length)),
+    h("td", {}, String(disks.length), failed ? h("span", { class: "error" }, ` · ${failed} bad`) : null),
+    h("td", {}, alerts.length ? h("span", { class: alerts.some((a) => a.severity === "critical") ? "error" : "warn-text" }, String(alerts.length)) : h("span", { class: "hint" }, "0")));
+  const more = h("tr", { class: "storage-more" }, h("td", { colspan: "8" }, detail(sys, data)));
+  more.hidden = !expanded;
+  const toggle = () => {
+    const now = more.hidden;
+    more.hidden = !now;
+    if (now) open.add(key); else open.delete(key);
+    row.setAttribute("aria-expanded", String(now));
+    row.firstChild.textContent = now ? "▾" : "▸";
+  };
+  row.addEventListener("click", (e) => { if (!e.target.closest("a")) toggle(); });
+  row.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+  return [row, more];
 }
 
 export async function render(container) {
@@ -72,25 +117,12 @@ export async function render(container) {
     tiles.append(uiTile("systems", s.systems, "", s.unhealthy ? "bad" : ""), uiTile("pools filling up or unhealthy", s.pools_filling, "", s.pools_filling ? "warn" : ""),
       uiTile("failed disks", s.failed_disks, "", s.failed_disks ? "bad" : ""), uiTile("open alerts", s.alerts, "", s.alerts ? "warn" : ""));
     body.appendChild(tiles);
-    for (const sys of data.systems) body.appendChild(systemCard(sys, data));
-
-    if (data.volumes.length) {
-      const systems = Object.fromEntries(data.systems.map((x) => [`${x.plugin_id}/${x.id}`, x.name]));
-      const card = h("div", { class: "card" }, h("h3", {}, `Volumes and shares (${data.volumes.length})`),
-        h("p", { class: "hint" }, "The hosts that use a volume come from the storage system (NFS clients, iSCSI initiators). A host Netlens has scanned links to its device."));
-      const rows = data.volumes.map((v) => [v.name, systems[`${v.plugin_id}/${v.system_id}`] || v.system_id, [v.kind, v.protocol].filter(Boolean).join(" · "),
-        v.size ? `${bytes(v.used)} / ${bytes(v.size)}${v.percent !== null ? ` (${v.percent}%)` : ""}` : "", health(v.health),
-        h("span", {}, ...v.clients.slice(0, 8).flatMap((c, i) => [i ? ", " : "", c.device_id ? deviceLink(c.device_id, c.device) : h("span", { class: "hint" }, c.ip)]), v.clients.length > 8 ? ` +${v.clients.length - 8} more` : "")]);
-      card.appendChild(table(["Name", "System", "Type", "Used", "State", "Used by"], rows));
-      body.appendChild(card);
-    }
-    if (data.alerts.length) {
-      const card = h("div", { class: "card" }, h("h3", {}, `Open alerts (${data.alerts.length})`));
-      const list = h("ul", {});
-      for (const a of data.alerts.slice(0, 50)) list.appendChild(h("li", {}, h("span", { class: a.severity === "critical" ? "error" : "warn-text" }, a.severity === "critical" ? "Critical " : "Warning "), a.at ? `${timeAgo(a.at)}: ` : "", a.text));
-      card.appendChild(list);
-      body.appendChild(card);
-    }
+    const t = h("table", { class: "data" });
+    t.appendChild(h("thead", {}, h("tr", {}, ...["", "State", "System", "Fullest pool", "Pools", "Volumes", "Disks", "Alerts"].map((c) => h("th", {}, c)))));
+    const tb = h("tbody");
+    for (const sys of data.systems) for (const r of systemRows(sys, data)) tb.appendChild(r);
+    t.appendChild(tb);
+    body.appendChild(h("div", { class: "card" }, h("p", { class: "hint" }, "Click a system to see its pools, controllers, volumes, disks and alerts."), h("div", { class: "table-wrap" }, t)));
   }
 
   await load();
