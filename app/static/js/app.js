@@ -471,6 +471,24 @@ function hideBoot() {
   if (boot) boot.remove();
 }
 
+// The menu only lists the optional pages (backups, storage, ...) that have a plugin switched on or already hold data; an admin gets a link to add more.
+async function applyFeatures() {
+  let features;
+  try { features = await get("/api/features"); } catch { return; }
+  let hidden = 0;
+  for (const link of document.querySelectorAll("#side-links [data-feature]")) {
+    const on = features[link.dataset.feature] !== false;
+    link.hidden = !on;
+    if (!on) hidden += 1;
+  }
+  for (const group of document.querySelectorAll("#side-links .side-group")) {
+    const links = group.querySelectorAll(".nav-link");
+    group.hidden = links.length > 0 && [...links].every((l) => l.hidden);
+  }
+  const more = el("#nav-more");
+  if (more) more.hidden = !hidden;
+}
+
 async function init() {
   const session = await applySession();
   await stylesheetsReady();
@@ -485,6 +503,8 @@ async function init() {
     openLoginDialog();
   } else {
     goToStartPage(session);
+    applyFeatures();
+    setInterval(() => { if (!document.hidden) applyFeatures(); }, 60000);
     startPoll();
     renderPage();
   }

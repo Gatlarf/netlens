@@ -819,3 +819,4 @@ body.side-hidden .sidenav { display: none; }
   body.side-open .sidenav { display: block; }
   .sidenav .nav-link { padding: 12px; font-size: 1rem; }
 }
+#side-links [hidden], .side-group[hidden] { display: none !important; }

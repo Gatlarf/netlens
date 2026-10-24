@@ -87,8 +87,8 @@
           <a class="nav-link" href="#/map" data-route="map">Map</a>
           <a class="nav-link" href="#/devices" data-route="devices">Devices</a>
           <a class="nav-link" href="#/hierarchy" data-route="hierarchy">Hierarchy</a>
-          <a class="nav-link" href="#/dns" data-route="dns">DNS</a>
-          <a class="nav-link" href="#/remote-sites" data-route="remote_sites">Remote sites</a>
+          <a class="nav-link" href="#/dns" data-route="dns" data-feature="dns">DNS</a>
+          <a class="nav-link" href="#/remote-sites" data-route="remote_sites" data-feature="remote_sites">Remote sites</a>
           <a class="nav-link admin-only" href="#/remote" data-route="remote">Remote access</a>
         </div>
         <div class="side-group">
@@ -96,15 +96,15 @@
           <a class="nav-link" href="#/uptime" data-route="uptime">Uptime</a>
           <a class="nav-link" href="#/health" data-route="health">Health</a>
           <a class="nav-link" href="#/services" data-route="services">Services</a>
-          <a class="nav-link" href="#/backups" data-route="backups">Backups</a>
-          <a class="nav-link" href="#/storage" data-route="storage">Storage</a>
-          <a class="nav-link" href="#/smarthome" data-route="smarthome">Smart home</a>
+          <a class="nav-link" href="#/backups" data-route="backups" data-feature="backups">Backups</a>
+          <a class="nav-link" href="#/storage" data-route="storage" data-feature="storage">Storage</a>
+          <a class="nav-link" href="#/smarthome" data-route="smarthome" data-feature="smarthome">Smart home</a>
         </div>
         <div class="side-group">
           <div class="side-title">Analysis</div>
           <a class="nav-link" href="#/stats" data-route="stats">Statistics</a>
           <a class="nav-link" href="#/network-health" data-route="network_health">Network health</a>
-          <a class="nav-link" href="#/vulnerabilities" data-route="vulnerabilities">Vulnerabilities</a>
+          <a class="nav-link" href="#/vulnerabilities" data-route="vulnerabilities" data-feature="vulnerabilities">Vulnerabilities</a>
           <a class="nav-link" href="#/reports" data-route="reports">Reports</a>
           <a class="nav-link admin-only" href="#/insights" data-route="insights">Insights</a>
           <a class="nav-link" href="#/changes" data-route="changes">What changed</a>
@@ -118,6 +118,7 @@
         <div class="side-group admin-only">
           <div class="side-title">Configuration</div>
           <a class="nav-link" href="#/settings" data-route="settings">Settings</a>
+          <a id="nav-more" class="nav-link admin-only" href="#/settings/plugin-browse" hidden title="Backups, storage, vulnerabilities and more come from plugins">+ More features</a>
         </div>
       </div>
     </nav>

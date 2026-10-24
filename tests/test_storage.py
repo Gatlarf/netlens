@@ -150,3 +150,16 @@ def test_alert_texts_lose_their_html_and_are_not_cut_short():
     text = out["alerts"][0]["text"]
     assert "<br>" not in text and "192.168.0.232. Migrate" in text and text.endswith("END & done") and len(text) > 300
     assert len(out["alerts"][1]["text"]) == 600 and out["alerts"][1]["text"].endswith("…")
+
+
+def test_features_follow_the_data(tmp_path):
+    db = tmp_path / "f.db"
+    c = connect(db)
+    init_db(c)
+    c.commit()
+    client = TestClient(create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=db), headers={"Authorization": "Bearer secret"})
+    assert client.get("/api/features").json()["storage"] is False
+    storage.apply_storage(c, "ontap", doc(), now=NOW)
+    c.commit()
+    features = client.get("/api/features").json()
+    assert features["storage"] is True and features["backups"] is False
