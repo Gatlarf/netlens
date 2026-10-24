@@ -1,5 +1,5 @@
 // One look for the buttons of every page: the button that saves is blue and filled, cancel/reset/close are plain, delete is red. Pages build
-// their buttons in many places; this runs over every button as it appears so none of them can drift (see docs/UI-RULES.md).
+// their buttons in many places; this runs over every button as it appears so none of them can drift (see contrib/UI-RULES.md).
 const SAVE = /^(save|apply|opslaan)\b/i;
 const PLAIN = /^(cancel|close|discard|reset|back|undo|annuleer)\b/i;
 const DANGER = /^(delete|remove all|forget|erase)\b/i;
