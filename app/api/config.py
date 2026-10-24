@@ -94,7 +94,15 @@ def _source(request: Request, key: str, env_value) -> str:
 
 
 async def _config_payload(request: Request) -> dict:
+    from app import beats
     from app.terminal.access import classify
+
+    conn = connect(request.app.state.db_path)
+    try:
+        beat_interval, beat_misses = beats.settings(conn)
+        beat_scope = beats.scope(conn)
+    finally:
+        conn.close()
 
     settings = request.app.state.settings
     allowed_here, why_here = classify(request, settings.terminal_remote)
@@ -110,6 +118,9 @@ async def _config_payload(request: Request) -> dict:
         "deep_interval_source": _source(request, "deep_interval", env.deep_interval),
         "env_quick_interval": env.quick_interval,
         "env_deep_interval": env.deep_interval,
+        "presence_interval": beat_interval,
+        "presence_misses": beat_misses,
+        "presence_scope": beat_scope,
         "terminal_enabled": settings.terminal_enabled,
         "terminal_source": _source(request, "terminal_enabled", env.terminal_enabled),
         "env_terminal_enabled": env.terminal_enabled,
@@ -156,6 +167,9 @@ class GeneralBody(BaseModel):
 
     quick_interval: int | None = None
     deep_interval: int | None = None
+    presence_interval: int | None = None       # seconds between the quick checks of the devices, 0 = off
+    presence_misses: int | None = None         # missed quick checks before a device is offline
+    presence_scope: str | None = None          # "core" (always-on devices) or "all"
     terminal_enabled: bool | None = None
 
 
@@ -177,6 +191,13 @@ async def put_general(request: Request, body: GeneralBody) -> dict:
                 )
             else:
                 set_setting(conn, key, str(value))
+        if "presence_interval" in fields or "presence_misses" in fields or "presence_scope" in fields:
+            from app import beats
+
+            try:
+                beats.save_settings(conn, body.presence_interval if "presence_interval" in fields else None, body.presence_misses if "presence_misses" in fields else None, body.presence_scope if "presence_scope" in fields else None)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
         if "terminal_enabled" in fields:
             from app.terminal.access import classify
 

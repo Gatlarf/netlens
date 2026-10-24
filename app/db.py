@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 34
+SCHEMA_VERSION = 35
 
 
 def utcnow() -> str:
@@ -483,6 +483,9 @@ def init_db(conn: sqlite3.Connection) -> None:
     # covers the uptime sums and the per-device scans over a time window without reading the table rows (about three times faster); it replaces the plain ts index
     cur.execute("CREATE INDEX IF NOT EXISTS idx_checks_cover ON checks(ts, device_id, up)")
     cur.execute("DROP INDEX IF EXISTS idx_checks_ts")
+    # beat = 1: a quick ping between two scans (app/beats.py). Those rows are many (one a minute per device), so they are kept for days only; the hourly roll-up keeps their count for good
+    _add_column_if_missing(conn, "checks", "beat", "INTEGER NOT NULL DEFAULT 0")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_checks_beat ON checks(beat, ts)")
 
     # --- schema v5: guests reported by hypervisor plugins (replaces proxmox_guests) ---------
     cur.execute(

@@ -189,7 +189,7 @@ def _flaps(conn, since: str, core: bool | None = None) -> dict[int, int]:
     key = (id(conn), since)
     if memo is None or key not in memo:
         found = {r[0]: r[1] for r in conn.execute(
-            "WITH s AS (SELECT device_id AS d, up, LAG(up) OVER (PARTITION BY device_id ORDER BY ts, id) AS prev FROM checks WHERE ts >= ?) "
+            "WITH s AS (SELECT device_id AS d, up, LAG(up) OVER (PARTITION BY device_id ORDER BY ts, id) AS prev FROM checks WHERE ts >= ? AND beat = 0) "
             "SELECT d, SUM(prev IS NOT NULL AND prev != up) AS n FROM s GROUP BY d HAVING n > 0", (since,))}
         if memo is not None:
             memo[key] = found
@@ -209,7 +209,7 @@ def _sequences(conn, ids: list[int], since: str) -> dict[int, tuple[int, int]]:
         marks = ",".join("?" * len(part))
         rows = conn.execute(
             "WITH s AS (SELECT device_id AS d, up, LAG(up) OVER (PARTITION BY device_id ORDER BY ts, id) AS prev, ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY ts, id) AS rn "
-            f"FROM checks WHERE ts >= ? AND device_id IN ({marks})) "
+            f"FROM checks WHERE ts >= ? AND beat = 0 AND device_id IN ({marks})) "
             "SELECT d, SUM(prev IS NOT NULL AND prev != up), SUM(prev = 1 AND up = 0) + SUM(rn = 1 AND up = 0) FROM s GROUP BY d", [since, *part])
         for d, transitions, outages in rows:
             out[d] = (outages or 0, transitions or 0)
@@ -356,7 +356,7 @@ def _history(conn, now: str, days: int) -> dict:
     # devices online per hour (24 h / 7 d) or per day (30 d / 90 d), from the uptime checks
     cutoff = _ago(now, days=min(days, 90))
     width = 13 if days <= 7 else 10  # characters of the timestamp that make up the bucket
-    per_scan = conn.execute("SELECT ts, SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ? GROUP BY ts ORDER BY ts", (cutoff,)).fetchall()
+    per_scan = conn.execute("SELECT ts, SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ? AND beat = 0 GROUP BY ts ORDER BY ts", (cutoff,)).fetchall()
     buckets: dict[str, list[tuple[int, int]]] = defaultdict(list)
     for r in per_scan:
         buckets[r["ts"][:width]].append((r["u"], r["n"]))

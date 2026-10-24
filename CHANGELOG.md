@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.215 — 2026-10-24
+
+### Added
+- ★ **Quick checks between the scans.** A scan finds and describes devices (every 15 minutes by default) and used to be the only thing that said whether a device was up. Netlens now also pings the always-on devices once a minute (one nmap host discovery for all of them), records every answer, marks a device offline after three missed answers in a row (about three minutes instead of up to fifteen, and one lost packet is not an outage) and online again at the first answer. Service checks already had their own interval (60 seconds by default) and are unchanged. Set the interval, the number of misses and whether every device or only the always-on ones get the quick check under Settings → Scan schedule; 0 switches it off. The rows of quick checks are kept for three days; the hourly roll-up keeps their counts, so the uptime figures and graphs get one measurement a minute.
+- ★ **Bars that show how much was missed.** A bar in the Uptime-Kuma-style strips that stands for several checks (a slice of 15 minutes, or of a day) is now coloured on a scale from green to red by how many of its checks failed: one lost check in fifteen is yellow-green, half is orange, all is red. The tooltip says "Partly down · 2 of 15 checks failed (13%)". The service bars now show the last 24 hours in 60 slices the same way.
+
+### Changed
+- Availability percentages of a single device (device page) come from the hourly roll-up like the overview already did, so they include the quick checks. Flapping, the monthly report and the scan statistics keep counting the scans only.
+
 ## 0.4.212 — 2026-10-24
 
 ### Changed

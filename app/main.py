@@ -112,6 +112,14 @@ async def lifespan(app: FastAPI):
             )
         ))
         tasks.append(asyncio.create_task(service_loop(app.state.db_path)))
+        from app import beats
+
+        async def beat_ranges() -> list[str]:                  # the ranges the scans use: the configured ones, else the ones detected
+            from app.scanner.netinfo import detect_ranges
+
+            return list(app.state.settings.ranges) or await detect_ranges()
+
+        tasks.append(asyncio.create_task(beats.loop(app.state.db_path, beat_ranges)))
         tasks.append(asyncio.create_task(asyncio.to_thread(_backfill_graphs, app.state.db_path)))
         tasks.append(asyncio.create_task(asyncio.to_thread(_fold_checks, app.state.db_path)))
         from app.hostmetrics import service as host_monitors

@@ -177,7 +177,7 @@ def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | 
     days = days if days in DAYS else 7
     current = _ts(now) if now else datetime.now(timezone.utc)
     since = (current - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    rows = conn.execute("SELECT ts, up, rtt_ms FROM checks WHERE device_id = ? AND ts >= ? ORDER BY ts", (device_id, since)).fetchall()
+    rows = conn.execute("SELECT ts, up, rtt_ms FROM checks WHERE device_id = ? AND ts >= ? AND beat = 0 ORDER BY ts", (device_id, since)).fetchall()
     result: dict[str, Any] = {"device_id": device_id, "days": days, "checks": len(rows), "findings": []}
     findings = result["findings"]
     address, address_info = address_findings(conn, device_id, since)       # independent of the uptime history: checked first
@@ -213,7 +213,7 @@ def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | 
         counted = 0
         stayed_up = 0
         for ts in down_ts:
-            total, up = conn.execute(f"SELECT COUNT(*), COALESCE(SUM(up), 0) FROM checks WHERE ts = ? AND device_id IN ({marks})", (ts, *behind)).fetchone()
+            total, up = conn.execute(f"SELECT COUNT(*), COALESCE(SUM(up), 0) FROM checks WHERE ts = ? AND beat = 0 AND device_id IN ({marks})", (ts, *behind)).fetchone()
             if total:
                 counted += 1
                 stayed_up += 1 if up / total >= 0.5 else 0
@@ -223,7 +223,7 @@ def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | 
     others_down = 0
     compared = 0
     for ts in down_ts:
-        total, up = conn.execute("SELECT COUNT(*), COALESCE(SUM(up), 0) FROM checks WHERE ts = ? AND device_id != ?", (ts, device_id)).fetchone()
+        total, up = conn.execute("SELECT COUNT(*), COALESCE(SUM(up), 0) FROM checks WHERE ts = ? AND beat = 0 AND device_id != ?", (ts, device_id)).fetchone()
         if total >= 5:
             compared += 1
             others_down += 1 if (total - up) / total >= 0.5 else 0

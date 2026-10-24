@@ -174,7 +174,7 @@ def _windows_of(conn, windows: list[tuple[int, str, str]]) -> dict[int, list]:
     out: dict[int, list] = {}
     for i in range(0, len(windows), 100):
         chunk = windows[i:i + 100]
-        cond = " OR ".join("(device_id = ? AND ts >= ? AND ts < ?)" for _ in chunk)
+        cond = "beat = 0 AND (" + " OR ".join("(device_id = ? AND ts >= ? AND ts < ?)" for _ in chunk) + ")"
         cur = conn.execute(f"SELECT device_id AS k, ts, up FROM checks WHERE {cond} ORDER BY device_id, ts, id", [x for w in chunk for x in w])
         for k, group in itertools.groupby(cur, operator.itemgetter(0)):
             out.setdefault(k, []).extend(group)

@@ -30,6 +30,25 @@ function fillScheduleCard(card, cfg) {
   deepField.appendChild(h("p", { class: "hint" }, sourceHint(cfg.deep_interval_source, "NETLENS_DEEP_INTERVAL", cfg.env_deep_interval, "hours")));
   form.appendChild(deepField);
 
+  const beatField = h("div", { class: "field" });
+  beatField.appendChild(h("label", {}, "Quick check of every device, between the scans (seconds)"));
+  const beatInput = h("input", { type: "number", name: "presence_interval", min: "0", max: "3600", step: "1", value: String(cfg.presence_interval) });
+  beatField.appendChild(beatInput);
+  beatField.appendChild(h("p", { class: "hint" }, "A scan is slow, so an outage would show up only at the next one. This asks every device on your network whether it is still there, usually once a minute (15 to 3600 seconds, 0 = off). The answers feed the uptime figures and graphs. Service checks have their own interval."));
+  form.appendChild(beatField);
+
+  const scopeSelect = h("select", { name: "presence_scope" }, h("option", { value: "core" }, "Only the always-on devices"), h("option", { value: "all" }, "Every device on the network"));
+  scopeSelect.value = cfg.presence_scope || "core";
+  form.appendChild(h("div", { class: "field" }, h("label", {}, "Which devices get the quick check"), scopeSelect,
+    h("p", { class: "hint" }, "Always-on devices (routers, servers, NAS, cameras: mark them on the Uptime page or the device page) are the ones whose outage matters within minutes. A phone that sleeps for ten minutes is not an outage, so by default it is left to the scans.")));
+
+  const missField = h("div", { class: "field" });
+  missField.appendChild(h("label", {}, "A device is offline after this many missed quick checks"));
+  const missInput = h("input", { type: "number", name: "presence_misses", min: "1", max: "10", step: "1", value: String(cfg.presence_misses) });
+  missField.appendChild(missInput);
+  missField.appendChild(h("p", { class: "hint" }, "One lost answer is not an outage. With 3 and a check every minute, a device is reported offline after about 3 minutes, and back online at its first answer."));
+  form.appendChild(missField);
+
   const errorEl = h("p", { class: "error" }, "");
   form.appendChild(errorEl);
   const saveBtn = h("button", { type: "submit", class: "btn" }, "Save");
@@ -64,9 +83,9 @@ function fillScheduleCard(card, cfg) {
       errorEl.textContent = "Enter a number of hours";
       return;
     }
-    submit({ quick_interval: Math.round(minutes * 60), deep_interval: Math.round(hours * 3600) }, "Schedule saved");
+    submit({ quick_interval: Math.round(minutes * 60), deep_interval: Math.round(hours * 3600), presence_interval: Math.round(parseFloat(beatInput.value) || 0), presence_misses: Math.round(parseFloat(missInput.value) || 3), presence_scope: scopeSelect.value }, "Schedule saved");
   });
-  resetBtn.addEventListener("click", () => submit({ quick_interval: null, deep_interval: null }, "Schedule reset"));
+  resetBtn.addEventListener("click", () => submit({ quick_interval: null, deep_interval: null, presence_interval: 60, presence_misses: 3, presence_scope: "core" }, "Schedule reset"));
 
   card.appendChild(form);
   card.appendChild(h("p", { class: "hint" }, "Takes effect from the next scheduler cycle; no restart needed."));

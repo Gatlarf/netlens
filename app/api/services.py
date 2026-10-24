@@ -139,8 +139,36 @@ async def run_now(check_id: int, conn=Depends(get_conn)) -> dict:
     return {"up": result.up, "ms": result.ms, "detail": result.detail, "check": _present(conn, _row(conn, check_id))}
 
 
+def slices(conn, check_id: int, hours: int, bars: int) -> list[dict]:
+    """The results of the last `hours` hours in `bars` equal slices of time (oldest first), for bars like the uptime page: a slice says how many checks
+    it holds and how many of them failed, so the bar can show how much of that time was lost."""
+    from datetime import datetime, timedelta, timezone
+
+    from app import dbengine
+
+    end = datetime.now(timezone.utc).replace(microsecond=0)
+    start = end - timedelta(hours=hours)
+    span = hours * 3600
+    sql = ("SELECT b, COUNT(*) AS n, SUM(up) AS ups, AVG(ms) AS rtt, MAX(ms) AS rtt_max, MIN(ts) AS first, MAX(ts) AS last FROM ("
+           "SELECT ts, up, ms, CASE WHEN x > ? THEN ? ELSE x END AS b FROM ("
+           f"SELECT ts, up, ms, (({dbengine.epoch_sql('ts')} - ?) * ?) / ? AS x FROM service_results WHERE check_id = ? AND ts >= ? AND ts <= ?"
+           ") AS s1) AS s2 GROUP BY b ORDER BY b")
+    stamp = "%Y-%m-%dT%H:%M:%SZ"
+    out = []
+    for r in conn.execute(sql, (bars - 1, bars - 1, int(start.timestamp()), bars, span, check_id, start.strftime(stamp), end.strftime(stamp))):
+        down = r["n"] - (r["ups"] or 0)
+        item = {"ts": r["first"], "up": down == 0, "ms": round(r["rtt"], 1) if r["rtt"] is not None else None}
+        if r["n"] > 1:
+            item.update(n=r["n"], down=down, end=r["last"], ms_max=round(r["rtt_max"], 1) if r["rtt_max"] is not None else None)
+        out.append(item)
+    return out
+
+
 @router.get("/service-checks/{check_id}/results")
-def results(check_id: int, limit: int = Query(90, ge=1, le=1000), conn=Depends(get_conn)) -> list[dict]:
+def results(check_id: int, limit: int = Query(90, ge=1, le=1000), bars: int | None = Query(None, ge=2, le=200), hours: int = Query(24, ge=1, le=720),
+            conn=Depends(get_conn)) -> list[dict]:
     _row(conn, check_id)
+    if bars:
+        return slices(conn, check_id, hours, bars)
     rows = conn.execute("SELECT ts, up, ms, detail FROM service_results WHERE check_id = ? ORDER BY id DESC LIMIT ?", (check_id, limit)).fetchall()
     return [{"ts": r["ts"], "up": bool(r["up"]), "ms": r["ms"], "detail": r["detail"]} for r in reversed(rows)]

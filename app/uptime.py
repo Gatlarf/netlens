@@ -96,14 +96,10 @@ def uptime_percent(
 ) -> float | None:
     if now is None:
         now = utcnow()
-    cutoff = _cutoff(now, days)
-    row = conn.execute(
-        "SELECT SUM(up) AS total_up, COUNT(*) AS total FROM checks WHERE device_id = ? AND ts >= ?",
-        (device_id, cutoff),
-    ).fetchone()
-    if row is None or row["total"] == 0:
+    up, total, _rs, _rn = checkstats.totals(conn, _cutoff(now, days)).get(device_id, (0, 0, 0.0, 0))      # from the hourly roll-up: the raw rows of quick checks are kept for days only
+    if not total:
         return None
-    return round(row["total_up"] / row["total"] * 100, 2)
+    return round(up / total * 100, 2)
 
 
 def recent_checks(

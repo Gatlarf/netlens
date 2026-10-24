@@ -786,3 +786,5 @@ button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background:
 .dev-flow > [hidden], .stat-grid > [hidden], .dev-flow > [data-card]:empty { display: none !important; }
 @media (max-width: 900px) { .dev-flow, .stat-grid { grid-template-columns: minmax(0, 1fr); } .dev-flow > .bd-w, .stat-grid > .bd-w { grid-column: auto; } }
 .stat-panel { display: block; }
+.hb-part { background: var(--warn); }          /* the colour of a bar with a part of its checks missed is set per bar (see missColour in heartbeat.js) */
+.hb-bar .hb-part:hover { opacity: 1; filter: brightness(1.12); }

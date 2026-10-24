@@ -14,8 +14,8 @@ export function stateDot(check) {
 
 async function heartbeats(check) {
   try {
-    const rows = await get(`/api/service-checks/${check.id}/results?limit=60`);
-    return heartbeatBar(rows.map((r) => ({ ts: r.ts, up: r.up, rtt_ms: r.ms })), 60);
+    const rows = await get(`/api/service-checks/${check.id}/results?bars=60&hours=24`);     // the last day in 60 slices: a slice with failures is coloured by how many
+    return heartbeatBar(rows.map((r) => ({ ts: r.ts, end: r.end, n: r.n, down: r.down, up: r.up, rtt_ms: r.ms, rtt_max: r.ms_max })), 60);
   } catch (err) {
     return h("span", {});
   }

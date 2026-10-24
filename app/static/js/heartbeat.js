@@ -21,12 +21,22 @@ export function hideTip() {
 }
 
 // what the infobox says about one measurement (or one slice of time that holds several): the time, up or down, and the response time
+// A bar that stands for several checks is coloured by how many of them failed: green when none did, red when all did, and a step along the way
+// (through yellow and orange) for a part. The square root makes one failed check in fifteen visible, not only the outages that are nearly complete.
+export function missedShare(item) {
+  if (typeof item !== "object" || !(item.n > 1) || !(item.down > 0)) return 0;
+  return Math.min(1, item.down / item.n);
+}
+export const missColour = (share) => `hsl(${Math.round(140 * (1 - Math.sqrt(share)))}, 72%, 42%)`;
+
 export function describe(item) {
   const lines = [];
   const many = typeof item.n === "number" && item.n > 1;
   lines.push(["hb-tip-time", many && item.end ? `${fmtTime(item.ts)} \u2013 ${fmtTime(item.end).slice(-5)}` : fmtTime(item.ts)]);
-  const state = item.up ? "Up" : "Down";
-  lines.push([item.up ? "hb-tip-up" : "hb-tip-down", many && !item.up ? `${state} \u00b7 ${item.down} of ${item.n} checks failed` : state]);
+  const share = missedShare(item);
+  const partly = many && share > 0 && share < 1;
+  const state = item.up ? "Up" : partly ? "Partly down" : "Down";
+  lines.push([item.up ? "hb-tip-up" : "hb-tip-down", many && !item.up ? `${state} \u00b7 ${item.down} of ${item.n} checks failed${partly ? ` (${Math.round(share * 100)}%)` : ""}` : state]);
   if (typeof item.rtt_ms === "number") {
     lines.push(["", many ? `Response: ${item.rtt_ms} ms on average${typeof item.rtt_max === "number" ? `, up to ${item.rtt_max} ms` : ""}` : `Response: ${item.rtt_ms} ms`]);
   } else if (item.up === false) {
@@ -77,7 +87,9 @@ export function heartbeatBar(items, total = 60) {
   for (const item of list) {
     const span = document.createElement("span");
     const up = typeof item === "number" ? item === 1 : item.up;
-    span.className = "hb " + (up ? "hb-up" : "hb-down");
+    const share = missedShare(item);
+    span.className = "hb " + (share > 0 && share < 1 ? "hb-part" : up ? "hb-up" : "hb-down");
+    if (share > 0 && share < 1) span.style.background = missColour(share);
     if (typeof item === "object" && item.ts) shown.push([span, { ...item, up }]);
     bar.appendChild(span);
   }
