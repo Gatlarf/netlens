@@ -212,6 +212,39 @@ function radar() {
   return s;
 }
 
+// ---- the traffic graph ----------------------------------------------------------------------------------------------------------------------------
+// In and out of all monitored devices combined, and the internet connection (WAN) on lines of its own. Built once; every refresh only changes the paths.
+const LINES = [["drx", "Devices in", "#00e5ff", ""], ["dtx", "Devices out", "#ff4fd8", ""], ["wrx", "WAN in", "#ffb020", "5 3"], ["wtx", "WAN out", "#ff7a45", "5 3"]];
+const bps = (v) => (v == null ? "–" : v >= 1e9 ? `${(v / 1e9).toFixed(2)} Gbit/s` : v >= 1e6 ? `${(v / 1e6).toFixed(v >= 1e8 ? 0 : 1)} Mbit/s` : v >= 1e3 ? `${Math.round(v / 1e3)} kbit/s` : `${Math.round(v)} bit/s`);
+const niceMax = (v) => { if (!(v > 0)) return 1e6; const p = 10 ** Math.floor(Math.log10(v)); const f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
+
+function trafficChart() {
+  const W = 400, H = 120, L = 4, B = 14;
+  const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", role: "img", "aria-label": "Traffic of all devices combined and of the internet connection" });
+  for (const f of [0.25, 0.5, 0.75]) s.appendChild(svg("line", { class: "axis", x1: L, x2: W, y1: (H - B) * f, y2: (H - B) * f }));
+  const paths = {};
+  for (const [key, , colour, dash] of LINES) {
+    paths[key] = svg("path", { fill: "none", stroke: colour, "stroke-width": 1.6, "vector-effect": "non-scaling-stroke", "stroke-dasharray": dash, "stroke-linejoin": "round" });
+    s.appendChild(paths[key]);
+  }
+  const top = svg("text", { class: "lbl", x: L + 2, y: 9 }), from = svg("text", { class: "lbl", x: L + 2, y: H - 3 }), to = svg("text", { class: "lbl", x: W - 2, y: H - 3, "text-anchor": "end" });
+  s.append(top, from, to);
+  s.update = (data) => {
+    const series = { drx: data.devices.rx, dtx: data.devices.tx, wrx: data.wan ? data.wan.rx : [], wtx: data.wan ? data.wan.tx : [] };
+    const max = niceMax(Math.max(0, ...Object.values(series).flat().map((p) => p[1])));
+    const t0 = data.start, t1 = data.end, x = (t) => L + (W - L) * (t - t0) / Math.max(1, t1 - t0), y = (v) => (H - B) - (H - B - 6) * v / max;
+    for (const [key] of LINES) {
+      const pts = series[key];
+      paths[key].setAttribute("d", pts.length ? pts.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(" ") : "");
+    }
+    top.textContent = bps(max);
+    const fmt = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+    from.textContent = fmt(t0);
+    to.textContent = "now";
+  };
+  return s;
+}
+
 export async function render(container) {
   let disposed = false, lastId = 0;
   let scope = "all", coreIds = new Set();            // "core": only the always-on devices
@@ -240,6 +273,30 @@ export async function render(container) {
     } }, label))));
   const gauges = h("div", { class: "hud-gauges" });
   const attn = h("ol", { class: "hud-attn" });
+  let tRange = "1h";
+  try { const v = localStorage.getItem("netlens.hud.traffic"); if (["1h", "6h", "24h"].includes(v)) tRange = v; } catch (e) { /* not remembered */ }
+  let tMode = "all";
+  try { if (localStorage.getItem("netlens.hud.traffic.mode") === "endpoints") tMode = "endpoints"; } catch (e) { /* not remembered */ }
+  const tModeBtns = {};
+  const tModeSwitch = h("div", { class: "hud-scope", role: "group", "aria-label": "What the traffic graph adds up", title: "All interfaces: every interface of every monitored device, so traffic that crosses a switch or a bridge is counted on each. Endpoints: leaves out switches, routers, access points and virtual interfaces." },
+    ...[["all", "All interfaces"], ["endpoints", "Endpoints"]].map(([key, label]) => (tModeBtns[key] = h("button", { type: "button", "aria-pressed": String(key === tMode), onclick: () => {
+      tMode = key;
+      try { localStorage.setItem("netlens.hud.traffic.mode", key); } catch (e) { /* only this page remembers it */ }
+      for (const [k, b] of Object.entries(tModeBtns)) b.setAttribute("aria-pressed", String(k === tMode));
+      traffic();
+    } }, label))));
+  const tChart = trafficChart();
+  const tLegend = h("div", { class: "hud-tlegend" });
+  const tNote = h("p", { class: "hud-cap" });
+  const tBtns = {};
+  const tSwitch = h("div", { class: "hud-scope", role: "group", "aria-label": "Period of the traffic graph" },
+    ...["1h", "6h", "24h"].map((key) => (tBtns[key] = h("button", { type: "button", "aria-pressed": String(key === tRange), onclick: () => {
+      tRange = key;
+      try { localStorage.setItem("netlens.hud.traffic", key); } catch (e) { /* only this page remembers it */ }
+      for (const [k, b] of Object.entries(tBtns)) b.setAttribute("aria-pressed", String(k === tRange));
+      traffic();
+    } }, key))));
+  const trafficPanel = h("section", { class: "hud-panel hud-traffic" }, h("div", { class: "hud-panel-head" }, h("h3", {}, "Traffic"), tModeSwitch, tSwitch), tLegend, h("div", { class: "hud-tchart" }, tChart), tNote);
   const radarBox = h("div", { class: "hud-radar" });
   const radarSvg = radar();
   radarBox.appendChild(radarSvg);
@@ -254,7 +311,7 @@ export async function render(container) {
     h("div", { class: "hud-top" }, h("span", { class: "hud-title" }, h("i", { class: "hud-live" }), "Netlens // situation"), scopeSwitch, clock),
     h("div", { class: "hud-left" }, h("section", { class: "hud-panel" }, h("h3", {}, "Vitals"), gauges), h("section", { class: "hud-panel", style: "flex:1" }, h("h3", {}, "Needs attention"), attn)),
     h("div", { class: "hud-mid" }, h("section", { class: "hud-panel hud-radar-panel", style: "flex:1;display:flex;flex-direction:column" }, h("div", { class: "hud-panel-head" }, h("h3", {}, "Network scope"), viewSwitch), caption, radarBox), h("section", { class: "hud-panel" }, stats)),
-    h("div", { class: "hud-right" }, h("section", { class: "hud-panel hud-feed", style: "flex:1" }, h("h3", {}, "Live event stream"), feed)),
+    h("div", { class: "hud-right" }, h("section", { class: "hud-panel hud-feed", style: "flex:1" }, h("h3", {}, "Live event stream"), feed), trafficPanel),
     h("div", { class: "hud-bottom" }, ticker));
   clear(container);
   container.appendChild(root);
@@ -341,6 +398,22 @@ export async function render(container) {
     } catch (err) { /* the next round tries again */ }
   }
 
+  async function traffic() {
+    try {
+      const data = await get(`/api/traffic?range=${tRange}&mode=${tMode}`);
+      if (disposed) return;
+      tChart.update(data);
+      const now = (o, k) => (o && o.now ? o.now[k] : null);
+      const item = (key, label, colour, dash, value) => h("a", { href: "#/health", class: "hud-tl", title: "Open the health monitors" },
+        h("i", { style: `background:${dash ? "transparent" : colour};border:1px ${dash ? "dashed" : "solid"} ${colour}` }), `${label} `, h("b", {}, bps(value)));
+      patch(tLegend, ...LINES.filter(([key]) => key[0] === "d" || data.wan).map(([key, label, colour, dash]) => item(key, label, colour, dash,
+        key === "drx" ? now(data.devices, "rx") : key === "dtx" ? now(data.devices, "tx") : key === "wrx" ? now(data.wan, "rx") : now(data.wan, "tx"))));
+      tNote.textContent = !data.devices.count ? "No monitored device reports traffic yet: set up health monitoring on a device."
+        : !data.wan ? `${data.devices.count} devices, ${data.devices.interfaces} interfaces. No WAN line: monitor the router (SNMP) and choose its internet interface under Settings → Interface.`
+        : `${data.devices.count} devices, ${data.devices.interfaces} interfaces${tMode === "endpoints" ? " (switches, routers and virtual interfaces left out)" : ""} · WAN: ${data.wan.device ? data.wan.device + " · " : ""}${data.wan.label}`;
+    } catch (err) { /* the graph keeps its last picture */ }
+  }
+
   // draws what the last fetch brought, for the chosen set of devices
   function paint() {
     try {
@@ -369,11 +442,12 @@ export async function render(container) {
   }
 
   size();
-  await Promise.all([events(true), overview(), responses()]);
+  await Promise.all([events(true), overview(), responses(), traffic()]);
   if (lastList) drawRadar();
   size();
   const evTimer = setInterval(() => events(false), 4000);
   const ovTimer = setInterval(overview, 15000);
   const rtTimer = setInterval(responses, 5000);
-  return () => { disposed = true; window.removeEventListener("resize", size); clearInterval(clockTimer); clearInterval(evTimer); clearInterval(ovTimer); clearInterval(rtTimer); };
+  const trTimer = setInterval(traffic, 15000);
+  return () => { disposed = true; window.removeEventListener("resize", size); clearInterval(clockTimer); clearInterval(evTimer); clearInterval(ovTimer); clearInterval(rtTimer); clearInterval(trTimer); };
 }

@@ -24,6 +24,7 @@ class InterfaceBody(BaseModel):
     pulse_for: str | None = None
     hud_sweep: bool | None = None
     hud_lines: bool | None = None
+    wan: str | None = None
 
 
 @router.put("/interface")

@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.234 — 2026-10-24
+
+### Added
+- ★ **A traffic graph on the HUD page**, under the events: the in and out bandwidth of all monitored devices combined (two lines), and the internet connection (WAN) of the router on lines of its own (dashed). Choose 1 hour, 6 hours or 24 hours. **All interfaces** adds up every interface of every monitored device; **Endpoints** leaves out switches, routers, access points and virtual interfaces so the same traffic is not counted twice (a Proxmox host counts its bridge, its guests count themselves). The WAN line needs a health monitor (SNMP or SSH) or plugin that records the router's interface speeds; pick the internet interface under **Settings → Interface**, or let Netlens find a router interface named like WAN.
+- `GET /api/traffic?range=1h|6h|24h|7d&mode=all|endpoints`.
+
 ## 0.4.233 — 2026-10-24
 
 ### Added

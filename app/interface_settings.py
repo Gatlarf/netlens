@@ -6,6 +6,7 @@ They are not secret: the sign-in page asks for them too (through /api/session), 
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from typing import Any
 
@@ -20,6 +21,7 @@ DEFAULTS: dict[str, Any] = {
     "pulse_for": "all",              # which devices: all, always_on, critical
     "hud_sweep": True,               # the slow scanline that runs down the screen in the HUD look
     "hud_lines": True,               # the fine scanline texture over the screen in the HUD look
+    "wan": "",                       # the interface that is the internet connection for the traffic graph: "<device id>|<interface name>"; empty = find it
 }
 CHOICES = {"default_look": LOOKS, "pulse_scope": ("hud", "all"), "pulse_for": ("all", "always_on", "critical")}
 
@@ -33,6 +35,10 @@ def clean(key: str, value: Any) -> Any:
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 10:
             raise ValueError("pulse_seconds is a number of seconds from 0 (off) to 10")
         return round(float(value), 1)
+    if key == "wan":
+        if not isinstance(value, str) or (value and not re.fullmatch(r"\d+\|.{1,60}", value)):
+            raise ValueError("wan is a device id and an interface name, like 1|WAN, or empty")
+        return value
     if key in ("hud_sweep", "hud_lines"):
         if not isinstance(value, bool):
             raise ValueError(f"{key} must be true or false")
