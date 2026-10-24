@@ -49,19 +49,39 @@ def _finding(level: str, title: str, detail: str) -> dict[str, str]:
     return {"level": level, "title": title, "detail": detail}
 
 
-def outages(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
-    """Runs of missed checks: start, end (when it was seen again; None while it still is down), number of checks."""
+def _is_beat(row) -> bool:
+    try:
+        return bool(row["beat"])
+    except (IndexError, KeyError):
+        return False
+
+
+def outages(rows: list[sqlite3.Row], misses: int = 1) -> list[dict[str, Any]]:
+    """Runs of missed checks: start, end (when it was seen again; None while it still is down), number of checks.
+
+    A quick check between two scans (`beat`) is one ping: one lost answer is not an outage, so a run only counts once `misses` quick checks in a row
+    were missed. A missed scan already had its second look before it was recorded, so it counts at once. Rows without a `beat` column (older data, tests)
+    are scans, and with misses = 1 every missed check counts, as it always did."""
     found: list[dict[str, Any]] = []
+    pending: list = []                   # down rows not yet enough to call an outage
+    weight = 0
     current: dict[str, Any] | None = None
     for r in rows:
         if not r["up"]:
-            if current is None:
-                current = {"start": r["ts"], "checks": 0, "end": None}
+            if current is not None:
+                current["checks"] += 1
+                continue
+            pending.append(r)
+            weight += 1 if _is_beat(r) else misses
+            if weight >= misses:
+                current = {"start": pending[0]["ts"], "checks": len(pending), "end": None}
                 found.append(current)
-            current["checks"] += 1
-        elif current is not None:
-            current["end"] = r["ts"]
-            current = None
+                pending, weight = [], 0
+        else:
+            if current is not None:
+                current["end"] = r["ts"]
+                current = None
+            pending, weight = [], 0
     for o in found:
         end = _ts(o["end"]) if o["end"] else None
         o["seconds"] = (end - _ts(o["start"])).total_seconds() if end else None
@@ -177,18 +197,22 @@ def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | 
     days = days if days in DAYS else 7
     current = _ts(now) if now else datetime.now(timezone.utc)
     since = (current - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    rows = conn.execute("SELECT ts, up, rtt_ms FROM checks WHERE device_id = ? AND ts >= ? AND beat = 0 ORDER BY ts", (device_id, since)).fetchall()
+    rows = conn.execute("SELECT ts, up, rtt_ms, beat FROM checks WHERE device_id = ? AND ts >= ? ORDER BY ts, id", (device_id, since)).fetchall()
+    from app import beats
+
+    misses = beats.settings(conn)[1]
     result: dict[str, Any] = {"device_id": device_id, "days": days, "checks": len(rows), "findings": []}
     findings = result["findings"]
     address, address_info = address_findings(conn, device_id, since)       # independent of the uptime history: checked first
     result["address"] = address_info
     findings.extend(address)
     if len(rows) < 10:
-        findings.append(_finding("info", "Not enough history yet", f"Only {len(rows)} scan result(s) in the last {days} day(s); a few more scans are needed."))
+        findings.append(_finding("info", "Not enough history yet", f"Only {len(rows)} check(s) in the last {days} day(s); a few more are needed."))
         return result
 
-    down = [r for r in rows if not r["up"]]
-    runs = outages(rows)
+    runs = outages(rows, misses)
+    in_outage = {r["ts"] for r in rows if not r["up"] and any(o["start"] <= r["ts"] and (o["end"] is None or r["ts"] < o["end"]) for o in runs)}
+    down = [r for r in rows if not r["up"] and r["ts"] in in_outage]           # a single lost quick check is not an outage
     result.update({
         "down_checks": len(down), "down_percent": round(100 * len(down) / len(rows), 1), "outages": len(runs),
         "currently_down": bool(rows and not rows[-1]["up"]),
@@ -199,7 +223,7 @@ def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | 
     result["recent_outages"] = [{"start": o["start"], "end": o["end"], "checks": o["checks"], "seconds": o["seconds"]} for o in runs[-10:]][::-1]
 
     if not runs or len(runs) < MIN_OUTAGES and result["down_percent"] < 5:
-        findings.append(_finding("ok", "Not flapping", f"Missed {len(runs)} time(s) in {days} day(s) ({result['down_percent']} % of the scans)."))
+        findings.append(_finding("ok", "Not flapping", f"Missed {len(runs)} time(s) in {days} day(s) ({result['down_percent']} % of the checks)."))
         return result
 
     # ---- the devices behind it, and everything else, at the moments it was missed
@@ -213,7 +237,7 @@ def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | 
         counted = 0
         stayed_up = 0
         for ts in down_ts:
-            total, up = conn.execute(f"SELECT COUNT(*), COALESCE(SUM(up), 0) FROM checks WHERE ts = ? AND beat = 0 AND device_id IN ({marks})", (ts, *behind)).fetchone()
+            total, up = conn.execute(f"SELECT COUNT(*), COALESCE(SUM(up), 0) FROM checks WHERE ts = ? AND device_id IN ({marks})", (ts, *behind)).fetchone()
             if total:
                 counted += 1
                 stayed_up += 1 if up / total >= 0.5 else 0
@@ -223,7 +247,7 @@ def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | 
     others_down = 0
     compared = 0
     for ts in down_ts:
-        total, up = conn.execute("SELECT COUNT(*), COALESCE(SUM(up), 0) FROM checks WHERE ts = ? AND beat = 0 AND device_id != ?", (ts, device_id)).fetchone()
+        total, up = conn.execute("SELECT COUNT(*), COALESCE(SUM(up), 0) FROM checks WHERE ts = ? AND device_id != ?", (ts, device_id)).fetchone()
         if total >= 5:
             compared += 1
             others_down += 1 if (total - up) / total >= 0.5 else 0
@@ -233,7 +257,7 @@ def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | 
     if up_share_behind is not None and up_share_behind >= RESPONSIVE:
         findings.append(_finding(
             "warn", "It is probably running; it just does not answer Netlens",
-            f"In {round(100 * up_share_behind)} % of the scans that missed it, the {len(behind)} device(s) behind it were online, so traffic was passing through it. "
+            f"In {round(100 * up_share_behind)} % of the checks that missed it, the {len(behind)} device(s) behind it were online, so traffic was passing through it. "
             "Most likely it answers Netlens' probes (ARP / ping) late or not at all when busy. Run the live test to see which probe fails."))
     elif up_share_behind is not None and up_share_behind <= 0.3:
         findings.append(_finding(
@@ -250,7 +274,7 @@ def analyze(conn: sqlite3.Connection, device_id: int, days: int = 7, now: str | 
             f"In {round(100 * network_wide)} % of its missed scans, at least half of all other devices were missed too. That points at the scan (Netlens' own network connection, a scan that "
             "timed out, a busy router) and not at this device."))
     elif network_wide is not None and network_wide <= 0.1:
-        findings.append(_finding("info", "Only this device is affected", "Other devices were answering during its gaps, so the scans themselves are working."))
+        findings.append(_finding("info", "Only this device is affected", "Other devices were answering during its gaps, so the checks themselves are working."))
 
     # ---- how long are the gaps
     short = sum(1 for o in runs if o["checks"] == 1)

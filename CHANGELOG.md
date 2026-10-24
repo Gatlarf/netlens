@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.217 — 2026-10-24
+
+### Changed
+- ★ **Flapping detection uses the quick checks.** For a device with quick checks (the always-on devices) Netlens now counts outages, not lost packets: a run only counts once three quick checks in a row were missed (the same number that marks a device offline), a missed scan counts at once, and "flapping" means six or more up/down changes in 24 hours of such outages. One lost answer no longer makes a device look unstable, and a real on-off-on-off pattern shows within minutes. The device page's flapping analysis reads every check (scans and quick checks), so outages and their durations are accurate to the minute.
+
 ## 0.4.215 — 2026-10-24
 
 ### Added

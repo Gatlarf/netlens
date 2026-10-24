@@ -7,6 +7,8 @@ uptime checks (which are pruned after 90 days).
 
 from __future__ import annotations
 
+import itertools
+
 import json
 import os
 import sqlite3
@@ -183,6 +185,28 @@ class memo_scope:
             _local.memo = None
 
 
+def _quick_sequences(conn, since: str, ids: list[int] | None = None) -> dict[int, tuple[int, int]]:
+    """(outages, transitions) since `since` of the devices that have quick checks (beats) in that time, worked out from every check of theirs with the
+    debounce of the quick checks: one lost answer is no outage. The transitions are the same kind of number as the plain count of up/down changes
+    (an outage that ended is two, one that goes on is one), so the flapping limit means the same. Devices without quick checks are not in the result."""
+    from app import beats, flapping
+
+    misses = beats.settings(conn)[1]
+    quick = [r[0] for r in conn.execute("SELECT DISTINCT device_id FROM checks WHERE beat = 1 AND ts >= ?", (since,))]
+    if ids is not None:
+        wanted = set(ids)
+        quick = [d for d in quick if d in wanted]
+    out: dict[int, tuple[int, int]] = {}
+    for i in range(0, len(quick), 400):
+        part = quick[i:i + 400]
+        marks = ",".join("?" * len(part))
+        rows = conn.execute(f"SELECT device_id, ts, up, beat FROM checks WHERE ts >= ? AND device_id IN ({marks}) ORDER BY device_id, ts, id", [since, *part]).fetchall()
+        for device, group in itertools.groupby(rows, key=lambda r: r["device_id"]):
+            runs = flapping.outages(list(group), misses)
+            out[device] = (len(runs), sum(2 if o["end"] else 1 for o in runs))
+    return out
+
+
 def _flaps(conn, since: str, core: bool | None = None) -> dict[int, int]:
     """Per device the changes between up and down among its checks since `since` (only devices that changed at all)."""
     memo = getattr(_local, "memo", None)
@@ -191,6 +215,11 @@ def _flaps(conn, since: str, core: bool | None = None) -> dict[int, int]:
         found = {r[0]: r[1] for r in conn.execute(
             "WITH s AS (SELECT device_id AS d, up, LAG(up) OVER (PARTITION BY device_id ORDER BY ts, id) AS prev FROM checks WHERE ts >= ? AND beat = 0) "
             "SELECT d, SUM(prev IS NOT NULL AND prev != up) AS n FROM s GROUP BY d HAVING n > 0", (since,))}
+        for device, (_outages, transitions) in _quick_sequences(conn, since).items():       # devices with quick checks: counted without the single lost answers
+            if transitions:
+                found[device] = transitions
+            else:
+                found.pop(device, None)
         if memo is not None:
             memo[key] = found
     else:
@@ -213,6 +242,7 @@ def _sequences(conn, ids: list[int], since: str) -> dict[int, tuple[int, int]]:
             "SELECT d, SUM(prev IS NOT NULL AND prev != up), SUM(prev = 1 AND up = 0) + SUM(rn = 1 AND up = 0) FROM s GROUP BY d", [since, *part])
         for d, transitions, outages in rows:
             out[d] = (outages or 0, transitions or 0)
+    out.update(_quick_sequences(conn, since, ids))
     return out
 
 

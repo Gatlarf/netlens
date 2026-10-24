@@ -127,3 +127,40 @@ def test_service_bars_are_slices_with_the_number_of_failed_checks(tmp_path):
     items = api.slices(c, 1, 1, 2)                                    # the last hour in two bars of 30 minutes
     assert sum(i.get("n", 1) for i in items) == 30 and sum(i.get("down", 0) for i in items) == 3
     assert all(not i["up"] for i in items if i.get("down"))
+
+
+def _row(conn, did, minute, up, beat):
+    conn.execute("INSERT INTO checks (device_id, ts, up, rtt_ms, beat) VALUES (?, ?, ?, NULL, ?)", (did, stamp(minute), up, beat))
+
+
+def test_a_single_lost_quick_check_is_no_outage_but_three_in_a_row_are(conn):
+    from app import flapping
+
+    for m, up in enumerate([1, 0, 1, 1, 0, 0, 0, 1, 1]):                # one lost answer, then three in a row
+        _row(conn, 1, m, up, 1)
+    rows = conn.execute("SELECT ts, up, beat FROM checks WHERE device_id = 1 ORDER BY ts").fetchall()
+    runs = flapping.outages(rows, 3)
+    assert len(runs) == 1 and runs[0]["start"] == stamp(4) and runs[0]["checks"] == 3 and runs[0]["seconds"] == 180
+    assert len(flapping.outages(rows, 1)) == 2                           # without the debounce both count
+
+
+def test_a_missed_scan_counts_at_once(conn):
+    from app import flapping
+
+    _row(conn, 1, 0, 1, 0)
+    _row(conn, 1, 15, 0, 0)
+    _row(conn, 1, 30, 1, 0)
+    rows = conn.execute("SELECT ts, up, beat FROM checks WHERE device_id = 1 ORDER BY ts").fetchall()
+    assert len(flapping.outages(rows, 3)) == 1
+
+
+def test_flapping_counts_outages_not_lost_packets_for_devices_with_quick_checks(conn):
+    from app import stats
+
+    for m in range(40):                                                  # device 1: a lost answer every 5 minutes, never three in a row
+        _row(conn, 1, m, 0 if m % 5 == 4 else 1, 1)
+    for m in range(40):                                                  # device 2: down for 3 minutes, up, three times
+        _row(conn, 2, m, 0 if m % 10 in (3, 4, 5) else 1, 1)
+    conn.commit()
+    flaps = stats._flaps(conn, "2026-10-24T11:00:00Z")
+    assert 1 not in flaps and flaps[2] == 8                              # 4 outages (minutes 3-5, 13-15, 23-25, 33-35), each down and up again
