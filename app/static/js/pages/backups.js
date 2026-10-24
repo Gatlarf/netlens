@@ -48,6 +48,7 @@ function storeCard(s, server) {
 }
 
 const openServers = new Set();
+let focused = false;          // "#/backups?focus=problems" opens the servers with a problem once
 
 function targetsTable(targets) {
   const table = h("table", { class: "data" });
@@ -73,8 +74,10 @@ function serverRows(v, data) {
   const full = stores.reduce((m, x) => (x.percent !== null && (m === null || x.percent > m.percent) ? x : m), null);
   const newest = targets.map((t) => t.last_backup).filter(Boolean).sort().pop();
   const state = !v.online ? h("span", { class: "error" }, "Offline") : failed ? h("span", { class: "error" }, "Failed") : late || atRisk || v.warnings.length ? h("span", { class: "warn-text" }, "Attention") : h("span", { class: "run-ok" }, "OK");
+  const bad = !v.online || failed > 0 || late > 0 || atRisk > 0 || v.warnings.length > 0;
+  if (bad && !focused && /[?&]focus=problems/.test(location.hash)) openServers.add(key);
   const expanded = openServers.has(key);
-  const row = h("tr", { class: "clickable", tabindex: "0", role: "button", "aria-expanded": String(expanded) },
+  const row = h("tr", { class: `clickable${bad ? " has-problem" : ""}`, tabindex: "0", role: "button", "aria-expanded": String(expanded) },
     h("td", {}, expanded ? "▾" : "▸"), h("td", {}, state),
     h("td", {}, h("strong", {}, v.name), v.version ? h("span", { class: "hint" }, ` · ${v.version}`) : null),
     h("td", {}, full ? h("span", {}, `${full.percent}%`, h("div", { class: "usage-bar", role: "img", "aria-label": `${full.percent} percent used` }, h("div", { class: `usage-fill ${full.level === "critical" ? "bad" : full.level === "warning" ? "warn" : ""}`, style: `width:${Math.min(100, full.percent)}%` }))) : h("span", { class: "hint" }, "–")),
@@ -127,6 +130,8 @@ function siteRollup(sites) {
 }
 
 export async function render(container) {
+  focused = false;
+  let showProblems = () => {};
   let destroyed = false;
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
   container.append(pageHead("Backups", "What your backup server holds for each guest. It comes from a backup plugin (Plugin store)."), body);
@@ -153,20 +158,27 @@ export async function render(container) {
     if (sitesCard) body.appendChild(sitesCard);
     const s = data.summary;
     const tiles = tileRow();
-    const tile = (label, value, tone) => uiTile(label, value, "", tone);
-    tiles.append(tile("guests with a backup", `${s.protected} / ${s.guests}`, s.unprotected ? "warn" : ""), tile("last backup failed", s.failed, s.failed ? "bad" : ""),
-      tile("not backed up on time", s.late, s.late ? "warn" : ""), tile("stores filling up", s.stores_at_risk, s.stores_at_risk ? "warn" : ""));
+    const go = (n) => (n ? () => showProblems() : null);
+    const unprotectedCard = () => document.getElementById("unprotected-guests")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    tiles.append(uiTile("guests with a backup", `${s.protected} / ${s.guests}`, "", s.unprotected ? "warn" : "", s.unprotected ? unprotectedCard : null), uiTile("last backup failed", s.failed, "", s.failed ? "bad" : "", go(s.failed)),
+      uiTile("not backed up on time", s.late, "", s.late ? "warn" : "", go(s.late)), uiTile("stores filling up", s.stores_at_risk, "", s.stores_at_risk ? "warn" : "", go(s.stores_at_risk)));
     body.appendChild(tiles);
 
     const st = h("table", { class: "data" });
     st.appendChild(h("thead", {}, h("tr", {}, ...["", "State", "Backup server", "Fullest store", "Backed up", "Failed", "Late", "Newest backup"].map((c) => h("th", {}, c)))));
     const sb = h("tbody");
     for (const v of data.servers) for (const r of serverRows(v, data)) sb.appendChild(r);
+    showProblems = () => {
+      const rows = [...sb.querySelectorAll("tr.has-problem")];
+      for (const r of rows) if (r.getAttribute("aria-expanded") !== "true") r.click();
+      if (rows[0]) rows[0].scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    if (!focused) { focused = true; if (/[?&]focus=problems/.test(location.hash)) setTimeout(() => showProblems(), 0); }
     st.appendChild(sb);
     body.append(h("p", { class: "hint" }, "Click a backup server to see its stores, what it holds for each guest and its recent problems."), h("div", { class: "table-wrap" }, st));
 
     if (data.unprotected.length) {
-      const card = h("div", { class: "card" }, h("h3", {}, `Guests without a backup (${data.unprotected.length})`),
+      const card = h("div", { class: "card", id: "unprotected-guests" }, h("h3", {}, `Guests without a backup (${data.unprotected.length})`),
         h("p", { class: "hint" }, "Virtual machines and containers of your hypervisors that the backup server has no backup for. Check the backup jobs of your hypervisor."));
       const list = h("ul", {});
       for (const g of data.unprotected) {

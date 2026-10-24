@@ -96,13 +96,22 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
         add("info", f"Netlens {s['update']['latest']} is available", "#/settings/about")
     gb = s.get("guest_backups") or {}
     if gb.get("failed"):
-        add("bad", f"{gb['failed']} guest backup{'s' if gb['failed'] != 1 else ''} failed", "#/backups")
+        add("bad", f"{gb['failed']} guest backup{'s' if gb['failed'] != 1 else ''} failed", "#/backups?focus=problems")
     if gb.get("late"):
-        add("warn", f"{gb['late']} guest{'s' if gb['late'] != 1 else ''} not backed up on time", "#/backups")
+        add("warn", f"{gb['late']} guest{'s' if gb['late'] != 1 else ''} not backed up on time", "#/backups?focus=problems")
     if gb.get("stores_at_risk"):
-        add("warn", f"{gb['stores_at_risk']} backup store{'s' if gb['stores_at_risk'] != 1 else ''} filling up", "#/backups")
+        add("warn", f"{gb['stores_at_risk']} backup store{'s' if gb['stores_at_risk'] != 1 else ''} filling up", "#/backups?focus=problems")
     if gb.get("unprotected"):
         add("info", f"{gb['unprotected']} guest{'s' if gb['unprotected'] != 1 else ''} without a backup", "#/backups")
+    st = s.get("storage") or {}
+    if st.get("unhealthy"):
+        add("bad", f"{st['unhealthy']} storage system{'s' if st['unhealthy'] != 1 else ''} not healthy", "#/storage?focus=problems")
+    if st.get("failed_disks"):
+        add("bad", f"{st['failed_disks']} failed disk{'s' if st['failed_disks'] != 1 else ''} in your storage", "#/storage?focus=problems")
+    if st.get("pools_filling"):
+        add("warn", f"{st['pools_filling']} storage pool{'s' if st['pools_filling'] != 1 else ''} filling up or unhealthy", "#/storage?focus=problems")
+    if st.get("alerts"):
+        add("warn", f"{st['alerts']} open storage alert{'s' if st['alerts'] != 1 else ''}", "#/storage?focus=problems")
     vu = s.get("vulns") or {}
     if vu.get("allowed") and vu.get("configured"):
         crit = (vu.get("counts") or {}).get("critical", 0)

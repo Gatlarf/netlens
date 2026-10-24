@@ -277,3 +277,10 @@ def test_shared_cards_are_available_to_every_user(tmp_path):
         # unshared: it silently leaves the layouts when they are saved again
         c.put("/api/dashboard/shared", json={"cards": []})
         assert vera.put("/api/dashboard/layout", json={"order": ["uptime", VALUE["id"]], "custom": []}).json()["order"] == ["uptime"]
+
+
+def test_storage_problems_lead_to_the_storage_page():
+    s = _summary_stub()
+    s["storage"] = {"unhealthy": 1, "failed_disks": 2, "pools_filling": 1, "alerts": 3}
+    items = [i for i in dashboard._attention(s, [], 0, []) if "storage" in i["text"]]
+    assert len(items) == 4 and all(i["href"] == "#/storage?focus=problems" for i in items)

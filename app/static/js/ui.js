@@ -9,9 +9,19 @@ export function pageHead(title, hint, ...actions) {
 }
 
 // One summary tile: a small title, a big value and a line below it. `tone` is ok, warn or bad (the coloured edge).
-export function tile(title, value, sub, tone) {
-  return h("section", { class: `dcard ${tone ? `tone-${tone}` : ""}` }, h("h2", { class: "d-title" }, title),
+// href (a #/ address) or onClick makes the whole tile clickable: a problem on a tile leads to the place where it can be seen.
+export function tile(title, value, sub, tone, target) {
+  const node = h("section", { class: `dcard ${tone ? `tone-${tone}` : ""}` }, h("h2", { class: "d-title" }, title),
     h("div", { class: "d-body" }, h("div", { class: "d-value" }, String(value)), sub ? h("div", { class: "d-sub" }, sub) : null));
+  if (target) {
+    const go = () => (typeof target === "function" ? target() : (location.hash = target));
+    node.classList.add("clickable-tile");
+    node.setAttribute("role", "link");
+    node.tabIndex = 0;
+    node.addEventListener("click", go);
+    node.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  }
+  return node;
 }
 
 export function tileRow(...tiles) {

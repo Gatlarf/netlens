@@ -733,3 +733,6 @@ tr.clickable { cursor: pointer; }
 tr.clickable:hover { background: var(--border); }
 .storage-more[hidden] { display: none; }
 .storage-detail { padding: 6px 4px 10px 22px; }
+.clickable-tile { cursor: pointer; }
+.clickable-tile:hover { background: var(--bg); }
+tr.has-problem > td:first-child { box-shadow: inset 3px 0 0 var(--warn, #d97706); }

@@ -24,6 +24,7 @@ function table(heads, rows) {
 }
 
 const open = new Set();
+let focused = false;          // "#/storage?focus=problems" opens the systems with a problem once
 
 function detail(sys, data) {
   const mine = (list) => list.filter((x) => x.plugin_id === sys.plugin_id && x.system_id === sys.id);
@@ -70,8 +71,10 @@ function systemRows(sys, data) {
   const failed = disks.filter((d) => d.state === "failed" || d.state === "degraded").length;
   const top = pools.reduce((m, p) => (p.percent !== null && (m === null || p.percent > m.percent) ? p : m), null);
   const subtitle = [sys.vendor, sys.model, sys.version].filter(Boolean).join(" ");
+  const bad = sys.health === "critical" || sys.health === "warning" || !sys.online || failed > 0 || alerts.length > 0 || pools.some((p) => p.level !== "ok" || p.health === "critical" || p.health === "warning");
+  if (bad && !focused && /[?&]focus=problems/.test(location.hash)) open.add(key);
   const expanded = open.has(key);
-  const row = h("tr", { class: "clickable", tabindex: "0", role: "button", "aria-expanded": String(expanded) },
+  const row = h("tr", { class: `clickable${bad ? " has-problem" : ""}`, tabindex: "0", role: "button", "aria-expanded": String(expanded) },
     h("td", {}, expanded ? "▾" : "▸"),
     h("td", {}, health(sys.health), sys.online ? "" : h("span", { class: "error" }, " · offline")),
     h("td", {}, h("strong", {}, sys.name), subtitle ? h("span", { class: "hint" }, ` · ${subtitle}`) : null),
@@ -94,9 +97,12 @@ function systemRows(sys, data) {
 }
 
 export async function render(container) {
+  focused = false;
   let destroyed = false;
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
   container.append(pageHead("Storage", "Your storage systems: pools, volumes, disks and who uses what. It comes from a storage plugin (Plugin store)."), body);
+
+  let showProblems = () => {};
 
   async function load() {
     let data;
@@ -114,14 +120,21 @@ export async function render(container) {
     }
     const s = data.summary;
     const tiles = tileRow();
-    tiles.append(uiTile("systems", s.systems, "", s.unhealthy ? "bad" : ""), uiTile("pools filling up or unhealthy", s.pools_filling, "", s.pools_filling ? "warn" : ""),
-      uiTile("failed disks", s.failed_disks, "", s.failed_disks ? "bad" : ""), uiTile("open alerts", s.alerts, "", s.alerts ? "warn" : ""));
+    const show = (n) => (n ? () => showProblems() : null);
+    tiles.append(uiTile("systems", s.systems, "", s.unhealthy ? "bad" : "", show(s.unhealthy)), uiTile("pools filling up or unhealthy", s.pools_filling, "", s.pools_filling ? "warn" : "", show(s.pools_filling)),
+      uiTile("failed disks", s.failed_disks, "", s.failed_disks ? "bad" : "", show(s.failed_disks)), uiTile("open alerts", s.alerts, "", s.alerts ? "warn" : "", show(s.alerts)));
     body.appendChild(tiles);
     const t = h("table", { class: "data" });
     t.appendChild(h("thead", {}, h("tr", {}, ...["", "State", "System", "Fullest pool", "Pools", "Volumes", "Disks", "Alerts"].map((c) => h("th", {}, c)))));
     const tb = h("tbody");
     for (const sys of data.systems) for (const r of systemRows(sys, data)) tb.appendChild(r);
+    if (!focused) { focused = true; if (/[?&]focus=problems/.test(location.hash)) setTimeout(() => showProblems(), 0); }
     t.appendChild(tb);
+    showProblems = () => {
+      const rows = [...tb.querySelectorAll("tr.has-problem")];
+      for (const r of rows) if (r.getAttribute("aria-expanded") !== "true") r.click();
+      if (rows[0]) rows[0].scrollIntoView({ behavior: "smooth", block: "start" });
+    };
     body.append(h("p", { class: "hint" }, "Click a system to see its pools, controllers, volumes, disks and alerts."), h("div", { class: "table-wrap" }, t));
   }
 
