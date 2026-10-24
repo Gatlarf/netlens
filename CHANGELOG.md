@@ -2,6 +2,17 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.237 — 2026-10-24
+
+### Added
+- ★ **Routers and access points can report their own health through a plugin.** A topology plugin may now give each node readings (processor, memory, temperature, uptime) and its firmware. Netlens records them like a monitored device: graphs, the Health page, the usual limits (processor and temperature; a router's memory figure includes its cache, so it is graphed but never raises an alert), and a *Firmware update waiting* event when a newer firmware is available. A device that has a health monitor of its own is left alone. The device page says when the health comes from a plugin.
+- ★ **ASUS router plugin 1.5.0: the main router and every AiMesh node.** Processor, memory, temperature, uptime, firmware (with the update that is waiting), the physical ports (cable and speed) and the speed of the interfaces, from the router and from each node that is online. The nodes are asked with the main router's login at the address the router lists for them, so nothing has to be set up per node and a node that gets another address is still found. The new version has to be installed from the Plugin store once it is released.
+
+## 0.4.236 — 2026-10-24
+
+### Added
+- ★ **ASUS router plugin 1.4.0: the speed of the router's interfaces.** The internet connection (WAN), the wired LAN and the Wi-Fi radios of the main router are now graphed, and the WAN line of the traffic graph on the HUD page uses them without SNMP.
+
 ## 0.4.234 — 2026-10-24
 
 ### Added
