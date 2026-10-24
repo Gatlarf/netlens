@@ -357,3 +357,19 @@ def test_api_monthly_and_new_report_settings(tmp_path, conn):
         body = tc.get("/api/reports/monthly").json()
         assert body["title"].startswith("Netlens availability report for") and body["settings"]["monthly"] is True
         assert tc.post("/api/reports/monthly/send").status_code == 409                                      # no channel asks for it yet
+
+
+def test_reliability_goes_into_the_weekly_and_monthly_text(conn):
+    now = datetime(2026, 11, 8, 12, 0, tzinfo=timezone.utc)
+    conn.execute("UPDATE devices SET always_on = 1 WHERE id = 1")
+    conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES ('2026-11-06T10:00:00Z', 1, 'device_offline', 'down')")
+    conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES ('2026-11-06T10:30:00Z', 1, 'device_online', 'up')")
+    conn.commit()
+    data = reports.weekly(conn, now)
+    text = reports.weekly_text(data)[1]
+    assert "Reliability of what matters" in text and "1 outage(s)" in text and "target of 99.5%" in text
+    reports.save_settings(conn, {"reliability": False})
+    data = reports.weekly(conn, now)
+    assert data["reliability"] is None and "Reliability of what matters" not in reports.weekly_text(data)[1]
+    reports.save_settings(conn, {"reliability": True})
+    assert "Reliability of what matters" in reports.monthly_text(reports.monthly(conn, "2026-11", now=now))[1]

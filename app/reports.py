@@ -25,8 +25,8 @@ SETTINGS_KEY = "reports.weekly"
 SENT_KEY = "reports.weekly_sent"
 DEFAULTS = {"enabled": False, "day": 0, "hour": 8,           # Monday, 08:00 (the time of the server)
             "scope": "all",                                  # all devices, or only the always-on ("core") devices
-            "services": True, "new_devices": True, "health": True, "disks": True, "sites": True}     # the parts of the weekly text
-SECTIONS = ("services", "new_devices", "health", "disks", "sites")
+            "services": True, "new_devices": True, "health": True, "disks": True, "sites": True, "reliability": True}     # the parts of the weekly text
+SECTIONS = ("services", "new_devices", "health", "disks", "sites", "reliability")
 SCOPES = ("all", "core")
 HOURS = ("all", "business")
 MONTHLY_KEY = "reports.monthly_sent"
@@ -343,10 +343,41 @@ def weekly(conn, now: datetime | None = None, options: dict[str, Any] | None = N
             sites.append({"name": p["name"], "state": p["state"], "problems": (p.get("problems") or {}).get("count", 0)})
     except Exception:  # noqa: BLE001 - remote sites are optional
         log.debug("remote sites left out of the weekly report", exc_info=True)
-    return {"options": {k: opts[k] for k in ("scope", "hours", "ignore_maintenance", "max_items") + SECTIONS}, "start": a, "end": _fmt(now), "devices": {"total": total, "online": online, "new": new[:10], "new_count": len(new)},
+    return {"reliability": _reliability(conn, 7, now) if opts["reliability"] else None,
+            "options": {k: opts[k] for k in ("scope", "hours", "ignore_maintenance", "max_items") + SECTIONS}, "start": a, "end": _fmt(now), "devices": {"total": total, "online": online, "new": new[:10], "new_count": len(new)},
             "availability": av["summary"], "worst_devices": worst, "worst_services": worst_services, "events": counts,
             "problems": [{k: p[k] for k in ("device", "title", "label", "value", "unit", "level", "since")} for p in problems[:max(10, limit)]],
             "filling": [{k: f[k] for k in ("device", "label", "current", "days_to_full", "full_on")} for f in filling], "sites": sites}
+
+
+def _reliability(conn, days: int, now: datetime | None = None) -> dict[str, Any] | None:
+    from app import reliability
+
+    try:
+        r = reliability.build(conn, days, _fmt(now) if now else None)
+    except Exception:  # noqa: BLE001 - the report goes out without this part rather than not at all
+        log.debug("reliability left out of the report", exc_info=True)
+        return None
+    return r if r["watching"]["devices"] or r["watching"]["services"] else None
+
+
+def reliability_lines(r: dict[str, Any] | None) -> list[str]:
+    """The reliability figures in plain language: availability against the target, outages, recovery time, alert quality."""
+    if not r:
+        return []
+    dev, a = r["devices"], r["alerts"]
+    lines = ["", f"Reliability of what matters (critical and always-on, {r['days']} days):"]
+    if r["availability"] is not None:
+        lines.append(f"  - Availability {_pct(r['availability'])} against a target of {r['target']:g}%: {'met' if r['meets_target'] else 'NOT met'}.")
+    total = dev["outages"] + r["services"]["outages"]
+    lines.append(f"  - {total} outage(s)" + (f", average recovery {duration(r['mttr_seconds'])}, typical {duration(r['median_seconds'])}" if r["mttr_seconds"] is not None else "") + ".")
+    if r["longest"]:
+        w = r["longest"][0]
+        lines.append(f"  - Longest: {w['name']}, {duration(w['seconds'])}{' (still down)' if w['ongoing'] else ''}.")
+    if a["problems"]:
+        lines.append(f"  - Alerts: {a['problems']} sent, {a['cleared_within_5_min']} cleared within 5 minutes" + (f" ({a['noise_percent']}% noise)" if a["noise_percent"] is not None else "")
+                     + f", {a['acknowledged']} acknowledged, {a['escalated']} escalated.")
+    return lines
 
 
 def _pct(v: float | None) -> str:
@@ -393,6 +424,7 @@ def weekly_text(r: dict[str, Any]) -> tuple[str, str]:
     for s in r["sites"]:
         if s["state"] == "silent":
             lines += ["", f"Remote site {s['name']} has stopped reporting."]
+    lines += reliability_lines(r.get("reliability"))
     if not (r["problems"] or r["filling"]) and (opts.get("health", True) or opts.get("disks", True)):
         lines += ["", "No health readings are past a limit and no disk is on course to fill up." if opts.get("health", True) and opts.get("disks", True)
                   else "No health readings are past a limit." if opts.get("health", True) else "No disk is on course to fill up."]
@@ -539,7 +571,7 @@ def monthly(conn, month: str | None = None, options: dict[str, Any] | None = Non
     worst = sorted([d for d in av["devices"] if d["outages"]], key=lambda d: -d["down_seconds"])[:limit]
     worst_services = sorted([s for s in av["services"] if s["outages"]], key=lambda s: -s["down_seconds"])[:limit]
     below = sorted([r for r in av["devices"] + av["services"] if r.get("below_target")], key=lambda r: r["availability"])[:max(limit, 10)]
-    return {"month": month, "summary": av["summary"], "worst_devices": worst, "worst_services": worst_services, "below_target": below,
+    return {"month": month, "reliability": _reliability(conn, 30, now) if opts["reliability"] else None, "summary": av["summary"], "worst_devices": worst, "worst_services": worst_services, "below_target": below,
             "options": {k: opts[k] for k in ("scope", "hours", "ignore_maintenance", "monthly_target")}}
 
 
@@ -576,6 +608,7 @@ def monthly_text(r: dict[str, Any]) -> tuple[str, str]:
     if r["below_target"]:
         lines += ["", f"Below the {opts['monthly_target']:g}% target:"]
         lines += [f"  - {x['name']}: {_pct(x['availability'])}" for x in r["below_target"]]
+    lines += reliability_lines(r.get("reliability"))
     return title, "\n".join(lines)
 
 

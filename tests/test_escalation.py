@@ -112,3 +112,35 @@ def test_api(tmp_path):
         assert client.put("/api/escalation", json={"levels": []}, headers=h).status_code == 422
         assert client.post("/api/escalation/999/ack", headers=h).status_code == 404
     tsdb.forget_all()
+
+
+def test_importance_sets_the_speed(conn):
+    policy(conn)
+    conn.execute("UPDATE devices SET tier = 'critical' WHERE id = 1")
+    conn.commit()
+    add_event(conn, "service_down", "x", device_id=1, now=stamp(8))              # critical: 50% of 15 minutes = 7.5
+    assert [l for _, l, _ in escalation.due(conn, NOW)] == [1]
+    conn.execute("UPDATE devices SET tier = 'normal' WHERE id = 1")
+    conn.execute("UPDATE events SET tier = 'normal'")
+    conn.commit()
+    assert escalation.due(conn, NOW) == []                                         # normal: still within 15 minutes
+
+
+def test_low_importance_never_escalates_and_critical_follows_any_problem(conn):
+    policy(conn)
+    conn.execute("UPDATE devices SET tier = 'low' WHERE id = 1")
+    conn.commit()
+    add_event(conn, "service_down", "x", device_id=1, now=stamp(120))
+    assert escalation.due(conn, NOW) == []
+    conn.execute("UPDATE devices SET tier = 'critical' WHERE id = 1")
+    conn.commit()
+    add_event(conn, "device_offline", "gone", device_id=1, now=stamp(10))          # not one of the default kinds, but critical
+    assert [i["kind"] for i, _, _ in escalation.due(conn, NOW)] == ["device_offline"]
+
+
+def test_timing_is_validated_and_saved(conn):
+    assert policy(conn, timing={"critical": 25, "low": 200})["timing"] == {"critical": 25, "normal": 100, "low": 200}
+    for bad in ({"urgent": 50}, {"critical": 5}, {"normal": "fast"}):
+        with pytest.raises(escalation.PolicyError):
+            policy(conn, timing=bad)
+    assert policy(conn, timing={"normal": None})["timing"]["normal"] is None

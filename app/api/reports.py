@@ -80,6 +80,7 @@ class SettingsBody(BaseModel):
     health: bool | None = None
     disks: bool | None = None
     sites: bool | None = None
+    reliability: bool | None = None    # outages, recovery time and availability against the target
     max_items: int | None = None        # how many outages, disks ... the text lists
     ignore_maintenance: bool | None = None
     hours: str | None = None            # "all" or "business"

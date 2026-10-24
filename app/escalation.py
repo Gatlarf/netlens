@@ -22,6 +22,8 @@ log = logging.getLogger(__name__)
 KEY = "escalation.policy"
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
 LOOKBACK = timedelta(hours=24)
+TIERS = ("critical", "normal", "low")
+DEFAULT_TIMING = {"critical": 50, "normal": 100, "low": None}      # percent of each level's time; None = a low-importance alert never escalates
 
 
 class PolicyError(ValueError):
@@ -34,13 +36,24 @@ def default_kinds() -> list[str]:
     return sorted(CRITICAL)
 
 
+def timing_of(raw: Any) -> dict[str, int | None]:
+    """Per importance: how much of each level's waiting time applies (50 = twice as fast, 200 = twice as slow, None = never escalate)."""
+    out = dict(DEFAULT_TIMING)
+    if isinstance(raw, dict):
+        for tier in TIERS:
+            if tier in raw:
+                v = raw[tier]
+                out[tier] = None if v in (None, 0, "") else (int(v) if isinstance(v, int) and not isinstance(v, bool) and 10 <= v <= 500 else out[tier])
+    return out
+
+
 def get_policy(conn: sqlite3.Connection) -> dict[str, Any]:
     try:
         doc = json.loads(get_setting(conn, KEY) or "{}")
     except ValueError:
         doc = {}
     levels = doc.get("levels") if isinstance(doc.get("levels"), list) else []
-    return {"enabled": bool(doc.get("enabled")), "kinds": doc.get("kinds") if isinstance(doc.get("kinds"), list) and doc["kinds"] else default_kinds(),
+    return {"enabled": bool(doc.get("enabled")), "timing": timing_of(doc.get("timing")), "kinds": doc.get("kinds") if isinstance(doc.get("kinds"), list) and doc["kinds"] else default_kinds(),
             "levels": [{"after_min": int(l["after_min"]), "channels": [str(c) for c in l.get("channels", [])]} for l in levels if isinstance(l, dict) and str(l.get("after_min", "")).isdigit()]
             or [{"after_min": 15, "channels": []}]}
 
@@ -69,7 +82,15 @@ def save_policy(conn: sqlite3.Connection, data: dict) -> dict[str, Any]:
         raise PolicyError("the levels must have increasing times")
     if len(levels) > 4:
         raise PolicyError("at most four levels")
-    set_setting(conn, KEY, json.dumps({"enabled": bool(data.get("enabled")), "kinds": kinds, "levels": levels}))
+    timing = data.get("timing") or {}
+    if not isinstance(timing, dict):
+        raise PolicyError("the timing per importance is a table of percentages")
+    for tier, v in timing.items():
+        if tier not in TIERS:
+            raise PolicyError(f"unknown importance {tier!r}")
+        if v not in (None, 0, "") and (not isinstance(v, int) or isinstance(v, bool) or not 10 <= v <= 500):
+            raise PolicyError(f"{tier}: the timing is between 10 and 500 percent, or empty for never")
+    set_setting(conn, KEY, json.dumps({"enabled": bool(data.get("enabled")), "kinds": kinds, "levels": levels, "timing": {t: timing.get(t, DEFAULT_TIMING[t]) for t in TIERS}}))
     return get_policy(conn)
 
 
@@ -87,14 +108,21 @@ def open_items(conn: sqlite3.Connection, now: datetime | None = None) -> list[di
     now = now or datetime.now(timezone.utc)
     policy = get_policy(conn)
     since = (now - LOOKBACK).strftime(STAMP)
+    from app.remediation import RECOVERY
+
     marks = ",".join("?" for _ in policy["kinds"])
+    problems = sorted(RECOVERY)                                  # whatever the chosen events, a problem on something critical is always followed
+    pmarks = ",".join("?" for _ in problems)
     out = []
     for e in conn.execute(f"SELECT e.*, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.mac, d.vendor, d.trusted FROM events e LEFT JOIN devices d ON d.id = e.device_id "
-                          f"WHERE e.ts >= ? AND e.kind IN ({marks}) AND (e.maintenance IS NULL OR e.maintenance = '') ORDER BY e.id", (since, *policy["kinds"])):
+                          f"WHERE e.ts >= ? AND (e.kind IN ({marks}) OR (e.tier = 'critical' AND e.kind IN ({pmarks}))) AND (e.maintenance IS NULL OR e.maintenance = '') ORDER BY e.id",
+                          (since, *policy["kinds"], *problems)):
+        if policy["timing"].get(e["tier"] or "normal", 100) is None:
+            continue
         state = conn.execute("SELECT * FROM escalation_state WHERE event_id = ?", (e["id"],)).fetchone()
         if (state and state["acked_at"]) or _resolved(conn, e):
             continue
-        out.append({"id": e["id"], "ts": e["ts"], "kind": e["kind"], "detail": e["detail"], "device": e["name"], "device_id": e["device_id"], "level": state["level"] if state else 0, "event": dict(e)})
+        out.append({"id": e["id"], "ts": e["ts"], "kind": e["kind"], "detail": e["detail"], "device": e["name"], "device_id": e["device_id"], "level": state["level"] if state else 0, "tier": e["tier"] or "normal", "event": dict(e)})
     return out
 
 
@@ -116,8 +144,9 @@ def due(conn: sqlite3.Connection, now: datetime | None = None) -> list[tuple[dic
     for item in open_items(conn, now):
         age = now - datetime.strptime(item["ts"], STAMP).replace(tzinfo=timezone.utc)
         reached = item["level"]
+        scale = (policy["timing"].get(item["tier"]) or 100) / 100
         for index, level in enumerate(policy["levels"], 1):
-            if index > reached and age >= timedelta(minutes=level["after_min"]):
+            if index > reached and age >= timedelta(minutes=level["after_min"] * scale):
                 out.append((item, index, level["channels"]))
                 reached = index
     return out
@@ -133,7 +162,7 @@ async def process(db_path: str, *, now: datetime | None = None, poster=None, mai
     try:
         by_id = {str(c.get("id")): c for c in ch.load_channels(conn)}
         for item, level, ids in due(conn, now):
-            title = f"ESCALATION {level}: {ch.build_digest([item['event']])[0]}"
+            title = f"ESCALATION {level}{' (critical)' if item['tier'] == 'critical' else ''}: {ch.build_digest([item['event']])[0]}"
             body = f"Nobody has acknowledged this for {int((now - datetime.strptime(item['ts'], STAMP).replace(tzinfo=timezone.utc)).total_seconds() // 60)} minutes.\n\n{item['detail'] or item['kind']}"
             from app import oncall
 

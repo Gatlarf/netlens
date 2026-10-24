@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.225 — 2026-10-24
+
+### Added
+- ★ **Escalation follows importance.** Under Settings → Escalation a new "Speed by importance" row sets how fast each importance escalates: critical alerts by default twice as fast (50% of each level's time), normal alerts as set, low-importance alerts never. A problem on something marked critical is now always followed, even when its kind is not among the chosen events. Escalation messages for critical problems say so.
+- ★ **Reliability in the e-mails.** The weekly report (7 days) and the monthly report (30 days) end with a reliability part: availability against your target, the number of outages, the average and typical time to recover, the longest outage and the quality of the alerts (noise, acknowledged, escalated). Switch it off under Reports → Include → Reliability.
+
 ## 0.4.223 — 2026-10-24
 
 ### Changed

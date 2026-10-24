@@ -155,7 +155,7 @@ export async function render(container) {
       // what the report covers: all devices or only the always-on ones, and which parts of the text
       const scope = h("select", {}, h("option", { value: "all" }, "All devices"), h("option", { value: "core" }, "Always-on devices only"));
       scope.value = w.settings.scope || "all";
-      const parts = [["services", "Service checks"], ["new_devices", "New devices"], ["health", "Health readings past a limit"], ["disks", "Disks filling up"], ["sites", "Remote sites"]];
+      const parts = [["services", "Service checks"], ["new_devices", "New devices"], ["health", "Health readings past a limit"], ["disks", "Disks filling up"], ["sites", "Remote sites"], ["reliability", "Reliability (recovery time, target)"]];
       const boxes = parts.map(([key, label]) => {
         const box = h("input", { type: "checkbox" });
         box.checked = w.settings[key] !== false;
