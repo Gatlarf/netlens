@@ -2,7 +2,7 @@
   "id": "asus",
   "name": "ASUS router (AiMesh)",
   "kind": "topology",
-  "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) so the hierarchy and the map show every client's real network position. Read-only: one login, two reads and a logout per sync, never SSH, so no sessions are left open on the router. A refused login pauses automatic syncing so the router does not lock the account.",
+  "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) for the hierarchy and the map, the router's Traffic Analyzer (traffic per application and per device), and the health of the router and every node: processor, memory, temperature, uptime, firmware, ports and interface speeds (internet, LAN, Wi-Fi). Read-only, never SSH: one login per router, a few reads and a logout per sync. A refused login pauses automatic syncing.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/asus",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -11,6 +11,15 @@
     "other stock ASUSWRT/AiMesh routers"
   ],
   "releases": [
+    {
+      "version": "1.5.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.5.0/asus.zip",
+      "sha256": "7f0c7b6df39d7f586689fae5c540a66c5cdf0d4a09cf6b4401ef0e2a70188ed1",
+      "api_version": 1,
+      "min_netlens": "0.4.237",
+      "released": "2026-10-25",
+      "changelog": "The health of the main router and of every AiMesh node: processor, memory, temperature, uptime, firmware (and the update that is waiting), the physical ports (cable and speed) and the speed of the interfaces (internet, wired, Wi-Fi radios), read with the main router's login at the address the router lists for each node. Nothing to set up per node; switches in the plugin settings turn it off. Includes the interface speeds planned as 1.4.0. Needs Netlens 0.4.237."
+    },
     {
       "version": "1.3.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.3.0/asus.zip",

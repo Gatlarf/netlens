@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.1.0/mikrotik.zip",
+      "sha256": "80bd00951826ce558e43b7c859b9efe19a9213e469b670b5d6e22d216221e4fe",
+      "api_version": 1,
+      "min_netlens": "0.4.237",
+      "released": "2026-10-25",
+      "changelog": "The health of every device: processor, memory, temperature, uptime, firmware (and the newest version the router already knows of), the ports with link, speed and counters, and the interface of the default route as the internet connection. New setting Read the health of the devices. Needs Netlens 0.4.237."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.0.1/mikrotik.zip",
       "sha256": "3de567f3ecc80619ca4a292d1cea39df44bcb0edd884f9288312454fb71c3981",

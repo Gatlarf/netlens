@@ -2,6 +2,17 @@
   "id": "mikrotik",
   "reviews": [
     {
+      "version": "1.1.0",
+      "sha256": "80bd00951826ce558e43b7c859b9efe19a9213e469b670b5d6e22d216221e4fe",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-25",
+      "tested_on": [
+        "RouterOS 7.12.1 CHR (QEMU): processor, memory, uptime, firmware, the port and the default route's interface were read; a CHR has no temperature sensor and no physical port speed, so those follow the documentation"
+      ],
+      "notes": "Written with the assistant Claude. New: a few extra read-only GETs per device. Reviewed, not yet confirmed by the maintainer."
+    },
+    {
       "version": "1.0.1",
       "sha256": "3de567f3ecc80619ca4a292d1cea39df44bcb0edd884f9288312454fb71c3981",
       "level": "reviewed",

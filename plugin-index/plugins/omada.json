@@ -2,7 +2,7 @@
   "id": "omada",
   "name": "TP-Link Omada",
   "kind": "topology",
-  "description": "Reads an Omada controller (5.1 or newer): gateway, switches and access points, which device hangs below which, which switch or access point each client is connected to, with Wi-Fi signal, band and link rate, switch ports and, with an Open API client, application statistics (DPI). Read-only. Not yet tested on real hardware.",
+  "description": "Reads the Omada controller (software controller, OC200/OC300 or Omada Cloud-less hardware, version 5.1 or newer): gateway, switches and access points, which device hangs below which, which switch or access point every client is on, with Wi-Fi signal and link rate, the ports of every switch (link, speed, duplex, traffic), and each device's processor, memory, uptime and firmware (with a waiting upgrade). With an Open API client it also reads the application statistics (DPI). Read-only.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/omada",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -11,6 +11,15 @@
     "OC200 / OC300 hardware controllers (not yet tested)"
   ],
   "releases": [
+    {
+      "version": "1.4.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.4.0/omada.zip",
+      "sha256": "36539662f85b29d4000a1c36ba2f6a79f3e69a72c03cc95d2e91014479eb7b54",
+      "api_version": 1,
+      "min_netlens": "0.4.237",
+      "released": "2026-10-25",
+      "changelog": "Processor, memory, uptime and firmware (with a waiting upgrade) of every device, from the device list the plugin already reads. Needs Netlens 0.4.237."
+    },
     {
       "version": "1.3.3",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.3.3/omada.zip",

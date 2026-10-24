@@ -2,7 +2,7 @@
   "id": "unifi",
   "name": "Ubiquiti UniFi",
   "kind": "topology",
-  "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine and Cloud Key Gen2+, or a classic self-hosted controller): gateway, switches and access points, which device hangs below which, and which switch or access point each client is connected to, with Wi-Fi signal, band and link rate. Read-only. Tested on real UniFi hardware by the maintainer.",
+  "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine, Cloud Key Gen2+, Cloud Gateway, or a self-hosted classic controller): gateway, switches and access points, which device hangs below which, which switch or access point every client is on with Wi-Fi signal and link rate, and each device's health: processor, memory, temperature, uptime, firmware (and the waiting upgrade), ports and WAN speed. Read-only: one login, a few reads and a logout per sync.",
   "author": "Netlens",
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unifi",
   "license": "PolyForm-Noncommercial-1.0.0",
@@ -11,6 +11,15 @@
     "UniFi OS consoles (Dream Machine, Cloud Gateway, Cloud Key Gen2+) and the classic self-hosted controller on port 8443 are both supported by the code"
   ],
   "releases": [
+    {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.1.0/unifi.zip",
+      "sha256": "4a489650f57c5fd7f5e284b2f2837d4b5df5b55972b114ed72ec6035a529fa7e",
+      "api_version": 1,
+      "min_netlens": "0.4.237",
+      "released": "2026-10-25",
+      "changelog": "The health of every device from the device list the plugin already reads: processor, memory, temperature, uptime, firmware (and the waiting upgrade), ports with link, speed and counters, and the WAN connections. Needs Netlens 0.4.237."
+    },
     {
       "version": "1.0.2",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.0.2/unifi.zip",

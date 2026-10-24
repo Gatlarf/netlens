@@ -120,7 +120,7 @@
    "id": "asus",
    "name": "ASUS router (AiMesh)",
    "kind": "topology",
-   "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) so the hierarchy and the map show every client's real network position. Read-only: one login, two reads and a logout per sync, never SSH, so no sessions are left open on the router. A refused login pauses automatic syncing so the router does not lock the account.",
+   "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) for the hierarchy and the map, the router's Traffic Analyzer (traffic per application and per device), and the health of the router and every node: processor, memory, temperature, uptime, firmware, ports and interface speeds (internet, LAN, Wi-Fi). Read-only, never SSH: one login per router, a few reads and a logout per sync. A refused login pauses automatic syncing.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/asus",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -129,6 +129,24 @@
     "other stock ASUSWRT/AiMesh routers"
    ],
    "releases": [
+    {
+     "version": "1.5.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.5.0/asus.zip",
+     "sha256": "7f0c7b6df39d7f586689fae5c540a66c5cdf0d4a09cf6b4401ef0e2a70188ed1",
+     "api_version": 1,
+     "min_netlens": "0.4.237",
+     "released": "2026-10-25",
+     "changelog": "The health of the main router and of every AiMesh node: processor, memory, temperature, uptime, firmware (and the update that is waiting), the physical ports (cable and speed) and the speed of the interfaces (internet, wired, Wi-Fi radios), read with the main router's login at the address the router lists for each node. Nothing to set up per node; switches in the plugin settings turn it off. Includes the interface speeds planned as 1.4.0. Needs Netlens 0.4.237.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-25",
+      "tested_on": [
+       "ASUS RT-AX92U (main router and three AiMesh nodes) and an RT-AX56U node running stock ASUSWRT, the maintainer's network: every read was run against them; all five routers returned processor, memory and temperature, four returned the uptime, and four had a firmware update waiting"
+      ],
+      "notes": "Written with the assistant Claude. New: more read-only requests per sync (a login per router and the router's own status pages). The nodes accept the main router's login. Reviewed, not yet confirmed by the maintainer."
+     }
+    },
     {
      "version": "1.3.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.3.0/asus.zip",
@@ -1098,6 +1116,24 @@
    ],
    "releases": [
     {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.1.0/mikrotik.zip",
+     "sha256": "80bd00951826ce558e43b7c859b9efe19a9213e469b670b5d6e22d216221e4fe",
+     "api_version": 1,
+     "min_netlens": "0.4.237",
+     "released": "2026-10-25",
+     "changelog": "The health of every device: processor, memory, temperature, uptime, firmware (and the newest version the router already knows of), the ports with link, speed and counters, and the interface of the default route as the internet connection. New setting Read the health of the devices. Needs Netlens 0.4.237.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-25",
+      "tested_on": [
+       "RouterOS 7.12.1 CHR (QEMU): processor, memory, uptime, firmware, the port and the default route's interface were read; a CHR has no temperature sensor and no physical port speed, so those follow the documentation"
+      ],
+      "notes": "Written with the assistant Claude. New: a few extra read-only GETs per device. Reviewed, not yet confirmed by the maintainer."
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.0.1/mikrotik.zip",
      "sha256": "3de567f3ecc80619ca4a292d1cea39df44bcb0edd884f9288312454fb71c3981",
@@ -1382,7 +1418,7 @@
    "id": "omada",
    "name": "TP-Link Omada",
    "kind": "topology",
-   "description": "Reads an Omada controller (5.1 or newer): gateway, switches and access points, which device hangs below which, which switch or access point each client is connected to, with Wi-Fi signal, band and link rate, switch ports and, with an Open API client, application statistics (DPI). Read-only. Not yet tested on real hardware.",
+   "description": "Reads the Omada controller (software controller, OC200/OC300 or Omada Cloud-less hardware, version 5.1 or newer): gateway, switches and access points, which device hangs below which, which switch or access point every client is on, with Wi-Fi signal and link rate, the ports of every switch (link, speed, duplex, traffic), and each device's processor, memory, uptime and firmware (with a waiting upgrade). With an Open API client it also reads the application statistics (DPI). Read-only.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/omada",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -1391,6 +1427,18 @@
     "OC200 / OC300 hardware controllers (not yet tested)"
    ],
    "releases": [
+    {
+     "version": "1.4.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.4.0/omada.zip",
+     "sha256": "36539662f85b29d4000a1c36ba2f6a79f3e69a72c03cc95d2e91014479eb7b54",
+     "api_version": 1,
+     "min_netlens": "0.4.237",
+     "released": "2026-10-25",
+     "changelog": "Processor, memory, uptime and firmware (with a waiting upgrade) of every device, from the device list the plugin already reads. Needs Netlens 0.4.237.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.3.3",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.3.3/omada.zip",
@@ -2731,7 +2779,7 @@
    "id": "unifi",
    "name": "Ubiquiti UniFi",
    "kind": "topology",
-   "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine and Cloud Key Gen2+, or a classic self-hosted controller): gateway, switches and access points, which device hangs below which, and which switch or access point each client is connected to, with Wi-Fi signal, band and link rate. Read-only. Tested on real UniFi hardware by the maintainer.",
+   "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine, Cloud Key Gen2+, Cloud Gateway, or a self-hosted classic controller): gateway, switches and access points, which device hangs below which, which switch or access point every client is on with Wi-Fi signal and link rate, and each device's health: processor, memory, temperature, uptime, firmware (and the waiting upgrade), ports and WAN speed. Read-only: one login, a few reads and a logout per sync.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unifi",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -2740,6 +2788,18 @@
     "UniFi OS consoles (Dream Machine, Cloud Gateway, Cloud Key Gen2+) and the classic self-hosted controller on port 8443 are both supported by the code"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.1.0/unifi.zip",
+     "sha256": "4a489650f57c5fd7f5e284b2f2837d4b5df5b55972b114ed72ec6035a529fa7e",
+     "api_version": 1,
+     "min_netlens": "0.4.237",
+     "released": "2026-10-25",
+     "changelog": "The health of every device from the device list the plugin already reads: processor, memory, temperature, uptime, firmware (and the waiting upgrade), ports with link, speed and counters, and the WAN connections. Needs Netlens 0.4.237.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.2",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.0.2/unifi.zip",

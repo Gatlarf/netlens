@@ -2,6 +2,17 @@
   "id": "asus",
   "reviews": [
     {
+      "version": "1.5.0",
+      "sha256": "7f0c7b6df39d7f586689fae5c540a66c5cdf0d4a09cf6b4401ef0e2a70188ed1",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-25",
+      "tested_on": [
+        "ASUS RT-AX92U (main router and three AiMesh nodes) and an RT-AX56U node running stock ASUSWRT, the maintainer's network: every read was run against them; all five routers returned processor, memory and temperature, four returned the uptime, and four had a firmware update waiting"
+      ],
+      "notes": "Written with the assistant Claude. New: more read-only requests per sync (a login per router and the router's own status pages). The nodes accept the main router's login. Reviewed, not yet confirmed by the maintainer."
+    },
+    {
       "version": "1.3.0",
       "sha256": "fd6ec666e39eec8b738cd4a848fdfc0896db43d6b4bee84d820e1870a159602e",
       "level": "reviewed",
