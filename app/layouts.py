@@ -11,7 +11,8 @@ import re
 import sqlite3
 from typing import Any
 
-PAGES = ("device",)
+PAGES = ("device", "stats")
+SIZES = ("s", "w", "f")      # one column, two columns, the whole row
 ID = re.compile(r"^[a-z0-9_.-]{1,48}$")
 TYPE = re.compile(r"^(\*|[a-z0-9_-]{1,30})$")
 
@@ -33,7 +34,7 @@ def check(page: str, type_: str) -> None:
 
 
 def clean(payload: Any) -> dict:
-    """The layout as it is stored: {"order": {tab: [card ids]}, "hidden": [ids], "full": [ids]}."""
+    """The layout as it is stored: {"order": {tab: [card ids]}, "hidden": [ids], "sizes": {id: s|w|f}}."""
     if not isinstance(payload, dict):
         raise ValueError("a layout is an object")
 
@@ -47,8 +48,11 @@ def clean(payload: Any) -> dict:
         return out
 
     order = payload.get("order") if isinstance(payload.get("order"), dict) else {}
+    sizes = {k: v for k, v in list(payload["sizes"].items())[:120] if isinstance(k, str) and ID.match(k) and v in SIZES} if isinstance(payload.get("sizes"), dict) else {}
+    for k in ids(payload.get("full")):          # layouts saved before widths had three steps
+        sizes.setdefault(k, "f")
     return {"order": {t: ids(v) for t, v in list(order.items())[:12] if isinstance(t, str) and ID.match(t)},
-            "hidden": ids(payload.get("hidden")), "full": ids(payload.get("full"))}
+            "hidden": ids(payload.get("hidden")), "sizes": sizes}
 
 
 def _read(conn: sqlite3.Connection, key: str) -> dict | None:

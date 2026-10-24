@@ -88,7 +88,6 @@ label.check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 /* ---- Statistics page ---- */
 .stats-body { display: flex; flex-direction: column; gap: 8px; }
 .stat-section > h3 { margin: 18px 0 8px; }
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; align-items: start; }
 .stat-grid > .tiles { grid-column: 1 / -1; }
 .stat-card h2 { font-size: 1em; margin-top: 0; }
 .stat-card h4 { margin: 12px 0 6px; font-size: 0.9em; }
@@ -738,8 +737,6 @@ tr.clickable:hover { background: var(--border); }
 tr.has-problem > td:first-child { box-shadow: inset 3px 0 0 var(--warn, #d97706); }
 
 /* Card layouts (device page): cards flow over two columns; a wide card spans both */
-.dev-flow > [hidden] { display: none !important; }
-.dev-flow > .dev-full { column-span: all; }
 .dev-customize { margin-left: auto; }
 .lay-drawer { position: fixed; top: var(--topbar-h, 52px); right: 0; bottom: 0; width: min(340px, 100vw); z-index: 30; overflow-y: auto; padding: 12px; background: var(--surface); border-left: 1px solid var(--border); box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18); }
 .lay-head { display: flex; justify-content: space-between; align-items: center; }
@@ -748,20 +745,44 @@ tr.has-problem > td:first-child { box-shadow: inset 3px 0 0 var(--warn, #d97706)
 .lay-list li { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .lay-tools { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .lay-actions { display: grid; gap: 6px; margin-top: 10px; }
-.dev-panel.dev-flow { display: block; }
 
 /* Wide and ultra-wide screens: use the width with more columns instead of stretching a few */
 .settings-content > .card { max-width: 1500px; }
 .settings-content .card input:is([type="text"], [type="password"], [type="number"], [type="url"], [type="email"], [type="search"]) { max-width: 720px; }
-@media (min-width: 1900px) { .dev-flow { column-count: 3; } .up-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 2800px) { .dev-flow { column-count: 4; } .up-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1900px) { .up-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 2800px) { .up-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background: var(--surface); color: inherit; }
 .dns-chip.active { box-shadow: 0 0 0 2px var(--accent); }
 /* remote access: one line per device, the session buttons on the right */
 .remote-dev { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
 .remote-list { max-height: calc(100vh - 230px); }
-.dev-flow > [data-card]:empty { display: none; }
 /* a card in the flowing columns never lets its table run over the neighbouring column: the table scrolls inside the card */
-.dev-flow > * { min-width: 0; }
 .dev-flow .card { overflow-x: auto; }
 .dev-flow .card td .btn { white-space: nowrap; }
+
+/* ---- the editing kit (js/board.js): a bar on every card, a drawer on the right ---- */
+[data-card].bd-card { position: relative; }
+.bd-editing [data-card] { outline: 1px dashed var(--border); outline-offset: 2px; }
+.bd-bar { position: absolute; top: 6px; right: 6px; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 2px 4px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.bd-btn, .bd-grip { background: none; border: 0; color: var(--muted); font: inherit; font-size: 1rem; line-height: 1; cursor: pointer; padding: 4px 7px; border-radius: var(--radius-sm); }
+.bd-btn:hover, .bd-grip:hover { background: var(--bg); color: var(--text); }
+.bd-grip { cursor: grab; letter-spacing: -3px; touch-action: none; user-select: none; }
+.bd-drawer { position: fixed; z-index: 40; top: var(--topbar-h, 52px); right: 0; bottom: 0; width: min(360px, 92vw); display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18); }
+.bd-drawer header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; }
+.bd-drawer h2 { margin: 0; font-size: 1.05rem; }
+.bd-drawer .bd-pick { margin: 0 14px 8px; }
+.bd-drawer .hint { margin: 0 0 6px; }
+.bd-drawer footer { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-top: 1px solid var(--border); }
+.bd-drawer .mk-opts { flex: 1; overflow-y: auto; }
+@media (min-width: 1100px) { body.bd-open .view { margin-right: 372px; } }
+.mk-ghost { position: fixed; z-index: 100; pointer-events: none; opacity: 0.92; box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35); transform: rotate(0.8deg); margin: 0; }
+.mk-moving { opacity: 0.25; outline: 2px dashed var(--accent); }
+
+/* pages of cards: a grid of at most four columns; a card is narrow (one column), wide (two) or full width (see js/board.js) */
+.dev-flow, .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(420px, calc((100% - 36px) / 4)), 1fr)); grid-auto-flow: row dense; gap: 12px; align-items: start; }
+.dev-flow > *, .stat-grid > * { margin: 0; min-width: 0; }
+.dev-flow > .bd-w, .stat-grid > .bd-w { grid-column: span 2; }
+.dev-flow > .bd-f, .stat-grid > .bd-f { grid-column: 1 / -1; }
+.dev-flow > [hidden], .stat-grid > [hidden], .dev-flow > [data-card]:empty { display: none !important; }
+@media (max-width: 900px) { .dev-flow, .stat-grid { grid-template-columns: minmax(0, 1fr); } .dev-flow > .bd-w, .stat-grid > .bd-w { grid-column: auto; } }
+.stat-panel { display: block; }

@@ -97,7 +97,7 @@ def test_top_bar_group_class_does_not_clash_with_the_settings_menu():
 
 
 # ---- the layout is kept per user on the server ----
-NONE = {"order": None, "custom": []}
+NONE = {"order": None, "custom": [], "sizes": {}}
 def test_every_user_keeps_their_own_layout_and_a_viewer_may_arrange_theirs(tmp_path):
     from tests.test_users import ADMIN, make, sign_in
 
@@ -107,11 +107,11 @@ def test_every_user_keeps_their_own_layout_and_a_viewer_may_arrange_theirs(tmp_p
         make(c, "vera", "viewer")
         alice, vera = sign_in(app, "alice"), sign_in(app, "vera")
         assert alice.get("/api/dashboard/layout").json() == NONE and vera.get("/api/dashboard/layout").json() == NONE
-        assert alice.put("/api/dashboard/layout", json={"order": ["uptime", "devices", "uptime"]}).json() == {"order": ["uptime", "devices"], "custom": []}    # no duplicates
+        assert alice.put("/api/dashboard/layout", json={"order": ["uptime", "devices", "uptime"]}).json() == {"order": ["uptime", "devices"], "custom": [], "sizes": {}}    # no duplicates
         assert vera.put("/api/dashboard/layout", json={"order": ["events"]}).status_code == 200                                                  # a viewer arranges their own
         # another browser or device of the same user sees the same layout; other users see theirs
-        assert sign_in(app, "alice").get("/api/dashboard/layout").json() == {"order": ["uptime", "devices"], "custom": []}
-        assert vera.get("/api/dashboard/layout").json() == {"order": ["events"], "custom": []}
+        assert sign_in(app, "alice").get("/api/dashboard/layout").json() == {"order": ["uptime", "devices"], "custom": [], "sizes": {}}
+        assert vera.get("/api/dashboard/layout").json() == {"order": ["events"], "custom": [], "sizes": {}}
         assert c.get("/api/dashboard/layout", headers=ADMIN).json() == NONE                                                           # the access token has its own
         assert vera.delete("/api/dashboard/layout").json() == NONE and vera.get("/api/dashboard/layout").json() == NONE
         assert alice.get("/api/dashboard/layout").json()["order"] == ["uptime", "devices"]
@@ -150,7 +150,7 @@ def test_cards_of_your_own_are_saved_with_the_layout(admin):
     assert saved["order"] == ["uptime", "c-abc123", "c-note01"]                    # a card of your own that does not exist is dropped
     assert [c["id"] for c in saved["custom"]] == [c["id"] for c in cards] and saved["custom"][0]["warn"] == 300
     assert admin.get("/api/dashboard/layout").json() == saved
-    assert admin.delete("/api/dashboard/layout").json() == {"order": None, "custom": []}
+    assert admin.delete("/api/dashboard/layout").json() == {"order": None, "custom": [], "sizes": {}}
 
 
 @pytest.mark.parametrize("card", [
@@ -217,7 +217,7 @@ def test_administrator_default_dashboard(tmp_path):
         alice, vera = sign_in(app, "alice"), sign_in(app, "vera")
         assert vera.get("/api/dashboard/default").json() == NONE
         note = {"id": "c-abc123", "type": "notes", "title": "Links", "text": "Hello", "links": []}
-        assert alice.put("/api/dashboard/default", json={"order": ["uptime", "c-abc123", "c-gone99"], "custom": [note]}).json() == {"order": ["uptime", "c-abc123"], "custom": [note]}
+        assert alice.put("/api/dashboard/default", json={"order": ["uptime", "c-abc123", "c-gone99"], "custom": [note]}).json() == {"order": ["uptime", "c-abc123"], "custom": [note], "sizes": {}}
         # everybody can read it, only an administrator can change or remove it
         assert vera.get("/api/dashboard/default").json()["order"] == ["uptime", "c-abc123"]
         assert vera.put("/api/dashboard/default", json={"order": ["events"]}).status_code == 403
@@ -284,3 +284,13 @@ def test_storage_problems_lead_to_the_storage_page():
     s["storage"] = {"unhealthy": 1, "failed_disks": 2, "pools_filling": 1, "alerts": 3}
     items = [i for i in dashboard._attention(s, [], 0, []) if "storage" in i["text"]]
     assert len(items) == 4 and all(i["href"] == "#/storage?focus=problems" for i in items)
+
+
+def test_card_widths_are_kept_and_cleaned(tmp_path):
+    from app.db import connect, init_db
+
+    c = connect(tmp_path / "w.db")
+    init_db(c)
+    saved = dashboard.set_layout(c, None, ["devices", "uptime"], [], {"devices": "f", "uptime": "huge", "gone": "w", "bad id": "w"})
+    assert saved["sizes"] == {"devices": "f"}
+    assert dashboard.get_layout(c, None)["sizes"] == {"devices": "f"}

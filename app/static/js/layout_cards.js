@@ -1,40 +1,48 @@
-// Card layouts for pages made of cards (the device page): hide, reorder and widen cards, saved on the server per user and per device type,
-// with templates an administrator pushes to everybody. Cards are elements with data-card (an id) and data-title; a panel holds them in
-// one ".dev-flow" container.
+// Card layouts for pages made of cards in sections (the device page, Statistics): hide, reorder and resize cards with the editing kit of
+// board.js. A layout is saved on the server per user and per page type (a device type, or "*" for all), with templates an administrator
+// pushes to everybody. Cards are elements with data-card (an id), data-title and optionally data-kind and data-size (s, w or f).
 import { get, put, del } from "./api.js";
-import { h, clear, toast } from "./util.js";
+import { h, toast } from "./util.js";
+import { SIZE_NAME, controlBar, dragCard, nextSize, openDrawer } from "./board.js";
 
-const flowOf = (panel) => (panel.classList.contains("dev-flow") ? panel : panel.querySelector(".dev-flow"));
-const cardsOf = (panel) => { const flow = flowOf(panel); return flow ? [...flow.children].filter((c) => c.dataset && c.dataset.card) : []; };
+const flowsOf = (panel) => [...(panel.matches(".dev-flow, .stat-grid") ? [panel] : []), ...panel.querySelectorAll(".dev-flow, .stat-grid")];
+const cardsIn = (flow) => [...flow.children].filter((c) => c.dataset && c.dataset.card);
+const cardsOf = (panel) => flowsOf(panel).flatMap(cardsIn);
+const defaultSize = (el) => el.dataset.size || (el.dataset.full === "1" ? "f" : "s");
 
-export const emptyLayout = () => ({ order: {}, hidden: [], full: [] });
+export const emptyLayout = () => ({ order: {}, hidden: [], sizes: {} });
 
-export async function loadLayout(type) {
+export async function loadLayout(page, type) {
   try {
-    return await get(`/api/layouts/device?type=${encodeURIComponent(type || "*")}`);
+    return await get(`/api/layouts/${page}?type=${encodeURIComponent(type || "*")}`);
   } catch (e) {
     return { effective: null, source: "builtin", mine: null, template: null, template_type: null };
   }
 }
 
-// Puts the cards of every panel in the order of the layout, hides what is hidden and widens what is full width.
+// Puts the cards of every panel in the order of the layout, hides what is hidden and gives every card its width.
 export function applyLayout(panels, layout) {
   for (const [tab, panel] of Object.entries(panels)) {
-    const flow = flowOf(panel);
-    if (!flow) continue;
-    const cards = cardsOf(panel);
     const wanted = layout && layout.order && layout.order[tab] ? layout.order[tab] : [];
-    const rank = (c) => { const i = wanted.indexOf(c.dataset.card); return i < 0 ? 1e6 : i; };
-    const sorted = [...cards].sort((a, b) => rank(a) - rank(b) || cards.indexOf(a) - cards.indexOf(b));
-    for (const c of sorted) {
-      flow.appendChild(c);
+    for (const flow of flowsOf(panel)) {
+      const cards = cardsIn(flow);
+      const rank = (c) => { const i = wanted.indexOf(c.dataset.card); return i < 0 ? 1e6 : i; };
+      for (const c of [...cards].sort((a, b) => rank(a) - rank(b) || cards.indexOf(a) - cards.indexOf(b))) flow.appendChild(c);
+    }
+    for (const c of cardsOf(panel)) {
       c.hidden = !!(layout && layout.hidden.includes(c.dataset.card));
-      c.classList.toggle("dev-full", layout ? layout.full.includes(c.dataset.card) : c.dataset.full === "1");
+      setSize(c, layout && layout.sizes && layout.sizes[c.dataset.card] ? layout.sizes[c.dataset.card] : defaultSize(c));
     }
   }
 }
 
-// The layout that matches what is on the screen now (used as the starting point for editing).
+function setSize(card, size) {
+  card.dataset.currentSize = size;
+  card.classList.remove("bd-s", "bd-w", "bd-f");
+  card.classList.add(`bd-${size}`);
+}
+
+// The layout that matches what is on the screen now (the starting point for editing).
 export function snapshot(panels) {
   const out = emptyLayout();
   for (const [tab, panel] of Object.entries(panels)) {
@@ -42,90 +50,108 @@ export function snapshot(panels) {
     out.order[tab] = cards.map((c) => c.dataset.card);
     for (const c of cards) {
       if (c.hidden) out.hidden.push(c.dataset.card);
-      if (c.classList.contains("dev-full")) out.full.push(c.dataset.card);
+      if (c.dataset.currentSize && c.dataset.currentSize !== defaultSize(c)) out.sizes[c.dataset.card] = c.dataset.currentSize;
     }
   }
   return out;
 }
 
-const TAB_LABEL = (tabs, key) => (tabs.find(([k]) => k === key) || [key, key])[1];
-
-// state: { layout (the loaded document), set(layout) }. Returns a function that closes the drawer.
-export function openCustomizer({ panels, tabs, activeTab, deviceType, typeLabel, isAdmin, state, onClose }) {
-  let tab = activeTab;
+// Editing mode: bars on the cards and the drawer. state: { doc (what loadLayout returned), set(layout) }. Returns a function that closes it.
+export function startBoard({ page, panels, tabs, getTab, typeKey, typeLabel, isAdmin, state, onClose }) {
   let draft = snapshot(panels);
-  const drawer = h("aside", { class: "lay-drawer", role: "dialog", "aria-label": "Customize this page" });
-  document.body.appendChild(drawer);
+  let timer = null, pending = false;
+  const root = document.querySelector(".view") || document.body;
+  root.classList.add("bd-editing");
 
-  const redraw = () => { applyLayout(panels, draft); state.set(draft); paint(); };
-  const move = (id, by) => {
-    const list = draft.order[tab] || [];
-    const i = list.indexOf(id);
-    const j = i + by;
-    if (i < 0 || j < 0 || j >= list.length) return;
-    [list[i], list[j]] = [list[j], list[i]];
-    redraw();
+  const save = () => {                               // every change is kept: the layout is saved a moment after the last one
+    clearTimeout(timer);
+    pending = true;
+    timer = setTimeout(async () => {
+      pending = false;
+      try {
+        await put(`/api/layouts/${page}/mine?type=${encodeURIComponent(typeKey)}`, draft);
+        state.doc = { ...state.doc, mine: draft, source: "mine", effective: draft };
+      } catch (err) { toast(err.message || "Could not save the layout", "error"); }
+    }, 500);
   };
-  const flip = (list, id) => { const i = list.indexOf(id); if (i < 0) list.push(id); else list.splice(i, 1); redraw(); };
+  const changed = () => { applyLayout(panels, draft); state.set(draft); decorate(); save(); paint(); };
+  const tabOf = (card) => Object.keys(panels).find((t) => cardsOf(panels[t]).includes(card));
 
-  async function save(kind) {
-    try {
-      const q = `?type=${encodeURIComponent(kind.all ? "*" : deviceType)}`;
-      if (kind.template) await put(`/api/layouts/device/template${q}`, draft);
-      else await put(`/api/layouts/device/mine${q}`, draft);
-      toast(kind.template ? `Saved as the template for ${kind.all ? "all devices" : typeLabel}` : "Saved: this is your layout now", "success");
-      Object.assign(state, { doc: await loadLayout(deviceType) });
-    } catch (err) { toast(err.message || "Could not save the layout", "error"); }
+  function decorate() {
+    for (const [tab, panel] of Object.entries(panels)) {
+      for (const flow of flowsOf(panel)) {
+        for (const card of cardsIn(flow)) {
+          card.classList.add("bd-card");
+          for (const old of card.querySelectorAll(":scope > .bd-bar")) old.remove();
+          if (card.hidden || !card.childElementCount) continue;
+          const id = card.dataset.card;
+          card.prepend(controlBar({
+            size: card.dataset.currentSize,
+            onGrip: (e) => dragCard(e, card, flow, () => {
+              draft.order[tab] = cardsOf(panel).map((c) => c.dataset.card);
+              state.set(draft); save();
+            }),
+            onSize: () => { draft.sizes[id] = nextSize(card.dataset.currentSize); if (draft.sizes[id] === defaultSize(card)) delete draft.sizes[id]; changed(); toast(`Width: ${SIZE_NAME[card.dataset.currentSize]}`, "info"); },
+            onRemove: () => { if (!draft.hidden.includes(id)) draft.hidden.push(id); changed(); },
+          }));
+        }
+      }
+    }
   }
-  async function reset(kind) {
+
+  async function reset(which) {
     try {
-      const q = `?type=${encodeURIComponent(deviceType)}`;
-      await del(kind === "template" ? `/api/layouts/device/template${q}` : `/api/layouts/device/mine${q}`);
-      if (kind === "template") await del("/api/layouts/device/template?type=*").catch(() => {});
-      state.doc = await loadLayout(deviceType);
-      draft = state.doc.effective || emptyLayout();
+      const q = `?type=${encodeURIComponent(typeKey)}`;
+      if (which === "template") { await del(`/api/layouts/${page}/template${q}`); await del(`/api/layouts/${page}/template?type=*`).catch(() => {}); }
+      else await del(`/api/layouts/${page}/mine${q}`);
+      state.doc = await loadLayout(page, typeKey);
       applyLayout(panels, state.doc.effective);
-      if (!state.doc.effective) draft = snapshot(panels);
+      draft = state.doc.effective || snapshot(panels);
+      if (!state.doc.effective) { draft = emptyLayout(); applyLayout(panels, null); draft = snapshot(panels); }
       state.set(state.doc.effective);
-      paint();
-      toast(kind === "template" ? "Template removed" : "Back to the template or the built-in layout", "success");
+      decorate(); paint();
+      toast(which === "template" ? "Template removed" : "Back to the template or the built-in layout", "success");
     } catch (err) { toast(err.message || "Could not reset", "error"); }
   }
-
-  function paint() {
-    clear(drawer);
-    const src = state.doc && state.doc.source;
-    drawer.append(
-      h("div", { class: "lay-head" }, h("strong", {}, "Customize"), h("button", { class: "btn ghost", type: "button", "aria-label": "Close", onclick: () => close() }, "✕")),
-      h("p", { class: "hint" }, src === "mine" ? "You are using your own layout." : src === "template" ? "You are using the template of your administrator." : "You are using the built-in layout.",
-        ` Changes apply to ${typeLabel} devices.`),
-      h("select", { class: "lay-tab", "aria-label": "Section", onchange: (e) => { tab = e.target.value; paint(); } }, tabs.filter(([k]) => panels[k]).map(([k, l]) => h("option", { value: k, selected: k === tab }, l))));
-    const list = h("ul", { class: "lay-list" });
-    const ids = draft.order[tab] || [];
-    for (const card of cardsOf(panels[tab]).filter((c) => c.childElementCount || draft.hidden.includes(c.dataset.card))) {
-      const id = card.dataset.card;
-      list.appendChild(h("li", {}, h("label", { class: "lay-show" }, h("input", { type: "checkbox", checked: !draft.hidden.includes(id), onchange: () => flip(draft.hidden, id) }), " ", card.dataset.title || id),
-        h("span", { class: "lay-tools" },
-          h("label", { class: "hint", title: "Use the full width of the page" }, h("input", { type: "checkbox", checked: draft.full.includes(id), onchange: () => flip(draft.full, id) }), " wide"),
-          h("button", { class: "btn ghost", type: "button", disabled: ids.indexOf(id) <= 0, "aria-label": "Move up", onclick: () => move(id, -1) }, "▲"),
-          h("button", { class: "btn ghost", type: "button", disabled: ids.indexOf(id) >= ids.length - 1, "aria-label": "Move down", onclick: () => move(id, 1) }, "▼"))));
-    }
-    drawer.appendChild(list);
-    const actions = h("div", { class: "lay-actions" },
-      h("button", { class: "btn primary", type: "button", onclick: () => save({}) }, "Save for me"),
-      state.doc && state.doc.mine ? h("button", { class: "btn", type: "button", onclick: () => reset("mine") }, "Reset my layout") : null);
-    drawer.appendChild(actions);
-    if (isAdmin) {
-      drawer.appendChild(h("div", { class: "lay-actions" },
-        h("p", { class: "hint" }, "As administrator you can give everybody a starting layout. Users can still change it for themselves."),
-        h("button", { class: "btn", type: "button", onclick: () => save({ template: true }) }, `Use as template for ${typeLabel}`),
-        h("button", { class: "btn", type: "button", onclick: () => save({ template: true, all: true }) }, "Use as template for all devices"),
-        state.doc && state.doc.template ? h("button", { class: "btn", type: "button", onclick: () => reset("template") }, "Remove the templates") : null));
-    }
+  async function template(all) {
+    try {
+      await put(`/api/layouts/${page}/template?type=${encodeURIComponent(all ? "*" : typeKey)}`, draft);
+      state.doc = await loadLayout(page, typeKey);
+      toast(`Saved as the template for ${all ? "all" : typeLabel} pages`, "success");
+      paint();
+    } catch (err) { toast(err.message || "Could not save the template", "error"); }
   }
 
-  function close() { drawer.remove(); document.body.classList.remove("lay-editing"); if (onClose) onClose(); }
-  document.body.classList.add("lay-editing");
+  let drawer = null;
+  let pickTab = getTab();
+  function paint() {
+    if (!drawer) return;
+    const rows = cardsOf(panels[pickTab] || Object.values(panels)[0]).filter((c) => c.childElementCount > (c.querySelector(":scope > .bd-bar") ? 1 : 0) || draft.hidden.includes(c.dataset.card)).map((c) => ({
+      id: c.dataset.card, title: c.dataset.title || c.dataset.card, kind: c.dataset.kind || "table", checked: !draft.hidden.includes(c.dataset.card),
+      onToggle: (on) => { draft.hidden = on ? draft.hidden.filter((x) => x !== c.dataset.card) : [...draft.hidden, c.dataset.card]; changed(); },
+    }));
+    const src = state.doc && state.doc.source;
+    const picker = h("select", { class: "bd-pick", "aria-label": "Section", onchange: (e) => { pickTab = e.target.value; paint(); } }, tabs.filter(([k]) => panels[k]).map(([k, l]) => h("option", { value: k, selected: k === pickTab }, l)));
+    const head = [h("p", { class: "hint bd-pick" }, `${src === "mine" ? "Your own layout" : src === "template" ? "Your administrator's template" : "The built-in layout"} for ${typeLabel}. Drag the grip on a card, use ↔ for its width, ✕ to remove it; tick a card here to bring it back.`), picker];
+    const foot = [
+      state.doc && state.doc.mine ? h("button", { class: "btn", type: "button", onclick: () => reset("mine") }, "Reset") : null,
+      ...(isAdmin ? [h("button", { class: "btn", type: "button", title: "Everybody starts from this arrangement and can still change it", onclick: () => template(false) }, `Template for ${typeLabel}`),
+        h("button", { class: "btn", type: "button", onclick: () => template(true) }, "Template for all"),
+        state.doc && state.doc.template ? h("button", { class: "btn", type: "button", onclick: () => reset("template") }, "Remove templates") : null] : []),
+    ].filter(Boolean);
+    drawer.update(rows, head);
+    drawer.el.querySelector("footer").append(...foot);
+  }
+
+  drawer = openDrawer({ title: "Customize this page", rows: [], onClose: () => {
+    clearTimeout(timer);
+    if (pending) put(`/api/layouts/${page}/mine?type=${encodeURIComponent(typeKey)}`, draft).catch(() => {});       // a change the timer has not saved yet
+    pending = false;
+    root.classList.remove("bd-editing");
+    for (const b of document.querySelectorAll(".bd-bar")) b.remove();
+    if (onClose) onClose();
+  } });
+  decorate();
   paint();
-  return close;
+  return { close: () => drawer.close(), setTab(t) { pickTab = t; paint(); } };
 }

@@ -106,18 +106,19 @@ def get_dashboard(request: Request) -> dict:
 class LayoutBody(BaseModel):
     order: list[str]
     custom: list[dict] = []
+    sizes: dict[str, str] = {}
 
 
 @router.get("/dashboard/layout")
 def get_layout(request: Request, conn=Depends(get_conn)) -> dict:
     """The cards this user chose, in order (null while the user still has the default)."""
-    return dashboard.get_layout(conn, request.state.user) or {"order": None, "custom": []}
+    return dashboard.get_layout(conn, request.state.user) or {"order": None, "custom": [], "sizes": {}}
 
 
 @router.put("/dashboard/layout")
 def put_layout(body: LayoutBody, request: Request, conn=Depends(get_conn)) -> dict:
     try:
-        return dashboard.set_layout(conn, request.state.user, body.order, body.custom)
+        return dashboard.set_layout(conn, request.state.user, body.order, body.custom, body.sizes)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -125,7 +126,7 @@ def put_layout(body: LayoutBody, request: Request, conn=Depends(get_conn)) -> di
 @router.delete("/dashboard/layout")
 def delete_layout(request: Request, conn=Depends(get_conn)) -> dict:
     dashboard.reset_layout(conn, request.state.user)
-    return {"order": None, "custom": []}
+    return {"order": None, "custom": [], "sizes": {}}
 
 
 class SharedBody(BaseModel):
@@ -150,14 +151,14 @@ def put_shared(body: SharedBody, request: Request, conn=Depends(get_conn)) -> di
 @router.get("/dashboard/default")
 def get_default(conn=Depends(get_conn)) -> dict:
     """The dashboard an administrator set for everybody (null while there is none)."""
-    return dashboard.get_default(conn) or {"order": None, "custom": []}
+    return dashboard.get_default(conn) or {"order": None, "custom": [], "sizes": {}}
 
 
 @router.put("/dashboard/default")
 def put_default(body: LayoutBody, request: Request, conn=Depends(get_conn)) -> dict:
     require_admin(request)
     try:
-        return dashboard.set_default(conn, body.order, body.custom)
+        return dashboard.set_default(conn, body.order, body.custom, body.sizes)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
@@ -166,4 +167,4 @@ def put_default(body: LayoutBody, request: Request, conn=Depends(get_conn)) -> d
 def delete_default(request: Request, conn=Depends(get_conn)) -> dict:
     require_admin(request)
     dashboard.reset_default(conn)
-    return {"order": None, "custom": []}
+    return {"order": None, "custom": [], "sizes": {}}

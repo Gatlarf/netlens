@@ -793,10 +793,7 @@ body.site-view .admin-only, body.site-view .act-only, body.site-view [data-route
 :root[data-theme="dark"] .site-banner { background: #1e3a5f; color: #dbeafe; border-bottom-color: #3b82f6; }
 
 /* the Network tab of a device: cards flow over two columns, each card whole */
-.dev-flow { column-count: 2; column-gap: 16px; }
-.dev-flow > * { break-inside: avoid; margin-bottom: 12px; }
 .dev-flow > .card, .dev-flow > div > .card { margin-top: 0; }
-@media (max-width: 900px) { .dev-flow { column-count: 1; } }
 
 /* ---------- the side menu ---------- */
 .app-shell { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; }

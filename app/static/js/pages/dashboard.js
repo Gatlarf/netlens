@@ -11,6 +11,7 @@ import { buildHealthCard, healthTone } from "../cards/health_map.js";
 import { buildCapacityCard, capacityTone } from "../cards/capacity.js";
 import { snoozeMenu, snoozedList } from "../snooze.js";
 import { WIDGETS as STAT_WIDGETS } from "./overview.js";
+import { controlBar, dragCard, nextSize, openDrawer } from "../board.js";
 
 const REFRESH_MS = 30000;
 const KINDS = {
@@ -256,15 +257,15 @@ async function loadLayout(shared, pending = null) {
   } catch (e) {
     reachable = false;
   }
-  if (Array.isArray(server.order)) return { order: server.order, custom: server.custom || [], own: true };
+  if (Array.isArray(server.order)) return { order: server.order, custom: server.custom || [], sizes: server.sizes || {}, own: true };
   const local = localLayout();
   if (local) {
     if (reachable) {  // a layout from before it was kept on the server: move it there
       try { await put("/api/dashboard/layout", local); setLocal(null); } catch (e) { /* stays in the browser */ }
     }
-    return { ...local, own: true };
+    return { ...local, sizes: local.sizes || {}, own: true };
   }
-  return shared ? { order: [...shared.order], custom: [...shared.custom], own: false } : { order: [...DEFAULT_ORDER], custom: [], own: false };
+  return shared ? { order: [...shared.order], custom: [...shared.custom], sizes: { ...(shared.sizes || {}) }, own: false } : { order: [...DEFAULT_ORDER], custom: [], sizes: {}, own: false };
 }
 
 // reset: go back to what the administrator set (or the built-in cards); the layout of this user is then removed
@@ -339,15 +340,14 @@ export async function render(container) {
   const [shared, library0] = await Promise.all([loadDefault(), loadLibrary()]);
   const layout = await loadLayout(shared, layoutRequest);
   let library = library0;
-  const base = () => (shared ? { order: shared.order, custom: shared.custom } : { order: DEFAULT_ORDER, custom: [] });
-  let data = null, order = layout.order, custom = layout.custom, own = layout.own, editing = false, disposed = false, timer = null;
+  const base = () => (shared ? { order: shared.order, custom: shared.custom, sizes: shared.sizes || {} } : { order: DEFAULT_ORDER, custom: [], sizes: {} });
+  let data = null, order = layout.order, custom = layout.custom, sizes = { ...(layout.sizes || {}) }, own = layout.own, editing = false, disposed = false, timer = null, drawerApi = null;
   const map = miniMap();
   let mapStarted = false;
   const header = h("div", { class: "dash-head" });
   const grid = h("div", { class: "dash-grid" });
-  const pool = h("div", { class: "dash-pool" });
   const nudge = h("div", {});
-  container.append(nudge, header, grid, pool);
+  container.append(nudge, header, grid);
   // administrators who have not been through the getting-started guide (or closed it halfway) get a one-line invitation
   if (isAdmin()) {
     get("/api/wizard").then((w) => {
@@ -380,18 +380,12 @@ export async function render(container) {
     order = order.filter((id) => known.has(id) || !data);                      // a card of a plugin that is switched off is dropped
     try {
       const b = base();
-      own = !(!custom.length && !b.custom.length && order.length === b.order.length && order.every((id, i) => id === b.order[i]));
-      await saveLayout({ order, custom }, !own);
+      sizes = Object.fromEntries(Object.entries(sizes).filter(([id]) => order.includes(id)));
+      own = !(!custom.length && !b.custom.length && order.length === b.order.length && order.every((id, i) => id === b.order[i]) && JSON.stringify(sizes) === JSON.stringify(b.sizes || {}));
+      await saveLayout({ order, custom, sizes }, !own);
     } catch (e) {
       toast(e.message || "Could not save the dashboard", "error");
     }
-  }
-  function move(id, delta) {
-    const i = order.indexOf(id), j = i + delta;
-    if (i < 0 || j < 0 || j >= order.length) return;
-    [order[i], order[j]] = [order[j], order[i]];
-    persist();
-    draw();
   }
   const isShared = (id) => library.some((c) => c.id === id) && !custom.some((c) => c.id === id);
   async function saveLibrary(next) {
@@ -459,31 +453,19 @@ export async function render(container) {
     const empty = !hasData(card);
     const title = h("h2", { class: "d-title" }, card.href && !editing ? h("a", { href: card.href }, card.title) : card.title);
     const head = h("div", { class: "d-head" }, title);
+    const size = sizes[card.id] || card.size;
     if (editing) {
-      const i = order.indexOf(card.id);
-      head.append(h("span", { class: "d-tools" },
-        card.custom && (!card.shared || isAdmin()) ? h("button", { class: "btn d-tool", type: "button", "aria-label": `Change ${card.title}`, title: "Change", onclick: () => edit(card.custom) }, "✎") : null,
-        card.custom && !card.shared && isAdmin() ? h("button", { class: "btn d-tool", type: "button", "aria-label": `Share ${card.title} with everyone`, title: "Share with everyone", onclick: () => shareCard(card.custom) }, "⇪") : null,
-        h("button", { class: "btn d-tool", type: "button", disabled: i === 0, "aria-label": `Move ${card.title} earlier`, title: "Earlier", onclick: () => move(card.id, -1) }, "◀"),
-        h("button", { class: "btn d-tool", type: "button", disabled: i === order.length - 1, "aria-label": `Move ${card.title} later`, title: "Later", onclick: () => move(card.id, 1) }, "▶"),
-        h("button", { class: "btn d-tool", type: "button", "aria-label": `Remove ${card.title}`, title: "Remove", onclick: () => { order = order.filter((x) => x !== card.id); persist(); draw(); } }, "✕")));
+      const extra = [
+        card.custom && (!card.shared || isAdmin()) ? h("button", { class: "bd-btn", type: "button", "aria-label": `Change ${card.title}`, title: "Change this card", onclick: () => edit(card.custom) }, "✎") : null,
+        card.custom && !card.shared && isAdmin() ? h("button", { class: "bd-btn", type: "button", "aria-label": `Share ${card.title} with everyone`, title: "Share with everyone", onclick: () => shareCard(card.custom) }, "⇪") : null,
+      ].filter(Boolean);
+      head.append(controlBar({ size, extra,
+        onGrip: (e) => dragCard(e, node, grid, (ids) => { order = [...ids, ...order.filter((x) => !ids.includes(x))]; persist(); }),
+        onSize: () => { const next = nextSize(sizes[card.id] || card.size); if (next === card.size) delete sizes[card.id]; else sizes[card.id] = next; persist(); draw(); },
+        onRemove: () => { order = order.filter((x) => x !== card.id); persist(); draw(); } }));
     }
     const body = card.id === "minimap" ? map.box : empty ? h("p", { class: "hint" }, "Nothing to show here yet: this card appears when it has something to report.") : card.build(data);
-    const node = h("section", { class: `dcard size-${card.size} ${tone ? `tone-${tone}` : ""} ${card.href && !editing ? "linked" : ""} ${card.tall ? "tall" : ""} ${editing ? "editing" : ""}`, dataset: { card: card.id }, draggable: editing }, head, body);
-    if (editing) {
-      node.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", card.id); e.dataTransfer.effectAllowed = "move"; node.classList.add("dragging"); });
-      node.addEventListener("dragend", () => node.classList.remove("dragging"));
-      node.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; });
-      node.addEventListener("drop", (e) => {
-        e.preventDefault();
-        const from = e.dataTransfer.getData("text/plain");
-        if (!byId(from) || from === card.id) return;
-        order = order.filter((x) => x !== from);
-        order.splice(order.indexOf(card.id), 0, from);
-        persist();
-        draw();
-      });
-    }
+    const node = h("section", { class: `dcard size-${size} ${tone ? `tone-${tone}` : ""} ${card.href && !editing ? "linked" : ""} ${card.tall ? "tall" : ""} ${editing ? "editing bd-card" : ""}`, dataset: { card: card.id } }, head, body);
     return node;
   }
 
@@ -507,15 +489,12 @@ export async function render(container) {
           h("span", { class: "dash-fact hint" }, `updated ${timeAgo(s.generated)}`)),
         shared && !own ? h("p", { class: "hint" }, "This is the starting dashboard set by your administrator. Press Customize to make it your own.") : null),
       h("div", { class: "dash-tools" },
-        editing && isAdmin() ? h("button", { class: "btn", type: "button", title: "Everybody who has not arranged their own dashboard will see this one", onclick: setForEveryone }, "Use as default for everyone") : null,
-        editing && isAdmin() && shared ? h("button", { class: "btn", type: "button", title: "Back to the built-in default for everybody who has not arranged their own", onclick: clearForEveryone }, "Remove the default") : null,
-        editing ? h("button", { class: "btn", type: "button", onclick: resetMine }, shared ? "Back to the default" : "Reset to default") : null,
         h("button", { class: `btn ${editing ? "primary" : ""}`, type: "button", "aria-pressed": String(editing), onclick: () => { editing = !editing; draw(); } }, editing ? "Done" : "Customize")));
   }
 
   async function setForEveryone() {
     try {
-      await put("/api/dashboard/default", { order, custom });
+      await put("/api/dashboard/default", { order, custom, sizes });
       toast("Saved. Everybody who has not arranged their own dashboard now sees this one.");
       location.reload();
     } catch (e) {
@@ -533,44 +512,39 @@ export async function render(container) {
   }
   async function resetMine() {
     const b = base();
-    order = [...b.order]; custom = b.custom.map((c) => ({ ...c })); own = false;
+    order = [...b.order]; custom = b.custom.map((c) => ({ ...c })); sizes = { ...(b.sizes || {}) }; own = false;
     try { await saveLayout(null, true); } catch (e) { toast(e.message || "Could not reset the dashboard", "error"); }
     draw();
   }
 
-  function poolItem(c, extra) {
-    const placed = order.includes(c.id);
-    return h("div", { class: "pool-item" }, h("div", {}, h("strong", {}, c.title), h("p", { class: "hint" }, placed ? `${c.about} On your dashboard.` : c.about)),
-      h("div", { class: "pool-buttons" }, extra, placed ? null : h("button", { class: "btn", type: "button", onclick: () => { order.push(c.id); persist(); draw(); } }, "Add")));
-  }
-
-  function drawPool() {
-    clear(pool);
-    if (!editing) return;
-    const all = [...registry().values()];
-    const free = all.filter((c) => !order.includes(c.id) && visible(c) && !c.custom && !c.plugin);
-    const mine = all.filter((c) => c.custom && !c.shared);                          // also the ones already on the dashboard
-    const sharedFree = all.filter((c) => c.shared && (isAdmin() || !order.includes(c.id)));    // an administrator also sees the ones already on the dashboard, to change or unshare them
-    const plugins = all.filter((c) => c.plugin && !order.includes(c.id));
-    pool.append(h("div", { class: "toolbar" }, h("h2", {}, "Your own cards"), h("button", { class: "btn primary", type: "button", onclick: () => edit(null) }, "Create a card")),
-      mine.length ? h("div", { class: "pool-list" }, mine.map((c) => poolItem({ ...c, about: TYPE_ABOUT[c.custom.type] || c.about }, [
-        h("button", { class: "btn", type: "button", onclick: () => edit(c.custom) }, "Change"),
-        isAdmin() ? h("button", { class: "btn", type: "button", title: "Let every user add this card to their dashboard", onclick: () => shareCard(c.custom) }, "Share") : null,
-        h("button", { class: "btn danger", type: "button", onclick: () => deleteCard(c.id) }, "Delete")])))
-        : h("p", { class: "hint" }, "Make a card that shows any value, a device, a group, a service check, or notes and links."));
-    if (sharedFree.length) {
-      pool.append(h("h2", {}, "Shared by your administrator"), h("div", { class: "pool-list" }, sharedFree.map((c) => poolItem({ ...c, about: TYPE_ABOUT[c.custom.type] || c.about }, isAdmin() ? [
-        h("button", { class: "btn", type: "button", onclick: () => edit(c.custom) }, "Change"),
-        h("button", { class: "btn", type: "button", title: "Take it out of the shared cards; it stays in your own cards", onclick: () => unshareCard(c.custom) }, "Stop sharing"),
-        h("button", { class: "btn danger", type: "button", title: "Delete it for everybody", onclick: () => deleteShared(c.custom) }, "Delete")] : []))));
+  // The drawer on the right (js/board.js): a tick box and a small picture for every card there is; ticking puts it on the dashboard.
+  const KIND_OF = Object.fromEntries(STAT_WIDGETS.map((w) => [`ov-${w.id}`, w.kind]));
+  const kindOf = (c) => KIND_OF[c.id] || (c.size === "f" ? "bars" : c.size === "w" ? "list" : "tiles");
+  function drawDrawer() {
+    if (!editing) { if (drawerApi) { const api = drawerApi; drawerApi = null; api.close(); } return; }
+    const known = [...registry().values()].filter((c) => visible(c));
+    const rows = known.map((c) => {
+      const extra = [];
+      if (c.custom && (!c.shared || isAdmin())) extra.push(h("button", { class: "btn", type: "button", onclick: () => edit(c.custom) }, "Change"));
+      if (c.custom && !c.shared && isAdmin()) extra.push(h("button", { class: "btn", type: "button", title: "Let every user add this card to their dashboard", onclick: () => shareCard(c.custom) }, "Share"));
+      if (c.custom && c.shared && isAdmin()) extra.push(h("button", { class: "btn", type: "button", title: "Take it out of the shared cards; it stays in your own cards", onclick: () => unshareCard(c.custom) }, "Stop sharing"));
+      if (c.custom && (!c.shared || isAdmin())) extra.push(h("button", { class: "btn danger", type: "button", onclick: () => (c.shared ? deleteShared(c.custom) : deleteCard(c.id)) }, "Delete"));
+      return { id: c.id, title: c.title, about: c.shared ? `${c.about || ""} Shared by your administrator.`.trim() : c.about, kind: kindOf(c), checked: order.includes(c.id), extra,
+        onToggle: (on) => { order = on ? [...order.filter((x) => x !== c.id), c.id] : order.filter((x) => x !== c.id); persist(); draw(); } };
+    });
+    const head = [h("p", { class: "hint bd-pick" }, "Drag the grip on a card to move it, use ↔ for its width and ✕ to remove it. Tick a card here to put it on the dashboard."),
+      h("button", { class: "btn bd-pick", type: "button", onclick: () => edit(null) }, "Create a card of your own")];
+    if (!drawerApi) {
+      const foot = [h("button", { class: "btn", type: "button", onclick: resetMine }, shared ? "Back to the default" : "Reset to default"),
+        ...(isAdmin() ? [h("button", { class: "btn", type: "button", title: "Everybody who has not arranged their own dashboard will see this one", onclick: setForEveryone }, "Use as default for everyone"),
+          shared ? h("button", { class: "btn", type: "button", title: "Back to the built-in default for everybody who has not arranged their own", onclick: clearForEveryone }, "Remove the default") : null] : [])].filter(Boolean);
+      drawerApi = openDrawer({ title: "Customize the dashboard", head, rows, footer: foot, onClose: () => { if (drawerApi) { drawerApi = null; editing = false; if (!disposed) draw(); } } });
+    } else {
+      const footer = drawerApi.el.querySelector("footer");
+      const keep = [...footer.children];
+      drawerApi.update(rows, head);
+      drawerApi.el.querySelector("footer").append(...keep.slice(1));        // the buttons after Done stay as they were
     }
-    if (plugins.length) {
-      // every enabled plugin offers a card: with many plugins this list is long, so it folds away (the Plugins card already summarises them all)
-      const folded = h("details", { class: "pool-plugins" }, h("summary", {}, h("strong", {}, `Cards from your plugins (${plugins.length})`)), h("div", { class: "pool-list" }, plugins.map((c) => poolItem(c))));
-      folded.open = plugins.length <= 6;
-      pool.append(folded);
-    }
-    pool.append(h("h2", {}, "Add a card"), free.length ? h("div", { class: "pool-list" }, free.map((c) => poolItem(c))) : h("p", { class: "hint" }, "All cards are on your dashboard."));
   }
 
   let statsLoading = false;
@@ -594,7 +568,7 @@ export async function render(container) {
       grid.append(cardEl(card));
     }
     if (!grid.children.length) grid.append(h("p", { class: "hint" }, "Your dashboard is empty. Press Customize to add cards."));
-    drawPool();
+    drawDrawer();
     if (order.includes("minimap") && !mapStarted) { mapStarted = true; map.load(); }
     else if (order.includes("minimap")) map.load();
   }
@@ -623,5 +597,5 @@ export async function render(container) {
   document.addEventListener("netlens:snoozed", onSnoozed);
   await refresh();
   timer = setInterval(() => { if (!editing && !document.hidden) refresh(); }, REFRESH_MS);
-  return () => { disposed = true; clearInterval(timer); map.destroy(); document.removeEventListener("netlens:snoozed", onSnoozed); };
+  return () => { disposed = true; clearInterval(timer); if (drawerApi) { const api = drawerApi; drawerApi = null; api.close(); } map.destroy(); document.removeEventListener("netlens:snoozed", onSnoozed); };
 }

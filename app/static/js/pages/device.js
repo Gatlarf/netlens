@@ -1,5 +1,5 @@
 import { get, patch, post, del, ApiError } from "../api.js";
-import { applyLayout, loadLayout, openCustomizer } from "../layout_cards.js";
+import { applyLayout, loadLayout, startBoard } from "../layout_cards.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { eventLabel } from "../event_labels.js";
 import { mountTerminal, isTerminalActive } from "../terminal.js";
@@ -740,7 +740,7 @@ const deviceType = (device) => String(device.type || "unknown").toLowerCase().re
 
 export async function render(container, params) {
   let customizing = false;       // the layout drawer is open: the page must not rebuild itself under it
-  let closeCustomizer = null;
+  let closeCustomizer = null, boardApi = null;
   const layoutState = { doc: null, set(l) { if (this.doc) this.doc.effective = l; } };
   let disposed = false;
   let loading = false;
@@ -832,16 +832,16 @@ export async function render(container, params) {
     const column = () => h("div", { class: "col-left" });
     // every panel is one flowing container of cards; a card has an id and a title so a layout can hide, move and widen it
     const flowOf = (...parts) => h("div", { class: "dev-flow" }, ...parts.flatMap((p) => (p.classList.contains("col-left") ? [...p.children] : [p])));
-    const tag = (el, id, title, full) => { if (el) { el.dataset.card = id; el.dataset.title = title; if (full) el.dataset.full = "1"; } return el; };
-    const slot = (id, title, full) => tag(h("div", {}), id, title, full);
+    const tag = (el, id, title, full, kind) => { if (el) { el.dataset.card = id; el.dataset.title = title; if (full) el.dataset.size = "f"; if (kind) el.dataset.kind = kind; } return el; };
+    const slot = (id, title, full, kind) => tag(h("div", {}), id, title, full, kind);
 
     // Overview: who it is, whether it is up, what happened lately
     const ovLeft = column();
-    ovLeft.appendChild(tag(buildDetailsCard(device), "details", "Details"));
+    ovLeft.appendChild(tag(buildDetailsCard(device), "details", "Details", false, "list"));
     const why = buildWhyCard(device);
     if (why) ovLeft.appendChild(tag(why, "why", "Why this device is shown as it is"));
     const ovRight = column();
-    const uptimeSlot = slot("uptime", "Uptime");
+    const uptimeSlot = slot("uptime", "Uptime", false, "tiles");
     ovRight.appendChild(uptimeSlot);
     buildDeviceUptimeCard(device.id).then((c) => {
       if (disposed) return;
@@ -855,12 +855,12 @@ export async function render(container, params) {
     const vulnSlot = slot("vulns", "Vulnerabilities");
     ovRight.appendChild(vulnSlot);
     buildDeviceVulnCard(device).then((c) => { if (c && !disposed) vulnSlot.appendChild(c); }).catch(() => {});
-    ovRight.appendChild(tag(buildEventsCard(device), "events", "Events"));
+    ovRight.appendChild(tag(buildEventsCard(device), "events", "Events", false, "list"));
     panels.overview = flowOf(ovLeft, ovRight);
 
     // Health: the graphs first, then how it is read and the service checks
     const health = h("div", { class: "dev-health" });
-    const performanceSlot = slot("performance", "Graphs", true);
+    const performanceSlot = slot("performance", "Graphs", true, "line");
     // a switch with many ports gets a table of ports with a graph per port: that card is on the Network tab, so its graphs are left out of the general ones
     const portsCardPromise = buildDevicePortsCard(device).catch(() => null);
     portsCardPromise.then((ports) => {
@@ -873,7 +873,7 @@ export async function render(container, params) {
       hLeft.appendChild(monitorSlot);
       buildDeviceMonitorCard(device, { onChange: () => load() }).then((c) => { if (c && !disposed) monitorSlot.appendChild(c); }).catch(() => {});
     }
-    const servicesSlot = slot("services", "Service checks");
+    const servicesSlot = slot("services", "Service checks", false, "list");
     hRight.appendChild(servicesSlot);
     buildDeviceServicesCard(device).then((c) => { if (!disposed) servicesSlot.appendChild(c); }).catch(() => {});
     health.appendChild(flowOf(performanceSlot, hLeft, hRight));
@@ -881,18 +881,18 @@ export async function render(container, params) {
 
     // Network: ports, names, Wi-Fi, virtual machines, proxied sites
     const network = h("div", { class: "dev-network" });
-    const portsSlot = slot("portstable", "Ports and traffic", true);
+    const portsSlot = slot("portstable", "Ports and traffic", true, "table");
     portsCardPromise.then((ports) => { if (ports && !disposed) portsSlot.appendChild(ports); });
     // the cards flow over two columns by themselves (CSS columns), so a short card does not leave a hole beside a tall one
     const flow = flowOf(portsSlot);
-    const appsSlot = slot("apps", "Applications");
+    const appsSlot = slot("apps", "Applications", false, "list");
     flow.appendChild(appsSlot);
     buildDeviceApplicationsCard(device).then((c) => { if (c && !disposed) appsSlot.appendChild(c); }).catch(() => {});
-    flow.appendChild(tag(buildPortsCard(device, () => load()), "openports", "Open ports", true));
+    flow.appendChild(tag(buildPortsCard(device, () => load()), "openports", "Open ports", true, "table"));
     const wifiSlot = slot("wifi", "Wi-Fi");
     flow.appendChild(wifiSlot);
     buildDeviceWifiCard(device.id).then((c) => { if (c && !disposed) wifiSlot.appendChild(c); }).catch(() => {});
-    const switchPortsSlot = slot("switchports", "Switch ports", true);
+    const switchPortsSlot = slot("switchports", "Switch ports", true, "table");
     flow.appendChild(switchPortsSlot);
     buildSwitchPortsCard(device.id).then((c) => { if (c && !disposed) switchPortsSlot.appendChild(c); }).catch(() => {});
     const firewallSlot = slot("firewall", "Firewall");
@@ -948,6 +948,7 @@ export async function render(container, params) {
     const buttons = {};
     const select = (key) => {
       activeTab = key;
+      if (boardApi) boardApi.setTab(key);
       for (const [k, el] of Object.entries(panels)) el.hidden = k !== key;
       for (const [k, b] of Object.entries(buttons)) { b.setAttribute("aria-selected", String(k === key)); b.classList.toggle("active", k === key); }
     };
@@ -963,14 +964,15 @@ export async function render(container, params) {
       el.classList.add("dev-panel");
       page.appendChild(el);
     }
-    if (!layoutState.doc) layoutState.doc = await loadLayout(deviceType(device));
+    if (!layoutState.doc) layoutState.doc = await loadLayout("device", deviceType(device));
     applyLayout(panels, layoutState.doc.effective);
     if (!document.body.dataset.scoped) {
       tabBar.appendChild(h("button", { type: "button", class: "btn ghost dev-customize", title: "Choose which cards this page shows, their order and width", onclick: () => {
         if (closeCustomizer) closeCustomizer();
         customizing = true;
-        closeCustomizer = openCustomizer({ panels, tabs: TABS, activeTab, deviceType: deviceType(device), typeLabel: (TYPE_LABELS[device.type] || deviceType(device)), isAdmin: isAdmin(), state: layoutState,
-          onClose: () => { customizing = false; closeCustomizer = null; } });
+        boardApi = startBoard({ page: "device", panels, tabs: TABS, getTab: () => activeTab, typeKey: deviceType(device), typeLabel: (TYPE_LABELS[device.type] || deviceType(device)),
+          isAdmin: isAdmin(), state: layoutState, onClose: () => { customizing = false; closeCustomizer = null; boardApi = null; } });
+        closeCustomizer = boardApi.close;
       } }, "Customize"));
     }
     select(activeTab);

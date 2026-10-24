@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.212 — 2026-10-24
+
+### Changed
+- ★ **One way to arrange cards on every page that has them.** The dashboard, the device page (each tab) and Statistics now work like the Overview beta page did: Customize opens a drawer on the right with a tick box and a small picture for every card (tick one to show it, untick to hide it), and in editing mode every card has a grip to drag it anywhere (also by touch), a ↔ button that makes it narrow, wide or full width, and a ✕ to remove it. Changes are saved on the server as you make them, per user (and per device type on the device page). Administrators can push the arrangement as the starting point for everybody (the dashboard default, or a template for a device type or all devices); everybody can still change it for themselves and go back with Reset.
+- Device and Statistics cards are laid out in a grid of up to four columns instead of flowing columns, so the order you choose is the order you see.
+
 ## 0.4.209 — 2026-10-24
 
 ### Changed

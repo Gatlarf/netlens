@@ -1,7 +1,8 @@
 import { get } from "../api.js";
-import { h, clear, toast, timeAgo, fmtTime, TYPE_LABELS } from "../util.js";
+import { h, clear, toast, timeAgo, fmtTime, TYPE_LABELS, isAdmin } from "../util.js";
 import { eventLabel } from "../event_labels.js";
 import { pageHead } from "../ui.js";
+import { applyLayout, loadLayout, startBoard } from "../layout_cards.js";
 import { barList, columnChart, donut, emptyNote, fmtBytes, fmtDuration, fmtNumber, fmtPct, lineChart, tile } from "../charts.js";
 
 const RANGES = [["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["90d", "90 days"]];
@@ -59,7 +60,11 @@ function card(title, ...children) {
   const tip = TIPS.find(([k]) => title.startsWith(k));
   const head = h("h2", {}, title);
   if (tip) head.appendChild(h("span", { class: "info-tip", tabindex: "0", role: "note", "aria-label": tip[1], "data-tip": tip[1] }, "?"));
-  return h("div", { class: "card stat-card" }, head, ...children);
+  const el = h("div", { class: "card stat-card" }, head, ...children);
+  el.dataset.card = title.split(/[(:]/)[0].trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "card";
+  el.dataset.title = title.split(/[(:]/)[0].trim();
+  el.dataset.kind = el.querySelector(".table-wrap") ? "table" : el.querySelector("svg, canvas") ? "bars" : "list";
+  return el;
 }
 
 function table(headers, rows) {
@@ -273,6 +278,9 @@ export async function render(container) {
     // storage unavailable: use the defaults
   }
   const buttons = {};
+  let boardApi = null;
+  const layoutState = { doc: null, set(l) { if (this.doc) this.doc.effective = l; } };
+  let panelEls = {};
   const picker = h("div", { class: "seg", role: "group", "aria-label": "Period for the history, scan and event groups" });
   for (const [key, label] of RANGES) {
     buttons[key] = h("button", { class: "btn", type: "button", "data-range": key }, label);
@@ -288,7 +296,11 @@ export async function render(container) {
     picker.appendChild(buttons[key]);
   }
   const stamp = h("span", { class: "hint stats-stamp" }, "");
-  const head = pageHead("Statistics", "Numbers about your network, grouped by what you want to know. The period applies to the history, scan and event groups.", picker, stamp);
+  const customize = h("button", { class: "btn", type: "button", title: "Choose which cards this page shows, their order and width", onclick: () => {
+    if (boardApi) { boardApi.close(); return; }
+    boardApi = startBoard({ page: "stats", panels: panelEls, tabs: TABS, getTab: () => tab, typeKey: "*", typeLabel: "Statistics", isAdmin: isAdmin(), state: layoutState, onClose: () => { boardApi = null; } });
+  } }, "Customize");
+  const head = pageHead("Statistics", "Numbers about your network, grouped by what you want to know. The period applies to the history, scan and event groups.", picker, customize, stamp);
   const nav = h("nav", { class: "dev-tabs", role: "tablist", "aria-label": "Groups of statistics" });
   const body = h("div", { class: "stats-body" }, h("p", { class: "hint" }, "Loading..."));
   container.appendChild(head);
@@ -297,6 +309,7 @@ export async function render(container) {
 
   const sections = () => [...body.querySelectorAll("section.stat-section")];
   function showTab() {
+    if (boardApi) boardApi.setTab(tab);
     for (const sec of sections()) sec.hidden = sec.dataset.tab !== tab;
     for (const chip of nav.querySelectorAll("button")) {
       chip.classList.toggle("active", chip.dataset.tab === tab);
@@ -328,6 +341,14 @@ export async function render(container) {
       const keepAt = window.scrollY;   // a refresh must not throw you back to the top
       const built = build(data);
       for (const sec of built.querySelectorAll("section.stat-section")) sec.dataset.tab = TAB_OF[sec.id.replace(/^stat-/, "")] || "system";
+      panelEls = {};
+      for (const sec of [...built.querySelectorAll("section.stat-section")]) {            // the cards of a group, so a layout can be kept per group
+        const wrap = panelEls[sec.dataset.tab] || (panelEls[sec.dataset.tab] = h("div", { class: "stat-panel", "data-tab": sec.dataset.tab }));
+        wrap.appendChild(sec);
+      }
+      built.append(...Object.values(panelEls));
+      if (!layoutState.doc) layoutState.doc = await loadLayout("stats", "*");
+      applyLayout(panelEls, layoutState.doc.effective);
       body.replaceChildren(built);
       buildNav();
       if (Math.abs(window.scrollY - keepAt) > 2) window.scrollTo(0, keepAt);
@@ -341,9 +362,10 @@ export async function render(container) {
   }
 
   load();
-  const timer = setInterval(() => { if (!destroyed && !document.hidden) load(); }, 60000);
+  const timer = setInterval(() => { if (!destroyed && !document.hidden && !boardApi) load(); }, 60000);
   return () => {
     destroyed = true;
+    if (boardApi) boardApi.close();
     clearInterval(timer);
   };
 }

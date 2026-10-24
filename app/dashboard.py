@@ -245,7 +245,18 @@ def _read(conn: sqlite3.Connection, key: str) -> dict | None:
         return None
     if not isinstance(value, dict) or not isinstance(value.get("order"), list):
         return None
-    return {"order": value["order"], "custom": value.get("custom") if isinstance(value.get("custom"), list) else []}
+    return {"order": value["order"], "custom": value.get("custom") if isinstance(value.get("custom"), list) else [],
+            "sizes": value.get("sizes") if isinstance(value.get("sizes"), dict) else {}}
+
+
+SIZES = ("s", "w", "f")      # one column, two columns, the whole row
+
+
+def clean_sizes(sizes) -> dict[str, str]:
+    """The width a user gave to cards: {card id: s | w | f}. Unknown values are dropped, not refused."""
+    if not isinstance(sizes, dict):
+        return {}
+    return {k: v for k, v in list(sizes.items())[:MAX_CARDS] if isinstance(k, str) and CARD_ID.match(k) and v in SIZES}
 
 
 def clean_order(order) -> list[str]:
@@ -354,23 +365,24 @@ def clean_custom(custom) -> list[dict]:
     return out
 
 
-def set_layout(conn: sqlite3.Connection, principal, order, custom=None) -> dict:
-    return _write(conn, _layout_key(principal), order, custom)
+def set_layout(conn: sqlite3.Connection, principal, order, custom=None, sizes=None) -> dict:
+    return _write(conn, _layout_key(principal), order, custom, sizes)
 
 
-def set_default(conn: sqlite3.Connection, order, custom=None) -> dict:
-    return _write(conn, DEFAULT_KEY, order, custom)
+def set_default(conn: sqlite3.Connection, order, custom=None, sizes=None) -> dict:
+    return _write(conn, DEFAULT_KEY, order, custom, sizes)
 
 
-def _write(conn: sqlite3.Connection, key: str, order, custom=None) -> dict:
+def _write(conn: sqlite3.Connection, key: str, order, custom=None, sizes=None) -> dict:
     from app.db import set_setting
 
     custom = clean_custom(custom or [])
     known = {c["id"] for c in custom} | {c["id"] for c in get_shared(conn)}      # your own cards and the shared ones
     order = [c for c in clean_order(order) if not c.startswith("c-") or c in known]      # a card of your own that no longer exists is dropped
-    set_setting(conn, key, json.dumps({"order": order, "custom": custom}))
+    sizes = {k: v for k, v in clean_sizes(sizes).items() if k in order}
+    set_setting(conn, key, json.dumps({"order": order, "custom": custom, "sizes": sizes}))
     conn.commit()
-    return {"order": order, "custom": custom}
+    return {"order": order, "custom": custom, "sizes": sizes}
 
 
 def reset_layout(conn: sqlite3.Connection, principal) -> None:

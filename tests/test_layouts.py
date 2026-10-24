@@ -7,7 +7,7 @@ from app.config import load_settings
 from app.db import connect, init_db
 from app.main import create_app
 
-LAYOUT = {"order": {"overview": ["details", "events"]}, "hidden": ["why"], "full": ["events"]}
+LAYOUT = {"order": {"overview": ["details", "events"]}, "hidden": ["why"], "sizes": {"events": "f"}}
 
 
 @pytest.fixture
@@ -28,11 +28,11 @@ def test_a_template_applies_and_my_own_layout_wins(client):
     assert client.put("/api/layouts/device/template?type=windows", json=LAYOUT).status_code == 200
     assert client.get("/api/layouts/device?type=windows").json()["source"] == "template"
     assert client.get("/api/layouts/device?type=linux").json()["source"] == "builtin"
-    client.put("/api/layouts/device/template?type=*", json={"order": {}, "hidden": ["names"], "full": []})
+    client.put("/api/layouts/device/template?type=*", json={"order": {}, "hidden": ["names"], "sizes": {}})
     assert client.get("/api/layouts/device?type=linux").json()["effective"]["hidden"] == ["names"]
-    client.put("/api/layouts/device/mine?type=windows", json={"order": {}, "hidden": [], "full": ["details"]})
+    client.put("/api/layouts/device/mine?type=windows", json={"order": {}, "hidden": [], "sizes": {"details": "w"}})
     r = client.get("/api/layouts/device?type=windows").json()
-    assert r["source"] == "mine" and r["effective"]["full"] == ["details"] and r["template"]["hidden"] == ["why"]
+    assert r["source"] == "mine" and r["effective"]["sizes"] == {"details": "w"} and r["template"]["hidden"] == ["why"]
     client.delete("/api/layouts/device/mine?type=windows")
     assert client.get("/api/layouts/device?type=windows").json()["source"] == "template"
     assert client.get("/api/layouts/device/templates").json()["types"] == ["*", "windows"]
@@ -41,7 +41,7 @@ def test_a_template_applies_and_my_own_layout_wins(client):
 
 
 def test_input_is_cleaned_and_checked(client):
-    r = client.put("/api/layouts/device/mine?type=*", json={"order": {"overview": ["ok", "../x", "ok", 5]}, "hidden": "no", "full": ["a b"]})
-    assert r.json() == {"order": {"overview": ["ok"]}, "hidden": [], "full": []}
+    r = client.put("/api/layouts/device/mine?type=*", json={"order": {"overview": ["ok", "../x", "ok", 5]}, "hidden": "no", "full": ["a b"], "sizes": {"x": "huge", "ok": "s"}})
+    assert r.json() == {"order": {"overview": ["ok"]}, "hidden": [], "sizes": {"ok": "s"}}
     assert client.put("/api/layouts/device/mine?type=Bad%20Type", json=LAYOUT).status_code == 422
     assert client.get("/api/layouts/nope?type=*").status_code == 422
