@@ -281,6 +281,8 @@ def clean_events(events: Any) -> list[str]:
 
 
 SEVERITIES = ("info", "warning", "critical")
+TIERS = ("any", "normal", "critical")          # a channel can be limited to the devices and services marked critical, or leave out the ones marked low
+TIER_RANK = {"low": 0, "normal": 1, "critical": 2}
 
 
 def severity_of(kind: str) -> str:
@@ -297,7 +299,10 @@ def clean_filters(data: Any) -> dict:
     level = data.get("min_severity") or "info"
     if level not in SEVERITIES:
         raise ValueError("the minimum severity is info, warning or critical")
-    out: dict = {"min_severity": level}
+    tier = data.get("min_tier") or "any"
+    if tier not in TIERS:
+        raise ValueError("the minimum importance is any, normal or critical")
+    out: dict = {"min_severity": level, "min_tier": tier}
     for key in ("devices", "groups"):
         ids = data.get(key) or []
         if not isinstance(ids, list) or len(ids) > 500 or not all(isinstance(i, int) and not isinstance(i, bool) for i in ids):
@@ -309,6 +314,9 @@ def clean_filters(data: Any) -> dict:
 def passes_filters(e: dict, filters: dict | None) -> bool:
     f = filters or {}
     if f.get("min_severity", "info") != "info" and SEVERITIES.index(severity_of(e["kind"])) < SEVERITIES.index(f["min_severity"]):
+        return False
+    wanted = f.get("min_tier", "any")
+    if wanted != "any" and TIER_RANK.get(e.get("tier") or "normal", 1) < TIER_RANK["critical" if wanted == "critical" else "normal"]:
         return False
     devices, groups = f.get("devices") or [], f.get("groups") or []
     if devices or groups:
@@ -523,7 +531,7 @@ def send_channel(channel: dict, title: str, body: str, events: list[dict], *, po
 def _pending_events(conn: sqlite3.Connection, after_id: int) -> list[dict]:
     rows = conn.execute(
         """
-        SELECT e.id, e.ts, e.kind, e.device_id, e.detail, e.maintenance,
+        SELECT e.id, e.ts, e.kind, e.device_id, e.detail, e.maintenance, e.tier,
                COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.mac, d.vendor, d.trusted, d.notify_offline, d.group_id, g.name AS group_name
         FROM events e LEFT JOIN devices d ON d.id = e.device_id LEFT JOIN device_groups g ON g.id = d.group_id
         WHERE e.id > ? ORDER BY e.id LIMIT 500

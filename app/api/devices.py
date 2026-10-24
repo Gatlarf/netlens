@@ -36,6 +36,7 @@ class DevicePatch(BaseModel):
     type_override: str | None = None
     notify_offline: bool | None = None
     report_exclude: bool | None = None      # True = left out of the weekly and monthly reports
+    tier: str | None = None                 # critical, normal or low: how much a problem with this device matters
     always_on: bool | None = None           # a core device: it should always be online (counts for the core availability)
     trusted: bool | None = None             # True = a device the user knows
     gentle: bool | None = None              # True = scans only check its ports, they never probe its services
@@ -87,6 +88,7 @@ def _device_dict(row: sqlite3.Row) -> dict[str, Any]:
         "open_ports": row["open_ports"],
         "notify_offline": bool(row["notify_offline"]),
         "always_on": bool(row["always_on"]),
+        "tier": row["tier"] if "tier" in row.keys() else "normal",
         "report_exclude": bool(row["report_exclude"]),
         "trusted": bool(row["trusted"]),
         "gentle": bool(row["gentle"]),
@@ -293,6 +295,7 @@ def list_devices(
             pos_y,
             notify_offline,
             always_on,
+            tier,
             report_exclude,
             trusted,
             gentle,
@@ -420,6 +423,7 @@ def get_device(
             pos_y,
             notify_offline,
             always_on,
+            tier,
             report_exclude,
             trusted,
             gentle,
@@ -469,6 +473,7 @@ def patch_device(
             pos_y,
             notify_offline,
             always_on,
+            tier,
             report_exclude,
             trusted,
             gentle,
@@ -549,6 +554,11 @@ def patch_device(
     if "notify_offline" in fields_set:
         updates["notify_offline"] = 0 if body.notify_offline is False else 1
 
+    if "tier" in fields_set and body.tier is not None:
+        if body.tier not in ("critical", "normal", "low"):
+            raise HTTPException(status_code=422, detail="importance is critical, normal or low")
+        updates["tier"] = body.tier
+
     if "report_exclude" in fields_set:
         updates["report_exclude"] = 1 if body.report_exclude else 0
 
@@ -621,6 +631,7 @@ def patch_device(
             pos_y,
             notify_offline,
             always_on,
+            tier,
             report_exclude,
             trusted,
             gentle,

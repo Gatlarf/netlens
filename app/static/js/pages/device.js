@@ -327,9 +327,12 @@ function buildEditCard(device, onSaved) {
   const trustInput = h("input", { type: "checkbox", name: "trusted", checked: device.trusted === true });
   const notifyInput = h("input", { type: "checkbox", name: "notify_offline", checked: device.notify_offline !== false });
   const alwaysInput = h("input", { type: "checkbox", name: "always_on", checked: device.always_on === true });
+  const tierSelect = h("select", { name: "tier" }, h("option", { value: "critical" }, "Critical: it must work"), h("option", { value: "normal" }, "Normal"), h("option", { value: "low" }, "Low: it may be off"));
+  tierSelect.value = device.tier || "normal";
   const excludeInput = h("input", { type: "checkbox", name: "report_exclude", checked: device.report_exclude === true });
   const gentleInput = h("input", { type: "checkbox", name: "gentle", checked: device.gentle === true });
   form.appendChild(section("Monitoring and reports",
+    labelled("Importance", tierSelect, "How much a problem with this device matters. Critical problems lead the list on the dashboard and can be sent to their own alert channel; low ones are shown quietly and are left out of channels set to normal or critical only."),
     checkRow(trustInput, "Known device", "Tick it for devices you recognise. Devices that appear later start as unknown, so you can spot newcomers."),
     checkRow(alwaysInput, "Always-on device (should always be online)", "For devices that should be on all the time (router, switch, server, NAS, camera). The Uptime page and the dashboard then show the availability of these core devices separately from phones, tablets and laptops that come and go."),
     checkRow(notifyInput, "Alert me when it goes offline", "Needs an alert channel (for example e-mail) under Settings → Alert channels."),
@@ -355,7 +358,7 @@ function buildEditCard(device, onSaved) {
   let focused = false;
   const extraForms = [];
 
-  const fields = [nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, alwaysInput, excludeInput, trustInput, dnsMode, dnsName];
+  const fields = [tierSelect, nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, alwaysInput, excludeInput, trustInput, dnsMode, dnsName];
   for (const f of fields) {
     f.addEventListener("input", () => { dirty = true; });
     f.addEventListener("change", () => { dirty = true; });
@@ -373,6 +376,7 @@ function buildEditCard(device, onSaved) {
       notes: notesTextarea.value,
       notify_offline: notifyInput.checked,
       always_on: alwaysInput.checked,
+      tier: tierSelect.value,
       report_exclude: excludeInput.checked,
       trusted: trustInput.checked,
       gentle: gentleInput.checked,

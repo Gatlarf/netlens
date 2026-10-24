@@ -23,6 +23,7 @@ class CheckBody(BaseModel):
     interval_s: int | None = None
     timeout_s: int | None = None
     enabled: bool | None = None
+    tier: str | None = None        # critical, normal or low
 
 
 def _row(conn, check_id: int) -> dict[str, Any]:
@@ -49,7 +50,7 @@ def _present(conn, c: dict[str, Any], days: dict[int, Any] | None = None, names:
     return {
         "id": c["id"], "device_id": c["device_id"], "device_name": dev_name, "name": c["name"], "kind": c["kind"],
         "host": c["host"], "port": c["port"], "path": c["path"], "expect": c["expect"], "interval_s": c["interval_s"],
-        "timeout_s": c["timeout_s"], "enabled": bool(c["enabled"]), "target": describe(c), "source": c.get("source"),
+        "timeout_s": c["timeout_s"], "enabled": bool(c["enabled"]), "tier": c.get("tier") or "normal", "target": describe(c), "source": c.get("source"),
         "state": None if c["last_up"] is None else ("up" if c["last_up"] else "down"),
         "last_ts": c["last_ts"], "last_ms": c["last_ms"], "last_detail": c["last_detail"], "since": c["since"],
         "uptime_24h": round(day[0] / day[1] * 100, 2) if day[1] else None,
@@ -62,6 +63,12 @@ def list_checks(device_id: int | None = None, conn=Depends(get_conn)) -> list[di
     days = {r["check_id"]: (r["u"], r["n"]) for r in conn.execute("SELECT check_id, SUM(up) AS u, COUNT(*) AS n FROM service_results WHERE ts >= ? GROUP BY check_id", (_ago(utcnow(), hours=24),))}
     names = {r["id"]: r["n"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices WHERE id IN (SELECT device_id FROM service_checks WHERE device_id IS NOT NULL)")}
     return [_present(conn, dict(r), days, names) for r in rows]
+
+
+def _set_tier(conn, check_id: int, tier: str) -> None:
+    if tier not in ("critical", "normal", "low"):
+        raise HTTPException(status_code=422, detail="importance is critical, normal or low")
+    conn.execute("UPDATE service_checks SET tier = ? WHERE id = ?", (tier, check_id))
 
 
 def _check_device(conn, device_id: int | None, kind: str | None = None) -> None:
@@ -86,6 +93,8 @@ def create_check(body: CheckBody, conn=Depends(get_conn)) -> dict:
         "INSERT INTO service_checks (device_id, name, kind, host, port, path, expect, interval_s, timeout_s, enabled, created) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         (body.device_id, data["name"], data["kind"], data["host"], data["port"], data["path"], data["expect"], data["interval_s"], data["timeout_s"], data["enabled"], utcnow()),
     )
+    if body.tier is not None:
+        _set_tier(conn, new_id, body.tier)
     conn.commit()
     return _present(conn, _row(conn, new_id))
 
@@ -113,6 +122,8 @@ def update_check(check_id: int, body: CheckBody, conn=Depends(get_conn)) -> dict
     )
     if changed_target:
         conn.execute("DELETE FROM service_results WHERE check_id = ?", (check_id,))
+    if body.tier is not None:
+        _set_tier(conn, check_id, body.tier)
     conn.commit()
     return _present(conn, _row(conn, check_id))
 

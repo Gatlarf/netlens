@@ -417,8 +417,8 @@ def test_per_device_offline_switch_via_api(client):
 
 # ------------------------------------------------------------------ filters and one message per event
 def test_filters_are_validated_and_applied():
-    assert ch.clean_filters(None) == {"min_severity": "info", "devices": [], "groups": []}
-    assert ch.clean_filters({"min_severity": "warning", "devices": [3, 1, 3], "groups": [2]}) == {"min_severity": "warning", "devices": [1, 3], "groups": [2]}
+    assert ch.clean_filters(None) == {"min_severity": "info", "min_tier": "any", "devices": [], "groups": []}
+    assert ch.clean_filters({"min_severity": "warning", "devices": [3, 1, 3], "groups": [2]}) == {"min_severity": "warning", "min_tier": "any", "devices": [1, 3], "groups": [2]}
     for bad in ({"min_severity": "loud"}, {"devices": "1"}, {"groups": ["a"]}, {"devices": [True]}):
         with pytest.raises(ValueError):
             ch.clean_filters(bad)
@@ -484,10 +484,10 @@ async def test_each_mode_sends_one_message_per_event_and_resumes_after_a_failure
 
 def test_api_saves_filters_and_rejects_bad_ones(client):
     made = client.post("/api/notify-channels", json={"type": "webhook", "settings": {"url": "https://n8n.example/hook", "mode": "each"},
-                                                     "filters": {"min_severity": "warning", "devices": [4], "groups": [1]}})
-    assert made.status_code == 201 and made.json()["filters"] == {"min_severity": "warning", "devices": [4], "groups": [1]}
+                                                     "filters": {"min_severity": "warning", "min_tier": "any", "devices": [4], "groups": [1]}})
+    assert made.status_code == 201 and made.json()["filters"] == {"min_severity": "warning", "min_tier": "any", "devices": [4], "groups": [1]}
     cid = made.json()["id"]
-    assert client.put(f"/api/notify-channels/{cid}", json={"filters": {"min_severity": "critical"}}).json()["filters"] == {"min_severity": "critical", "devices": [], "groups": []}
+    assert client.put(f"/api/notify-channels/{cid}", json={"filters": {"min_severity": "critical"}}).json()["filters"] == {"min_severity": "critical", "min_tier": "any", "devices": [], "groups": []}
     assert client.put(f"/api/notify-channels/{cid}", json={"filters": {"min_severity": "nope"}}).status_code == 422
     assert client.post("/api/notify-channels", json={"type": "ntfy", "settings": {"topic": "t"}}).json()["filters"]["min_severity"] == "info"
 
@@ -504,3 +504,13 @@ def test_openclaw_formats():
     assert json.loads(p.calls[-1][1]) == {"text": "[Netlens] Service down\nNAS web is down", "mode": "now", "agentId": "main"} and p.calls[-1][2]["Authorization"] == "Bearer T"
     send_channel(channel("webhook", url="http://c/hooks/agent", format="openclaw_agent", agent_id="ops"), "T", "B", ev, poster=p)
     assert json.loads(p.calls[-1][1]) == {"message": "T\nB", "name": "Netlens", "agentId": "ops", "deliver": True}
+
+
+def test_a_channel_can_be_limited_to_critical_or_normal_importance():
+    f_all, f_normal, f_critical = ({"min_tier": t} for t in ("any", "normal", "critical"))
+    for tier, expect in (("critical", (True, True, True)), ("normal", (True, True, False)), ("low", (True, False, False))):
+        e = {"kind": "device_offline", "tier": tier}
+        assert tuple(ch.passes_filters(e, f) for f in (f_all, f_normal, f_critical)) == expect
+    assert ch.clean_filters({"min_tier": "critical"})["min_tier"] == "critical"
+    with pytest.raises(ValueError):
+        ch.clean_filters({"min_tier": "loud"})

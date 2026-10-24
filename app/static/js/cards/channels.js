@@ -21,6 +21,8 @@ function filterBox(filters, groups, devices) {
   const f = filters || { min_severity: "info", devices: [], groups: [] };
   const level = h("select", { name: "min_severity" }, [["info", "Everything selected above"], ["warning", "Warnings and serious problems"], ["critical", "Serious problems only"]].map(([v, label]) => h("option", { value: v }, label)));
   level.value = f.min_severity;
+  const tier = h("select", { name: "min_tier" }, [["any", "Every device and service"], ["normal", "Not the ones marked low"], ["critical", "Only the ones marked critical"]].map(([v, label]) => h("option", { value: v }, label)));
+  tier.value = f.min_tier || "any";
   const groupBoxes = groups.map((g) => h("label", { class: "check-row" }, h("input", { type: "checkbox", "data-group": g.id, checked: f.groups.includes(g.id) }), " ", g.name));
   const picked = new Set(f.devices);
   const search = h("input", { type: "search", placeholder: "Find a device", autocomplete: "off" });
@@ -36,9 +38,10 @@ function filterBox(filters, groups, devices) {
   draw();
   const box = h("div", { class: "filter-box" },
     h("div", { class: "field" }, h("label", {}, "How serious"), level),
+    h("div", { class: "field" }, h("label", {}, "How important"), tier, h("p", { class: "hint" }, "The importance is set on each device (its Settings tab) and each service check.")),
     groups.length ? h("div", { class: "field" }, h("label", {}, "Only these groups"), h("div", { class: "event-boxes" }, groupBoxes)) : null,
     devices.length ? h("div", { class: "field" }, h("label", {}, "Only these devices"), search, list, h("p", { class: "hint" }, "Leave all unticked to hear about every device. With groups and devices both ticked, an event counts when it is about one of them.")) : null);
-  box.read = () => ({ min_severity: level.value, groups: groupBoxes.map((l) => l.firstChild).filter((i) => i.checked).map((i) => Number(i.dataset.group)), devices: [...picked] });
+  box.read = () => ({ min_severity: level.value, min_tier: tier.value, groups: groupBoxes.map((l) => l.firstChild).filter((i) => i.checked).map((i) => Number(i.dataset.group)), devices: [...picked] });
   return box;
 }
 

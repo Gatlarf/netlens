@@ -38,11 +38,24 @@ def _llm_attention(conn: sqlite3.Connection) -> list[dict]:
     return []
 
 
-def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], core_down: list[dict] | None = None, down_checks: list[dict] | None = None) -> list[dict]:
+def _tiers(conn: sqlite3.Connection) -> dict[str, str]:
+    """The importance somebody gave to devices and service checks (only the ones that are not "normal"), by the subject a problem is acknowledged with."""
+    out = {f"device:{r[0]}": r[1] for r in conn.execute("SELECT id, tier FROM devices WHERE tier != 'normal'")}
+    out.update({f"service:{r[0]}": r[1] for r in conn.execute("SELECT id, tier FROM service_checks WHERE tier != 'normal'")})
+    return out
+
+
+def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], core_down: list[dict] | None = None, down_checks: list[dict] | None = None, tiers: dict[str, str] | None = None) -> list[dict]:
     items: list[dict] = []
+    tiers = tiers or {}
 
     def add(level: str, text: str, href: str, snooze: str | None = None) -> None:
-        item = {"level": level, "text": text, "href": href}
+        tier = tiers.get(snooze or "")                      # what the user said about this device or service: critical problems lead, low ones are quiet
+        if tier == "critical":
+            text = f"Critical: {text}"
+        elif tier == "low" and level == "bad":
+            level = "warn"
+        item = {"level": level, "text": text, "href": href, "critical": tier == "critical"}
         if snooze:
             item["snooze"] = snooze          # the subject someone can acknowledge (see app/snooze.py)
         items.append(item)
@@ -133,7 +146,7 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
     if s["update"]["plugin_updates"]:
         add("info", f"{s['update']['plugin_updates']} plugin update{'s' if s['update']['plugin_updates'] != 1 else ''} available", "#/settings/plugin-browse")
     order = {"bad": 0, "warn": 1, "info": 2}
-    return sorted(items, key=lambda i: order[i["level"]])
+    return sorted(items, key=lambda i: (order[i["level"]], not i["critical"]))
 
 
 def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
@@ -168,7 +181,7 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "summary": s,
         "devices_uptime": uptime,
         "service_checks": _services(conn, now)["checks"],
-        "attention": _attention(s, certs, login_failed, down, core_down, down_checks) + _network_attention(conn) + _site_vuln_attention(conn) + _llm_attention(conn),
+        "attention": _attention(s, certs, login_failed, down, core_down, down_checks, _tiers(conn)) + _network_attention(conn) + _site_vuln_attention(conn) + _llm_attention(conn),
         "events": events,
         "services_down": down,
         "login_failed_24h": login_failed,

@@ -41,6 +41,8 @@ export async function buildServiceForm({ check = null, defaults = {}, onDone }) 
   device.appendChild(h("option", { value: "" }, "(no device)"));
   for (const d of devices.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""))) device.appendChild(h("option", { value: String(d.id) }, `${d.name || d.primary_ip} (${d.primary_ip || ""})`));
   device.value = c.device_id ? String(c.device_id) : "";
+  const tier = h("select", { name: "tier" }, h("option", { value: "critical" }, "Critical: it must work"), h("option", { value: "normal" }, "Normal"), h("option", { value: "low" }, "Low: it may be down"));
+  tier.value = c.tier || "normal";
 
   const pathField = h("div", { class: "field" });
   const expectField = h("div", { class: "field" });
@@ -63,7 +65,7 @@ export async function buildServiceForm({ check = null, defaults = {}, onDone }) 
   refreshKind();
 
   form.append(field("Name", name), field("Type", kind), field("Host", host), portField, pathField, expectField, deviceNote,
-    field("Check every (seconds)", interval), field("Give up after (seconds)", timeout), field("Belongs to device", device));
+    field("Check every (seconds)", interval), field("Give up after (seconds)", timeout), field("Belongs to device", device), field("Importance", tier));
   const error = h("p", { class: "error" }, "");
   const save = h("button", { type: "submit", class: "btn" }, check ? "Save" : "Add check");
   const cancel = h("button", { type: "button", class: "btn" }, "Cancel");
@@ -76,7 +78,7 @@ export async function buildServiceForm({ check = null, defaults = {}, onDone }) 
     const body = {
       name: name.value, kind: kind.value, host: host.value, port: port.value === "" ? null : Number(port.value),
       path: path.value, expect: expect.value, interval_s: Number(interval.value), timeout_s: Number(timeout.value),
-      device_id: device.value === "" ? null : Number(device.value),
+      device_id: device.value === "" ? null : Number(device.value), tier: tier.value,
     };
     if (body.port === null) delete body.port;
     save.disabled = true;

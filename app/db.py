@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 35
+SCHEMA_VERSION = 36
 
 
 def utcnow() -> str:
@@ -485,6 +485,9 @@ def init_db(conn: sqlite3.Connection) -> None:
     cur.execute("DROP INDEX IF EXISTS idx_checks_ts")
     # beat = 1: a quick ping between two scans (app/beats.py). Those rows are many (one a minute per device), so they are kept for days only; the hourly roll-up keeps their count for good
     _add_column_if_missing(conn, "checks", "beat", "INTEGER NOT NULL DEFAULT 0")
+    # importance of a device / a service check / the event it raised: critical, normal or low (it steers how loudly a problem is reported)
+    _add_column_if_missing(conn, "devices", "tier", "TEXT NOT NULL DEFAULT 'normal'")
+    _add_column_if_missing(conn, "events", "tier", "TEXT NOT NULL DEFAULT 'normal'")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_checks_beat ON checks(beat, ts)")
 
     # --- schema v5: guests reported by hypervisor plugins (replaces proxmox_guests) ---------
@@ -970,6 +973,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_service_results ON service_results(check_id, ts)")
+    _add_column_if_missing(conn, "service_checks", "tier", "TEXT NOT NULL DEFAULT 'normal'")       # importance, see devices.tier
     # --- schema v19: checks made by a plugin, and checks that go through a reverse proxy
     _add_column_if_missing(conn, "service_checks", "source", "TEXT")      # who made the check (a plugin), NULL = the user
     _add_column_if_missing(conn, "service_checks", "via", "TEXT")         # connect to this address, but ask for `host` (Host header / SNI)
@@ -1262,13 +1266,25 @@ def add_event(
             window = snooze.tag(conn, kind, subject, now)
         except Exception:  # noqa: BLE001 - same: never lose an event over a broken snooze list
             window = None
+    tier = "normal"
+    try:
+        if subject and subject.startswith("service:") and subject[8:].isdigit():
+            row = conn.execute("SELECT tier FROM service_checks WHERE id = ?", (int(subject[8:]),)).fetchone()
+        elif device_id is not None:
+            row = conn.execute("SELECT tier FROM devices WHERE id = ?", (device_id,)).fetchone()
+        else:
+            row = None
+        if row is not None and row[0] in ("critical", "low"):
+            tier = row[0]
+    except Exception:  # noqa: BLE001 - an event is never lost over a missing column
+        tier = "normal"
     new_id = insert_id(
         conn,
         """
-        INSERT INTO events (ts, device_id, kind, detail, maintenance)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO events (ts, device_id, kind, detail, maintenance, tier)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (now, device_id, kind, detail, window),
+        (now, device_id, kind, detail, window, tier),
     )
     conn.commit()
     return new_id

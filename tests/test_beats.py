@@ -164,3 +164,18 @@ def test_flapping_counts_outages_not_lost_packets_for_devices_with_quick_checks(
     conn.commit()
     flaps = stats._flaps(conn, "2026-10-24T11:00:00Z")
     assert 1 not in flaps and flaps[2] == 8                              # 4 outages (minutes 3-5, 13-15, 23-25, 33-35), each down and up again
+
+
+def test_events_carry_the_importance_and_critical_problems_lead_the_attention_list(conn):
+    from app import dashboard
+    from app.db import add_event
+
+    conn.execute("UPDATE devices SET tier = 'critical' WHERE primary_ip = '10.0.0.5'")
+    conn.execute("UPDATE devices SET tier = 'low' WHERE primary_ip = '10.0.0.6'")
+    conn.commit()
+    ids = {r["primary_ip"]: r["id"] for r in conn.execute("SELECT id, primary_ip FROM devices")}
+    add_event(conn, "device_offline", "x", device_id=ids["10.0.0.5"], now=T0)
+    add_event(conn, "device_offline", "y", device_id=ids["10.0.0.6"], now=T0)
+    assert [r[0] for r in conn.execute("SELECT tier FROM events ORDER BY id")] == ["critical", "low"]
+    tiers = dashboard._tiers(conn)
+    assert tiers == {f"device:{ids['10.0.0.5']}": "critical", f"device:{ids['10.0.0.6']}": "low"}
