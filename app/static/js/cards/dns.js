@@ -34,19 +34,22 @@ function describeChange(c) {
   return `${verb} ${what}${c.old_value ? ` (${c.old_value} → ${c.value})` : c.type === "PTR" ? "" : ` → ${c.value}`}`;
 }
 
-export async function buildDnsCard() {
+// mode "page": the preview of what would be registered (the DNS page); mode "settings": the rules for registering (Settings -> DNS registration)
+export async function buildDnsCard(mode = "page") {
   const card = h("div", { class: "card", id: "dns-card" });
   const state = await get("/api/dns");
-  render(card, state);
+  render(card, state, mode);
   return card;
 }
 
-function render(card, state) {
+function render(card, state, mode = "page") {
   clear(card);
+  if (mode === "settings") card.appendChild(h("h2", {}, "DNS registration"));
   card.appendChild(h("p", { class: "hint" },
-    "Netlens can register the devices it knows in your DNS server, and keep the address right when a device gets a new one from DHCP. " +
-    "It only ever changes records it created itself (marked with a comment) and never touches records that something else made, such as a Windows machine that registers itself. " +
-    "Nothing is written before you approve it here."));
+    mode === "settings"
+      ? "Netlens can register the devices it knows in your DNS server, and keep the address right when a device gets a new one from DHCP. It only ever changes records it created itself (marked with a comment) and never touches records that something else made, such as a Windows machine that registers itself."
+      : "It only ever changes records it created itself (marked with a comment) and never touches records that something else made. Nothing is written before you approve it here. The rules (networks, zones, what to register) are under ",
+    mode === "settings" ? null : h("a", { href: "#/settings/dns" }, "Settings → DNS registration"), mode === "settings" ? null : "."));
 
   if (!state.plugins.length) {
     card.appendChild(h("p", {}, "No DNS plugin is installed yet. Install one under ", h("a", { href: "#/settings/plugin-browse" }, "Settings → Plugin store"), " (for example Technitium DNS)."));
@@ -80,7 +83,7 @@ function render(card, state) {
   const auto = checkbox("auto_apply", s.auto_apply, "Apply automatically after every scan", "Adds missing and changed records without asking (never removes any). Turn it on when you have seen that the preview is what you want.");
   const limit = h("input", { type: "number", name: "max_changes", min: "1", max: "500", value: String(s.max_changes) });
   form.append(containers, sites, remove, auto, field("Most changes per run", limit, "A safety limit: a bigger plan needs approving in smaller parts."));
-  const save = h("button", { type: "submit", class: "btn", id: "dns-save" }, "Save settings");
+  const save = h("button", { type: "submit", class: "btn primary", id: "dns-save" }, "Save");
   form.appendChild(save);
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -93,14 +96,19 @@ function render(card, state) {
     if (state.plugins.length > 1) body.plugin = pluginSelect.value;
     save.disabled = true;
     try {
-      render(card, await put("/api/dns/settings", body));
+      render(card, await put("/api/dns/settings", body), mode);
       toast("DNS settings saved", "success");
     } catch (err) {
       toast(err.message || "Could not save", "error");
       save.disabled = false;
     }
   });
-  card.appendChild(h("details", { class: "dns-settings", open: !!state.needs_setup }, h("summary", {}, h("strong", {}, "Settings"), h("span", { class: "hint" }, " networks, zones and rules for registering")), form));
+  if (mode === "settings") {
+    form.classList.add("dns-form");
+    card.appendChild(form);
+    card.appendChild(h("p", { class: "hint" }, "The preview of what Netlens would register, and the button to apply it, are on the ", h("a", { href: "#/dns" }, "DNS page"), "."));
+    return;
+  }
 
   // ---- the server and the preview
   card.appendChild(h("h3", {}, "What Netlens would do"));
@@ -111,7 +119,7 @@ function render(card, state) {
     refresh.disabled = true;
     refresh.textContent = "Reading…";
     try {
-      render(card, await post("/api/dns/refresh"));
+      render(card, await post("/api/dns/refresh"), mode);
       toast("DNS server read", "success");
     } catch (err) {
       toast(err.message || "Could not read the DNS server", "error");
@@ -127,7 +135,7 @@ function render(card, state) {
     card.appendChild(h("p", { class: "hint", id: "dns-snapshot" }, `Read ${state.snapshot.records} records in ${state.snapshot.zones} zones (${state.snapshot.managed} made by Netlens), ${w}${state.status && state.status.ts ? `, ${timeAgo(state.status.ts)}` : ""}.`));
   }
   if (state.needs_setup) {
-    card.appendChild(h("p", { class: "hint" }, "Enter your network and zone above and save, then read the DNS server."));
+    card.appendChild(h("p", { class: "hint" }, "First enter your network and zone under ", h("a", { href: "#/settings/dns" }, "Settings → DNS registration"), ", then read the DNS server."));
     return;
   }
   if (!state.plan) {
@@ -140,8 +148,17 @@ function render(card, state) {
 function renderPlan(card, state) {
   const plan = state.plan;
   const counts = h("div", { class: "dns-counts", id: "dns-counts" });
+  let filter = "";
+  const applyFilter = () => {
+    for (const r of card.querySelectorAll("tr.dns-row")) r.hidden = filter ? r.dataset.state !== filter : (r.classList.contains("ok") || r.classList.contains("self")) && !(card.querySelector("#dns-show-ok") || {}).checked && r.dataset.settled === "1";
+    for (const c of counts.children) c.classList.toggle("active", c.dataset.key === filter);
+  };
   for (const key of ORDER) {
-    if (plan.counts[key]) counts.appendChild(h("span", { class: `dns-chip ${key}`, title: STATE_HELP[key] }, `${plan.counts[key]} ${STATE_LABEL[key].toLowerCase()}`));
+    if (plan.counts[key]) {
+      const chip = h("button", { type: "button", class: `dns-chip ${key}`, title: `${STATE_HELP[key]} Click to show only these.`, "data-key": key,
+        onclick: () => { filter = filter === key ? "" : key; applyFilter(); } }, `${plan.counts[key]} ${STATE_LABEL[key].toLowerCase()}`);
+      counts.appendChild(chip);
+    }
   }
   card.appendChild(counts);
   if (!plan.items.length) {
@@ -168,12 +185,12 @@ function renderPlan(card, state) {
   const settled = [...body.querySelectorAll("tr.dns-row.ok, tr.dns-row.self")];
   if (settled.length && settled.length < plan.items.length) {
     const toggle = h("input", { type: "checkbox", id: "dns-show-ok" });
-    const apply = () => { for (const r of settled) r.hidden = !toggle.checked; };
-    toggle.addEventListener("change", apply);
-    apply();
+    for (const r of settled) r.dataset.settled = "1";
+    toggle.addEventListener("change", applyFilter);
     card.appendChild(h("label", { class: "check dns-show-ok" }, toggle, ` Also show the ${settled.length} that are already right`));
   }
   card.appendChild(h("div", { class: "table-wrap" }, table));
+  applyFilter();
 
   const actionable = boxes.filter((b) => !b.disabled);
   if (actionable.length) {

@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.202 — 2026-10-24
+
+### Changed
+- ★ **DNS settings moved to Settings → DNS registration.** The DNS page now only shows what Netlens would register: the state figures filter the list when you click them, and it links to the settings. The DNS conflict warning on the dashboard opens the DNS page.
+- **One look for buttons.** The button that saves is always blue and first in its row, Cancel, Reset and Close are plain, and delete buttons are red and last. Settings forms put their fields side by side instead of one long column of full-width fields. The list of unacknowledged escalations shows the newest eight.
+
 ## 0.4.200 — 2026-10-24
 
 ### Changed

@@ -1,4 +1,5 @@
 import { initSearch } from "./search.js";
+import { initActions } from "./actions.js";
 import { autoResizable } from "./colresize.js";
 import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
@@ -490,6 +491,7 @@ async function applyFeatures() {
 }
 
 async function init() {
+  initActions();
   const session = await applySession();
   await stylesheetsReady();
   hideBoot();

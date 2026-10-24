@@ -353,7 +353,7 @@ function buildEditCard(device, onSaved) {
   trustField.appendChild(h("label", { title: "Tick it for devices you recognise. Devices that appear later start as unknown, so you can spot newcomers." }, trustInput, " Known device"));
   form.appendChild(trustField);
 
-  const saveBtn = h("button", { type: "submit" }, "Save");
+  const saveBtn = h("button", { type: "submit", class: "btn primary" }, "Save");
   form.appendChild(saveBtn);
 
   let dirty = false;

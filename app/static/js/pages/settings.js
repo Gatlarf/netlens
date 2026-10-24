@@ -29,6 +29,7 @@ import { buildUsersCard } from "../cards/users.js";
 import { buildSharesCard } from "../cards/shares.js";
 import { buildNetchecksCard } from "../cards/netchecks.js";
 import { buildCveCheckCard } from "../cards/cve_check.js";
+import { buildDnsCard } from "../cards/dns.js";
 import { buildGroupsCard } from "../cards/groups.js";
 import { buildIgnoredCard } from "../cards/ignored.js";
 import { buildPassiveCard } from "../cards/passive.js";
@@ -232,6 +233,7 @@ const STATIC_GROUPS = [
       { key: "schedule", label: "Scan schedule", build: buildScheduleCard },
       { key: "netchecks", label: "Network checks", build: buildNetchecksCard },
       { key: "ipv6", label: "IPv6", build: buildIpv6Card },
+      { key: "dns", label: "DNS registration", build: () => buildDnsCard("settings") },
       { key: "cvecheck", label: "Version check (CVE)", build: () => buildCveCheckCard() },
       { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
     ],
@@ -349,7 +351,6 @@ export async function render(container, params) {
   clear(container);
   let groups = await loadGroups();
   const items = () => groups.flatMap((g) => g.items);
-  if (params && params.section === "dns") { location.replace("#/dns"); return; }     // DNS has its own page now
   const requested = params && (ALIASES[params.section] || params.section);
   const item = items().find((i) => i.key === requested) || items().find((i) => i.key === DEFAULT_PAGE) || items().find((i) => i.key === VIEWER_PAGE);
   if (params && params.section && item.key !== params.section) {

@@ -87,7 +87,7 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
     if s["devices"]["unknown"]:
         add("info", f"{s['devices']['unknown']} device{'s' if s['devices']['unknown'] != 1 else ''} not marked as known yet", "#/devices")
     if s["dns"]["conflicts"]:
-        add("warn", f"{s['dns']['conflicts']} DNS name conflict{'s' if s['dns']['conflicts'] != 1 else ''}", "#/settings/dns")
+        add("warn", f"{s['dns']['conflicts']} DNS name conflict{'s' if s['dns']['conflicts'] != 1 else ''}", "#/dns")
     if s["netchecks"]["untrusted"]:
         add("bad", f"{s['netchecks']['untrusted']} DHCP server{'s' if s['netchecks']['untrusted'] != 1 else ''} you do not trust", "#/settings/netchecks")
     if login_failed:

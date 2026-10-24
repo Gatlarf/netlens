@@ -38,7 +38,9 @@ export async function buildEscalationCard() {
       h("div", { class: "field" }, h("label", {}, "Which events"), kinds, h("p", { class: "hint" }, "Hold Ctrl (or Cmd) to choose several.")), h("div", { class: "form-actions" }, save));
     card.appendChild(h("h3", {}, `Waiting for someone (${info.open.length})`));
     if (!info.open.length) card.appendChild(h("p", { class: "hint" }, "Nothing is waiting."));
-    for (const item of info.open) {
+    const shown = info.open.slice(0, 8);
+    if (info.open.length > shown.length) card.appendChild(h("p", { class: "hint" }, `The newest ${shown.length} are listed; ${info.open.length - shown.length} older ones wait too and close when the problem is gone or someone takes them.`));
+    for (const item of shown) {
       const ack = h("button", { class: "btn", type: "button" }, "I'm on it");
       ack.addEventListener("click", async () => { ack.disabled = true; try { draw(await post(`/api/escalation/${item.id}/ack`, {})); } catch (err) { toast(err.message || "Failed", "error"); ack.disabled = false; } });
       card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, h("strong", {}, item.device || "network"), ` · ${item.kind} ${timeAgo(item.ts)}`), h("span", {}, item.detail || "", " ", item.level ? h("span", { class: "warn-text" }, `level ${item.level} sent `) : "", ack)));

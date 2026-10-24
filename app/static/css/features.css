@@ -755,3 +755,5 @@ tr.has-problem > td:first-child { box-shadow: inset 3px 0 0 var(--warn, #d97706)
 .settings-content .card input:is([type="text"], [type="password"], [type="number"], [type="url"], [type="email"], [type="search"]) { max-width: 720px; }
 @media (min-width: 1900px) { .dev-flow { column-count: 3; } .up-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 2800px) { .dev-flow { column-count: 4; } .up-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background: var(--surface); color: inherit; }
+.dns-chip.active { box-shadow: 0 0 0 2px var(--accent); }
