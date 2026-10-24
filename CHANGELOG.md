@@ -4,6 +4,9 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 
 ## 0.4.225 — 2026-10-24
 
+### Changed
+- Health graphs no longer draw the warning and critical limits by default. A "Show limits" box on the graphs card turns the dashed lines and tinted zones on; the choice is remembered in the browser.
+
 ### Added
 - ★ **Escalation follows importance.** Under Settings → Escalation a new "Speed by importance" row sets how fast each importance escalates: critical alerts by default twice as fast (50% of each level's time), normal alerts as set, low-importance alerts never. A problem on something marked critical is now always followed, even when its kind is not among the chosen events. Escalation messages for critical problems say so.
 - ★ **Reliability in the e-mails.** The weekly report (7 days) and the monthly report (30 days) end with a reliability part: availability against your target, the number of outages, the average and typical time to recover, the longest outage and the quality of the alerts (noise, acknowledged, escalated). Switch it off under Reports → Include → Reliability.

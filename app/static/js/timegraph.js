@@ -265,7 +265,7 @@ function summary(points, unit) {
 }
 
 // One graph with a title, the newest value and a lowest / average / highest line. `range` is a string key.
-export function metricGraph({ entity, id, metric, label = "", title, unit = "", warn = null, crit = null, range, height = 110, fixedMax = null }) {
+export function metricGraph({ entity, id, metric, label = "", title, unit = "", warn = null, crit = null, range, height = 110, fixedMax = null, showLimits = false }) {
   const box = h("section", { class: "tg-box" });
   const head = h("div", { class: "tg-head" }, h("strong", {}, title));
   const now = h("span", { class: "tg-now" });
@@ -279,7 +279,7 @@ export function metricGraph({ entity, id, metric, label = "", title, unit = "", 
     if (!last) return;
     const width = body.clientWidth || 640;
     lastWidth = width;
-    body.replaceChildren(drawGraph(last, { unit: unit || last.unit, warn, crit, height, fixedMax, width }));
+    body.replaceChildren(drawGraph(last, { unit: unit || last.unit, warn: showLimits ? warn : null, crit: showLimits ? crit : null, height, fixedMax, width }));
   }
   if (typeof ResizeObserver !== "undefined") {
     new ResizeObserver(() => { if (last && Math.abs((body.clientWidth || 0) - lastWidth) > 8) paint(); }).observe(body);
@@ -304,6 +304,7 @@ export function metricGraph({ entity, id, metric, label = "", title, unit = "", 
   }
   load(range);
   box.reload = load;
+  box.setLimits = (on) => { showLimits = on; paint(); };       // the dashed lines and tinted zones are off until asked for
   return box;
 }
 

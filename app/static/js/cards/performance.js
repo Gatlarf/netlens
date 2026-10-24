@@ -59,16 +59,26 @@ export async function buildPerformanceCard(entity, id, { title = "Performance", 
   }
   let range = savedGraphRange();
   const graphs = h("div", { class: "tg-grid-list" });
+  let showLimits = false;
+  try { showLimits = localStorage.getItem("nl.graph.limits") === "1"; } catch (e) { /* off */ }
   const make = () => series.map((s) => {
     const d = describeSeries(s);
     const rule = limits[s.metric];            // the limits the user set decide where the dashed lines are
     const warn = rule ? (rule.enabled ? rule.warn : null) : d.warn ?? null;
     const crit = rule ? (rule.enabled ? rule.crit : null) : d.crit ?? null;
-    return metricGraph({ entity, id, metric: s.metric, label: s.label, title: d.title, unit: d.unit, warn, crit, fixedMax: d.fixedMax ?? null, range });
+    return metricGraph({ entity, id, metric: s.metric, label: s.label, title: d.title, unit: d.unit, warn, crit, fixedMax: d.fixedMax ?? null, range, showLimits });
   });
   graphs.append(...make());
+  const anyLimits = series.some((s) => { const r = limits[s.metric]; const d = describeSeries(s); return r ? r.enabled : d.warn != null || d.crit != null; });
+  const limitBox = h("input", { type: "checkbox" });
+  limitBox.checked = showLimits;
+  limitBox.addEventListener("change", () => {
+    showLimits = limitBox.checked;
+    try { localStorage.setItem("nl.graph.limits", showLimits ? "1" : "0"); } catch (e) { /* only this page remembers it */ }
+    for (const g of graphs.children) g.setLimits(showLimits);
+  });
   const card = h("div", { class: "card tg-card" },
-    h("div", { class: "upc-head" }, h("h2", {}, title), graphRangeTabs(range, (key) => { range = key; for (const g of graphs.children) g.reload(key); })),
+    h("div", { class: "upc-head" }, h("h2", {}, title), anyLimits ? h("label", { class: "check" }, limitBox, " Show limits") : null, graphRangeTabs(range, (key) => { range = key; for (const g of graphs.children) g.reload(key); })),
     hint ? h("p", { class: "hint" }, hint) : null,
     graphs);
   return card;
