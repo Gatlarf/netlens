@@ -99,7 +99,17 @@
 .hud-radar .axis { stroke: rgba(0, 229, 255, 0.14); stroke-width: 1; }
 .hud-radar .sweep { transform-origin: 250px 250px; animation: hud-spin 6s linear infinite; }
 @keyframes hud-spin { to { transform: rotate(360deg); } }
-.hud-radar .blip { transition: r 0.3s; }
+.hud-radar .blip { transition: transform 1.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.6s, r 0.3s; }
+.hud-radar .blip.dim { opacity: 0.4; }
+.hud-radar .frame.quiet { opacity: 0.35; }
+.hud-radar .lring { fill: none; stroke: rgba(0, 229, 255, 0.28); stroke-width: 1; stroke-dasharray: 3 5; }
+.hud-radar .spoke { stroke: rgba(0, 229, 255, 0.22); }
+.hud-radar .lbl { fill: var(--muted); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; font-family: var(--mono); }
+.hud-radar .lbl.slice { font-size: 10px; letter-spacing: 0.06em; opacity: 0.9; }
+.hud-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.hud-panel-head h3 { margin: 0; font-size: 0.72em; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); }
+.hud-views { margin: 0; }
+.hud-cap { margin: 4px 0 0; font-size: 0.68em; letter-spacing: 0.08em; color: var(--muted); }
 .hud-radar .blip.off { animation: hud-pulse 1.1s ease-in-out infinite; }
 @keyframes hud-pulse { 50% { opacity: 0.25; } }
 .hud-radar .blip.crit { stroke: #fff; stroke-width: 1.2; }
@@ -134,3 +144,17 @@
 .hud-scope { display: inline-flex; border: 1px solid var(--border); margin-left: auto; margin-right: 16px; }
 .hud-scope button { background: transparent; color: var(--muted); border: 0; padding: 3px 12px; font: inherit; font-size: 0.78em; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; }
 .hud-scope button[aria-pressed="true"] { background: rgba(0, 229, 255, 0.18); color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* everything on the HUD opens what it shows */
+.hud a { color: inherit; text-decoration: none; text-shadow: none; }
+.hud-gauge { display: block; border-radius: 0; }
+.hud-gauge:hover, .hud-gauge:focus-visible { background: rgba(0, 229, 255, 0.08); box-shadow: var(--hud-glow); }
+.hud-stats a { text-align: center; padding: 2px 8px; }
+.hud-stats a:hover, .hud-stats a:focus-visible { background: rgba(0, 229, 255, 0.1); box-shadow: var(--hud-glow); }
+.hud-feed li a { display: block; overflow: hidden; text-overflow: ellipsis; }
+.hud-feed li:hover { background: rgba(0, 229, 255, 0.08); }
+.hud-ticker a:hover { color: var(--accent); }
+.hud-attn a { text-decoration: underline; text-decoration-color: rgba(77, 243, 255, 0.45); }
+.hud-radar .blip { cursor: pointer; pointer-events: all; stroke: rgba(0, 0, 0, 0); stroke-width: 9; }
+.hud-radar .blip.crit { stroke: #fff; stroke-width: 1.2; }
+.hud-radar .blip:hover, .hud-radar .blip:focus-visible { stroke: #fff; stroke-width: 2; outline: none; }

@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.232 — 2026-10-24
+
+### Added
+- ★ **Four views for the HUD radar.** Choose how the radar places the devices: **Hash** (the steady scatter, critical devices in the middle), **Depth** (the network as a tree: the top device in the middle, each level a ring further out, each branch its own slice), **Group** (one slice per device group) and **Response** (the distance is the response time right now on a log scale, offline devices on the rim). The blips glide to their new place, and in the Response view they move as the response times change (every five seconds). The choice is remembered in the browser.
+- Everything on the HUD page opens what it shows: a blip opens its device, an event opens the device or the page of that problem, the gauges and figures open Devices, Services, Uptime, What changed or Speed tests, and the ticker opens the service checks.
+- `GET /api/uptime/latest`: the response time of every device that answered a check in the last half hour.
+
 ## 0.4.231 — 2026-10-24
 
 ### Fixed

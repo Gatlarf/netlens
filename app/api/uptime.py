@@ -12,6 +12,28 @@ from app.uptime import RANGES, core_choices, device_uptime, set_core, uptime_ove
 router = APIRouter(prefix="/api", tags=["uptime"])
 
 
+@router.get("/uptime/latest")
+def get_uptime_latest(request: Request, conn=Depends(get_conn)) -> list[dict]:
+    """The response time right now of every device that answered a check in the last half hour (the average of its last three checks), for views that move
+    with it, such as the radar of the HUD. {id, rtt_ms, up, ts}; a device whose latest check failed has up false and no rtt_ms."""
+    from datetime import datetime, timedelta, timezone
+
+    since = (datetime.now(timezone.utc) - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    latest: dict[int, list] = {}
+    for r in conn.execute("SELECT device_id, ts, up, rtt_ms FROM checks WHERE ts >= ? ORDER BY ts", (since,)):
+        latest.setdefault(r["device_id"], []).append(r)
+    scope = scope_of(request)
+    allowed = devices_in_scope(conn, scope) if scope is not None else None
+    out = []
+    for device_id, rows in latest.items():
+        if allowed is not None and device_id not in allowed:
+            continue
+        last = rows[-1]
+        times = [r["rtt_ms"] for r in rows[-3:] if r["up"] and r["rtt_ms"] is not None]
+        out.append({"id": device_id, "up": bool(last["up"]), "rtt_ms": round(sum(times) / len(times), 2) if last["up"] and times else None, "ts": last["ts"]})
+    return out
+
+
 @router.get("/uptime")
 def get_uptime_overview(request: Request, bars: int = Query(60, ge=1, le=240), range: Literal["24h", "7d", "30d"] | None = None) -> list[dict]:
     """Per-device heartbeat bars and 24h/7d/30d uptime, like Uptime Kuma's dashboard. With `range` each bar is a slice of that period with its

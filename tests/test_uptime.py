@@ -255,3 +255,32 @@ def test_core_api_and_viewer_rights(tmp_path):
         assert c.patch(f"/api/devices/{dev}", json={"always_on": False}).json()["always_on"] is False
         assert c.get("/api/uptime?range=24h").json()[0]["always_on"] is False
         assert c.patch(f"/api/devices/{dev}", json={"always_on": True}).json()["always_on"] is True
+
+
+def test_latest_response_times_for_the_radar(tmp_path):
+    from datetime import datetime, timedelta, timezone
+
+    from fastapi.testclient import TestClient
+
+    from app.config import load_settings
+    from app.db import connect, init_db
+    from app.main import create_app
+
+    db = tmp_path / "l.db"
+    conn = connect(db)
+    init_db(conn)
+    now = datetime.now(timezone.utc)
+    stamp = lambda minutes: (now - timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for i, ip in ((1, "10.0.0.1"), (2, "10.0.0.2"), (3, "10.0.0.3")):
+        conn.execute("INSERT INTO devices (id, primary_ip, mac, online, first_seen, last_seen) VALUES (?, ?, ?, 1, ?, ?)", (i, ip, f"aa:00:00:00:00:0{i}", stamp(900), stamp(1)))
+    for minutes, rtt in ((5, 10.0), (3, 20.0), (1, 30.0)):                      # device 1: answers, the last three average 20 ms
+        conn.execute("INSERT INTO checks (device_id, ts, up, rtt_ms) VALUES (1, ?, 1, ?)", (stamp(minutes), rtt))
+    conn.execute("INSERT INTO checks (device_id, ts, up, rtt_ms) VALUES (2, ?, 1, 5.0)", (stamp(4),))
+    conn.execute("INSERT INTO checks (device_id, ts, up, rtt_ms) VALUES (2, ?, 0, NULL)", (stamp(1),))     # device 2: its latest check failed
+    conn.execute("INSERT INTO checks (device_id, ts, up, rtt_ms) VALUES (3, ?, 1, 9.0)", (stamp(120),))    # device 3: nothing recent
+    conn.commit()
+    conn.close()
+    client = TestClient(create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=db), headers={"Authorization": "Bearer secret"})
+    got = {d["id"]: d for d in client.get("/api/uptime/latest").json()}
+    assert set(got) == {1, 2} and got[1]["rtt_ms"] == 20.0 and got[1]["up"] is True
+    assert got[2]["up"] is False and got[2]["rtt_ms"] is None
