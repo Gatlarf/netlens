@@ -449,7 +449,8 @@ def record_node_health(conn: sqlite3.Connection, plugin_id: str, data: dict, now
         mark = f"fw|{device_id}"
         if fw and fw.get("latest"):
             if state.get(mark) != fw["latest"]:
-                add_event(conn, "firmware_update", f"{name}: firmware {fw['version']} is running, {fw['latest']} is available", device_id=device_id, now=now)
+                waiting = f"{fw['latest']} is available" if fw["latest"][:1].isdigit() else "a newer version is available"          # some controllers only say that one waits
+                add_event(conn, "firmware_update", f"{name}: firmware {fw['version']} is running, {waiting}", device_id=device_id, now=now)
                 state[mark] = fw["latest"]
                 summary["firmware"] += 1
         else:

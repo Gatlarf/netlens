@@ -18,8 +18,12 @@ spec.loader.exec_module(plugin)
 
 GW, SW, AP1, AP2, AP3 = ("aa:bb:cc:00:00:0%d" % i for i in range(1, 6))
 DEVICES = [
-    {"mac": GW, "type": "udm", "model": "UDMPRO", "name": "Dream Machine", "ip": "192.168.1.1", "adopted": True},
-    {"mac": SW, "type": "usw", "model": "US8P150", "name": "Office switch", "ip": "192.168.1.2", "adopted": True, "uplink": {"type": "wire", "uplink_mac": GW.upper(), "port_idx": 2}},
+    {"mac": GW, "type": "udm", "model": "UDMPRO", "name": "Dream Machine", "ip": "192.168.1.1", "adopted": True, "version": "4.0.6", "upgradable": True, "upgrade_to_firmware": "4.0.9",
+     "system-stats": {"cpu": "12.5", "mem": "48.2", "uptime": "86400"}, "uptime": 86400, "general_temperature": 61,
+     "port_table": [{"port_idx": 1, "name": "Port 1", "up": True, "enable": True, "speed": 1000, "full_duplex": True, "rx_bytes": 5000, "tx_bytes": 7000, "rx_packets": 50, "tx_packets": 70, "rx_errors": 0, "tx_errors": 0},
+                    {"port_idx": 2, "name": "Switch uplink", "up": False, "enable": True, "speed": 0}],
+     "wan1": {"up": True, "speed": 1000, "rx_bytes": 123456789, "tx_bytes": 98765432}},
+    {"mac": SW, "type": "usw", "model": "US8P150", "name": "Office switch", "ip": "192.168.1.2", "adopted": True, "version": "7.0.50", "upgradable": False, "system-stats": {"cpu": 3, "mem": "30"}, "temperatures": [{"name": "CPU", "value": 45}, {"name": "Board", "value": 52}], "uplink": {"type": "wire", "uplink_mac": GW.upper(), "port_idx": 2}},
     {"mac": AP1, "type": "uap", "model": "U6LR", "name": "Hall AP", "ip": "192.168.1.3", "adopted": True, "uplink": {"type": "wire", "uplink_mac": SW}},
     {"mac": AP2, "type": "uap", "model": "U6LITE", "ip": "192.168.1.4", "adopted": True, "uplink": {"type": "wireless", "uplink_mac": AP1}},  # a meshed AP, no name
     {"mac": AP3, "type": "uap", "model": "U6PRO", "name": "Not adopted", "adopted": False},
@@ -267,3 +271,19 @@ def test_diagnose_records_a_failing_step_and_still_logs_out():
         assert Fake.state["logouts"] == 1
     finally:
         httpd.shutdown()
+
+
+def test_every_device_reports_its_health_firmware_and_ports(server):
+    url, state = server
+    out = validate_output("topology", plugin.fetch(cfg(url)))
+    nodes = {n["mac"]: n for n in out["nodes"]}
+    gw = nodes[GW]
+    assert {m["metric"]: m["value"] for m in gw["metrics"]} == {"cpu_pct": 12.5, "mem_pct": 48.2, "temp_c": 61.0, "uptime_s": 86400.0}
+    assert gw["firmware"] == {"version": "4.0.6", "latest": "4.0.9"}
+    ports = {p["name"] or f"#{p['port']}": p for p in gw["ports"]}
+    assert ports["#1"]["up"] is True and ports["#1"]["speed_mbps"] == 1000 and ports["#1"]["rx_bytes"] == 5000 and ports["#1"]["duplex"] == "full"      # "Port 1" is no name
+    assert ports["Switch uplink"]["up"] is False
+    assert ports["WAN"]["port"] == 101 and ports["WAN"]["rx_bytes"] == 123456789 and ports["WAN"]["up"] is True
+    sw = nodes[SW]
+    assert {m["metric"]: m["value"] for m in sw["metrics"]} == {"cpu_pct": 3.0, "mem_pct": 30.0, "temp_c": 52.0} and sw["firmware"] == {"version": "7.0.50", "latest": None}     # the hottest sensor
+    assert not nodes[AP1]["metrics"] and nodes[AP1]["firmware"] is None                     # a device that says nothing about itself is left as it was

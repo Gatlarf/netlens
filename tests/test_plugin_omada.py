@@ -19,8 +19,8 @@ spec.loader.exec_module(plugin)
 
 GW, SW, AP1, AP2 = "AA-BB-CC-00-00-01", "AA-BB-CC-00-00-02", "AA-BB-CC-00-00-03", "AA-BB-CC-00-00-04"
 DEVICES = [
-    {"type": "gateway", "mac": GW, "name": "ER605", "ip": "192.168.0.1", "model": "ER605", "showModel": "ER605 v2"},
-    {"type": "switch", "mac": SW, "name": "Rack switch", "ip": "192.168.0.2", "model": "TL-SG2008P"},
+    {"type": "gateway", "mac": GW, "name": "ER605", "ip": "192.168.0.1", "model": "ER605", "showModel": "ER605 v2", "cpuUtil": 7, "memUtil": 41, "uptimeLong": 3600, "firmwareVersion": "2.1.3", "needUpgrade": True},
+    {"type": "switch", "mac": SW, "name": "Rack switch", "ip": "192.168.0.2", "model": "TL-SG2008P", "cpuUtil": 12, "memUtil": 55, "uptime": "1day(s) 2h 3m 4s", "firmwareVersion": "1.0.4", "needUpgrade": False},
     {"type": "ap", "mac": AP1, "name": "Living room", "ip": "192.168.0.3", "model": "EAP653"},
     {"type": "ap", "mac": AP2, "name": "Garden", "ip": "192.168.0.4", "model": "EAP225"},
 ]
@@ -439,3 +439,14 @@ def test_the_diagnostic_reports_what_the_gateway_says_about_dpi_without_leaking_
     assert gateway["dpi_related_settings"] == {"dpiEnable": True, "dpiSetting.loggingTraffic": False, "devCap.supportDpi": True}
     text = json.dumps(report)
     assert "secret-name" not in text and "203.0.113.9" not in text
+
+
+def test_devices_report_processor_memory_uptime_and_the_firmware_that_waits(server):
+    url, state = server
+    out = validate_output("topology", plugin.fetch(cfg(url)))
+    nodes = {n["name"]: n for n in out["nodes"]}
+    assert {m["metric"]: m["value"] for m in nodes["ER605"]["metrics"]} == {"cpu_pct": 7.0, "mem_pct": 41.0, "uptime_s": 3600.0}
+    assert nodes["ER605"]["firmware"] == {"version": "2.1.3", "latest": "a newer version"}                  # the controller says that one waits, not which
+    assert {m["metric"]: m["value"] for m in nodes["Rack switch"]["metrics"]} == {"cpu_pct": 12.0, "mem_pct": 55.0, "uptime_s": 93784.0}      # "1day(s) 2h 3m 4s"
+    assert nodes["Rack switch"]["firmware"] == {"version": "1.0.4", "latest": None}
+    assert not nodes["Living room"]["metrics"] and nodes["Living room"]["firmware"] is None

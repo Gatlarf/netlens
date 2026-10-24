@@ -1,11 +1,11 @@
 {
   "id": "omada",
   "name": "TP-Link Omada",
-  "version": "1.3.3",
+  "version": "1.4.0",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",
-  "description": "Reads the Omada controller (software controller, OC200/OC300 or Omada Cloud-less hardware, version 5.1 or newer): your gateway, switches and access points, which device hangs below which, which switch or access point every client is connected to, with Wi-Fi signal and link rate, the switch port of every wired client, and the ports of every switch (link, speed, duplex, traffic). With an Open API client it also reads the application statistics (DPI) for Statistics. Read-only.",
+  "description": "Reads the Omada controller (software controller, OC200/OC300 or Omada Cloud-less hardware, version 5.1 or newer): gateway, switches and access points, which device hangs below which, which switch or access point every client is on, with Wi-Fi signal and link rate, the ports of every switch (link, speed, duplex, traffic), and each device's processor, memory, uptime and firmware (with a waiting upgrade). With an Open API client it also reads the application statistics (DPI). Read-only.",
   "timeout": 150,
   "diagnose": true,
   "config": [

@@ -1,11 +1,11 @@
 {
   "id": "unifi",
   "name": "Ubiquiti UniFi",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",
-  "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine, Cloud Key Gen2+, Cloud Gateway, or a self-hosted classic controller): your gateway, switches and access points, which device hangs below which, and which switch or access point every client is connected to, with Wi-Fi signal and link rate. Read-only: one login, a few reads and a logout per sync.",
+  "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine, Cloud Key Gen2+, Cloud Gateway, or a self-hosted classic controller): gateway, switches and access points, which device hangs below which, which switch or access point every client is on with Wi-Fi signal and link rate, and each device's health: processor, memory, temperature, uptime, firmware (and the waiting upgrade), ports and WAN speed. Read-only: one login, a few reads and a logout per sync.",
   "timeout": 90,
   "diagnose": true,
   "config": [
@@ -22,9 +22,18 @@
       "type": "select",
       "label": "Type of controller",
       "options": [
-        {"value": "auto", "label": "Detect automatically"},
-        {"value": "unifi_os", "label": "UniFi OS console (Dream Machine, Cloud Key Gen2+, Cloud Gateway)"},
-        {"value": "classic", "label": "Classic controller (self-hosted, port 8443)"}
+        {
+          "value": "auto",
+          "label": "Detect automatically"
+        },
+        {
+          "value": "unifi_os",
+          "label": "UniFi OS console (Dream Machine, Cloud Key Gen2+, Cloud Gateway)"
+        },
+        {
+          "value": "classic",
+          "label": "Classic controller (self-hosted, port 8443)"
+        }
       ],
       "default": "auto"
     },

@@ -19,6 +19,8 @@ One login, three reads per site and a logout per sync (Netlens syncs after every
 | clients | `GET /proxy/network/api/s/<site>/stat/sta` | `GET /api/s/<site>/stat/sta` |
 | logout | `POST /api/auth/logout` | `POST /api/logout` |
 
+**Health of every device (1.1.0).** The same device list also carries each device's own figures, so the plugin reports them without another request: processor and memory (`system-stats`), temperature (`general_temperature`, or the hottest of `temperatures`), uptime, the firmware (`version`, and `upgrade_to_firmware` when `upgradable`), the ports of switches and the gateway (`port_table`: link, speed, duplex, bytes, packets, errors) and the internet connections (`wan1`..`wan3`, as ports named WAN, with their byte counters: the WAN line of the traffic graph on the HUD page). Netlens records them like a monitored device. *Written from the controller's documented fields and community documentation, tested against a fake controller; not yet against real hardware.*
+
 *Type of controller = Detect automatically* tries the UniFi OS login first and falls back to the classic one.
 
 ## Set-up

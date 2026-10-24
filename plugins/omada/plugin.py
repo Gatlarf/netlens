@@ -266,6 +266,7 @@ class Controller:
                     "mac": mac, "ip": device.get("ip") or None, "role": role,
                     "name": device.get("name") or device.get("showModel") or device.get("model") or mac,
                     "model": device.get("showModel") or device.get("model") or "",
+                    "metrics": _health(device), "firmware": _firmware(device),
                 })
                 nodes[-1]["parent_mac"], ports = self.detail_of(site, device)      # asked for with the MAC exactly as the controller wrote it
                 if ports:
@@ -396,6 +397,37 @@ class Controller:
 
 
 SPEEDS = {1: 10, 2: 100, 3: 1000, 4: 2500, 5: 10000, 6: 25000}      # the controller's link speed codes, in Mbit/s
+
+
+def _percent(value):
+    value = _number(value)
+    return float(value) if value is not None and 0 <= value <= 100 else None
+
+
+def _uptime_s(device):
+    """Seconds since the device started: a number on newer controllers (`uptimeLong`), otherwise text like "5day(s) 3h 12m 11s"."""
+    value = _number(device.get("uptimeLong"))
+    if value is not None and value >= 0:
+        return float(value)
+    text = str(device.get("uptime") or "")
+    parts = re.findall(r"(\d+)\s*(day|h|m|s)", text)
+    return float(sum(int(n) * {"day": 86400, "h": 3600, "m": 60, "s": 1}[u] for n, u in parts)) if parts else None
+
+
+def _health(device):
+    """Processor, memory and uptime from the device list (the controller does not give a temperature)."""
+    out = []
+    for metric, value in (("cpu_pct", _percent(device.get("cpuUtil"))), ("mem_pct", _percent(device.get("memUtil"))), ("uptime_s", _uptime_s(device))):
+        if value is not None:
+            out.append({"metric": metric, "value": value})
+    return out
+
+
+def _firmware(device):
+    version = str(device.get("firmwareVersion") or "").strip()
+    if not version:
+        return None
+    return {"version": version, "latest": "a newer version" if device.get("needUpgrade") else None}                 # the controller says that one waits, not which
 
 
 def _port(raw):

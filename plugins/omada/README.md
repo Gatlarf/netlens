@@ -18,6 +18,7 @@ The session is closed again afterwards, so no sessions pile up.
 | login | `POST /<id>/api/v2/login` (cookie + `Csrf-Token`) |
 | sites | `GET .../users/current` |
 | devices | `GET .../sites/<site>/devices`, then per switch `.../switches/<mac>` and per access point `.../eaps/<mac>` (their uplink; for a switch also its ports: link, speed, duplex, byte counters) |
+| health | (from the device list above, no extra request) processor `cpuUtil`, memory `memUtil`, uptime (`uptimeLong`, or the text of `uptime`), firmware `firmwareVersion` and whether `needUpgrade`. The controller gives no temperature. Netlens records them like a monitored device (1.4.0; written from the controller's documented fields, not yet tested on real hardware) |
 | clients | `GET .../sites/<site>/clients?currentPage=&currentPageSize=` (paged) |
 | logout | `POST .../logout` (best effort) |
 | application statistics (only with an Open API client, see below) | `POST /openapi/authorize/token?grant_type=client_credentials`, `GET /openapi/v1/<id>/sites`, then per client `GET /openapi/v1/<id>/sites/<site>/dashboard/specificClientInfo/<mac>?start=&end=` |

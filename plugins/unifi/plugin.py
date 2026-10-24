@@ -1,7 +1,8 @@
 """Ubiquiti UniFi plugin (kind "topology"): which device and which client hangs below which, read from the controller.
 
 Works with the UniFi Network application on a UniFi OS console (Dream Machine, Cloud Key Gen2+, Cloud Gateway, ...)
-and with a classic self-hosted controller. Read-only:
+and with a classic self-hosted controller. Read-only. Besides the links it reads each device's own health (processor, memory, temperature, uptime), firmware (and the upgrade that is waiting), ports and WAN
+counters from the same device list:
 
     POST /api/auth/login   (UniFi OS)  or  /api/login  (classic)    one login; the session is a cookie
     GET  <prefix>/api/self/sites                                      the sites the account may see
@@ -190,6 +191,7 @@ class Controller:
                     "name": device.get("name") or device.get("model") or mac,
                     "model": device.get("model") or "",
                     "parent_mac": _mac(uplink.get("uplink_mac")) or _mac(device.get("uplink_mac")),
+                    "metrics": _health(device), "firmware": _firmware(device), "ports": _ports(device),      # what the device says about itself: Netlens records it like a monitored device
                 })
             for client in self._get(f"/api/s/{urllib.parse.quote(site['name'])}/stat/sta"):
                 mac = _mac(client.get("mac")) if isinstance(client, dict) else None
@@ -197,6 +199,72 @@ class Controller:
                     seen_clients.add(mac)
                     clients.append((client, mac))
         return nodes, clients
+
+
+def _float(value):
+    """A figure the controller gives as a number or as text ("3.4"); None when it is neither."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).strip())
+    except ValueError:
+        return None
+
+
+def _health(device):
+    """Processor, memory, temperature and uptime of a UniFi device (a gateway, switch or access point reports them in `system-stats`)."""
+    stats = device.get("system-stats") if isinstance(device.get("system-stats"), dict) else {}
+    out = []
+    for metric, value in (("cpu_pct", _float(stats.get("cpu"))), ("mem_pct", _float(stats.get("mem")))):
+        if value is not None and 0 <= value <= 100:
+            out.append({"metric": metric, "value": value})
+    temps = [_float(t.get("value")) for t in device.get("temperatures") or [] if isinstance(t, dict)]
+    temp = _float(device.get("general_temperature"))
+    temp = temp if temp is not None else max((t for t in temps if t is not None), default=None)
+    if temp is not None and 0 < temp < 150:
+        out.append({"metric": "temp_c", "value": temp})
+    uptime = _float(device.get("uptime"))
+    uptime = uptime if uptime is not None else _float(stats.get("uptime"))
+    if uptime is not None and uptime >= 0:
+        out.append({"metric": "uptime_s", "value": uptime})
+    return out
+
+
+def _firmware(device):
+    version = str(device.get("version") or "").strip()
+    if not version:
+        return None
+    latest = str(device.get("upgrade_to_firmware") or "").strip() if device.get("upgradable") else ""
+    return {"version": version, "latest": latest or None}
+
+
+def _int(value):
+    value = _number(value)
+    return int(value) if value is not None and value >= 0 else None
+
+
+def _ports(device):
+    """The ports of a switch or gateway with their link and counters, and the internet connections (WAN) of a gateway as ports of their own (numbered from 100)."""
+    ports = []
+    for p in device.get("port_table") or []:
+        index = _int(p.get("port_idx")) if isinstance(p, dict) else None
+        if not index or index > 99:
+            continue
+        name = str(p.get("name") or "").strip()
+        ports.append({
+            "port": index, "name": None if not name or name.lower() == f"port {index}" else name[:40], "up": bool(p.get("up")), "enabled": p.get("enable", True) is not False,
+            "speed_mbps": _int(p.get("speed")), "duplex": ("full" if p.get("full_duplex") else "half") if p.get("up") and "full_duplex" in p else None,
+            "rx_bytes": _int(p.get("rx_bytes")), "tx_bytes": _int(p.get("tx_bytes")), "rx_packets": _int(p.get("rx_packets")), "tx_packets": _int(p.get("tx_packets")),
+            "rx_errors": _int(p.get("rx_errors")), "tx_errors": _int(p.get("tx_errors")),
+        })
+    for n, key in enumerate(("wan1", "wan2", "wan3"), 1):
+        wan = device.get(key)
+        if isinstance(wan, dict) and (wan.get("rx_bytes") is not None or wan.get("up") is not None):
+            ports.append({"port": 100 + n, "name": "WAN" if n == 1 else f"WAN {n}", "up": bool(wan.get("up")), "enabled": True, "speed_mbps": _int(wan.get("speed")),
+                          "rx_bytes": _int(wan.get("rx_bytes")), "tx_bytes": _int(wan.get("tx_bytes")), "rx_packets": _int(wan.get("rx_packets")), "tx_packets": _int(wan.get("tx_packets"))})
+    return ports
 
 
 def _rate_mbps(value):

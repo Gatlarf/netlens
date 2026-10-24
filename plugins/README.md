@@ -72,3 +72,16 @@ python plugins/build_zip.py unifi
 ```
 
 The zip holds only `plugin.json` and `plugin.py`. The README and the tests stay in the repository.
+
+## What a plugin for network gear should report
+
+A plugin for a router, access point, mesh node, switch or firewall (kind `topology`) should give everything its API allows, not only the links, so Netlens can monitor the device without SNMP:
+
+- **Health** (`nodes[].metrics`): processor, memory, temperature and uptime of the device and of every node or cluster member. A figure that only counts up (processor time) goes as `used` and `total`; Netlens works out the percentage between two syncs. Netlens records the readings like a monitored device (graphs, the Health page, the usual limits).
+- **Firmware** (`nodes[].firmware`): `version` and, when an upgrade is waiting, `latest`. Netlens tells it once as a *Firmware update waiting* event.
+- **Ports** (`nodes[].ports`): the physical ports with link state, speed and counters (bytes, packets, errors), the **internet connection (WAN)** as a port named like "WAN" (it becomes the WAN line of the traffic graph on the HUD page), the Wi-Fi radios.
+- **Mesh and cluster nodes**: log in to each member with the main login, at the address the main device lists for it *right now* (addresses change; nothing to set up per node). A node that refuses the login is skipped and the others still count.
+- Put the extras behind plugin settings that switch them off, keep everything read-only, and never let an extra fail the sync. Say in the plugin README what was tested on real hardware and what only follows the vendor's documentation.
+
+The ASUS plugin (1.5.0) is the reference.
+
