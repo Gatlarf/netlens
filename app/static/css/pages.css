@@ -120,7 +120,7 @@
   text-transform: uppercase;
   background: var(--muted);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .ip-seen {
@@ -139,7 +139,7 @@
   font-size: 0.85rem;
   font-weight: bold;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .event-detail {
@@ -207,7 +207,7 @@
 .facts b { font-size: 1.25rem; }
 .facts span { color: var(--muted); font-size: 0.8rem; }
 .findings { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.finding { border-left: 4px solid var(--border); background: var(--bg-alt, rgba(127, 127, 127, 0.08)); padding: 8px 12px; border-radius: 4px; }
+.finding { border-left: 4px solid var(--border); background: var(--bg-alt, rgba(127, 127, 127, 0.08)); padding: 8px 12px; border-radius: var(--radius-sm); }
 .finding.warn { border-left-color: #d97706; }
 .finding.info { border-left-color: var(--accent); }
 .finding.ok { border-left-color: #16a34a; }

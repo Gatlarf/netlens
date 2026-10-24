@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.195 — 2026-10-24
+
+### Changed
+- **One look for corners and spacing.** Containers (cards, tiles, dialogs, table frames) share one corner radius and controls another, instead of a mix of 4 to 14 pixel values. Tables now have the same soft frame on every page. Cards, page margins, grid gaps and the side menu are a little tighter, so more fits on the screen.
+
 ## 0.4.194 — 2026-10-24
 
 ### Changed

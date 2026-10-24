@@ -11,7 +11,7 @@
 .terminal-wrap {
   height: 420px;
   background: #0b1020;
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 8px;
   overflow: hidden;
 }

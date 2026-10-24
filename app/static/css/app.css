@@ -14,6 +14,7 @@
   --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius: 8px;
+  --radius-sm: 6px;       /* controls and chips; containers (cards, tiles, dialogs, tables) use --radius */
 }
 
 /* Theme: follows the system unless the user picked one with the switch in the top bar
@@ -126,7 +127,7 @@ body {
   padding: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
 }
 .popmenu[hidden] { display: none; }
@@ -139,7 +140,7 @@ body {
   gap: 12px;
   padding: 8px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text);
   font: inherit;
@@ -155,7 +156,7 @@ body {
 .menu-row .app-version { margin: 0; font-size: inherit; }
 .menu-row.version-link { cursor: pointer; text-decoration: none; }
 .menu-row.version-link:hover { background: var(--bg); color: var(--text); }
-.menu-row.update-badge { color: var(--warn, #b45309); font-weight: 600; margin: 0; border: 0; border-radius: 6px; background: none; font-size: 0.85rem; padding: 8px 10px; }
+.menu-row.update-badge { color: var(--warn, #b45309); font-weight: 600; margin: 0; border: 0; border-radius: var(--radius-sm); background: none; font-size: 0.85rem; padding: 8px 10px; }
 .menu-who { padding: 6px 10px; }
 .menu-who small { display: block; color: var(--muted); }
 
@@ -240,7 +241,7 @@ body.has-update .user-btn::after, body.has-update .burger::after {
 /* ---------- view ---------- */
 .view {
   width: 100%;
-  padding: 16px;
+  padding: 12px;
 }
 
 /* ---------- toolbar ---------- */
@@ -249,7 +250,7 @@ body.has-update .user-btn::after, body.has-update .burger::after {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 /* ---------- inputs ---------- */
@@ -271,7 +272,8 @@ input:focus, select:focus, textarea:focus {
 textarea { min-height: 80px; resize: vertical; }
 
 /* ---------- tables ---------- */
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.card .table-wrap, .table-wrap .table-wrap { border: 0; border-radius: 0; background: none; }
 
 table.data {
   width: 100%;
@@ -380,13 +382,13 @@ th.sortable.sorted-desc::after { content: "\2193"; color: var(--accent); }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 12px 14px;
 }
 
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 12px;
 }
 
 /* ---------- key/value ---------- */
@@ -600,7 +602,7 @@ body[data-role="viewer"] .admin-only, body[data-role="viewer"] .act-only, body[d
 #login-dialog input { width: 100%; box-sizing: border-box; }
 #login-dialog .btn { margin-top: 12px; }
 
-.brand-icon { vertical-align: -6px; margin-right: 8px; border-radius: 6px; }
+.brand-icon { vertical-align: -6px; margin-right: 8px; border-radius: var(--radius-sm); }
 
 /* first-run wizard */
 body.setup-mode #nav, body.setup-mode .topbar-actions, body.setup-mode .burger { display: none; }
@@ -619,7 +621,7 @@ body.setup-mode .app-shell { display: block; }
 @media (max-width: 520px) { .evidence li { grid-template-columns: 5em 3em 1fr; } }
 
 /* plugin on/off banner */
-.plugin-state { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5em; padding: 0.7em 0.9em; margin: 0.6em 0; border-radius: 6px; border: 1px solid; }
+.plugin-state { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5em; padding: 0.7em 0.9em; margin: 0.6em 0; border-radius: var(--radius-sm); border: 1px solid; }
 .plugin-state .btn { margin-left: auto; }
 .plugin-state.on { border-color: #16a34a; background: rgba(22, 163, 74, 0.12); }
 .plugin-state.off { border-color: #d97706; background: rgba(217, 119, 6, 0.16); }
@@ -687,7 +689,7 @@ body.setup-mode .app-shell { display: block; }
 .d-quiet { margin: 0; color: var(--ok); font-weight: 600; }
 .d-events li { display: grid; grid-template-columns: 6em 12em 1fr; gap: 8px; align-items: baseline; }
 .d-time, .d-kind { color: var(--muted); font-size: 0.82rem; }
-.d-map { width: 100%; height: 260px; border-radius: 6px; background: var(--bg); position: relative; z-index: 1; cursor: pointer; }
+.d-map { width: 100%; height: 260px; border-radius: var(--radius-sm); background: var(--bg); position: relative; z-index: 1; cursor: pointer; }
 .d-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .dcard.editing { border-style: dashed; cursor: grab; }
 .dcard.dragging { opacity: 0.4; }
@@ -706,7 +708,7 @@ body.setup-mode .app-shell { display: block; }
 
 /* ---------- speed tests ---------- */
 .speed-title { margin: 0; font-size: 1.4rem; }
-.speed-page .card { margin-bottom: 14px; }
+.speed-page .card { margin-bottom: 12px; }
 .speed-page h3 { margin: 18px 0 6px; font-size: 1rem; }
 .speed-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 10px 0; }
 .speed-tiles .tile { padding: 10px 12px; }
@@ -716,7 +718,7 @@ body.setup-mode .app-shell { display: block; }
 .speed-port { width: 5.5em; }
 .speed-cmds { display: grid; gap: 6px; margin: 8px 0; }
 .speed-cmd { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.speed-cmd code { padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; word-break: break-all; }
+.speed-cmd code { padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); word-break: break-all; }
 .speed-failed td { color: var(--muted); }
 .speed-page .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media (max-width: 700px) { .speed-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -724,7 +726,7 @@ body.setup-mode .app-shell { display: block; }
 .speed-page .chart { max-width: 760px; }
 
 /* ---------- cards of your own ---------- */
-.d-editor { width: min(640px, calc(100vw - 24px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); }
+.d-editor { width: min(640px, calc(100vw - 24px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); }
 .d-editor::backdrop { background: rgba(0, 0, 0, 0.45); }
 .d-editor h2 { margin-top: 0; }
 .d-editor h3 { margin: 14px 0 6px; font-size: 1rem; }
@@ -744,7 +746,7 @@ body.setup-mode .app-shell { display: block; }
 .d-device { display: flex; align-items: center; gap: 8px; font-size: 1.3rem; overflow-wrap: anywhere; }
 .d-status { display: flex; align-items: center; gap: 8px; }
 .d-status-dot { width: 14px; height: 14px; border-radius: 50%; background: currentColor; }
-.d-gauge { height: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin: 6px 0 2px; }
+.d-gauge { height: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; margin: 6px 0 2px; }
 .d-gauge-fill { display: block; height: 100%; background: var(--accent); }
 .d-gauge-fill.d-ok { background: var(--ok); }
 .d-gauge-fill.d-warn { background: var(--warn); }
@@ -792,12 +794,12 @@ body.site-view .admin-only, body.site-view .act-only, body.site-view [data-route
 
 /* the Network tab of a device: cards flow over two columns, each card whole */
 .dev-flow { column-count: 2; column-gap: 16px; }
-.dev-flow > * { break-inside: avoid; margin-bottom: 16px; }
+.dev-flow > * { break-inside: avoid; margin-bottom: 12px; }
 .dev-flow > .card, .dev-flow > div > .card { margin-top: 0; }
 @media (max-width: 900px) { .dev-flow { column-count: 1; } }
 
 /* ---------- the side menu ---------- */
-.app-shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); align-items: start; }
+.app-shell { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; }
 body.side-hidden .app-shell { grid-template-columns: minmax(0, 1fr); }
 body.side-hidden .sidenav { display: none; }
 .app-main { min-width: 0; }

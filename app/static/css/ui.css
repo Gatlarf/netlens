@@ -38,7 +38,7 @@ a.dash-fact:hover { text-decoration: underline; }
 .row-menu > summary { list-style: none; cursor: pointer; padding: 2px 10px; }
 .row-menu > summary::-webkit-details-marker { display: none; }
 .row-menu-list { position: absolute; right: 0; z-index: 20; min-width: 140px; margin-top: 4px; padding: 4px; display: grid; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15); }
-.row-menu-list .menu-item { text-align: left; padding: 6px 10px; background: none; border: 0; color: var(--text); font: inherit; cursor: pointer; border-radius: 4px; }
+.row-menu-list .menu-item { text-align: left; padding: 6px 10px; background: none; border: 0; color: var(--text); font: inherit; cursor: pointer; border-radius: var(--radius-sm); }
 .row-menu-list .menu-item:hover { background: var(--bg); }
 .row-menu-list .danger-text { color: var(--bad); }
 .up-list.up-compact .up-row { grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 236px; padding: 6px 12px; }
@@ -76,7 +76,7 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 .ipv6-primer > summary { cursor: pointer; } .ipv6-primer dt { font-weight: 600; margin-top: 8px; } .ipv6-primer dd { margin: 2px 0 0; color: var(--muted); }
 
 /* vulnerabilities */
-.vuln-sev { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; color: #fff; background: var(--muted); }
+.vuln-sev { display: inline-block; padding: 1px 8px; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600; color: #fff; background: var(--muted); }
 .vuln-critical { background: var(--bad); } .vuln-high { background: #d9480f; } .vuln-medium { background: var(--warn); } .vuln-low { background: #3b82c4; }
 .vuln-exploited { margin-left: 6px; font-size: 0.72rem; font-weight: 700; color: var(--bad); text-transform: uppercase; }
 .vuln-count { margin-right: 12px; white-space: nowrap; }
