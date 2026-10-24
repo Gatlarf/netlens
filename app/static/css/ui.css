@@ -105,7 +105,7 @@ summary > h2.inline-h2 { display: inline; margin: 0; } details.card > summary { 
 tr.svc-sep td { background: var(--bg); padding-top: 12px; }
 tr.svc-sep:hover { background: var(--bg); }
 
-/* ---------- forms and buttons, one convention (docs/UI-RULES.md) ---------- */
+/* ---------- forms and buttons, one convention (contrib/UI-RULES.md) ---------- */
 /* Fields that follow each other sit side by side; long fields (text areas, multi-selects) and everything that is not a field take a whole row. */
 .settings-content :where(form, .card, div):has(> .field + .field) { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px 20px; align-items: start; }
 .settings-content :where(form, .card, div):has(> .field + .field) > :not(.field) { grid-column: 1 / -1; }
@@ -124,3 +124,11 @@ td .btn.danger:hover, li .btn.danger:hover { background: color-mix(in srgb, #c62
 .settings-content form:has(> fieldset) > :not(fieldset) { grid-column: 1 / -1; }
 .settings-content form:has(> fieldset) > :is(button, .btn) { justify-self: start; }
 fieldset { margin: 0; min-width: 0; }
+/* one setting on one line: label, a short field, the unit and the save button */
+.inline-setting { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0; }
+.inline-setting > label { margin: 0; }
+.inline-setting > .hint { flex: 1 1 100%; margin: 0; }
+input.inline-number { width: 5.5em; }
+/* narrow screens: the heartbeat strips shrink so the table keeps its last columns in view */
+@media (max-width: 1100px) { .hb { min-width: 1px; } .hb-bar { min-width: 90px; } }
+.plugin-status { min-width: 14rem; overflow-wrap: anywhere; }

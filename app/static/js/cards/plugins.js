@@ -13,10 +13,10 @@ function health(p) {
 
 // the last sync, in words
 function statusCell(p) {
-  if (p.problem && !p.status) return h("td", { class: "error" }, p.problem);
-  if (!p.status) return h("td", { class: "hint" }, p.enabled ? "waiting for the first sync" : "");
-  if (p.status.ok) return h("td", { class: "hint" }, `synced ${timeAgo(p.status.ts)}`);
-  return h("td", { class: "error" }, `failed ${timeAgo(p.status.ts)}: ${p.status.error}`);
+  if (p.problem && !p.status) return h("td", { class: "error plugin-status" }, p.problem);
+  if (!p.status) return h("td", { class: "hint plugin-status" }, p.enabled ? "waiting for the first sync" : "");
+  if (p.status.ok) return h("td", { class: "hint plugin-status" }, `synced ${timeAgo(p.status.ts)}`);
+  return h("td", { class: "error plugin-status" }, `failed ${timeAgo(p.status.ts)}: ${p.status.error}`);
 }
 
 // the running state before the switch: green Running, red Failing or Off
@@ -88,10 +88,10 @@ function fillPluginsCard(card, data, notice = null) {
   get("/api/plugin-compat").then((compat) => fillCompat(compatBox, card, compat)).catch(() => {});
 
   // a timeout now and then is normal behind a reverse proxy: a plugin is a problem only after this many failed syncs in a row
-  const graceBox = h("div", { class: "field" });
+  const graceBox = h("div", { class: "inline-setting" });
   card.appendChild(graceBox);
   get("/api/plugin-settings").then((s) => {
-    const input = h("input", { type: "number", min: "1", max: "48", value: String(s.failure_grace), class: "admin-only", "aria-label": "Failed syncs in a row" });
+    const input = h("input", { type: "number", min: "1", max: "48", value: String(s.failure_grace), class: "admin-only inline-number", "aria-label": "Failed syncs in a row" });
     const save = h("button", { type: "button", class: "btn admin-only" }, "Save");
     save.addEventListener("click", async () => {
       try {

@@ -760,3 +760,4 @@ button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background:
 /* remote access: one line per device, the session buttons on the right */
 .remote-dev { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
 .remote-list { max-height: calc(100vh - 230px); }
+.dev-flow > [data-card]:empty { display: none; }
