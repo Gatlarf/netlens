@@ -219,3 +219,7 @@
 
 .stability-details { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
 .stability-details[open] > summary { margin-bottom: 8px; }
+
+/* a form field is a grid: do not let its buttons and single-line inputs stretch across a wide card */
+.field > button, .field > .btn { justify-self: start; }
+.field input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .field select { max-width: 36rem; }

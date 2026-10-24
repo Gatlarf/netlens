@@ -5,7 +5,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ## 0.4.200 — 2026-10-24
 
 ### Changed
-- **Better use of wide and ultra-wide screens.** The dashboard fills the width with up to six columns instead of four stretched ones, the device page shows three or four columns of cards, the Uptime list runs in two or three columns, Statistics cards get more room for their tables, and form fields on the Settings pages no longer stretch across the whole screen.
+- **Better use of wide and ultra-wide screens.** The dashboard fills the width with up to six columns instead of four stretched ones, the device page shows three or four columns of cards, the Uptime list runs in two or three columns, Statistics cards get more room for their tables, and form fields on the Settings pages no longer stretch across the whole screen. Buttons and single-line fields in forms (plugin manager, speed test schedule and others) keep a sensible width instead of spanning the card.
 
 ## 0.4.199 — 2026-10-24
 
