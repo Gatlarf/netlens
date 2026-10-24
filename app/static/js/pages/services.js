@@ -1,5 +1,5 @@
 import { get, post, patch, del } from "../api.js";
-import { h, clear, toast, timeAgo, shortName } from "../util.js";
+import { h, clear, patch as patchDom, toast, timeAgo, shortName } from "../util.js";
 import { pageHead, rowMenu, emptyState } from "../ui.js";
 import { heartbeatBar, uptimeText, uptimeClass } from "../heartbeat.js";
 import { buildServiceForm } from "../cards/service_form.js";
@@ -71,6 +71,7 @@ export async function render(container) {
   }
   addBtn.addEventListener("click", () => showForm());
 
+  let table = null, tbody = null, wrap = null;       // built once; a refresh only changes the rows that changed
   async function load() {
     let checks;
     try {
@@ -87,12 +88,18 @@ export async function render(container) {
       body.replaceChildren(...[emptyState("No checks yet", "Add one to watch a web page, a port or a DNS server. Typical examples: your router's web page (HTTP), your NAS on port 445 (TCP), your DNS server resolving example.com (DNS).", h("button", { class: "btn primary admin-only", type: "button", onclick: () => addBtn.click() }, "Add check")), plugRows.length ? h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("tbody", {}, ...plugRows))) : null].filter(Boolean));
       return;
     }
-    const table = h("table", { class: "data" });
-    table.appendChild(h("thead", {}, h("tr", {}, ["", "Name", "Device", "History", "24 h", "Resp.", "Checked", ""].map((t) => h("th", {}, t)))));
-    const tbody = h("tbody");
-    for (const c of checks) {
-      const hb = h("td", {});
-      heartbeats(c).then((bar) => { if (!destroyed) hb.appendChild(bar); });
+    // the history bars are fetched first and built into the rows, so a refresh that changed nothing leaves the rows exactly as they are
+    const bars = await Promise.all(checks.map(heartbeats));
+    if (destroyed) return;
+    if (!table) {
+      table = h("table", { class: "data" });
+      table.appendChild(h("thead", {}, h("tr", {}, ["", "Name", "Device", "History", "24 h", "Resp.", "Checked", ""].map((t) => h("th", {}, t)))));
+      tbody = h("tbody");
+      table.appendChild(tbody);
+    }
+    const lines = [];
+    for (const [i, c] of checks.entries()) {
+      const hb = h("td", {}, bars[i]);
       const run = h("button", { class: "btn admin-only", type: "button" }, "Run");
       run.title = "Run the check now";
       run.addEventListener("click", async () => {
@@ -119,7 +126,7 @@ export async function render(container) {
       };
       const more = rowMenu([{ label: "Edit", onclick: doEdit }, { label: c.enabled ? "Pause" : "Resume", onclick: doPause }, { label: "Delete", onclick: doRemove, danger: true }], { cls: "admin-only" });
       const graphBtn = h("button", { class: "btn", type: "button", "aria-expanded": String(openGraphs.has(c.id)) }, "Graph");
-      const graphRow = h("tr", { class: "svc-graph-row", hidden: !openGraphs.has(c.id) }, h("td", { colspan: 8 }));
+      const graphRow = h("tr", { class: "svc-graph-row", hidden: !openGraphs.has(c.id) }, h("td", { colspan: 8, "data-live": "" }));
       const showGraph = async () => {
         const cell = graphRow.firstChild;
         if (cell.firstChild) return;
@@ -140,12 +147,11 @@ export async function render(container) {
         h("td", {}, c.last_ts ? timeAgo(c.last_ts) : "never"), h("td", { class: "actions" }, run, graphBtn, more));
       // a click on the line opens the graph, except on a link, a button or the heartbeat bar (those have their own meaning)
       line.addEventListener("click", (e) => { if (!e.target.closest("a, button, input, select, .hb-bar, .rl, .row-menu, .actions")) graphBtn.click(); });
-      tbody.appendChild(line);
-      tbody.appendChild(graphRow);
+      lines.push(line, graphRow);
     }
-    tbody.append(...plugRows);
-    table.appendChild(tbody);
-    body.replaceChildren(h("div", { class: "table-wrap" }, table));
+    patchDom(tbody, lines, plugRows);
+    if (!wrap) wrap = h("div", { class: "table-wrap" }, table);
+    patchDom(body, wrap);
   }
 
   await load();

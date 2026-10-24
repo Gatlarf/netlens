@@ -333,11 +333,15 @@ export async function render(container) {
     showTab();
   }
 
+  let lastSig = "";
   async function load() {
     for (const [key, btn] of Object.entries(buttons)) btn.classList.toggle("active", key === range);
     try {
       const data = await get(`/api/stats?range=${range}`);
       if (destroyed) return;
+      const sig = JSON.stringify(data, (k, v) => (k === "generated" ? undefined : v));
+      if (sig === lastSig) return;                 // nothing changed: nothing is redrawn
+      lastSig = sig;
       const keepAt = window.scrollY;   // a refresh must not throw you back to the top
       const built = build(data);
       for (const sec of built.querySelectorAll("section.stat-section")) sec.dataset.tab = TAB_OF[sec.id.replace(/^stat-/, "")] || "system";

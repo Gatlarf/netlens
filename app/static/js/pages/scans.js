@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { h, clear, fmtTime, timeAgo, isAdmin } from "../util.js";
+import { h, clear, fmtTime, timeAgo, isAdmin, patch } from "../util.js";
 import { makeResizable } from "../colresize.js";
 import { pageHead } from "../ui.js";
 import { EVENT_LABELS as KIND_LABELS, eventLabel } from "../event_labels.js";
@@ -154,10 +154,14 @@ export async function render(container, params) {
   let intervalId = null;
   let listenerAttached = false;
 
+  let scansSig = "";
   async function loadScans() {
-    clear(scansBody);
     try {
       const scans = await get("/api/scans?limit=50");
+      const sig = JSON.stringify(scans);
+      if (sig === scansSig) return;                  // nothing new: the table stays as it is
+      scansSig = sig;
+      clear(scansBody);
       if (!scans || !scans.length) {
         scansBody.appendChild(h("div", { class: "empty" }, "No scans yet."));
         return;
@@ -213,21 +217,22 @@ export async function render(container, params) {
       makeResizable(table, "scans");
       scansBody.appendChild(h("div", { class: "table-wrap" }, table));
     } catch (err) {
+      clear(scansBody);
       scansBody.appendChild(h("div", { class: "empty" }, "Failed to load scans."));
     }
   }
 
   async function loadEvents() {
-    clear(eventsBody);
     try {
       const kind = select.value;
       const url = kind ? `/api/events?limit=200&kind=${encodeURIComponent(kind)}` : "/api/events?limit=200";
       const events = await get(url);
       if (!events || !events.length) {
+        clear(eventsBody);
         eventsBody.appendChild(h("div", { class: "empty" }, "No events."));
         return;
       }
-      const list = h("ul", { class: "event-list" });
+      const list = h("ul", { class: "event-list", "data-morph": "" });
       for (const ev of events) {
         const li = h("li", { class: "event-item" });
 
@@ -249,8 +254,9 @@ export async function render(container, params) {
 
         list.appendChild(li);
       }
-      eventsBody.appendChild(list);
+      patch(eventsBody, list);                       // only the lines that are new or changed are touched
     } catch (err) {
+      clear(eventsBody);
       eventsBody.appendChild(h("div", { class: "empty" }, "Failed to load events."));
     }
   }

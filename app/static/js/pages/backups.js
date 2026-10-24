@@ -136,6 +136,7 @@ export async function render(container) {
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
   container.append(pageHead("Backups", "What your backup server holds for each guest. It comes from a backup plugin (Plugin store)."), body);
 
+  let lastSig = "";
   async function load() {
     let data;
     try {
@@ -145,6 +146,9 @@ export async function render(container) {
       return;
     }
     if (destroyed) return;
+    const sig = JSON.stringify(data);
+    if (sig === lastSig) return;               // nothing changed: leave the page as it is (an opened row stays open)
+    lastSig = sig;
     clear(body);
     const sitesCard = (data.sites || []).length ? siteRollup(data.sites) : null;
     if (!data.servers.length && sitesCard) {

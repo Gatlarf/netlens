@@ -104,6 +104,7 @@ export async function render(container) {
 
   let showProblems = () => {};
 
+  let lastSig = "";
   async function load() {
     let data;
     try {
@@ -113,6 +114,9 @@ export async function render(container) {
       return;
     }
     if (destroyed) return;
+    const sig = JSON.stringify(data);
+    if (sig === lastSig) return;               // nothing changed: leave the page as it is (an opened row stays open)
+    lastSig = sig;
     clear(body);
     if (!data.systems.length) {
       body.appendChild(emptyState("No storage system is connected yet", "Install a storage plugin from the Plugin store and turn it on. Netlens then shows pools, volumes and disks, tells you which hosts use which volume, and warns when a system, pool or disk becomes unhealthy or a pool fills up.", h("a", { class: "btn primary", href: "#/settings/plugin-browse" }, "Open the Plugin store")));

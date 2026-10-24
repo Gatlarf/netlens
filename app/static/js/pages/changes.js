@@ -113,9 +113,14 @@ export async function render(container) {
     if (data.total > data.items.length) list.append(h("p", { class: "hint" }, `The newest ${data.items.length} of ${data.total} are shown. Choose a group or a shorter period to see the rest.`));
   }
 
+  let lastSig = "";
   async function load() {
     try {
-      data = await get(`/api/changes?period=${period}${category ? `&category=${category}` : ""}${core ? "&always_on=1" : ""}`);
+      const next = await get(`/api/changes?period=${period}${category ? `&category=${category}` : ""}${core ? "&always_on=1" : ""}`);
+      const sig = `${period}|${category}|${core}|${JSON.stringify(next)}`;      // the choices are part of it: a click on a chip always redraws
+      if (sig === lastSig && data) return;          // nothing new since the last look
+      lastSig = sig;
+      data = next;
       if (!disposed) draw();
     } catch (err) {
       if (!disposed) { clear(list); list.append(h("p", { class: "error" }, err.message || "Could not load what changed")); }

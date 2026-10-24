@@ -1,5 +1,5 @@
 import { get, post } from "../api.js";
-import { h, clear, toast, foldToolbarOnPhone, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS, shortName, vendorText, vendorTitle } from "../util.js";
+import { h, clear, patch, toast, foldToolbarOnPhone, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS, shortName, vendorText, vendorTitle } from "../util.js";
 import { pageHead } from "../ui.js";
 
 const REFRESH_MS = 15000;
@@ -257,8 +257,6 @@ function buildTable(state) {
 }
 
 function renderRows() {
-  clear(tbody);
-
   const sorted = devices.slice().sort((a, b) => compare(a, b, state.sortKey, state.sortDir));
 
   for (const th of thead.querySelectorAll("th.sortable")) {
@@ -268,6 +266,7 @@ function renderRows() {
     }
   }
 
+  const rows = [];
   for (const d of sorted) {
     const tr = h("tr", {
       tabindex: "0",
@@ -316,8 +315,9 @@ function renderRows() {
     tr.appendChild(portsCell);
     tr.appendChild(h("td", { title: fmtTime(d.last_seen) }, timeAgo(d.last_seen)));
 
-    tbody.appendChild(tr);
+    rows.push(tr);
   }
+  patch(tbody, rows);
 
   count.textContent = sorted.length + (sorted.length === 1 ? " device" : " devices");
 }
@@ -344,11 +344,10 @@ async function load() {
   else if (state.ports === "none") devices = devices.filter((d) => d.ports_drift === null);
 
   if (!devices.length) {
-    clear(tbody);
     const empty = h("tr");
     const td = h("td", { class: "empty", colspan: String(SORT_KEYS.length) }, "No devices yet. Run a scan.");
     empty.appendChild(td);
-    tbody.appendChild(empty);
+    patch(tbody, empty);
     count.textContent = "0 devices";
     return;
   }

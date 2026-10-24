@@ -1027,11 +1027,17 @@ export async function render(container, params) {
     }
   }
 
-  async function load() {
+  let lastSig = "", lastDraw = 0;
+  // `quiet`: the timer asks; nothing is redrawn when the device is the same as a moment ago (the page is rebuilt at most every three minutes then, so its graphs still catch up)
+  async function load(quiet = false) {
     if (loading || disposed) return;
     loading = true;
     try {
       const device = await get(`/api/devices/${params.id}`);
+      const sig = JSON.stringify(device);
+      if (quiet && sig === lastSig && Date.now() - lastDraw < 180000) return;
+      lastSig = sig;
+      lastDraw = Date.now();
       try {
         groupChoices = (await get("/api/groups")).groups;
       } catch (e) {
@@ -1064,7 +1070,7 @@ export async function render(container, params) {
     if (isStabilityOpen() || customizing) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
     if (deleteOpen || isMonitorFormOpen() || isPortMapBusy()) return;     // never wipe a form someone is filling in
-    load();
+    load(true);
   }, 20000);
 
   // show the result of a (full) scan as soon as it is done

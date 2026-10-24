@@ -1,6 +1,6 @@
 // The start page: a grid of cards. Which cards, in what order and the cards a user made are a per-user choice kept on the server.
 import { get, put, del } from "../api.js";
-import { h, clear, timeAgo, shortName, isAdmin, sessionInfo, toast } from "../util.js";
+import { h, clear, patch, timeAgo, shortName, isAdmin, sessionInfo, toast } from "../util.js";
 import { eventLabel } from "../event_labels.js";
 import { barList, columnChart, emptyNote, fmtPct, lineChart } from "../charts.js";
 import { cssVar } from "../theme.js";
@@ -459,6 +459,7 @@ export async function render(container) {
     draw();
   }
 
+  let mapCard = null;                // the map card is kept as it is: the map inside it updates itself
   function cardEl(card) {
     const tone = card.tone ? card.tone(data) : "";
     const empty = !hasData(card);
@@ -475,8 +476,10 @@ export async function render(container) {
         onSize: () => { const next = nextSize(sizes[card.id] || card.size); if (next === card.size) delete sizes[card.id]; else sizes[card.id] = next; persist(); draw(); },
         onRemove: () => { order = order.filter((x) => x !== card.id); persist(); draw(); } }));
     }
+    if (card.id === "minimap" && mapCard && mapCard.key === `${size}${tone}${editing}`) return mapCard.node;
     const body = card.id === "minimap" ? map.box : empty ? h("p", { class: "hint" }, "Nothing to show here yet: this card appears when it has something to report.") : card.build(data);
     const node = h("section", { class: `dcard size-${size} ${tone ? `tone-${tone}` : ""} ${card.href && !editing ? "linked" : ""} ${card.tall ? "tall" : ""} ${editing ? "editing bd-card" : ""}`, dataset: { card: card.id } }, head, body);
+    if (card.id === "minimap") mapCard = { key: `${size}${tone}${editing}`, node };
     return node;
   }
 
@@ -488,9 +491,8 @@ export async function render(container) {
     const core = s.core && s.core.devices ? s.core.uptime["24h"] : s.uptime["24h"];
     const fact = (href, value, label, cls) => h("a", { href, class: "dash-fact" }, h("strong", { class: cls || "" }, value), ` ${label}`);
     const last = s.scans.last;
-    clear(header);
     header.className = `dash-hero tone-${tone}`;
-    header.append(
+    patch(header,
       h("div", { class: "dash-hero-main" }, h("h1", {}, "Dashboard"), h("p", { class: "dash-verdict" }, verdict),
         h("div", { class: "dash-facts" },
           fact("#/devices", `${s.devices.online} / ${s.devices.total}`, "devices online", s.devices.offline ? "d-warn" : ""),
@@ -570,15 +572,16 @@ export async function render(container) {
     if (!data) return;
     needStats();
     drawHeader();
-    clear(grid);
     grid.classList.toggle("editing", editing);
     const known = registry();
+    const cards = [];
     for (const id of order) {
       const card = known.get(id);
       if (!card || !visible(card) || (!editing && !hasData(card))) continue;
-      grid.append(cardEl(card));
+      cards.push(cardEl(card));
     }
-    if (!grid.children.length) grid.append(h("p", { class: "hint" }, "Your dashboard is empty. Press Customize to add cards."));
+    if (!cards.length) cards.push(h("p", { class: "hint" }, "Your dashboard is empty. Press Customize to add cards."));
+    patch(grid, cards);               // only the cards whose content changed are replaced, so nothing flickers on a refresh
     drawDrawer();
     if (order.includes("minimap") && !mapStarted) { mapStarted = true; map.load(); }
     else if (order.includes("minimap")) map.load();

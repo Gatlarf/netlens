@@ -13,6 +13,7 @@ export async function render(container) {
   container.append(pageHead("Smart home", "The devices of your smart-home hub, with what Netlens cannot see on the network. It comes from a plugin (Home Assistant)."), body);
   let filter = "", area = "", only = "";
 
+  let lastSig = "";
   async function load() {
     let data;
     try {
@@ -22,6 +23,9 @@ export async function render(container) {
       return;
     }
     if (destroyed) return;
+    const sig = JSON.stringify(data);
+    if (sig === lastSig) return;
+    lastSig = sig;
     clear(body);
     if (!data.servers.length) {
       body.appendChild(emptyState("No smart-home hub is connected yet", "Install the Home Assistant plugin from the Plugin store and turn it on. Netlens then lists your devices with manufacturer, model, area and battery, and ties the ones that are on the network to their device page.", h("a", { class: "btn primary", href: "#/settings/plugin-browse" }, "Open the Plugin store")));

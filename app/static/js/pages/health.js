@@ -1,6 +1,6 @@
 import { get, put } from "../api.js";
 import { snoozeMenu, wakeButton, untilText } from "../snooze.js";
-import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin } from "../util.js";
+import { h, clear, patch, toast, statusDot, shortName, timeAgo, isAdmin } from "../util.js";
 import { pageHead, emptyState } from "../ui.js";
 
 const REFRESH_MS = 30000;
@@ -39,17 +39,17 @@ export async function render(container) {
 
   function draw() {
     if (!data) return;
-    clear(tiles); clear(problems); clear(list);
     const rows = data.monitors;
     const critical = rows.filter((r) => r.level === "critical").length;
     const warning = rows.filter((r) => r.level === "warning").length;
     const failing = rows.filter((r) => r.enabled && r.last_ok === false).length;
-    tiles.append(
+    patch(tiles,
       tile("Monitored", String(rows.length), rows.length ? "devices whose health is read" : "none set up yet", ""),
       tile("Need attention", String(critical + warning), critical ? `${critical} critical, ${warning} warning` : warning ? `${warning} warning` : "everything within its limits", critical ? "bad" : warning ? "warn" : "ok"),
       tile("Cannot be read", String(failing), failing ? "check the login or the address" : "all readings work", failing ? "warn" : "ok"));
     if (!rows.length) {
-      list.appendChild(emptyState("Nothing is monitored yet", "Open a device and choose “Set up health monitoring”. Switches, NAS boxes, printers and UPS units are read over SNMP; Linux servers over SSH. Netlens then draws processor, memory, disk and traffic graphs and warns when a disk fills up, a server runs hot or a UPS runs on battery. Nothing is installed on the devices.", h("a", { class: "btn primary", href: "#/devices" }, "Choose a device")));
+      clear(problems);
+      patch(list, emptyState("Nothing is monitored yet", "Open a device and choose “Set up health monitoring”. Switches, NAS boxes, printers and UPS units are read over SNMP; Linux servers over SSH. Netlens then draws processor, memory, disk and traffic graphs and warns when a disk fills up, a server runs hot or a UPS runs on battery. Nothing is installed on the devices.", h("a", { class: "btn primary", href: "#/devices" }, "Choose a device")));
       return;
     }
     if (data.problems.length) {
@@ -60,8 +60,8 @@ export async function render(container) {
           h("span", {}, `${p.title}${p.label ? ` · ${p.label}` : ""}: ${p.metric === "service_stopped" ? "stopped" : p.metric === "storage_status" ? (p.level === "critical" ? "failed" : "degraded") : p.unit === "%" ? `${Math.round(p.value)}%` : p.unit === "°C" ? `${Math.round(p.value)} °C` : Math.round(p.value * 10) / 10}`, " ", h("span", { class: "hint" }, `since ${timeAgo(p.since)}`), " ",
             p.snoozed_until ? h("span", {}, h("span", { class: "hint" }, `snoozed for another ${untilText(p.snoozed_until)}`), " ", wakeButton(p.snooze)) : snoozeMenu(p.snooze))));
       }
-      problems.appendChild(card);
-    }
+      patch(problems, card);
+    } else clear(problems);
     const q = filter.trim().toLowerCase();
     const table = h("table", { class: "data hl-table" });
     table.appendChild(h("thead", {}, h("tr", {}, ["", "Device", "Processor", "Memory", "Disk (fullest) / supply", "Temp", "Traffic in / out", "Running", "Read"].map((t) => h("th", {}, t)))));
@@ -84,8 +84,8 @@ export async function render(container) {
         cell(r.last_ts ? timeAgo(r.last_ts) : "never")));
     }
     table.appendChild(body);
-    list.append(h("div", { class: "up-tools" }, h("input", { type: "text", placeholder: "Filter by name or IP", "aria-label": "Filter", value: filter, oninput: (e) => { filter = e.target.value; draw(); const i = list.querySelector("input"); if (i) { i.focus(); i.setSelectionRange(filter.length, filter.length); } } })),
-      h("div", { class: "table-wrap" }, table));
+    patch(list, h("div", { class: "up-tools" }, h("input", { type: "text", placeholder: "Filter by name or IP", "aria-label": "Filter", value: filter, oninput: (e) => { filter = e.target.value; draw(); const i = list.querySelector("input"); if (i) { i.focus(); i.setSelectionRange(filter.length, filter.length); } } })),
+      h("div", { class: "table-wrap", "data-morph": "" }, table));
   }
 
   function limitsCard() {

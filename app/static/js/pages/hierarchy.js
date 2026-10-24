@@ -191,6 +191,7 @@ export async function render(container, params) {
     summary.textContent = `${s.devices} devices${s.guests ? ` · ${s.guests} containers` : ""} · ${s.with_parent} with a parent · ${s.manual} set manually · ${s.max_depth + 1} level${s.max_depth === 0 ? "" : "s"} deep`;
   }
 
+  let lastSig = "";
   async function load() {
     if (loading || disposed) return;
     loading = true;
@@ -198,6 +199,9 @@ export async function render(container, params) {
       const fresh = await get(`/api/hierarchy${showGuests ? "?guests=true" : ""}`);
       if (disposed) return;
       failing = false;
+      const sig = JSON.stringify(fresh);
+      if (sig === lastSig && data) return;          // nothing changed: the tree (and what is folded open) stays
+      lastSig = sig;
       data = fresh;
       draw();
     } catch (err) {

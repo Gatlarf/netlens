@@ -1,5 +1,5 @@
 import { get, put } from "../api.js";
-import { h, clear, toast, statusDot, shortName } from "../util.js";
+import { h, clear, patch, toast, statusDot, shortName } from "../util.js";
 import { pageHead } from "../ui.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 import { heartbeatBar, responseLine, rangeTabs, savedRange, RANGES, uptimeText, uptimeClass } from "../heartbeat.js";
@@ -33,9 +33,8 @@ export async function render(container) {
   const periodLabel = () => RANGES.find(([k]) => k === range)[1];
 
   function drawTiles() {
-    clear(tiles);
     const data_ = pool();
-    if (!data_.length) return;
+    if (!data_.length) return clear(tiles);
     const withData = data_.filter((d) => d[PCT[range]] !== null && d[PCT[range]] !== undefined);
     const avg = mean(withData.map((d) => d[PCT[range]]));
     const online = data_.filter((d) => d.online).length;
@@ -43,7 +42,7 @@ export async function render(container) {
     const rt = mean(data_.map(avgResponse).filter((v) => v !== null));
     const tile = (title, value, sub, kind) => h("section", { class: `dcard ${kind ? `tone-${kind}` : ""}` }, h("h2", { class: "d-title" }, title),
       h("div", { class: "d-body" }, h("div", { class: "d-value" }, value), h("div", { class: "d-sub" }, sub)));
-    tiles.append(
+    patch(tiles,
       tile("Online now", `${online} / ${data_.length}`, online === data_.length ? "every device answers" : `${data_.length - online} not answering`, online === data_.length ? "ok" : "warn"),
       tile("Availability", uptimeText(avg), `${scopeLabel()}, average over ${periodLabel().toLowerCase()}`, avg === null ? "" : avg >= 99 ? "ok" : avg >= 95 ? "warn" : "bad"),
       tile("With downtime", String(withDowntime), withDowntime ? `devices missed a check in ${periodLabel().toLowerCase()}` : `no device missed a check in ${periodLabel().toLowerCase()}`, withDowntime ? "warn" : "ok"),
@@ -55,7 +54,7 @@ export async function render(container) {
     const n = slots();
     const resp = avgResponse(item);
     const num = (key, label) => h("div", { class: `up-num ${key === range ? "picked" : ""}` }, h("small", {}, label), h("strong", { class: uptimeClass(item[PCT[key]]) }, uptimeText(item[PCT[key]])));
-    const detail = h("div", { class: "up-detail", hidden: !openGraphs.has(item.id) });
+    const detail = h("div", { class: "up-detail", "data-live": "", hidden: !openGraphs.has(item.id) });
     const fill = async () => {
       if (detail.firstChild) return;
       const card = await buildPerformanceCard("device", item.id, { title: `${shortName(item.name) || item.ip}: history`, only: ["up", "rtt_ms"] });
@@ -80,13 +79,11 @@ export async function render(container) {
   }
 
   function drawList() {
-    clear(list);
-    if (!data) return;
-    if (!data.length) { list.append(h("div", { class: "up-empty" }, "No devices yet. Run a scan first.")); return; }
+    if (!data) return clear(list);
+    if (!data.length) return patch(list, h("div", { class: "up-empty" }, "No devices yet. Run a scan first."));
     if (scope === "core" && !pool().length) {
-      list.append(h("div", { class: "up-empty" }, "No device is marked as always-on yet. ", h("button", { class: "btn primary admin-only", type: "button", onclick: openChooser }, "Choose always-on devices"),
+      return patch(list, h("div", { class: "up-empty" }, "No device is marked as always-on yet. ", h("button", { class: "btn primary admin-only", type: "button", onclick: openChooser }, "Choose always-on devices"),
         h("p", { class: "hint" }, "Always-on devices are the ones that should be online all the time, such as the router, switches, servers and cameras. You can also tick \u201cAlways-on device\u201d on a device's page.")));
-      return;
     }
     const q = filterText.trim().toLowerCase();
     let items = pool().filter((d) => (!q || `${(d.name || "").toLowerCase()} ${(d.ip || "").toLowerCase()}`.includes(q))
@@ -94,8 +91,8 @@ export async function render(container) {
     const key = PCT[range];
     if (sort === "worst") items = [...items].sort((a, b) => (a[key] ?? 101) - (b[key] ?? 101) || (a.name || "").localeCompare(b.name || ""));
     if (sort === "slow") items = [...items].sort((a, b) => (avgResponse(b) ?? -1) - (avgResponse(a) ?? -1));
-    if (!items.length) { list.append(h("div", { class: "up-empty" }, onlyProblems && !q ? "No device had a problem in this period." : "No device matches.")); return; }
-    for (const item of items) list.append(row(item));
+    if (!items.length) return patch(list, h("div", { class: "up-empty" }, onlyProblems && !q ? "No device had a problem in this period." : "No device matches."));
+    patch(list, items.map(row));
   }
 
   function draw() { drawTiles(); drawList(); }

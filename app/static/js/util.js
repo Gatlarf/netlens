@@ -39,6 +39,48 @@ export function h(tag, attrs = {}, ...children) {
   return el;
 }
 
+// Refreshing without flicker: put `nodes` (freshly built) into `parent`, but keep every element that is already there and looks exactly the same, and replace
+// only what differs. Scroll position, focus, typed text, open sections, running animations and drawn graphs survive a refresh that changed nothing.
+// (A node that is already inside `parent`, such as a map that lives on, is moved, not copied.)
+export function patch(parent, ...nodes) {
+  const incoming = [];
+  for (const n of nodes.flat(Infinity)) {
+    if (n === null || n === undefined || n === false) continue;
+    const node = n instanceof Node ? n : document.createTextNode(String(n));
+    if (node instanceof DocumentFragment) incoming.push(...node.childNodes); else incoming.push(node);
+  }
+  // what an element looks like, leaving out what fills in later by itself (marked data-live: a graph that loads when a row is opened)
+  const sig = (el) => {
+    if (!el.querySelector || !el.querySelector("[data-live]")) return el.outerHTML;
+    const copy = el.cloneNode(true);
+    for (const live of copy.querySelectorAll("[data-live]")) live.textContent = "";
+    return copy.outerHTML;
+  };
+  // inside an element marked data-morph (a table of readings, for instance) a change is made in place: the same rows and cells stay, only the text or attribute that differs changes
+  const morph = (a, b) => {
+    for (const at of [...a.attributes]) if (!b.hasAttribute(at.name)) a.removeAttribute(at.name);
+    for (const at of [...b.attributes]) if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+    const old = [...a.childNodes], fresh = [...b.childNodes];
+    fresh.forEach((nb, i) => {
+      const na = old[i];
+      if (!na) a.appendChild(nb);
+      else if (na.nodeType === nb.nodeType && na.nodeName === nb.nodeName) {
+        if (na.nodeType === 1) { if (sig(na) !== sig(nb)) morph(na, nb); } else if (na.textContent !== nb.textContent) na.textContent = nb.textContent;
+      } else a.replaceChild(nb, na);
+    });
+    while (a.childNodes.length > fresh.length) a.removeChild(a.lastChild);
+  };
+  const alike = (a, b) => a.nodeType === b.nodeType && (a.nodeType === 1 ? sig(a) === sig(b) : a.textContent === b.textContent);
+  incoming.forEach((node, i) => {
+    const cur = parent.childNodes[i];
+    if (cur === node) return;
+    if (cur && node.parentNode !== parent && alike(cur, node)) return;      // the same picture: keep the element that is on screen
+    if (cur && node.parentNode !== parent && cur.nodeType === 1 && node.nodeType === 1 && cur.nodeName === node.nodeName && cur.hasAttribute("data-morph")) return morph(cur, node);
+    if (cur) parent.replaceChild(node, cur); else parent.appendChild(node);
+  });
+  while (parent.childNodes.length > incoming.length) parent.removeChild(parent.lastChild);
+}
+
 export function clear(el) {
   while (el.firstChild) {
     el.removeChild(el.firstChild);

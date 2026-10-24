@@ -47,8 +47,9 @@ export async function render(container) {
   container.append(pageHead("Remediation", "Let Netlens fix known problems itself, or propose the fix and wait for you."), body);
   let data;
 
+  let lastSig = "";
   async function load() {
-    try { data = await get("/api/remediation"); } catch (err) { if (!destroyed) { clear(body); body.appendChild(h("p", { class: "error" }, err.message || "Could not load.")); } return; }
+    try { const next = await get("/api/remediation"); const sig = JSON.stringify(next); if (sig === lastSig && data) return; lastSig = sig; data = next; } catch (err) { if (!destroyed) { clear(body); body.appendChild(h("p", { class: "error" }, err.message || "Could not load.")); } return; }
     if (!destroyed && !formOpen) draw();
   }
 
