@@ -54,7 +54,8 @@ function fillSchedule(box, data) {
     const table = h("table", { class: "table backups" });
     table.appendChild(h("thead", {}, h("tr", {}, h("th", {}, "Backup"), h("th", {}, "Size"), h("th", {}, ""))));
     const body = h("tbody");
-    for (const b of data.backups) {
+    const SHOWN = 6;
+    for (const [n, b] of data.backups.entries()) {
       const restore = h("button", { type: "button", class: "btn" }, "Restore");
       const remove = h("button", { type: "button", class: "btn danger" }, "Delete");
       restore.addEventListener("click", async () => {
@@ -71,13 +72,23 @@ function fillSchedule(box, data) {
         }
       });
       remove.addEventListener("click", () => call(remove, () => api(`/api/backups/${b.name}`, { method: "DELETE" }), "Backup deleted"));
-      body.appendChild(h("tr", {},
+      body.appendChild(h("tr", { class: n >= SHOWN ? "older" : "", hidden: n >= SHOWN },
         h("td", {}, h("a", { href: `/api/backups/${b.name}`, download: b.name }, b.name)),
         h("td", {}, fmtSize(b.size)),
         h("td", {}, restore, " ", remove)));
     }
     table.appendChild(body);
     box.appendChild(table);
+    if (data.backups.length > SHOWN) {
+      const more = h("button", { type: "button", class: "btn ghost" }, `Show the ${data.backups.length - SHOWN} older backups`);
+      more.addEventListener("click", () => {
+        const hide = more.dataset.open === "1";
+        for (const r of body.querySelectorAll("tr.older")) r.hidden = hide;
+        more.dataset.open = hide ? "" : "1";
+        more.textContent = hide ? `Show the ${data.backups.length - SHOWN} older backups` : "Show fewer";
+      });
+      box.appendChild(more);
+    }
   } else {
     box.appendChild(h("p", { class: "hint" }, "No scheduled backups yet."));
   }

@@ -115,3 +115,12 @@ tr.svc-sep:hover { background: var(--bg); }
 .form-actions, .btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
 .form-actions > .btn.primary, .btn-row > .btn.primary { order: -1; }
 .form-actions > .btn.danger, .btn-row > .btn.danger { order: 2; margin-left: auto; }
+.settings-content :where(form, .card, div):has(> .field + .field) > :is(button, .btn) { justify-self: start; }
+/* a delete button inside a table row or list is an outline, so a column of them does not shout; a lone delete button stays filled */
+td .btn.danger, li .btn.danger { background: transparent; color: #c62828; }
+td .btn.danger:hover, li .btn.danger:hover { background: color-mix(in srgb, #c62828 12%, transparent); }
+/* forms made of fieldsets (share links): the groups sit side by side */
+.settings-content form:has(> fieldset) { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 12px 16px; align-items: start; }
+.settings-content form:has(> fieldset) > :not(fieldset) { grid-column: 1 / -1; }
+.settings-content form:has(> fieldset) > :is(button, .btn) { justify-self: start; }
+fieldset { margin: 0; min-width: 0; }

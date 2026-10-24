@@ -9,7 +9,7 @@ function fix(button) {
   button.dataset.actionChecked = button.textContent;
   if (!button.classList.contains("btn")) return;             // icon buttons, menu items, tabs and so on keep their own look
   const text = button.textContent.trim();
-  if (SAVE.test(text)) { button.classList.add("primary"); button.classList.remove("danger", "ghost"); }
+  if (SAVE.test(text) || (button.getAttribute("type") === "submit" && !PLAIN.test(text) && !DANGER.test(text))) { button.classList.add("primary"); button.classList.remove("danger", "ghost"); }
   else if (PLAIN.test(text)) button.classList.remove("primary", "danger");
   else if (DANGER.test(text)) { button.classList.add("danger"); button.classList.remove("primary"); }
 }

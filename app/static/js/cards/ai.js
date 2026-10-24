@@ -15,3 +15,23 @@ export async function buildAiCard() {
   }
   return card;
 }
+
+// The same content as two settings pages, so each has one Save button: the model Netlens calls, and the agents that call Netlens.
+export async function buildAiModelCard() {
+  const card = h("div", { class: "card" });
+  card.appendChild(h("h2", {}, "AI language model"));
+  card.appendChild(await buildEngineerCard());
+  return card;
+}
+
+export async function buildAiAgentsCard() {
+  const card = h("div", { class: "card" });
+  card.appendChild(h("h2", {}, "AI agents"));
+  card.appendChild(h("p", { class: "hint" }, "Agents outside Netlens (Claude, ChatGPT, a local model with tools) that call Netlens: the assistant works through a written guide and the API, the MCP server through tools. A token may only do what you allow here."));
+  for (const build of [buildAssistantCard, buildMcpCard]) {
+    const part = await build();
+    part.className = "ai-part";
+    card.append(h("hr", {}), part);
+  }
+  return card;
+}

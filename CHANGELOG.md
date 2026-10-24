@@ -2,6 +2,17 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.204 — 2026-10-24
+
+### Changed
+- **The AI settings are two pages**, each with one Save button: "AI language model" and "AI agents (assistant, MCP)".
+- **Hierarchy starts without the containers**, so the tree shows your devices; the "Show containers" box brings them back and remembers the choice.
+- **Share links**: the options of a new link sit side by side in groups; every create or add button is blue like the save buttons. Delete buttons inside a table row are outlined so a column of them does not shout.
+- **Backup list** shows the newest six, with a button for the older ones. The summary figures on pages like Smart home fit one row when they can.
+
+### Fixed
+- The audit log wrote "{0}" instead of the plugin or site name for plugin settings and remote-site commands.
+
 ## 0.4.202 — 2026-10-24
 
 ### Changed

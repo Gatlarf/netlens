@@ -91,3 +91,11 @@ def test_pruning_keeps_the_newest(env):
     audit.prune(conn)
     assert [r["action"] for r in conn.execute("SELECT action FROM audit_log ORDER BY id")] == ["n1", "n2", "n3", "n4"]
     conn.close()
+
+
+def test_sentences_fill_in_what_was_changed():
+    import sqlite3
+
+    c = sqlite3.connect(":memory:")
+    assert audit.describe(c, "PUT", "/api/plugins/truenas") == "Changed the settings of the plugin truenas"
+    assert audit.describe(c, "POST", "/api/probes/3/command") == "Sent a command to remote site 3"

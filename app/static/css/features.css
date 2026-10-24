@@ -269,7 +269,7 @@ dialog.whats-new h2 { margin: 0; }
 .up-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .up-head h1 { margin: 0 0 2px; }
 .up-head p { margin: 0; }
-.up-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.up-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .up-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .up-tools input[type="text"] { flex: 1 1 220px; max-width: 320px; margin: 0; }
 .up-tools label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; color: var(--muted); }

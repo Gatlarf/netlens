@@ -89,7 +89,7 @@ def describe(conn: sqlite3.Connection, method: str, path: str) -> str:
             if groups and "{d0}" in text and groups[0].isdigit():
                 fields["d0"] = _device_name(conn, groups[0])
             try:
-                return text.format(**fields)
+                return text.format(*groups, **{k: v for k, v in fields.items() if not k.isdigit()})
             except (KeyError, IndexError):
                 return text
     verb = {"POST": "Added or ran", "PUT": "Changed", "PATCH": "Changed", "DELETE": "Removed"}.get(method, method)

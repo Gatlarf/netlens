@@ -16,9 +16,9 @@ const GUESTS_KEY = "netlens.hierarchy.guests";
 
 function loadShowGuests() {
   try {
-    return localStorage.getItem(GUESTS_KEY) !== "0";       // on unless the user switched it off in this browser
+    return localStorage.getItem(GUESTS_KEY) === "1";       // off until the user switches it on in this browser: the tree is about devices, not their 80 containers
   } catch (e) {
-    return true;
+    return false;
   }
 }
 
