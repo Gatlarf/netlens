@@ -23,8 +23,12 @@ NO_CMD = 400
 def routes(nat=True, wifi=True, name="rtr", own="AA:00:00:00:00:01", neighbors=True):
     r = {
         "/rest/system/identity": {"name": name},
-        "/rest/system/resource": {"board-name": "hAP ax3", "version": "7.12.1 (stable)"},
-        "/rest/interface": [{"name": "bridge-lan", "type": "bridge", "mac-address": own}, {"name": "ether1", "type": "ether", "mac-address": own.replace(":01", ":02")}, {"name": "wlan1", "type": "wlan", "mac-address": own.replace(":01", ":03")}],
+        "/rest/system/resource": {"board-name": "hAP ax3", "version": "7.12.1 (stable)", "cpu-load": "9", "total-memory": "1073741824", "free-memory": "536870912", "uptime": "1w2d3h4m5s"},
+        "/rest/system/health": [{".id": "*1", "name": "voltage", "value": "24.1", "type": "V"}, {".id": "*2", "name": "temperature", "value": "47", "type": "C"}, {".id": "*3", "name": "cpu-temperature", "value": "55", "type": "C"}],
+        "/rest/system/package/update": {"channel": "stable", "installed-version": "7.12.1", "latest-version": "7.15.2", "status": "New version is available"},
+        "/rest/interface/ethernet": [{"name": "ether1", "rate": "1Gbps", "running": "true"}, {"name": "ether3", "rate": "100Mbps", "running": "true"}],
+        "/rest/ip/route": [{"dst-address": "0.0.0.0/0", "active": "true", "immediate-gw": "192.0.2.1%ether1", "vrf-interface": "ether1"}],
+        "/rest/interface": [{"name": "bridge-lan", "type": "bridge", "mac-address": own}, {"name": "ether1", "type": "ether", "mac-address": own.replace(":01", ":02"), "running": "true", "rx-byte": "5000", "tx-byte": "7000", "rx-packet": "50", "tx-packet": "70", "rx-error": "0", "tx-error": "1"}, {"name": "ether3", "type": "ether", "mac-address": own.replace(":01", ":04"), "running": "false"}, {"name": "wlan1", "type": "wlan", "mac-address": own.replace(":01", ":03"), "running": "true", "rx-byte": "10", "tx-byte": "20"}],
         "/rest/ip/address": [{"address": "192.168.88.1/24", "interface": "bridge-lan", "disabled": "false", "invalid": "false"}],
         "/rest/ip/firewall/nat": [{"chain": "srcnat", "action": "masquerade", "disabled": "false"}] if nat else [],
         "/rest/ip/neighbor": [{"mac-address": "AA:00:00:00:00:77", "identity": "switch-garage", "address": "192.168.88.7", "platform": "MikroTik", "board": "CRS326"},
@@ -95,3 +99,26 @@ def test_message_login_and_diagnose():
         assert caught.value.auth_failed is True
         text = json.dumps(plugin.diagnose(config({"host": s.url})))
     assert '"wifi_stations": {"ok": true' in text and "192.168" not in text and "aa:00" not in text.lower() and "laptop" not in text
+
+
+def test_the_device_reports_its_health_firmware_and_ports():
+    with Ros(routes()) as s:
+        out = validate_output("topology", plugin.fetch(config({"host": s.url})))
+    node = out["nodes"][0]
+    assert {m["metric"]: m["value"] for m in node["metrics"]} == {"cpu_pct": 9.0, "mem_pct": 50.0, "temp_c": 55.0, "uptime_s": float(604800 + 2 * 86400 + 3 * 3600 + 4 * 60 + 5)}     # the hottest sensor
+    assert node["firmware"] == {"version": "7.12.1", "latest": "7.15.2"}
+    ports = {p["name"]: p for p in node["ports"]}
+    assert set(ports) == {"WAN ether1", "ether3", "wlan1"}                                                      # the bridge is no port; the default route's interface is the WAN
+    wan = ports["WAN ether1"]
+    assert wan["up"] is True and wan["speed_mbps"] == 1000 and wan["rx_bytes"] == 5000 and wan["tx_bytes"] == 7000 and wan["tx_errors"] == 1
+    assert ports["ether3"]["up"] is False and ports["ether3"]["speed_mbps"] is None
+
+
+def test_a_router_without_the_extras_and_the_switch_to_turn_them_off():
+    plain = {k: v for k, v in routes().items() if k not in ("/rest/system/health", "/rest/system/package/update", "/rest/interface/ethernet", "/rest/ip/route")}      # a CHR: nothing to say
+    with Ros(plain) as s:
+        node = validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]
+    assert node["firmware"] == {"version": "7.12.1", "latest": None} and not any(m["metric"] == "temp_c" for m in node["metrics"])
+    with Ros(routes()) as s:
+        off = validate_output("topology", plugin.fetch({**config({"host": s.url}), "health": False}))["nodes"][0]
+    assert not off["metrics"] and off["firmware"] is None and not off["ports"]

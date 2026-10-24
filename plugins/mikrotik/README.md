@@ -6,6 +6,10 @@ Reads a **MikroTik router, switch or access point (RouterOS 7.1+)**: the device 
 
 > **Status: tested against the real software in a lab** (RouterOS 7.12.1 CHR under QEMU: login with admin and with a read-only user made from the setup box, bridge hosts, ARP, DHCP leases, interfaces. Neighbours (MNDP), the wireless and wifi registration tables are covered by simulated answers only (the lab router has no radio and no neighbours).) Please report what you see; *Run diagnostic* on the plugin's page makes an anonymised report (counts and field names, never names or addresses).
 
+## Health of the device (1.1.0)
+
+Besides the topology the plugin reports the device's own health, read with a few extra GETs per device: the **processor** (`system/resource` `cpu-load`), **memory**, **uptime**, the **temperature** (`system/health`, the hottest sensor; devices without sensors, like a CHR, give none), the **firmware** (the installed version, and the newest one the router already knows of from `system/package/update`: the plugin never asks MikroTik's servers, so run *Check for updates* on the router to see a waiting version), the **ports** (`interface`: link, byte, packet and error counters; speed from `interface/ethernet`) and the **internet connection**: the interface of the default route is named *WAN* (it becomes the WAN line of the traffic graph on the HUD page). Netlens records them like a monitored device. Switch it off with *Read the health of the devices*. Tested on a real RouterOS 7.12.1 (CHR); the temperature and the speed of a physical port follow the documentation.
+
 ## Set-up
 
 1. Create the read-only user and enable the REST API with the lines in the box at the top of the plugin's page (`www-ssl` on 443 or plain `www` on 80; limit the service to the Netlens machine).

@@ -9,6 +9,8 @@ Talks to the RouterOS 7.1+ REST API (/rest/...) with basic authentication. Only 
     /rest/ip/neighbor                              MNDP/LLDP neighbours (MikroTik ones become child nodes)
     /rest/interface/bridge/host                    the bridge host table: MAC -> port the device sits behind
     /rest/ip/dhcp-server/lease, /rest/ip/arp       addresses and names
+    /rest/system/health, /rest/system/package/update   temperature; the newest version the router already knows of (it never asks MikroTik)
+    /rest/interface/ethernet, /rest/ip/route            link speed of the ports; the interface of the default route (the internet connection)
     /rest/interface/wifi/registration-table        Wi-Fi stations (wifi package, RouterOS 7.13+)   } absent on devices
     /rest/interface/wireless/registration-table    Wi-Fi stations (wireless package)               } without Wi-Fi
 
@@ -64,13 +66,14 @@ def _number(value):
 
 
 class Router:
-    def __init__(self, url, username, password, role="", uplink="", verify_tls=False, timeout=20):
+    def __init__(self, url, username, password, role="", uplink="", verify_tls=False, timeout=20, extras=True):
         url = url.strip().rstrip("/")
         if "://" not in url:
             url = "https://" + url
         parts = urllib.parse.urlsplit(url)
         if parts.scheme not in ("http", "https") or not parts.hostname:
             raise RouterosError(f"{url!r} is not an address like https://192.168.88.1")
+        self.extras = bool(extras)
         self.base, self.id, self.host, self.timeout = f"{parts.scheme}://{parts.netloc}/rest", parts.netloc, parts.hostname, float(timeout)
         self.auth = "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()
         self.role = (role or "auto").strip().lower()
@@ -114,6 +117,82 @@ class Router:
         return [r for r in data if isinstance(r, dict)] if isinstance(data, list) else []
 
 
+def _uptime_s(text):
+    """RouterOS writes the uptime as 1w2d3h4m5s."""
+    parts = re.findall(r"(\d+)([wdhms])", str(text or ""))
+    return float(sum(int(n) * {"w": 604800, "d": 86400, "h": 3600, "m": 60, "s": 1}[u] for n, u in parts)) if parts else None
+
+
+def _optional(router, path):
+    """An extra read: [] when the router does not have it, does not allow it or does not answer (an extra never fails the sync)."""
+    try:
+        data = router.get(path)
+    except (RouterosError, AuthRefused):
+        return []
+    return [r for r in data if isinstance(r, dict)] if isinstance(data, list) else ([data] if isinstance(data, dict) else [])
+
+
+def _health(resource, router):
+    out = []
+    cpu = _number(resource.get("cpu-load"))
+    if cpu is not None and 0 <= cpu <= 100:
+        out.append({"metric": "cpu_pct", "value": cpu})
+    total, free = _number(resource.get("total-memory")), _number(resource.get("free-memory"))
+    if total and free is not None and total > 0:
+        out.append({"metric": "mem_pct", "value": round(100 * (total - free) / total, 1)})
+    temps = []
+    for row in _optional(router, "system/health"):          # a list of {name, value} on new versions, one object of name: value on old ones
+        pairs = [(row.get("name"), row.get("value"))] if "name" in row else list(row.items())
+        temps += [_number(v) for k, v in pairs if "temperature" in str(k)]
+    temp = max((t for t in temps if t is not None), default=None)
+    if temp is not None and 0 < temp < 150:
+        out.append({"metric": "temp_c", "value": temp})
+    uptime = _uptime_s(resource.get("uptime"))
+    if uptime is not None:
+        out.append({"metric": "uptime_s", "value": uptime})
+    return out
+
+
+def _firmware(resource, router):
+    version = (re.match(r"[\w.]+", str(resource.get("version") or "")) or [""])[0]
+    if not version:
+        return None
+    for row in _optional(router, "system/package/update"):
+        latest = str(row.get("latest-version") or "").strip()
+        if latest and latest != version:
+            return {"version": version, "latest": latest}
+    return {"version": version, "latest": None}
+
+
+SPEED = {"10Mbps": 10, "100Mbps": 100, "1Gbps": 1000, "2.5Gbps": 2500, "5Gbps": 5000, "10Gbps": 10000, "25Gbps": 25000}
+
+
+def _ports(interfaces, router):
+    """The device's physical interfaces as ports: link, speed and counters, and the interface of the default route (the internet connection) named WAN."""
+    speeds = {r.get("name"): SPEED.get(str(r.get("rate") or r.get("speed") or "").replace(" ", "")) for r in _optional(router, "interface/ethernet")}
+    wan = []                  # the interface(s) the default route goes out of: the physical one (vrf-interface) first, then the one in the gateway text (it may be a bridge)
+    for r in _optional(router, "ip/route"):
+        if r.get("dst-address") == "0.0.0.0/0" and not _yes(r.get("disabled")) and (r.get("active") is None or _yes(r.get("active"))):
+            gw = str(r.get("immediate-gw") or r.get("gateway") or "")
+            wan = [x for x in (r.get("vrf-interface"), gw.split("%", 1)[1] if "%" in gw else None) if x]
+            break
+    known = {str(row.get("name")) for row in interfaces}
+    wan = next((x for x in wan if x in known and next((i for i in interfaces if i.get("name") == x), {}).get("type") != "bridge"), None)
+    ports = []
+    for row in interfaces:
+        if row.get("type") not in ("ether", "wlan", "wifi", "sfp", "sfp-sfpplus", "wifi-cap", "cap", "pppoe-out", "lte") or _yes(row.get("disabled")) or len(ports) >= 120:
+            continue
+        name = str(row.get("name") or "")[:30]
+        up = _yes(row.get("running"))
+        entry = {"port": len(ports) + 1, "name": (f"WAN {name}" if name == wan else name) or None, "up": up, "enabled": True, "speed_mbps": speeds.get(name) if up else None}
+        for key, field in (("rx_bytes", "rx-byte"), ("tx_bytes", "tx-byte"), ("rx_packets", "rx-packet"), ("tx_packets", "tx-packet"), ("rx_errors", "rx-error"), ("tx_errors", "tx-error")):
+            value = _number(row.get(field))
+            if value is not None and value >= 0:
+                entry[key] = int(value)
+        ports.append(entry)
+    return ports
+
+
 def parse_routers(config):
     rows = config.get("servers")
     items = [r for r in rows if isinstance(r, dict) and any(str(r.get(k) or "").strip() for k in ("host", "username", "password"))] if isinstance(rows, list) else []
@@ -126,7 +205,7 @@ def parse_routers(config):
             raise ValueError(f"line {i}: enter the address")
         if not str(r.get("username") or "").strip() or not str(r.get("password") or ""):
             raise ValueError(f"{url}: enter the user name and password")
-        out.append(Router(url, str(r["username"]).strip(), str(r["password"]), r.get("role"), r.get("uplink"), config.get("verify_tls", False), config.get("timeout") or 20))
+        out.append(Router(url, str(r["username"]).strip(), str(r["password"]), r.get("role"), r.get("uplink"), config.get("verify_tls", False), config.get("timeout") or 20, config.get("health", True)))
     return out
 
 
@@ -165,6 +244,8 @@ def read(router):
     nat = [r for r in router.rows("ip/firewall/nat", optional=True) if r.get("chain") == "srcnat" and r.get("action") == "masquerade" and not _yes(r.get("disabled"))]
     role = router.role if router.role != "auto" else ("gateway" if nat else "switch")
     node = {"mac": mac, "ip": ip, "name": str(identity.get("name") or router.id)[:100], "model": str(resource.get("board-name") or "")[:100] or None, "role": role}
+    if router.extras:                       # the device's own health, firmware and ports (the extras: switched off in the plugin settings)
+        node.update(metrics=_health(resource, router), firmware=_firmware(resource, router), ports=_ports(interfaces, router))
     if role != "gateway" and router.uplink:
         node["uplink_ip"] = router.uplink
 

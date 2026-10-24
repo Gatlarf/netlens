@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.240 — 2026-10-24
+
+### Added
+- ★ **Plugins for network gear now report the device's own health.** UniFi 1.1.0 (processor, memory, temperature, uptime, firmware and the waiting upgrade, ports with their counters, WAN), Omada 1.4.0 (processor, memory, uptime, firmware) and MikroTik 1.1.0 (processor, memory, temperature, uptime, firmware, ports, the internet interface; tested on RouterOS 7.12.1) join the ASUS plugin 1.5.0 (the main router and every AiMesh node). The devices get graphs, show on the Health page and raise the usual warnings. The plugin guide (plugins/README.md) says what a plugin for network gear should report.
+
 ## 0.4.237 — 2026-10-24
 
 ### Added
