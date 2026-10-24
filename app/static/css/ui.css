@@ -109,7 +109,7 @@ tr.svc-sep:hover { background: var(--bg); }
 /* Fields that follow each other sit side by side; long fields (text areas, multi-selects) and everything that is not a field take a whole row. */
 .settings-content :where(form, .card, div):has(> .field + .field) { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px 20px; align-items: start; }
 .settings-content :where(form, .card, div):has(> .field + .field) > :not(.field) { grid-column: 1 / -1; }
-.settings-content .field:has(textarea), .settings-content .field:has(select[multiple]), .settings-content .field:has(> .hint:only-of-type) { grid-column: 1 / -1; }
+.settings-content .field:has(textarea), .settings-content .field:has(select[multiple]) { grid-column: 1 / -1; }
 .settings-content .field > .hint { max-width: 72ch; }
 /* Button rows: the one button that saves comes first, then cancel/reset, a destructive button last. */
 .form-actions, .btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
