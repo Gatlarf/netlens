@@ -394,3 +394,66 @@ def record_firewall(conn: sqlite3.Connection, plugin_id: str, data: dict, now: s
         count += 1
     conn.commit()
     return count
+
+
+# ----------------------------------------------------------------------------- the health of the routers and access points themselves
+def record_node_health(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None) -> dict:
+    """What a router plugin says about its nodes' own health: processor, memory, temperature and uptime become readings of the device (graphs, limits, the Health page,
+    like a monitored device), and a firmware update that is waiting is told once as an event. Figures that count up (processor time) arrive as used/total; the growth
+    since the previous sync is the percentage. A device that has a health monitor of its own is left to that monitor. Returns {"devices", "readings", "firmware"}."""
+    import json
+    from datetime import datetime, timezone
+
+    from app.db import get_setting, set_setting
+    from app.hostmetrics import service as hm
+
+    now = now or utcnow()
+    stamp = datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+    by_mac, by_ip = device_lookup(conn)
+    key = f"plugin.{plugin_id}.counters"
+    try:
+        state = json.loads(get_setting(conn, key) or "{}")
+    except ValueError:
+        state = {}
+    summary = {"devices": 0, "readings": 0, "firmware": 0}
+    for node in data.get("nodes", []):
+        device_id = next((by_mac[m] for m in node["macs"] if m in by_mac), None) or by_ip.get(node.get("ip") or "")
+        if device_id is None:
+            continue
+        name = node.get("name") or node["mac"]
+        points = []
+        for m in node.get("metrics") or []:
+            if m.get("value") is not None:
+                value = m["value"]
+            else:
+                mark = f"{device_id}|{m['metric']}|{m['label']}"
+                before, state[mark] = state.get(mark), [stamp, m["used"], m["total"]]
+                if not before or m["total"] <= before[2] or m["used"] < before[1]:
+                    continue                                          # the first sync, or the router restarted: no growth to measure yet
+                value = max(0.0, min(100.0, 100.0 * (m["used"] - before[1]) / (m["total"] - before[2])))
+            points.append((m["metric"], m["label"], value, m["unit"]))
+        row = hm.get_monitor(conn, device_id)
+        if points and (row is None or row["method"] == "plugin"):
+            hm.record(conn, device_id, points, stamp)
+            if row is None:
+                conn.execute("INSERT INTO host_monitors (device_id, method, address, port, credential, interval_s, groups, alerts, enabled, created, source) VALUES (?, 'plugin', ?, 0, '', 900, '[]', 1, 1, ?, ?)",
+                             (device_id, node.get("ip") or "", now, plugin_id))
+                row = hm.get_monitor(conn, device_id)
+            conn.execute("UPDATE host_monitors SET last_ts = ?, last_ok = 1, last_error = NULL, since = COALESCE(since, ?) WHERE id = ?", (now, now, row["id"]))
+            if row["alerts"]:
+                # a router's memory figure counts the cache, so it always looks full: it is graphed but never raises an alert
+                hm.evaluate(conn, row["id"], device_id, name, [p for p in points if p[0] != "mem_pct"], now)
+            summary["devices"] += 1
+            summary["readings"] += len(points)
+        fw = node.get("firmware")
+        mark = f"fw|{device_id}"
+        if fw and fw.get("latest"):
+            if state.get(mark) != fw["latest"]:
+                add_event(conn, "firmware_update", f"{name}: firmware {fw['version']} is running, {fw['latest']} is available", device_id=device_id, now=now)
+                state[mark] = fw["latest"]
+                summary["firmware"] += 1
+        else:
+            state.pop(mark, None)
+    set_setting(conn, key, json.dumps(state))
+    conn.commit()
+    return summary

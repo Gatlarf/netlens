@@ -1,12 +1,12 @@
 {
   "id": "asus",
   "name": "ASUS router (AiMesh)",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "api_version": 1,
   "diagnose": true,
   "kind": "topology",
   "author": "Netlens",
-  "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) for the hierarchy and the map, the router's Traffic Analyzer (traffic per application and per device) and the speed of its own interfaces: internet (WAN), wired LAN and Wi-Fi radios. Read-only, never SSH: one login, a few reads and a logout per sync. A refused login pauses automatic syncing so the router does not lock the account.",
+  "description": "Reads which device is connected to which AiMesh node (stock ASUSWRT, tested on an RT-AX92U) for the hierarchy and the map, the router's Traffic Analyzer (traffic per application and per device), and the health of the router and every node: processor, memory, temperature, uptime, firmware, ports and interface speeds (internet, LAN, Wi-Fi). Read-only, never SSH: one login per router, a few reads and a logout per sync. A refused login pauses automatic syncing.",
   "timeout": 60,
   "config": [
     {
@@ -46,9 +46,16 @@
     {
       "key": "interfaces",
       "type": "bool",
-      "label": "Record the speed of the router's interfaces",
+      "label": "Record the health of the routers",
       "default": true,
-      "help": "The internet connection (WAN), the wired LAN and the Wi-Fi radios, as graphs of bits per second. One extra read per sync; nothing to switch on in the router."
+      "help": "Processor, memory, temperature and uptime, the physical ports, and the speed of the internet connection (WAN), the wired LAN and the Wi-Fi radios. A few extra reads per router per sync; nothing to switch on in the router."
+    },
+    {
+      "key": "nodes",
+      "type": "bool",
+      "label": "Read the AiMesh nodes too",
+      "default": true,
+      "help": "The nodes accept the main router's user name and password. Netlens asks each node at the address the router lists for it on every sync, so a node that gets another address is still found; nothing to set up per node. A node that refuses the login is skipped."
     }
   ]
 }

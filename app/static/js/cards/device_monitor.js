@@ -60,6 +60,14 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     const status = h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Status"),
       m.last_ok === null ? h("span", { class: "hint" }, "waiting for the first reading")
         : m.last_ok ? h("span", {}, `Reading works (${timeAgo(m.last_ts)})`) : h("span", { class: "error" }, m.last_error || "The last reading failed"));
+    if (m.method === "plugin") {         // a router plugin reports this device's health with every sync: nothing to read or edit here, only the limits
+      card.append(
+        h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Status"), h("span", {}, m.last_ts ? `Reported by the ${m.source || "router"} plugin ${timeAgo(m.last_ts)}` : "Waiting for the plugin's next sync")),
+        h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Warnings"), h("span", {}, m.alerts ? "on (limits are in Monitoring → Health)" : "off")),
+        h("p", { class: "hint" }, "The router tells Netlens its processor, memory, temperature and uptime when the plugin syncs, so there is nothing to set up. Set up SNMP or SSH instead to read more, more often."));
+      card.append(limitsBox(), h("div", { class: "form-actions" }, h("button", { class: "btn", type: "button", onclick: () => showForm(null) }, "Use SNMP or SSH instead")));
+      return;
+    }
     card.append(
       status,
       h("div", { class: "kv" }, h("span", { class: "kv-label" }, "How"), h("span", {}, `${m.method.toUpperCase()} to ${m.address}:${m.port}, ${INTERVALS.find(([s]) => s === m.interval_s)?.[1] || `every ${m.interval_s} seconds`}`)),

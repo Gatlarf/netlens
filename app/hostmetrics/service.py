@@ -287,7 +287,7 @@ def public(conn, row) -> dict[str, Any]:
     """The monitor as the API shows it: never the secrets, only whether they are set."""
     secret = load_secret(conn, row)
     return {
-        "id": row["id"], "device_id": row["device_id"], "method": row["method"], "address": row["address"], "port": row["port"],
+        "id": row["id"], "device_id": row["device_id"], "method": row["method"], "source": row["source"], "address": row["address"], "port": row["port"],
         "interval_s": row["interval_s"], "alerts": bool(row["alerts"]), "enabled": bool(row["enabled"]),
         "groups": json.loads(row["groups"] or "[]"), "last_ts": row["last_ts"], "last_ok": None if row["last_ok"] is None else bool(row["last_ok"]),
         "last_error": row["last_error"], "since": row["since"],
@@ -628,7 +628,7 @@ _STATES: dict[int, dict] = {}        # monitor id -> counters kept between round
 
 def _due(conn, now_ts: float) -> list[Any]:
     out = []
-    for row in conn.execute("SELECT * FROM host_monitors WHERE enabled = 1"):
+    for row in conn.execute("SELECT * FROM host_monitors WHERE enabled = 1 AND method != 'plugin'"):          # a plugin feeds its own rows (app/plugins/enrich.py)
         if row["last_ts"] is None:
             out.append(row)
             continue

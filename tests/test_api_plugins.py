@@ -77,7 +77,7 @@ def test_get_masks_secrets_and_returns_the_form_schema(env):
     assert "TOPSECRET" not in r.text
     body = r.json()
     assert body["secrets_set"] == {"password": True} and body["config"]["username"] == "u" and "password" not in body["config"]
-    assert [f["key"] for f in body["manifest"]["config"]] == ["url", "verify_tls", "username", "password", "traffic", "interfaces"]
+    assert [f["key"] for f in body["manifest"]["config"]] == ["url", "verify_tls", "username", "password", "traffic", "interfaces", "nodes"]
     assert c.get("/api/plugins/nope").status_code == 404
 
 

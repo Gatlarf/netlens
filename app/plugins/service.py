@@ -14,7 +14,7 @@ from app import containers, imageupdates, usagecfg
 from app.db import Error as db_Error, add_event, connect, delete_setting, get_setting, set_setting, utcnow
 from app.plugins.contract import ContractError, clean_config, default_config, migrate_servers, missing_required, validate_output
 from app.plugins import enrich, runs
-from app.plugins.enrich import device_lookup, record_client_hints, record_client_links, record_firewall, record_router_names, record_switch_ports, record_usage, record_wifi
+from app.plugins.enrich import device_lookup, record_client_hints, record_client_links, record_firewall, record_router_names, record_node_health, record_switch_ports, record_usage, record_wifi
 from app.plugins.matching import match_hypervisor, norm_mac, topology_links
 from app.plugins.registry import Plugin, discover
 from app.plugins.runner import PluginRunError, run_subprocess
@@ -436,6 +436,7 @@ class PluginService:
                     record_client_links(conn, plugin.id, data)
                     summary.update(record_wifi(conn, data))
                     record_switch_ports(conn, plugin.id, data)
+                    record_node_health(conn, plugin.id, data)
                     record_firewall(conn, plugin.id, data)
                     if usagecfg.enabled(conn):
                         record_usage(conn, plugin.id, data)

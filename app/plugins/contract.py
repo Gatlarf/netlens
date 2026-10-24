@@ -1042,6 +1042,46 @@ def _switch_ports(value: Any, path: str) -> list[dict]:
     return ports
 
 
+NODE_METRICS = {"cpu_pct": "%", "mem_pct": "%", "temp_c": "\u00b0C", "uptime_s": "s", "load1": ""}      # what a router or access point may report about itself
+
+
+def _node_metrics(value: Any, path: str) -> list[dict]:
+    """The health of a node as readings: processor, memory, temperature, uptime. A reading is a `value`, or for a figure that has to be worked out from two
+    syncs (the processor time of a router only counts up) `used` and `total`: Netlens turns the growth between two syncs into a percentage."""
+    out = []
+    for i, raw in enumerate(_list(value, path)[:40]):
+        p = f"{path}[{i}]"
+        raw = _dict(raw, p)
+        metric = raw.get("metric")
+        if metric not in NODE_METRICS:
+            _fail(f"{p}.metric", f"must be one of {', '.join(NODE_METRICS)}, got {metric!r}")
+        item = {"metric": metric, "label": _text(raw.get("label"), f"{p}.label", max_len=40), "unit": NODE_METRICS[metric]}
+        if raw.get("used") is not None or raw.get("total") is not None:
+            used, total = _optional_number(raw.get("used"), f"{p}.used", 0, 2**63 - 1), _optional_number(raw.get("total"), f"{p}.total", 0, 2**63 - 1)
+            if used is None or total is None:
+                _fail(p, "needs both used and total")
+            item.update(used=used, total=total, value=None)
+        else:
+            v = _optional_number(raw.get("value"), f"{p}.value", -1e12, 1e12)
+            if v is None:
+                continue                                   # a reading the router did not give
+            item["value"] = v
+        out.append(item)
+    return out
+
+
+def _firmware(value: Any, path: str) -> dict | None:
+    """The firmware of a node: what runs, and the newer version that is waiting (if any)."""
+    if value is None:
+        return None
+    value = _dict(value, path)
+    version = _text(value.get("version"), f"{path}.version", max_len=60)
+    if not version:
+        return None
+    latest = _text(value.get("latest"), f"{path}.latest", max_len=60) or None
+    return {"version": version, "latest": latest if latest and latest != version else None}
+
+
 def _firewall(value: Any, path: str) -> dict | None:
     """What a firewall node tells besides its clients: version, high availability, VPN tunnels and licences."""
     if not value:
@@ -1104,6 +1144,8 @@ def _topology(data: Any) -> dict:
             "role": role,
             "parent_mac": _mac(raw.get("parent_mac"), f"{path}.parent_mac"),
             "ports": _switch_ports(raw.get("ports"), f"{path}.ports"),
+            "metrics": _node_metrics(raw.get("metrics"), f"{path}.metrics"),
+            "firmware": _firmware(raw.get("firmware"), f"{path}.firmware"),
             "firewall": _firewall(raw.get("firewall"), f"{path}.firewall"),
         })
     known = {m for n in nodes for m in n["macs"]}

@@ -12,6 +12,7 @@ export const EVENT_LABELS = {
   os_changed: "OS changed",
   host_timeout: "Host timeout",
   link_down: "Link down",
+  firmware_update: "Firmware update waiting",
   link_up: "Link up",
   firewall_ha: "Firewall failover",
   vpn_down: "VPN down",

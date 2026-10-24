@@ -124,6 +124,7 @@ EVENT_LABELS = {
     "wifi_roamed": "A Wi-Fi device moves to another mesh node",
     "host_timeout": "A host times out during a scan",
     "link_down": "A device reports that a network link went down (SNMP trap)",
+    "firmware_update": "A router or access point has a firmware update waiting",
     "link_up": "A device reports that a network link came back (SNMP trap)",
     "firewall_ha": "A firewall's high-availability state changes (a failover)",
     "vpn_down": "A VPN tunnel on a firewall goes down",

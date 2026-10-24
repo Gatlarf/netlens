@@ -41,6 +41,14 @@ NETDEV = {"netdev": {"BRIDGE_rx": "0x2094588f9", "BRIDGE_tx": "0x16b900fbbe", "I
                     "WIRELESS0_rx": "0x56a36a2", "WIRELESS0_tx": "0xa7cccf2", "WIRELESS1_rx": "0x0", "WIRELESS1_tx": "0x7776f07", "WIRELESS2_rx": "0xb8a836", "WIRELESS2_tx": "0x92fb135"}}
 
 
+HOOKS = {
+    "/appGet.cgi?hook=cpu_usage(appobj)": {"cpu_usage": {"cpu1_total": "1000", "cpu1_usage": "100", "cpu2_total": "1000", "cpu2_usage": "300"}},
+    "/appGet.cgi?hook=memory_usage(appobj)": {"memory_usage": {"mem_total": "524288", "mem_free": "131072", "mem_used": "393216"}},
+    "/appGet.cgi?hook=get_cpu_temperature()": {"get_cpu_temperature": "61.589"},
+    "/appGet.cgi?hook=get_wan_lan_status()": {"get_wan_lan_status": {"portSpeed": {"WAN 0": "G", "LAN 1": "X", "LAN 2": "M", "LAN 3": "G", "LAN 4": "X"}, "portCount": {"wanCount": 1, "lanCount": 4}}},
+}
+
+
 class FakeTransport:
     def __init__(self, login=None, fail_on=None):
         self.calls = []
@@ -64,6 +72,8 @@ class FakeTransport:
             return (200, self.devices) if self.devices else (404, b"")
         if path == "/appGet.cgi?hook=netdev(appobj)":
             return (200, json.dumps(NETDEV).encode()) if self.netdev else (404, b"")
+        if path in HOOKS and self.netdev:
+            return 200, json.dumps(HOOKS[path]).encode()
         if path.startswith("/appGet.cgi"):
             return 200, json.dumps(CLIENTS).encode()
         if path == "/ajax_onboarding.asp":
@@ -106,7 +116,9 @@ def test_client_logs_in_reads_and_always_logs_out():
     t = FakeTransport()
     snap = AsusClient(AsusConfig(url=CFG.url, username=CFG.username, password=CFG.password, traffic=False), transport=t).snapshot()
     assert len(snap["nodes"]) == 3
-    assert [c[1] for c in t.calls] == ["/login.cgi", "/appGet.cgi?hook=get_clientlist()", "/ajax_onboarding.asp", "/appGet.cgi?hook=netdev(appobj)", "/Logout.asp"]
+    paths = [c[1] for c in t.calls]
+    assert paths[:3] == ["/login.cgi", "/appGet.cgi?hook=get_clientlist()", "/ajax_onboarding.asp"] and paths[-1] == "/Logout.asp"
+    assert paths.count("/login.cgi") == 3 and paths.count("/Logout.asp") == 3                       # the router and the two nodes that are online
     assert t.calls[1][2] == "asus_token=TOK" and t.calls[0][2] is None
 
     t = FakeTransport(fail_on="ajax_onboarding")
@@ -199,25 +211,53 @@ def test_netlens_switch_for_application_statistics_has_the_last_word(monkeypatch
     assert _asus.fetch(base)["usage"] != []                      # an older Netlens does not send the flag: unchanged
 
 
-def test_the_router_interfaces_become_ports_with_byte_counters():
+def test_the_router_and_every_node_report_their_health_and_ports():
     from app.plugins.contract import validate_output
 
-    client = AsusClient(CFG, transport=FakeTransport())
-    ports = client.interfaces()
-    assert [p["name"] for p in ports] == ["WAN", "LAN", "Wi-Fi radio 1", "Wi-Fi radio 2", "Wi-Fi radio 3"]
-    wan = ports[0]
-    assert wan["rx_bytes"] == 0x168C4AFC2E and wan["tx_bytes"] == 0x203CF8D7D and wan["port"] == 1
-    snap = client.snapshot()
+    snap = AsusClient(CFG, transport=FakeTransport()).snapshot()
     out = validate_output("topology", to_topology(snap))
-    gateway = next(n for n in out["nodes"] if n["role"] == "gateway")
-    assert [p["name"] for p in gateway["ports"]][:2] == ["WAN", "LAN"] and all("ports" not in n or not n["ports"] for n in out["nodes"] if n["role"] != "gateway")
+    by_name = {n["name"]: n for n in out["nodes"]}
+    gateway = by_name["Main"]
+    assert [m["metric"] for m in gateway["metrics"]] == ["cpu_pct", "mem_pct", "temp_c", "uptime_s"]
+    cpu = gateway["metrics"][0]
+    assert cpu["used"] == 400 and cpu["total"] == 2000 and gateway["metrics"][1]["value"] == 75.0 and gateway["metrics"][2]["value"] == 61.6
+    ports = {p["name"]: p for p in gateway["ports"]}
+    assert ports["WAN"]["rx_bytes"] == 0x168C4AFC2E and ports["WAN"]["port"] == 1 and ports["LAN"]["tx_bytes"] == 0x16EC0CFAA8
+    assert ports["LAN 1"]["up"] is False and ports["LAN 2"]["speed_mbps"] == 100 and ports["LAN 3"]["speed_mbps"] == 1000 and ports["WAN port"]["up"] is True
+    for name in ("Garden", "Attic"):                                                                    # the nodes were asked too
+        assert [m["metric"] for m in by_name[name]["metrics"]][0] == "cpu_pct" and any(p["name"] == "LAN 3" for p in by_name[name]["ports"])
 
 
-def test_a_router_that_does_not_say_still_syncs_and_the_switch_can_turn_it_off():
+def test_the_firmware_of_a_node_and_the_update_waiting():
+    nodes = [dict(n, fwver="3.0.0.4.388_1", newfwver="3.0.0.4.388_2") if i == 0 else dict(n, fwver="3.0.0.4.388_1") for i, n in enumerate(NODES)]
+    snap = build_snapshot(CLIENTS, parse_onboarding("get_cfg_clientlist = [" + json.dumps(nodes) + "];"))
+    from app.plugins.contract import validate_output
+
+    checked = validate_output("topology", to_topology(snap))["nodes"]
+    assert checked[0]["firmware"]["latest"] == "3.0.0.4.388_2" and checked[1]["firmware"]["latest"] is None             # the same version is no update
+
+
+def test_a_node_that_refuses_the_login_is_skipped_and_the_others_still_count():
+    class Picky(FakeTransport):
+        def __call__(self, method, url, headers, data):
+            if "10.0.0.50" in url:
+                return 200, json.dumps({"error_status": "2"}).encode()                     # wrong password on the node
+            return super().__call__(method, url, headers, data)
+
+    snap = AsusClient(CFG, transport=Picky()).snapshot()
+    nodes = {n["name"]: n for n in snap["nodes"]}
+    assert not nodes["Garden"].get("metrics") and nodes["Attic"]["metrics"] and nodes["Main"]["metrics"]
+    assert list(snap["node_errors"].values()) == ["login refused"]
+
+
+def test_a_router_that_does_not_say_still_syncs_and_the_switches_turn_it_off():
     transport = FakeTransport()
     transport.netdev = False
     snap = AsusClient(CFG, transport=transport).snapshot()
-    assert snap["interfaces"] == [] and "ports" not in to_topology(snap)["nodes"][0]
-    off = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", interfaces=False)
-    quiet = FakeTransport()
-    assert AsusClient(off, transport=quiet).snapshot()["interfaces"] == [] and not any("netdev" in c[1] for c in quiet.calls)
+    assert not snap["nodes"][0].get("ports") and "ports" not in to_topology(snap)["nodes"][0]
+    for kwargs in ({"interfaces": False}, {"nodes": False}):
+        quiet = FakeTransport()
+        snap = AsusClient(AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", **kwargs), transport=quiet).snapshot()
+        logins = [c for c in quiet.calls if c[1] == "/login.cgi"]
+        assert len(logins) == 1                                                                   # only the main router
+        assert bool(snap["nodes"][0].get("metrics")) == ("interfaces" not in kwargs)
