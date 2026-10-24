@@ -241,6 +241,10 @@ def uptime_overview(
         return f"device {row['id']}"
 
     devices_sorted = sorted(devices, key=lambda r: (display_name(r).lower(), r["id"]))
+    from app import rootcause
+
+    behind = rootcause.unreachable(conn)                 # offline because of the device above it
+    names = {r["id"]: display_name(r) for r in devices}
 
     result = []
     for row in devices_sorted:
@@ -250,6 +254,7 @@ def uptime_overview(
             "name": display_name(row),
             "ip": row["primary_ip"],
             "online": bool(row["online"]),
+            "behind": names.get(behind.get(device_id)),
             "always_on": bool(row["always_on"]),
             "up_24h": agg_24h.get(device_id),
             "up_7d": agg_7d.get(device_id),

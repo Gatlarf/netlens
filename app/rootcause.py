@@ -55,3 +55,21 @@ def collapse(conn: sqlite3.Connection, events: list[dict]) -> list[dict]:
             "hidden_names": names, "text": f"{device_name(parent)} is offline, so {len(names)} device{'s' if len(names) != 1 else ''} behind it cannot be reached: {shown}",
         })
     return sorted(out, key=lambda e: e["id"])
+
+
+def unreachable(conn: sqlite3.Connection) -> dict[int, int]:
+    """Offline devices that sit behind another offline device: {device id: id of the highest offline device above it}. They are unreachable, not broken."""
+    try:
+        devices, hierarchy = load_hierarchy(conn)
+    except db_Error:
+        return {}
+    out: dict[int, int] = {}
+    for did, d in devices.items():
+        if d["online"]:
+            continue
+        for parent in reversed(ancestors(hierarchy, did)):
+            p = devices.get(parent)
+            if p is not None and not p["online"]:
+                out[did] = parent
+                break
+    return out

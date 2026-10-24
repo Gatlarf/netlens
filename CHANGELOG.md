@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.220 — 2026-10-24
+
+### Added
+- ★ **Monitoring coverage.** Insights has a new card (and `/api/coverage`) that lists, for every device you marked always-on or critical, what is not watching it yet: a quick check, a service check, a health monitor, a backup (virtual machines and containers), or alerts for it going offline. It also warns when no alert channel is switched on at all, so a gap is found before an outage finds it.
+- ★ **One cause, one problem.** When a switch or host is offline, the always-on devices behind it are no longer listed as separate outages on the dashboard: one line says that the device is not answering and how many always-on devices behind it cannot be reached. On the Uptime page such a device is marked "unreachable · behind <device>". Alert messages already grouped these; now the screens do too.
+
 ## 0.4.219 — 2026-10-24
 
 ### Added

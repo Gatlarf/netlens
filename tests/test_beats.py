@@ -195,3 +195,37 @@ def test_reliability_pairs_outages_and_reports_recovery_time_and_alert_quality(c
     assert doc["mttr_seconds"] == (120 + 1800) // 2 and doc["alerts"]["cleared_within_5_min"] == 1
     assert doc["alerts"]["problems"] == 3 and doc["watching"]["devices"] == 3 and doc["meets_target"] in (True, False)
     assert reliability.set_target(conn, 99.9) == 99.9 and reliability.target(conn) == 99.9
+
+
+def test_coverage_lists_what_is_missing_for_the_devices_that_matter(conn):
+    from app import coverage
+
+    conn.execute("UPDATE devices SET tier = 'critical', device_type = 'server' WHERE primary_ip = '10.0.0.5'")
+    conn.execute("UPDATE devices SET always_on = 0, tier = 'normal' WHERE primary_ip = '192.168.9.9'")      # not on the list at all
+    did = conn.execute("SELECT id FROM devices WHERE primary_ip = '10.0.0.6'").fetchone()[0]
+    conn.execute("INSERT INTO service_checks (device_id, name, kind, host, port, interval_s, timeout_s, enabled, created) VALUES (?, 'web', 'tcp', 'h', 80, 60, 5, 1, ?)", (did, T0))
+    conn.commit()
+    doc = coverage.build(conn)
+    assert doc["watching"] == 2 and doc["with_gaps"] == 1
+    gap = doc["devices"][0]
+    assert gap["tier"] == "critical" and {m["what"] for m in gap["missing"]} == {"service check", "health monitor"}
+    assert doc["gaps_by_kind"] == {"service check": 1, "health monitor": 1}
+
+
+def test_devices_behind_a_down_device_are_one_problem(conn):
+    from app import dashboard
+
+    ids = {r["primary_ip"]: r["id"] for r in conn.execute("SELECT id, primary_ip FROM devices")}
+    conn.execute("UPDATE devices SET online = 0 WHERE primary_ip IN ('10.0.0.5', '10.0.0.6')")
+    conn.execute("UPDATE devices SET parent_device_id = ?, parent_mode = 'device' WHERE primary_ip = '10.0.0.6'", (ids["10.0.0.5"],))
+    conn.commit()
+    from app import rootcause
+
+    assert rootcause.unreachable(conn) == {ids["10.0.0.6"]: ids["10.0.0.5"]}
+    s = {"plugins": [], "scans": {"last": None, "last_ok_age_s": None}, "backup": {"last_ok": None}, "containers": {"unhealthy": 0, "restarting": 0}, "sites": {"down": 0},
+         "devices": {"flapping": 0, "unknown": 0}, "dns": {"conflicts": 0}, "netchecks": {"untrusted": 0}, "update": {"available": False, "plugin_problems": 0, "plugin_updates": 0}}
+    core = [{"id": ids["10.0.0.5"], "name": "switch", "behind": None, "behind_name": None}, {"id": ids["10.0.0.6"], "name": "nas", "behind": ids["10.0.0.5"], "behind_name": "switch"}]
+    texts = [i["text"] for i in dashboard._attention(s, [], 0, [], core)]
+    assert "switch should always be online but is not answering" in texts
+    assert any("so 1 always-on device behind it cannot be reached: nas" in t for t in texts)
+    assert not any(t.startswith("nas should") for t in texts)

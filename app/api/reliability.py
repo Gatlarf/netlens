@@ -28,3 +28,11 @@ def put_target(body: TargetBody, request: Request, conn=Depends(get_conn)) -> di
         return {"target": reliability.set_target(conn, body.target)}
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/coverage")
+def get_coverage(conn=Depends(get_conn)) -> dict:
+    """The devices that matter and what is not watching them yet."""
+    from app import coverage
+
+    return coverage.build(conn)

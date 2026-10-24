@@ -64,7 +64,8 @@ export async function render(container) {
     if (openGraphs.has(item.id)) fill();
     const rowEl = h("div", { class: `up-row ${tone(pct)}`, dataset: { search: `${(item.name || "").toLowerCase()} ${(item.ip || "").toLowerCase()}` } },
       h("div", { class: "up-who" },
-        h("div", { class: "up-state" }, statusDot(item.online), h("a", { href: `#/device/${item.id}`, title: item.name || null }, shortName(item.name) || "")),
+        h("div", { class: "up-state" }, statusDot(item.online), h("a", { href: `#/device/${item.id}`, title: item.name || null }, shortName(item.name) || ""),
+          item.behind ? h("span", { class: "tag unknown-tag", title: `${item.behind} is offline: this device cannot be reached through it` }, `unreachable · behind ${shortName(item.behind)}`) : null),
         item.ip && item.ip !== item.name ? h("div", { class: "mono hint" }, item.ip) : null),
       h("div", { class: "up-avail" }, h("span", { class: "up-graph-label" }, "Availability"), heartbeatBar(item.bars || [], n)),
       h("div", { class: "up-resp" }, h("span", { class: "up-graph-label" }, `Response time · average ${fmtMs(resp)}`), responseLine(item.bars || [], n, { height: 34 })),

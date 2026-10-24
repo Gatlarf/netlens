@@ -89,6 +89,18 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
         add("warn", f"Certificate {soon[0]['name']} ends in {soon[0]['days']} day{'s' if soon[0]['days'] != 1 else ''}", "#/stats")
     if s["sites"]["down"]:
         add("bad", f"{s['sites']['down']} proxy site{'s' if s['sites']['down'] != 1 else ''} not answering", "#/stats")
+    behind_root: dict[int, list[dict]] = {}
+    shown_down: list[dict] = []
+    for dev in core_down or []:                       # a device that is down because of the device above it is part of that one problem
+        if dev.get("behind") is None:
+            shown_down.append(dev)
+        else:
+            behind_root.setdefault(dev["behind"], []).append(dev)
+    for root, kids in sorted(behind_root.items()):
+        names_ = [k["name"] or f"device {k['id']}" for k in kids]
+        add("bad", f"{kids[0].get('behind_name') or 'A device'} is not answering, so {len(kids)} always-on device{'s' if len(kids) != 1 else ''} behind it cannot be reached: {', '.join(names_[:3])}{'…' if len(names_) > 3 else ''}",
+            f"#/device/{root}", f"device:{root}")
+    core_down = shown_down
     for dev in (core_down or [])[:3]:
         add("bad", f"{dev['name']} should always be online but is not answering", f"#/device/{dev['id']}", f"device:{dev['id']}")
     if len(core_down or []) > 3:
@@ -168,7 +180,10 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         {"id": d, "name": names.get(d), "pct": _pct(u, n)}
         for d, (u, n, _rs, _rn) in sorted(((d, v) for d, v in week.items() if v[0] < v[1] and d in names), key=lambda kv: (kv[1][0] / kv[1][1], kv[0]))[:5]
     ]
-    core_down = [{"id": r["id"], "name": names.get(r["id"])} for r in conn.execute("SELECT id FROM devices WHERE always_on = 1 AND online = 0 ORDER BY id")]
+    from app import rootcause
+
+    behind = rootcause.unreachable(conn)               # offline devices behind another offline device: one cause, not a list of separate outages
+    core_down = [{"id": r["id"], "name": names.get(r["id"]), "behind": behind.get(r["id"]), "behind_name": names.get(behind.get(r["id"]))} for r in conn.execute("SELECT id FROM devices WHERE always_on = 1 AND online = 0 ORDER BY id")]
     since = _ago(now, days=14)[:10]
     trend = [{"day": r["day"], "devices": r["devices"], "online": r["online"], "events": r["events"]}
              for r in conn.execute("SELECT day, devices, online, events FROM stats_daily WHERE day >= ? ORDER BY day", (since,))]

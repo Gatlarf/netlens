@@ -6,7 +6,7 @@ import { boardPage } from "../layout_cards.js";
 const TYPES = ["router", "switch", "ap", "server", "pc", "phone", "tablet", "tv", "speaker", "console", "appliance", "printer", "iot", "camera", "nas", "vm"];
 
 export async function render(container) {
-  let destroyed = false, data;
+  let destroyed = false, data, coverage = null;
   let everything = false;           // also phones, tablets and other devices that come and go
   try { everything = localStorage.getItem("netlens.ask.all") === "1"; } catch (e) { /* private window */ }
   // one tick box, shown where it matters (the question and the incidents); it redraws the page
@@ -22,6 +22,7 @@ export async function render(container) {
   container.append(pageHead("Insights", "Questions, incidents, unusual readings and predictions, worked out from your own data. The AI report is under Reports.", board.button()), body);
 
   async function load() {
+    try { coverage = await get("/api/coverage").catch(() => null); } catch (e) { coverage = null; }
     try { data = await get(`/api/insights${everything ? "?include_all=1" : ""}`); } catch (err) { if (!destroyed) { clear(body); body.appendChild(h("p", { class: "error" }, err.message || "Could not load.")); } return; }
     if (!destroyed) draw();
   }
@@ -176,6 +177,23 @@ export async function render(container) {
       h("label", { class: "check" }, llm, " Let the language model word the answers and incident summaries"));
   }
 
+  // what is not yet watching the devices that matter (always-on or critical): a quick check, a service check, a health monitor, a backup, alerts
+  function coverageCard() {
+    const c = coverage;
+    const card = h("div", { class: "card" }, h("h2", {}, `Monitoring coverage (${c.with_gaps} of ${c.watching} with a gap)`));
+    card.appendChild(h("p", { class: "hint" }, "The devices you marked always-on or critical, and what does not watch them yet. A gap is where an outage would go unnoticed or unexplained."));
+    if (c.no_channel) card.appendChild(h("p", { class: "warn-text" }, ["No alert channel is switched on: nobody is told when something goes down. ", h("a", { href: "#/settings/channels" }, "Add one")]));
+    if (!c.devices.length) { card.appendChild(h("p", { class: "run-ok" }, c.watching ? "Every device that matters is covered." : "No device is marked always-on or critical yet.")); return card; }
+    const list = h("ul", {});
+    for (const d of c.devices.slice(0, 12)) {
+      list.appendChild(h("li", {}, h("a", { href: `#/device/${d.id}` }, d.name), d.tier === "critical" ? h("span", { class: "tag unknown-tag" }, "critical") : null, h("span", { class: "hint" }, ` ${d.type}`),
+        h("ul", {}, d.missing.map((m) => h("li", {}, h("strong", {}, `No ${m.what}. `), h("span", { class: "hint" }, m.fix))))));
+    }
+    card.appendChild(list);
+    if (c.devices.length > 12) card.appendChild(h("p", { class: "hint" }, `and ${c.devices.length - 12} more.`));
+    return card;
+  }
+
   function draw() {
     clear(body);
     if (!data.status.allowed) {
@@ -185,9 +203,10 @@ export async function render(container) {
       return;
     }
     const tag = (el, id, title, kind, size) => { el.dataset.card = id; el.dataset.title = title; el.dataset.kind = kind; if (size) el.dataset.size = size; return el; };
-    const flow = h("div", { class: "dev-flow" },
+    const flow = h("div", { class: "dev-flow" }, ...[
       tag(askCard(), "ask", "Ask your network", "tiles", "f"), tag(incidentsCard(), "incidents", "Incidents", "list", "w"), tag(unusualCard(), "unusual", "Unusual right now", "list"),
-      tag(predictionsCard(), "predictions", "Predictions", "list"), tag(unknownCard(), "unknown", "Devices without a type", "list"));
+      coverage ? tag(coverageCard(), "coverage", "Monitoring coverage", "list") : null,
+      tag(predictionsCard(), "predictions", "Predictions", "list"), tag(unknownCard(), "unknown", "Devices without a type", "list")].filter(Boolean));
     body.append(flow);
     board.apply({ main: flow });
   }
