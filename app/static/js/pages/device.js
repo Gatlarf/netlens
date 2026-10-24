@@ -353,6 +353,7 @@ function buildEditCard(device, onSaved) {
 
   let dirty = false;
   let focused = false;
+  const extraForms = [];
 
   const fields = [nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, alwaysInput, excludeInput, trustInput, dnsMode, dnsName];
   for (const f of fields) {
@@ -385,6 +386,7 @@ function buildEditCard(device, onSaved) {
       return;
     }
     dirty = false;
+    for (const other of extraForms) other.requestSubmit();       // the network position is saved by the same button
     toast("Saved", "success");
     onSaved();
   });
@@ -393,7 +395,7 @@ function buildEditCard(device, onSaved) {
   const parentSlot = h("div", { class: "parent-slot" });  // "Network position", filled in by the page
   card.appendChild(parentSlot);
 
-  return { card, parentSlot, isDirty: () => dirty, isFocused: () => focused };
+  return { card, parentSlot, isDirty: () => dirty, isFocused: () => focused, saveWith: (f) => { extraForms.push(f); f.addEventListener("input", () => { dirty = true; }); f.addEventListener("change", () => { dirty = true; }); } };
 }
 
 const KIND_LABELS = { lxc: "LXC", qemu: "VM", vm: "VM", app: "App", container: "Container" };
@@ -930,7 +932,12 @@ export async function render(container, params) {
       sRight.appendChild(tag(deleteCard, "delete", "Delete this device"));
       panels.settings = flowOf(sLeft, sRight);
       buildParentCard(device, (message) => { toast(message, "success"); load(); })
-        .then((c) => { if (!disposed) newEdit.parentSlot.appendChild(c); })
+        .then((c) => {
+          if (disposed) return;
+          newEdit.parentSlot.appendChild(c);
+          const pform = c.querySelector("form");        // one Save for the whole card
+          if (pform) { newEdit.saveWith(pform); for (const b of pform.querySelectorAll("button[type=submit]")) b.hidden = true; }
+        })
         .catch(() => {});
     }
 

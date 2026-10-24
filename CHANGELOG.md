@@ -5,7 +5,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ## 0.4.209 — 2026-10-24
 
 ### Changed
-- **The device Edit card is always open and easier to read.** Settings → Edit no longer hides behind an arrow: it is a full-width card in four groups (Identity, Monitoring and reports, Scanning, DNS registration). Every explanation is now text under its field instead of a tooltip, every label is tied to its field for screen readers and tapping, and the fields sit in columns that fit the screen.
+- **The device Edit card is always open and easier to read.** Settings → Edit no longer hides behind an arrow: it is a full-width card in four groups (Identity, Monitoring and reports, Scanning, DNS registration). The network position (parent and port) is part of the same card and saved by the one Save button. Every explanation is now text under its field instead of a tooltip, every label is tied to its field for screen readers and tapping, and the fields sit in columns that fit the screen.
 
 ## 0.4.208 — 2026-10-24
 
