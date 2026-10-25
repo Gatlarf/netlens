@@ -171,6 +171,22 @@ export async function buildChannelsCard() {
     const card = h("div", { class: "card" }, h("h2", {}, "Notification channels"));
     card.appendChild(h("p", { class: "hint" },
       "Send alerts by e-mail, to your phone or to a chat: e-mail (SMTP), ntfy, Telegram, Discord, Pushover or any webhook (n8n, OpenClaw, Home Assistant). Each channel picks the events it wants, how serious they are and which devices or groups they are about."));
+    const gaps = overview.coverage && overview.coverage.gaps || [];
+    if (gaps.length) {                                  // nobody would be told about these: say so, and offer the fix
+      const first = overview.channels.find((c) => c.enabled);
+      const fix = first ? h("button", { class: "btn", type: "button" }, `Add them to ${first.name}`) : null;
+      if (fix) fix.addEventListener("click", async () => {
+        try {
+          await put(`/api/notify-channels/${first.id}`, { events: [...new Set([...first.events, ...gaps.map((g) => g.kind)])] });
+          toast("Added", "success");
+        } catch (err) {
+          toast(err.message || "Could not save", "error");
+        }
+        load();
+      });
+      card.appendChild(h("div", { class: "card warning", role: "alert" }, h("strong", {}, first ? "You would not be told about:" : "No channel is switched on, so nobody is told about anything."),
+        h("ul", {}, gaps.map((g) => h("li", {}, g.label, h("span", { class: "hint" }, ` (${g.why})`)))), fix));
+    }
     const slot = h("div", {});
     const add = h("button", { class: "btn", type: "button" }, "Add channel");
     add.addEventListener("click", async () => {

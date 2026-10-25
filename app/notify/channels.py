@@ -294,6 +294,25 @@ def severity_of(kind: str) -> str:
     return "critical" if n <= 2 else "warning" if n <= 4 else "info"
 
 
+# what almost everybody wants to hear about: the kinds a channel should include before you can rely on being warned
+SHOULD_HEAR = ("device_offline", "service_down", "metric_critical", "metric_warning", "capacity_warning", "capacity_critical", "container_restarting", "container_unhealthy", "backup_failed", "storage_degraded")
+
+
+def coverage(conn: sqlite3.Connection) -> dict:
+    """Who would be told? For each kind in SHOULD_HEAR: is there an enabled channel that includes it (and whose minimum severity lets it through)?
+    A gap is how you end up reading about a full disk the next morning."""
+    channels = [c for c in load_channels(conn) if c["enabled"]]
+    rank = {s: i for i, s in enumerate(SEVERITIES)}
+    gaps = []
+    for kind in SHOULD_HEAR:
+        if kind not in EVENT_LABELS:
+            continue
+        covered = [c for c in channels if kind in c["events"] and rank[severity_of(kind)] >= rank[(c.get("filters") or {}).get("min_severity", "info")]]
+        if not covered:
+            gaps.append({"kind": kind, "label": EVENT_LABELS[kind], "why": "no channel is on" if not channels else "no channel includes it" if not any(kind in c["events"] for c in channels) else "the channels that include it only pass more serious events"})
+    return {"channels": len(channels), "gaps": gaps, "ok": not gaps}
+
+
 def clean_filters(data: Any) -> dict:
     """What a channel narrows its events down to: a minimum severity, and optionally only some devices and groups (empty = all)."""
     data = data if isinstance(data, dict) else {}

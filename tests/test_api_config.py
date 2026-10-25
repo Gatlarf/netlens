@@ -139,14 +139,18 @@ def test_session_reports_authenticated(tmp_path: Path) -> None:
     with _make_client(settings, tmp_path / "t.db", headers={"Authorization": "Bearer wrong"}) as client:
         resp = client.get("/api/session")
         assert resp.status_code == 200
-        assert resp.json() == {"authenticated": False, "setup_required": False, "token_login": True, "oidc": {"enabled": False, "label": "Single sign-on"}}
+        body = resp.json()
+        body.pop("interface", None)                                   # the look settings ride along; tests/test_interface.py covers them
+        assert body == {"authenticated": False, "setup_required": False, "token_login": True, "oidc": {"enabled": False, "label": "Single sign-on"}}
 
         resp = client.post("/api/login", json={"token": "secret"})
         assert resp.status_code == 200
 
         resp = client.get("/api/session")
         assert resp.status_code == 200
-        assert resp.json() == {"authenticated": True, "user": {"username": "access token", "role": "admin", "builtin": True}, "start_page": None}
+        body = resp.json()
+        body.pop("interface", None)
+        assert body == {"authenticated": True, "user": {"username": "access token", "role": "admin", "builtin": True}, "start_page": None}
 
 
 def test_logout_clears_cookie(tmp_path: Path) -> None:

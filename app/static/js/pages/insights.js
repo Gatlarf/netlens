@@ -77,6 +77,27 @@ export async function render(container) {
       const text = h("div", { class: "ins-text" }, i.summary);
       const row = h("div", { class: "rem-run" }, h("div", {}, h("strong", {}, i.title), " ", h("span", { class: `badge ${i.resolved ? "" : "warn"}` }, i.resolved ? "over" : i.ongoing ? "going on" : "open"), " ",
         h("span", { class: "hint", title: i.start }, timeAgo(i.start))), text);
+      const why = h("div", { class: "ins-text" });
+      const dig = h("button", { class: "btn", type: "button" }, "Investigate");
+      dig.addEventListener("click", async () => {
+        dig.disabled = true;
+        try {
+          const res = await get(`/api/insights/incidents/${i.id}/investigate${data.status.llm_ready ? "?words=true" : ""}`);
+          clear(why);
+          if (res.words) why.appendChild(h("p", {}, res.words));
+          const list = h("ul", {});
+          for (const f of res.findings) list.appendChild(h("li", { class: f.level === "warn" || f.level === "cause" ? "warn-text" : "" }, f.text));
+          if (!res.findings.length) list.appendChild(h("li", { class: "hint" }, "Nothing more to say than the summary above."));
+          why.appendChild(list);
+          for (const d of res.devices) {
+            const det = h("details", {}, h("summary", {}, `Timeline of ${d.name}`));
+            det.appendChild(h("ul", {}, d.timeline.map((t) => h("li", {}, h("span", { class: "hint" }, `${t.ts.replace("T", " ").replace("Z", "")} `), t.count > 1 ? `${t.count}× ` : "", t.text || t.kind))));
+            why.appendChild(det);
+          }
+        } catch (err) { toast(err.message || "Failed", "error"); }
+        dig.disabled = false;
+      });
+      row.append(dig, why);
       if (data.status.llm_ready) {
         const words = h("button", { class: "btn ghost", type: "button" }, "Say it in the model's words");
         words.addEventListener("click", async () => {

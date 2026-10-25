@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.243 — 2026-10-25
+
+### Added
+- ★ **Investigate an incident.** On the Insights page every incident has an *Investigate* button. Netlens works out what happened from the data it already holds: the timeline of each affected device (a repeating alert is one line with a count), how a reading moved (a slow climb or a sudden jump, from what to what, how fast, and whether a trend forecast could have seen it), what happened in the three hours before (a container in a restart loop is named as the probable source), how long it took before the first alert, and whether anybody was told: which channels include the alert, a minimum severity that filters it out, quiet hours that held it back. A language model, when set up, may only put the same facts into words.
+- ★ **Notification coverage.** The Notifications page warns when no switched-on channel would tell you about a device offline, a service down, a health reading going warning or critical, a disk filling up, a container restarting, a failed backup or a storage problem, and offers to add them to your first channel. A channel carried over from the old e-mail setting only listened to new devices and services.
+
+### Changed
+- OpenWrt 1.1.0 and OPNsense 1.1.0 are released to the plugin store.
+
 ## 0.4.242 — 2026-10-25
 
 ### Added

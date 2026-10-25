@@ -18,6 +18,7 @@ def _overview(conn) -> dict:
         "events": [{"key": k, "label": v} for k, v in ch.EVENT_LABELS.items()],
         "default_events": ch.DEFAULT_EVENTS,
         "quiet": ch.load_quiet(conn),
+        "coverage": ch.coverage(conn),
     }
 
 

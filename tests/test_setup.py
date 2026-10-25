@@ -37,7 +37,7 @@ def test_token_is_optional_in_the_configuration():
 
 def test_fresh_install_asks_for_setup_and_has_no_token_login(tmp_path):
     with TestClient(make(tmp_path)) as c:
-        s = c.get("/api/session").json()
+        s = {k: v for k, v in c.get("/api/session").json().items() if k != "interface"}
         assert s == {"authenticated": False, "setup_required": True, "token_login": False, "oidc": {"enabled": False, "label": "Single sign-on"}}
         info = c.get("/api/setup").json()
         assert info["required"] and info["detected_ranges"] == ["192.168.7.0/24"] and info["min_password"] == 8
@@ -56,7 +56,7 @@ def test_setup_creates_the_admin_signs_in_and_starts_the_scan(tmp_path):
         r = c.post("/api/setup", json={"username": "Bert", "password": "longenough1", "ranges": ["192.168.7.0/24"]})
         assert r.status_code == 200 and r.json() == {"ok": True, "scan_started": True}
         assert app.state.started == ["quick"]
-        s = c.get("/api/session").json()  # signed in already
+        s = {k: v for k, v in c.get("/api/session").json().items() if k != "interface"}  # signed in already
         assert s["authenticated"] and s["user"] == {"username": "Bert", "role": "admin", "builtin": False}
         assert c.get("/api/config").json()["ranges"] == ["192.168.7.0/24"]
         assert c.get("/api/users").status_code == 200
@@ -93,7 +93,7 @@ def test_an_install_with_a_token_never_shows_the_wizard(tmp_path):
     """The upgrade path: NETLENS_TOKEN stays in the compose file, nothing changes for its owner."""
     app = make(tmp_path, token="secret")
     with TestClient(app) as c:
-        assert c.get("/api/session").json() == {"authenticated": False, "setup_required": False, "token_login": True, "oidc": {"enabled": False, "label": "Single sign-on"}}
+        assert {k: v for k, v in c.get("/api/session").json().items() if k != "interface"} == {"authenticated": False, "setup_required": False, "token_login": True, "oidc": {"enabled": False, "label": "Single sign-on"}}
         assert c.get("/api/setup").status_code == 404
         assert c.post("/api/setup", json={"username": "evil", "password": "longenough1"}).status_code == 409
         assert c.post("/api/login", json={"token": "secret"}).status_code == 200
@@ -127,7 +127,7 @@ def test_removing_the_token_later_with_users_present_needs_no_wizard(tmp_path):
     users.create_user(conn, "bert", "longenough1", "admin")
     conn.close()
     with TestClient(make(tmp_path)) as c:
-        assert c.get("/api/session").json() == {"authenticated": False, "setup_required": False, "token_login": False, "oidc": {"enabled": False, "label": "Single sign-on"}}
+        assert {k: v for k, v in c.get("/api/session").json().items() if k != "interface"} == {"authenticated": False, "setup_required": False, "token_login": False, "oidc": {"enabled": False, "label": "Single sign-on"}}
         assert c.post("/api/login", json={"username": "bert", "password": "longenough1"}).status_code == 200
 
 

@@ -514,3 +514,18 @@ def test_a_channel_can_be_limited_to_critical_or_normal_importance():
     assert ch.clean_filters({"min_tier": "critical"})["min_tier"] == "critical"
     with pytest.raises(ValueError):
         ch.clean_filters({"min_tier": "loud"})
+
+
+def test_coverage_names_what_nobody_would_hear_about(db):
+    conn = db[1]
+    assert ch.coverage(conn)["channels"] == 0 and ch.coverage(conn)["gaps"]                  # no channel at all: every kind is a gap
+    channel = {"id": "a", "type": "ntfy", "name": "n", "enabled": True, "events": ["device_new", "service_down"], "filters": {"min_severity": "info", "min_tier": "any", "devices": [], "groups": []}, "settings": {}}
+    ch.save_channels(conn, [channel])
+    kinds = {g["kind"] for g in ch.coverage(conn)["gaps"]}
+    assert "metric_critical" in kinds and "capacity_warning" in kinds and "service_down" not in kinds
+    channel["events"] = list(ch.SHOULD_HEAR)
+    ch.save_channels(conn, [channel])
+    assert ch.coverage(conn)["ok"] is True
+    channel["filters"]["min_severity"] = "critical"
+    ch.save_channels(conn, [channel])
+    assert any(g["kind"] == "metric_warning" and "more serious" in g["why"] for g in ch.coverage(conn)["gaps"])

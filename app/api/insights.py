@@ -9,7 +9,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app import aireport, anomaly, relevance, ask, forecast, identify, incidents, insights, modelcheck, postmortem
+from app import aireport, anomaly, relevance, ask, forecast, identify, incidents, insights, investigate, modelcheck, postmortem
 from app import engineer
 from app.api.devices import get_conn
 
@@ -75,6 +75,18 @@ async def incident_words(incident_id: int, conn=Depends(get_conn)) -> dict:
         raise HTTPException(status_code=404, detail="that incident is no longer in the list")
     text = await asyncio.to_thread(incidents.narrate, conn, found)
     return {"text": text or found["summary"], "source": "model" if text else "rules"}
+
+
+@router.get("/insights/incidents/{incident_id}/investigate")
+async def investigate_incident(incident_id: int, words: bool = False, conn=Depends(get_conn)) -> dict:
+    """What happened in an incident, how it built up and whether anybody was told: worked out from the data; with `words` the model may phrase it."""
+    _allowed(conn)
+    out = await asyncio.to_thread(investigate.investigate, conn, incident_id)
+    if out is None:
+        raise HTTPException(status_code=404, detail="that incident is no longer in the list")
+    if words:
+        out["words"] = await asyncio.to_thread(investigate.narrate, conn, out)
+    return out
 
 
 @router.get("/insights/identify/{device_id}")
