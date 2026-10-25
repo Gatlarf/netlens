@@ -49,7 +49,7 @@ export function isProbeBusy() {
 // mode "health": what the probes found (device page, Health). mode "setup": the settings and the install of the probe on the host (Settings → Host probes).
 export async function buildDeviceProbeCard(device, mode = "health") {
   const setup = mode === "setup";
-  const card = h("div", { class: "card admin-only probe-card" });
+  const card = h("div", { class: setup ? "probe-card" : "card admin-only probe-card" });
   for (const ev of ["input", "change"]) card.addEventListener(ev, () => { card.dataset.dirty = "1"; });
   let info = null;
   let open = "diagnosis";
@@ -197,7 +197,7 @@ export async function buildDeviceProbeCard(device, mode = "health") {
     card.appendChild(diagnosisBox());
     for (const u of info.hidden || []) card.appendChild(h("p", { class: "error" }, u.text + "."));
     const stale = Object.values(info.probes).some((p) => p.mode === "locked") && info.latest && info.latest.data && info.latest.data.script_version && info.latest.data.script_version < info.script_version;
-    if (stale) card.appendChild(h("p", { class: "hint" }, "The script installed on the host is older than this Netlens expects. Install the new one: Settings → Host probes → Prepare a host."));
+    if (stale) card.appendChild(h("p", { class: "hint" }, "The script installed on the host is older than this Netlens expects. Update it under Settings → Host probes → Hosts."));
     const tabs = h("div", { class: "btn-row" }, Object.entries(info.probes).map(([name, p]) => {
       const b = h("button", { class: `btn${open === name ? " primary" : ""}`, type: "button", title: p.error ? `Last try failed: ${p.error}` : p.taken ? `Looked ${timeAgo(p.taken)}` : "Not looked at yet" }, p.title + (p.error ? " ⚠" : ""));
       b.addEventListener("click", () => { open = open === name ? "diagnosis" : name; draw(); });

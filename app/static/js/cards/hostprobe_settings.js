@@ -22,7 +22,8 @@ export async function buildHostProbeCard() {
     card.appendChild(h("p", { class: "hint" }, "Host probes (device page) log in to a host and look at it: what uses its disks, processor, memory and network, which applications fail, what changed, what is scheduled, hardware and security. They only read, and the host can be locked down so that it can run nothing else. Logins can be short-lived: nothing secret is then kept on the host or reused."));
 
     // 1. the Netlens certificate authority
-    const ca = h("div", { class: "field" }, h("h3", {}, "Netlens certificate authority"));
+    const ca = h("div", { class: "field" });
+    card.appendChild(h("h3", {}, "Netlens certificate authority"));
     if (s.ca_public_key) {
       ca.append(h("p", { class: "hint" }, "Netlens signs a new certificate for every look, valid for a few minutes. A host only has to trust this public key."), copyBox("CA public key", s.ca_public_key + "\n"));
     } else {
@@ -86,7 +87,7 @@ export async function buildHostProbeCard() {
     card.append(h("p", { class: "hint" }, "Hosts that are monitored over SSH or WinRM. What the probes find is on the device page, under Health."), field("Host", pick), hostSlot);
 
     // 4. prepare a host
-    card.appendChild(h("h3", {}, "Prepare a host"));
+    card.appendChild(h("h3", {}, "Prepare a host manually"));
     const platform = h("select", {}, [["linux", "Linux"], ["windows", "Windows (OpenSSH server)"]].map(([k, t]) => h("option", { value: k }, t)));
     const user = h("input", { type: "text", value: "netlens-ro" });
     const pub = h("input", { type: "text", placeholder: "ssh-ed25519 AAAA… (only to use a key instead of certificates)" });
@@ -103,6 +104,14 @@ export async function buildHostProbeCard() {
     });
     card.append(h("p", { class: "hint" }, "The host gets a root-owned script that only reads, a small entry script, and an account that can run nothing but the probes by name, however it is asked. Nothing else is changed."),
       field("System", platform), field("Account name", user), field("Public key (optional)", pub), h("div", { class: "form-actions" }, show), out);
+
+    // one box per section, so that the page reads the same all the way down
+    const parts = [...card.children].slice(2);
+    let box = null;
+    for (const el of parts) {
+      if (el.tagName === "H3") { box = h("section", { class: "probe-section" }); card.insertBefore(box, el); }
+      if (box) box.appendChild(el);
+    }
   }
   draw();
   return card;

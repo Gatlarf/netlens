@@ -788,3 +788,5 @@ button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background:
 .stat-panel { display: block; }
 .hb-part { background: var(--warn); }          /* the colour of a bar with a part of its checks missed is set per bar (see missColour in heartbeat.js) */
 .hb-bar .hb-part:hover { opacity: 1; filter: brightness(1.12); }
+.probe-section { border: 1px solid var(--border, #3333); border-radius: 8px; padding: 10px 14px 12px; margin: 12px 0; }
+.probe-section > h3:first-child { margin-top: 0; }
