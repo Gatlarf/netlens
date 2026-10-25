@@ -174,4 +174,4 @@ def test_what_is_wrong_also_names_a_full_disk(conn):
     conn.execute("INSERT INTO metric_state (monitor_id, metric, label, level, since, value) VALUES (1, 'disk_pct', '/', 'critical', '2026-11-01T09:00:00Z', 100)")
     conn.commit()
     a = ask.answer(conn, "What is wrong right now?", NOW)
-    assert "Past their limit" in a["answer"] and "nas" in a["answer"] and "100" in a["answer"]
+    assert "Needs attention" in a["answer"] and "nas" in a["answer"] and "100%" in a["answer"]

@@ -163,6 +163,65 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
     return sorted(items, key=lambda i: (order[i["level"]], not i.get("critical")))
 
 
+def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
+    """What the summary does not hold: a key that cannot be read, a host reading past its limit, a disk that fills up, a remote site in trouble."""
+    from app import forecast, probes as probes_mod, vault
+    from app.hostmetrics import service as host_monitors
+
+    out: list[dict] = []
+    unreadable = vault.status(conn)["unreadable"]
+    if unreadable:       # a restore on another machine without the key: the passwords have to be entered again, or the key put back
+        out.append({"level": "bad", "text": f"{unreadable} stored password setting(s) cannot be read: the encryption key is missing or different", "href": "#/settings/backup"})
+    problems = host_monitors.problems(conn)
+    for p in problems[:8]:      # a disk filling up, a hot server, a UPS on battery
+        where = f" on {p['label']}" if p["label"] else ""
+        value = f"{p['value']:.0f}{p['unit']}" if p["unit"] else f"{p['value']:g}"
+        text = f"{p['device']}: {p['title'].lower()}{where} is {value}"
+        if p["metric"] == "storage_status":
+            text = f"{p['device']}: {p['label'] or 'storage'} is {'degraded or needs attention' if p['level'] == 'warning' else 'failed'}"
+        if p["metric"] == "service_stopped":
+            text = f"{p['device']}: the service {p['label']} has stopped with an error"
+        out.append({"level": "bad" if p["level"] == "critical" else "warn", "text": text, "href": f"#/device/{p['device_id']}", "snooze": p["snooze"]})
+    full = {(p["device_id"], p["label"]) for p in problems if p["metric"] == "disk_pct"}
+    for f in forecast.cached(conn):        # a disk that is not full yet but will be within two weeks
+        days = f.get("days_to_full")
+        if days is not None and days <= 14 and (f.get("device_id"), f["label"]) not in full:
+            out.append({"level": "bad" if days <= 3 else "warn", "text": f"{f['device']}: {f['label']} is {f['current']:g}% full and will be full in {days:g} day{'s' if days != 1 else ''}",
+                        "href": f"#/device/{f['device_id']}" if f.get("device_id") else "#/insights"})
+    for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY LOWER(name)"):
+        site = probes_mod.present(conn, row)
+        href = f"#/remote-sites?id={site['id']}"
+        if site["locked"]:
+            out.append({"level": "warn", "text": f"{site['name']} is frozen: the licence takes in fewer remote sites", "href": "#/settings/licence"})
+            continue
+        if site["state"] == "silent":
+            out.append({"level": "bad", "text": f"{site['name']} has stopped reporting", "href": href, "snooze": f"site:{site['id']}"})
+            continue
+        bk = site.get("backups") or {}
+        if bk.get("failed") or bk.get("late"):
+            out.append({"level": "bad" if bk.get("failed") else "warn", "text": f"{site['name']}: {bk.get('failed', 0)} backup(s) failed, {bk.get('late', 0)} late", "href": "#/backups"})
+        down = site["devices"]["core_down"]
+        if down:
+            out.append({"level": "bad", "text": f"{site['name']}: {down} always-on device{'s' if down != 1 else ''} offline", "href": href})
+        if site["services"]["down"]:
+            out.append({"level": "bad", "text": f"{site['name']}: {site['services']['down']} service check{'s' if site['services']['down'] != 1 else ''} down", "href": href})
+        if site["problems"]["count"]:
+            out.append({"level": "bad" if site["problems"]["critical"] else "warn",
+                        "text": f"{site['name']}: {site['problems']['count']} health problem{'s' if site['problems']['count'] != 1 else ''}", "href": href})
+    return out
+
+
+def current_problems(conn: sqlite3.Connection, minimum: str = "warn") -> list[dict]:
+    """Everything the dashboard would list under "needs attention" right now, for the answers, the assistant and the reports: one list, so none of
+    them can leave something out. What someone acknowledged (snoozed) is left out. `minimum` "info" also returns the notes."""
+    from app import snooze, stats
+
+    attention = build(conn, stats.summary(conn))["attention"]
+    asleep = snooze.active(conn)
+    keep = {"bad", "warn"} if minimum == "warn" else {"bad", "warn", "info"}
+    return [i for i in attention if i["level"] in keep and not asleep.get(i.get("snooze"))]
+
+
 def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
     """`s` is the summary document."""
     now = now or utcnow()
@@ -198,7 +257,8 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "summary": s,
         "devices_uptime": uptime,
         "service_checks": _services(conn, now)["checks"],
-        "attention": _attention(s, certs, login_failed, down, core_down, down_checks, _tiers(conn)) + _network_attention(conn) + _site_vuln_attention(conn) + _llm_attention(conn),
+        "attention": sorted(_attention(s, certs, login_failed, down, core_down, down_checks, _tiers(conn)) + _network_attention(conn) + _site_vuln_attention(conn) + _llm_attention(conn)
+                            + _extra_attention(conn), key=lambda i: {"bad": 0, "warn": 1}.get(i["level"], 2)),
         "events": events,
         "services_down": down,
         "login_failed_24h": login_failed,

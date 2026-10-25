@@ -35,47 +35,6 @@ def get_dashboard(request: Request) -> dict:
             s = summary(conn, scan_running=running_scan(conn) is not None, data_dir=request.app.state.settings.data_dir, passive=_passive(request))
             doc = dashboard.build(conn, s)
             doc["plugin_cards"] = _plugin_cards(request, conn)
-            from app import vault
-
-            unreadable = vault.status(conn)["unreadable"]
-            if unreadable:       # a restore on another machine without the key: the passwords have to be entered again, or the key put back
-                doc["attention"].insert(0, {"level": "bad", "text": f"{unreadable} stored password setting(s) cannot be read: the encryption key is missing or different",
-                                            "href": "#/settings/backup"})
-            from app.hostmetrics import service as host_monitors
-
-            for p in host_monitors.problems(conn)[:8]:      # a disk filling up, a hot server, a UPS on battery
-                where = f" on {p['label']}" if p["label"] else ""
-                value = f"{p['value']:.0f}{p['unit']}" if p["unit"] else f"{p['value']:g}"
-                text = f"{p['device']}: {p['title'].lower()}{where} is {value}"
-                if p["metric"] == "storage_status":
-                    text = f"{p['device']}: {p['label'] or 'storage'} is {'degraded or needs attention' if p['level'] == 'warning' else 'failed'}"
-                if p["metric"] == "service_stopped":
-                    text = f"{p['device']}: the service {p['label']} has stopped with an error"
-                doc["attention"].append({"level": "bad" if p["level"] == "critical" else "warn",
-                                         "text": text, "href": f"#/device/{p['device_id']}", "snooze": p["snooze"]})
-            from app import probes as probes_mod
-
-            for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY LOWER(name)"):
-                site = probes_mod.present(conn, row)
-                href = f"#/remote-sites?id={site['id']}"
-                if site["locked"]:
-                    doc["attention"].append({"level": "warn", "text": f"{site['name']} is frozen: the licence takes in fewer remote sites", "href": "#/settings/licence", "snooze": None})
-                    continue
-                if site["state"] == "silent":
-                    doc["attention"].append({"level": "bad", "text": f"{site['name']} has stopped reporting", "href": href, "snooze": f"site:{site['id']}"})
-                    continue
-                bk = site.get("backups") or {}
-                if bk.get("failed") or bk.get("late"):
-                    doc["attention"].append({"level": "bad" if bk.get("failed") else "warn", "text": f"{site['name']}: {bk.get('failed', 0)} backup(s) failed, {bk.get('late', 0)} late", "href": "#/backups", "snooze": None})
-                down = site["devices"]["core_down"]
-                if down:
-                    doc["attention"].append({"level": "bad", "text": f"{site['name']}: {down} always-on device{'s' if down != 1 else ''} offline", "href": href})
-                if site["services"]["down"]:
-                    doc["attention"].append({"level": "bad", "text": f"{site['name']}: {site['services']['down']} service check{'s' if site['services']['down'] != 1 else ''} down", "href": href})
-                if site["problems"]["count"]:
-                    doc["attention"].append({"level": "bad" if site["problems"]["critical"] else "warn",
-                                             "text": f"{site['name']}: {site['problems']['count']} health problem{'s' if site['problems']['count'] != 1 else ''}", "href": href})
-            doc["attention"].sort(key=lambda i: {"bad": 0, "warn": 1}.get(i["level"], 2))
             return doc
         finally:
             conn.close()

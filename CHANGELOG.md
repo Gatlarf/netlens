@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.250 — 2026-10-25
+
+### Fixed
+- ★ **One list of what is wrong, used everywhere.** "What is wrong right now?" listed only offline devices and failed services. It now gives the same list as the dashboard's "needs attention": full or filling disks, hot or busy hosts, restarting containers, failed backups and plugins, certificates, remote sites and more, without what you snoozed. A disk that is not full yet but will be within two weeks is now on that list too. The dashboard, the assistant and the answers can no longer disagree.
+
 ## 0.4.249 — 2026-10-25
 
 ### Fixed
