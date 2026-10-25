@@ -6,7 +6,7 @@ import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 import { buildDeviceMonitorCard, isMonitorFormOpen } from "../cards/device_monitor.js";
-import { buildDeviceProbeCard } from "../cards/device_probe.js";
+import { buildDeviceProbeCard, isProbeBusy } from "../cards/device_probe.js";
 import { buildHealthGlance } from "../cards/health_glance.js";
 import { buildDevicePortsCard, PORT_METRICS } from "../cards/device_ports.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
@@ -1073,14 +1073,14 @@ export async function render(container, params) {
     if (terminalSlot && isTerminalActive(terminalSlot)) return;
     if (isStabilityOpen() || customizing) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
-    if (deleteOpen || isMonitorFormOpen() || isPortMapBusy()) return;     // never wipe a form someone is filling in
+    if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isProbeBusy()) return;     // never wipe a form someone is filling in
     load(true);
   }, 20000);
 
   // show the result of a (full) scan as soon as it is done
   const onScanFinished = () => {
     if (customizing) return;
-    if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isStabilityOpen() || (terminalSlot && isTerminalActive(terminalSlot))) return;
+    if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isProbeBusy() || isStabilityOpen() || (terminalSlot && isTerminalActive(terminalSlot))) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
     load();
   };

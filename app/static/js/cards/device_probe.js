@@ -41,8 +41,14 @@ const DETAILS = {
 };
 
 // Host probes: read-only looks at a host (storage, processor, memory, network, applications, changes, scheduled jobs, hardware, security) and the digital engineer that chains them into a cause.
+// True while someone is typing in this card or a diagnosis/install is running: the device page must not rebuild itself then
+export function isProbeBusy() {
+  return [...document.querySelectorAll(".probe-card")].some((c) => c.dataset.dirty === "1" || c.dataset.working === "1" || (c.contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)));
+}
+
 export async function buildDeviceProbeCard(device) {
   const card = h("div", { class: "card admin-only probe-card" });
+  for (const ev of ["input", "change"]) card.addEventListener(ev, () => { card.dataset.dirty = "1"; });
   let info = null;
   let open = "diagnosis";
 
@@ -74,12 +80,14 @@ export async function buildDeviceProbeCard(device) {
     const list = h("datalist", { id: `symptoms-${device.id}` }, SYMPTOMS.map((t) => h("option", { value: t })));
     const out = h("div", {});
     async function ask(live) {
+      card.dataset.working = "1"; card.dataset.dirty = "0";
       out.replaceChildren(h("p", { class: "hint" }, live ? "Looking at the host… (up to a minute or two)" : "Thinking…"));
       try {
         const r = await post(`/api/devices/${device.id}/hostprobe/diagnose`, { symptom: symptom.value, live });
         show(out, r);
         if (live) { info = await get(`/api/devices/${device.id}/hostprobe`); }
       } catch (err) { out.replaceChildren(h("p", { class: "error" }, err.message || "Could not diagnose")); }
+      finally { card.dataset.working = "0"; }
     }
     const live = h("button", { class: "btn primary", type: "button", onclick: () => ask(true) }, "Diagnose now");
     const snap = h("button", { class: "btn", type: "button", onclick: () => ask(false) }, "From the latest looks");
@@ -131,6 +139,7 @@ export async function buildDeviceProbeCard(device) {
     const sshd = h("input", { type: "checkbox" });
     const out = h("div", {});
     async function go(action) {
+      card.dataset.working = "1";
       out.replaceChildren(h("p", { class: "hint" }, action === "check" ? "Checking…" : "Working… (a few seconds)"));
       try {
         const r = await post(`/api/devices/${device.id}/hostprobe/install`, { action, username: user.value, password: pass.value, private_key: key.value, enable_sshd: sshd.checked });
@@ -141,6 +150,7 @@ export async function buildDeviceProbeCard(device) {
           r.created_ca ? h("p", { class: "hint" }, "The Netlens certificate authority was created for this.") : null);
         if (r.probes) { info = r; draw(); }
       } catch (err) { out.replaceChildren(h("p", { class: "error" }, err.message || "Failed")); }
+      finally { card.dataset.working = "0"; card.dataset.dirty = "0"; }
     }
     const buttons = [["check", "Check (changes nothing)", ""], ["install", info.installed_version ? "Install / update" : "Install", " primary"], ["remove", "Remove from the host", " danger"]];
     box.append(h("p", { class: "hint" }, label), h("p", { class: "hint" }, "Needs an administrator login on the host once. It is used for this action only: never stored, never logged. Netlens backs up and tests the SSH server configuration before it takes effect, and puts the old one back if the test fails."),
@@ -170,7 +180,7 @@ export async function buildDeviceProbeCard(device) {
       try {
         info = await put(`/api/devices/${device.id}/hostprobe`, { enabled: on.checked, interval_h: Number(every.value), provider: source.value, username: user.value,
           probes: boxes.map((l) => l.firstChild).filter((i) => i.checked).map((i) => i.dataset.probe) });
-        toast("Saved", "success"); draw();
+        toast("Saved", "success"); card.dataset.dirty = "0"; draw();
       } catch (err) { toast(err.message || "Could not save", "error"); }
     });
     const settings = h("details", { class: "limits-box" }, h("summary", {}, cfg.enabled ? "Settings (on)" : "Settings (off)"),
