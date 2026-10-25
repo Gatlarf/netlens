@@ -68,6 +68,7 @@ export async function buildDeviceProbeCard(device) {
     const data = info.latest && info.latest.data;
     if (!data) return;
     if (data.partial) card.appendChild(h("p", { class: "hint" }, "The disk is so big that the look stopped after its time limit: the list is partial."));
+    for (const u of info.hidden || []) card.appendChild(h("p", { class: "error" }, u.text + "."));
     const grown = info.growth_since_previous && info.growth_since_previous.growth;
     if (grown && grown.length) {
       card.appendChild(h("h3", {}, "Grew since the look before"));

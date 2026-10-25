@@ -197,6 +197,32 @@ def compare(old: dict[str, Any], new: dict[str, Any], min_bytes: int = 200 * 102
     return {"growth": growth[:8], "used_delta": used_delta}
 
 
+def unaccounted(snapshot: dict[str, Any], min_bytes: int = 2 * 1024 ** 3) -> list[dict[str, Any]]:
+    """Disks whose used space is much more than all their folders add up to. On Linux this is usually a disk mounted over a folder that still holds
+    the old files (they are hidden under the mount, no `du` sees them), or deleted files that a program still holds open."""
+    out = []
+    if snapshot.get("platform") != "linux":
+        return out
+    for m in snapshot.get("mounts", []):
+        top = next((d["bytes"] for d in m["dirs"] if d["path"] == m["mount"]), None)
+        if top is None or not m["used"] or not m["size"]:
+            continue
+        gap = m["used"] - top
+        if gap >= max(min_bytes, 0.05 * m["size"]):
+            below = [c["mount"] for c in snapshot["mounts"] if c is not m and c["mount"].startswith(m["mount"].rstrip("/") + "/") and c["used"] < gap / 10]
+            out.append({"mount": m["mount"], "bytes": gap, "used": m["used"], "seen": top, "maybe_under": below})
+    return out
+
+
+def describe_unaccounted(u: dict[str, Any]) -> str:
+    text = f"{nice_bytes(u['bytes'])} of {u['mount']} is not in any folder that can be seen"
+    if u["maybe_under"]:
+        text += f": a disk mounted over {', '.join(u['maybe_under'][:2])} may be hiding old files that are still on {u['mount']} (unmount it to see them)"
+    else:
+        text += ": files that were deleted but are still held open by a program, or data hidden under a mount, are the usual causes"
+    return text
+
+
 def nice_bytes(n: float) -> str:
     for unit, size in (("TB", 1024 ** 4), ("GB", 1024 ** 3), ("MB", 1024 ** 2), ("kB", 1024)):
         if abs(n) >= size:

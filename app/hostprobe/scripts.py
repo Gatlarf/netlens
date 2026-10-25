@@ -13,7 +13,7 @@ from __future__ import annotations
 import base64
 
 PROBES = ("storage",)
-SCRIPT_VERSION = 2          # raise it when the Linux script changes: a host that has an older copy installed is told so
+SCRIPT_VERSION = 3          # raise it when the Linux script changes: a host that has an older copy installed is told so
 WRAPPER_PATH = "/usr/local/sbin/netlens-probe"
 WRAPPER_NAME = "netlens-probe"
 
@@ -44,7 +44,7 @@ if [ -n "$D" ]; then
   done
 fi
 echo "##deleted"
-if command -v lsof >/dev/null 2>&1; then $R $T lsof -nP +L1 2>/dev/null | awk 'NR>1 && $4 ~ /^[0-9]+[urw]/ && $7+0 > 10485760 {n=""; for (i=10; i<=NF; i++) n = n (i>10 ? " " : "") $i; print $7"|"$1"|"n}' | sort -rn | head -n 10; fi
+if command -v lsof >/dev/null 2>&1; then $R $T lsof -nP +L1 2>/dev/null | awk 'NR>1 && $4 ~ /^[0-9]+[urw]/ && $7+0 > 10485760 {n=""; for (i=10; i<=NF; i++) n = n (i>10 ? " " : "") $i; if (n !~ /^\/(memfd:|dev\/shm\/)/) print $7"|"$1"|"n}' | sort -rn | head -n 10; fi
 echo "##end"
 '''
 

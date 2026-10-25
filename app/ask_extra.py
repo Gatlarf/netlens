@@ -177,7 +177,8 @@ def t_storage_use(conn, args, now=None) -> dict:
     if older:
         prev = probes.latest_ok(conn, pick["id"], before=older["taken"])
         grew = parse.compare(prev["data"], data, min_bytes=100 * 1024 ** 2) if prev else None
-    return {"device": pick["n"], "taken": last["taken"], "mode": last["mode"], "partial": data.get("partial"), "disks": mounts, "docker": docker,
+    hidden = [parse.describe_unaccounted(u) for u in parse.unaccounted(data)]
+    return {"device": pick["n"], "not_in_any_folder": hidden, "taken": last["taken"], "mode": last["mode"], "partial": data.get("partial"), "disks": mounts, "docker": docker,
             "docker_total": [{"type": u["type"], "size": parse.nice_bytes(u["bytes"]), "reclaimable": parse.nice_bytes(u["reclaimable"])} for u in data["docker"]["usage"]],
             "deleted_but_open": [{"path": d["path"], "size": parse.nice_bytes(d["bytes"]), "process": d["process"]} for d in data["deleted"][:3]],
             "grew_since_previous": [{"path": g["path"], "grew": parse.nice_bytes(g["bytes"]), "kind": g["kind"]} for g in (grew or {"growth": []})["growth"][:4]]}
@@ -195,6 +196,8 @@ def r_storage_use(r: dict) -> str:
         text += f" {m['mount']} is {m['used_pct']}% full ({m['used']}); biggest: " + ", ".join(f"{d['path']} {d['size']}" for d in m["biggest"][:4]) + "."
         if m["big_files"]:
             text += " Big files: " + ", ".join(f"{f['path']} {f['size']}" for f in m["big_files"][:3]) + "."
+    if r.get("not_in_any_folder"):
+        text += " Note: " + "; ".join(r["not_in_any_folder"]) + "."
     if r["grew_since_previous"]:
         text += " Grew since the previous snapshot: " + ", ".join(f"{g['path']} +{g['grew']}" for g in r["grew_since_previous"]) + "."
     if r["docker"]:

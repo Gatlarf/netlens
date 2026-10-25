@@ -206,6 +206,18 @@ def _told(conn: sqlite3.Connection, kind: str, when: datetime) -> dict[str, Any]
             "excluded_by_severity": len(include) - len(passing)}
 
 
+def _storage_hidden(conn: sqlite3.Connection, device_id: int, name: str) -> list[dict[str, Any]]:
+    """Disk space that no folder accounts for (see hostprobe.parse.unaccounted): the one thing a growth comparison cannot show."""
+    try:
+        from app.hostprobe import parse, service as probes
+
+        last = probes.latest_ok(conn, device_id)
+        return [{"level": "fact", "text": f"On {name}, {parse.describe_unaccounted(u)}.", "private": True,
+                 "llm_text": f"On {name}, {parse.nice_bytes(u['bytes'])} of {u['mount']} is not in any visible folder (names withheld)."} for u in parse.unaccounted(last["data"])] if last else []
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def _storage_cause(conn: sqlite3.Connection, device_id: int, name: str, start: str, end: str) -> list[dict[str, Any]]:
     """What grew on the host according to its storage snapshots (Settings → Host probes): the directory, file or container log that explains a full disk."""
     try:
@@ -215,7 +227,7 @@ def _storage_cause(conn: sqlite3.Connection, device_id: int, name: str, start: s
     except Exception:  # noqa: BLE001 - the snapshots are an extra; they never break an investigation
         return []
     if not found or not found["growth"]:
-        return []
+        return _storage_hidden(conn, device_id, name)
     top = found["growth"][0]
     from app.hostprobe import parse
 
@@ -229,7 +241,7 @@ def _storage_cause(conn: sqlite3.Connection, device_id: int, name: str, start: s
     for g, line in zip(found["growth"][1:3], lines[1:]):
         out.append({"level": "fact", "text": f"Also on {name}: {line[0].lower() + line[1:]}.", "private": True,
                     "llm_text": f"Also on {name}: another {g['kind']} grew by {parse.nice_bytes(g['bytes'])} (names withheld)."})
-    return out
+    return out + _storage_hidden(conn, device_id, name)
 
 
 def investigate(conn: sqlite3.Connection, incident_id: int, now: datetime | None = None) -> dict[str, Any] | None:

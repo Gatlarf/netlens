@@ -98,7 +98,10 @@ def _view(conn, device_id: int) -> dict[str, Any]:
             from app.hostprobe import parse
 
             growth = {"from": prev["taken"], "to": last["taken"], **parse.compare(prev["data"], last["data"], min_bytes=50 * 1024 ** 2)}
-    return {"script_version": scripts.SCRIPT_VERSION, "config": service.device_config(conn, device_id), "monitor": monitor["method"] if monitor else None, "snapshots": snaps,
+    from app.hostprobe import parse as _parse
+
+    hidden = [{**u, "text": _parse.describe_unaccounted(u)} for u in _parse.unaccounted(last["data"])] if last else []
+    return {"hidden": hidden, "script_version": scripts.SCRIPT_VERSION, "config": service.device_config(conn, device_id), "monitor": monitor["method"] if monitor else None, "snapshots": snaps,
             "latest": {"taken": last["taken"], "mode": last["mode"], "data": last["data"]} if last else None, "growth_since_previous": growth,
             "last_error": next((s["error"] for s in snaps[:1] if not s["ok"]), None)}
 

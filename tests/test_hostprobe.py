@@ -441,3 +441,22 @@ def test_the_script_has_a_version_and_deleted_files_ignore_memory_maps():
     out = subprocess.run(["sh", "-c", "awk 'NR>1 && $4 ~ /^[0-9]+[urw]/ && $7+0 > 10485760 {n=\"\"; for (i=10; i<=NF; i++) n = n (i>10 ? \" \" : \"\") $i; print $7\"|\"$1\"|\"n}'"],
                          input=lsof.encode(), capture_output=True).stdout.decode()
     assert out.strip() == "2147483648|java|/tmp/big file.log (deleted)"
+
+
+def test_space_that_no_folder_accounts_for_is_found_and_explained():
+    snap = {"platform": "linux", "mounts": [
+        {"mount": "/", "fs": "ext4", "size": 98 * GB, "used": 88 * GB, "dirs": [{"path": "/", "bytes": 34 * GB}, {"path": "/var", "bytes": 30 * GB}], "files": []},
+        {"mount": "/media/torrents", "fs": "ext4", "size": 79 * GB, "used": 2 * MB, "dirs": [{"path": "/media/torrents", "bytes": 2 * MB}], "files": []}]}
+    found = parse.unaccounted(snap)
+    assert len(found) == 1 and found[0]["mount"] == "/" and 53.9 * GB < found[0]["bytes"] < 54.1 * GB and found[0]["maybe_under"] == ["/media/torrents"]
+    text = parse.describe_unaccounted(found[0])
+    assert "54.0 GB of / is not in any folder" in text and "mounted over /media/torrents may be hiding old files" in text
+    snap["mounts"][0]["dirs"][0]["bytes"] = 86 * GB
+    assert parse.unaccounted(snap) == []                                                                # a normal difference is not news
+    assert parse.unaccounted({**snap, "platform": "windows"}) == []
+
+
+def test_the_memory_mappings_of_dotnet_are_not_deleted_files():
+    import re
+
+    assert re.search(r"memfd", scripts.LINUX_SCRIPT) and "dev\\/shm" in scripts.LINUX_SCRIPT
