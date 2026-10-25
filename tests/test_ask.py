@@ -167,3 +167,11 @@ def test_current_memory_is_a_question_of_its_own_and_forecasts_are_not(conn):
     assert ask.answer(conn, "which disk is the fullest?", now)["answer"].splitlines()[1] == "nas /: 40%"
     assert ask.answer(conn, "when will a disk run out of space?", now)["tools"] == ["disks"]
     tsdb.forget_all()
+
+
+def test_what_is_wrong_also_names_a_full_disk(conn):
+    conn.execute("INSERT INTO host_monitors (id, device_id, method, address, port, created) VALUES (1, 1, 'ssh', '192.168.1.20', 22, 'x')")
+    conn.execute("INSERT INTO metric_state (monitor_id, metric, label, level, since, value) VALUES (1, 'disk_pct', '/', 'critical', '2026-11-01T09:00:00Z', 100)")
+    conn.commit()
+    a = ask.answer(conn, "What is wrong right now?", NOW)
+    assert "Past their limit" in a["answer"] and "nas" in a["answer"] and "100" in a["answer"]

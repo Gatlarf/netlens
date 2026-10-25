@@ -54,7 +54,13 @@ def t_overview(conn, args, now=None) -> dict:
     rows = [r for r in conn.execute("SELECT id, custom_name, hostname, primary_ip, online FROM devices ORDER BY last_seen DESC") if keep is None or r["id"] in keep]
     down = [_name(r) for r in rows if not r["online"]][:LIMIT]
     services = [r["name"] for r in conn.execute("SELECT name FROM service_checks WHERE enabled = 1 AND last_up = 0 LIMIT ?", (LIMIT,))]
-    return {"devices": len(rows), "online": sum(1 for r in rows if r["online"]), "offline_devices": down, "services_down": services}
+    from app.hostmetrics import service as hm
+
+    past = [{"device": p["device"], "reading": p["title"] + (f" ({p['label']})" if p["label"] else ""), "value": p["value"], "unit": p["unit"], "level": p["level"]}
+            for p in hm.problems(conn, include_snoozed=False) if keep is None or p["device_id"] in keep][:LIMIT]
+    filling = [{"device": f["device"], "disk": f["label"], "used_pct": f["current"], "full_in_days": f["days_to_full"]}
+               for f in forecast.cached(conn) if f.get("days_to_full") is not None and f["days_to_full"] <= 14][:LIMIT]
+    return {"devices": len(rows), "online": sum(1 for r in rows if r["online"]), "offline_devices": down, "services_down": services, "readings_past_limit": past, "filling_up": filling}
 
 
 def t_offline_now(conn, args, now=None) -> dict:
@@ -218,7 +224,7 @@ def t_device(conn, args, now=None) -> dict:
 TYPE_WORDS = ("router", "switch", "tablet", "tv", "speaker", "console", "appliance", "printer", "iot", "camera", "nas", "phone", "server", "pc")
 
 TOOLS: dict[str, tuple[Callable, str]] = {
-    "overview": (t_overview, "how many devices are online, which are offline and which services are down right now. args: none"),
+    "overview": (t_overview, "how many devices are online, which are offline and which services are down right now, plus host readings past their limit (full disk, hot, busy) and disks filling up. args: none"),
     "offline_now": (t_offline_now, "the devices that are offline now with the time they were last seen. args: none"),
     "events": (t_events, "recent events (devices going offline or online, services, alerts). args: days (1-30), kind (optional event kind such as device_offline), device (optional name text)"),
     "availability": (t_availability, "availability percentages and outages of devices and services over a period. args: days (1-30)"),
@@ -300,6 +306,10 @@ def render(tool: str, r: dict) -> str:
         lines = [f"{r['online']} of {r['devices']} devices are online."]
         lines.append("Offline: " + ", ".join(r["offline_devices"]) + "." if r["offline_devices"] else "No device is offline.")
         lines.append("Services down: " + ", ".join(r["services_down"]) + "." if r["services_down"] else "All service checks are up.")
+        if r.get("readings_past_limit"):
+            lines.append("Past their limit: " + "; ".join(f"{p['device']}: {p['reading']} is {p['value']:g}{p['unit'] or ''} ({p['level']})" for p in r["readings_past_limit"]) + ".")
+        if r.get("filling_up"):
+            lines.append("Filling up: " + "; ".join(f"{f['device']} {f['disk']} at {f['used_pct']:g}%, full in {f['full_in_days']:g} days" for f in r["filling_up"]) + ".")
         return " ".join(lines)
     if tool == "offline_now":
         return "Offline now: " + "; ".join(f"{d['name']} (last seen {d['last_seen']})" for d in r["offline"]) + "." if r["offline"] else "No device is offline."
