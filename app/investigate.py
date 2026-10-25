@@ -257,8 +257,14 @@ def investigate(conn: sqlite3.Connection, incident_id: int, now: datetime | None
             if rd["level"] in ("warning", "critical"):
                 findings.append({"level": "warn", "text": f"The {what} is still {rd['level']} ({rd['now']}{rd['unit']})."})
     # host and guest: the one that moved first is the origin, the other one shows the load
+    try:
+        from app.hierarchy import ancestors, load_hierarchy
+
+        _, hierarchy = load_hierarchy(conn)
+    except Exception:  # noqa: BLE001 - without a hierarchy only the hypervisor links are used
+        hierarchy, ancestors = {}, None
     for d in core:
-        host = host_of.get(d["id"])
+        host = host_of.get(d["id"]) or next((a for a in (ancestors(hierarchy, d["id"]) if ancestors else []) if any(x["id"] == a for x in core)), None)
         mine = next((x for x in core if x["id"] == host), None)
         if mine is None:
             continue
