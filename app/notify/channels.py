@@ -282,6 +282,7 @@ def clean_events(events: Any) -> list[str]:
 
 
 SEVERITIES = ("info", "warning", "critical")
+PRESENCE = {"device_offline", "device_online"}          # the events the "always-on only" setting is about
 TIERS = ("any", "normal", "critical")          # a channel can be limited to the devices and services marked critical, or leave out the ones marked low
 TIER_RANK = {"low": 0, "normal": 1, "critical": 2}
 
@@ -322,7 +323,7 @@ def clean_filters(data: Any) -> dict:
     tier = data.get("min_tier") or "any"
     if tier not in TIERS:
         raise ValueError("the minimum importance is any, normal or critical")
-    out: dict = {"min_severity": level, "min_tier": tier}
+    out: dict = {"min_severity": level, "min_tier": tier, "always_on_only": bool(data.get("always_on_only"))}
     for key in ("devices", "groups"):
         ids = data.get(key) or []
         if not isinstance(ids, list) or len(ids) > 500 or not all(isinstance(i, int) and not isinstance(i, bool) for i in ids):
@@ -337,6 +338,8 @@ def passes_filters(e: dict, filters: dict | None) -> bool:
         return False
     wanted = f.get("min_tier", "any")
     if wanted != "any" and TIER_RANK.get(e.get("tier") or "normal", 1) < TIER_RANK["critical" if wanted == "critical" else "normal"]:
+        return False
+    if f.get("always_on_only") and e["kind"] in PRESENCE and not e.get("always_on"):      # "only for the devices that should always be on": a phone coming and going stays quiet; a full disk does not
         return False
     devices, groups = f.get("devices") or [], f.get("groups") or []
     if devices or groups:
@@ -552,7 +555,7 @@ def _pending_events(conn: sqlite3.Connection, after_id: int) -> list[dict]:
     rows = conn.execute(
         """
         SELECT e.id, e.ts, e.kind, e.device_id, e.detail, e.maintenance, e.tier,
-               COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.mac, d.vendor, d.trusted, d.notify_offline, d.group_id, g.name AS group_name
+               COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.mac, d.vendor, d.trusted, d.notify_offline, d.always_on, d.group_id, g.name AS group_name
         FROM events e LEFT JOIN devices d ON d.id = e.device_id LEFT JOIN device_groups g ON g.id = d.group_id
         WHERE e.id > ? ORDER BY e.id LIMIT 500
         """,

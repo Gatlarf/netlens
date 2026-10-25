@@ -417,8 +417,8 @@ def test_per_device_offline_switch_via_api(client):
 
 # ------------------------------------------------------------------ filters and one message per event
 def test_filters_are_validated_and_applied():
-    assert ch.clean_filters(None) == {"min_severity": "info", "min_tier": "any", "devices": [], "groups": []}
-    assert ch.clean_filters({"min_severity": "warning", "devices": [3, 1, 3], "groups": [2]}) == {"min_severity": "warning", "min_tier": "any", "devices": [1, 3], "groups": [2]}
+    assert ch.clean_filters(None) == {"min_severity": "info", "min_tier": "any", "always_on_only": False, "devices": [], "groups": []}
+    assert ch.clean_filters({"min_severity": "warning", "devices": [3, 1, 3], "groups": [2]}) == {"min_severity": "warning", "min_tier": "any", "always_on_only": False, "devices": [1, 3], "groups": [2]}
     for bad in ({"min_severity": "loud"}, {"devices": "1"}, {"groups": ["a"]}, {"devices": [True]}):
         with pytest.raises(ValueError):
             ch.clean_filters(bad)
@@ -485,9 +485,9 @@ async def test_each_mode_sends_one_message_per_event_and_resumes_after_a_failure
 def test_api_saves_filters_and_rejects_bad_ones(client):
     made = client.post("/api/notify-channels", json={"type": "webhook", "settings": {"url": "https://n8n.example/hook", "mode": "each"},
                                                      "filters": {"min_severity": "warning", "min_tier": "any", "devices": [4], "groups": [1]}})
-    assert made.status_code == 201 and made.json()["filters"] == {"min_severity": "warning", "min_tier": "any", "devices": [4], "groups": [1]}
+    assert made.status_code == 201 and made.json()["filters"] == {"min_severity": "warning", "min_tier": "any", "always_on_only": False, "devices": [4], "groups": [1]}
     cid = made.json()["id"]
-    assert client.put(f"/api/notify-channels/{cid}", json={"filters": {"min_severity": "critical"}}).json()["filters"] == {"min_severity": "critical", "min_tier": "any", "devices": [], "groups": []}
+    assert client.put(f"/api/notify-channels/{cid}", json={"filters": {"min_severity": "critical"}}).json()["filters"] == {"min_severity": "critical", "min_tier": "any", "always_on_only": False, "devices": [], "groups": []}
     assert client.put(f"/api/notify-channels/{cid}", json={"filters": {"min_severity": "nope"}}).status_code == 422
     assert client.post("/api/notify-channels", json={"type": "ntfy", "settings": {"topic": "t"}}).json()["filters"]["min_severity"] == "info"
 
@@ -529,3 +529,14 @@ def test_coverage_names_what_nobody_would_hear_about(db):
     channel["filters"]["min_severity"] = "critical"
     ch.save_channels(conn, [channel])
     assert any(g["kind"] == "metric_warning" and "more serious" in g["why"] for g in ch.coverage(conn)["gaps"])
+
+
+def test_a_channel_can_be_limited_to_always_on_devices():
+    f = ch.clean_filters({"always_on_only": True})
+    assert f["always_on_only"] is True
+    phone = {"kind": "device_offline", "device_id": 1, "always_on": 0}
+    server = {"kind": "device_offline", "device_id": 2, "always_on": 1}
+    service = {"kind": "service_down", "device_id": None}
+    assert ch.passes_filters({"kind": "metric_critical", "device_id": 1, "always_on": 0}, f)          # a full disk on any host is still told
+    assert not ch.passes_filters(phone, f) and ch.passes_filters(server, f) and ch.passes_filters(service, f)
+    assert ch.passes_filters(phone, ch.clean_filters({}))
