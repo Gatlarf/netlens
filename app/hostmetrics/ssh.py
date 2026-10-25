@@ -360,7 +360,7 @@ async def run(host: str, port: int, username: str, password: str | None, private
 
 
 async def run_command(host: str, port: int, username: str, password: str | None, private_key: str | None, passphrase: str | None,
-                      command: str, known_fingerprint: str | None = None, timeout: float = 15.0, certificate: str | None = None) -> tuple[str, int | None, str | None]:
+                      command: str, known_fingerprint: str | None = None, timeout: float = 15.0, certificate: str | None = None, input: str | None = None) -> tuple[str, int | None, str | None]:
     """Run one command. Returns (output, exit status, host key fingerprint). `certificate` is an OpenSSH user certificate for `private_key` (a short-lived login)."""
     seen: dict[str, str] = {}
 
@@ -384,7 +384,7 @@ async def run_command(host: str, port: int, username: str, password: str | None,
     except Exception as exc:  # noqa: BLE001 - turned into a sentence for the user
         raise SshError(interpret_error(exc)) from None
     try:
-        result = await asyncio.wait_for(conn.run(command, check=False), timeout)
+        result = await asyncio.wait_for(conn.run(command, check=False, input=input), timeout)
     except Exception as exc:  # noqa: BLE001
         raise SshError(interpret_error(exc)) from None
     finally:

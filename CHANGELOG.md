@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.258 — 2026-10-25
+
+### Added
+- ★ **Different from normal.** Every host probe is compared with what the same probe saw on the same host on earlier calm days: "the processor is 98% busy; it is normally about 6%", "java holds 11.4 GB; normally 1.2 GB", a connection source or listening port never seen before, a container that started restarting, a new account that can sign in, a disk whose reallocated sectors rise, a storage jump against how it normally changes. Looks taken while a reading was over its limit do not count as normal; nothing is said before about three earlier looks exist. "It is normal" is reported too.
+- ★ **Install, update, check and remove the probe from within Netlens.** Device page → Host probes → "Install or update on the host": you type an administrator login for that one action (never stored, never logged); Netlens puts the scripts, the sudo rule, the CA key and the SSH server blocks in place, backs up and tests the SSH configuration first (and puts the old one back when the test fails), leaves a host alone that already trusts another certificate authority, and then proves the chain by logging in as the probe account with a one-time certificate. The device card says when the script on the host is older. Linux is tested against a sandbox that runs the real script; Windows is written but not run on a real Windows host.
+- ★ **Incident ids and analysis reports for other systems.** Every incident shows its id (INC-…), every analysis is kept under a report id (AR-…) and can be fetched later: `GET /api/analysis/{id}`, `GET /api/insights/incidents/{id}/analysis`, `GET /api/events/{event_id}/incident` (which incident an alert belongs to), and the assistant tools `get_analysis_report`, `get_incident_analysis`, `list_analysis_reports`, `get_incident_for_event`, `send_analysis`. A report is made automatically about 10 minutes after an incident starts. Information only: nothing is ever changed on a host by the probes or the engineer, so an automation system with its own rights can decide what to do.
+- **Delivery.** New alert event "The digital engineer finished an analysis": e-mail gets a formatted HTML report with a plain-text part, a webhook gets the whole report as JSON (`type: netlens.analysis`), chat and push channels a short version; "Send it by e-mail / alert channels" on an incident or a diagnosis sends it at once. Every send, every fetch of a report and every install is an audit line.
+- Ask: "what does INC-345 say?", "show me AR-12".
+
 ## 0.4.257 — 2026-10-25
 
 ### Added

@@ -130,7 +130,7 @@ def _describe(c: dict, devices: dict, hierarchy: dict, now: datetime) -> dict[st
     parts.append(f"It lasted {_span((end - start).total_seconds())} and is over." if resolved and end > start else "It is over." if resolved else "It may still be going on.")
     if fixes:
         parts.append("Automatic fix: " + "; ".join(f["text"] for f in fixes[:2]) + ".")
-    return {"id": c["events"][0]["id"], "start": c["events"][0]["ts"], "end": c["events"][-1]["ts"], "title": title[:140], "summary": " ".join(parts), "devices": names[:20],
+    return {"id": c["events"][0]["id"], "ref": f"INC-{c['events'][0]['id']}", "event_ids": [e["id"] for e in c["events"]][:200], "start": c["events"][0]["ts"], "end": c["events"][-1]["ts"], "title": title[:140], "summary": " ".join(parts), "devices": names[:20],
             "device_count": len(ids), "device_ids": ids, "notes": notes, "events": len(c["events"]), "resolved": resolved, "ongoing": ongoing and not resolved, "cause": cause, "facts": facts}
 
 
@@ -139,3 +139,11 @@ def narrate(conn: sqlite3.Connection, incident: dict, ask=None) -> str | None:
     import json
 
     return insights.complete(conn, SYSTEM, json.dumps(incident["facts"], indent=1), names=incident["devices"], ask=ask)
+
+
+def incident_of(conn: sqlite3.Connection, event_id: int, days: int = 30, now: datetime | None = None) -> dict[str, Any] | None:
+    """The incident that contains an event (by the event's id), or None."""
+    for inc in incidents(conn, days, now):
+        if event_id in inc.get("event_ids", []):
+            return inc
+    return None

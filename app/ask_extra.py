@@ -184,6 +184,38 @@ def t_storage_use(conn, args, now=None) -> dict:
             "grew_since_previous": [{"path": g["path"], "grew": parse.nice_bytes(g["bytes"]), "kind": g["kind"]} for g in (grew or {"growth": []})["growth"][:4]]}
 
 
+def t_analysis(conn, args, now=None) -> dict:
+    """An analysis report by its id (AR-12) or the analysis of an incident by its id (INC-345), or the newest one."""
+    from app import analysis
+
+    ref = str(args.get("ref") or "")
+    doc = None
+    m = analysis.REPORT_RE.search(ref)
+    if m:
+        doc = analysis.get(conn, int(m.group(1)))
+    else:
+        m = analysis.INCIDENT_RE.search(ref)
+        if m:
+            doc = analysis.latest_for_incident(conn, int(m.group(1))) or analysis.create_for_incident(conn, int(m.group(1)), "ask", now)
+        else:
+            rows = analysis.listing(conn, 1)
+            doc = analysis.get(conn, rows[0]["report_id"]) if rows else None
+    if doc is None:
+        return {"error": f"No analysis found for {ref or 'that'}. Reports have ids like AR-12; incidents INC-345."}
+    hide = ask.for_model() and not __import__("app.hostprobe.service", fromlist=["x"])._load(conn)["names_to_llm"]
+    show = lambda f: (f.get("llm_text") or "A finding with names was withheld.") if f.get("private") and hide else f["text"]
+    cause = next((show(f) for f in doc["findings"] if f["text"] == doc.get("probable_cause")), doc.get("probable_cause") if not hide else "A cause with names was withheld.")
+    return {"report": doc["report_ref"], "incident": doc.get("incident_ref"), "title": doc["title"], "created": doc["created"], "probable_cause": cause,
+            "findings": [show(f) for f in doc["findings"]][:10], "ruled_out": doc.get("ruled_out"), "read_only_note": "Information only: nothing was changed on any host."}
+
+
+def r_analysis(r: dict) -> str:
+    text = f"{r['report']}" + (f" ({r['incident']})" if r.get("incident") else "") + f": {r['title']}. "
+    text += ("Probable cause: " + r["probable_cause"].removeprefix("Probable cause: ") + " ") if r.get("probable_cause") else "No single cause stands out. "
+    rest = [f for f in r["findings"] if f != r.get("probable_cause")][:4]
+    return (text + " ".join(rest) + " " + r["read_only_note"]).strip()
+
+
 def _device_pick(conn, name: str):
     rows = conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices").fetchall()
     return next((r for r in rows if name and name in (r["n"] or "").lower()), None)
@@ -263,10 +295,11 @@ TOOLS = {
     "oncall": (t_oncall, "who is on call now and the coming shifts. args: none"),
     "system_log": (t_system_log, "warnings and errors in Netlens' own log (why a sync, a monitor or a notification failed). args: level (warning or error)"),
     "storage_use": (t_storage_use, "WHAT USES the disk space of a host (needs Storage inspection on that device): the biggest directories and files, Docker logs and layers, files deleted but still open, and what grew since the previous snapshot. args: device (name, optional)"),
+    "analysis": (t_analysis, "an ANALYSIS REPORT of the digital engineer by id (AR-12), or the analysis of an incident by its id (INC-345), or the newest one: probable cause, findings, what was ruled out. Information only. args: ref (AR-12, INC-345 or empty)"),
     "host_activity": (t_host_activity, "WHAT IS GOING ON on one host according to the read-only host probes: what uses the processor, memory and network, which applications or containers are failing or restarting, what changed or was scheduled lately, hardware and security state, chained into a probable cause. Use for 'why is X slow', 'what is using the CPU/memory/network on X', 'why did X restart'. args: device (name), symptom (optional words such as slow, memory, network, restart)"),
     "investigate": (t_investigate, "ROOT CAUSE of the latest incident (or of one device's): what started it, which device moved first, what was running at the time, what else broke, whether anybody was told. args: device (optional name), days (1-30)"),
 }
-RENDERERS = {"host_activity": r_host_activity, "storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "system_log": r_system_log, "investigate": r_investigate}
+RENDERERS = {"analysis": r_analysis, "host_activity": r_host_activity, "storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "system_log": r_system_log, "investigate": r_investigate}
 PRESETS = [
     {"id": "vulns", "text": "Which vulnerabilities do I have?", "tool": "vulnerabilities", "args": {}},
     {"id": "traffic", "text": "How much traffic is going through my network?", "tool": "traffic", "args": {}},
@@ -277,6 +310,7 @@ PRESETS = [
     {"id": "log", "text": "Are there errors in the Netlens log?", "tool": "system_log", "args": {"level": "error"}},
 ]
 RULES = [
+    ("analysis", r"\b(inc|ar)-\d+\b|analysis report|latest analysis|the report of (the )?incident"),
     ("host_activity", r"why is .{0,40}(slow|sluggish|laggy|unresponsive|hanging|overloaded|busy)|what('s| is| are) (using|eating|hogging|consuming|taking) .{0,20}(cpu|processor|memory|ram|bandwidth|network)|what('s| is) (going on|wrong|happening) (on|with) |why did .{0,40}(restart|reboot|crash)|what('s| is| are) (killing|crashing)|(cpu|memory|ram|network) (usage|hog|hogs|spike)|who is using the (cpu|memory|network|bandwidth)|diagnos"),
     ("storage_use", r"what (is|are|was|has been) (using|taking|eating|filling|consuming|hogging)\b.{0,30}(space|disk|storage)|where (did|does|is) (the |my )?(disk|space|storage).{0,20}(go|going|gone)|what filled|(biggest|largest) (files?|folders?|directories|dirs?)|disk space (is )?(used|taken|used up) by|what.{0,12}(uses|using) (the )?(disk|space)"),
     ("investigate", r"root cause|investigat|what caused|cause of|post-?mortem|what went wrong|why did .{0,40}(stop|fail|crash|go down|go offline|jump|spike|slow)|why was .{0,40}(slow|full|overloaded|busy)"),
@@ -297,6 +331,9 @@ def route(q: str, names: list[str]) -> tuple[str, dict] | None:
                 args = {"device": name} if name else {}
             elif tool == "traffic":
                 args = {"range": next((r for r, p in (("7d", r"week|7 ?d"), ("24h", r"today|24 ?h|day"), ("6h", r"6 ?h")) if re.search(p, q)), "1h")}
+            elif tool == "analysis":
+                m = re.search(r"\b(inc|ar)-\d+\b", q)
+                args = {"ref": m.group(0).upper()} if m else {}
             elif tool == "host_activity":
                 name = next((n for n in sorted(names, key=len, reverse=True) if len(n) > 2 and n.lower() in q), "")
                 symptom = next((w for w, pat in (("memory", r"memory|ram|oom"), ("cpu", r"cpu|processor|slow|sluggish|busy|overload"), ("network", r"network|bandwidth|latency|connect"), ("restart", r"restart|reboot|crash|die|stop|go down|killing")) if re.search(pat, q)), "")

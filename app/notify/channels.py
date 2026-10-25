@@ -100,6 +100,7 @@ EVENT_LABELS = {
     "guest_backup_late": "A guest has not been backed up for much longer than usual",
     "guest_backup_recovered": "A guest is backed up again after a failed or late backup",
     "storage_degraded": "A storage system, pool or disk becomes unhealthy or fails, or a storage system raises a critical alert (storage plugin)",
+    "analysis_ready": "The digital engineer finished an analysis of an incident (a report with an id: e-mail gets a formatted report, a webhook the full JSON)",
     "storage_recovered": "A storage system, pool or disk is healthy again",
     "remote_new": "A new device appears at a remote site",
     "remote_offline": "A device at a remote site goes offline",
@@ -449,7 +450,7 @@ def _line(e: dict) -> str:
         "remediation_pending": f"APPROVAL NEEDED: {detail}", "remediation_ran": f"Fix done: {detail}", "remediation_failed": f"FIX FAILED: {detail}", "remediation_recovered": detail,
         "inventory_unavailable": f"Unavailable: {detail}", "inventory_available": detail, "inventory_battery_low": f"Battery low: {detail}",
         "guest_backup_failed": f"BACKUP FAILED: {detail}", "guest_backup_late": f"Backup late: {detail}", "guest_backup_recovered": detail,
-        "storage_degraded": f"STORAGE PROBLEM: {detail}", "storage_recovered": detail,
+        "storage_degraded": f"STORAGE PROBLEM: {detail}", "storage_recovered": detail, "analysis_ready": f"Analysis ready: {detail}",
         "container_unhealthy": f"Container unhealthy: {detail}",
         "container_restarting": f"Container restarting: {detail}",
         "container_stopped": f"Container stopped: {detail}",
@@ -495,25 +496,28 @@ def http_post(url: str, data: bytes, headers: dict[str, str], timeout: float = 1
 Poster = Callable[[str, bytes, dict[str, str], float], tuple[int, str]]
 
 
-def _send_email(s: dict, title: str, body: str, mailer: Callable) -> None:
+def _send_email(s: dict, title: str, body: str, mailer: Callable, html: str | None = None) -> None:
     from app.notify.config import NotifyConfig
 
     port = int(s["smtp_port"]) if str(s.get("smtp_port") or "").isdigit() else SECURITY_PORT.get(s.get("security") or "starttls", 587)
     cfg = NotifyConfig(smtp_host=s["smtp_host"], smtp_port=port, security=s.get("security") or "starttls", username=s.get("username") or "",
                        password=s.get("password") or "", from_addr=s["from_addr"], to_addrs=parse_addresses(s.get("to_addrs")))
     try:
-        mailer(cfg, title, body + "\n\n-- sent by Netlens")
+        if html:
+            mailer(cfg, title, body + "\n\n-- sent by Netlens", html=html)
+        else:
+            mailer(cfg, title, body + "\n\n-- sent by Netlens")
     except MailError as exc:
         raise ChannelError(str(exc)) from None
 
 
-def send_channel(channel: dict, title: str, body: str, events: list[dict], *, poster: Poster = http_post, mailer: Callable = send_mail) -> None:
+def send_channel(channel: dict, title: str, body: str, events: list[dict], *, poster: Poster = http_post, mailer: Callable = send_mail, html: str | None = None, analysis: dict | None = None) -> None:
     """Send one message through a channel; raises ChannelError with a message that never contains a token."""
     s = channel["settings"]
     kind = channel["type"]
     json_headers = {"Content-Type": "application/json"}
     if kind == "email":
-        _send_email(s, title, body, mailer)
+        _send_email(s, title, body, mailer, html)
         return
     if kind == "ntfy":
         headers = {"Title": title.encode("ascii", "replace").decode(), "Priority": s.get("priority") or "default", "Tags": "satellite"}
@@ -538,6 +542,9 @@ def send_channel(channel: dict, title: str, body: str, events: list[dict], *, po
         shaped = [{**{k: e.get(k) for k in ("id", "ts", "kind", "name", "ip", "mac", "detail", "device_id")}, "severity": severity_of(e["kind"]), "label": EVENT_LABELS.get(e["kind"], e["kind"]),
                    "group": e.get("group_name")} for e in events]
         payload = {"source": "netlens", "event": shaped[0]} if s.get("mode") == "each" and len(shaped) == 1 else {"source": "netlens", "title": title, "message": body, "text": f"{title}\n{body}", "events": shaped}
+        if analysis:                         # an analysis report: the whole report as JSON, for an automation system that knows what to do with it (read-only information)
+            payload["analysis"] = analysis
+            payload["type"] = "netlens.analysis"
         fmt = s.get("format") or "json"
         if fmt != "json":
             say = f"{title}\n{body}".strip()
@@ -568,6 +575,27 @@ def _pending_events(conn: sqlite3.Connection, after_id: int) -> list[dict]:
             e["name"] = (e["detail"] or "").split(" ")[0] or "device"
         out.append(e)
     return out
+
+
+def _analysis_of(conn, e: dict) -> dict | None:
+    if e.get("kind") != "analysis_ready":
+        return None
+    from app import analysis
+
+    return analysis.report_of_event(conn, e)
+
+
+def _send_analysis(ch: dict, doc: dict, e: dict, poster: Poster, mailer: Callable) -> None:
+    """One analysis report through one channel, in the shape that channel can use."""
+    from app import analysis
+
+    title, text = analysis.message_title(doc), analysis.render_text(doc)
+    if ch["type"] == "email":
+        send_channel(ch, title, text, [e], poster=poster, mailer=mailer, html=analysis.render_html(doc))
+    elif ch["type"] == "webhook":
+        send_channel(ch, title, text, [e], poster=poster, mailer=mailer, analysis=analysis.payload(doc))
+    else:                                  # chat and push: the short version with the ids
+        send_channel(ch, title, analysis.render_chat(doc), [e], poster=poster, mailer=mailer)
 
 
 async def process_channels(db_path: str, *, now: datetime | None = None, poster: Poster = http_post, mailer: Callable = send_mail) -> dict:
@@ -604,7 +632,13 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
                     # one message per event, for automations: no quiet hours, no grouping, and a failure resumes at the event that failed
                     for e in wanted[:MAX_EVENTS_PER_MESSAGE]:
                         try:
-                            await asyncio.to_thread(send_channel, ch, "[Netlens] " + EVENT_LABELS.get(e["kind"], e["kind"]), e.get("detail") or e["name"], [e], poster=poster, mailer=mailer)
+                            doc = _analysis_of(conn, e)
+                            if doc:
+                                from app import analysis as analysis_mod
+
+                                await asyncio.to_thread(send_channel, ch, analysis_mod.message_title(doc), analysis_mod.render_text(doc), [e], poster=poster, mailer=mailer, analysis=analysis_mod.payload(doc))
+                            else:
+                                await asyncio.to_thread(send_channel, ch, "[Netlens] " + EVENT_LABELS.get(e["kind"], e["kind"]), e.get("detail") or e["name"], [e], poster=poster, mailer=mailer)
                         except ChannelError as exc:
                             ch["status"] = {"ts": utcnow(), "ok": False, "error": str(exc), "pending": len(wanted)}
                             result["failed"] += 1
@@ -625,16 +659,36 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
                     from app import rootcause
 
                     wanted = rootcause.collapse(conn, wanted)
-                title, body = build_digest(wanted)
-                try:
-                    await asyncio.to_thread(send_channel, ch, title, body, wanted, poster=poster, mailer=mailer)
-                except ChannelError as exc:
-                    ch["status"] = {"ts": utcnow(), "ok": False, "error": str(exc), "pending": len(wanted)}
-                    result["failed"] += 1
-                else:
-                    ch["last_event_id"] = top
-                    ch["status"] = {"ts": utcnow(), "ok": True, "sent": len(wanted), "title": title}
+                reports = [e for e in wanted if e["kind"] == "analysis_ready"]          # an analysis is one message of its own (a formatted e-mail, the JSON for a webhook)
+                wanted = [e for e in wanted if e["kind"] != "analysis_ready"]
+                resume, failed = top, False
+                if wanted:
+                    title, body = build_digest(wanted)
+                    try:
+                        await asyncio.to_thread(send_channel, ch, title, body, wanted, poster=poster, mailer=mailer)
+                    except ChannelError as exc:
+                        ch["status"] = {"ts": utcnow(), "ok": False, "error": str(exc), "pending": len(wanted)}
+                        result["failed"] += 1
+                        failed = True
+                        resume = None
+                    else:
+                        ch["status"] = {"ts": utcnow(), "ok": True, "sent": len(wanted), "title": title}
+                        result["sent"] += 1
+                for e in reports if not failed else []:
+                    doc = _analysis_of(conn, e)
+                    if doc is None:
+                        continue
+                    try:
+                        await asyncio.to_thread(_send_analysis, ch, doc, e, poster, mailer)
+                    except ChannelError as exc:
+                        ch["status"] = {"ts": utcnow(), "ok": False, "error": str(exc), "pending": 1}
+                        result["failed"] += 1
+                        resume = e["id"] - 1
+                        break
+                    ch["status"] = {"ts": utcnow(), "ok": True, "sent": 1, "title": doc["report_ref"]}
                     result["sent"] += 1
+                if resume is not None:
+                    ch["last_event_id"] = resume
                 changed = True
             if changed:
                 save_channels(conn, channels)

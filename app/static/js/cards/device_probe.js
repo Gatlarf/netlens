@@ -52,7 +52,20 @@ export async function buildDeviceProbeCard(device) {
   }
 
   function findingsList(items) {
-    return h("ul", { class: "plain" }, items.map((f) => h("li", { class: f.level === "cause" || f.level === "warn" ? "warn-text" : "" }, f.text)));
+    return h("ul", { class: "plain" }, items.map((f) => h("li", { class: f.level === "cause" || f.level === "warn" ? "warn-text" : "" }, f.text, f.unusual ? h("span", { class: "badge", style: "margin-left:.4rem" }, "different from normal") : null)));
+  }
+
+  // The report that was kept under an id: other systems fetch it with that id; people can have it mailed
+  function reportBox(r) {
+    if (!r.report_id) return null;
+    const open = h("a", { class: "btn", href: `/api/analysis/${r.report_id}/html`, target: "_blank", rel: "noopener" }, "Open the report");
+    const send = h("button", { class: "btn", type: "button" }, "Send it by e-mail / alert channels");
+    send.addEventListener("click", async () => {
+      send.disabled = true;
+      try { const x = await post(`/api/analysis/${r.report_id}/send`, {}); toast(x.sent.length ? `Sent through ${x.sent.join(", ")}` : "Not sent", x.sent.length ? "success" : "error"); if (x.failed.length) toast(x.failed.map((f) => `${f.channel}: ${f.error}`).join("; "), "error"); } catch (err) { toast(err.message || "Could not send", "error"); }
+      send.disabled = false;
+    });
+    return h("div", {}, h("p", { class: "hint" }, `Report ${r.report_ref}. Other systems fetch it with this id (GET /api/analysis/${r.report_id}, or the assistant tool get_analysis_report).`), h("div", { class: "form-actions" }, open, send));
   }
 
   function diagnosisBox() {
@@ -82,6 +95,8 @@ export async function buildDeviceProbeCard(device) {
     if (!r.findings.length) { out.appendChild(h("p", { class: "hint" }, r.missing && r.missing.length ? `No look yet at: ${r.missing.join(", ")}. Press "Diagnose now".` : "Nothing unusual was found.")); return; }
     for (const c of (r.chains || []).slice(0, 2)) out.appendChild(h("p", { class: "error" }, h("strong", {}, "Probable cause: "), c.text));
     out.appendChild(findingsList(r.findings.filter((f) => !f.text.startsWith("Probable cause: ") || !(r.chains || []).length)));
+    const rb = reportBox(r);
+    if (rb) out.appendChild(rb);
     if (r.missing && r.missing.length) out.appendChild(h("p", { class: "hint" }, `Not looked at yet: ${r.missing.join(", ")}.`));
   }
 
@@ -106,9 +121,38 @@ export async function buildDeviceProbeCard(device) {
     return box;
   }
 
+  // Put the probe on the host, or update or remove it, with an administrator login that is used once and not stored
+  function installBox() {
+    const label = info.installed_version ? (info.update_available ? `The script on the host is version ${info.installed_version}; this Netlens has ${info.script_version}. Update it.` : `The script on the host is up to date (version ${info.installed_version}).`) : "Install the probe on the host so that it can run nothing else (recommended), or let Netlens send the script each time.";
+    const box = h("details", { class: "limits-box" }, h("summary", {}, info.update_available ? "Install or update on the host ⚠" : "Install or update on the host"));
+    const user = h("input", { type: "text", placeholder: "administrator account", autocomplete: "off", value: info.monitor_user || "" });
+    const pass = h("input", { type: "password", placeholder: "password (also used for sudo)", autocomplete: "new-password" });
+    const key = h("textarea", { rows: 3, placeholder: "or a private key (optional)", class: "mono" });
+    const out = h("div", {});
+    async function go(action) {
+      out.replaceChildren(h("p", { class: "hint" }, action === "check" ? "Checking…" : "Working… (a few seconds)"));
+      try {
+        const r = await post(`/api/devices/${device.id}/hostprobe/install`, { action, username: user.value, password: pass.value, private_key: key.value });
+        pass.value = ""; key.value = "";
+        out.replaceChildren(h("ul", { class: "plain" }, r.log.map((l) => h("li", { class: l.startsWith("Error") ? "error" : "" }, l))),
+          r.error ? h("p", { class: "error" }, r.error) : null,
+          r.verified ? h("p", { class: r.verified.ok ? "hint" : "error" }, r.verified.ok ? `Verified: Netlens logged in as the probe account with a one-time certificate and ran a probe (script version ${r.verified.script_version}).` : `The install worked but the check failed: ${r.verified.error}`) : null,
+          r.created_ca ? h("p", { class: "hint" }, "The Netlens certificate authority was created for this.") : null);
+        if (r.probes) { info = r; draw(); }
+      } catch (err) { out.replaceChildren(h("p", { class: "error" }, err.message || "Failed")); }
+    }
+    const buttons = [["check", "Check (changes nothing)", ""], ["install", info.installed_version ? "Install / update" : "Install", " primary"], ["remove", "Remove from the host", " danger"]];
+    box.append(h("p", { class: "hint" }, label), h("p", { class: "hint" }, "Needs an administrator login on the host once. It is used for this action only: never stored, never logged. Netlens backs up and tests the SSH server configuration before it takes effect, and puts the old one back if the test fails."),
+      h("div", { class: "field" }, h("label", {}, "Administrator account"), user), h("div", { class: "field" }, h("label", {}, "Password"), pass), h("div", { class: "field" }, h("label", {}, "Private key"), key),
+      h("div", { class: "form-actions" }, buttons.map(([a, t, c]) => h("button", { class: `btn${c}`, type: "button", onclick: () => { if (a === "remove" && !window.confirm("Remove the probe, its sudo rule and the Netlens CA key from the host?")) return; go(a); } }, t))), out);
+    if (info.update_available) box.open = true;
+    return box;
+  }
+
   function draw() {
     clear(card);
     card.appendChild(h("h2", {}, "Host probes"));
+    card.appendChild(h("p", { class: "hint" }, "Information only: the probes read and report. Netlens never changes anything on the host with them. What to do about a finding is for you, or for an automation system that has the right to change things and fetches the analysis by its id."));
     if (!info.monitor || !["ssh", "winrm"].includes(info.monitor)) {
       card.appendChild(h("p", { class: "hint" }, "Read-only looks at this host (what uses the processor, memory, disk and network, which applications fail, what changed, what was scheduled, hardware and security) and an engineer that chains them into a cause. It needs health monitoring over SSH or WinRM first (the card above): that supplies the address and the login."));
       return;
@@ -135,6 +179,7 @@ export async function buildDeviceProbeCard(device) {
       h("div", { class: "field" }, h("label", {}, "User name on the host (certificates)"), user), h("div", { class: "form-actions" }, save));
     if (!cfg.enabled) settings.open = true;
     card.appendChild(settings);
+    card.appendChild(installBox());
     if (!cfg.enabled) return;
     card.appendChild(diagnosisBox());
     for (const u of info.hidden || []) card.appendChild(h("p", { class: "error" }, u.text + "."));

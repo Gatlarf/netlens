@@ -76,6 +76,7 @@ export async function render(container) {
     data.incidents.forEach((i, n) => {
       const text = h("div", { class: "ins-text" }, i.summary);
       const row = h("div", { class: "rem-run" }, h("div", {}, h("strong", {}, i.title), " ", h("span", { class: `badge ${i.resolved ? "" : "warn"}` }, i.resolved ? "over" : i.ongoing ? "going on" : "open"), " ",
+        h("span", { class: "badge", title: "The id other systems use for this incident (get_incident_analysis in the assistant, /api/insights/incidents/<id>/analysis)" }, i.ref || `INC-${i.id}`), " ",
         h("span", { class: "hint", title: i.start }, timeAgo(i.start))), text);
       const why = h("div", { class: "ins-text" });
       const dig = h("button", { class: "btn", type: "button" }, "Investigate");
@@ -97,7 +98,27 @@ export async function render(container) {
         } catch (err) { toast(err.message || "Failed", "error"); }
         dig.disabled = false;
       });
-      row.append(dig, why);
+      const rep = h("button", { class: "btn", type: "button", title: "Make the analysis report of this incident: it gets an id that other systems can fetch, and can be sent by e-mail or to a webhook. Information only." }, "Analysis report");
+      const repOut = h("div", { class: "ins-text" });
+      rep.addEventListener("click", async () => {
+        rep.disabled = true;
+        try {
+          const r = await post(`/api/insights/incidents/${i.id}/analysis`, {});
+          clear(repOut);
+          repOut.append(h("p", {}, h("strong", {}, `${r.report_ref}`), ` for ${r.incident_ref}. `, r.probable_cause ? r.probable_cause : "No single cause stands out."),
+            h("p", { class: "hint" }, "Information only: nothing was changed on any host. Other systems fetch it with this id."));
+          const open = h("a", { class: "btn", href: `/api/analysis/${r.report_id}/html`, target: "_blank", rel: "noopener" }, "Open the report");
+          const send = h("button", { class: "btn", type: "button" }, "Send it by e-mail / alert channels");
+          send.addEventListener("click", async () => {
+            send.disabled = true;
+            try { const x = await post(`/api/analysis/${r.report_id}/send`, {}); toast(x.sent.length ? `Sent through ${x.sent.join(", ")}` : "Not sent", x.sent.length ? "success" : "error"); if (x.failed.length) toast(x.failed.map((f) => `${f.channel}: ${f.error}`).join("; "), "error"); } catch (err) { toast(err.message || "Could not send", "error"); }
+            send.disabled = false;
+          });
+          repOut.append(h("div", { class: "form-actions" }, open, send));
+        } catch (err) { toast(err.message || "Failed", "error"); }
+        rep.disabled = false;
+      });
+      row.append(dig, rep, why, repOut);
       if (data.status.llm_ready) {
         const words = h("button", { class: "btn ghost", type: "button" }, "Say it in the model's words");
         words.addEventListener("click", async () => {

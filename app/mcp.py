@@ -116,6 +116,16 @@ tool("get_host_probe", "overview", "The newest answer of one host probe with its
      {"device_id": i("Device id"), "probe": s("Which probe", ["storage", "cpu", "memory", "network", "apps", "changes", "schedule", "hardware", "security"])}, ("device_id", "probe"))
 tool("diagnose_host", "overview", "Ask the digital engineer to find the root cause of a symptom on one host ('slow', 'out of memory', 'network timeouts', 'keeps restarting', 'disk full'). It picks the probes the symptom calls for, chains what they find (memory -> OOM kill -> restart loop -> full disk) and names the probable cause. live=true looks at the host first (read-only, audited, at most once a minute per host); otherwise it uses the snapshots Netlens already has.", "POST", "/api/devices/{device_id}/hostprobe/diagnose",
      {"device_id": i("Device id"), "symptom": s("What is wrong, in a few words"), "live": b("Look at the host now first")}, ("device_id",))
+tool("list_analysis_reports", "overview", "The analysis reports of the digital engineer (read-only information): id, incident id, title and probable cause, newest first. An automation system that received a message about an incident finds the report here.", "GET", "/api/analysis",
+     {"limit": i("How many"), "incident_id": i("Only this incident (INC-<id>)"), "device_id": i("Only this device")}, query=("limit", "incident_id", "device_id"))
+tool("get_analysis_report", "overview", "One analysis report by its id (AR-<id>): the incident id, probable cause, findings (including what is different from normal), what was ruled out, and how to fetch it again. INFORMATION ONLY: nothing was changed on any host; whoever acts on it needs their own rights.", "GET", "/api/analysis/{report_id}",
+     {"report_id": i("Report id")}, ("report_id",))
+tool("get_incident_analysis", "overview", "The newest analysis of an incident by its id (INC-<id>, the id in get_insights and in the messages Netlens sends); makes one now when there is none. Read-only information about the cause, for a person or an automation system.", "GET", "/api/insights/incidents/{incident_id}/analysis",
+     {"incident_id": i("Incident id")}, ("incident_id",))
+tool("get_incident_for_event", "overview", "Which incident an alert event belongs to (the event id is in every message and webhook Netlens sends), with the id of the newest analysis report.", "GET", "/api/events/{event_id}/incident",
+     {"event_id": i("Event id")}, ("event_id",))
+tool("send_analysis", "overview", "Send an analysis report through the alert channels now (e-mail gets a formatted report, a webhook the JSON). It only informs: it changes nothing on any host.", "POST", "/api/analysis/{report_id}/send",
+     {"report_id": i("Report id"), "channels": a("Channel ids (default: every enabled channel)", s("id"))}, ("report_id",))
 tool("get_traffic", "overview", "Bandwidth in and out of the internet line and of the monitored devices together, over 1h, 6h, 24h or 7d.", "GET", "/api/traffic",
      {"range": s("Period", ["1h", "6h", "24h", "7d"]), "mode": s("all, or endpoints (no double counting)", ["all", "endpoints"])}, query=("range", "mode"))
 tool("get_oncall", "overview", "Who is on call now and the shifts of the coming week.", "GET", "/api/oncall")

@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from app.hostprobe import analyze, parse, scripts, service
+from app.hostprobe import analyze, baseline, parse, scripts, service
 
 PLANS = [
     (r"memory|\bram\b|oom|swap|out of memory|leak", ["memory", "apps", "cpu", "changes"]),
@@ -119,6 +119,11 @@ def analyze_device(conn, device_id: int, name: str, probes: list[str], around: t
     for probe in probes:
         if probe == "storage":
             ev = _storage_evidence(conn, device_id, name, around, now)
+            last_storage = service.latest_ok(conn, device_id)
+            if last_storage:
+                for e in baseline.compare("storage", last_storage["data"], service.history(conn, device_id, "storage", last_storage["taken"])):
+                    e["at"] = _epoch(last_storage["taken"])
+                    ev.append(e)
             snap = service.latest_ok(conn, device_id)
             if snap:
                 taken[probe] = snap["taken"]
@@ -135,6 +140,9 @@ def analyze_device(conn, device_id: int, name: str, probes: list[str], around: t
             if e["at"] is None and probe not in ("changes", "schedule"):
                 e["at"] = _epoch(snap["taken"])
             evidence.append(e)
+        for e in baseline.compare(probe, snap["data"], service.history(conn, device_id, probe, snap["taken"])):          # and how it differs from normal
+            e["at"] = _epoch(snap["taken"])
+            evidence.append(e)
     chains = analyze.correlate(evidence, ctx)
     return {"evidence": evidence, "chains": chains, "taken": taken, "missing": missing}
 
@@ -143,7 +151,7 @@ def findings(result: dict[str, Any], name: str) -> list[dict[str, Any]]:
     """The report as findings in the form the investigation uses: {"level", "text", "private", "llm_text"}."""
     out = []
     for i, c in enumerate(result["chains"][:2]):
-        out.append({"level": "cause", "text": f"Probable cause: {c['text']}", "private": c["private"], "llm_text": f"Probable cause: {c['llm_text']}" if c.get("llm_text") else None, "probes": c["probes"]})
+        out.append({"level": "cause", "text": f"Probable cause: {c['text']}", "private": c["private"], "llm_text": f"Probable cause: {c['llm_text']}" if c.get("llm_text") else None, "probes": c["probes"], "weight": c["weight"]})
     for e in sorted(result["evidence"], key=lambda e: -e["weight"]):
         if any(t.startswith("ok:") for t in e["tags"]) or (e["level"] == "fact" and e["weight"] < 40):
             continue
@@ -151,7 +159,7 @@ def findings(result: dict[str, Any], name: str) -> list[dict[str, Any]]:
         # a "Probable cause" sentence that is already the head of a chain is not repeated
         if e["text"].startswith("Probable cause") and any(c["private"] == e["private"] and e["text"][:60] == f"Probable cause: {c['text']}"[:60] for c in result["chains"][:2]):
             continue
-        out.append({"level": level, "text": e["text"], "private": e["private"], "llm_text": e["llm_text"], "probes": [e["probe"]]})
+        out.append({"level": level, "text": e["text"], "private": e["private"], "llm_text": e["llm_text"], "probes": [e["probe"]], "unusual": "unusual" in e["tags"], "weight": e["weight"]})
     ruled_out = sorted({t.split(":", 1)[1] for e in result["evidence"] for t in e["tags"] if t.startswith("ok:")})
     if ruled_out:
         words = {"cpu": "the processor", "memory": "memory", "changes": "recent changes", "schedule": "scheduled jobs"}

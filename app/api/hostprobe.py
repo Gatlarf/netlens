@@ -6,11 +6,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app import audit
+from app import analysis, audit
 from app.api.devices import get_conn
 from app.auth import client_ip, require_admin
 from app.hostmetrics import service as hm
-from app.hostprobe import credentials, diagnose as engineer, scripts, service
+from app.hostprobe import baseline, credentials, diagnose as engineer, installer, scripts, service
 
 router = APIRouter(prefix="/api", tags=["hostprobe"])
 
@@ -31,7 +31,7 @@ def _note(request: Request, conn, method: str, action: str) -> None:
 @router.get("/hostprobe/settings")
 def get_settings(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     _admin(request)
-    return service.public_settings(conn)
+    return {**service.public_settings(conn), "analysis_auto": analysis.auto_enabled(conn), "base_url": analysis.base_url(conn)}
 
 
 @router.put("/hostprobe/settings")
@@ -39,9 +39,14 @@ def put_settings(body: dict, request: Request, conn=Depends(get_conn)) -> dict[s
     _admin(request)
     try:
         out = service.save_settings(conn, body)
+        if "analysis_auto" in body:
+            analysis.set_auto(conn, bool(body["analysis_auto"]))
+        if "base_url" in body:
+            analysis.set_base_url(conn, str(body["base_url"] or ""))
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    changed = sorted([f"{name}.{k}" for name, v in (body.get("providers") or {}).items() if isinstance(v, dict) for k in v] + [k for k in ("names_to_llm", "keep_days") if k in body])
+    out = {**out, "analysis_auto": analysis.auto_enabled(conn), "base_url": analysis.base_url(conn)}
+    changed = sorted([f"{name}.{k}" for name, v in (body.get("providers") or {}).items() if isinstance(v, dict) for k in v] + [k for k in ("names_to_llm", "keep_days", "analysis_auto", "base_url") if k in body])
     _note(request, conn, "PUT", "Changed the host probe settings: " + (", ".join(changed) or "nothing") + " (secret values are never written to the log)")
     return out
 
@@ -108,7 +113,12 @@ def _view(conn, device_id: int) -> dict[str, Any]:
         probes[name] = {"title": scripts.TITLES[name], "taken": good["taken"] if good else None, "mode": good["mode"] if good else None,
                         "error": snaps[0]["error"] if snaps and not snaps[0]["ok"] else None, "last_try": snaps[0]["taken"] if snaps else None}
     diagnosis = engineer.diagnose(conn, device_id) if any(p["taken"] for p in probes.values()) else None
-    return {"probes": probes, "diagnosis": diagnosis, "hidden": hidden, "script_version": scripts.SCRIPT_VERSION, "config": service.device_config(conn, device_id), "monitor": monitor["method"] if monitor else None, "snapshots": snaps,
+    newest = max((p for p in probes.values() if p["taken"]), key=lambda p: p["taken"], default=None)
+    installed = None
+    if newest:
+        snap = service.latest_ok(conn, device_id, probe=next(n for n, p in probes.items() if p is newest))
+        installed = (snap["data"].get("script_version") if snap else None) if newest["mode"] == "locked" else None
+    return {"monitor_user": (hm.public(conn, monitor) or {}).get("username") if monitor else None, "installed_version": installed, "update_available": bool(installed and installed < scripts.SCRIPT_VERSION), "probes": probes, "diagnosis": diagnosis, "hidden": hidden, "script_version": scripts.SCRIPT_VERSION, "config": service.device_config(conn, device_id), "monitor": monitor["method"] if monitor else None, "snapshots": snaps,
             "latest": {"taken": last["taken"], "mode": last["mode"], "data": last["data"]} if last else None, "growth_since_previous": growth,
             "last_error": next((s["error"] for s in snaps[:1] if not s["ok"]), None)}
 
@@ -153,7 +163,8 @@ def get_probe(device_id: int, probe: str, request: Request, conn=Depends(get_con
     if last and probe != "storage":
         from app.hostprobe import analyze
 
-        findings = [{k: e[k] for k in ("level", "weight", "text")} for e in analyze.analyze(probe, last["data"], {"onset": None}) if not any(t.startswith("ok:") for t in e["tags"])]
+        evidence = analyze.analyze(probe, last["data"], {"onset": None}) + baseline.compare(probe, last["data"], service.history(conn, device_id, probe, last["taken"]))
+        findings = [{**{k: e[k] for k in ("level", "weight", "text")}, "unusual": "unusual" in e["tags"]} for e in evidence if not any(t.startswith("ok:") and t != "ok:cpu_normal" and t != "ok:mem_normal" for t in e["tags"])]
     return {"probe": probe, "title": scripts.TITLES[probe], "latest": last, "findings": findings, "history": service.snapshots(conn, device_id, 20, probe=probe)}
 
 
@@ -204,9 +215,43 @@ async def diagnose_now(device_id: int, body: dict, request: Request) -> dict[str
     finally:
         db.close()
     if live:
-        return await engineer.diagnose_live(request.app.state.db_path, device_id, symptom, actor=(_who(request), client_ip(request)))
+        diag = await engineer.diagnose_live(request.app.state.db_path, device_id, symptom, actor=(_who(request), client_ip(request)))
+    else:
+        db = connect(request.app.state.db_path)
+        try:
+            diag = engineer.diagnose(db, device_id, symptom)
+        finally:
+            db.close()
+    db = connect(request.app.state.db_path)
+    try:                                       # kept under an id, so another system can fetch it (information only: nothing was changed on the host)
+        doc = analysis.create_for_diagnosis(db, diag, "manual")
+    finally:
+        db.close()
+    return {**diag, "report_id": doc["report_id"], "report_ref": doc["report_ref"], "links": doc["links"], "read_only": True}
+
+
+@router.post("/devices/{device_id}/hostprobe/install")
+async def install(device_id: int, body: dict, request: Request) -> dict[str, Any]:
+    """Check, install, update or remove the probe on the host from here. The administrator login in the body is used for this one action: it is never stored and never logged.
+    `action`: check (changes nothing), install, update, remove."""
+    from app.db import connect
+
+    _admin(request)
+    action = str(body.get("action") or "check")
     db = connect(request.app.state.db_path)
     try:
-        return engineer.diagnose(db, device_id, symptom)
+        row = _device(db, device_id)
+        admin = {"username": str(body.get("username") or "").strip(), "password": body.get("password") or None, "private_key": body.get("private_key") or None,
+                 "passphrase": body.get("passphrase") or None, "sudo_password": body.get("sudo_password") or None}
+        try:
+            result = await installer.administer(db, device_id, action, admin, str(body.get("probe_user") or "") or None)
+        except installer.InstallError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        words = {"check": "Checked", "install": "Installed", "update": "Updated", "remove": "Removed"}[action]
+        audit.record_by(db, _who(request), client_ip(request), "POST", request.url.path, 200 if result["ok"] else 502,
+                        f"{words} the host probe {'on' if action != 'check' else 'state of'} {row['name']} with the administrator account '{admin['username']}' (that login was used once and not stored)"
+                        + (f"; account '{result['account']}', script version {result.get('installed_version')}" if result["ok"] else f": failed: {str(result.get('error'))[:160]}")
+                        + ("; a new Netlens CA was created" if result.get("created_ca") else ""))
+        return {**result, **(_view(db, device_id) if action != "remove" or result["ok"] else {})}
     finally:
         db.close()

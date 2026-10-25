@@ -124,10 +124,10 @@ def _stamp(ts: float) -> str:
     return datetime.fromtimestamp(ts, timezone.utc).strftime(STAMP)
 
 
-def store(conn, device_id: int, ok: bool, mode: str | None, error: str | None, data: dict | None, now: float | None = None, probe: str = "storage") -> int:
+def store(conn, device_id: int, ok: bool, mode: str | None, error: str | None, data: dict | None, now: float | None = None, probe: str = "storage", reason: str = "schedule") -> int:
     now = now if now is not None else time.time()
-    new_id = insert_id(conn, "INSERT INTO probe_snapshots (device_id, probe, taken, ok, mode, error, data) VALUES (?,?,?,?,?,?,?)",
-                       (device_id, probe, _stamp(now), int(ok), mode, error, json.dumps(data) if data else None))
+    new_id = insert_id(conn, "INSERT INTO probe_snapshots (device_id, probe, taken, ok, mode, error, data, reason) VALUES (?,?,?,?,?,?,?,?)",
+                       (device_id, probe, _stamp(now), int(ok), mode, error, json.dumps(data) if data else None, reason))
     conn.execute("DELETE FROM probe_snapshots WHERE device_id = ? AND probe = ? AND (taken < ? OR id NOT IN (SELECT id FROM probe_snapshots WHERE device_id = ? AND probe = ? ORDER BY id DESC LIMIT ?))",
                  (device_id, probe, _stamp(now - _load(conn)["keep_days"] * 86400), device_id, probe, KEEP_MAX))
     conn.commit()
@@ -139,6 +139,14 @@ def snapshots(conn, device_id: int, limit: int = 20, with_data: bool = False, pr
     where, args = ("AND probe = ?", [probe]) if probe else ("", [])
     rows = conn.execute(f"SELECT id, probe, taken, ok, mode, error, data FROM probe_snapshots WHERE device_id = ? {where} ORDER BY taken DESC, id DESC LIMIT ?", (device_id, *args, limit)).fetchall()
     return [{"id": r["id"], "probe": r["probe"], "taken": r["taken"], "ok": bool(r["ok"]), "mode": r["mode"], "error": r["error"], **({"data": json.loads(r["data"]) if r["data"] else None} if with_data else {})} for r in rows]
+
+
+def history(conn, device_id: int, probe: str, before: str, limit: int = 24, days: int = 21) -> list[dict[str, Any]]:
+    """The earlier answers of one probe, oldest first, that tell what is normal: successful, older than `before`, within `days`, and not taken while a reading was over its limit."""
+    cutoff = _stamp(datetime.strptime(before, STAMP).replace(tzinfo=timezone.utc).timestamp() - days * 86400)
+    rows = conn.execute("SELECT data FROM probe_snapshots WHERE device_id = ? AND probe = ? AND ok = 1 AND reason != 'alarm' AND taken < ? AND taken >= ? ORDER BY taken DESC LIMIT ?",
+                        (device_id, probe, before, cutoff, limit)).fetchall()
+    return [json.loads(r["data"]) for r in reversed(rows) if r["data"]]
 
 
 def latest_ok(conn, device_id: int, before: str | None = None, after: str | None = None, probe: str = "storage") -> dict[str, Any] | None:
@@ -198,7 +206,7 @@ def _parse(probe: str, platform: str, out: str) -> dict[str, Any]:
     return parsers.parse_probe(probe, platform, out)
 
 
-async def run(conn, device_id: int, probe: str = "storage") -> dict[str, Any]:
+async def run(conn, device_id: int, probe: str = "storage", reason: str = "manual") -> dict[str, Any]:
     """One snapshot of one probe now. Returns {"ok", "error", "mode", "data", "credential", "probe"} and stores it."""
     if probe not in scripts.PROBES:
         raise ProbeFailed(f"no such probe: {probe}")
@@ -256,7 +264,7 @@ async def run(conn, device_id: int, probe: str = "storage") -> dict[str, Any]:
     data = data if error is None else None
     if data is not None:
         data["seconds"] = round(time.time() - started, 1)
-    store(conn, device_id, error is None, mode, error, data, probe=probe)
+    store(conn, device_id, error is None, mode, error, data, probe=probe, reason=reason)
     return {"ok": error is None, "error": error, "mode": mode, "data": data, "probe": probe, "credential": cred_info or {"source": "static", "username": secret.get("username", "")}}
 
 
@@ -297,6 +305,12 @@ def due(conn, now: float | None = None) -> list[tuple[int, str]]:
     return out
 
 
+def due_with_reason(conn, now: float | None = None) -> list[tuple[int, str, str]]:
+    """Like due(), with why: "alarm" (a reading is over its limit: the answer is not what is normal) or "schedule"."""
+    alarm = alarms(conn)
+    return [(d, p, "alarm" if p in alarm.get(d, ()) else "schedule") for d, p in due(conn, now)]
+
+
 def audit_text(name: str, result: dict[str, Any], trigger: str) -> str:
     """The audit line for one look: which host and probe, why it ran, which login (never the secret), and how it ended. The certificate id is what the host's sshd logs."""
     cred = result.get("credential") or {}
@@ -328,7 +342,7 @@ def _audit(conn, device_id: int, result: dict[str, Any], actor) -> None:
         log.exception("host probe: audit line")
 
 
-async def run_one(db_path: str, device_id: int, actor=None, probe: str = "storage") -> dict[str, Any]:
+async def run_one(db_path: str, device_id: int, actor=None, probe: str = "storage", reason: str | None = None) -> dict[str, Any]:
     """`actor` is (principal, ip) when a person started it; None for the schedule. Every attempt, failed or not, is written to the audit log."""
     key = (device_id, probe)
     if key in _running:
@@ -337,9 +351,9 @@ async def run_one(db_path: str, device_id: int, actor=None, probe: str = "storag
     conn = connect(db_path)
     try:
         try:
-            result = await run(conn, device_id, probe)
+            result = await run(conn, device_id, probe, reason or ("manual" if actor else "schedule"))
         except ProbeFailed as exc:
-            store(conn, device_id, False, None, str(exc), None, probe=probe)
+            store(conn, device_id, False, None, str(exc), None, probe=probe, reason=reason or "manual")
             result = {"ok": False, "error": str(exc), "mode": None, "data": None, "credential": None, "probe": probe}
         _audit(conn, device_id, result, actor)
         return result
@@ -357,10 +371,10 @@ async def loop(db_path: str, interval: float = 60.0) -> None:
     await asyncio.sleep(30)
     gate = asyncio.Semaphore(2)
 
-    async def one(device_id: int, probe: str) -> None:
+    async def one(device_id: int, probe: str, reason: str) -> None:
         async with gate:
             try:
-                await run_one(db_path, device_id, probe=probe)
+                await run_one(db_path, device_id, probe=probe, reason=reason)
             except Exception:  # noqa: BLE001
                 log.exception("host probe %s of device %s crashed", probe, device_id)
 
@@ -368,11 +382,11 @@ async def loop(db_path: str, interval: float = 60.0) -> None:
         try:
             conn = connect(db_path)
             try:
-                pairs = due(conn)
+                pairs = due_with_reason(conn)
             finally:
                 conn.close()
             if pairs:
-                await asyncio.gather(*(one(d, p) for d, p in pairs))
+                await asyncio.gather(*(one(d, p, r) for d, p, r in pairs))
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001

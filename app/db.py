@@ -1021,6 +1021,25 @@ def init_db(conn: sqlite3.Connection) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_probe_snapshots_device ON probe_snapshots (device_id, taken)")
     _add_column_if_missing(conn, "probe_snapshots", "probe", "TEXT NOT NULL DEFAULT 'storage'")          # which probe took it (storage, cpu, memory ...)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_probe_snapshots_probe ON probe_snapshots (device_id, probe, taken)")
+    _add_column_if_missing(conn, "probe_snapshots", "reason", "TEXT NOT NULL DEFAULT 'schedule'")       # why it was taken: schedule, alarm (while a reading was over its limit: not 'normal') or manual
+    # --- analysis reports: what the digital engineer concluded, kept under an id so another system can fetch it later (see app/analysis.py) ---
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS analysis_reports (
+            id INTEGER PRIMARY KEY,
+            kind TEXT NOT NULL,
+            incident_id INTEGER,
+            device_id INTEGER,
+            created TEXT NOT NULL,
+            trigger TEXT NOT NULL,
+            title TEXT NOT NULL,
+            cause TEXT,
+            data TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_analysis_incident ON analysis_reports (incident_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_analysis_created ON analysis_reports (created)")
 
     # --- schema v22: host monitors (health readings over SNMP or SSH) and the level each reading is at ---------
     cur.execute(

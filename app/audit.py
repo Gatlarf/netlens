@@ -16,7 +16,7 @@ from app.db import ago, utcnow
 RETENTION_DAYS = 365
 MAX_ROWS = 50000
 # what is not worth a line: personal preferences, probes reporting with their token, the browser's own speed test, the terminal protocol
-SKIP = re.compile(r"^/api/(login|logout|me/preferences|dashboard/layout|probe/(push|relay)|speedtest/(up|down|ping|browser)|devices/\d+/(ping|trace)|insights/(ask|identify|model-check|incidents/\d+/words)|hostprobe/(ca|settings)$|devices/\d+/hostprobe/(run|diagnose)$)")
+SKIP = re.compile(r"^/api/(login|logout|me/preferences|dashboard/layout|probe/(push|relay)|speedtest/(up|down|ping|browser)|devices/\d+/(ping|trace)|insights/(ask|identify|model-check|incidents/\d+/words)|hostprobe/(ca|settings)$|devices/\d+/hostprobe/(run|diagnose|install)$|analysis/\d+/send$)")
 
 # (method, path regex, sentence). {0}, {1}... are the groups; a device id becomes the device's name.
 PATTERNS: list[tuple[str, str, str]] = [
@@ -68,6 +68,7 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("DELETE", r"^/api/shares/", "Removed a share link"),
     ("PUT", r"^/api/config", "Changed the scan settings"),
     ("POST", r"^/api/vault", "Changed the stored-password protection"),
+    ("POST", r"^/api/insights/incidents/(\d+)/analysis$", "Made a new analysis of incident INC-{0}"),
     ("PUT", r"^/api/devices/(\d+)/hostprobe$", "Changed the host probes of {d0}"),
 ]
 _COMPILED = [(m, re.compile(rx), text) for m, rx, text in PATTERNS]
