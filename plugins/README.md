@@ -29,9 +29,9 @@ Plugins that are **not built into Netlens**. They are installed from *Settings â
 | [`nomad/`](nomad/README.md) | HashiCorp Nomad | client nodes as hosts, allocations as guests (a `hypervisor` plugin) | tested on a real Nomad 2.0.7 (dev mode) |
 | [`traefik/`](traefik/README.md) | Traefik | the sites a Traefik v2/v3 publishes (a `proxy` plugin) | tested on a real Traefik 3.7.15 (Docker provider) |
 | [`caddy/`](caddy/README.md) | Caddy | the reverse-proxy sites of a Caddy 2 (a `proxy` plugin) | tested on a real Caddy 2.11.7 |
-| [`openwrt/`](openwrt/README.md) | OpenWrt | router/access point and its clients over ubus (a `topology` plugin) | tested on OpenWrt 25.12.5 (QEMU, no Wi-Fi radio) |
+| [`openwrt/`](openwrt/README.md) | OpenWrt | router/access point and its clients over ubus (a `topology` plugin) | tested on OpenWrt 25.12.5 (QEMU, no Wi-Fi radio); health, ports and WAN since 1.1.0 |
 | [`mikrotik/`](mikrotik/README.md) | MikroTik RouterOS | router/switch, neighbours and clients over the REST API, with the device's health (processor, memory, temperature, uptime, firmware, ports, WAN interface) (a `topology` plugin) | tested on RouterOS 7.12.1 CHR (QEMU, no radio, no temperature sensor) |
-| [`opnsense/`](opnsense/README.md) | OPNsense | the firewall as gateway and its ARP/DHCP clients (a `topology` plugin) | tested on OPNsense 26.7 (QEMU) |
+| [`opnsense/`](opnsense/README.md) | OPNsense | the firewall as gateway and its ARP/DHCP clients (a `topology` plugin) | tested on OPNsense 26.7 (QEMU); health, firmware and ports since 1.1.0 |
 | [`powerdns/`](powerdns/README.md) | PowerDNS Authoritative | registers devices in PowerDNS 4.x through its API, with comments as marker (a `dns` plugin) | tested on a real PowerDNS 4.9.17 (Docker) |
 | [`bind/`](bind/README.md) | BIND 9 | registers devices by RFC 2136 dynamic update, zones read by AXFR, TSIG-signed (a `dns` plugin) | tested on a real BIND 9.20 (Docker) |
 | [`swarm/`](swarm/README.md) | Docker Swarm | swarm nodes as hosts, tasks as guests (a `hypervisor` plugin) | tested on a real swarm (one manager) |

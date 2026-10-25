@@ -52,7 +52,7 @@ def _mac(value):
 
 
 class Firewall:
-    def __init__(self, url, key, secret, verify_tls=False, timeout=20):
+    def __init__(self, url, key, secret, verify_tls=False, timeout=20, extras=True):
         url = url.strip().rstrip("/")
         if "://" not in url:
             url = "https://" + url
@@ -60,6 +60,7 @@ class Firewall:
         if parts.scheme not in ("http", "https") or not parts.hostname:
             raise OpnsenseError(f"{url!r} is not an address like https://192.168.1.1")
         self.base, self.id, self.host, self.timeout = f"{parts.scheme}://{parts.netloc}", parts.netloc, parts.hostname, float(timeout)
+        self.extras = bool(extras)            # health, firmware and ports (switched off in the plugin settings)
         self.auth = "Basic " + base64.b64encode(f"{key}:{secret}".encode()).decode()
         self.context = None
         if parts.scheme == "https" and not verify_tls:
@@ -112,7 +113,7 @@ def parse_firewalls(config):
             raise ValueError(f"line {i}: enter the address")
         if not str(r.get("api_key") or "").strip() or not str(r.get("api_secret") or "").strip():
             raise ValueError(f"{url}: enter the API key and secret")
-        out.append(Firewall(url, str(r["api_key"]).strip(), str(r["api_secret"]).strip(), config.get("verify_tls", False), config.get("timeout") or 20))
+        out.append(Firewall(url, str(r["api_key"]).strip(), str(r["api_secret"]).strip(), config.get("verify_tls", False), config.get("timeout") or 20, config.get("health", True)))
     return out
 
 
@@ -142,6 +143,118 @@ def leases(fw):
     return found, sources
 
 
+def _optional(fw, path):
+    """An extra read: None when the firewall does not have it, does not allow it or does not answer (an extra never fails the sync)."""
+    try:
+        return fw.get(path)
+    except OpnsenseError:
+        return None
+
+
+def _num(value):
+    """A number from 12, "12", "12.5" or "12.5%"; None for anything else."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    m = re.fullmatch(r"\s*(-?\d+(?:\.\d+)?)\s*%?\s*", str(value or ""))
+    return float(m.group(1)) if m else None
+
+
+def _uptime_s(text):
+    """"3 days, 02:03:04", "1 day, 00:10:00" or "02:03:04"."""
+    m = re.fullmatch(r"\s*(?:(\d+)\s*days?,?\s*)?(?:(\d+):(\d+)(?::(\d+))?)?\s*", str(text or ""))
+    if not m or not any(m.groups()):
+        return None
+    d, h, mi, sec = (int(x or 0) for x in m.groups())
+    return float(d * 86400 + h * 3600 + mi * 60 + sec)
+
+
+def _health(fw):
+    out = []
+    res = _optional(fw, "diagnostics/system/systemResources")
+    mem = res.get("memory") if isinstance(res, dict) and isinstance(res.get("memory"), dict) else {}
+    total, used = _num(mem.get("total")), _num(mem.get("used"))
+    if total and used is not None and total > 0 and 0 <= used <= total * 1.01:
+        out.append({"metric": "mem_pct", "value": round(min(100.0, 100 * used / total), 1)})
+    act = _optional(fw, "diagnostics/activity/getActivity")
+    for line in (act.get("headers") or []) if isinstance(act, dict) else []:
+        m = re.search(r"CPU:.*?(\d+(?:\.\d+)?)% idle", str(line))
+        if m:
+            out.append({"metric": "cpu_pct", "value": round(100 - float(m.group(1)), 1)})
+            break
+    clock = _optional(fw, "diagnostics/system/systemTime")
+    if isinstance(clock, dict):
+        up = _uptime_s(clock.get("uptime"))
+        if up is not None:
+            out.append({"metric": "uptime_s", "value": up})
+        load = _num(str(clock.get("loadavg") or "").split(",")[0])
+        if load is not None:
+            out.append({"metric": "load1", "value": load})
+    temps = _optional(fw, "diagnostics/system/systemTemperature")
+    values = [_num(t.get("temperature")) for t in (temps if isinstance(temps, list) else []) if isinstance(t, dict)]
+    temp = max((v for v in values if v is not None), default=None)
+    if temp is not None and 0 < temp < 150:
+        out.append({"metric": "temp_c", "value": temp})
+    return out
+
+
+def _firmware(fw, info):
+    status = _optional(fw, "core/firmware/status")
+    version = str((status or {}).get("product_version") or "").strip() if isinstance(status, dict) else ""
+    if not version:
+        version = next((re.sub(r"-(amd64|arm64|aarch64|i386)$", "", str(v).split()[1]) for v in (info.get("versions") or []) if str(v).startswith("OPNsense ") and len(str(v).split()) > 1), "")
+    if not version:
+        return None
+    latest = None
+    if isinstance(status, dict) and (status.get("status") in ("update", "upgrade") or (_num(status.get("updates")) or 0) > 0):
+        latest = str(status.get("product_latest") or status.get("upgrade_major_version") or "update waiting").strip()
+    return {"version": version, "latest": latest}
+
+
+def _speed(media):
+    """Mbit/s from "1000baseT <full-duplex>", "10Gbase-T <full-duplex>" or "2500Base-T"."""
+    m = re.search(r"(\d+)\s*(G)?base", str(media or ""), re.I)
+    return int(m.group(1)) * (1000 if m.group(2) else 1) if m else None
+
+
+STAT_KEYS = (("rx_bytes", "bytes received"), ("tx_bytes", "bytes transmitted"), ("rx_packets", "packets received"), ("tx_packets", "packets transmitted"),
+             ("rx_errors", "input errors"), ("tx_errors", "output errors"))
+SKIP_DEVICES = re.compile(r"^(lo|pflog|pfsync|enc|ovpn|openvpn|wg|tun|tap|gif|gre|ipsec|bridge)\d*")
+
+
+def _traffic(fw):
+    """{device: counters} from diagnostics/traffic/interface, for versions whose interface list carries no counters."""
+    data = _optional(fw, "diagnostics/traffic/interface")
+    found = (data or {}).get("interfaces") if isinstance(data, dict) else None
+    return {str(v.get("name") or k): v for k, v in found.items() if isinstance(v, dict)} if isinstance(found, dict) else {}
+
+
+def _ports(interfaces, traffic=None):
+    """The firewall's interfaces as ports: link, speed and counters; the interface of the internet connection is named WAN."""
+    rows = [i for i in interfaces if i.get("device") and not SKIP_DEVICES.match(str(i["device"]))]
+    wan = next((i for i in rows if i.get("identifier") == "wan"), None) or next((i for i in rows if i.get("gateways")), None)
+    ports = []
+    for row in rows[:120]:
+        label = str(row.get("description") or row.get("identifier") or row["device"]).strip()[:30]
+        status = str(row.get("status") or "").lower()
+        up = status in ("up", "active", "associated") or (not status and bool(row.get("addr4")))
+        entry = {"port": len(ports) + 1, "name": f"WAN {label}" if row is wan and "wan" not in label.lower() else label, "up": up, "enabled": True}
+        speed = _speed(row.get("media") or row.get("media_raw"))
+        if up and speed:
+            entry["speed_mbps"] = speed
+            duplex = re.search(r"(full|half)-duplex", str(row.get("media") or row.get("media_raw")))
+            if duplex:
+                entry["duplex"] = duplex.group(1)
+        stats = row.get("statistics") if isinstance(row.get("statistics"), dict) else (traffic or {}).get(row["device"]) or {}
+        for key, field in STAT_KEYS:
+            value = _num(stats.get(field))
+            if value is not None and value >= 0:
+                entry[key] = int(value)
+        ports.append(entry)
+    return ports
+
+
 def read(fw, wanted):
     info = fw.get("diagnostics/system/system_information") or {}
     interfaces = [i for i in _rows(fw.get("interfaces/overview/interfacesInfo")) if isinstance(i, dict)]
@@ -151,6 +264,8 @@ def read(fw, wanted):
     mac = _mac((lan or {}).get("macaddr")) or next(iter(sorted(own)), None)
     node = {"mac": mac, "macs": sorted(own - {mac}) or None, "ip": _ipv4((lan or {}).get("addr4")) or _ipv4(fw.host), "name": str(info.get("name") or fw.id)[:100],
             "model": next((v for v in info.get("versions") or [] if str(v).startswith("OPNsense")), "")[:100] or None, "role": "gateway"}
+    if fw.extras:                           # the firewall's own health, firmware and ports
+        node.update(metrics=_health(fw), firmware=_firmware(fw, info), ports=_ports(interfaces, _traffic(fw) if not all(isinstance(i.get("statistics"), dict) for i in interfaces if i.get("identifier")) else None))
     by_device = {i.get("device"): i for i in interfaces}
     dhcp, sources = leases(fw)
     clients = {}
@@ -251,7 +366,9 @@ def diagnose(config):
         entry = {"steps": {}}
         report["firewalls"].append(entry)
         for step, path in (("system_information", "diagnostics/system/system_information"), ("interfaces", "interfaces/overview/interfacesInfo"), ("arp", "diagnostics/interface/search_arp"),
-                           ("dnsmasq_leases", "dnsmasq/leases/search"), ("kea_leases", "kea/leases4/search"), ("isc_leases", "dhcpv4/leases/searchLease")):
+                           ("dnsmasq_leases", "dnsmasq/leases/search"), ("kea_leases", "kea/leases4/search"), ("isc_leases", "dhcpv4/leases/searchLease"), ("system_resources", "diagnostics/system/systemResources"),
+                           ("activity", "diagnostics/activity/getActivity"), ("system_time", "diagnostics/system/systemTime"), ("temperature", "diagnostics/system/systemTemperature"),
+                           ("firmware", "core/firmware/status"), ("traffic", "diagnostics/traffic/interface")):
             try:
                 data = fw.get(path)
                 rows = _rows(data) if not isinstance(data, list) else data
@@ -259,6 +376,8 @@ def diagnose(config):
                     entry["steps"][step] = {"ok": True, "fields": sorted(data)[:20] if isinstance(data, dict) else type(data).__name__, "version": str((data.get("versions") or [""])[0])[:30]}
                 else:
                     info = {"ok": True, "count": len(rows), "fields": sorted({k for r in rows[:50] if isinstance(r, dict) for k in r})[:40]}
+                    if step in ("system_resources", "activity", "system_time", "firmware", "traffic") and isinstance(data, dict):
+                        info["fields"] = sorted(data)[:30]
                     if step == "interfaces":
                         info["identifiers"] = sorted({str(r.get("identifier")) for r in rows})[:20]
                     if step == "arp":

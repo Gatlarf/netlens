@@ -1,7 +1,7 @@
 {
   "id": "opnsense",
   "name": "OPNsense",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",
@@ -11,7 +11,7 @@
   "info": {
     "title": "Make a read-only API key (once)",
     "text": "In OPNsense: System > Access > Groups > add a group 'netlens' with the privileges listed below, System > Access > Users > add a user 'netlens' in that group (give it a long random password you will not use), then edit the user and press the + under 'API keys': a file with the key and secret is downloaded. Enter them below.",
-    "code": "Privileges for the group 'netlens' (checked on OPNsense 26.7):\n  Diagnostics: ARP Table\n  Lobby: Dashboard                    (host name and version)\n  Status: Interfaces\n  Services: Dnsmasq DNS/DHCP: Settings   (lease list, if Dnsmasq is your DHCP server)\n  Services: DHCP: Kea(v4)                (lease list, if you use Kea)"
+    "code": "Privileges for the group 'netlens' (checked on OPNsense 26.7):\n  Diagnostics: ARP Table\n  Lobby: Dashboard                    (host name and version)\n  Status: Interfaces\n  Services: Dnsmasq DNS/DHCP: Settings   (lease list, if Dnsmasq is your DHCP server)\n  Services: DHCP: Kea(v4)                (lease list, if you use Kea)\n\nFor the health readings (optional; a reading the key may not read is simply left out):\n  System: Firmware                     (version and waiting update)\n  Diagnostics: Activity                (processor)\n  and the Diagnostics privileges that cover the system resources, system time and temperature pages"
   },
   "config": [
     {
@@ -54,6 +54,13 @@
       "label": "Verify TLS certificate",
       "default": false,
       "help": "OPNsense makes a self-signed certificate until you install your own."
+    },
+    {
+      "key": "health",
+      "type": "bool",
+      "label": "Read the health of the firewalls",
+      "default": true,
+      "help": "Processor, memory, temperature, uptime, load, firmware and a waiting update, the interfaces with link, speed and traffic, and the internet interface. A few extra reads per firewall per sync."
     },
     {
       "key": "timeout",

@@ -90,3 +90,39 @@ def test_message_login_rights_and_diagnose():
     with Canned({**ROUTES, "/api/diagnostics/interface/search_arp": 403}, auth=AUTH) as s, pytest.raises(plugin.AuthRefused) as caught:
         plugin.test(config(s.url))
     assert "ARP" not in str(caught.value) and "search_arp" in str(caught.value)
+
+
+HEALTH = {
+    "/api/diagnostics/system/systemResources": {"memory": {"total": "1000", "used": "250", "arc": "0"}},
+    "/api/diagnostics/activity/getActivity": {"headers": ["last pid: 1;  load averages:  0.10", "CPU:  1.5% user,  0.0% nice,  2.5% system,  0.0% interrupt, 96.0% idle", "Mem: 1M"]},
+    "/api/diagnostics/system/systemTime": {"uptime": "3 days, 02:03:04", "loadavg": "0.25, 0.30, 0.20", "datetime": "x"},
+    "/api/diagnostics/system/systemTemperature": [{"device": "cpu", "temperature": "41.0"}, {"device": "cpu", "temperature": "47.5"}],
+    "/api/core/firmware/status": {"status": "update", "product_version": "26.7", "product_latest": "26.7.1", "updates": 3},
+    "/api/diagnostics/traffic/interface": {"interfaces": {"lan": {"name": "vtnet0", "bytes received": "100", "bytes transmitted": "200", "packets received": "3", "packets transmitted": "4", "input errors": "0", "output errors": "1"}}},
+}
+
+
+def test_health_firmware_ports_and_wan_of_the_firewall():
+    routes = {**ROUTES, **HEALTH}
+    routes["/api/interfaces/overview/interfacesInfo"] = {"rows": [
+        {**IFACES["rows"][0], "status": "up", "media": "1000baseT <full-duplex>"},
+        {**IFACES["rows"][1], "status": "up", "media": "10Gbase-T <full-duplex>", "statistics": {"bytes received": "5", "bytes transmitted": "6"}, "gateways": ["WAN_GW"]},
+        {**IFACES["rows"][2], "status": "no carrier"}, IFACES["rows"][3]]}
+    with Canned(routes, auth=AUTH) as s:
+        node = validate_output("topology", plugin.fetch(config(s.url)))["nodes"][0]
+    m = {x["metric"]: x["value"] for x in node["metrics"]}
+    assert m == {"mem_pct": 25.0, "cpu_pct": 4.0, "uptime_s": 3 * 86400 + 2 * 3600 + 3 * 60 + 4, "load1": 0.25, "temp_c": 47.5}
+    assert node["firmware"] == {"version": "26.7", "latest": "26.7.1"}
+    ports = {p["name"]: p for p in node["ports"]}
+    assert set(ports) == {"LAN", "WAN", "IOT"}                                                  # no loopback; the wan interface is named WAN
+    assert (ports["LAN"]["speed_mbps"], ports["LAN"]["duplex"], ports["LAN"]["rx_bytes"], ports["LAN"]["tx_errors"]) == (1000, "full", 100, 1)
+    assert ports["WAN"]["speed_mbps"] == 10000 and ports["WAN"]["tx_bytes"] == 6 and ports["IOT"]["up"] is False
+
+
+def test_extras_never_fail_and_can_be_switched_off():
+    with Canned(ROUTES, auth=AUTH) as s:                                  # none of the extra endpoints exist
+        node = validate_output("topology", plugin.fetch(config(s.url)))["nodes"][0]
+        assert node["metrics"] == [] and node["firmware"]["version"] == "26.7"        # the version still comes from the system information
+    with Canned({**ROUTES, **HEALTH}, auth=AUTH) as s:
+        node = validate_output("topology", plugin.fetch(config(s.url, health=False)))["nodes"][0]
+    assert not node.get("metrics") and not node.get("ports") and not node.get("firmware")

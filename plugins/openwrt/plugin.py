@@ -51,7 +51,7 @@ def _mac(value):
 
 
 class Router:
-    def __init__(self, url, username, password, role="", uplink="", verify_tls=False, timeout=15):
+    def __init__(self, url, username, password, role="", uplink="", verify_tls=False, timeout=15, extras=True):
         url = url.strip().rstrip("/")
         if "://" not in url:
             url = "http://" + url
@@ -67,6 +67,7 @@ class Router:
         if uplink and not self.uplink:
             raise OpenwrtError(f"{self.id}: the uplink must be an IPv4 address")
         self.sid = None
+        self.extras = bool(extras)            # the health, firmware and ports (switched off in the plugin settings)
         self.context = None
         if parts.scheme == "https" and not verify_tls:
             self.context = ssl.create_default_context()
@@ -134,7 +135,7 @@ def parse_routers(config):
             raise ValueError(f"line {i}: enter the address")
         if not str(r.get("username") or "").strip() or not str(r.get("password") or ""):
             raise ValueError(f"{url}: enter the user name and password")
-        out.append(Router(url, str(r["username"]).strip(), str(r["password"]), r.get("role"), r.get("uplink"), config.get("verify_tls", False), config.get("timeout") or 15))
+        out.append(Router(url, str(r["username"]).strip(), str(r["password"]), r.get("role"), r.get("uplink"), config.get("verify_tls", False), config.get("timeout") or 15, config.get("health", True)))
     return out
 
 
@@ -163,6 +164,84 @@ def _lan(dump):
     return lan, wan
 
 
+def _optional(router, obj, method, args=None):
+    """An extra read: {} when the router does not have it, does not allow it or does not answer (an extra never fails the sync)."""
+    try:
+        return router.rpc(obj, method, args, allow=(3, 4, 6)) or {}
+    except OpenwrtError:
+        return {}
+
+
+def _file(router, path):
+    """The text of a small file through ubus `file read` (needs the file ACL in the box at the top of this page)."""
+    data = _optional(router, "file", "read", {"path": path})
+    return data.get("data") if isinstance(data.get("data"), str) else ""
+
+
+def _health(router):
+    """Processor, memory, load, temperature and uptime of the router. Processor time only counts up, so it goes out as used/total of /proc/stat."""
+    out = []
+    info = _optional(router, "system", "info")
+    mem = info.get("memory") or {}
+    total = mem.get("total")
+    avail = mem.get("available")
+    if avail is None and isinstance(mem.get("free"), (int, float)):
+        avail = mem["free"] + (mem.get("buffered") or 0) + (mem.get("cached") or 0)
+    if isinstance(total, (int, float)) and total > 0 and isinstance(avail, (int, float)):
+        out.append({"metric": "mem_pct", "value": round(100 * (total - avail) / total, 1)})
+    load = info.get("load")
+    if isinstance(load, list) and load and isinstance(load[0], (int, float)):
+        out.append({"metric": "load1", "value": round(load[0] / 65536, 2)})        # ubus gives the load times 65536
+    if isinstance(info.get("uptime"), (int, float)):
+        out.append({"metric": "uptime_s", "value": float(info["uptime"])})
+    stat = next((l.split() for l in _file(router, "/proc/stat").splitlines() if l.startswith("cpu ")), None)
+    if stat and len(stat) >= 6:
+        try:
+            ticks = [int(x) for x in stat[1:9]]
+            out.append({"metric": "cpu_pct", "used": sum(ticks) - ticks[3] - ticks[4], "total": sum(ticks)})        # idle and iowait are not busy
+        except ValueError:
+            pass
+    temps = []
+    for zone in range(4):
+        raw = _file(router, f"/sys/class/thermal/thermal_zone{zone}/temp").strip()
+        if raw.lstrip("-").isdigit():
+            temps.append(int(raw) / 1000)
+    temp = max(temps, default=None)
+    if temp is not None and 0 < temp < 150:
+        out.append({"metric": "temp_c", "value": temp})
+    return out
+
+
+VIRTUAL = re.compile(r"^(lo$|br-|bond|ifb|veth|teql|ip6|gre|sit|tun|tap|wg|docker|dummy|erspan|ip_vti|miireg)")
+
+
+def _ports(router, wan_device):
+    """The physical network devices as ports: link, speed (`1000F` = 1000 Mbit/s full duplex) and counters; the one the internet connection uses is named WAN."""
+    devices = _optional(router, "network.device", "status")
+    ports = []
+    for name in sorted(devices):
+        dev = devices[name]
+        if not isinstance(dev, dict) or VIRTUAL.match(name) or "." in name or not re.fullmatch(r"[A-Za-z0-9_-]{1,15}", name):
+            continue
+        if dev.get("type") not in (None, "Network device"):
+            continue                                          # bridges, vlans, macvlans ...
+        up = bool(dev.get("up")) and dev.get("carrier") is not False
+        entry = {"port": len(ports) + 1, "name": f"WAN {name}" if name == wan_device else name, "up": up, "enabled": True}
+        speed = re.match(r"(\d+)([FH])?", str(dev.get("speed") or ""))
+        if up and speed and int(speed.group(1)) > 0:
+            entry["speed_mbps"] = int(speed.group(1))
+            if speed.group(2):
+                entry["duplex"] = "full" if speed.group(2) == "F" else "half"
+        stats = dev.get("statistics") or {}
+        for key in ("rx_bytes", "tx_bytes", "rx_packets", "tx_packets", "rx_errors", "tx_errors"):
+            if isinstance(stats.get(key), (int, float)) and stats[key] >= 0:
+                entry[key] = int(stats[key])
+        ports.append(entry)
+        if len(ports) >= 120:
+            break
+    return ports
+
+
 def read(router):
     """Everything about one router: its node entry and its clients."""
     board = router.rpc("system", "board")
@@ -177,6 +256,9 @@ def read(router):
             own.add(_mac(status.get("macaddr")))
     role = router.role if router.role != "auto" else ("gateway" if wan else "ap")
     node = {"mac": mac, "ip": ip, "name": str(board.get("hostname") or router.id)[:100], "model": str(board.get("model") or "")[:100] or None, "role": role}
+    if router.extras:                       # health, firmware and ports (the extras: switched off in the plugin settings)
+        version = str((board.get("release") or {}).get("version") or "").strip()
+        node.update(metrics=_health(router), ports=_ports(router, (wan or {}).get("device")), firmware={"version": version, "latest": None} if version else None)
     if role == "ap" and router.uplink:
         node["uplink_ip"] = router.uplink
 

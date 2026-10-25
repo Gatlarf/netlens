@@ -12,6 +12,12 @@ Reads an **OPNsense firewall**: the firewall as the gateway node, and every devi
 2. In Netlens install **OPNsense**, add a line with the address (`https://192.168.1.1`), the key and the secret. Optionally limit the interfaces.
 3. Test, enable.
 
+## Health of the firewall (1.1.0)
+
+The plugin also reports the firewall itself: processor, memory, load, temperature and uptime, the installed version and a waiting update, and the interfaces as ports with link, speed, duplex and counters. The interface of the internet connection (`wan`, or the one with a gateway) is named **WAN**, so the HUD traffic graph can draw your provider line. All read-only and optional: a reading the API key may not read is left out and never fails the sync. Switch the whole thing off with *Read the health of the firewalls*.
+
+> **Status of the 1.1.0 parts:** the interface list, link and speed were checked against OPNsense 26.7 under QEMU. The lab key could not read the other endpoints (HTTP 403), so processor, memory, uptime, temperature, firmware and the counters follow the OPNsense API documentation and simulated answers. The privileges for them are not confirmed; *Run diagnostic* shows which reading is refused.
+
 ## Good to know
 
 - The WAN interface is left out unless you list it; the firewall's own MAC addresses are never clients.

@@ -1,7 +1,7 @@
 {
   "id": "openwrt",
   "name": "OpenWrt",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",
@@ -11,7 +11,7 @@
   "info": {
     "title": "Set up the router (once)",
     "text": "Netlens talks to OpenWrt's ubus over HTTP(S), the same way LuCI does. Install the packages below, then either use root or create a login that may only read what Netlens needs (recommended). Wi-Fi details need the iwinfo module.",
-    "code": "# 1. as root on the router: the luci-rpc calls and the web server for ubus\napk add uhttpd-mod-ubus rpcd-mod-iwinfo luci-base     # opkg install ... on OpenWrt before 25.12\n\n# 2. a login that can only read what Netlens needs\ncat > /usr/share/rpcd/acl.d/netlens.json <<'EOF2'\n{\"netlens\": {\"description\": \"Netlens, read only\",\n  \"read\": {\"ubus\": {\"luci-rpc\": [\"getHostHints\", \"getDHCPLeases\", \"getWirelessDevices\"],\n                    \"system\": [\"board\"], \"network.interface\": [\"dump\"], \"network.device\": [\"status\"],\n                    \"iwinfo\": [\"info\", \"assoclist\"]}}}}\nEOF2\necho 'netlens:x:1500:1500:netlens:/var:/bin/false' >> /etc/passwd\necho 'netlens:x:0:0:99999:7:::' >> /etc/shadow\npasswd netlens                                          # choose a password\nuci add rpcd login; uci set rpcd.@login[-1].username=netlens\nuci set rpcd.@login[-1].password='$p$netlens'; uci add_list rpcd.@login[-1].read=netlens\nuci commit rpcd; /etc/init.d/rpcd restart"
+    "code": "# 1. as root on the router: the luci-rpc calls and the web server for ubus\napk add uhttpd-mod-ubus rpcd-mod-iwinfo luci-base     # opkg install ... on OpenWrt before 25.12\n\n# 2. a login that can only read what Netlens needs\ncat > /usr/share/rpcd/acl.d/netlens.json <<'EOF2'\n{\"netlens\": {\"description\": \"Netlens, read only\",\n  \"read\": {\"ubus\": {\"luci-rpc\": [\"getHostHints\", \"getDHCPLeases\", \"getWirelessDevices\"],\n                    \"system\": [\"board\", \"info\"], \"network.interface\": [\"dump\"], \"network.device\": [\"status\"],\n                    \"iwinfo\": [\"info\", \"assoclist\"], \"file\": [\"read\"]},\n                    \"file\": {\"/proc/stat\": [\"read\"], \"/sys/class/thermal/*/temp\": [\"read\"]}}}}\nEOF2\necho 'netlens:x:1500:1500:netlens:/var:/bin/false' >> /etc/passwd\necho 'netlens:x:0:0:99999:7:::' >> /etc/shadow\npasswd netlens                                          # choose a password\nuci add rpcd login; uci set rpcd.@login[-1].username=netlens\nuci set rpcd.@login[-1].password='$p$netlens'; uci add_list rpcd.@login[-1].read=netlens\nuci commit rpcd; /etc/init.d/rpcd restart"
   },
   "config": [
     {
@@ -61,6 +61,13 @@
       "label": "Verify TLS certificate",
       "default": false,
       "help": "Only for https addresses. OpenWrt makes a self-signed certificate."
+    },
+    {
+      "key": "health",
+      "type": "bool",
+      "label": "Read the health of the devices",
+      "default": true,
+      "help": "Processor, memory, load, temperature, uptime, firmware, the ports with their speed and traffic, and the internet interface. A few extra reads per device per sync."
     },
     {
       "key": "timeout",

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.242 — 2026-10-25
+
+### Added
+- **OpenWrt 1.1.0 and OPNsense 1.1.0 report the device's own health.** Processor, memory, load, temperature and uptime, the installed version (OPNsense also a waiting update), and the interfaces as ports with link, speed and counters; the internet interface is named WAN so the HUD traffic graph draws it. Read-only, extras never fail the sync, switch *Read the health* off in the plugin settings. OpenWrt was tested on a real OpenWrt 25.12.5 (QEMU); of OPNsense only the interface list was checked on 26.7, the other readings follow the documentation. Not yet released to the plugin store.
+
 ## 0.4.240 — 2026-10-24
 
 ### Added

@@ -27,7 +27,7 @@ def router(wan=True, wifi=True, denied=()):
     if wan:
         interfaces.append({"interface": "wan", "device": "eth1", "proto": "dhcp", "ipv4-address": [{"address": "203.0.113.5", "mask": 24}], "route": [{"target": "0.0.0.0", "mask": 0}]})
     answers = {
-        ("system", "board"): {"hostname": "gw" if wan else "ap1", "model": "Test Router", "release": {"description": "OpenWrt 25.12.5"}},
+        ("system", "board"): {"hostname": "gw" if wan else "ap1", "model": "Test Router", "release": {"description": "OpenWrt 25.12.5", "version": "25.12.5"}},
         ("network.interface", "dump"): {"interface": interfaces},
         ("network.device", "status"): {"macaddr": "aa:aa:aa:00:00:01" if wan else "aa:aa:aa:00:00:02"},
         ("luci-rpc", "getDHCPLeases"): {"dhcp_leases": [{"expires": 3600, "hostname": "laptop", "macaddr": "02:11:22:33:44:55", "ipaddr": "192.168.1.120"},
@@ -36,6 +36,14 @@ def router(wan=True, wifi=True, denied=()):
                                        "AA:AA:AA:00:00:01": {"ipaddrs": ["192.168.1.1"], "ip6addrs": []}, "00:00:00:00:00:00": {"ipaddrs": ["1.1.1.1"], "ip6addrs": []},
                                        "DE:AD:00:00:00:09": {"ipaddrs": [], "ip6addrs": ["fe80::1"]}},
     }
+    answers[("system", "info")] = {"uptime": 86400, "load": [32768, 0, 0], "memory": {"total": 1000, "free": 100, "buffered": 100, "cached": 300, "available": 600}}
+    answers[("file", "read", "/proc/stat")] = {"data": "cpu  100 0 50 800 40 5 5 0 0 0\ncpu0 1 2 3\n"}
+    answers[("file", "read", "/sys/class/thermal/thermal_zone0/temp")] = {"data": "52000\n"}
+    answers[("network.device", "status", "all")] = {
+        "br-lan": {"type": "bridge", "up": True}, "lo": {"type": "Network device", "up": True},
+        "eth0": {"type": "Network device", "up": True, "carrier": True, "speed": "1000F", "statistics": {"rx_bytes": 10, "tx_bytes": 20, "rx_packets": 1, "tx_packets": 2, "rx_errors": 0, "tx_errors": 3}},
+        "eth1": {"type": "Network device", "up": True, "carrier": True, "speed": "100H", "statistics": {"rx_bytes": 5}}, "lan3": {"type": "Network device", "up": False, "carrier": False},
+        "eth0.2": {"type": "VLAN", "up": True}}
     if wifi:
         answers[("luci-rpc", "getWirelessDevices")] = {"radio0": {"interfaces": [{"section": "default_radio0", "ifname": "phy0-ap0"}]}, "radio1": {"interfaces": [{"ifname": "phy1-ap0"}]}}
         answers[("iwinfo", "info", "phy0-ap0")] = {"frequency": 2437}
@@ -68,7 +76,9 @@ class Ubus:
                 elif obj in denied:
                     result = [6]
                 else:
-                    key = (obj, method, args.get("device")) if obj == "iwinfo" else (obj, method)
+                    key = (obj, method, args.get("device")) if obj == "iwinfo" else (obj, method, "all") if (obj, method) == ("network.device", "status") and not args.get("name") else (obj, method)
+                    if (obj, method) == ("file", "read"):
+                        key = (obj, method, args.get("path"))
                     result = [0, answers[key]] if key in answers else [4]
                 self.send({"jsonrpc": "2.0", "id": 1, "result": result})
 
@@ -135,3 +145,31 @@ def test_diagnose_has_counts_only():
         text = json.dumps(plugin.diagnose(config({"host": s.url})))
     assert '"leases": {"ok": true, "count": 2' in text and '"wifi_stations": 2' in text
     assert "192.168" not in text and "aa:bb" not in text.lower() and "laptop" not in text
+
+
+def test_health_firmware_and_ports_of_the_router():
+    with Ubus(router()) as s:
+        node = validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]
+    metrics = {m["metric"]: m for m in node["metrics"]}
+    assert metrics["mem_pct"]["value"] == 40.0 and metrics["uptime_s"]["value"] == 86400 and metrics["load1"]["value"] == 0.5 and metrics["temp_c"]["value"] == 52.0
+    assert (metrics["cpu_pct"]["used"], metrics["cpu_pct"]["total"]) == (160, 1000)              # idle (800) and iowait (40) are not busy
+    assert node["firmware"] == {"version": "25.12.5", "latest": None}
+    ports = {p["name"]: p for p in node["ports"]}
+    assert set(ports) == {"eth0", "WAN eth1", "lan3"}                                            # no bridge, loopback or vlan; the wan device is named WAN
+    assert (ports["eth0"]["speed_mbps"], ports["eth0"]["duplex"], ports["eth0"]["rx_bytes"], ports["eth0"]["tx_errors"]) == (1000, "full", 10, 3)
+    assert ports["WAN eth1"]["speed_mbps"] == 100 and ports["WAN eth1"]["duplex"] == "half" and ports["lan3"]["up"] is False and ports["lan3"]["speed_mbps"] is None
+
+
+def test_extras_never_fail_the_sync_and_can_be_switched_off():
+    answers, _ = router(wifi=False)
+    for key in [k for k in answers if k[0] in ("system",) and k[1] == "info" or k[0] == "file" or (k[0] == "network.device" and len(k) == 3)]:
+        del answers[key]                                          # an old router: no system info, no file read, no device list
+    with Ubus((answers, ())) as s:
+        node = validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]
+        assert node["metrics"] == [] and node["ports"] == []
+    with Ubus(router()) as s:
+        node = validate_output("topology", plugin.fetch({**config({"host": s.url}), "health": False}))["nodes"][0]
+    assert not node.get("metrics") and not node.get("ports") and not node.get("firmware")
+    with Ubus(router(denied=("file",))) as s:                    # the file ACL missing: no processor or temperature, the rest stays
+        node = validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]
+    assert {m["metric"] for m in node["metrics"]} == {"mem_pct", "load1", "uptime_s"}
