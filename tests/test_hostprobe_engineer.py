@@ -240,7 +240,7 @@ def test_hardware_and_security():
     assert "/dev/sda reports trouble" in t and "md0 is degraded" in t and "91 °C" in t and "hardware, disk or memory errors" in t and "read-only" in t and "on battery" in t
     sec = {"failed_total": 300, "failed": [{"ip": "6.6.6.6", "count": 280}], "updates": {"pending": 40, "security": 3, "reboot": True}, "time_synced": False, "firewall": {"ufw": "inactive"}, "exposed": ["0.0.0.0:22"]}
     t = texts(analyze.analyze("security", sec, {}))
-    assert "300 failed sign-in" in t and "6.6.6.6" in t and "3 security updates" in t and "clock is not synchronised" in t and "No host firewall" in t
+    assert "300 failed sign-in" in t and "6.6.6.6" in t and "3 security updates" in t and "clock is not synchronised" in t and "firewall is switched off" in t
 
 
 # ----------------------------------------------------------------------------- chains
@@ -449,4 +449,4 @@ def test_windows_answers_from_a_limited_account_are_read_and_say_what_could_not_
     assert "\\Backup started at" in texts_ and "\\Sync started at" in texts_ and "ended with an error" in texts_ and texts_.count("ended with an error") == 1       # 267011 is "not yet run", not an error
     sec = parsers.parse_probe("security", "windows", wrap({"failed_total": 4, "firewall": [{"n": "Domain", "on": False}, {"n": "Public", "on": False}], "time_synced": False, "admins": ["PC\\Administrator"]}))
     t = " | ".join(e["text"] for e in analyze.analyze("security", sec, {}))
-    assert "No host firewall is active" in t and "clock is not synchronised" in t
+    assert "firewall is switched off" in t and "clock is not synchronised" in t

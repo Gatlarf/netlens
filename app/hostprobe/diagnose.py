@@ -153,7 +153,7 @@ def findings(result: dict[str, Any], name: str) -> list[dict[str, Any]]:
     for i, c in enumerate(result["chains"][:2]):
         out.append({"level": "cause", "text": f"Probable cause: {c['text']}", "private": c["private"], "llm_text": f"Probable cause: {c['llm_text']}" if c.get("llm_text") else None, "probes": c["probes"], "weight": c["weight"]})
     for e in sorted(result["evidence"], key=lambda e: -e["weight"]):
-        if any(t.startswith("ok:") for t in e["tags"]) or (e["level"] == "fact" and e["weight"] < 40):
+        if any(t.startswith("ok:") for t in e["tags"]) or (e["level"] == "fact" and e["weight"] < 25 and "cannot_read" not in e["tags"]):
             continue
         level = "cause" if e["level"] == "cause" else "warn" if e["level"] == "warn" and e["weight"] >= 60 else "fact"
         # a "Probable cause" sentence that is already the head of a chain is not repeated

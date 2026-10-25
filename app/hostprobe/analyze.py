@@ -266,7 +266,7 @@ def security(d: dict[str, Any], ctx: dict[str, Any]) -> list[dict[str, Any]]:
         out.append(ev("security", "warn", 52, "The clock is not synchronised with a time server: certificates, logins and logs can disagree with other machines.", ["clock_drift"]))
     fw = d.get("firewall") or {}
     if fw and not any(v == "active" for v in fw.values()):
-        out.append(ev("security", "fact", 28, "No host firewall is active.", ["no_firewall"]))
+        out.append(ev("security", "warn", 42, "The host firewall is switched off on every network profile.", ["no_firewall"]))
     if d.get("exposed"):
         out.append(ev("security", "fact", 15, f"{len(d['exposed'])} ports listen on every interface.", ["exposed"], private=True, llm_text=f"{len(d['exposed'])} ports listen on every interface."))
     return out
