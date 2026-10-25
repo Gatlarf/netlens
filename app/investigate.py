@@ -144,8 +144,15 @@ def investigate(conn: sqlite3.Connection, incident_id: int, now: datetime | None
             what = f"{WORDS.get(rd['metric'], rd['metric'])}{' on ' + rd['label'] if rd['label'] else ''} of {name}"
             if sh and sh["kind"] == "step":
                 at = datetime.fromtimestamp(sh["at"], timezone.utc)
-                findings.append({"level": "info", "text": f"The {what} did not creep up, it jumped: from {sh['from_value']}{rd['unit']} to {sh['to_value']}{rd['unit']} in {_minutes(sh['seconds'])}, starting {_clock(at)}."
-                                  + (f" Before that it grew about {sh['slope_before_per_day']} points a day, so a trend forecast could not see it coming." if sh.get("slope_before_per_day") is not None and abs(sh["slope_before_per_day"]) < 5 else "")})
+                findings.append({"level": "info", "text": f"The {what} did not creep up, it jumped: from {sh['from_value']}{rd['unit']} to {sh['to_value']}{rd['unit']} in {_minutes(sh['seconds'])}, starting {_clock(at)}."})
+                slope = sh.get("slope_before_per_day")
+                warned = conn.execute("SELECT 1 FROM events WHERE device_id = ? AND kind IN ('capacity_warning', 'capacity_critical') AND ts < ? LIMIT 1", (device_id, found["start"])).fetchone()
+                if slope is not None and slope > 0.2 and rd["metric"] == "disk_pct":
+                    days = (100 - sh["from_value"]) / slope
+                    findings.append({"level": "info", "text": f"Before the jump it was growing about {slope} points a day" + (f", which would have filled it in about {days:.0f} days" if days < 60 else "") + "."
+                                     + (" The disk forecast did not warn: it fits a straight line through 30 days and smooths out a recent change." if days < 14 and not warned else "")})
+                elif slope is not None and abs(slope) <= 0.2:
+                    findings.append({"level": "info", "text": "Before the jump it was steady, so no trend could have warned about it."})
                 lag = first_alert.get(device_id)
                 if lag and lag > at:
                     findings.append({"level": "info", "text": f"The first alert for {name} came {_minutes((lag - at).total_seconds())} after the jump began."})

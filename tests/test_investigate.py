@@ -69,7 +69,7 @@ def test_a_full_disk_is_a_jump_after_a_restart_loop_and_nobody_was_told(conn):
     report = investigate.investigate(conn, found[0]["id"], now=NOW)
     text = " ".join(f["text"] for f in report["findings"])
     assert "did not creep up, it jumped: from" in text
-    assert "trend forecast could not see it coming" in text
+    assert "points a day" in text and "disk forecast did not warn" in text
     assert "Probable source: whoiswho-frontend" in text and "5 alerts" in text
     assert "Nobody was told" in text and "no channel includes it" in text
     assert "still critical" in text
