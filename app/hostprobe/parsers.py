@@ -387,16 +387,18 @@ def parse_security_linux(text: str) -> dict[str, Any]:
 def parse_cpu_windows(text: str) -> dict[str, Any]:
     d = _win_json(text)
     procs = [{"pid": _int(p.get("id")), "name": str(p.get("n") or ""), "user": None, "cpu": _f(p.get("cpu"), 0.0), "mem_pct": None, "container": None} for p in _many(d.get("procs"))]
-    return {"platform": "windows", "script_version": d.get("version"), "cpus": _int(d.get("cpus")) or None, "load": [], "cpu_pct": {"busy": _f(d.get("load"))} if d.get("load") is not None else {},
+    return {"platform": "windows", "script_version": d.get("version"), "notes": [str(n) for n in _many(d.get("notes"))], "cpus": _int(d.get("cpus")) or None, "load": [], "cpu_pct": {"busy": _f(d.get("load"))} if d.get("load") is not None else {},
             "pressure": {}, "vmstat": {"r": _f(d.get("queue")), "b": _f(d.get("diskq"))}, "procs": procs, "containers": []}
 
 
 def parse_memory_windows(text: str) -> dict[str, Any]:
     d = _win_json(text)
     total, free = (_f(d.get("total_kb"), 0.0) or 0) * 1024, (_f(d.get("free_kb"), 0.0) or 0) * 1024
-    page = _many(d.get("pagefile"))
-    return {"platform": "windows", "script_version": d.get("version"), "total": total, "available": free, "used_pct": round(100 * (1 - free / total), 1) if total else None,
-            "swap_total": sum(_int(p.get("size")) for p in page) * 1024 ** 2, "swap_used": sum(_int(p.get("used")) for p in page) * 1024 ** 2, "swap_io": {"si": 0.0, "so": 0.0}, "pressure": {},
+    commit = (_f(d.get("commit_total_kb"), 0.0) or 0) * 1024
+    swap_total = max(0.0, commit - total) if commit < 10 * 1024 ** 4 else 0.0                       # a 64-bit process reports an enormous "virtual" size: then there is no sensible figure
+    swap_pct = _f(d.get("pagefile_pct"), 0.0) or 0.0
+    return {"platform": "windows", "script_version": d.get("version"), "total": total, "available": free, "used_pct": round(100 * (1 - free / total), 1) if total else None, "notes": [str(n) for n in _many(d.get("notes"))],
+            "swap_total": int(swap_total), "swap_used": int(swap_total * swap_pct / 100), "swap_io": {"si": 0.0, "so": 0.0}, "pressure": {},
             "procs": [{"pid": _int(p.get("id")), "name": str(p.get("n") or ""), "rss": _int(p.get("ws")), "container": None} for p in _many(d.get("procs"))],
             "oom": [f"{e.get('t')} {e.get('m')}" for e in _many(d.get("events"))], "containers": [], "container_oom": []}
 
@@ -409,7 +411,7 @@ def parse_network_windows(text: str) -> dict[str, Any]:
     nics.sort(key=lambda n: -(n["rx_bps"] + n["tx_bps"]))
     ping = [{"kind": str(p.get("t")), "target": str(p.get("ip")), "loss": round(100 - 100 * _int(p.get("ok")) / 3, 1), "rtt": _f(p.get("ms"))} for p in _many(d.get("ping"))]
     dns = d.get("dns") if isinstance(d.get("dns"), dict) else None
-    return {"platform": "windows", "script_version": d.get("version"), "interfaces": nics[:10], "tcp": {}, "states": {str(s.get("s")): _int(s.get("c")) for s in _many(d.get("states"))},
+    return {"platform": "windows", "script_version": d.get("version"), "notes": [str(n) for n in _many(d.get("notes"))], "interfaces": nics[:10], "tcp": {}, "states": {str(s.get("s")): _int(s.get("c")) for s in _many(d.get("states"))},
             "remote": [{"ip": str(r.get("ip")), "count": _int(r.get("c"))} for r in _many(d.get("remote"))], "processes": [{"name": str(p.get("n") or "?"), "count": _int(p.get("c"))} for p in _many(d.get("processes"))],
             "listening": [{"addr": str(l.get("a")), "process": str(l.get("n") or "")} for l in _many(d.get("listening"))], "ping": ping,
             "dns": {"ok": bool(dns.get("ok")), "ms": _int(dns.get("ms"))} if dns else None, "route": str(d.get("gateway") or "")}
@@ -418,7 +420,7 @@ def parse_network_windows(text: str) -> dict[str, Any]:
 def parse_apps_windows(text: str) -> dict[str, Any]:
     d = _win_json(text)
     boot = _iso(d.get("boot"))
-    return {"platform": "windows", "script_version": d.get("version"), "failed_units": [{"unit": str(s.get("n")), "result": str(s.get("state")), "exit": _int(s.get("exit")), "restarts": 0, "since": ""} for s in _many(d.get("services"))],
+    return {"platform": "windows", "script_version": d.get("version"), "notes": [str(n) for n in _many(d.get("notes"))], "failed_units": [{"unit": str(s.get("n")), "result": str(s.get("state")), "exit": _int(s.get("exit")), "restarts": 0, "since": ""} for s in _many(d.get("services"))],
             "errors": [{"unit": str(e.get("n")), "count": _int(e.get("c"))} for e in _many(d.get("errors"))],
             "sample": [f"{e.get('t')} {e.get('n')}: {e.get('m')}" for e in _many(d.get("sample"))] + [f"{e.get('t')} crash: {e.get('m')}" for e in _many(d.get("crashes"))][:4],
             "containers": [], "uptime_s": (datetime.now(timezone.utc).timestamp() - boot) if boot else None}
@@ -438,12 +440,12 @@ def parse_changes_windows(text: str) -> dict[str, Any]:
         events.append({"at": _iso(e.get("t")), "kind": "service", "text": f"A service was installed: {e.get('m')}"})
     events = [e for e in events if e["at"]]
     events.sort(key=lambda e: -e["at"])
-    return {"platform": "windows", "script_version": d.get("version"), "events": events[:80], "users": [str(u.get("n")) for u in _many(d.get("users"))]}
+    return {"platform": "windows", "script_version": d.get("version"), "notes": [str(n) for n in _many(d.get("notes"))], "events": events[:80], "users": [str(u.get("n")) for u in _many(d.get("users"))]}
 
 
 def parse_schedule_windows(text: str) -> dict[str, Any]:
     d = _win_json(text)
-    return {"platform": "windows", "script_version": d.get("version"), "runs": [], "dirs": {},
+    return {"platform": "windows", "script_version": d.get("version"), "notes": [str(n) for n in _many(d.get("notes"))], "runs": [], "dirs": {},
             "jobs": [{"name": str(t.get("n")), "source": "task", "last": _iso(t.get("last")), "next": _iso(t.get("next")), "detail": f"last result {_int(t.get('res'))}", "result": _int(t.get("res"))} for t in _many(d.get("tasks"))]}
 
 
@@ -453,15 +455,15 @@ def parse_hardware_windows(text: str) -> dict[str, Any]:
     for x in _many(d.get("disks")):
         bad = str(x.get("health")).lower() not in ("healthy", "") or _int(x.get("werr")) > 0 or _int(x.get("rerr")) > 0
         disks.append({"dev": str(x.get("n")), "health": str(x.get("health")), "detail": f"temperature {x.get('temp')} C, wear {x.get('wear')}, read errors {x.get('rerr')}, write errors {x.get('werr')}", "bad": bad})
-    return {"platform": "windows", "script_version": d.get("version"), "virt": "", "disks": disks, "raid": [], "zfs": [], "temps": [{"name": x["dev"], "c": float(re.search(r"temperature (\d+)", x["detail"]).group(1))} for x in disks if re.search(r"temperature (\d+)", x["detail"])],
+    return {"platform": "windows", "script_version": d.get("version"), "notes": [str(n) for n in _many(d.get("notes"))], "virt": "", "disks": disks, "raid": [], "zfs": [], "temps": [{"name": x["dev"], "c": float(re.search(r"temperature (\d+)", x["detail"]).group(1))} for x in disks if re.search(r"temperature (\d+)", x["detail"])],
             "errors": [f"{e.get('t')} event {e.get('id')}: {e.get('m')}" for e in _many(d.get("ioerrors"))], "readonly": [], "ups": [{"name": "battery", "detail": f"{b.get('charge')}% status {b.get('status')}"} for b in _many(d.get("battery"))]}
 
 
 def parse_security_windows(text: str) -> dict[str, Any]:
     d = _win_json(text)
-    return {"platform": "windows", "script_version": d.get("version"), "failed": [{"ip": str(f.get("ip")), "count": _int(f.get("c"))} for f in _many(d.get("failed"))], "failed_total": _int(d.get("failed_total")),
+    return {"platform": "windows", "script_version": d.get("version"), "notes": [str(n) for n in _many(d.get("notes"))], "failed": [{"ip": str(f.get("ip")), "count": _int(f.get("c"))} for f in _many(d.get("failed"))], "failed_total": _int(d.get("failed_total")),
             "accepted": [], "sudo": 0, "exposed": [], "docker_ports": [], "users": [str(u) for u in _many(d.get("users"))], "admins": [str(a) for a in _many(d.get("admins"))],
-            "updates": {"pending": 0, "security": 0, "reboot": bool(d.get("reboot_pending"))}, "time_synced": None, "firewall": {str(f.get("n")): ("active" if f.get("on") else "inactive") for f in _many(d.get("firewall"))},
+            "updates": {"pending": 0, "security": 0, "reboot": bool(d.get("reboot_pending"))}, "time_synced": d.get("time_synced") if isinstance(d.get("time_synced"), bool) else None, "firewall": {str(f.get("n")): ("active" if f.get("on") else "inactive") for f in _many(d.get("firewall"))},
             "defender": d.get("defender") if isinstance(d.get("defender"), dict) else None}
 
 

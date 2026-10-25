@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.261 — 2026-10-25
+
+### Fixed
+- ★ **The Windows probes work with a plain read-only account.** Tried on a real Windows 11 host, most of them came back empty: the probe account may not use WMI/CIM (processor load, memory totals, network adapters, connections, services, firewall, disk health). They now use what such an account may use: performance counters, .NET, `netstat`, `schtasks`, the event logs (through the read-only "Event Log Readers" group) and the registry, and take seconds instead of minutes. What a limited account still cannot read (for example SMART disk health) is said in the report ("Could not read part of this: ..."), never silently left out. Windows "last result" codes that only mean "not run yet" or "running" are no longer shown as errors.
+
 ## 0.4.260 — 2026-10-25
 
 ### Added

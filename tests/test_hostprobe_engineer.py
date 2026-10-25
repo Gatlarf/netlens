@@ -426,3 +426,27 @@ def test_the_windows_scripts_parse_in_powershell(tmp_path):
     w.write_text(scripts.windows_wrapper())
     r = subprocess.run(["pwsh", "-NoProfile", "-Command", "$e=$null;$t=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('" + str(w) + "',[ref]$t,[ref]$e);if($e.Count){$e|%{$_.Message};exit 1}"], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
+
+
+# ----------------------------------------------------------------------------- Windows: what the limited probe account really returned (captured on a real Windows 11 host)
+def test_windows_answers_from_a_limited_account_are_read_and_say_what_could_not_be_read():
+    import json as _json
+
+    def wrap(d):
+        return "##netlens-probe\n" + _json.dumps(d)
+
+    cpu = parsers.parse_probe("cpu", "windows", wrap({"version": 6, "cpus": 20, "load": 10.7, "queue": 0, "diskq": 0, "procs": [{"id": 0, "n": "searchindexer", "cpu": 58.3, "ws": 0}], "notes": []}))
+    assert cpu["cpu_pct"] == {"busy": 10.7} and cpu["procs"][0]["name"] == "searchindexer"
+    mem = parsers.parse_probe("memory", "windows", wrap({"total_kb": 49679100, "free_kb": 29912068, "commit_total_kb": 137438953344, "commit_free_kb": 135286597760, "pagefile_pct": 1.75,
+                                                       "procs": [{"id": 0, "n": "vmmemwsl", "ws": 3345068032, "pm": 0}], "notes": []}))
+    assert 39 < mem["used_pct"] < 40 and mem["swap_total"] == 0 and mem["procs"][0]["name"] == "vmmemwsl"                           # a 64-bit "virtual size" is not a swap size
+    hw = parsers.parse_probe("hardware", "windows", wrap({"version": 6, "notes": ["disk health (SMART) needs more rights than the probe account has: Access denied"]}))
+    found = analyze.analyze("hardware", hw, {})
+    assert any("Could not read part of this: disk health (SMART) needs more rights" in e["text"] and e["tags"] == ["cannot_read"] for e in found)
+    sched = parsers.parse_probe("schedule", "windows", wrap({"tasks": [{"n": "\\Backup", "last": "2026-10-25T02:50:00.0000000Z", "next": None, "res": 267011}, {"n": "\\Sync", "last": "2026-10-25T02:49:00.0000000Z", "next": None, "res": -2147160572}]}))
+    onset = datetime(2026, 10, 25, 2, 55, tzinfo=timezone.utc).timestamp()
+    texts_ = " | ".join(e["text"] for e in analyze.analyze("schedule", sched, {"onset": onset}))
+    assert "\\Backup started at" in texts_ and "\\Sync started at" in texts_ and "ended with an error" in texts_ and texts_.count("ended with an error") == 1       # 267011 is "not yet run", not an error
+    sec = parsers.parse_probe("security", "windows", wrap({"failed_total": 4, "firewall": [{"n": "Domain", "on": False}, {"n": "Public", "on": False}], "time_synced": False, "admins": ["PC\\Administrator"]}))
+    t = " | ".join(e["text"] for e in analyze.analyze("security", sec, {}))
+    assert "No host firewall is active" in t and "clock is not synchronised" in t

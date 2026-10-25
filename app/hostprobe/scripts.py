@@ -24,7 +24,7 @@ import base64
 PROBES = ("storage", "cpu", "memory", "network", "apps", "changes", "schedule", "hardware", "security")
 TITLES = {"storage": "Storage", "cpu": "Processor", "memory": "Memory", "network": "Network", "apps": "Applications", "changes": "Recent changes",
           "schedule": "Scheduled jobs", "hardware": "Hardware health", "security": "Security"}
-SCRIPT_VERSION = 5          # raise it when a script changes: a host that has an older copy installed is told so
+SCRIPT_VERSION = 6          # raise it when a script changes: a host that has an older copy installed is told so
 WRAPPER_PATH = "/usr/local/sbin/netlens-probe"
 ENTRY_PATH = "/usr/local/sbin/netlens-probe-entry"
 WRAPPER_NAME = "netlens-probe"
@@ -256,94 +256,88 @@ WINDOWS["storage"] = (
     "'##netlens-probe';$r|ConvertTo-Json -Compress -Depth 5"
 )
 
-# CPU: two samples of the per-process counters 2 seconds apart (a cumulative total says nothing about NOW)
-WINDOWS["cpu"] = (
-    "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='SilentlyContinue';$r=@{version=@VERSION@};"
-    "$cpus=[Environment]::ProcessorCount;$r.cpus=$cpus;"
-    "$a=@{};foreach($p in Get-Process){$a[$p.Id]=@{n=$p.ProcessName;c=[double]$p.CPU;ws=[int64]$p.WorkingSet64}};Start-Sleep -Seconds 2;"
-    "$rows=@();foreach($p in Get-Process){$o=$a[$p.Id];if($o -and $p.CPU -ne $null){$rows+=@{id=$p.Id;n=$p.ProcessName;cpu=[math]::Round((([double]$p.CPU-$o.c)/2)*100,1);ws=[int64]$p.WorkingSet64}}};"
-    "$r.procs=@($rows|Sort-Object {$_.cpu} -Descending|Select-Object -First 12);"
-    "try{$r.load=(Get-CimInstance Win32_Processor|Measure-Object LoadPercentage -Average).Average}catch{};"
-    "try{$r.queue=(Get-Counter '\\System\\Processor Queue Length' -ErrorAction Stop).CounterSamples[0].CookedValue}catch{};"
-    "try{$r.diskq=(Get-Counter '\\PhysicalDisk(_Total)\\Current Disk Queue Length' -ErrorAction Stop).CounterSamples[0].CookedValue}catch{};"
-    "'##netlens-probe';$r|ConvertTo-Json -Compress -Depth 4"
-)
+# The probe account is a plain local account (read-only groups only), so the Windows probes use what such an account may use: performance counters, .NET, netstat, the event logs and the registry.
+# WMI/CIM (Get-CimInstance, Get-NetAdapter, Get-NetTCPConnection, Get-PhysicalDisk ...) is refused to it. What cannot be read is said in `notes`, never silently left out.
+_WIN_HEAD = ("$ProgressPreference='SilentlyContinue';$ErrorActionPreference='SilentlyContinue';$r=@{version=@VERSION@;notes=New-Object System.Collections.ArrayList};"
+             "function note($m){[void]$r.notes.Add(([string]$m -replace '\\s+',' '))};")
+_WIN_TAIL = "\n'##netlens-probe';$r|ConvertTo-Json -Compress -Depth 5"
 
-WINDOWS["memory"] = (
-    "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='SilentlyContinue';$r=@{version=@VERSION@};"
-    "try{$o=Get-CimInstance Win32_OperatingSystem;$r.total_kb=[double]$o.TotalVisibleMemorySize;$r.free_kb=[double]$o.FreePhysicalMemory;$r.commit_total_kb=[double]$o.TotalVirtualMemorySize;$r.commit_free_kb=[double]$o.FreeVirtualMemory}catch{};"
-    "$r.procs=@(Get-Process|Sort-Object WorkingSet64 -Descending|Select-Object -First 12|%{@{id=$_.Id;n=$_.ProcessName;ws=[int64]$_.WorkingSet64;pm=[int64]$_.PrivateMemorySize64}});"
-    "try{$r.pagefile=@(Get-CimInstance Win32_PageFileUsage|%{@{n=$_.Name;used=[int64]$_.CurrentUsage;size=[int64]$_.AllocatedBaseSize}})}catch{};"
-    "try{$r.events=@(Get-WinEvent -FilterHashtable @{LogName='System';Id=2004;StartTime=(Get-Date).AddHours(-72)} -MaxEvents 5|%{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');m=($_.Message -replace '\\s+',' ').Substring(0,[math]::Min(200,$_.Message.Length))}})}catch{};"
-    "'##netlens-probe';$r|ConvertTo-Json -Compress -Depth 4"
-)
+WINDOWS["cpu"] = _WIN_HEAD + r"""
+$r.cpus=[Environment]::ProcessorCount
+try{$r.load=[math]::Round((Get-Counter '\Processor Information(_Total)\% Processor Time' -ErrorAction Stop).CounterSamples[0].CookedValue,1)}catch{note ('processor load: '+$_.Exception.Message)}
+try{$r.queue=(Get-Counter '\System\Processor Queue Length' -ErrorAction Stop).CounterSamples[0].CookedValue}catch{}
+try{$r.diskq=(Get-Counter '\PhysicalDisk(_Total)\Current Disk Queue Length' -ErrorAction Stop).CounterSamples[0].CookedValue}catch{}
+try{$s=(Get-Counter '\Process(*)\% Processor Time' -SampleInterval 2 -MaxSamples 1 -ErrorAction Stop).CounterSamples|Where-Object{$_.InstanceName -ne '_total' -and $_.InstanceName -ne 'idle'}|Sort-Object CookedValue -Descending|Select-Object -First 12
+$r.procs=@($s|ForEach-Object{@{id=0;n=($_.InstanceName -replace '#\d+$','');cpu=[math]::Round($_.CookedValue,1);ws=0}})}catch{note ('processes: '+$_.Exception.Message)}""" + _WIN_TAIL
 
-WINDOWS["network"] = (
-    "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='SilentlyContinue';$r=@{version=@VERSION@};"
-    "$s1=@{};foreach($a in Get-NetAdapterStatistics){$s1[$a.Name]=$a};Start-Sleep -Seconds 1;"
-    "$r.nics=@(Get-NetAdapterStatistics|%{$o=$s1[$_.Name];@{n=$_.Name;rx=[double]($_.ReceivedBytes-$o.ReceivedBytes)*8;tx=[double]($_.SentBytes-$o.SentBytes)*8;rxerr=[double]$_.ReceivedPacketErrors;txerr=[double]$_.OutboundPacketErrors;rxdrop=[double]$_.ReceivedDiscardedPackets;txdrop=[double]$_.OutboundDiscardedPackets}});"
-    "$c=@(Get-NetTCPConnection);$r.states=@($c|Group-Object State|%{@{s=[string]$_.Name;c=$_.Count}});"
-    "$r.remote=@($c|Where-Object{$_.State -eq 'Established'}|Group-Object RemoteAddress|Sort-Object Count -Descending|Select-Object -First 10|%{@{ip=[string]$_.Name;c=$_.Count}});"
-    "$names=@{};foreach($p in Get-Process){$names[$p.Id]=$p.ProcessName};"
-    "$r.processes=@($c|Where-Object{$_.State -eq 'Established'}|Group-Object OwningProcess|Sort-Object Count -Descending|Select-Object -First 8|%{@{n=[string]$names[[int]$_.Name];c=$_.Count}});"
-    "$r.listening=@($c|Where-Object{$_.State -eq 'Listen'}|Select-Object -First 25|%{@{a=($_.LocalAddress+':'+$_.LocalPort);n=[string]$names[[int]$_.OwningProcess]}});"
-    "try{$gw=(Get-NetRoute -DestinationPrefix '0.0.0.0/0'|Sort-Object RouteMetric|Select-Object -First 1).NextHop;$r.gateway=$gw;"
-    "$r.ping=@(@{t='gateway';ip=$gw},@{t='internet';ip='1.1.1.1'}|%{$x=Test-Connection -ComputerName $_.ip -Count 3 -ErrorAction SilentlyContinue;@{t=$_.t;ip=$_.ip;ok=@($x).Count;ms=if($x){[math]::Round(($x|Measure-Object ResponseTime -Average).Average,1)}else{$null}}})}catch{};"
-    "$sw=[Diagnostics.Stopwatch]::StartNew();try{[void][Net.Dns]::GetHostAddresses('example.com');$r.dns=@{ok=$true;ms=$sw.ElapsedMilliseconds}}catch{$r.dns=@{ok=$false;ms=$sw.ElapsedMilliseconds}};"
-    "'##netlens-probe';$r|ConvertTo-Json -Compress -Depth 4"
-)
+WINDOWS["memory"] = _WIN_HEAD + r"""
+try{Add-Type -AssemblyName Microsoft.VisualBasic;$c=New-Object Microsoft.VisualBasic.Devices.ComputerInfo;$r.total_kb=[double]$c.TotalPhysicalMemory/1024;$r.free_kb=[double]$c.AvailablePhysicalMemory/1024;$r.commit_total_kb=[double]$c.TotalVirtualMemory/1024;$r.commit_free_kb=[double]$c.AvailableVirtualMemory/1024}catch{note ('memory totals: '+$_.Exception.Message)}
+try{$r.procs=@((Get-Counter '\Process(*)\Working Set - Private' -ErrorAction Stop).CounterSamples|Where-Object{$_.InstanceName -ne '_total' -and $_.InstanceName -ne 'idle'}|Sort-Object CookedValue -Descending|Select-Object -First 12|ForEach-Object{@{id=0;n=($_.InstanceName -replace '#\d+$','');ws=[int64]$_.CookedValue;pm=0}})}catch{note ('processes: '+$_.Exception.Message)}
+try{$r.pagefile_pct=(Get-Counter '\Paging File(_Total)\% Usage' -ErrorAction Stop).CounterSamples[0].CookedValue}catch{}
+try{$r.events=@(Get-WinEvent -FilterHashtable @{LogName='System';Id=2004;StartTime=(Get-Date).AddHours(-72)} -MaxEvents 5 -ErrorAction Stop|ForEach-Object{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');m=(($_.Message -replace '\s+',' ')+'').Substring(0,[math]::Min(200,(($_.Message+'').Length)))}})}catch{}""" + _WIN_TAIL
 
-WINDOWS["apps"] = (
-    "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='SilentlyContinue';$r=@{version=@VERSION@};"
-    "try{$r.boot=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('o')}catch{};"
-    "$r.services=@(Get-CimInstance Win32_Service -Filter \"StartMode='Auto' AND State<>'Running' AND ExitCode<>0 AND ExitCode<>1077\"|Select-Object -First 20|%{@{n=[string]$_.DisplayName;state=[string]$_.State;exit=[int]$_.ExitCode}});"
-    "try{$e=@(Get-WinEvent -FilterHashtable @{LogName='Application','System';Level=1,2;StartTime=(Get-Date).AddHours(-1)} -MaxEvents 300);"
-    "$r.errors=@($e|Group-Object ProviderName|Sort-Object Count -Descending|Select-Object -First 10|%{@{n=[string]$_.Name;c=$_.Count}});"
-    "$r.sample=@($e|Select-Object -First 6|%{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');n=[string]$_.ProviderName;m=(($_.Message -replace '\\s+',' ')+'').Substring(0,[math]::Min(160,(($_.Message+'').Length)))}})}catch{};"
-    "try{$r.crashes=@(Get-WinEvent -FilterHashtable @{LogName='Application';Id=1000,1002;StartTime=(Get-Date).AddHours(-24)} -MaxEvents 10|%{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');m=(($_.Message -replace '\\s+',' ')+'').Substring(0,[math]::Min(160,(($_.Message+'').Length)))}})}catch{};"
-    "'##netlens-probe';$r|ConvertTo-Json -Compress -Depth 4"
-)
+WINDOWS["network"] = _WIN_HEAD + r"""
+function Stat($n){$s=$n.GetIPv4Statistics();@{rx=[double]$s.BytesReceived;tx=[double]$s.BytesSent;re=[double]$s.IncomingPacketsWithErrors;te=[double]$s.OutgoingPacketsWithErrors;rd=[double]$s.IncomingPacketsDiscarded;td=[double]$s.OutgoingPacketsDiscarded}}
+function PingIt($ip){$p=New-Object Net.NetworkInformation.Ping;$ok=0;$tot=0;1..3|ForEach-Object{try{$x=$p.Send($ip,1000);if($x.Status -eq 'Success'){$ok++;$tot+=$x.RoundtripTime}}catch{}};@{ok=$ok;ms=$(if($ok){[math]::Round($tot/$ok,1)}else{$null})}}
+$nics=@([Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()|Where-Object{$_.OperationalStatus -eq 'Up' -and $_.NetworkInterfaceType -ne 'Loopback' -and $_.NetworkInterfaceType -ne 'Tunnel'})
+$a=@{};foreach($n in $nics){$a[$n.Id]=Stat $n};Start-Sleep -Seconds 1
+$r.nics=@($nics|ForEach-Object{$b=Stat $_;$o=$a[$_.Id];@{n=$_.Name;rx=($b.rx-$o.rx)*8;tx=($b.tx-$o.tx)*8;rxerr=$b.re;txerr=$b.te;rxdrop=$b.rd;txdrop=$b.td}})
+try{$r.gateway=[string](($nics|ForEach-Object{$_.GetIPProperties().GatewayAddresses}|Where-Object{$_.Address.AddressFamily -eq 'InterNetwork'}|Select-Object -First 1).Address)}catch{}
+$names=@{};foreach($p in Get-Process){$names[[int]$p.Id]=$p.ProcessName}
+$ns=@(netstat -ano -p tcp 2>$null|Where-Object{$_ -match '^\s*TCP'}|ForEach-Object{$p=$_.Trim() -split '\s+';@{l=$p[1];r=$p[2];s=$p[3];pid=[int]$p[4]}})
+if(-not $ns.Count){note 'connections: netstat gave nothing'}
+$r.states=@($ns|Group-Object{$_.s}|ForEach-Object{@{s=[string]$_.Name;c=$_.Count}})
+$est=@($ns|Where-Object{$_.s -eq 'ESTABLISHED'})
+$r.remote=@($est|Group-Object{($_.r -replace ':\d+$','')}|Sort-Object Count -Descending|Select-Object -First 10|ForEach-Object{@{ip=[string]$_.Name;c=$_.Count}})
+$r.processes=@($est|Group-Object{$names[$_.pid]}|Sort-Object Count -Descending|Select-Object -First 8|ForEach-Object{@{n=[string]$_.Name;c=$_.Count}})
+$r.listening=@($ns|Where-Object{$_.s -eq 'LISTENING'}|Select-Object -First 25|ForEach-Object{@{a=$_.l;n=[string]$names[$_.pid]}})
+$pg=@();if($r.gateway){$g=PingIt $r.gateway;$pg+=@{t='gateway';ip=$r.gateway;ok=$g.ok;ms=$g.ms}};$i=PingIt '1.1.1.1';$pg+=@{t='internet';ip='1.1.1.1';ok=$i.ok;ms=$i.ms};$r.ping=$pg
+$sw=[Diagnostics.Stopwatch]::StartNew();try{[void][Net.Dns]::GetHostAddresses('example.com');$r.dns=@{ok=$true;ms=$sw.ElapsedMilliseconds}}catch{$r.dns=@{ok=$false;ms=$sw.ElapsedMilliseconds}}""" + _WIN_TAIL
 
-WINDOWS["changes"] = (
-    "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='SilentlyContinue';$r=@{version=@VERSION@};"
-    "$since=(Get-Date).AddDays(-3);"
-    "try{$r.boots=@(Get-WinEvent -FilterHashtable @{LogName='System';Id=41,1074,6005,6006,6008;StartTime=(Get-Date).AddDays(-7)} -MaxEvents 15|%{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');id=$_.Id}})}catch{};"
-    "try{$r.hotfixes=@(Get-HotFix|Where-Object{$_.InstalledOn -ge $since}|Select-Object -First 15|%{@{id=[string]$_.HotFixID;t=$_.InstalledOn.ToUniversalTime().ToString('o')}})}catch{};"
-    "try{$r.installs=@(Get-WinEvent -FilterHashtable @{LogName='Application';ProviderName='MsiInstaller';Id=11707,11724;StartTime=$since} -MaxEvents 20|%{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');m=(($_.Message -replace '\\s+',' ')+'').Substring(0,[math]::Min(140,(($_.Message+'').Length)))}})}catch{};"
-    "try{$r.services=@(Get-WinEvent -FilterHashtable @{LogName='System';Id=7045;StartTime=$since} -MaxEvents 10|%{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');m=(($_.Message -replace '\\s+',' ')+'').Substring(0,[math]::Min(140,(($_.Message+'').Length)))}})}catch{};"
-    "try{$r.users=@(Get-LocalUser|Where-Object{$_.Enabled}|%{@{n=$_.Name;pwd=if($_.PasswordLastSet){$_.PasswordLastSet.ToUniversalTime().ToString('o')}else{$null}}})}catch{};"
-    "'##netlens-probe';$r|ConvertTo-Json -Compress -Depth 4"
-)
+WINDOWS["apps"] = _WIN_HEAD + r"""
+try{$r.boot=[DateTime]::UtcNow.AddMilliseconds(-[Environment]::TickCount).ToString('o')}catch{}
+try{$e=@(Get-WinEvent -FilterHashtable @{LogName='System';ProviderName='Service Control Manager';Id=7031,7034,7023;StartTime=(Get-Date).AddHours(-24)} -MaxEvents 100 -ErrorAction Stop)
+$r.services=@($e|ForEach-Object{if($_.Message -match 'The (.+?) service (terminated|entered|failed)'){$Matches[1]}}|Group-Object|Sort-Object Count -Descending|Select-Object -First 10|ForEach-Object{@{n=[string]$_.Name;state='stopped unexpectedly';exit=0;c=$_.Count}})}catch{if($_.Exception.Message -notlike '*No events*'){note ('service failures: '+$_.Exception.Message)}}
+try{$e=@(Get-WinEvent -FilterHashtable @{LogName='Application','System';Level=1,2;StartTime=(Get-Date).AddHours(-1)} -MaxEvents 300 -ErrorAction Stop)
+$r.errors=@($e|Group-Object ProviderName|Sort-Object Count -Descending|Select-Object -First 10|ForEach-Object{@{n=[string]$_.Name;c=$_.Count}})
+$r.sample=@($e|Select-Object -First 6|ForEach-Object{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');n=[string]$_.ProviderName;m=(($_.Message -replace '\s+',' ')+'').Substring(0,[math]::Min(160,(($_.Message+'').Length)))}})}catch{if($_.Exception.Message -notlike '*No events*'){note ('event log: '+$_.Exception.Message)}}
+try{$r.crashes=@(Get-WinEvent -FilterHashtable @{LogName='Application';Id=1000,1002;StartTime=(Get-Date).AddHours(-24)} -MaxEvents 10 -ErrorAction Stop|ForEach-Object{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');m=(($_.Message -replace '\s+',' ')+'').Substring(0,[math]::Min(160,(($_.Message+'').Length)))}})}catch{}""" + _WIN_TAIL
 
-WINDOWS["schedule"] = (
-    "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='SilentlyContinue';$r=@{version=@VERSION@};"
-    "$r.tasks=@(Get-ScheduledTask|Where-Object{$_.State -ne 'Disabled' -and $_.TaskPath -notlike '\\Microsoft\\*'}|Select-Object -First 60|%{$i=$_|Get-ScheduledTaskInfo;"
-    "@{n=($_.TaskPath+$_.TaskName);last=if($i.LastRunTime -and $i.LastRunTime.Year -gt 2000){$i.LastRunTime.ToUniversalTime().ToString('o')}else{$null};next=if($i.NextRunTime -and $i.NextRunTime.Year -gt 2000){$i.NextRunTime.ToUniversalTime().ToString('o')}else{$null};res=[int]$i.LastTaskResult}});"
-    "'##netlens-probe';$r|ConvertTo-Json -Compress -Depth 4"
-)
+WINDOWS["changes"] = _WIN_HEAD + r"""
+$since=(Get-Date).AddDays(-3)
+try{$r.boots=@(Get-WinEvent -FilterHashtable @{LogName='System';Id=41,1074,6005,6006,6008;StartTime=(Get-Date).AddDays(-7)} -MaxEvents 15 -ErrorAction Stop|ForEach-Object{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');id=$_.Id}})}catch{}
+try{$r.hotfixes=@(Get-WinEvent -FilterHashtable @{LogName='System';ProviderName='Microsoft-Windows-WindowsUpdateClient';Id=19;StartTime=$since} -MaxEvents 15 -ErrorAction Stop|ForEach-Object{@{id=(($_.Message -replace '\s+',' ')+'').Substring(0,[math]::Min(120,(($_.Message+'').Length)));t=$_.TimeCreated.ToUniversalTime().ToString('o')}})}catch{}
+try{$r.installs=@(Get-WinEvent -FilterHashtable @{LogName='Application';ProviderName='MsiInstaller';Id=11707,11724;StartTime=$since} -MaxEvents 20 -ErrorAction Stop|ForEach-Object{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');m=(($_.Message -replace '\s+',' ')+'').Substring(0,[math]::Min(140,(($_.Message+'').Length)))}})}catch{}
+try{$r.services=@(Get-WinEvent -FilterHashtable @{LogName='System';Id=7045;StartTime=$since} -MaxEvents 10 -ErrorAction Stop|ForEach-Object{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');m=(($_.Message -replace '\s+',' ')+'').Substring(0,[math]::Min(140,(($_.Message+'').Length)))}})}catch{}
+try{$r.users=@(Get-LocalUser -ErrorAction Stop|Where-Object{$_.Enabled}|ForEach-Object{@{n=$_.Name;pwd=$(if($_.PasswordLastSet){$_.PasswordLastSet.ToUniversalTime().ToString('o')}else{$null})}})}catch{note ('accounts: '+$_.Exception.Message)}""" + _WIN_TAIL
 
-WINDOWS["hardware"] = (
-    "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='SilentlyContinue';$r=@{version=@VERSION@};"
-    "try{$r.disks=@(Get-PhysicalDisk|%{$c=$_|Get-StorageReliabilityCounter;@{n=[string]$_.FriendlyName;health=[string]$_.HealthStatus;op=[string]$_.OperationalStatus;temp=$c.Temperature;wear=$c.Wear;rerr=$c.ReadErrorsTotal;werr=$c.WriteErrorsTotal}})}catch{};"
-    "try{$r.volumes=@(Get-Volume|Where-Object{$_.DriveLetter}|%{@{d=[string]$_.DriveLetter;health=[string]$_.HealthStatus;size=[int64]$_.Size;free=[int64]$_.SizeRemaining}})}catch{};"
-    "try{$r.ioerrors=@(Get-WinEvent -FilterHashtable @{LogName='System';Id=7,11,15,51,55,129,153;StartTime=(Get-Date).AddDays(-3)} -MaxEvents 12|%{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');id=$_.Id;m=(($_.Message -replace '\\s+',' ')+'').Substring(0,[math]::Min(160,(($_.Message+'').Length)))}})}catch{};"
-    "try{$r.battery=@(Get-CimInstance Win32_Battery|%{@{charge=$_.EstimatedChargeRemaining;status=$_.BatteryStatus}})}catch{};"
-    "'##netlens-probe';$r|ConvertTo-Json -Compress -Depth 4"
-)
+WINDOWS["schedule"] = _WIN_HEAD + r"""
+try{$cu=[Globalization.CultureInfo]::CurrentCulture
+function T($x){try{$d=[datetime]::Parse([string]$x,$cu);if($d.Year -gt 2000){$d.ToUniversalTime().ToString('o')}else{$null}}catch{$null}}
+$seen=@{};$tasks=New-Object System.Collections.ArrayList
+foreach($t in @(schtasks.exe /query /fo csv /v 2>$null|ConvertFrom-Csv)){if(-not $t.TaskName -or $t.TaskName -eq 'TaskName' -or $t.TaskName -like '\Microsoft\*' -or $t.'Scheduled Task State' -ne 'Enabled' -or $seen[$t.TaskName]){continue};$seen[$t.TaskName]=1
+$res=0;[void][int]::TryParse([string]$t.'Last Result',[ref]$res);[void]$tasks.Add(@{n=[string]$t.TaskName;last=(T $t.'Last Run Time');next=(T $t.'Next Run Time');res=$res})
+if($tasks.Count -ge 80){break}}
+$r.tasks=@($tasks);if(-not $tasks.Count){note 'scheduled tasks: schtasks gave nothing'}}catch{note ('scheduled tasks: '+$_.Exception.Message)}""" + _WIN_TAIL
 
-WINDOWS["security"] = (
-    "$ProgressPreference='SilentlyContinue';$ErrorActionPreference='SilentlyContinue';$r=@{version=@VERSION@};"
-    "$since=(Get-Date).AddHours(-24);"
-    "try{$f=@(Get-WinEvent -FilterHashtable @{LogName='Security';Id=4625;StartTime=$since} -MaxEvents 2000);"
-    "$r.failed_total=$f.Count;$r.failed=@($f|ForEach-Object{$x=[xml]$_.ToXml();($x.Event.EventData.Data|Where-Object{$_.Name -eq 'IpAddress'}).'#text'}|Where-Object{$_}|Group-Object|Sort-Object Count -Descending|Select-Object -First 10|%{@{ip=[string]$_.Name;c=$_.Count}})}catch{};"
-    "try{$r.admins=@(Get-LocalGroupMember -SID S-1-5-32-544|%{[string]$_.Name})}catch{};"
-    "try{$r.users=@(Get-LocalUser|Where-Object{$_.Enabled}|%{[string]$_.Name})}catch{};"
-    "try{$m=Get-MpComputerStatus;$r.defender=@{enabled=$m.RealTimeProtectionEnabled;sig_age=$m.AntivirusSignatureAge}}catch{};"
-    "try{$r.firewall=@(Get-NetFirewallProfile|%{@{n=[string]$_.Name;on=[bool]$_.Enabled}})}catch{};"
-    "try{$r.reboot_pending=[bool](Test-Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\Auto Update\\RebootRequired')}catch{};"
-    "try{$r.time=(w32tm /query /status|Out-String).Substring(0,[math]::Min(400,(w32tm /query /status|Out-String).Length))}catch{};"
-    "'##netlens-probe';$r|ConvertTo-Json -Compress -Depth 4"
-)
+WINDOWS["hardware"] = _WIN_HEAD + r"""
+try{$r.disks=@(Get-PhysicalDisk -ErrorAction Stop|ForEach-Object{$c=$_|Get-StorageReliabilityCounter -ErrorAction SilentlyContinue;@{n=[string]$_.FriendlyName;health=[string]$_.HealthStatus;op=[string]$_.OperationalStatus;temp=$c.Temperature;wear=$c.Wear;rerr=$c.ReadErrorsTotal;werr=$c.WriteErrorsTotal}})}catch{note ('disk health (SMART) needs more rights than the probe account has: '+$_.Exception.Message)}
+try{$e=@()
+$e+=@(Get-WinEvent -FilterHashtable @{LogName='System';ProviderName='disk','Disk';Id=7,11,15,51,52,153;StartTime=(Get-Date).AddDays(-3)} -MaxEvents 8 -ErrorAction Stop)
+$e+=@(Get-WinEvent -FilterHashtable @{LogName='System';ProviderName='Ntfs','Microsoft-Windows-Ntfs';Id=55,57,140;StartTime=(Get-Date).AddDays(-3)} -MaxEvents 8 -ErrorAction Stop)
+$e+=@(Get-WinEvent -FilterHashtable @{LogName='System';ProviderName='stornvme','storahci','Microsoft-Windows-WHEA-Logger';Level=1,2,3;StartTime=(Get-Date).AddDays(-3)} -MaxEvents 8 -ErrorAction Stop)
+$r.ioerrors=@($e|Sort-Object TimeCreated -Descending|Select-Object -First 12|ForEach-Object{@{t=$_.TimeCreated.ToUniversalTime().ToString('o');id=$_.Id;m=(($_.ProviderName+': '+($_.Message -replace '\s+',' '))+'').Substring(0,[math]::Min(160,(($_.ProviderName+': '+$_.Message).Length)))}})}catch{if($_.Exception.Message -notlike '*No events*'){note ('disk errors: '+$_.Exception.Message)}}""" + _WIN_TAIL
+
+WINDOWS["security"] = _WIN_HEAD + r"""
+$since=(Get-Date).AddHours(-24)
+try{$f=@(Get-WinEvent -FilterHashtable @{LogName='Security';Id=4625;StartTime=$since} -MaxEvents 2000 -ErrorAction Stop)
+$r.failed_total=$f.Count;$r.failed=@($f|ForEach-Object{$x=[xml]$_.ToXml();($x.Event.EventData.Data|Where-Object{$_.Name -eq 'IpAddress'}).'#text'}|Where-Object{$_ -and $_ -ne '-'}|Group-Object|Sort-Object Count -Descending|Select-Object -First 10|ForEach-Object{@{ip=[string]$_.Name;c=$_.Count}})}catch{if($_.Exception.Message -notlike '*No events*'){note ('failed sign-ins (needs the Event Log Readers group): '+$_.Exception.Message)}}
+try{$r.admins=@(Get-LocalGroupMember -SID S-1-5-32-544 -ErrorAction Stop|ForEach-Object{[string]$_.Name})}catch{note ('administrators: '+$_.Exception.Message)}
+try{$r.users=@(Get-LocalUser -ErrorAction Stop|Where-Object{$_.Enabled}|ForEach-Object{[string]$_.Name})}catch{}
+try{$fw=@();foreach($p in 'DomainProfile','StandardProfile','PublicProfile'){$v=(Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\$p" -ErrorAction Stop).EnableFirewall;$fw+=@{n=$p -replace 'Profile','';on=[bool]$v}};$r.firewall=$fw}catch{note ('firewall state: '+$_.Exception.Message)}
+try{$d=Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows Defender\Real-Time Protection' -ErrorAction Stop;$r.defender=@{enabled=-not [bool]$d.DisableRealtimeMonitoring;sig_age=$null}}catch{}
+try{$r.reboot_pending=[bool](Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired')}catch{}
+try{$r.time_synced=[bool]((Get-Service w32time -ErrorAction Stop).Status -eq 'Running')}catch{}""" + _WIN_TAIL
 
 
 def windows_script(name: str) -> str:
@@ -444,7 +438,7 @@ def linux_setup(user: str, public_key: str | None, ca_public_key: str | None) ->
 def windows_wrapper() -> str:
     """C:\\ProgramData\\netlens\\probe.ps1: runs one of the probes by the name the client asked for and refuses every other command."""
     names = ", ".join(f"'{n}'" for n in PROBES)
-    blocks = "\n".join(f"function Probe-{n} {{\n{windows_script(n).replace(';', ';' + chr(10))}\n}}" for n in PROBES)
+    blocks = "\n".join(f"function Probe-{n} {{\n{windows_script(n)}\n}}" for n in PROBES)
     return (f"# Installed for Netlens. Read-only. Generated by Netlens; do not edit.\n{blocks}\n"
             f"$ask = [string]$env:SSH_ORIGINAL_COMMAND\n$name = if ($ask -match '^netlens-probe (\\w+)$') {{ $Matches[1] }} else {{ '' }}\n"
             f"if (@({names}) -notcontains $name) {{ [Console]::Error.WriteLine('refused'); exit 2 }}\n& \"Probe-$name\"\n")

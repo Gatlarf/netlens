@@ -214,7 +214,7 @@ def schedule(d: dict[str, Any], ctx: dict[str, Any]) -> list[dict[str, Any]]:
         if j.get("last") and onset - 20 * 60 <= j["last"] <= onset + 300:
             seen.add(j["name"])
             gap = (onset - j["last"]) / 60
-            bad = j.get("result") not in (None, 0)
+            bad = j.get("result") not in (None, 0) and not 267008 <= (j.get("result") or 0) <= 267015           # 0x41300..0x4130F are "ready", "running", "not yet run" ... not errors
             out.append(ev("schedule", "warn", 78 if gap >= 0 else 60, f"The scheduled job {j['name']} started at {clock(j['last'])}, " + (f"{gap:.0f} minutes before the problem began" if gap >= 0 else "just after the problem began")
                           + (f" and ended with an error ({j['detail']})" if bad else "") + ".", ["job:" + j["name"]], at=j["last"], private=j.get("private", False), llm_text="A scheduled job started shortly before the problem."))
     for r in d.get("runs", []):
@@ -277,7 +277,10 @@ ANALYZERS = {"cpu": cpu, "memory": memory, "network": network, "apps": apps, "ch
 
 def analyze(probe: str, data: dict[str, Any], ctx: dict[str, Any]) -> list[dict[str, Any]]:
     fn = ANALYZERS.get(probe)
-    return fn(data, ctx) if fn else []
+    out = fn(data, ctx) if fn else []
+    for note in (data.get("notes") or [])[:3]:                       # what the probe account could not read (a limited account sees less): said, never silently left out
+        out.append(ev(probe, "fact", 12, f"Could not read part of this: {note}"[:240], ["cannot_read"]))
+    return out
 
 
 # ----------------------------------------------------------------------------- chains across probes
