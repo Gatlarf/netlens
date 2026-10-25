@@ -39,8 +39,8 @@ def r_vulnerabilities(r: dict) -> str:
     return text
 
 
-def _mbps(point) -> float | None:
-    return None if not point else round(point[1] / 1e6, 2) if isinstance(point, (list, tuple)) else None
+def _mbps(bits) -> float | None:
+    return None if bits is None else round(bits / 1e6, 2)
 
 
 def t_traffic(conn, args, now=None) -> dict:
@@ -49,7 +49,7 @@ def t_traffic(conn, args, now=None) -> dict:
     range_key = args.get("range") if args.get("range") in traffic.RANGES else "1h"
     chosen = interface_settings.get(conn)["wan"]
     wan = (int(chosen.split("|", 1)[0]), chosen.split("|", 1)[1]) if chosen else None
-    t = traffic.build(conn, range_key, wan, mode="endpoints")
+    t = traffic.build(conn, range_key, wan, now=now.timestamp() if now else None, mode="endpoints")
     out: dict[str, Any] = {"range": range_key, "devices": None, "internet": None}
     d = t["devices"]
     if d.get("now"):

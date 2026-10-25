@@ -54,3 +54,14 @@ def test_the_quiet_ones_answer_without_data(conn):
     for q in ("who is on call", "are there errors in the log", "how much traffic is on the network", "what caused the latest incident"):
         a = ask.answer(conn, q, NOW)
         assert a["answer"] and a["source"] == "rules"
+
+
+def test_traffic_reports_the_newest_reading_and_the_peak(conn):
+    store = tsdb.for_conn(conn)
+    t0 = int(NOW.timestamp()) - 1800
+    for n in range(7):
+        store.record([("device", 1, "net_rx_bps", 2e6 + n * 1e6, "eth0", "bps"), ("device", 1, "net_tx_bps", 5e5, "eth0", "bps")], ts=t0 + n * 300)
+    conn.commit()
+    r = ask.TOOLS["traffic"][0](conn, {}, NOW)
+    assert r["devices"]["in_mbps_now"] == 8.0 and r["devices"]["in_mbps_peak"] == 8.0 and r["devices"]["out_mbps_now"] == 0.5
+    assert "8.0 Mbit/s in" in ask.render("traffic", r)
