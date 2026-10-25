@@ -1019,6 +1019,8 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_probe_snapshots_device ON probe_snapshots (device_id, taken)")
+    _add_column_if_missing(conn, "probe_snapshots", "probe", "TEXT NOT NULL DEFAULT 'storage'")          # which probe took it (storage, cpu, memory ...)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_probe_snapshots_probe ON probe_snapshots (device_id, probe, taken)")
 
     # --- schema v22: host monitors (health readings over SNMP or SSH) and the level each reading is at ---------
     cur.execute(

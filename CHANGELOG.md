@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.257 — 2026-10-25
+
+### Added
+- ★ **The digital engineer: root cause across processor, memory, network, applications and more, with read-only probes.** Storage inspection became **Host probes**: nine probes for Linux and Windows (storage, processor, memory, network, applications, recent changes, scheduled jobs, hardware health, security). Each answers one question about a host without changing anything. "Diagnose now" on the device page picks the probes a symptom calls for ("it is slow", "out of memory", "network timeouts", "keeps restarting", "the disk is full"), looks at the host and **chains what it finds**: a memory hog, the kernel killing a database, the database restarting in a loop, its log filling the disk; a scheduled scan that started just before the processor got busy; a package upgrade shortly before the trouble; a gateway that is fine while the internet is not. It also says what it ruled out.
+- A reading that goes over its limit calls for the matching probes at once (memory pressure looks at memory and applications), so the picture is taken while the problem is going on; incident investigations use those snapshots. Probes also run once a day for a picture of normal.
+- The same lock-down and short-lived logins as before cover all nine probes: the host gets one root-owned script and an entry script that accepts exactly the nine probe names (checked by tests that try to run anything else).
+- AI: ask "why is <host> slow?", "what is using the memory/processor/network on <host>?", "why did <host> restart?"; the assistant (MCP) has `get_host_probe` and `diagnose_host`; log lines and file names stay out of what a language model sees unless allowed. Every look and every question to the engineer is in the audit log. See docs/HOST-PROBES.md. The scripts for Linux were run on a real host; the Windows ones were only syntax-checked in PowerShell 7.
+
 ## 0.4.256 — 2026-10-25
 
 ### Added

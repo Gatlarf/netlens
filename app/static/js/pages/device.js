@@ -877,7 +877,7 @@ export async function render(container, params) {
       const monitorSlot = slot("monitor", "Health monitoring");
       hLeft.appendChild(monitorSlot);
       buildDeviceMonitorCard(device, { onChange: () => load() }).then((c) => { if (c && !disposed) monitorSlot.appendChild(c); }).catch(() => {});
-      const probeSlot = slot("probe", "Storage inspection");
+      const probeSlot = slot("probe", "Host probes");
       hLeft.appendChild(probeSlot);
       buildDeviceProbeCard(device).then((c) => { if (c && !disposed) probeSlot.appendChild(c); }).catch(() => {});
     }

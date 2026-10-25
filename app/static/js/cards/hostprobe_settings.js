@@ -16,7 +16,7 @@ export async function buildHostProbeCard() {
   function draw() {
     clear(card);
     card.appendChild(h("h2", {}, "Host probes"));
-    card.appendChild(h("p", { class: "hint" }, "Storage inspection (device page) logs in to a host and reads what uses its disks. It only reads, and the host can be locked down so that it can run nothing else. Logins can be short-lived: nothing secret is then kept on the host or reused."));
+    card.appendChild(h("p", { class: "hint" }, "Host probes (device page) log in to a host and look at it: what uses its disks, processor, memory and network, which applications fail, what changed, what is scheduled, hardware and security. They only read, and the host can be locked down so that it can run nothing else. Logins can be short-lived: nothing secret is then kept on the host or reused."));
 
     // 1. the Netlens certificate authority
     const ca = h("div", { class: "field" }, h("h3", {}, "Netlens certificate authority"));
@@ -78,12 +78,12 @@ export async function buildHostProbeCard() {
       clear(out);
       try {
         const r = await get(`/api/hostprobe/setup?platform=${platform.value}&user=${encodeURIComponent(user.value)}${pub.value ? `&public_key=${encodeURIComponent(pub.value)}` : ""}`);
-        const names = { install: "Run on the host (installs the read-only script and the account)", authorized_keys: "authorized_keys of the account (binds the key to the probe)", sshd_config: "Add to sshd_config (trust the Netlens CA, run only the probe)", ca_public_key: "Contents of the CA public key file", sudoers: "/etc/sudoers.d/netlens-probe", script: "The probe script itself (read it before you install it)" };
+        const names = { install: "Run on the host (installs the read-only script and the account)", authorized_keys: "authorized_keys of the account (binds the key to the probe)", sshd_config: "Add to sshd_config (trust the Netlens CA, run only the probe)", ca_public_key: "Contents of the CA public key file", sudoers: "/etc/sudoers.d/netlens-probe", script: "The probe script itself (read it before you install it)", entry: "The only command the account may run (sshd starts this whatever is asked)" };
         for (const [k, t] of Object.entries(names)) if (r.files[k]) out.appendChild(copyBox(t, r.files[k]));
         if (!r.has_ca && !pub.value) out.prepend(h("p", { class: "hint" }, "Create the CA above, or paste a public key, to get the lines that let Netlens in."));
       } catch (err) { toast(err.message || "Could not load", "error"); }
     });
-    card.append(h("p", { class: "hint" }, "The host gets a root-owned script that only reads, and an account that can run nothing but that script, however it is asked. Nothing else is changed."),
+    card.append(h("p", { class: "hint" }, "The host gets a root-owned script that only reads, a small entry script, and an account that can run nothing but the probes by name, however it is asked. Nothing else is changed."),
       field("System", platform), field("Account name", user), field("Public key (optional)", pub), h("div", { class: "form-actions" }, show), out);
   }
   draw();

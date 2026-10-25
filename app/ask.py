@@ -26,6 +26,11 @@ LIMIT = 15
 # Which devices count. A phone going offline is not news: by default the answers are about the devices that are meant to be on
 # (marked always-on, or of an infrastructure kind) and about network problems. `scope="all"` brings everything back.
 _SCOPE: contextvars.ContextVar[str] = contextvars.ContextVar("ask_scope", default="all")
+_FOR_MODEL: contextvars.ContextVar[bool] = contextvars.ContextVar("ask_for_model", default=False)       # the result of a tool goes to a language model: no file or folder names
+
+
+def for_model() -> bool:
+    return _FOR_MODEL.get()
 
 
 def important_ids(conn) -> set[int] | None:
@@ -452,7 +457,11 @@ def _ask_model(conn, question: str, names: list[str], now, ask) -> dict | None:
         if tool not in TOOLS or len(used) >= MAX_STEPS:
             return None
         used.append(tool)
-        result = TOOLS[tool][0](conn, _restore_args(doc.get("args"), redact), now)
+        token = _FOR_MODEL.set(True)
+        try:
+            result = TOOLS[tool][0](conn, _restore_args(doc.get("args"), redact), now)
+        finally:
+            _FOR_MODEL.reset(token)
         text = hide(json.dumps(result, default=str))[:MAX_RESULT]
         messages += [{"role": "assistant", "content": json.dumps({"tool": tool, "args": doc.get("args") or {}})}, {"role": "user", "content": "Result of " + tool + ":\n" + text}]
     return None

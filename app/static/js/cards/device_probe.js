@@ -3,24 +3,114 @@ import { h, clear, toast, timeAgo } from "../util.js";
 
 const GB = 1024 ** 3;
 const size = (n) => (n >= GB ? `${(n / GB).toFixed(1)} GB` : n >= 1024 ** 2 ? `${Math.round(n / 1024 ** 2)} MB` : `${Math.round(n / 1024)} kB`);
+const mbit = (n) => `${(n / 1e6).toFixed(1)} Mbit/s`;
 const SOURCES = [["static", "The login of the health monitor"], ["netlens_ca", "A certificate from the Netlens CA (valid for minutes)"], ["vault_ssh", "A certificate from Vault / OpenBao"]];
 const INTERVALS = [[1, "every hour"], [3, "every 3 hours"], [6, "every 6 hours"], [12, "every 12 hours"], [24, "every day"]];
+const SYMPTOMS = ["It is slow", "It ran out of memory", "Network timeouts", "A service keeps restarting", "The disk is full", "It restarted by itself", "Something changed"];
+const clock = (t) => (t ? new Date(t * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
-// "What uses the storage of this host": snapshots of the biggest directories, files and Docker logs, and what grew between two of them.
+function table(rows, head) {
+  if (!rows.length) return null;
+  return h("div", { class: "table-wrap" }, h("table", {}, h("thead", {}, h("tr", {}, head.map((t) => h("th", {}, t)))), h("tbody", {}, rows.map((r) => h("tr", {}, r.map((c) => h("td", {}, c)))))));
+}
+
+// What each probe saw, as small tables next to the findings
+const DETAILS = {
+  storage: (d) => d.mounts.slice(0, 3).flatMap((m) => [h("h3", {}, `${m.mount}${m.size ? ` ${Math.round((100 * m.used) / m.size)}% full (${size(m.used)} of ${size(m.size)})` : ""}`),
+    table(m.dirs.filter((x) => x.path !== m.mount).slice(0, 8).map((x) => [x.path, size(x.bytes)]), ["Folder", "Size"]),
+    m.files.length ? h("p", { class: "hint" }, "Big files: " + m.files.slice(0, 4).map((f) => `${f.path} (${size(f.bytes)})`).join(", ")) : null]),
+  cpu: (d) => [table(d.procs.slice(0, 8).map((p) => [p.container ? `${p.name} (${p.container})` : p.name, `${p.cpu.toFixed(0)}%`]), ["Process", "Processor (100% = one core)"]),
+    d.load && d.load.length ? h("p", { class: "hint" }, `Load ${d.load.join(" / ")} on ${d.cpus || "?"} cores`) : null],
+  memory: (d) => [h("p", { class: "hint" }, d.total ? `${d.used_pct}% of ${size(d.total)} used; swap ${size(d.swap_used)} of ${size(d.swap_total)}` : ""),
+    table(d.procs.slice(0, 8).map((p) => [p.container ? `${p.name} (${p.container})` : p.name, size(p.rss)]), ["Process", "Memory"]),
+    d.oom && d.oom.length ? h("p", { class: "error" }, `The kernel killed processes for lack of memory: ${d.oom.length} time(s)`) : null],
+  network: (d) => [table(d.interfaces.slice(0, 6).map((n) => [n.name, mbit(n.rx_bps), mbit(n.tx_bps), `${n.rx_err_total + n.tx_err_total}`]), ["Interface", "In", "Out", "Errors (total)"]),
+    d.remote.length ? h("p", { class: "hint" }, "Most connections from: " + d.remote.slice(0, 4).map((r) => `${r.ip} (${r.count})`).join(", ")) : null,
+    d.ping.length ? h("p", { class: "hint" }, d.ping.map((p) => `${p.kind}: ${p.loss}% loss${p.rtt ? `, ${p.rtt} ms` : ""}`).join("; ") + (d.dns ? `; DNS ${d.dns.ok ? d.dns.ms + " ms" : "fails"}` : "")) : null],
+  apps: (d) => [table(d.containers.slice(0, 12).map((c) => [c.name, c.state, c.restarts, c.health || "", c.oom ? "out of memory" : c.exit ? `exit ${c.exit}` : ""]), ["Container", "State", "Restarts", "Health", "Last end"]),
+    d.failed_units.length ? h("p", { class: "error" }, "Failed services: " + d.failed_units.map((u) => u.unit).join(", ")) : null,
+    d.errors.length ? h("p", { class: "hint" }, "Errors in the log (1 h): " + d.errors.slice(0, 5).map((e) => `${e.unit} ${e.count}`).join(", ")) : null],
+  changes: (d) => [table(d.events.slice(0, 12).map((e) => [clock(e.at), e.text]), ["When", "What changed"])],
+  schedule: (d) => [table(d.jobs.filter((j) => j.last).sort((a, b) => b.last - a.last).slice(0, 12).map((j) => [j.name, clock(j.last), clock(j.next)]), ["Job", "Last ran", "Next"]),
+    d.runs.length ? h("p", { class: "hint" }, `${d.runs.length} cron runs in the last day`) : null],
+  hardware: (d) => [table(d.disks.map((x) => [x.dev, x.health, x.detail]), ["Disk", "Health", "Details"]),
+    d.raid.length ? h("p", { class: d.raid.some((r) => r.degraded) ? "error" : "hint" }, d.raid.map((r) => `${r.name}: ${r.detail}`).join("; ")) : null,
+    d.errors.length ? h("p", { class: "error" }, `${d.errors.length} hardware or disk errors in the kernel log`) : null],
+  security: (d) => [d.failed.length ? h("p", { class: "hint" }, `${d.failed_total} failed sign-ins in 24 h, most from ` + d.failed.slice(0, 3).map((f) => `${f.ip} (${f.count})`).join(", ")) : null,
+    d.updates && (d.updates.pending || d.updates.security) ? h("p", { class: "hint" }, `${d.updates.pending} updates waiting, ${d.updates.security} for security`) : null],
+};
+
+// Host probes: read-only looks at a host (storage, processor, memory, network, applications, changes, scheduled jobs, hardware, security) and the digital engineer that chains them into a cause.
 export async function buildDeviceProbeCard(device) {
   const card = h("div", { class: "card admin-only probe-card" });
   let info = null;
+  let open = "diagnosis";
 
   async function load() {
     info = await get(`/api/devices/${device.id}/hostprobe`);
     draw();
   }
 
+  function findingsList(items) {
+    return h("ul", { class: "plain" }, items.map((f) => h("li", { class: f.level === "cause" || f.level === "warn" ? "warn-text" : "" }, f.text)));
+  }
+
+  function diagnosisBox() {
+    const box = h("div", { class: "field" });
+    const symptom = h("input", { type: "text", list: `symptoms-${device.id}`, placeholder: "What is wrong? (or leave empty)", style: "max-width: 28rem" });
+    const list = h("datalist", { id: `symptoms-${device.id}` }, SYMPTOMS.map((t) => h("option", { value: t })));
+    const out = h("div", {});
+    async function ask(live) {
+      out.replaceChildren(h("p", { class: "hint" }, live ? "Looking at the host… (up to a minute or two)" : "Thinking…"));
+      try {
+        const r = await post(`/api/devices/${device.id}/hostprobe/diagnose`, { symptom: symptom.value, live });
+        show(out, r);
+        if (live) { info = await get(`/api/devices/${device.id}/hostprobe`); }
+      } catch (err) { out.replaceChildren(h("p", { class: "error" }, err.message || "Could not diagnose")); }
+    }
+    const live = h("button", { class: "btn primary", type: "button", onclick: () => ask(true) }, "Diagnose now");
+    const snap = h("button", { class: "btn", type: "button", onclick: () => ask(false) }, "From the latest looks");
+    box.append(h("label", {}, "Find the cause"), h("div", { class: "form-actions" }, symptom, list, live, snap),
+      h("p", { class: "hint" }, "The engineer picks the probes the problem calls for, looks at the host (read-only, every look is in the audit log) and chains what it finds."), out);
+    if (info.diagnosis && info.diagnosis.findings.length) show(out, info.diagnosis);
+    return box;
+  }
+
+  function show(out, r) {
+    out.replaceChildren();
+    if (r.ran) out.appendChild(h("p", { class: "hint" }, "Looked at: " + Object.entries(r.ran).map(([p, x]) => `${p}${x.ok ? "" : " (failed: " + x.error + ")"}`).join(", ")));
+    if (!r.findings.length) { out.appendChild(h("p", { class: "hint" }, r.missing && r.missing.length ? `No look yet at: ${r.missing.join(", ")}. Press "Diagnose now".` : "Nothing unusual was found.")); return; }
+    for (const c of (r.chains || []).slice(0, 2)) out.appendChild(h("p", { class: "error" }, h("strong", {}, "Probable cause: "), c.text));
+    out.appendChild(findingsList(r.findings.filter((f) => !f.text.startsWith("Probable cause: ") || !(r.chains || []).length)));
+    if (r.missing && r.missing.length) out.appendChild(h("p", { class: "hint" }, `Not looked at yet: ${r.missing.join(", ")}.`));
+  }
+
+  async function probeView(name) {
+    const box = h("div", {}, h("p", { class: "hint" }, "Loading…"));
+    try {
+      const r = await get(`/api/devices/${device.id}/hostprobe/${name}`);
+      box.replaceChildren();
+      if (!r.latest) { box.appendChild(h("p", { class: "hint" }, "No look yet.")); } else {
+        box.appendChild(h("p", { class: "hint" }, `Looked ${timeAgo(r.latest.taken)} (${r.latest.mode === "locked" ? "locked-down script" : "script sent directly"}).`));
+        if (r.findings.length) box.appendChild(findingsList(r.findings));
+        for (const part of (DETAILS[name] ? DETAILS[name](r.latest.data) : [])) if (part) box.appendChild(part);
+      }
+      const run = h("button", { class: "btn", type: "button" }, "Look now");
+      run.addEventListener("click", async () => {
+        run.disabled = true; run.textContent = "Looking…";
+        try { info = await post(`/api/devices/${device.id}/hostprobe/run?probe=${name}`, {}); toast(info.ok ? "Done" : info.error, info.ok ? "success" : "error"); } catch (err) { toast(err.message || "Could not look", "error"); }
+        draw();
+      });
+      box.appendChild(h("div", { class: "form-actions" }, run));
+    } catch (err) { box.replaceChildren(h("p", { class: "error" }, err.message || "Could not load")); }
+    return box;
+  }
+
   function draw() {
     clear(card);
-    card.appendChild(h("h2", {}, "Storage inspection"));
+    card.appendChild(h("h2", {}, "Host probes"));
     if (!info.monitor || !["ssh", "winrm"].includes(info.monitor)) {
-      card.appendChild(h("p", { class: "hint" }, "Finds out what fills the disks of this host: the biggest folders and files, Docker logs and images, and what grew since the last look. It reads only. It needs health monitoring over SSH or WinRM first (the card above), which supplies the address and the login."));
+      card.appendChild(h("p", { class: "hint" }, "Read-only looks at this host (what uses the processor, memory, disk and network, which applications fail, what changed, what was scheduled, hardware and security) and an engineer that chains them into a cause. It needs health monitoring over SSH or WinRM first (the card above): that supplies the address and the login."));
       return;
     }
     const cfg = info.config;
@@ -28,62 +118,35 @@ export async function buildDeviceProbeCard(device) {
     const every = h("select", {}, INTERVALS.map(([v, t]) => h("option", { value: v, selected: v === cfg.interval_h }, t)));
     const source = h("select", {}, SOURCES.map(([v, t]) => h("option", { value: v, selected: v === cfg.provider }, t)));
     const user = h("input", { type: "text", value: cfg.username, placeholder: "netlens-ro", autocomplete: "off" });
+    const boxes = Object.entries(info.probes).map(([name, p]) => h("label", { class: "check-row" }, h("input", { type: "checkbox", "data-probe": name, checked: cfg.probes.includes(name) }), " ", p.title));
     const save = h("button", { class: "btn primary", type: "button" }, "Save");
     save.addEventListener("click", async () => {
       try {
-        info = await put(`/api/devices/${device.id}/hostprobe`, { enabled: on.checked, interval_h: Number(every.value), provider: source.value, username: user.value });
-        toast("Saved", "success");
-        draw();
+        info = await put(`/api/devices/${device.id}/hostprobe`, { enabled: on.checked, interval_h: Number(every.value), provider: source.value, username: user.value,
+          probes: boxes.map((l) => l.firstChild).filter((i) => i.checked).map((i) => i.dataset.probe) });
+        toast("Saved", "success"); draw();
       } catch (err) { toast(err.message || "Could not save", "error"); }
     });
-    card.append(
-      h("div", { class: "field" }, h("label", { class: "check-row" }, on, " Look at what uses the storage of this host"), h("p", { class: "hint" }, "A look is taken now and then, and at once when a disk goes over its limit, so a sudden jump can be traced afterwards.")),
-      h("div", { class: "field" }, h("label", {}, "How often"), every),
+    const settings = h("details", { class: "limits-box" }, h("summary", {}, cfg.enabled ? "Settings (on)" : "Settings (off)"),
+      h("div", { class: "field" }, h("label", { class: "check-row" }, on, " Look at this host now and then, and at once when a reading goes over its limit")),
+      h("div", { class: "field" }, h("label", {}, "Which probes"), h("div", { class: "event-boxes" }, boxes)),
+      h("div", { class: "field" }, h("label", {}, "Storage is looked at"), every, h("p", { class: "hint" }, "The other probes once a day, and at once when a reading goes over its limit (memory pressure looks at memory and applications, for example).")),
       h("div", { class: "field" }, h("label", {}, "Log in with"), source, h("p", { class: "hint" }, "A certificate is made for each look and stops working after a few minutes; the host only has to trust the Netlens CA. Set it up under Settings → Host probes.")),
-      h("div", { class: "field" }, h("label", {}, "User name on the host (certificates)"), user),
-      h("div", { class: "form-actions" }, save));
-    const last = info.snapshots[0];
-    const run = h("button", { class: "btn", type: "button" }, "Inspect now");
-    run.addEventListener("click", async () => {
-      run.disabled = true;
-      run.textContent = "Inspecting… (a big disk can take a minute or two)";
-      try {
-        const r = await post(`/api/devices/${device.id}/hostprobe/run`, {});
-        info = r;
-        toast(r.ok ? "Done" : r.error, r.ok ? "success" : "error");
-      } catch (err) { toast(err.message || "Could not inspect", "error"); }
-      draw();
-    });
-    if (last) {
-      card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Last look"),
-        last.ok ? h("span", {}, `${timeAgo(last.taken)}, ${info.snapshots.length} kept`) : h("span", { class: "error" }, `${timeAgo(last.taken)} failed: ${last.error}`)));
-      if (info.latest && info.latest.mode === "locked" && info.latest.data.script_version && info.latest.data.script_version < info.script_version) {
-        card.appendChild(h("p", { class: "hint" }, "The script installed on the host is older than this Netlens expects. Install the new one: Settings → Host probes → Prepare a host."));
-      }
-      if (info.latest && info.latest.mode === "direct") {
-        card.appendChild(h("p", { class: "hint" }, "The host runs the script it was sent. Lock it down so it can run nothing else: Settings → Host probes → Prepare a host."));
-      }
-    }
-    card.appendChild(h("div", { class: "form-actions" }, run));
-    const data = info.latest && info.latest.data;
-    if (!data) return;
-    if (data.partial) card.appendChild(h("p", { class: "hint" }, "The disk is so big that the look stopped after its time limit: the list is partial."));
+      h("div", { class: "field" }, h("label", {}, "User name on the host (certificates)"), user), h("div", { class: "form-actions" }, save));
+    if (!cfg.enabled) settings.open = true;
+    card.appendChild(settings);
+    if (!cfg.enabled) return;
+    card.appendChild(diagnosisBox());
     for (const u of info.hidden || []) card.appendChild(h("p", { class: "error" }, u.text + "."));
-    const grown = info.growth_since_previous && info.growth_since_previous.growth;
-    if (grown && grown.length) {
-      card.appendChild(h("h3", {}, "Grew since the look before"));
-      card.appendChild(h("ul", { class: "plain" }, grown.map((g) => h("li", {}, h("strong", {}, `+${size(g.bytes)} `), g.path, g.new && g.kind === "file" ? " (new file)" : ""))));
-    }
-    for (const m of data.mounts.slice(0, 3)) {
-      const pct = m.size ? Math.round((100 * m.used) / m.size) : null;
-      card.appendChild(h("h3", {}, `${m.mount}${pct !== null ? ` ${pct}% full (${size(m.used)} of ${size(m.size)})` : ""}`));
-      const rows = m.dirs.filter((d) => d.path !== m.mount).slice(0, 8);
-      card.appendChild(h("div", { class: "table-wrap" }, h("table", {}, h("tbody", {}, rows.map((d) => h("tr", {}, h("td", {}, d.path), h("td", { class: "num" }, size(d.bytes))))))));
-      if (m.files.length) card.appendChild(h("p", { class: "hint" }, "Big files: " + m.files.slice(0, 4).map((f) => `${f.path} (${size(f.bytes)})`).join(", ")));
-    }
-    const boxes = data.docker.containers.filter((c) => c.log_bytes > 100 * 1024 ** 2 || c.layer_bytes > GB).sort((a, b) => b.log_bytes + b.layer_bytes - (a.log_bytes + a.layer_bytes)).slice(0, 5);
-    if (boxes.length) card.appendChild(h("p", { class: "hint" }, "Docker: " + boxes.map((c) => `${c.name} (log ${size(c.log_bytes)}, data ${size(c.layer_bytes)})`).join(", ")));
-    if (data.deleted.length) card.appendChild(h("p", { class: "hint" }, "Deleted but still held open: " + data.deleted.slice(0, 3).map((d) => `${d.path} ${size(d.bytes)} (${d.process})`).join(", ")));
+    const stale = Object.values(info.probes).some((p) => p.mode === "locked") && info.latest && info.latest.data && info.latest.data.script_version && info.latest.data.script_version < info.script_version;
+    if (stale) card.appendChild(h("p", { class: "hint" }, "The script installed on the host is older than this Netlens expects. Install the new one: Settings → Host probes → Prepare a host."));
+    const tabs = h("div", { class: "btn-row" }, Object.entries(info.probes).map(([name, p]) => {
+      const b = h("button", { class: `btn${open === name ? " primary" : ""}`, type: "button", title: p.error ? `Last try failed: ${p.error}` : p.taken ? `Looked ${timeAgo(p.taken)}` : "Not looked at yet" }, p.title + (p.error ? " ⚠" : ""));
+      b.addEventListener("click", () => { open = open === name ? "diagnosis" : name; draw(); });
+      return b;
+    }));
+    card.appendChild(tabs);
+    if (open !== "diagnosis") probeView(open).then((v) => card.appendChild(v));
   }
 
   try { await load(); } catch (err) { card.appendChild(h("p", { class: "error" }, err.message || "Could not load")); }

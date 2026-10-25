@@ -112,8 +112,8 @@ def test_the_probe_script_is_valid_sh_and_only_reads():
 
 def test_the_lockdown_files():
     setup = scripts.linux_setup("netlens-ro", "ssh-ed25519 AAAAkey me", "ssh-ed25519 AAAAca netlens-ca")
-    assert setup["authorized_keys"].startswith('command="sudo -n /usr/local/sbin/netlens-probe",restrict ssh-ed25519 AAAAkey')
-    assert "NOPASSWD: /usr/local/sbin/netlens-probe" in setup["sudoers"] and "ForceCommand sudo -n /usr/local/sbin/netlens-probe" in setup["sshd_config"]
+    assert setup["authorized_keys"].startswith('command="/usr/local/sbin/netlens-probe-entry",restrict ssh-ed25519 AAAAkey')
+    assert "NOPASSWD: /usr/local/sbin/netlens-probe storage" in setup["sudoers"] and "ForceCommand /usr/local/sbin/netlens-probe-entry" in setup["sshd_config"]
     assert "TrustedUserCAKeys" in setup["sshd_config"] and setup["script"].startswith("#!/bin/sh")
     win = scripts.windows_setup("netlens-ro", None, "ssh-ed25519 AAAAca netlens-ca")
     assert "authorized_keys" not in win and "ForceCommand" in win["sshd_config"] and "New-LocalUser" in win["install"]
@@ -293,14 +293,16 @@ def test_old_snapshots_are_pruned(conn):
 def test_the_schedule(conn):
     service.save_settings(conn, {"devices": {"1": {"enabled": True, "interval_h": 6}}})
     now = time.time()
-    assert service.due(conn, now) == [1]                                                              # never looked at
-    service.store(conn, 1, True, "direct", None, snapshot(0), now=now - 3600)
+    assert (1, "storage") in service.due(conn, now)                                                    # never looked at
+    for probe in scripts.PROBES:
+        service.store(conn, 1, True, "direct", None, snapshot(0), now=now - 3600, probe=probe)
     assert service.due(conn, now) == []
-    assert service.due(conn, now + 6 * 3600) == [1]
+    assert service.due(conn, now + 6 * 3600) == [(1, "storage")]                                     # storage every 6 hours, the others once a day
+    assert len(service.due(conn, now + 25 * 3600)) == len(scripts.PROBES)
     conn.execute("INSERT INTO host_monitors (id, device_id, method, address, port, created) VALUES (7, 1, 'ssh', 'a', 22, 'x')")
     conn.execute("INSERT INTO metric_state (monitor_id, metric, label, level, since, value) VALUES (7, 'disk_pct', '/', 'critical', 'x', 100)")
     conn.commit()
-    assert service.due(conn, now) == [1]                                                              # a full disk: look again after half an hour, not six hours
+    assert service.due(conn, now) == [(1, "storage")]                                                  # a full disk: look again after half an hour, not six hours
     service.save_settings(conn, {"devices": {"1": {"enabled": False}}})
     assert service.due(conn, now) == []
 
@@ -401,7 +403,7 @@ def test_changes_and_views_are_recorded_without_secret_values(client):
         db.close()
     assert actions[0].startswith("Created the Netlens SSH certificate authority (public key SHA256:") and actions[1].startswith("Replaced the Netlens SSH certificate authority") and "refuse new certificates" in actions[1]
     assert any(a.startswith("Changed the host probe settings: keep_days, vault_ssh.token, vault_ssh.url") for a in actions)
-    assert any(a.startswith("Changed the storage inspection of nas") for a in actions)
+    assert any(a.startswith("Changed the host probes of nas") for a in actions)
     assert sum(1 for a in actions if a.startswith("Viewed the files that prepare a linux host")) == 1
     assert "TOPSECRET" not in everything and "BEGIN" not in everything
 

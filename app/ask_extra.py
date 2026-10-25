@@ -184,6 +184,55 @@ def t_storage_use(conn, args, now=None) -> dict:
             "grew_since_previous": [{"path": g["path"], "grew": parse.nice_bytes(g["bytes"]), "kind": g["kind"]} for g in (grew or {"growth": []})["growth"][:4]]}
 
 
+def _device_pick(conn, name: str):
+    rows = conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices").fetchall()
+    return next((r for r in rows if name and name in (r["n"] or "").lower()), None)
+
+
+def t_host_activity(conn, args, now=None) -> dict:
+    """What the host probes saw on one host (processor, memory, network, applications, changes, scheduled jobs, hardware, security) and the probable cause."""
+    from app.hostprobe import diagnose, service as probes
+
+    name = str(args.get("device") or "").strip().lower()
+    symptom = str(args.get("symptom") or "").strip()
+    pick = _device_pick(conn, name) if name else None
+    if pick is None:
+        enabled = [r for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices") if device_enabled(conn, r["id"])]
+        if name:
+            return {"error": f"I don't know a device called {name}."}
+        if not enabled:
+            return {"error": "No host is being inspected yet: switch it on for a device (device page → Host probes)."}
+        pick = enabled[0]
+    if not device_enabled(conn, pick["id"]):
+        return {"error": f"Host probes are not switched on for {pick['n']} (device page → Host probes)."}
+    rep = diagnose.diagnose(conn, pick["id"], symptom or None, now.timestamp() if now else None)
+    if not rep["taken"]:
+        return {"error": f"No probe has looked at {pick['n']} yet" + ("" if not rep["missing"] else f" (missing: {', '.join(rep['missing'])})") + ". Use Diagnose now on its device page."}
+    model = for_model_view()
+    from app.hostprobe import service as svc
+
+    allow = svc._load(conn)["names_to_llm"]
+    hide = model and not allow
+    pick_text = lambda f: (f.get("llm_text") or "A finding with names was withheld.") if f.get("private") and hide else f["text"]
+    return {"device": rep["device"], "looked_at": rep["taken"], "not_yet_looked_at": rep["missing"], "probable_cause": [(c.get("llm_text") or "A cause with names was withheld.") if c["private"] and hide else c["text"] for c in rep["chains"]],
+            "findings": [{"level": f["level"], "text": pick_text(f)} for f in rep["findings"]]}
+
+
+def for_model_view() -> bool:
+    return ask.for_model()
+
+
+def r_host_activity(r: dict) -> str:
+    text = f"{r['device']}: "
+    if r["probable_cause"]:
+        text += "probable cause: " + " ".join(r["probable_cause"][:2]) + " "
+    rest = [f["text"] for f in r["findings"] if not f["text"].startswith("Probable cause")][:6]
+    text += (" ".join(rest) if rest else "nothing unusual in what the probes saw.")
+    if r["not_yet_looked_at"]:
+        text += f" (Not looked at yet: {', '.join(r['not_yet_looked_at'])}.)"
+    return text.strip()
+
+
 def device_enabled(conn, device_id: int) -> bool:
     from app.hostprobe import service as probes
 
@@ -214,18 +263,21 @@ TOOLS = {
     "oncall": (t_oncall, "who is on call now and the coming shifts. args: none"),
     "system_log": (t_system_log, "warnings and errors in Netlens' own log (why a sync, a monitor or a notification failed). args: level (warning or error)"),
     "storage_use": (t_storage_use, "WHAT USES the disk space of a host (needs Storage inspection on that device): the biggest directories and files, Docker logs and layers, files deleted but still open, and what grew since the previous snapshot. args: device (name, optional)"),
+    "host_activity": (t_host_activity, "WHAT IS GOING ON on one host according to the read-only host probes: what uses the processor, memory and network, which applications or containers are failing or restarting, what changed or was scheduled lately, hardware and security state, chained into a probable cause. Use for 'why is X slow', 'what is using the CPU/memory/network on X', 'why did X restart'. args: device (name), symptom (optional words such as slow, memory, network, restart)"),
     "investigate": (t_investigate, "ROOT CAUSE of the latest incident (or of one device's): what started it, which device moved first, what was running at the time, what else broke, whether anybody was told. args: device (optional name), days (1-30)"),
 }
-RENDERERS = {"storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "system_log": r_system_log, "investigate": r_investigate}
+RENDERERS = {"host_activity": r_host_activity, "storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "system_log": r_system_log, "investigate": r_investigate}
 PRESETS = [
     {"id": "vulns", "text": "Which vulnerabilities do I have?", "tool": "vulnerabilities", "args": {}},
     {"id": "traffic", "text": "How much traffic is going through my network?", "tool": "traffic", "args": {}},
     {"id": "told", "text": "Would I be told if something broke?", "tool": "notifications", "args": {}},
+    {"id": "slow", "text": "Why is my server slow?", "tool": "host_activity", "args": {"symptom": "slow"}},
     {"id": "space", "text": "What is using the disk space?", "tool": "storage_use", "args": {}},
     {"id": "cause", "text": "What caused the latest incident?", "tool": "investigate", "args": {}},
     {"id": "log", "text": "Are there errors in the Netlens log?", "tool": "system_log", "args": {"level": "error"}},
 ]
 RULES = [
+    ("host_activity", r"why is .{0,40}(slow|sluggish|laggy|unresponsive|hanging|overloaded|busy)|what('s| is| are) (using|eating|hogging|consuming|taking) .{0,20}(cpu|processor|memory|ram|bandwidth|network)|what('s| is) (going on|wrong|happening) (on|with) |why did .{0,40}(restart|reboot|crash)|what('s| is| are) (killing|crashing)|(cpu|memory|ram|network) (usage|hog|hogs|spike)|who is using the (cpu|memory|network|bandwidth)|diagnos"),
     ("storage_use", r"what (is|are|was|has been) (using|taking|eating|filling|consuming|hogging)\b.{0,30}(space|disk|storage)|where (did|does|is) (the |my )?(disk|space|storage).{0,20}(go|going|gone)|what filled|(biggest|largest) (files?|folders?|directories|dirs?)|disk space (is )?(used|taken|used up) by|what.{0,12}(uses|using) (the )?(disk|space)"),
     ("investigate", r"root cause|investigat|what caused|cause of|post-?mortem|what went wrong|why did .{0,40}(stop|fail|crash|go down|go offline|jump|spike|slow)|why was .{0,40}(slow|full|overloaded|busy)"),
     ("vulnerabilities", r"vulnerab|\bcves?\b|exploit|greenbone|openvas|nessus|unpatched|security (hole|weakness)"),
@@ -245,6 +297,10 @@ def route(q: str, names: list[str]) -> tuple[str, dict] | None:
                 args = {"device": name} if name else {}
             elif tool == "traffic":
                 args = {"range": next((r for r, p in (("7d", r"week|7 ?d"), ("24h", r"today|24 ?h|day"), ("6h", r"6 ?h")) if re.search(p, q)), "1h")}
+            elif tool == "host_activity":
+                name = next((n for n in sorted(names, key=len, reverse=True) if len(n) > 2 and n.lower() in q), "")
+                symptom = next((w for w, pat in (("memory", r"memory|ram|oom"), ("cpu", r"cpu|processor|slow|sluggish|busy|overload"), ("network", r"network|bandwidth|latency|connect"), ("restart", r"restart|reboot|crash|die|stop|go down|killing")) if re.search(pat, q)), "")
+                args = {k: v for k, v in (("device", name), ("symptom", symptom)) if v}
             elif tool == "storage_use":
                 name = next((n for n in sorted(names, key=len, reverse=True) if len(n) > 2 and n.lower() in q), "")
                 args = {"device": name} if name else {}
