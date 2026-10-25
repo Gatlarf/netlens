@@ -141,7 +141,18 @@ if ($action -ne 'remove') {
     if (-not $svc) {
         if (-not $enableSshd) { say 'error the OpenSSH server is not installed on this host. It is needed for the locked-down probe: choose "also install the OpenSSH server" (Netlens then restricts it to the probe account and to this Netlens), or install it yourself'; exit 7 }
         say 'step installing the Windows OpenSSH Server (this can take a few minutes)'
-        Add-WindowsCapability -Online -Name 'OpenSSH.Server~~~~0.0.1.0' | Out-Null
+        # Windows refuses to install a feature for a remote (WinRM) session ("Access is denied": the Windows Update service will not serve it), so it is done locally, as SYSTEM, by a one-time task
+        $log = Join-Path $env:TEMP 'netlens-cap.txt'; Remove-Item $log -Force -ErrorAction SilentlyContinue
+        $inner = "try { `$r = Add-WindowsCapability -Online -Name 'OpenSSH.Server~~~~0.0.1.0'; ('RESULT: ' + (`$r | Out-String)) | Set-Content '$log' -Encoding UTF8 } catch { ('ERROR: ' + `$_.Exception.Message) | Set-Content '$log' -Encoding UTF8 }"
+        $act = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($inner)))
+        Register-ScheduledTask -TaskName 'NetlensInstallOpenSsh' -Action $act -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
+        Start-ScheduledTask -TaskName 'NetlensInstallOpenSsh'
+        $t0 = Get-Date
+        while (((Get-Date) - $t0).TotalSeconds -lt 600) { Start-Sleep -Seconds 3; if (Test-Path $log) { break } }
+        Unregister-ScheduledTask -TaskName 'NetlensInstallOpenSsh' -Confirm:$false -ErrorAction SilentlyContinue
+        $res = if (Test-Path $log) { (Get-Content $log -Raw).Trim() } else { 'ERROR: no answer after 10 minutes' }
+        Remove-Item $log -Force -ErrorAction SilentlyContinue
+        if ($res -like 'ERROR*' -or -not (Get-Service sshd -ErrorAction SilentlyContinue)) { say ('error the OpenSSH server could not be installed: ' + ($res -replace '\s+', ' ')); exit 8 }
         New-Item -ItemType Directory -Force $dir | Out-Null
         Set-Content -Path $marker -Value 'The OpenSSH server was installed by Netlens.' -Encoding ASCII
         say 'step installed the OpenSSH Server'
@@ -304,9 +315,12 @@ async def administer(conn, device_id: int, action: str, admin: dict[str, Any], p
             script = windows_script(action, user, ca or "", enable_sshd, allow_from, defer_restart=False)
             out, err, _code = await asyncio.to_thread(winrm_upload_and_run, script, session, 900.0)
             parsed = parse_output(out)
+            detail = winrm.powershell_error(err) or re.sub(r"\s+", " ", err or "").strip()[:300]
             if not parsed["log"]:
-                detail = winrm.powershell_error(err) or (re.sub(r"\s+", " ", out or err or "").strip()[:200])
-                parsed["error"] = f"the host did not answer the way the install script does: {detail or 'no output'}"
+                parsed["error"] = f"the host did not answer the way the install script does: {detail or re.sub(chr(92) + 's+', ' ', out or '').strip()[:200] or 'no output'}"
+            elif parsed["done"] is None and parsed["error"] is None and detail:           # the script stopped on an error that PowerShell reported on its error stream
+                parsed["error"] = f"the script stopped: {detail}"
+                parsed["log"].append("Error: " + parsed["error"])
         else:
             from app.terminal.hostkeys import get_fingerprint
 
