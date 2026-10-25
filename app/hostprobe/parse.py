@@ -101,7 +101,8 @@ def parse_linux(text: str) -> dict[str, Any]:
             deleted.append({"path": p[2].replace(" (deleted)", ""), "bytes": int(p[0]), "process": p[1]})
     for m in mounts.values():
         m["dirs"] = m["dirs"][:MAX_DIRS]
-    return {"platform": "linux", "partial": False, "mounts": sorted((m for m in mounts.values() if m["dirs"] or m["files"]), key=lambda m: -m["used"]), "docker": docker, "deleted": deleted[:10]}
+    version = next((int(k.split()[1]) for k in sec if k.startswith("version ") and k.split()[1].isdigit()), None)
+    return {"platform": "linux", "script_version": version, "partial": False, "mounts": sorted((m for m in mounts.values() if m["dirs"] or m["files"]), key=lambda m: -m["used"]), "docker": docker, "deleted": deleted[:10]}
 
 
 def parse_windows(text: str) -> dict[str, Any]:

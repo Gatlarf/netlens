@@ -170,7 +170,7 @@ def describe(growth: dict[str, Any], limit: int = 3) -> list[str]:
 async def _linux(cred: credentials.Credential, address: str, port: int, known: str | None) -> tuple[str, str, str | None]:
     """(output, mode, host key fingerprint): the locked-down script first; a host that has none gets the same script sent directly."""
     out, status, fp = await ssh.run_command(address, port, cred.username, cred.password, cred.private_key, cred.passphrase, scripts.LOCKED_COMMAND, known, timeout=30.0, certificate=cred.certificate)
-    if "##end" in out:                  # the host ran its own installed script: it is locked down (a normal host does not know `netlens-probe`)
+    if "##end" in out:                  # the host ran its own installed script (its version is in the answer: parse.parse_linux): it is locked down (a normal host does not know `netlens-probe`)
         return out, "locked", fp
     out, status, fp = await ssh.run_command(address, port, cred.username, cred.password, cred.private_key, cred.passphrase, scripts.LINUX_COMMAND, known, timeout=200.0, certificate=cred.certificate)
     return out, "direct", fp

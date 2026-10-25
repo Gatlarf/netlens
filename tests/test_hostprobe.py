@@ -428,3 +428,16 @@ def test_the_snapshots_are_kept_for_the_chosen_number_of_days(conn):
     service.store(conn, 1, True, "direct", None, snapshot(0), now=time.time() - 3 * 86400)
     service.store(conn, 1, True, "direct", None, snapshot(0), now=time.time() - 3600)
     assert len(service.snapshots(conn, 1)) == 1
+
+
+def test_the_script_has_a_version_and_deleted_files_ignore_memory_maps():
+    assert f'echo "##version {scripts.SCRIPT_VERSION}"' in scripts.LINUX_SCRIPT and "@VERSION@" not in scripts.LINUX_SCRIPT
+    s = parse.parse_linux(OUTPUT.replace("##host", f"##version {scripts.SCRIPT_VERSION}\n##host"))
+    assert s["script_version"] == scripts.SCRIPT_VERSION and parse.parse_linux(OUTPUT)["script_version"] is None
+    # the filter: only real file descriptors (3u, 4w ...) count, a memory mapping of 2 TB does not
+    lsof = ("COMMAND PID USER FD TYPE DEVICE SIZE/OFF NLINK NODE NAME\n"
+            "java 10 u 5w REG 8,1 2147483648 0 123 /tmp/big file.log (deleted)\n"
+            "dotnet 11 u DEL REG 8,1 2199023255552 0 124 /tmp/map (deleted)\n")
+    out = subprocess.run(["sh", "-c", "awk 'NR>1 && $4 ~ /^[0-9]+[urw]/ && $7+0 > 10485760 {n=\"\"; for (i=10; i<=NF; i++) n = n (i>10 ? \" \" : \"\") $i; print $7\"|\"$1\"|\"n}'"],
+                         input=lsof.encode(), capture_output=True).stdout.decode()
+    assert out.strip() == "2147483648|java|/tmp/big file.log (deleted)"

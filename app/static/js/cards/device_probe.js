@@ -57,6 +57,9 @@ export async function buildDeviceProbeCard(device) {
     if (last) {
       card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Last look"),
         last.ok ? h("span", {}, `${timeAgo(last.taken)}, ${info.snapshots.length} kept`) : h("span", { class: "error" }, `${timeAgo(last.taken)} failed: ${last.error}`)));
+      if (info.latest && info.latest.mode === "locked" && info.latest.data.script_version && info.latest.data.script_version < info.script_version) {
+        card.appendChild(h("p", { class: "hint" }, "The script installed on the host is older than this Netlens expects. Install the new one: Settings → Host probes → Prepare a host."));
+      }
       if (info.latest && info.latest.mode === "direct") {
         card.appendChild(h("p", { class: "hint" }, "The host runs the script it was sent. Lock it down so it can run nothing else: Settings → Host probes → Prepare a host."));
       }

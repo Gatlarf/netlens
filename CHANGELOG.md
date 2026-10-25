@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.255 — 2026-10-25
+
+### Fixed
+- Storage inspection: "deleted but still open" files no longer list memory mappings of terabytes, and the file name is complete. The probe script now has a version, and the device card says when the script installed on the host is older than the one Netlens expects.
+
 ## 0.4.254 — 2026-10-25
 
 ### Added

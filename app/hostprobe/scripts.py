@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 
 PROBES = ("storage",)
+SCRIPT_VERSION = 2          # raise it when the Linux script changes: a host that has an older copy installed is told so
 WRAPPER_PATH = "/usr/local/sbin/netlens-probe"
 WRAPPER_NAME = "netlens-probe"
 
@@ -23,6 +24,7 @@ if [ "$(id -u)" != "0" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/d
 T=""; command -v timeout >/dev/null 2>&1 && T="timeout 100"
 N=""; command -v nice >/dev/null 2>&1 && N="nice -n 19"
 command -v ionice >/dev/null 2>&1 && N="$N ionice -c3"
+echo "##version @VERSION@"
 echo "##host"; uname -sr 2>/dev/null; id -u
 echo "##df"; df -PkT 2>/dev/null
 for M in $(df -PkT 2>/dev/null | awk 'NR>1 && $2 !~ /^(tmpfs|devtmpfs|squashfs|overlay|nfs|nfs4|cifs|smb3|smbfs|fuse.*|9p|proc|sysfs|cgroup.*|ramfs|iso9660|efivarfs|autofs)$/ && $7 ~ /^\// {print $7}' | sort -u | head -n 6); do
@@ -42,10 +44,11 @@ if [ -n "$D" ]; then
   done
 fi
 echo "##deleted"
-if command -v lsof >/dev/null 2>&1; then $R $T lsof -nP +L1 2>/dev/null | awk 'NR>1 && $7+0 > 10485760 {print $7"|"$1"|"$NF}' | sort -rn | head -n 10; fi
+if command -v lsof >/dev/null 2>&1; then $R $T lsof -nP +L1 2>/dev/null | awk 'NR>1 && $4 ~ /^[0-9]+[urw]/ && $7+0 > 10485760 {n=""; for (i=10; i<=NF; i++) n = n (i>10 ? " " : "") $i; print $7"|"$1"|"n}' | sort -rn | head -n 10; fi
 echo "##end"
 '''
 
+LINUX_SCRIPT = LINUX_SCRIPT.replace("@VERSION@", str(SCRIPT_VERSION))
 LINUX_COMMAND = "sh -c '" + LINUX_SCRIPT.replace("'", "'\\''") + "'"
 LOCKED_COMMAND = f"{WRAPPER_NAME} storage"        # what Netlens asks first; a host that is locked down runs its own script whatever is asked
 
