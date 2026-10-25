@@ -13,7 +13,9 @@ A language model, when one is set up, may only put the same facts into better wo
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
+import statistics
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -24,13 +26,16 @@ STAMP = "%Y-%m-%dT%H:%M:%SZ"
 BEFORE = timedelta(hours=3)             # what happened before the first alert counts as "the lead-up"
 LOOKBACK = 48 * 3600                    # how far back a reading is examined
 MAX_DEVICES = 6
+FLAP = {"device_offline", "device_online", "wifi_roamed", "ip_changed", "device_new"}      # a device that only did this is background noise, not part of the story
+HEALTH_METRICS = ("cpu_pct", "mem_pct", "disk_pct", "net_tx_bps", "net_rx_bps")
 LEAD_KINDS = {"container_restarting", "container_unhealthy", "container_stopped", "service_down", "anomaly", "metric_warning", "capacity_warning", "backup_failed", "firmware_update",
               "port_opened", "port_unexpected", "device_new", "gateway_changed", "dhcp_rogue", "cert_expiring"}
-UNITS = {"cpu_pct": "%", "mem_pct": "%", "disk_pct": "%", "temp_c": " °C", "battery_pct": "%"}
-WORDS = {"disk_pct": "disk use", "cpu_pct": "processor use", "mem_pct": "memory use", "temp_c": "temperature"}
+UNITS = {"cpu_pct": "%", "mem_pct": "%", "disk_pct": "%", "temp_c": " °C", "battery_pct": "%", "net_tx_bps": " bit/s", "net_rx_bps": " bit/s"}
+WORDS = {"disk_pct": "disk use", "cpu_pct": "processor use", "mem_pct": "memory use", "temp_c": "temperature", "net_tx_bps": "outgoing traffic", "net_rx_bps": "incoming traffic"}
 SYSTEM = ("You write a short report (at most six plain sentences) for the administrator of a home or small-business network about one incident that has been investigated. "
-          "Use only the facts in the JSON: what happened, how it built up, the probable source if one is given, and why the administrator was or was not warned. "
-          "Invent no causes, times, numbers or devices. Finish with what to look at first, but only if the facts say so.")
+          "Use only the facts in the JSON, in this order: what happened and to which device, the probable cause and the evidence for it, what was affected as a result, "
+          "and, last and in one short sentence, whether the administrator was warned. Leave out the devices listed as unrelated. "
+          "Invent no causes, times, numbers or devices; if the facts name no cause, say that none stands out.")
 
 
 def _ts(text: str) -> datetime:
@@ -76,6 +81,19 @@ def shape(points: list[list[float]], unit: str = "%") -> dict[str, Any] | None:
     return out
 
 
+def surge(points: list[list[float]]) -> dict[str, Any] | None:
+    """A reading that is not a percentage (traffic): it counts as a surge when it rises to five times its usual level and by at least 1 Mbit/s."""
+    pts = [(p[0], p[1]) for p in points if p[1] is not None]
+    if len(pts) < 6:
+        return None
+    base = statistics.median(v for _, v in pts[: max(3, len(pts) // 2)])
+    peak = max(pts, key=lambda p: p[1])
+    if peak[1] - base < 1e6 or peak[1] < 5 * max(base, 1.0):
+        return {"kind": "steady", "first": round(base), "last": round(pts[-1][1]), "peak": round(peak[1])}
+    onset = next(t for t, v in pts if v > base + (peak[1] - base) / 3)
+    return {"kind": "surge", "from_value": round(base), "to_value": round(peak[1]), "at": int(onset), "seconds": int(peak[0] - onset), "first": round(base), "last": round(pts[-1][1]), "peak": round(peak[1])}
+
+
 def _timeline(conn: sqlite3.Connection, device_id: int, since: str, until: str) -> list[dict[str, Any]]:
     """The device's events in the window, a kind that repeats is one line with a count."""
     rows = conn.execute("SELECT id, ts, kind, detail FROM events WHERE device_id = ? AND ts >= ? AND ts <= ? ORDER BY id", (device_id, since, until)).fetchall()
@@ -90,21 +108,88 @@ def _timeline(conn: sqlite3.Connection, device_id: int, since: str, until: str) 
     return out[:40]
 
 
+def _noise(conn: sqlite3.Connection, device_id: int, timeline: list[dict], start: datetime) -> str | None:
+    """Why a device that only went offline and online again is not part of the story (None when it is)."""
+    if any(t["kind"] not in FLAP for t in timeline):
+        return None
+    for t in timeline:
+        m = re.search(r"maintenance '([^']+)'", t["text"])
+        if m:
+            return f"it went offline during the maintenance window '{m.group(1)}'"
+    day = conn.execute("SELECT COUNT(*) FROM events WHERE device_id = ? AND kind IN ('device_offline', 'device_online', 'wifi_roamed', 'ip_changed') AND ts >= ? AND ts < ?",
+                       (device_id, (start - timedelta(hours=24)).strftime(STAMP), start.strftime(STAMP))).fetchone()[0]
+    changes = sum(t["count"] for t in timeline)
+    if day >= 3 or changes >= 4:
+        return f"it keeps going offline and online ({changes} times in these hours, {day} in the day before) and nothing else about it changed"
+    return None
+
+
 def _readings(conn: sqlite3.Connection, device_id: int, start: datetime, end: datetime, now: datetime) -> list[dict[str, Any]]:
-    """The readings of this device that went wrong during the incident (or are wrong now), with the shape of each."""
+    """How the processor, memory, disk and network traffic of this device moved around the incident; only what changed is returned."""
     store = tsdb.for_conn(conn)
+    if store is None:
+        return []
+    states = {(r["metric"], r["label"] or ""): r for r in conn.execute(
+        "SELECT s.metric, s.label, s.level, s.value FROM metric_state s JOIN host_monitors m ON m.id = s.monitor_id WHERE m.device_id = ?", (device_id,))}
     out = []
-    rows = conn.execute("SELECT s.metric, s.label, s.level, s.since, s.value FROM metric_state s JOIN host_monitors m ON m.id = s.monitor_id WHERE m.device_id = ?", (device_id,)).fetchall()
-    for r in rows:
-        if r["metric"] not in UNITS or not (r["level"] != "ok" or (r["since"] or "") >= (start - timedelta(hours=1)).strftime(STAMP)):
+    e = int(min(now, end + timedelta(hours=2)).timestamp())
+    for series in store.metrics_of("device", device_id):
+        metric, label = series["metric"], series["label"] or ""
+        if metric not in HEALTH_METRICS:
             continue
-        item: dict[str, Any] = {"metric": r["metric"], "label": r["label"] or "", "level": r["level"], "now": round(r["value"], 1) if r["value"] is not None else None, "unit": UNITS[r["metric"]]}
-        if store is not None:
-            e = int(min(now, end + timedelta(hours=2)).timestamp())
-            got = store.query("device", device_id, r["metric"], r["label"] or "", span=min(LOOKBACK, max(7200, e - int(start.timestamp()) + 36 * 3600)), end=e, points=400)
-            item["shape"] = shape(got["points"])
-        out.append(item)
-    return out[:6]
+        got = store.query("device", device_id, metric, label, span=min(LOOKBACK, max(6 * 3600, e - int(start.timestamp()) + 36 * 3600)), end=e, points=400)
+        sh = surge(got["points"]) if metric.startswith("net_") else shape(got["points"])
+        if not sh or sh["kind"] == "steady":
+            continue
+        st = states.get((metric, label))
+        out.append({"metric": metric, "label": label, "level": st["level"] if st else "ok", "now": round(st["value"], 1) if st and st["value"] is not None else sh.get("last"), "unit": UNITS[metric], "shape": sh})
+    return out[:8]
+
+
+def _bits(value: float) -> str:
+    return f"{value / 1e6:.0f} Mbit/s" if value >= 1e6 else f"{value / 1e3:.0f} kbit/s"
+
+
+def _suspects(conn: sqlite3.Connection, device_ids: list[int], onset: datetime, end: datetime, now: datetime) -> list[dict[str, Any]]:
+    """What else was going on at the same time on the same machine: a scan, a (re)started container, a backup, a maintenance window."""
+    out = []
+    lo, hi = (onset - timedelta(minutes=45)).strftime(STAMP), (max(end, onset) + timedelta(hours=2)).strftime(STAMP)
+    guests = [dict(r) for r in conn.execute("SELECT plugin_id, name, host_device_id, device_id, details FROM hypervisor_guests WHERE host_device_id IN (%s)" % ",".join("?" * len(device_ids)), device_ids)] if device_ids else []
+    # a vulnerability scanner that reported during the incident; it runs here when its containers are guests of the affected machine
+    for srv in conn.execute("SELECT plugin_id, server_id, name FROM vuln_servers"):
+        row = conn.execute("SELECT MIN(last_seen) a, MAX(last_seen) b, COUNT(*) n, COUNT(DISTINCT host_ip) hosts FROM vuln_findings WHERE plugin_id = ? AND server_id = ? AND last_seen >= ? AND last_seen <= ?",
+                           (srv["plugin_id"], srv["server_id"], lo, hi)).fetchone()
+        if not row or not row["n"]:
+            continue
+        key = (srv["plugin_id"] + " " + srv["name"]).lower()
+        here = [g for g in guests if srv["plugin_id"].lower() in g["name"].lower() or srv["name"].lower() in g["name"].lower()]
+        text = f"{srv['name']} (a vulnerability scanner) reported findings from {_clock(_ts(row['a']))[:-4]} to {_clock(_ts(row['b']))[:-4]} UTC on {row['hosts']} host{'s' if row['hosts'] != 1 else ''}: a scan was running while this happened"
+        if here:
+            text += f". It runs on the affected machine ({len(here)} of its containers, such as {here[0]['name']}), and a scan loads the processor and memory heavily"
+        out.append({"score": 90 if here else 40, "text": text + "."})
+    # containers of the affected machines that (re)started right around the onset
+    for g in guests:
+        try:
+            details = json.loads(g["details"] or "{}")
+        except ValueError:
+            continue
+        started = details.get("started")
+        if started and started[:19] + "Z" >= (onset - timedelta(minutes=20)).strftime(STAMP) and started[:19] + "Z" <= (onset + timedelta(minutes=20)).strftime(STAMP):
+            out.append({"score": 70, "text": f"The container {g['name']} (re)started at {started[11:16]} UTC, right at the start."})
+    # other scheduled or administrative work around the onset
+    for r in conn.execute("SELECT ts, kind, detail FROM events WHERE ts >= ? AND ts <= ? AND kind IN ('backup_failed', 'guest_backup_failed', 'guest_backup_late', 'remediation_ran', 'firmware_update', 'image_update') ORDER BY id LIMIT 3",
+                          ((onset - timedelta(hours=1)).strftime(STAMP), (onset + timedelta(minutes=30)).strftime(STAMP))):
+        out.append({"score": 50, "text": f"At {r['ts'][11:16]} UTC: {(r['detail'] or r['kind'])[:120]}."})
+    try:
+        from app import maintenance
+
+        for w in maintenance.load_windows(conn):
+            if w.get("enabled", True) and any(d in device_ids for d in (w.get("scope") or {}).get("devices", [])) and maintenance.is_active(w, onset):
+                out.append({"score": 60, "text": f"The maintenance window '{w.get('name')}' covered the start."})
+    except (ImportError, AttributeError):
+        pass
+    out.sort(key=lambda x: -x["score"])
+    return out[:4]
 
 
 def _told(conn: sqlite3.Connection, kind: str, when: datetime) -> dict[str, Any]:
@@ -128,72 +213,117 @@ def investigate(conn: sqlite3.Connection, incident_id: int, now: datetime | None
     lead_from = (start - BEFORE).strftime(STAMP)
     until = (min(now, end + timedelta(hours=6))).strftime(STAMP)
     names = {r["id"]: r["n"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices")}
-    findings: list[dict[str, str]] = []
-    devices = []
-    first_alert: dict[int, datetime] = {}
+    host_of = {r["device_id"]: r["host_device_id"] for r in conn.execute("SELECT device_id, host_device_id FROM hypervisor_guests WHERE device_id IS NOT NULL AND host_device_id IS NOT NULL")}
+
+    # 1. who is part of the story and who is only background noise
+    core, unrelated = [], []
     for device_id in found["device_ids"][:MAX_DEVICES]:
-        name = names.get(device_id, f"device {device_id}")
         timeline = _timeline(conn, device_id, lead_from, until)
-        readings = _readings(conn, device_id, start, end, now)
-        devices.append({"id": device_id, "name": name, "timeline": timeline, "readings": readings})
-        problem = next((t for t in timeline if t["kind"] in incidents.PROBLEMS and t["ts"] >= found["start"]), None)
-        if problem:
-            first_alert[device_id] = _ts(problem["ts"])
-        for rd in readings:
-            sh = rd.get("shape")
-            what = f"{WORDS.get(rd['metric'], rd['metric'])}{' on ' + rd['label'] if rd['label'] else ''} of {name}"
-            if sh and sh["kind"] == "step":
+        why = _noise(conn, device_id, timeline, start)
+        entry = {"id": device_id, "name": names.get(device_id, f"device {device_id}"), "timeline": timeline}
+        (unrelated if why else core).append({**entry, "why": why} if why else entry)
+    if not core:                                   # nothing but flapping: then that is the story
+        core, unrelated = [{k: v for k, v in u.items() if k != "why"} for u in unrelated], []
+    for d in core:
+        d["readings"] = _readings(conn, d["id"], start, end, now)
+
+    # 2. what moved first: the earliest jump of a reading, and the machine that hosts the other one
+    onsets = {d["id"]: min((datetime.fromtimestamp(r["shape"]["at"], timezone.utc) for r in d["readings"] if r["shape"]["kind"] in ("step", "surge") and r["metric"] != "disk_pct"), default=None) for d in core}
+    onset = min((o for o in onsets.values() if o), default=None)
+    findings: list[dict[str, str]] = []
+    for d in core:
+        for rd in d["readings"]:
+            sh = rd["shape"]
+            what = f"{WORDS.get(rd['metric'], rd['metric'])}{' on ' + rd['label'] if rd['label'] else ''} of {d['name']}"
+            if sh["kind"] == "step":
                 at = datetime.fromtimestamp(sh["at"], timezone.utc)
-                findings.append({"level": "info", "text": f"The {what} did not creep up, it jumped: from {sh['from_value']}{rd['unit']} to {sh['to_value']}{rd['unit']} in {_minutes(sh['seconds'])}, starting {_clock(at)}."})
+                findings.append({"level": "fact", "text": f"The {what} jumped from {sh['from_value']}{rd['unit']} to {sh['to_value']}{rd['unit']} in {_minutes(sh['seconds'])}, starting {_clock(at)}."})
                 slope = sh.get("slope_before_per_day")
-                warned = conn.execute("SELECT 1 FROM events WHERE device_id = ? AND kind IN ('capacity_warning', 'capacity_critical') AND ts < ? LIMIT 1", (device_id, found["start"])).fetchone()
-                if slope is not None and slope > 0.2 and rd["metric"] == "disk_pct":
+                warned = conn.execute("SELECT 1 FROM events WHERE device_id = ? AND kind IN ('capacity_warning', 'capacity_critical') AND ts < ? LIMIT 1", (d["id"], found["start"])).fetchone()
+                if rd["metric"] == "disk_pct" and slope is not None and slope > 0.2:
                     days = (100 - sh["from_value"]) / slope
-                    findings.append({"level": "info", "text": f"Before the jump it was growing about {slope} points a day" + (f", which would have filled it in about {days:.0f} days" if days < 60 else "") + "."
+                    findings.append({"level": "fact", "text": f"Before the jump it was growing about {slope} points a day" + (f", which would have filled it in about {days:.0f} days" if days < 60 else "") + "."
                                      + (" The disk forecast did not warn: it fits a straight line through 30 days and smooths out a recent change." if days < 14 and not warned else "")})
-                elif slope is not None and abs(slope) <= 0.2:
-                    findings.append({"level": "info", "text": "Before the jump it was steady, so no trend could have warned about it."})
-                lag = first_alert.get(device_id)
-                if lag and lag > at:
-                    findings.append({"level": "info", "text": f"The first alert for {name} came {_minutes((lag - at).total_seconds())} after the jump began."})
-            elif sh and sh["kind"] == "climb":
-                findings.append({"level": "info", "text": f"The {what} climbed from {sh['from_value']}{rd['unit']} to {sh['to_value']}{rd['unit']}, about {sh['per_day']} points a day."})
-            if rd.get("level") in ("warning", "critical"):
+                first = conn.execute("SELECT MIN(ts) FROM events WHERE device_id = ? AND kind IN ('metric_warning', 'metric_critical', 'anomaly', 'capacity_warning', 'capacity_critical') AND ts >= ?", (d["id"], (at - timedelta(hours=1)).strftime(STAMP))).fetchone()[0]
+                if first and _ts(first) > at:
+                    findings.append({"level": "fact", "text": f"The first alert about {d['name']} came {_minutes((_ts(first) - at).total_seconds())} after the jump began."})
+            elif sh["kind"] == "surge":
+                at = datetime.fromtimestamp(sh["at"], timezone.utc)
+                findings.append({"level": "fact", "text": f"The {what} rose from {_bits(sh['from_value'])} to {_bits(sh['to_value'])} from {_clock(at)}."})
+            elif sh["kind"] == "climb":
+                findings.append({"level": "fact", "text": f"The {what} climbed from {sh['from_value']}{rd['unit']} to {sh['to_value']}{rd['unit']}, about {sh['per_day']} points a day."})
+            if rd["level"] in ("warning", "critical"):
                 findings.append({"level": "warn", "text": f"The {what} is still {rd['level']} ({rd['now']}{rd['unit']})."})
-        # the lead-up: what the same device did in the hours before the first alert, and what changed elsewhere
-        for t in sorted(timeline, key=lambda t: -t["count"]):
+    # host and guest: the one that moved first is the origin, the other one shows the load
+    for d in core:
+        host = host_of.get(d["id"])
+        mine = next((x for x in core if x["id"] == host), None)
+        if mine is None:
+            continue
+        a, b = onsets.get(d["id"]), onsets.get(mine["id"])
+        if a and b and a < b:
+            findings.append({"level": "cause", "text": f"{mine['name']} is the host of {d['name']} and its load followed {_minutes((b - a).total_seconds())} later: the problem started inside {d['name']} and shows through on {mine['name']}, not the other way round."})
+        elif a and not b:
+            findings.append({"level": "cause", "text": f"{mine['name']} is the host of {d['name']}; its own alerts are the load of {d['name']} showing through, not a separate problem."})
+        elif b and a and b < a:
+            findings.append({"level": "cause", "text": f"{mine['name']}, the host, moved first ({_minutes((a - b).total_seconds())} before {d['name']}): look at the host itself."})
+
+    # 3. suspects: what else happened on that machine at the same time
+    suspects = _suspects(conn, [d["id"] for d in core], onset or start, end, now) if (onset or core) else []
+    for sp in suspects[:3]:
+        findings.append({"level": "cause", "text": ("Probable cause: " if sp is suspects[0] and sp["score"] >= 60 else "Also at that time: ") + sp["text"]})
+    if not suspects and not any(f["level"] == "cause" for f in findings):
+        findings.append({"level": "fact", "text": "Nothing Netlens knows about explains the start: no scan, backup, restart or maintenance window at that time. Look at what runs on the machine."})
+    # restart loops on the same devices
+    for d in core:
+        for t in sorted(d["timeline"], key=lambda t: -t["count"]):
             if t["kind"] in ("container_restarting", "container_unhealthy", "container_stopped") and t["count"] >= 2:
-                findings.append({"level": "cause", "text": f"Probable source: {t['text'] or t['kind']} ({t['count']} alerts on {name} between {_clock(_ts(t['ts']))} and {_clock(_ts(t['last']))}). A container in a restart loop is a common reason for a disk to fill or a host to slow down."})
+                findings.append({"level": "cause", "text": f"Probable cause: {t['text'] or t['kind']} ({t['count']} alerts on {d['name']} between {_clock(_ts(t['ts']))} and {_clock(_ts(t['last']))}). A container in a restart loop is a common reason for a disk to fill or a host to slow down."})
                 break
-    before = []
-    for r in conn.execute("SELECT ts, device_id, kind, detail FROM events WHERE ts >= ? AND ts < ? ORDER BY id", (lead_from, found["start"])):
-        if r["kind"] in LEAD_KINDS and r["device_id"] not in found["device_ids"][:MAX_DEVICES]:
-            before.append({"ts": r["ts"], "device": names.get(r["device_id"]), "kind": r["kind"], "text": (r["detail"] or "")[:140]})
-    if before:
-        findings.append({"level": "info", "text": f"{len(before)} other thing{'s' if len(before) != 1 else ''} happened elsewhere in the three hours before, such as: {before[0]['text']}"})
-    # who was told
+
+    # 4. what it did to the rest: services that failed meanwhile
+    if onset:
+        down = [r for r in conn.execute("SELECT ts, detail FROM events WHERE kind = 'service_down' AND ts >= ? AND ts <= ? ORDER BY id", (onset.strftime(STAMP), until))]
+        if down:
+            findings.append({"level": "impact", "text": "Service checks that failed meanwhile: " + "; ".join(f"{(r['detail'] or '')[:70]} at {r['ts'][11:16]}" for r in down[:4]) + ". They may be a result of the overload."})
+    for d in core:
+        slow = conn.execute("SELECT detail FROM events WHERE kind = 'anomaly' AND ts >= ? AND ts <= ? AND device_id != ? AND detail LIKE '%response time%' ORDER BY id LIMIT 1", ((onset or start).strftime(STAMP), until, d["id"])).fetchone()
+        if slow:
+            findings.append({"level": "impact", "text": f"Elsewhere: {slow['detail'][:140]}."})
+            break
+    if unrelated:
+        findings.append({"level": "noise", "text": "Left out as unrelated: " + "; ".join(f"{u['name']} ({u['why']})" for u in unrelated) + "."})
+
+    # 5. was anybody told: one line, at the end
     told = []
-    kinds = list(dict.fromkeys(p["kind"] for d in devices for p in d["timeline"] if p["kind"] in incidents.PROBLEMS))[:6]
+    kinds = list(dict.fromkeys(p["kind"] for d in core for p in d["timeline"] if p["kind"] in incidents.PROBLEMS))[:6]
+    silent, held = [], []
     for kind in kinds:
-        when = min((_ts(p["ts"]) for d in devices for p in d["timeline"] if p["kind"] == kind), default=start)
+        when = min((_ts(p["ts"]) for d in core for p in d["timeline"] if p["kind"] == kind), default=start)
         t = _told(conn, kind, when)
         told.append(t)
-        if not t["enabled_channels"]:
-            findings.append({"level": "warn", "text": f"Nobody was told: no notification channel is switched on ({t['label'].lower()})."})
-        elif not t["channels"]:
-            reason = "its minimum severity lets only more serious events through" if t["excluded_by_severity"] else "no channel includes it"
-            findings.append({"level": "warn", "text": f"Nobody was told about \"{t['label']}\": {reason}. Settings → Notifications → Channels."})
+        if not t["channels"]:
+            silent.append(t["label"])
         elif t["held_by_quiet_hours"]:
-            findings.append({"level": "info", "text": f"\"{t['label']}\" came during quiet hours, so it was held until they ended."})
+            held.append(t["label"])
+    if told and not told[0]["enabled_channels"]:
+        findings.append({"level": "notify", "text": "Nobody was told: no notification channel is switched on."})
+    elif silent:
+        findings.append({"level": "notify", "text": f"These alerts reached nobody, because no channel includes them: {'; '.join(silent)} (Settings → Notifications → Channels)."})
+    for label in held:
+        findings.append({"level": "notify", "text": f"\"{label}\" came during quiet hours, so it was held until they ended."})
     if not found["resolved"]:
         findings.append({"level": "warn", "text": "The incident is not over."})
-    order = {"cause": 0, "warn": 1, "info": 2}
+    order = {"cause": 0, "fact": 1, "warn": 2, "impact": 3, "noise": 4, "notify": 5}
     findings.sort(key=lambda f: order[f["level"]])
-    facts = {"title": found["title"], "start": found["start"], "end": found["end"], "over": found["resolved"], "devices": [d["name"] for d in devices],
-             "findings": [f["text"] for f in findings][:10]}
-    return {"id": found["id"], "title": found["title"], "start": found["start"], "end": found["end"], "resolved": found["resolved"], "devices": devices, "before": before[:10], "notifications": told,
-            "findings": findings, "facts": facts}
+    names_core = [d["name"] for d in core]
+    changed = sorted({WORDS.get(r["metric"], r["metric"]) for d in core for r in d["readings"] if r["shape"]["kind"] in ("step", "surge")})
+    title = f"{', '.join(names_core[:2])}: {' and '.join(changed[:3])} jumped" if changed else found["title"]
+    facts = {"title": title, "start": found["start"], "end": found["end"], "over": found["resolved"], "devices": names_core, "unrelated_devices": [u["name"] for u in unrelated],
+             "findings": [f["text"] for f in findings if f["level"] != "noise"][:12]}
+    return {"id": found["id"], "title": title, "start": found["start"], "end": found["end"], "resolved": found["resolved"], "devices": core, "unrelated": [{"id": u["id"], "name": u["name"], "why": u["why"]} for u in unrelated],
+            "notifications": told, "findings": findings, "facts": facts}
 
 
 def narrate(conn: sqlite3.Connection, report: dict, ask=None) -> str | None:
-    return insights.complete(conn, SYSTEM, json.dumps(report["facts"], indent=1), names=report["facts"]["devices"], ask=ask)
+    return insights.complete(conn, SYSTEM, json.dumps(report["facts"], indent=1), names=report["facts"]["devices"] + report["facts"]["unrelated_devices"], ask=ask)
