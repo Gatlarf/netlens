@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.265 — 2026-10-25
+
+### Changed
+- **Host probe setup moved to Settings → Host probes → Hosts.** Choose a host there to switch probing on, pick the probes and the login, and install, update, check or remove the script on the host. The device page (Health) now only shows what the probes found.
+
+### Fixed
+- **"Check" on the host install showed nothing and closed the settings.** The result stays on screen now and the fields stay open.
+
 ## 0.4.264 — 2026-10-25
 
 ### Fixed

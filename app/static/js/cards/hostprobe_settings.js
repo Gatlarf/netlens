@@ -1,5 +1,6 @@
 import { get, put, post } from "../api.js";
 import { h, clear, toast } from "../util.js";
+import { buildDeviceProbeCard } from "./device_probe.js";
 
 function copyBox(title, text) {
   const area = h("textarea", { readonly: true, rows: Math.min(14, text.split("\n").length + 1), class: "mono", style: "width:100%" }, text);
@@ -12,6 +13,8 @@ function copyBox(title, text) {
 export async function buildHostProbeCard() {
   const card = h("div", { class: "card" });
   let s = await get("/api/hostprobe/settings");
+  let monitored = [];
+  try { monitored = (await get("/api/monitors")).monitors.filter((m) => ["ssh", "winrm"].includes(m.method)); } catch (e) { /* the list is optional */ }
 
   function draw() {
     clear(card);
@@ -71,7 +74,18 @@ export async function buildHostProbeCard() {
       h("div", { class: "field" }, h("label", { class: "check-row" }, f.names, " Let the language model see file and folder names"), h("p", { class: "hint" }, "Off: when an investigation is written out by a language model, it is only told how much grew and where, not the names. The built-in text always shows the names.")),
       h("div", { class: "form-actions" }, save));
 
-    // 3. prepare a host
+    // 3. the hosts: switch probing on, choose the probes and the login, install or update the script on the host
+    card.appendChild(h("h3", {}, "Hosts"));
+    const hostSlot = h("div", {});
+    const pick = h("select", {}, h("option", { value: "" }, "Choose a host…"), monitored.map((m) => h("option", { value: m.device_id }, `${m.name} (${m.method})`)));
+    pick.addEventListener("change", async () => {
+      clear(hostSlot);
+      if (!pick.value) return;
+      try { hostSlot.appendChild(await buildDeviceProbeCard({ id: Number(pick.value) }, "setup")); } catch (err) { toast(err.message || "Could not load", "error"); }
+    });
+    card.append(h("p", { class: "hint" }, "Hosts that are monitored over SSH or WinRM. What the probes find is on the device page, under Health."), field("Host", pick), hostSlot);
+
+    // 4. prepare a host
     card.appendChild(h("h3", {}, "Prepare a host"));
     const platform = h("select", {}, [["linux", "Linux"], ["windows", "Windows (OpenSSH server)"]].map(([k, t]) => h("option", { value: k }, t)));
     const user = h("input", { type: "text", value: "netlens-ro" });

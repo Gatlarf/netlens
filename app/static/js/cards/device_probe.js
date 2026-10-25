@@ -46,7 +46,9 @@ export function isProbeBusy() {
   return [...document.querySelectorAll(".probe-card")].some((c) => c.dataset.dirty === "1" || c.dataset.working === "1" || (c.contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)));
 }
 
-export async function buildDeviceProbeCard(device) {
+// mode "health": what the probes found (device page, Health). mode "setup": the settings and the install of the probe on the host (Settings → Host probes).
+export async function buildDeviceProbeCard(device, mode = "health") {
+  const setup = mode === "setup";
   const card = h("div", { class: "card admin-only probe-card" });
   for (const ev of ["input", "change"]) card.addEventListener(ev, () => { card.dataset.dirty = "1"; });
   let info = null;
@@ -148,7 +150,7 @@ export async function buildDeviceProbeCard(device) {
           r.error ? h("p", { class: "error" }, r.error) : null,
           r.verified ? h("p", { class: r.verified.ok ? "hint" : "error" }, r.verified.ok ? `Verified: Netlens logged in as the probe account with a one-time certificate and ran a probe (script version ${r.verified.script_version}).` : `The install worked but the check failed: ${r.verified.error}`) : null,
           r.created_ca ? h("p", { class: "hint" }, "The Netlens certificate authority was created for this.") : null);
-        if (r.probes) { info = r; draw(); }
+        if (r.probes) info = r;                                   // keep the log on screen: no redraw
       } catch (err) { out.replaceChildren(h("p", { class: "error" }, err.message || "Failed")); }
       finally { card.dataset.working = "0"; card.dataset.dirty = "0"; }
     }
@@ -157,16 +159,17 @@ export async function buildDeviceProbeCard(device) {
       h("div", { class: "field" }, h("label", {}, "Administrator account"), user), h("div", { class: "field" }, h("label", {}, "Password"), pass), h("div", { class: "field" }, h("label", {}, "Private key"), key),
       h("div", { class: "field" }, h("label", { class: "check-row" }, sshd, " Windows: also install the OpenSSH server if it is missing"), h("p", { class: "hint" }, "The locked-down probe needs it. Netlens then lets only the probe account sign in (with one-time certificates, no passwords) and only this Netlens reach port 22. Without it, a Windows host monitored over WinRM keeps running the probes with its stored login.")),
       h("div", { class: "form-actions" }, buttons.map(([a, t, c]) => h("button", { class: `btn${c}`, type: "button", onclick: () => { if (a === "remove" && !window.confirm("Remove the probe, its sudo rule and the Netlens CA key from the host?")) return; go(a); } }, t))), out);
-    if (info.update_available) box.open = true;
+    box.open = true;
     return box;
   }
 
   function draw() {
     clear(card);
-    card.appendChild(h("h2", {}, "Host probes"));
-    card.appendChild(h("p", { class: "hint" }, "Information only: the probes read and report. Netlens never changes anything on the host with them. What to do about a finding is for you, or for an automation system that has the right to change things and fetches the analysis by its id."));
+    if (!setup) card.appendChild(h("h2", {}, "Host probes"));
+    if (!setup) card.appendChild(h("p", { class: "hint" }, "Information only: the probes read and report. Netlens never changes anything on the host with them. What to do about a finding is for you, or for an automation system that has the right to change things and fetches the analysis by its id."));
     if (!info.monitor || !["ssh", "winrm"].includes(info.monitor)) {
-      card.appendChild(h("p", { class: "hint" }, "Read-only looks at this host (what uses the processor, memory, disk and network, which applications fail, what changed, what was scheduled, hardware and security) and an engineer that chains them into a cause. It needs health monitoring over SSH or WinRM first (the card above): that supplies the address and the login."));
+      if (setup) card.appendChild(h("p", { class: "hint" }, "This device has no health monitoring over SSH or WinRM yet. Add it on the device page (Health): that supplies the address and the login."));
+      else card.appendChild(h("p", { class: "hint" }, "Read-only looks at this host (what uses the processor, memory, disk and network, which applications fail, what changed, what was scheduled, hardware and security) and an engineer that chains them into a cause. It needs health monitoring over SSH or WinRM first (the card above): that supplies the address and the login."));
       return;
     }
     const cfg = info.config;
@@ -183,16 +186,14 @@ export async function buildDeviceProbeCard(device) {
         toast("Saved", "success"); card.dataset.dirty = "0"; draw();
       } catch (err) { toast(err.message || "Could not save", "error"); }
     });
-    const settings = h("details", { class: "limits-box" }, h("summary", {}, cfg.enabled ? "Settings (on)" : "Settings (off)"),
+    const settings = h("div", { class: "limits-box" }, h("p", { class: "hint" }, cfg.enabled ? "Probing is on for this host." : "Probing is off for this host."),
       h("div", { class: "field" }, h("label", { class: "check-row" }, on, " Look at this host now and then, and at once when a reading goes over its limit")),
       h("div", { class: "field" }, h("label", {}, "Which probes"), h("div", { class: "event-boxes" }, boxes)),
       h("div", { class: "field" }, h("label", {}, "Storage is looked at"), every, h("p", { class: "hint" }, "The other probes once a day, and at once when a reading goes over its limit (memory pressure looks at memory and applications, for example).")),
       h("div", { class: "field" }, h("label", {}, "Log in with"), source, h("p", { class: "hint" }, "A certificate is made for each look and stops working after a few minutes; the host only has to trust the Netlens CA. Set it up under Settings → Host probes.")),
       h("div", { class: "field" }, h("label", {}, "User name on the host (certificates)"), user), h("div", { class: "form-actions" }, save));
-    if (!cfg.enabled) settings.open = true;
-    card.appendChild(settings);
-    card.appendChild(installBox());
-    if (!cfg.enabled) return;
+    if (setup) { card.appendChild(settings); card.appendChild(installBox()); return; }
+    if (!cfg.enabled) { card.appendChild(h("p", { class: "hint" }, "Probing is off for this host. Turn it on under Settings → Host probes → Hosts.")); return; }
     card.appendChild(diagnosisBox());
     for (const u of info.hidden || []) card.appendChild(h("p", { class: "error" }, u.text + "."));
     const stale = Object.values(info.probes).some((p) => p.mode === "locked") && info.latest && info.latest.data && info.latest.data.script_version && info.latest.data.script_version < info.script_version;
