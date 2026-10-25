@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.247 — 2026-10-25
+
+### Changed
+- **Investigate looks for the cause, not only the symptoms.** It now names what else ran on the same machine at the start (a vulnerability scan whose containers live on that host, a container that (re)started, a backup, a maintenance window), says which of a host and its guest moved first (the guest's load shows through on its host, not the other way round), includes network traffic surges, lists the service checks that failed meanwhile, leaves out devices that only flapped (with the reason, such as a maintenance window), titles the report after what happened, and puts the remark about notifications last and in one line.
+
 ## 0.4.243 — 2026-10-25
 
 ### Added

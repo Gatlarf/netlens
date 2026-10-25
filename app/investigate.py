@@ -141,6 +141,8 @@ def _readings(conn: sqlite3.Connection, device_id: int, start: datetime, end: da
         sh = surge(got["points"]) if metric.startswith("net_") else shape(got["points"])
         if not sh or sh["kind"] == "steady":
             continue
+        if sh["kind"] in ("step", "surge") and not (start - timedelta(hours=4)).timestamp() <= sh["at"] <= (end + timedelta(hours=1)).timestamp():
+            continue                                  # it moved, but at another time: not part of this story
         st = states.get((metric, label))
         out.append({"metric": metric, "label": label, "level": st["level"] if st else "ok", "now": round(st["value"], 1) if st and st["value"] is not None else sh.get("last"), "unit": UNITS[metric], "shape": sh})
     return out[:8]
@@ -161,12 +163,12 @@ def _suspects(conn: sqlite3.Connection, device_ids: list[int], onset: datetime, 
                            (srv["plugin_id"], srv["server_id"], lo, hi)).fetchone()
         if not row or not row["n"]:
             continue
-        key = (srv["plugin_id"] + " " + srv["name"]).lower()
         here = [g for g in guests if srv["plugin_id"].lower() in g["name"].lower() or srv["name"].lower() in g["name"].lower()]
         text = f"{srv['name']} (a vulnerability scanner) reported findings from {_clock(_ts(row['a']))[:-4]} to {_clock(_ts(row['b']))[:-4]} UTC on {row['hosts']} host{'s' if row['hosts'] != 1 else ''}: a scan was running while this happened"
         if here:
             text += f". It runs on the affected machine ({len(here)} of its containers, such as {here[0]['name']}), and a scan loads the processor and memory heavily"
-        out.append({"score": 90 if here else 40, "text": text + "."})
+        if here:                                       # a scanner elsewhere loads the network, not this machine; it is only mentioned when it runs here
+            out.append({"score": 90, "text": text + "."})
     # containers of the affected machines that (re)started right around the onset
     for g in guests:
         try:
@@ -283,7 +285,7 @@ def investigate(conn: sqlite3.Connection, incident_id: int, now: datetime | None
 
     # 4. what it did to the rest: services that failed meanwhile
     if onset:
-        down = [r for r in conn.execute("SELECT ts, detail FROM events WHERE kind = 'service_down' AND ts >= ? AND ts <= ? ORDER BY id", (onset.strftime(STAMP), until))]
+        down = [r for r in conn.execute("SELECT ts, detail FROM events WHERE kind = 'service_down' AND ts >= ? AND ts <= ? ORDER BY id", (onset.strftime(STAMP), (end + timedelta(minutes=30)).strftime(STAMP)))]
         if down:
             findings.append({"level": "impact", "text": "Service checks that failed meanwhile: " + "; ".join(f"{(r['detail'] or '')[:70]} at {r['ts'][11:16]}" for r in down[:4]) + ". They may be a result of the overload."})
     for d in core:
