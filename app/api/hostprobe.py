@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import PlainTextResponse
 
 from app import analysis, audit
 from app.api.devices import get_conn
@@ -60,6 +61,18 @@ def create_ca(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     _note(request, conn, "POST", ("Replaced" if had else "Created") + f" the Netlens SSH certificate authority (public key {_fingerprint(pub)})"
           + ("; hosts that trusted the old key refuse new certificates" if had else ""))
     return {"ca_public_key": pub}
+
+
+@router.get("/hostprobe/uninstall")
+def get_uninstall(request: Request, platform: str = "linux", user: str = "netlens-ro") -> PlainTextResponse:
+    """The standalone uninstaller (a shell script for Linux, a PowerShell script for Windows): takes the probe off a host without Netlens."""
+    _admin(request)
+    if platform not in ("linux", "windows"):
+        raise HTTPException(status_code=422, detail="platform must be linux or windows")
+    if not user.replace("-", "").replace("_", "").isalnum() or len(user) > 32:
+        raise HTTPException(status_code=422, detail="the user name may only hold letters, digits, - and _")
+    name = "netlens-probe-uninstall.sh" if platform == "linux" else "Uninstall-NetlensProbe.ps1"
+    return PlainTextResponse(scripts.linux_uninstall(user) if platform == "linux" else scripts.windows_uninstall(user), headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @router.get("/hostprobe/setup")
@@ -244,14 +257,14 @@ async def install(device_id: int, body: dict, request: Request) -> dict[str, Any
         admin = {"username": str(body.get("username") or "").strip(), "password": body.get("password") or None, "private_key": body.get("private_key") or None,
                  "passphrase": body.get("passphrase") or None, "sudo_password": body.get("sudo_password") or None}
         try:
-            result = await installer.administer(db, device_id, action, admin, str(body.get("probe_user") or "") or None)
+            result = await installer.administer(db, device_id, action, admin, str(body.get("probe_user") or "") or None, bool(body.get("enable_sshd")), str(body.get("allow_from") or ""))
         except installer.InstallError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         words = {"check": "Checked", "install": "Installed", "update": "Updated", "remove": "Removed"}[action]
         audit.record_by(db, _who(request), client_ip(request), "POST", request.url.path, 200 if result["ok"] else 502,
                         f"{words} the host probe {'on' if action != 'check' else 'state of'} {row['name']} with the administrator account '{admin['username']}' (that login was used once and not stored)"
                         + (f"; account '{result['account']}', script version {result.get('installed_version')}" if result["ok"] else f": failed: {str(result.get('error'))[:160]}")
-                        + ("; a new Netlens CA was created" if result.get("created_ca") else ""))
+                        + ("; a new Netlens CA was created" if result.get("created_ca") else "") + ("; the OpenSSH server was installed or started by Netlens" if body.get("enable_sshd") and action in ("install", "update") and result["ok"] else ""))
         return {**result, **(_view(db, device_id) if action != "remove" or result["ok"] else {})}
     finally:
         db.close()

@@ -381,6 +381,44 @@ def linux_entry() -> str:
             '  *) echo "refused" >&2; exit 2 ;;\nesac\n')
 
 
+def linux_uninstall(user: str = "netlens-ro") -> str:
+    """A standalone script that takes the probe off a Linux host again, without Netlens: `sudo sh netlens-probe-uninstall.sh [--remove-account]`.
+    It removes the two scripts, the sudoers file, the CA key and the marked blocks of sshd_config (also the block an older Netlens wrote), after a backup and a test of the SSH configuration."""
+    return f'''#!/bin/sh
+# Removes the Netlens host probe from this host. Run as root:  sudo sh netlens-probe-uninstall.sh [--remove-account]
+# It only removes what Netlens installed: {WRAPPER_PATH}, {ENTRY_PATH}, /etc/sudoers.d/netlens-probe, /etc/ssh/netlens_ca.pub
+# and the blocks marked "netlens-probe" in /etc/ssh/sshd_config (a backup is made and the configuration is tested first).
+USER_="{user}"
+[ "$(id -u)" = "0" ] || {{ echo "Run this as root: sudo sh $0"; exit 3; }}
+W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
+STAMP=$(date +%Y%m%d%H%M%S)
+if [ -f /etc/ssh/sshd_config ]; then
+  awk -v b='# >>> netlens-probe' -v e='# <<< netlens-probe' '
+    index($0, b) == 1 {{ skip = 1 }}
+    skip != 1 {{ print }}
+    index($0, e) == 1 {{ skip = 0 }}' /etc/ssh/sshd_config | awk '
+    /^# Netlens read-only probe \\(added by Netlens/ {{ leg = 1; next }}
+    leg == 1 {{ if ($0 ~ /^[[:space:]]*AllowAgentForwarding[[:space:]]+no/) leg = 0; next }}
+    {{ print }}' > "$W/sshd_clean"
+  if ! cmp -s "$W/sshd_clean" /etc/ssh/sshd_config; then
+    cp -p /etc/ssh/sshd_config /etc/ssh/sshd_config.netlens-backup-$STAMP && echo "Backed up sshd_config as sshd_config.netlens-backup-$STAMP"
+    install -m 0644 -o root -g root "$W/sshd_clean" /etc/ssh/sshd_config
+    if sshd -t >/dev/null 2>&1; then
+      (systemctl reload ssh || systemctl reload sshd || service ssh reload || service sshd reload) >/dev/null 2>&1 && echo "The SSH server reloaded its configuration"
+    else
+      cp -p /etc/ssh/sshd_config.netlens-backup-$STAMP /etc/ssh/sshd_config
+      echo "The SSH server configuration did not pass its own test: the old configuration was put back. Nothing else was removed."; exit 6
+    fi
+  else
+    echo "sshd_config holds nothing from Netlens"
+  fi
+fi
+rm -f {WRAPPER_PATH} {ENTRY_PATH} /etc/sudoers.d/netlens-probe /etc/ssh/netlens_ca.pub && echo "Removed the scripts, the sudoers file and the CA key"
+if [ "$1" = "--remove-account" ]; then userdel -r "$USER_" 2>/dev/null && echo "Removed the account $USER_" || echo "The account $USER_ was not removed (does it exist?)"; else echo "The account $USER_ was left. Remove it with:  userdel -r $USER_   (or run this script again with --remove-account)"; fi
+echo "Done."
+'''
+
+
 def linux_setup(user: str, public_key: str | None, ca_public_key: str | None) -> dict[str, str]:
     """The files and lines that lock a Linux host down, for a key (authorized_keys) or for certificates from the Netlens CA (sshd_config)."""
     sudoers = f"{user} ALL=(root) NOPASSWD: " + ", ".join(f"{WRAPPER_PATH} {n}" for n in PROBES) + "\n"
@@ -392,6 +430,7 @@ def linux_setup(user: str, public_key: str | None, ca_public_key: str | None) ->
         "sudoers": sudoers,
         "script": linux_wrapper(),
         "entry": linux_entry(),
+        "uninstall": linux_uninstall(user),
     }
     if public_key:
         out["authorized_keys"] = f'command="{ENTRY_PATH}",restrict {public_key.strip()}\n'
@@ -411,6 +450,45 @@ def windows_wrapper() -> str:
             f"if (@({names}) -notcontains $name) {{ [Console]::Error.WriteLine('refused'); exit 2 }}\n& \"Probe-$name\"\n")
 
 
+def windows_uninstall(user: str = "netlens-ro") -> str:
+    """A standalone PowerShell script that takes the probe off a Windows host again, without Netlens (run as administrator).
+    -RemoveAccount also deletes the account; -StopSshServer also stops and disables the OpenSSH server (only meant for a host where Netlens installed it: the marker file says so)."""
+    return f"""# Removes the Netlens host probe from this host. Run in an elevated PowerShell:
+#   powershell -ExecutionPolicy Bypass -File Uninstall-NetlensProbe.ps1 [-RemoveAccount] [-StopSshServer]
+param([switch]$RemoveAccount, [switch]$StopSshServer)
+$ErrorActionPreference = 'Stop'
+$user = '{user}'; $dir = 'C:\\ProgramData\\netlens'; $cfg = 'C:\\ProgramData\\ssh\\sshd_config'; $ca = 'C:\\ProgramData\\ssh\\netlens_ca.pub'; $marker = Join-Path $dir 'installed-sshd.txt'
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {{ Write-Output 'Run this in an elevated (administrator) PowerShell.'; exit 3 }}
+$weInstalledSshd = Test-Path $marker
+if (Test-Path $cfg) {{
+    $text = Get-Content $cfg -Raw
+    $clean = [regex]::Replace($text, '(?ms)^# >>> netlens-probe.*?^# <<< netlens-probe[^\r\n]*\r?\n?', '')
+    if ($clean -ne $text) {{
+        $stamp = Get-Date -Format yyyyMMddHHmmss
+        Copy-Item $cfg ($cfg + '.netlens-backup-' + $stamp)
+        Set-Content -Path $cfg -Value $clean.TrimEnd() -Encoding ASCII
+        & (Join-Path $env:WINDIR 'System32\\OpenSSH\\sshd.exe') -t 2>$null
+        if ($LASTEXITCODE -ne 0) {{ Copy-Item ($cfg + '.netlens-backup-' + $stamp) $cfg -Force; Write-Output 'The SSH server configuration did not pass its own test: the old one was put back. Nothing else was removed.'; exit 6 }}
+        Write-Output ('Removed the Netlens blocks from sshd_config (backup: sshd_config.netlens-backup-' + $stamp + ')')
+    }} else {{ Write-Output 'sshd_config holds nothing from Netlens' }}
+}}
+Remove-Item $ca -Force -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $dir 'probe.ps1') -Force -ErrorAction SilentlyContinue
+if ($StopSshServer -or $weInstalledSshd) {{
+    if ($weInstalledSshd -and -not $StopSshServer) {{ Write-Output 'Netlens installed the OpenSSH server on this host. It is left running: add -StopSshServer to stop and disable it.' }}
+}}
+if ($StopSshServer) {{
+    Stop-Service sshd -ErrorAction SilentlyContinue; Set-Service sshd -StartupType Disabled -ErrorAction SilentlyContinue
+    Get-NetFirewallRule -Name 'netlens-ssh' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+    Write-Output 'The OpenSSH server was stopped and disabled (to remove it completely: Remove-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0)'
+}} elseif (Get-Service sshd -ErrorAction SilentlyContinue) {{ Restart-Service sshd -ErrorAction SilentlyContinue; Write-Output 'The OpenSSH server was restarted with the cleaned configuration' }}
+Remove-Item $marker -Force -ErrorAction SilentlyContinue
+if ((Test-Path $dir) -and -not (Get-ChildItem $dir -Force)) {{ Remove-Item $dir -Force }}
+if ($RemoveAccount) {{ Remove-LocalUser -Name $user -ErrorAction SilentlyContinue; Write-Output ('Removed the account ' + $user) }} else {{ Write-Output ('The account ' + $user + ' was left. Remove it with: Remove-LocalUser ' + $user + '  (or run this script again with -RemoveAccount)') }}
+Write-Output 'Done.'
+"""
+
+
 def windows_setup(user: str, public_key: str | None, ca_public_key: str | None) -> dict[str, str]:
     """The same for Windows with the OpenSSH server (Windows 10/11, Server 2019+): a local account that can only run the probe script."""
     script_path = WINDOWS_WRAPPER_PATH
@@ -426,7 +504,7 @@ def windows_setup(user: str, public_key: str | None, ca_public_key: str | None) 
         "# For the Application and System event logs (the applications probe): net localgroup 'Event Log Readers' " + user + " /add\n"
         "# For performance counters (the processor probe):                      net localgroup 'Performance Monitor Users' " + user + " /add\n"
     )
-    out = {"install": install, "script": windows_wrapper()}
+    out = {"install": install, "script": windows_wrapper(), "uninstall": windows_uninstall(user)}
     force = f'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {script_path}'
     if public_key:
         out["authorized_keys"] = (f'# C:\\ProgramData\\ssh\\administrators_authorized_keys is for administrators; for {user} use C:\\Users\\{user}\\.ssh\\authorized_keys\n'

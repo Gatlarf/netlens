@@ -14,6 +14,7 @@ Linux is done through SSH with sudo (or root). Windows through the OpenSSH serve
 
 from __future__ import annotations
 
+import re
 import shlex
 from typing import Any
 
@@ -116,38 +117,135 @@ fi
 '''
 
 
-def windows_script(action: str, user: str, ca_public_key: str) -> str:
-    """PowerShell for a Windows host with the OpenSSH server (run as an administrator). Not yet run on a real Windows host."""
+WINDOWS_TEMPLATE = r"""$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+function say($m) { Write-Output ('NETLENS: ' + $m) }
+$action = '@@ACTION@@'; $user = '@@USER@@'; $enableSshd = $@@ENABLE@@; $allowFrom = '@@ALLOW@@'; $deferRestart = $@@DEFER@@
+$dir = 'C:\ProgramData\netlens'; $cfg = 'C:\ProgramData\ssh\sshd_config'; $ca = 'C:\ProgramData\ssh\netlens_ca.pub'; $marker = Join-Path $dir 'installed-sshd.txt'
+if ($enableSshd -and -not $allowFrom) { $c = Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in 5985, 5986, 22 } | Select-Object -First 1; if ($c) { $allowFrom = [string]$c.RemoteAddress } }
+$sshd = Join-Path $env:WINDIR 'System32\OpenSSH\sshd.exe'
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) { say 'error this login is not an administrator'; exit 3 }
+say ('step connected as ' + $env:USERNAME + ' on ' + $env:COMPUTERNAME)
+$svc = Get-Service sshd -ErrorAction SilentlyContinue
+$inst = 'none'
+if (Test-Path (Join-Path $dir 'probe.ps1')) { $m = Select-String -Path (Join-Path $dir 'probe.ps1') -Pattern 'netlens-probe-script-version' -List; if ($m) { $inst = ($m.Line -split ':')[-1].Trim() } }
+say ('result installed_version=' + $inst)
+say ('result account=' + [bool](Get-LocalUser -Name $user -ErrorAction SilentlyContinue))
+say ('result sshd_installed=' + [bool]$svc)
+say ('result sshd_running=' + [bool]($svc -and $svc.Status -eq 'Running'))
+say ('result sshd_by_netlens=' + (Test-Path $marker))
+if ($action -eq 'check') { say 'done check: nothing was changed'; exit 0 }
+
+if ($action -ne 'remove') {
+    if (-not $svc) {
+        if (-not $enableSshd) { say 'error the OpenSSH server is not installed on this host. It is needed for the locked-down probe: choose "also install the OpenSSH server" (Netlens then restricts it to the probe account and to this Netlens), or install it yourself'; exit 7 }
+        say 'step installing the Windows OpenSSH Server (this can take a few minutes)'
+        Add-WindowsCapability -Online -Name 'OpenSSH.Server~~~~0.0.1.0' | Out-Null
+        New-Item -ItemType Directory -Force $dir | Out-Null
+        Set-Content -Path $marker -Value 'The OpenSSH server was installed by Netlens.' -Encoding ASCII
+        say 'step installed the OpenSSH Server'
+        $svc = Get-Service sshd
+    }
+    $weInstalled = Test-Path $marker
+    if (-not (Test-Path $cfg)) { Start-Service sshd; for ($i = 0; $i -lt 20 -and -not (Test-Path $cfg); $i++) { Start-Sleep -Seconds 1 }; Stop-Service sshd -ErrorAction SilentlyContinue; say 'step the SSH server created its configuration' }
+    $text = Get-Content $cfg -Raw
+    $text = [regex]::Replace($text, '(?ms)^# >>> netlens-probe.*?^# <<< netlens-probe[^\r\n]*\r?\n?', '')
+    if ($text -match '(?im)^\s*TrustedUserCAKeys\s+(?!C:\\ProgramData\\ssh\\netlens_ca\.pub)') { say 'error this host already trusts another certificate authority: add the Netlens CA public key to that file instead'; exit 4 }
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    $probe = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('@@PROBE_B64@@'))
+    Set-Content -Path (Join-Path $dir 'probe.ps1') -Value ('# netlens-probe-script-version: @@VERSION@@' + [Environment]::NewLine + $probe) -Encoding UTF8
+    say 'step installed probe.ps1'
+    if (-not (Get-LocalUser -Name $user -ErrorAction SilentlyContinue)) {
+        $p = ConvertTo-SecureString -AsPlainText -Force ([guid]::NewGuid().ToString() + 'aA1!')
+        New-LocalUser -Name $user -Password $p -PasswordNeverExpires -UserMayNotChangePassword -Description 'Netlens read-only probe' | Out-Null
+        say ('step created the account ' + $user + ' (a random password nobody knows; it signs in with one-time certificates only)')
+    }
+    foreach ($sid in 'S-1-5-32-573', 'S-1-5-32-558') { try { Add-LocalGroupMember -SID $sid -Member $user -ErrorAction Stop; say ('step added ' + $user + ' to the read-only group ' + (Get-LocalGroup -SID $sid).Name) } catch { } }
+    icacls $dir /inheritance:r /grant 'Administrators:(OI)(CI)F' 'SYSTEM:(OI)(CI)F' ($user + ':(OI)(CI)RX') | Out-Null
+    Set-Content -Path $ca -Value ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('@@CA_B64@@'))) -Encoding ASCII
+    say 'step installed the CA public key'
+    $force = 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + $dir + '\probe.ps1'
+    $globalBody = 'TrustedUserCAKeys ' + $ca
+    if ($weInstalled) { $globalBody += "`r`nAllowUsers " + $user + "`r`nPasswordAuthentication no" }
+    $gblock = "# >>> netlens-probe (global) >>>`r`n" + $globalBody + "`r`n# <<< netlens-probe (global) <<<`r`n"
+    $mblock = "# >>> netlens-probe >>>`r`nMatch User " + $user + "`r`n    ForceCommand " + $force + "`r`n    AllowTcpForwarding no`r`n# <<< netlens-probe <<<`r`n"
+    $first = [regex]::Match($text, '(?im)^\s*Match\s')
+    if ($first.Success) { $text = $text.Insert($first.Index, $gblock) } else { $text = $text.TrimEnd() + "`r`n`r`n" + $gblock }
+    $text = $text.TrimEnd() + "`r`n`r`n" + $mblock
+} else {
+    $text = if (Test-Path $cfg) { Get-Content $cfg -Raw } else { '' }
+    $text = [regex]::Replace($text, '(?ms)^# >>> netlens-probe.*?^# <<< netlens-probe[^\r\n]*\r?\n?', '').TrimEnd()
+}
+$stamp = Get-Date -Format yyyyMMddHHmmss
+if (Test-Path $cfg) {
+    $old = Get-Content $cfg -Raw
+    if ($old.TrimEnd() -eq $text.TrimEnd()) { say 'step the SSH server configuration was already right' }
+    else {
+        Copy-Item $cfg ($cfg + '.netlens-backup-' + $stamp)
+        say ('step backed up sshd_config as sshd_config.netlens-backup-' + $stamp)
+        Set-Content -Path $cfg -Value $text -Encoding ASCII
+        & $sshd -t 2>$null
+        if ($LASTEXITCODE -ne 0) { Copy-Item ($cfg + '.netlens-backup-' + $stamp) $cfg -Force; say 'error the SSH server configuration did not pass its own test (sshd -t): the old configuration was put back'; exit 6 }
+        say 'step the SSH server configuration passed its own test (sshd -t)'
+    }
+}
+if ($action -eq 'remove') {
+    Remove-Item (Join-Path $dir 'probe.ps1'), $ca -Force -ErrorAction SilentlyContinue
+    say ('step removed the script and the CA key; the account ' + $user + ' was left (Remove-LocalUser ' + $user + ')')
+    if (Test-Path $marker) {
+        Stop-Service sshd -ErrorAction SilentlyContinue; Set-Service sshd -StartupType Disabled -ErrorAction SilentlyContinue
+        Get-NetFirewallRule -Name 'netlens-ssh' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+        Remove-Item $marker -Force
+        say 'step the OpenSSH server that Netlens had installed was stopped and disabled (to remove it completely: Remove-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0)'
+    } elseif ($svc) { if ($deferRestart) { Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile', '-Command', 'Start-Sleep 4; Restart-Service sshd' } else { Restart-Service sshd }; say 'step the SSH server restarts with the cleaned configuration' }
+    say 'done remove'
+    exit 0
+}
+if ($weInstalled) {
+    $rule = Get-NetFirewallRule -Name 'netlens-ssh' -ErrorAction SilentlyContinue
+    if ($rule) { Remove-NetFirewallRule -Name 'netlens-ssh' }
+    $fw = @{ Name = 'netlens-ssh'; DisplayName = 'Netlens probe (SSH)'; Protocol = 'TCP'; LocalPort = 22; Direction = 'Inbound'; Action = 'Allow'; Profile = 'Any' }
+    if ($allowFrom) { $fw['RemoteAddress'] = $allowFrom }
+    New-NetFirewallRule @fw | Out-Null
+    Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue | Disable-NetFirewallRule
+    say ('step the firewall lets only ' + $(if ($allowFrom) { $allowFrom } else { 'the local network' }) + ' reach the SSH server (port 22)')
+}
+Set-Service sshd -StartupType Automatic
+if ($deferRestart) { Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile', '-Command', 'Start-Sleep 4; Restart-Service sshd'; say 'step the SSH server restarts in a few seconds (this connection ends)' }
+else { Restart-Service sshd; say 'step the SSH server was (re)started' }
+say 'result installed_version=@@VERSION@@'
+say ('done ' + $action)
+"""
+
+
+def windows_script(action: str, user: str, ca_public_key: str, enable_sshd: bool = False, allow_from: str = "", defer_restart: bool = False) -> str:
+    """PowerShell for a Windows host (run as an administrator): over WinRM, or over SSH on stdin when the OpenSSH server is already there. Uses the OpenSSH server as the locked-down way in:
+    when Netlens has to install it, it restricts it to the probe account and (when known) to this Netlens in the firewall."""
     import base64
 
-    probe_b64 = base64.b64encode(scripts.windows_wrapper().encode()).decode()
-    ca_b64 = base64.b64encode((ca_public_key.strip() + "\n").encode()).decode()
-    return (
-        "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';function say($m){Write-Output ('NETLENS: '+$m)};"
-        f"$action='{action}';$user='{user}';$dir='C:\\ProgramData\\netlens';$cfg='C:\\ProgramData\\ssh\\sshd_config';$ca='C:\\ProgramData\\ssh\\netlens_ca.pub';"
-        "$isAdmin=([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator);"
-        "if(-not $isAdmin){say 'error this login is not an administrator';exit 3};say ('step connected as '+$env:USERNAME+' on '+$env:COMPUTERNAME);"
-        "$inst='none';if(Test-Path \"$dir\\probe.ps1\"){$m=Select-String -Path \"$dir\\probe.ps1\" -Pattern 'netlens-probe-script-version' -List;if($m){$inst=($m.Line -split ':')[-1].Trim()}};say ('result installed_version='+$inst);"
-        "say ('result account='+[bool](Get-LocalUser -Name $user -ErrorAction SilentlyContinue));"
-        "if($action -eq 'check'){say 'done check: nothing was changed';exit 0};"
-        "$text=if(Test-Path $cfg){Get-Content $cfg -Raw}else{''};$text=[regex]::Replace($text,'(?ms)^# >>> netlens-probe.*?^# <<< netlens-probe[^\\r\\n]*\\r?\\n?','');"
-        "if($action -ne 'remove'){"
-        "if($text -match '(?im)^\\s*TrustedUserCAKeys\\s+(?!C:\\\\ProgramData\\\\ssh\\\\netlens_ca.pub)'){say 'error this host already trusts another certificate authority: add the Netlens CA public key to that file instead';exit 4};"
-        "New-Item -ItemType Directory -Force $dir|Out-Null;"
-        f"$probe=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{probe_b64}'));Set-Content -Path \"$dir\\probe.ps1\" -Value ('# netlens-probe-script-version: {scripts.SCRIPT_VERSION}'+[Environment]::NewLine+$probe) -Encoding UTF8;say 'step installed probe.ps1';"
-        "if(-not (Get-LocalUser -Name $user -ErrorAction SilentlyContinue)){$p=ConvertTo-SecureString -AsPlainText -Force ([guid]::NewGuid().ToString());New-LocalUser -Name $user -Password $p -PasswordNeverExpires -Description 'Netlens read-only probe'|Out-Null;say ('step created the account '+$user)};"
-        "icacls $dir /inheritance:r /grant 'Administrators:(OI)(CI)F' 'SYSTEM:(OI)(CI)F' (\"${user}:(OI)(CI)RX\")|Out-Null;"
-        f"Set-Content -Path $ca -Value ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{ca_b64}'))) -Encoding ASCII;say 'step installed the CA public key';"
-        "$force='powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File '+$dir+'\\probe.ps1';"
-        "$global=\"# >>> netlens-probe (global) >>>`r`nTrustedUserCAKeys $ca`r`n# <<< netlens-probe (global) <<<`r`n\";"
-        "$match=\"# >>> netlens-probe >>>`r`nMatch User $user`r`n    ForceCommand $force`r`n    AllowTcpForwarding no`r`n# <<< netlens-probe <<<`r`n\";"
-        "$i=[regex]::Match($text,'(?im)^\\s*Match\\s');if($i.Success){$text=$text.Insert($i.Index,$global)}else{$text=$text+\"`r`n\"+$global};$text=$text.TrimEnd()+\"`r`n`r`n\"+$match};"
-        "$stamp=Get-Date -Format yyyyMMddHHmmss;if(Test-Path $cfg){Copy-Item $cfg \"$cfg.netlens-backup-$stamp\";say ('step backed up sshd_config as sshd_config.netlens-backup-'+$stamp)};"
-        "Set-Content -Path $cfg -Value $text -Encoding ASCII;"
-        "$sshd=Join-Path $env:WINDIR 'System32\\OpenSSH\\sshd.exe';& $sshd -t 2>&1|Out-Null;if($LASTEXITCODE -ne 0){Copy-Item \"$cfg.netlens-backup-$stamp\" $cfg -Force;say 'error the SSH server configuration did not pass its own test: the old configuration was put back';exit 6};"
-        "if($action -eq 'remove'){Remove-Item \"$dir\\probe.ps1\",$ca -Force -ErrorAction SilentlyContinue;say ('step removed the script and the CA key; the account '+$user+' was left (Remove-LocalUser '+$user+')')};"
-        "say 'step the SSH server restarts in a few seconds (this connection ends)';Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile','-Command','Start-Sleep 4; Restart-Service sshd';say ('done '+$action)"
-    )
+    return (WINDOWS_TEMPLATE.replace("@@ACTION@@", action).replace("@@USER@@", user).replace("@@ENABLE@@", "true" if enable_sshd else "false").replace("@@ALLOW@@", allow_from)
+            .replace("@@DEFER@@", "true" if defer_restart else "false").replace("@@VERSION@@", str(scripts.SCRIPT_VERSION))
+            .replace("@@PROBE_B64@@", base64.b64encode(scripts.windows_wrapper().encode()).decode()).replace("@@CA_B64@@", base64.b64encode((ca_public_key.strip() + "\n").encode()).decode()))
+
+
+def winrm_upload_and_run(script: str, session_factory, total: float = 900.0, chunk: int = 2000) -> tuple[str, str, int]:
+    """Run a long PowerShell script over WinRM, which only takes short command lines: the script is compressed, sent in small pieces into a temporary file and run from there."""
+    import base64
+    import gzip
+    import uuid
+
+    packed = base64.b64encode(gzip.compress(script.encode("utf-8"))).decode()
+    name = f"netlens-install-{uuid.uuid4().hex[:10]}"
+    parts = [packed[i:i + chunk] for i in range(0, len(packed), chunk)]
+    for n, piece in enumerate(parts):
+        out, err, code = session_factory().run_powershell(f"$f = Join-Path $env:TEMP '{name}.b64'; " + ("Set-Content" if n == 0 else "Add-Content") + f" -Path $f -Value '{piece}' -NoNewline -Encoding ASCII", 60)
+        if code not in (0, None):
+            return out, err or "could not write the install script on the host", code
+    final = (f"$f = Join-Path $env:TEMP '{name}.b64'; $b = [Convert]::FromBase64String((Get-Content $f -Raw)); Remove-Item $f -Force; "
+             "$ms = New-Object IO.MemoryStream(, $b); $gz = New-Object IO.Compression.GzipStream($ms, [IO.Compression.CompressionMode]::Decompress); "
+             "$code = (New-Object IO.StreamReader($gz)).ReadToEnd(); Invoke-Expression $code")
+    return session_factory().run_powershell(final, total)
 
 
 def parse_output(text: str) -> dict[str, Any]:
@@ -170,64 +268,87 @@ def parse_output(text: str) -> dict[str, Any]:
     return {"log": log, "result": result, "done": done, "error": error}
 
 
-async def administer(conn, device_id: int, action: str, admin: dict[str, Any], probe_user: str | None = None) -> dict[str, Any]:
-    """Check, install, update or remove the probe on a host with an administrator login that is used once (never stored). Returns {"ok", "action", "log", ...}."""
+async def administer(conn, device_id: int, action: str, admin: dict[str, Any], probe_user: str | None = None, enable_sshd: bool = False, allow_from: str = "") -> dict[str, Any]:
+    """Check, install, update or remove the probe on a host with an administrator login that is used once (never stored). Returns {"ok", "action", "log", ...}.
+    SSH hosts (Linux, or Windows with the OpenSSH server) are reached over SSH; Windows hosts that Netlens monitors over WinRM over WinRM.
+    `enable_sshd`: on Windows, also install and start the OpenSSH server when it is missing (restricted to the probe account, and in the firewall to `allow_from`)."""
+    import asyncio
+
+    from app.hostmetrics import winrm
+
     if action not in ACTIONS:
         raise InstallError("action must be one of: " + ", ".join(ACTIONS))
     row = hm.get_monitor(conn, device_id)
-    if row is None or row["method"] != "ssh":
-        raise InstallError("the probe is installed over SSH: this device needs a health monitor over SSH first (WinRM hosts run the probes directly with the stored login: nothing to install)")
+    if row is None or row["method"] not in ("ssh", "winrm"):
+        raise InstallError("the probe is installed over SSH or WinRM: this device needs a health monitor over SSH or WinRM first (it supplies the address)")
     if not (admin.get("username") and (admin.get("password") or admin.get("private_key"))):
         raise InstallError("give an administrator login for this one action: user name and password (or a private key); it is not stored")
+    if row["method"] == "winrm" and not admin.get("password"):
+        raise InstallError("over WinRM the administrator login needs a password")
     cfg = service.device_config(conn, device_id)
     user = (probe_user or cfg["username"] or "netlens-ro").strip()
     if not user.replace("-", "").replace("_", "").isalnum() or len(user) > 32:
         raise InstallError("the account name may only hold letters, digits, - and _")
     created = False
     ca = credentials.ca_public(conn)
-    if ca is None and action != "check" and action != "remove":
+    if ca is None and action not in ("check", "remove"):
         ca = credentials.ca_create(conn)
         created = True
-    from app.terminal.hostkeys import get_fingerprint
-
-    known = get_fingerprint(conn, device_id)
     secret = hm.load_secret(conn, row)
-    platform = (hm._STATES.get(row["id"]) or {}).get("platform") or secret.get("platform", "auto")
     as_root = admin["username"] == "root"
     try:
-        if platform in ("auto", "linux"):
-            out, status, _fp = await ssh.run_command(row["address"], row["port"], admin["username"], admin.get("password"), admin.get("private_key"), admin.get("passphrase"), "bash -s",
-                                                     known, timeout=120.0, input=linux_script(action, user, ca or "", admin.get("password"), admin.get("sudo_password"), as_root))
+        if row["method"] == "winrm":
+            def session():
+                return winrm.Session(row["address"], row["port"], row["port"] != 5985, admin["username"], admin["password"], secret.get("auth", "ntlm"), bool(secret.get("verify_tls")), timeout=40)
+
+            script = windows_script(action, user, ca or "", enable_sshd, allow_from, defer_restart=False)
+            out, err, _code = await asyncio.to_thread(winrm_upload_and_run, script, session, 900.0)
             parsed = parse_output(out)
-            if not parsed["log"] and platform == "auto":                    # not a Linux host: try it as Windows
-                out, status, _fp = await ssh.run_command(row["address"], row["port"], admin["username"], admin.get("password"), admin.get("private_key"), admin.get("passphrase"),
-                                                         WINDOWS_STDIN, known, timeout=120.0, input=windows_script(action, user, ca or ""))
-                parsed = parse_output(out)
+            if not parsed["log"]:
+                detail = winrm.powershell_error(err) or (re.sub(r"\s+", " ", out or err or "").strip()[:200])
+                parsed["error"] = f"the host did not answer the way the install script does: {detail or 'no output'}"
         else:
-            out, status, _fp = await ssh.run_command(row["address"], row["port"], admin["username"], admin.get("password"), admin.get("private_key"), admin.get("passphrase"),
-                                                     WINDOWS_STDIN, known, timeout=120.0, input=windows_script(action, user, ca or ""))
-            parsed = parse_output(out)
-    except ssh.SshError as exc:
+            from app.terminal.hostkeys import get_fingerprint
+
+            known = get_fingerprint(conn, device_id)
+            platform = (hm._STATES.get(row["id"]) or {}).get("platform") or secret.get("platform", "auto")
+            parsed = {"log": []}
+            if platform in ("auto", "linux"):
+                out, status, _fp = await ssh.run_command(row["address"], row["port"], admin["username"], admin.get("password"), admin.get("private_key"), admin.get("passphrase"), "bash -s",
+                                                         known, timeout=120.0, input=linux_script(action, user, ca or "", admin.get("password"), admin.get("sudo_password"), as_root))
+                parsed = parse_output(out)
+            if not parsed["log"] and platform in ("auto", "windows"):                    # not a Linux host: try it as Windows (OpenSSH server)
+                out, status, _fp = await ssh.run_command(row["address"], row["port"], admin["username"], admin.get("password"), admin.get("private_key"), admin.get("passphrase"),
+                                                         WINDOWS_STDIN, known, timeout=300.0, input=windows_script(action, user, ca or "", enable_sshd, allow_from, defer_restart=True))
+                parsed = parse_output(out)
+    except (ssh.SshError, winrm.WinrmError) as exc:
         return {"ok": False, "action": action, "log": [], "error": str(exc), "created_ca": created, "account": user}
-    ok = parsed["error"] is None and parsed["done"] is not None
+    ok = parsed.get("error") is None and parsed.get("done") is not None
     if not parsed["log"]:
-        parsed["error"] = parsed["error"] or "the host did not answer the way the install script does (is this a Linux host with bash, or Windows with the OpenSSH server?)"
+        parsed["error"] = parsed.get("error") or "the host did not answer the way the install script does (is this a Linux host with bash, or Windows with the OpenSSH server?)"
         ok = False
-    result = {"ok": ok, "action": action, "log": parsed["log"], "error": parsed["error"], "installed_version": parsed["result"].get("installed_version"), "expected_version": scripts.SCRIPT_VERSION,
-              "created_ca": created, "account": user, "verified": None}
+    result = {"ok": ok, "action": action, "log": parsed["log"], "error": parsed.get("error"), "installed_version": parsed.get("result", {}).get("installed_version"), "expected_version": scripts.SCRIPT_VERSION,
+              "created_ca": created, "account": user, "verified": None, "state": parsed.get("result", {})}
     if ok and action in ("install", "update"):
+        if row["method"] == "winrm":
+            await asyncio.sleep(3)                                                      # the SSH server has just been (re)started
         result["verified"] = await verify(conn, device_id, user)
+        if result["verified"].get("ok") and cfg["provider"] == "static":                # the proof worked: use the locked-down login from now on
+            service.save_settings(conn, {"devices": {str(device_id): {"provider": "netlens_ca", "username": user}}})
+            result["log"].append(f"Switched the probes of this device to the one-time certificate login of the account {user}")
+            result["switched"] = True
     return result
 
 
 async def verify(conn, device_id: int, user: str) -> dict[str, Any]:
-    """Log in as the probe account with a fresh short-lived certificate and run one probe: proves the whole chain works (CA trust, forced command, sudo)."""
+    """Log in as the probe account with a fresh short-lived certificate and run one probe: proves the whole chain works (CA trust, forced command, sudo / the script)."""
     row = hm.get_monitor(conn, device_id)
+    port = row["port"] if row["method"] == "ssh" else service.device_config(conn, device_id)["ssh_port"]
     try:
         cred = await credentials.issue(conn, "netlens_ca", {"username": user, "ttl_s": 120}, {})
         from app.terminal.hostkeys import get_fingerprint
 
-        out, status, _fp = await ssh.run_command(row["address"], row["port"], cred.username, None, cred.private_key, None, scripts.locked_command("changes"), get_fingerprint(conn, device_id), timeout=40.0, certificate=cred.certificate)
+        out, status, _fp = await ssh.run_command(row["address"], port, cred.username, None, cred.private_key, None, scripts.locked_command("changes"), get_fingerprint(conn, device_id), timeout=60.0, certificate=cred.certificate)
     except (credentials.CredentialError, ssh.SshError) as exc:
         return {"ok": False, "error": str(exc)}
     from app.hostprobe import parsers
@@ -236,4 +357,4 @@ async def verify(conn, device_id: int, user: str) -> dict[str, Any]:
         data = parsers.parse_probe("changes", "linux", out) if "##end" in out else parsers.parse_probe("changes", "windows", out)
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": f"the probe answered, but not as expected: {exc}"}
-    return {"ok": True, "script_version": data.get("script_version"), "mode": "locked" if "##end" in out else "direct"}
+    return {"ok": True, "script_version": data.get("script_version"), "mode": "locked", "platform": data.get("platform")}

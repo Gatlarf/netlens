@@ -39,7 +39,8 @@ class Sandbox:
         self._stub("sshd", f'echo "sshd $*" >> {self.log}; if [ -n "$SSHD_FAIL" ] && grep -q "Match User netlens-ro" {self.ssh}/sshd_config; then echo "bad config" >&2; exit 1; fi; exit 0')
         self._stub("systemctl", f'echo "systemctl $*" >> {self.log}')
         self._stub("install", 'A=""; while [ $# -gt 0 ]; do case "$1" in -o|-g) shift 2;; *) A="$A $1"; shift;; esac; done; exec /usr/bin/install $A')
-        self._stub("id", f'if [ "$1" = "netlens-ro" ]; then [ -e {root}/account-created ] && exit 0 || exit 1; fi; exec /usr/bin/id "$@"')
+        self._stub("userdel", f'echo "userdel $*" >> {self.log}; rm -f {root}/account-created')
+        self._stub("id", f'if [ "$1" = "-u" ] && [ -n "$FAKE_ROOT" ]; then echo 0; exit 0; fi; if [ "$1" = "netlens-ro" ]; then [ -e {root}/account-created ] && exit 0 || exit 1; fi; exec /usr/bin/id "$@"')
 
     def _stub(self, name: str, body: str) -> None:
         f = self.bin / name
@@ -168,8 +169,8 @@ def test_the_checks_before_anything_is_sent(conn):
     with pytest.raises(installer.InstallError, match="account name"):
         asyncio.run(installer.administer(conn, 1, "install", {"username": "a", "password": "b"}, "x;y"))
     hm.save_monitor(conn, 1, {"method": "winrm", "address": "10.0.0.5", "username": "a", "password": "b"})
-    with pytest.raises(installer.InstallError, match="nothing to install"):
-        asyncio.run(installer.administer(conn, 1, "install", {"username": "a", "password": "b"}))
+    with pytest.raises(installer.InstallError, match="needs a password"):
+        asyncio.run(installer.administer(conn, 1, "install", {"username": "a", "private_key": "KEY"}))                 # over WinRM there is no key login
 
 
 def test_install_creates_the_ca_sends_the_script_once_and_checks_the_result(conn, monkeypatch):
@@ -209,3 +210,118 @@ def test_the_windows_script_parses_in_powershell_when_it_is_available(tmp_path):
     f.write_text(installer.windows_script("install", "netlens-ro", CA))
     r = subprocess.run(["pwsh", "-NoProfile", "-Command", "$e=$null;$t=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('" + str(f) + "',[ref]$t,[ref]$e);if($e.Count){$e|%{$_.Message};exit 1}"], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
+
+
+# ----------------------------------------------------------------------------- the standalone uninstallers
+def run_uninstall(box, *args, **env):
+    script = scripts.linux_uninstall("netlens-ro").replace("/usr/local/sbin", str(box.sbin)).replace("/etc/ssh", str(box.ssh)).replace("/etc/sudoers.d", str(box.sudoers))
+    path = box.root / "uninstall.sh"
+    path.write_text(script)
+    return subprocess.run(["sh", str(path), *args], capture_output=True, text=True, env={"PATH": f"{box.bin}:/usr/bin:/bin", "HOME": str(box.root), "FAKE_ROOT": "1", **env}, timeout=60)
+
+
+def test_the_linux_uninstaller_undoes_an_install_without_netlens(box):
+    box.run("install")
+    r = run_uninstall(box)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert box.config() == ORIGINAL and "Removed the scripts" in r.stdout and "was left" in r.stdout
+    for f in (box.sbin / "netlens-probe", box.sbin / "netlens-probe-entry", box.sudoers / "netlens-probe", box.ssh / "netlens_ca.pub"):
+        assert not f.exists(), f
+    assert "reload ssh" in box.log.read_text() and "userdel" not in box.log.read_text()
+    again = run_uninstall(box)
+    assert again.returncode == 0 and "holds nothing from Netlens" in again.stdout                                      # safe to run twice
+
+
+def test_the_linux_uninstaller_removes_the_account_only_when_asked(box):
+    box.run("install")
+    r = run_uninstall(box, "--remove-account")
+    assert "Removed the account netlens-ro" in r.stdout and "userdel -r netlens-ro" in box.log.read_text()
+
+
+def test_the_linux_uninstaller_replaces_an_older_install_and_needs_root(box):
+    (box.ssh / "sshd_config").write_text(ORIGINAL + LEGACY.replace("/etc/ssh", str(box.ssh)).replace("/usr/local/sbin", str(box.sbin)))
+    assert run_uninstall(box).returncode == 0 and box.config().rstrip() == ORIGINAL.rstrip()
+    r = subprocess.run(["sh", "-c", scripts.linux_uninstall()], capture_output=True, text=True, env={"PATH": f"{box.bin}:/usr/bin:/bin"})
+    assert r.returncode == 3 and "Run this as root" in r.stdout
+
+
+def test_a_configuration_that_fails_its_test_is_put_back_by_the_uninstaller_too(box):
+    box.run("install")
+    installed = box.config()
+    (box.bin / "sshd").write_text("#!/bin/sh\nexit 1\n")
+    r = run_uninstall(box)
+    assert r.returncode == 6 and "put back" in r.stdout and box.config() == installed and (box.sbin / "netlens-probe").exists()           # nothing else was removed
+
+
+def test_both_uninstallers_are_offered_and_the_windows_one_parses(tmp_path):
+    import shutil
+
+    setup = scripts.linux_setup("netlens-ro", None, CA)
+    assert setup["uninstall"].startswith("#!/bin/sh") and scripts.windows_setup("netlens-ro", None, CA)["uninstall"].startswith("# Removes the Netlens host probe")
+    if not shutil.which("pwsh"):
+        pytest.skip("PowerShell is not installed here")
+    f = tmp_path / "u.ps1"
+    f.write_text(scripts.windows_uninstall("netlens-ro"))
+    r = subprocess.run(["pwsh", "-NoProfile", "-Command", "$e=$null;$t=$null;[void][System.Management.Automation.Language.Parser]::ParseFile('" + str(f) + "',[ref]$t,[ref]$e);if($e.Count){$e|%{$_.Message};exit 1}"], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout
+
+
+# ----------------------------------------------------------------------------- Windows over WinRM
+def test_the_windows_script_carries_its_settings_and_the_ssh_server_is_opt_in():
+    t = installer.windows_script("install", "netlens-ro", CA, enable_sshd=False)
+    assert "$enableSshd = $false" in t and "@@" not in t and "error the OpenSSH server is not installed" in t and f"@@VERSION@@" not in t and f"installed_version={scripts.SCRIPT_VERSION}" in t
+    on = installer.windows_script("install", "netlens-ro", CA, enable_sshd=True, allow_from="192.168.0.189")
+    assert "$enableSshd = $true" in on and "$allowFrom = '192.168.0.189'" in on and "AllowUsers" in on and "PasswordAuthentication no" in on and "Add-WindowsCapability" in on
+    assert "$deferRestart = $true" in installer.windows_script("check", "x", CA, defer_restart=True)
+
+
+def test_the_windows_script_is_sent_over_winrm_in_small_pieces_and_arrives_whole():
+    import base64
+    import gzip
+    import re
+
+    script = installer.windows_script("install", "netlens-ro", CA, enable_sshd=True)
+    commands = []
+
+    class FakeSession:
+        def run_powershell(self, command, total=None):
+            commands.append(command)
+            return "NETLENS: done install\n", "", 0
+
+    out, err, code = installer.winrm_upload_and_run(script, FakeSession, 10.0)
+    assert code == 0 and len(commands) > 3
+    assert all(len(base64.b64encode(c.encode("utf-16-le"))) < 7500 for c in commands), "every command line has to fit in what WinRM takes"
+    pieces = [re.search(r"-Value '([A-Za-z0-9+/=]*)'", c).group(1) for c in commands[:-1]]
+    assert gzip.decompress(base64.b64decode("".join(pieces))).decode() == script
+    assert commands[0].startswith("$f = Join-Path $env:TEMP") and "Set-Content" in commands[0] and "Add-Content" in commands[1] and "Invoke-Expression" in commands[-1]
+    assert "password" not in " ".join(commands).lower().replace("passwordauthentication", "").replace("securestring", "").replace("-password", "").replace("random password", "")
+
+
+def test_a_windows_host_over_winrm_is_installed_through_winrm_and_then_switched_to_the_locked_login(conn, monkeypatch):
+    from app.hostmetrics import winrm
+
+    hm.save_monitor(conn, 1, {"method": "winrm", "address": "10.0.0.5", "port": 5986, "username": "netlens", "password": "mon-pw"})
+    seen = {"users": [], "scripts": []}
+
+    class FakeSession:
+        def __init__(self, host, port, https, user, password, auth="ntlm", verify_tls=False, timeout=30):
+            seen["users"].append((user, password, port, https))
+
+        def run_powershell(self, command, total=None):
+            seen["scripts"].append(command)
+            if "Invoke-Expression" in command:
+                return ("NETLENS: step connected as admin on PC\nNETLENS: result installed_version=none\nNETLENS: result sshd_installed=False\nNETLENS: step installed the Windows OpenSSH Server\n"
+                        "NETLENS: step installed probe.ps1\nNETLENS: result installed_version=%d\nNETLENS: done install\n" % scripts.SCRIPT_VERSION), "", 0
+            return "", "", 0
+
+    async def fake_ssh(host, port, user, password, key, passphrase, command, known=None, timeout=15.0, certificate=None, input=None):
+        assert port == 22 and user == "netlens-ro" and certificate and command == scripts.locked_command("changes")
+        return '##netlens-probe\n{"version": 5, "boots": [], "hotfixes": [], "installs": [], "services": [], "users": []}', 0, None
+
+    monkeypatch.setattr(winrm, "Session", FakeSession)
+    monkeypatch.setattr(ssh, "run_command", fake_ssh)
+    r = asyncio.run(installer.administer(conn, 1, "install", {"username": "admin@example.com", "password": "adminpw"}, enable_sshd=True))
+    assert r["ok"] and r["verified"]["ok"] and r["verified"]["platform"] == "windows" and r["switched"] is True
+    assert {u[0] for u in seen["users"]} == {"admin@example.com"} and all(u[1] == "adminpw" and u[2] == 5986 and u[3] for u in seen["users"])      # the admin login, not the monitor's
+    assert service.device_config(conn, 1)["provider"] == "netlens_ca" and service.device_config(conn, 1)["username"] == "netlens-ro"
+    assert "adminpw" not in str(r) and not any("adminpw" in c for c in seen["scripts"])

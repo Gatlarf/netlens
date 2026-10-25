@@ -128,11 +128,12 @@ export async function buildDeviceProbeCard(device) {
     const user = h("input", { type: "text", placeholder: "administrator account", autocomplete: "off", value: info.monitor_user || "" });
     const pass = h("input", { type: "password", placeholder: "password (also used for sudo)", autocomplete: "new-password" });
     const key = h("textarea", { rows: 3, placeholder: "or a private key (optional)", class: "mono" });
+    const sshd = h("input", { type: "checkbox" });
     const out = h("div", {});
     async function go(action) {
       out.replaceChildren(h("p", { class: "hint" }, action === "check" ? "Checking…" : "Working… (a few seconds)"));
       try {
-        const r = await post(`/api/devices/${device.id}/hostprobe/install`, { action, username: user.value, password: pass.value, private_key: key.value });
+        const r = await post(`/api/devices/${device.id}/hostprobe/install`, { action, username: user.value, password: pass.value, private_key: key.value, enable_sshd: sshd.checked });
         pass.value = ""; key.value = "";
         out.replaceChildren(h("ul", { class: "plain" }, r.log.map((l) => h("li", { class: l.startsWith("Error") ? "error" : "" }, l))),
           r.error ? h("p", { class: "error" }, r.error) : null,
@@ -144,6 +145,7 @@ export async function buildDeviceProbeCard(device) {
     const buttons = [["check", "Check (changes nothing)", ""], ["install", info.installed_version ? "Install / update" : "Install", " primary"], ["remove", "Remove from the host", " danger"]];
     box.append(h("p", { class: "hint" }, label), h("p", { class: "hint" }, "Needs an administrator login on the host once. It is used for this action only: never stored, never logged. Netlens backs up and tests the SSH server configuration before it takes effect, and puts the old one back if the test fails."),
       h("div", { class: "field" }, h("label", {}, "Administrator account"), user), h("div", { class: "field" }, h("label", {}, "Password"), pass), h("div", { class: "field" }, h("label", {}, "Private key"), key),
+      h("div", { class: "field" }, h("label", { class: "check-row" }, sshd, " Windows: also install the OpenSSH server if it is missing"), h("p", { class: "hint" }, "The locked-down probe needs it. Netlens then lets only the probe account sign in (with one-time certificates, no passwords) and only this Netlens reach port 22. Without it, a Windows host monitored over WinRM keeps running the probes with its stored login.")),
       h("div", { class: "form-actions" }, buttons.map(([a, t, c]) => h("button", { class: `btn${c}`, type: "button", onclick: () => { if (a === "remove" && !window.confirm("Remove the probe, its sudo rule and the Netlens CA key from the host?")) return; go(a); } }, t))), out);
     if (info.update_available) box.open = true;
     return box;

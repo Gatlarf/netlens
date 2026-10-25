@@ -57,7 +57,7 @@ def _save(conn, data: dict) -> None:
 def device_config(conn, device_id: int) -> dict[str, Any]:
     cfg = _load(conn)["devices"].get(str(device_id)) or {}
     probes = [p for p in (cfg.get("probes") if isinstance(cfg.get("probes"), list) else scripts.PROBES) if p in scripts.PROBES]
-    return {"enabled": bool(cfg.get("enabled")), "interval_h": int(cfg.get("interval_h") or DEFAULT_INTERVAL_H), "provider": cfg.get("provider") or "static", "username": cfg.get("username") or "", "probes": probes}
+    return {"enabled": bool(cfg.get("enabled")), "interval_h": int(cfg.get("interval_h") or DEFAULT_INTERVAL_H), "provider": cfg.get("provider") or "static", "username": cfg.get("username") or "", "probes": probes, "ssh_port": int(cfg.get("ssh_port") or 22)}
 
 
 def public_settings(conn) -> dict[str, Any]:
@@ -111,6 +111,8 @@ def save_settings(conn, body: dict[str, Any]) -> dict[str, Any]:
             cur["provider"] = incoming["provider"]
         if "username" in incoming:
             cur["username"] = str(incoming["username"] or "").strip()[:60]
+        if "ssh_port" in incoming:
+            cur["ssh_port"] = min(max(int(incoming["ssh_port"]), 1), 65535)
         if "probes" in incoming:
             if not isinstance(incoming["probes"], list) or any(p not in scripts.PROBES for p in incoming["probes"]):
                 raise ValueError("probes must be a list of: " + ", ".join(scripts.PROBES))
@@ -220,9 +222,7 @@ async def run(conn, device_id: int, probe: str = "storage", reason: str = "manua
     started = time.time()
     mode, data, error, cred_info = None, None, None, None
     try:
-        if row["method"] == "winrm":
-            if cfg["provider"] != "static":
-                raise credentials.CredentialError("short-lived credentials are used over SSH; WinRM uses the stored login")
+        if row["method"] == "winrm" and cfg["provider"] == "static":                  # a Windows host with no locked-down login: the stored WinRM login runs the script directly
             session = winrm.Session(row["address"], row["port"], row["port"] != 5985, secret.get("username", ""), secret.get("password", ""), secret.get("auth", "ntlm"), bool(secret.get("verify_tls")), timeout=30)
             try:
                 out, err, _code = await asyncio.to_thread(session.run_powershell, scripts.windows_script(probe), 180)
@@ -240,22 +240,34 @@ async def run(conn, device_id: int, probe: str = "storage", reason: str = "manua
             from app.terminal.hostkeys import get_fingerprint
 
             known = get_fingerprint(conn, device_id)
-            platform = (hm._STATES.get(row["id"]) or {}).get("platform") or secret.get("platform", "auto")
+            winrm_host = row["method"] == "winrm"                                         # a Windows host that is watched over WinRM but probed through its OpenSSH server
+            platform = "windows" if winrm_host else (hm._STATES.get(row["id"]) or {}).get("platform") or secret.get("platform", "auto")
+            port = cfg["ssh_port"] if winrm_host else row["port"]
+            seen = None
             try:
                 if platform in ("auto", "linux"):
                     try:
-                        out, mode, _fp = await _linux(cred, row["address"], row["port"], known, probe)
+                        out, mode, seen = await _linux(cred, row["address"], port, known, probe)
                         data = _parse(probe, "linux", out)
                     except (parse.ProbeError, ssh.SshError):
                         if platform == "linux":
                             raise
                         data = None
+                if data is None and winrm_host:                                            # the locked-down Windows script, then (a login that is not locked down) the same script sent directly
+                    out, _s, seen = await ssh.run_command(row["address"], port, cred.username, cred.password, cred.private_key, cred.passphrase, scripts.locked_command(probe), known,
+                                                          timeout=_TIMEOUT.get(probe, 90.0) + 20, certificate=cred.certificate)
+                    if "##netlens-probe" in out:
+                        data, mode = _parse(probe, "windows", out), "locked"
                 if data is None:
-                    out, _s, _fp = await ssh.run_command(row["address"], row["port"], cred.username, cred.password, cred.private_key, cred.passphrase, scripts.WINDOWS_COMMANDS[probe], known,
-                                                         timeout=_TIMEOUT.get(probe, 90.0) + 20, certificate=cred.certificate)
+                    out, _s, seen = await ssh.run_command(row["address"], port, cred.username, cred.password, cred.private_key, cred.passphrase, scripts.WINDOWS_COMMANDS[probe], known,
+                                                          timeout=_TIMEOUT.get(probe, 90.0) + 20, certificate=cred.certificate)
                     data, mode = _parse(probe, "windows", out), "direct"
             except (ssh.SshError, parse.ProbeError) as exc:
                 raise ProbeFailed(str(exc)) from None
+            if winrm_host and seen and known is None:                                      # first contact: remember the host key (the monitor does that for SSH devices)
+                from app.terminal.hostkeys import remember_fingerprint
+
+                remember_fingerprint(conn, device_id, seen, _stamp(time.time()))
             data["credential"] = cred_info
     except credentials.CredentialError as exc:
         error = str(exc)

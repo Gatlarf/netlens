@@ -82,7 +82,7 @@ export async function buildHostProbeCard() {
       clear(out);
       try {
         const r = await get(`/api/hostprobe/setup?platform=${platform.value}&user=${encodeURIComponent(user.value)}${pub.value ? `&public_key=${encodeURIComponent(pub.value)}` : ""}`);
-        const names = { install: "Run on the host (installs the read-only script and the account)", authorized_keys: "authorized_keys of the account (binds the key to the probe)", sshd_config: "Add to sshd_config (trust the Netlens CA, run only the probe)", ca_public_key: "Contents of the CA public key file", sudoers: "/etc/sudoers.d/netlens-probe", script: "The probe script itself (read it before you install it)", entry: "The only command the account may run (sshd starts this whatever is asked)" };
+        const names = { install: "Run on the host (installs the read-only script and the account)", authorized_keys: "authorized_keys of the account (binds the key to the probe)", sshd_config: "Add to sshd_config (trust the Netlens CA, run only the probe)", ca_public_key: "Contents of the CA public key file", sudoers: "/etc/sudoers.d/netlens-probe", script: "The probe script itself (read it before you install it)", entry: "The only command the account may run (sshd starts this whatever is asked)", uninstall: "Uninstaller: run it on the host to take the probe off again, without Netlens" };
         for (const [k, t] of Object.entries(names)) if (r.files[k]) out.appendChild(copyBox(t, r.files[k]));
         if (!r.has_ca && !pub.value) out.prepend(h("p", { class: "hint" }, "Create the CA above, or paste a public key, to get the lines that let Netlens in."));
       } catch (err) { toast(err.message || "Could not load", "error"); }

@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.260 — 2026-10-25
+
+### Added
+- ★ **Uninstallers for Linux and Windows.** Settings → Host probes → "Prepare a host" now also gives a standalone uninstaller that takes the probe off a host without Netlens (`sudo sh netlens-probe-uninstall.sh [--remove-account]`, and `Uninstall-NetlensProbe.ps1 [-RemoveAccount] [-StopSshServer]`), also downloadable at `/api/hostprobe/uninstall`. Both back up and test the SSH configuration first, remove only what Netlens installed (also the block an older Netlens wrote), and are safe to run twice. Netlens itself can still remove it ("Remove from the host").
+- ★ **Windows hosts monitored over WinRM can be installed from Netlens.** The install now runs over WinRM too (the script is sent compressed in small pieces), not only over SSH. The locked-down Windows probe needs the OpenSSH server: with "also install the OpenSSH server if it is missing" Netlens installs it and restricts it to the probe account (certificates only, no passwords) and, in the firewall, to this Netlens. The probe account gets only the read-only "Event Log Readers" and "Performance Monitor Users" groups. After a successful check the probes of that device switch to the one-time certificate login; a Windows host monitored over WinRM is then probed through its OpenSSH server.
+
 ## 0.4.259 — 2026-10-25
 
 ### Fixed
