@@ -271,8 +271,9 @@ class Session:
             f'<w:OperationTimeout>PT20S</w:OperationTimeout>{selector}{option_set}</s:Header><s:Body>{body}</s:Body></s:Envelope>'
         )
 
-    def run_powershell(self, script):
-        """Run a script and return (stdout text, stderr text, exit code)."""
+    def run_powershell(self, script, total=None):
+        """Run a script and return (stdout text, stderr text, exit code). `total` is how long it may take (seconds)."""
+        total = total or TIMEOUT_TOTAL
         encoded = base64.b64encode(script.encode("utf-16-le")).decode()
         root = self.post(self.envelope(
             "create", "<rsp:Shell><rsp:InputStreams>stdin</rsp:InputStreams><rsp:OutputStreams>stdout stderr</rsp:OutputStreams></rsp:Shell>",
@@ -290,7 +291,7 @@ class Session:
                 raise WinrmError(f"{self.id} did not start the command")
             command_id = command.text
             out, err, code = [], [], None
-            deadline = time.monotonic() + TIMEOUT_TOTAL
+            deadline = time.monotonic() + total
             while time.monotonic() < deadline:
                 try:
                     root = self.post(self.envelope(
@@ -308,7 +309,7 @@ class Session:
                     code = int(exit_code.text) if exit_code is not None and (exit_code.text or "").lstrip("-").isdigit() else 0
                     break
             if code is None:
-                raise WinrmError(f"{self.id}: the script did not finish within {TIMEOUT_TOTAL} seconds")
+                raise WinrmError(f"{self.id}: the script did not finish within {total} seconds")
             return b"".join(out).decode("utf-8", "replace"), b"".join(err).decode("utf-8", "replace"), code
         finally:
             try:

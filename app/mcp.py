@@ -110,6 +110,8 @@ tool("get_coverage", "overview", "Monitoring gaps: devices marked always-on or c
 tool("get_weekly_report", "overview", "The weekly report as it would be sent now.", "GET", "/api/reports/weekly")
 tool("investigate_incident", "overview", "Find the probable cause of an incident (ids come from get_insights): what started it, which device moved first (host or guest), what was running at the time, what else broke, devices that only flapped, and whether anybody was told.", "GET", "/api/insights/incidents/{incident_id}/investigate",
      {"incident_id": i("Incident id"), "words": b("Also write it out in plain language with the language model")}, ("incident_id",), query=("words",))
+tool("get_storage_breakdown", "overview", "What uses the disk space of one host (needs Storage inspection switched on for it): snapshots over time, the biggest directories and files, Docker logs and layers, files deleted but still open, and what grew since the previous snapshot. Administrators only.", "GET", "/api/devices/{device_id}/hostprobe",
+     {"device_id": i("Device id")}, ("device_id",))
 tool("get_traffic", "overview", "Bandwidth in and out of the internet line and of the monitored devices together, over 1h, 6h, 24h or 7d.", "GET", "/api/traffic",
      {"range": s("Period", ["1h", "6h", "24h", "7d"]), "mode": s("all, or endpoints (no double counting)", ["all", "endpoints"])}, query=("range", "mode"))
 tool("get_oncall", "overview", "Who is on call now and the shifts of the coming week.", "GET", "/api/oncall")

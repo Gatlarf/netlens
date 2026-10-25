@@ -1,0 +1,336 @@
+"""Host probes: look at what uses the storage of a host, keep snapshots, and say what grew between two of them.
+
+Switched on per device (the device needs a host monitor over SSH or WinRM, which supplies the address). A snapshot is taken every few hours
+and, as soon as a disk goes over its limit, at once, so the next morning "what happened to the disk?" has an answer.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import time
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+from app.db import connect, get_setting, insert_id, set_setting
+from app.hostmetrics import service as hm, ssh, winrm
+from app.hostprobe import credentials, parse, scripts
+
+log = logging.getLogger(__name__)
+SETTINGS_KEY = "hostprobe.settings"
+STAMP = "%Y-%m-%dT%H:%M:%SZ"
+DEFAULT_INTERVAL_H = 6
+KEEP_DAYS = 30            # default; Settings → Host probes
+KEEP_MAX = 120
+ALARM_GAP_S = 1800            # while a disk is over its limit: at most one snapshot per half hour
+PROVIDER_NAMES = ("static", "netlens_ca", "vault_ssh")
+_running: set[int] = set()
+
+
+class ProbeFailed(Exception):
+    pass
+
+
+# ----------------------------------------------------------------------------- settings
+def _load(conn) -> dict[str, Any]:
+    try:
+        data = json.loads(get_setting(conn, SETTINGS_KEY) or "{}")
+    except ValueError:
+        data = {}
+    data = data if isinstance(data, dict) else {}
+    return {"devices": data.get("devices") if isinstance(data.get("devices"), dict) else {},
+            "providers": data.get("providers") if isinstance(data.get("providers"), dict) else {},
+            "names_to_llm": bool(data.get("names_to_llm")), "keep_days": min(max(int(data.get("keep_days") or KEEP_DAYS), 1), 365)}
+
+
+def _save(conn, data: dict) -> None:
+    set_setting(conn, SETTINGS_KEY, json.dumps(data))
+    conn.commit()
+
+
+def device_config(conn, device_id: int) -> dict[str, Any]:
+    cfg = _load(conn)["devices"].get(str(device_id)) or {}
+    return {"enabled": bool(cfg.get("enabled")), "interval_h": int(cfg.get("interval_h") or DEFAULT_INTERVAL_H), "provider": cfg.get("provider") or "static", "username": cfg.get("username") or ""}
+
+
+def public_settings(conn) -> dict[str, Any]:
+    """Everything for the settings page; secrets only as 'is set'."""
+    data = _load(conn)
+    vault_cfg = data["providers"].get("vault_ssh") or {}
+    ca_cfg = data["providers"].get("netlens_ca") or {}
+    return {"names_to_llm": data["names_to_llm"], "keep_days": data["keep_days"], "ca_public_key": credentials.ca_public(conn),
+            "providers": {"netlens_ca": {"ttl_s": credentials._ttl(ca_cfg), "username": ca_cfg.get("username") or "netlens-ro"},
+                          "vault_ssh": {"url": vault_cfg.get("url") or "", "mount": vault_cfg.get("mount") or "ssh", "role": vault_cfg.get("role") or "",
+                                        "namespace": vault_cfg.get("namespace") or "", "username": vault_cfg.get("username") or "netlens-ro", "ttl_s": credentials._ttl(vault_cfg),
+                                        "has_token": bool(vault_cfg.get("token")), "has_approle": bool(vault_cfg.get("role_id") and vault_cfg.get("secret_id"))}},
+            "devices": {k: device_config(conn, int(k)) for k in data["devices"] if k.isdigit()}}
+
+
+def save_settings(conn, body: dict[str, Any]) -> dict[str, Any]:
+    data = _load(conn)
+    if "names_to_llm" in body:
+        data["names_to_llm"] = bool(body["names_to_llm"])
+    if "keep_days" in body:
+        data["keep_days"] = min(max(int(body["keep_days"]), 1), 365)
+    for name, incoming in (body.get("providers") or {}).items():
+        if name not in ("netlens_ca", "vault_ssh") or not isinstance(incoming, dict):
+            raise ValueError(f"unknown credential source: {name}")
+        cur = data["providers"].setdefault(name, {})
+        for key in ("url", "mount", "role", "namespace", "username", "approle_mount"):
+            if key in incoming:
+                cur[key] = str(incoming[key] or "").strip()[:200]
+        if "ttl_s" in incoming:
+            cur["ttl_s"] = min(max(int(incoming["ttl_s"]), credentials.MIN_TTL_S), credentials.MAX_TTL_S)
+        for key in ("token", "role_id", "secret_id"):
+            if incoming.get(key):
+                cur[key] = str(incoming[key]).strip()
+        for key in ("clear_token", "clear_approle"):
+            if incoming.get(key):
+                for k in (("token",) if key == "clear_token" else ("role_id", "secret_id")):
+                    cur.pop(k, None)
+        if name == "vault_ssh" and cur.get("url") and not cur["url"].startswith(("http://", "https://")):
+            raise ValueError("the address of the secrets service must start with http:// or https://")
+    for key, incoming in (body.get("devices") or {}).items():
+        if not str(key).isdigit() or not isinstance(incoming, dict):
+            raise ValueError("devices must be keyed by device id")
+        cur = data["devices"].setdefault(str(key), {})
+        if "enabled" in incoming:
+            cur["enabled"] = bool(incoming["enabled"])
+        if "interval_h" in incoming:
+            cur["interval_h"] = min(max(int(incoming["interval_h"]), 1), 168)
+        if "provider" in incoming:
+            if incoming["provider"] not in PROVIDER_NAMES:
+                raise ValueError("the credential source must be static, netlens_ca or vault_ssh")
+            cur["provider"] = incoming["provider"]
+        if "username" in incoming:
+            cur["username"] = str(incoming["username"] or "").strip()[:60]
+    _save(conn, data)
+    return public_settings(conn)
+
+
+# ----------------------------------------------------------------------------- snapshots
+def _stamp(ts: float) -> str:
+    return datetime.fromtimestamp(ts, timezone.utc).strftime(STAMP)
+
+
+def store(conn, device_id: int, ok: bool, mode: str | None, error: str | None, data: dict | None, now: float | None = None) -> int:
+    now = now if now is not None else time.time()
+    new_id = insert_id(conn, "INSERT INTO probe_snapshots (device_id, taken, ok, mode, error, data) VALUES (?,?,?,?,?,?)",
+                       (device_id, _stamp(now), int(ok), mode, error, json.dumps(data) if data else None))
+    conn.execute("DELETE FROM probe_snapshots WHERE device_id = ? AND (taken < ? OR id NOT IN (SELECT id FROM probe_snapshots WHERE device_id = ? ORDER BY id DESC LIMIT ?))",
+                 (device_id, _stamp(now - _load(conn)["keep_days"] * 86400), device_id, KEEP_MAX))
+    conn.commit()
+    return new_id
+
+
+def snapshots(conn, device_id: int, limit: int = 20, with_data: bool = False) -> list[dict[str, Any]]:
+    rows = conn.execute("SELECT id, taken, ok, mode, error, data FROM probe_snapshots WHERE device_id = ? ORDER BY taken DESC, id DESC LIMIT ?", (device_id, limit)).fetchall()
+    return [{"id": r["id"], "taken": r["taken"], "ok": bool(r["ok"]), "mode": r["mode"], "error": r["error"], **({"data": json.loads(r["data"]) if r["data"] else None} if with_data else {})} for r in rows]
+
+
+def latest_ok(conn, device_id: int, before: str | None = None, after: str | None = None) -> dict[str, Any] | None:
+    sql, args = "SELECT id, taken, mode, data FROM probe_snapshots WHERE device_id = ? AND ok = 1", [device_id]
+    if before:
+        sql += " AND taken <= ?"
+        args.append(before)
+    if after:
+        sql += " AND taken >= ?"
+        args.append(after)
+    sql += " ORDER BY taken " + ("ASC" if after else "DESC") + ", id " + ("ASC" if after else "DESC") + " LIMIT 1"
+    r = conn.execute(sql, args).fetchone()
+    return {"id": r["id"], "taken": r["taken"], "mode": r["mode"], "data": json.loads(r["data"])} if r and r["data"] else None
+
+
+def explain(conn, device_id: int, start: str, end: str | None = None) -> dict[str, Any] | None:
+    """What grew on a host around [start, end]: the newest snapshot at or before `start` against the first one at or after `end` (else the newest).
+    None when there are not two snapshots to compare."""
+    before = latest_ok(conn, device_id, before=start)
+    after = latest_ok(conn, device_id, after=end or start) or latest_ok(conn, device_id)
+    first = False
+    if before is None:                                    # nothing before: the oldest one we have is the best baseline
+        row = conn.execute("SELECT taken FROM probe_snapshots WHERE device_id = ? AND ok = 1 ORDER BY taken ASC LIMIT 1", (device_id,)).fetchone()
+        before = latest_ok(conn, device_id, after=row["taken"]) if row else None
+        first = True
+    if before is None or after is None or before["id"] == after["id"]:
+        return None
+    result = parse.compare(before["data"], after["data"])
+    return {"from": before["taken"], "to": after["taken"], "baseline_is_later_than_start": first, **result}
+
+
+def describe(growth: dict[str, Any], limit: int = 3) -> list[str]:
+    out = []
+    for g in growth["growth"][:limit]:
+        what = {"directory": "The directory", "file": "The file", "container log": "The log of the container", "container layer": "The data of the container"}.get(g["kind"], "")
+        out.append(f"{what} {g['path']} grew by {parse.nice_bytes(g['bytes'])}" + (f" to {parse.nice_bytes(g['now'])}" if g.get("now") else "") + (" (new)" if g.get("new") and g["kind"] == "file" else ""))
+    return out
+
+
+# ----------------------------------------------------------------------------- running a probe
+async def _linux(cred: credentials.Credential, address: str, port: int, known: str | None) -> tuple[str, str, str | None]:
+    """(output, mode, host key fingerprint): the locked-down script first; a host that has none gets the same script sent directly."""
+    out, status, fp = await ssh.run_command(address, port, cred.username, cred.password, cred.private_key, cred.passphrase, scripts.LOCKED_COMMAND, known, timeout=30.0, certificate=cred.certificate)
+    if "##end" in out:                  # the host ran its own installed script: it is locked down (a normal host does not know `netlens-probe`)
+        return out, "locked", fp
+    out, status, fp = await ssh.run_command(address, port, cred.username, cred.password, cred.private_key, cred.passphrase, scripts.LINUX_COMMAND, known, timeout=200.0, certificate=cred.certificate)
+    return out, "direct", fp
+
+
+async def run(conn, device_id: int) -> dict[str, Any]:
+    """One snapshot now. Returns {"ok", "error", "mode", "data"} and stores it."""
+    row = hm.get_monitor(conn, device_id)
+    if row is None or row["method"] not in ("ssh", "winrm"):
+        raise ProbeFailed("this device needs a host monitor over SSH or WinRM first (Health monitoring on the device page): it supplies the address and the login")
+    cfg = device_config(conn, device_id)
+    secret = hm.load_secret(conn, row)
+    providers = _load(conn)["providers"]
+    config = {**(providers.get(cfg["provider"]) or {}), **({"username": cfg["username"]} if cfg["username"] else {})}
+    started = time.time()
+    mode, data, error, cred_info = None, None, None, None
+    try:
+        if row["method"] == "winrm":
+            if cfg["provider"] != "static":
+                raise credentials.CredentialError("short-lived credentials are used over SSH; WinRM uses the stored login")
+            session = winrm.Session(row["address"], row["port"], row["port"] != 5985, secret.get("username", ""), secret.get("password", ""), secret.get("auth", "ntlm"), bool(secret.get("verify_tls")), timeout=30)
+            try:
+                out, err, _code = await asyncio.to_thread(session.run_powershell, scripts.WINDOWS_SCRIPT, 180)
+            except winrm.WinrmError as exc:
+                raise ProbeFailed(str(exc)) from None
+            finally:
+                session.close()
+            try:
+                data, mode = parse.parse_windows(out), "direct"
+            except parse.ProbeError as exc:
+                raise ProbeFailed(f"{exc}: {winrm.powershell_error(err) or 'the script printed nothing'}") from None
+        else:
+            cred = await credentials.issue(conn, cfg["provider"], config, secret)
+            cred_info = cred.public()
+            from app.terminal.hostkeys import get_fingerprint
+
+            known = get_fingerprint(conn, device_id)
+            platform = (hm._STATES.get(row["id"]) or {}).get("platform") or secret.get("platform", "auto")
+            try:
+                if platform in ("auto", "linux"):
+                    try:
+                        out, mode, _fp = await _linux(cred, row["address"], row["port"], known)
+                        data = parse.parse_linux(out)
+                    except (parse.ProbeError, ssh.SshError):
+                        if platform == "linux":
+                            raise
+                        data = None
+                if data is None:
+                    out, _s, _fp = await ssh.run_command(row["address"], row["port"], cred.username, cred.password, cred.private_key, cred.passphrase, scripts.WINDOWS_COMMAND, known, timeout=200.0, certificate=cred.certificate)
+                    data, mode = parse.parse_windows(out), "direct"
+            except (ssh.SshError, parse.ProbeError) as exc:
+                raise ProbeFailed(str(exc)) from None
+            data["credential"] = cred.public()
+    except credentials.CredentialError as exc:
+        error = str(exc)
+    except ProbeFailed as exc:
+        error = str(exc)
+    data = data if error is None else None
+    if data is not None:
+        data["seconds"] = round(time.time() - started, 1)
+    store(conn, device_id, error is None, mode, error, data)
+    return {"ok": error is None, "error": error, "mode": mode, "data": data, "credential": cred_info or {"source": "static", "username": secret.get("username", "")}}
+
+
+# ----------------------------------------------------------------------------- the schedule
+def due(conn, now: float | None = None) -> list[int]:
+    """Devices to look at now: the interval has passed, or a disk is over its limit and the last look is older than half an hour."""
+    now = now if now is not None else time.time()
+    settings = _load(conn)["devices"]
+    alarm = set()
+    try:
+        alarm = {p["device_id"] for p in hm.problems(conn, include_snoozed=True) if p["metric"] == "disk_pct"}
+    except Exception:  # noqa: BLE001 - a broken problems list must not stop the schedule
+        log.exception("host probe: problems")
+    out = []
+    for key, cfg in settings.items():
+        if not key.isdigit() or not cfg.get("enabled"):
+            continue
+        device_id = int(key)
+        last = conn.execute("SELECT MAX(taken) AS t FROM probe_snapshots WHERE device_id = ?", (device_id,)).fetchone()["t"]
+        if last is None:
+            out.append(device_id)
+            continue
+        age = now - datetime.strptime(last, STAMP).replace(tzinfo=timezone.utc).timestamp()
+        if age >= int(cfg.get("interval_h") or DEFAULT_INTERVAL_H) * 3600 or (device_id in alarm and age >= ALARM_GAP_S):
+            out.append(device_id)
+    return out
+
+
+def audit_text(name: str, result: dict[str, Any], trigger: str) -> str:
+    """The audit line for one look: which host, why it ran, which login (never the secret), and how it ended. The certificate id is what the host's sshd logs."""
+    cred = result.get("credential") or {}
+    login = {"netlens_ca": "a certificate from the Netlens CA", "vault_ssh": "a certificate from Vault/OpenBao"}.get(cred.get("source"), "the stored login of the health monitor")
+    if cred.get("certificate"):
+        until = _stamp(cred["expires"])[11:16] + " UTC" if cred.get("expires") else "?"
+        login += f" (id {cred.get('key_id')}, user {cred.get('username')}, valid until {until})"
+    elif cred.get("username"):
+        login += f" (user {cred['username']})"
+    outcome = f"ok, {result.get('mode')} script" if result["ok"] else "failed: " + str(result.get("error") or "")[:160]
+    return f"Storage inspection of {name} ({trigger}): read-only probe with {login}: {outcome}"
+
+
+def _audit(conn, device_id: int, result: dict[str, Any], actor) -> None:
+    try:
+        from app import audit
+
+        row = conn.execute("SELECT COALESCE(custom_name, hostname, primary_ip) AS n FROM devices WHERE id = ?", (device_id,)).fetchone()
+        name = row["n"] if row else f"device {device_id}"
+        path = f"/api/devices/{device_id}/hostprobe/run"
+        if actor is None:
+            audit.record_system(conn, audit_text(name, result, "scheduled"), path, 200 if result["ok"] else 502)
+        else:
+            principal, ip = actor
+            audit.record_by(conn, principal, ip, "POST", path, 200 if result["ok"] else 502, audit_text(name, result, "started by a person"))
+        log.info("storage inspection of device %s: %s", device_id, "ok" if result["ok"] else result.get("error"))
+    except Exception:  # noqa: BLE001 - the log must never stop the probe
+        log.exception("host probe: audit line")
+
+
+async def run_one(db_path: str, device_id: int, actor=None) -> dict[str, Any]:
+    """`actor` is (principal, ip) when a person started it; None for the schedule. Every attempt, failed or not, is written to the audit log."""
+    if device_id in _running:
+        return {"ok": False, "error": "a probe of this device is already running", "mode": None, "data": None}
+    _running.add(device_id)
+    conn = connect(db_path)
+    try:
+        try:
+            result = await run(conn, device_id)
+        except ProbeFailed as exc:
+            store(conn, device_id, False, None, str(exc), None)
+            result = {"ok": False, "error": str(exc), "mode": None, "data": None, "credential": None}
+        _audit(conn, device_id, result, actor)
+        return result
+    finally:
+        _running.discard(device_id)
+        conn.close()
+
+
+async def loop(db_path: str, interval: float = 60.0) -> None:
+    await asyncio.sleep(30)
+    gate = asyncio.Semaphore(2)
+
+    async def one(device_id: int) -> None:
+        async with gate:
+            try:
+                await run_one(db_path, device_id)
+            except Exception:  # noqa: BLE001
+                log.exception("host probe of device %s crashed", device_id)
+
+    while True:
+        try:
+            conn = connect(db_path)
+            try:
+                ids = due(conn)
+            finally:
+                conn.close()
+            if ids:
+                await asyncio.gather(*(one(i) for i in ids))
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            log.exception("host probe loop failed")
+        await asyncio.sleep(interval)

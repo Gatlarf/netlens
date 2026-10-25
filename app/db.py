@@ -1004,6 +1004,22 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
 
+    # --- host probes: what uses the storage of a host (see app/hostprobe), kept as snapshots so a jump can be traced afterwards ---
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS probe_snapshots (
+            id INTEGER PRIMARY KEY,
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            taken TEXT NOT NULL,
+            ok INTEGER NOT NULL,
+            mode TEXT,
+            error TEXT,
+            data TEXT
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_probe_snapshots_device ON probe_snapshots (device_id, taken)")
+
     # --- schema v22: host monitors (health readings over SNMP or SSH) and the level each reading is at ---------
     cur.execute(
         """

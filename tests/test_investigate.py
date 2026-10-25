@@ -141,3 +141,23 @@ def test_a_scan_on_the_host_is_the_cause_the_host_follows_and_flapping_devices_a
     assert "Biekes.be is down" in text and "result of the overload" in text
     assert "lxc-dockerdev" in report["title"] and "processor use" in report["title"]
     assert report["findings"][0]["level"] == "cause"
+
+
+def test_the_storage_snapshots_name_what_filled_the_disk_and_the_model_does_not_get_the_names(conn):
+    import json
+
+    from app import incidents
+    from app.hostprobe import service as probes
+    from tests.test_hostprobe import snapshot
+
+    probes.store(conn, 1, True, "locked", None, snapshot(0), now=(JUMP - timedelta(hours=4)).timestamp())
+    probes.store(conn, 1, True, "locked", None, snapshot(16, with_big=True), now=(JUMP + timedelta(hours=2)).timestamp())
+    make_incident(conn)
+    report = investigate.investigate(conn, incidents.incidents(conn, 7, NOW)[0]["id"], now=NOW)
+    text = " ".join(f["text"] for f in report["findings"])
+    assert "Probable cause: on lxc-docker1, the directory /media/torrents/transmission/incomplete grew by 16.0 GB" in text
+    asked = json.dumps(report["facts"])
+    assert "transmission" not in asked and "names withheld" in asked and "16.0 GB" in asked
+    probes.save_settings(conn, {"names_to_llm": True})
+    again = investigate.investigate(conn, incidents.incidents(conn, 7, NOW)[0]["id"], now=NOW)
+    assert "transmission/incomplete" in json.dumps(again["facts"])

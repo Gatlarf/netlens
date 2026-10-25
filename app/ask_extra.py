@@ -146,23 +146,84 @@ def r_investigate(r: dict) -> str:
     return f"{r['title']} (from {r['start']}, {'over' if r['resolved'] else 'still going'}). " + " ".join(r["findings"])
 
 
+def t_storage_use(conn, args, now=None) -> dict:
+    """What uses the disk space of a host, from its storage snapshots (Settings → Host probes)."""
+    from app.hostprobe import parse, service as probes
+
+    name = str(args.get("device") or "").strip().lower()
+    rows = conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices").fetchall()
+    enabled = [r for r in rows if device_enabled(conn, r["id"])]
+    pick = next((r for r in rows if name and name in (r["n"] or "").lower()), None)
+    if pick is None and not name:
+        from app.hostmetrics import service as hm
+
+        bad = {p["device_id"] for p in hm.problems(conn) if p["metric"] == "disk_pct"}
+        pick = next((r for r in enabled if r["id"] in bad), enabled[0] if enabled else None)
+    if pick is None:
+        return {"error": "No host is being inspected yet: switch it on for a device (device page → Storage inspection)." if not name else f"I don't know a device called {name}."}
+    last = probes.latest_ok(conn, pick["id"])
+    if not last:
+        return {"error": f"No storage snapshot of {pick['n']} yet" + ("" if device_enabled(conn, pick["id"]) else ": switch on Storage inspection on its device page") + "."}
+    data = last["data"]
+    mounts = []
+    for m in data["mounts"][:3]:
+        top = [d for d in m["dirs"] if d["path"] != m["mount"]][:6]
+        mounts.append({"mount": m["mount"], "used_pct": round(100 * m["used"] / m["size"]) if m["size"] else None, "used": parse.nice_bytes(m["used"]),
+                       "biggest": [{"path": d["path"], "size": parse.nice_bytes(d["bytes"])} for d in top], "big_files": [{"path": f["path"], "size": parse.nice_bytes(f["bytes"])} for f in m["files"][:4]]})
+    docker = [{"container": c["name"], "log": parse.nice_bytes(c["log_bytes"]), "layer": parse.nice_bytes(c["layer_bytes"])} for c in sorted(data["docker"]["containers"], key=lambda c: -(c["log_bytes"] + c["layer_bytes"]))[:4]]
+    first = probes.snapshots(conn, pick["id"], 40)
+    grew = None
+    older = next((x for x in first[1:] if x["ok"]), None)
+    if older:
+        prev = probes.latest_ok(conn, pick["id"], before=older["taken"])
+        grew = parse.compare(prev["data"], data, min_bytes=100 * 1024 ** 2) if prev else None
+    return {"device": pick["n"], "taken": last["taken"], "mode": last["mode"], "partial": data.get("partial"), "disks": mounts, "docker": docker,
+            "docker_total": [{"type": u["type"], "size": parse.nice_bytes(u["bytes"]), "reclaimable": parse.nice_bytes(u["reclaimable"])} for u in data["docker"]["usage"]],
+            "deleted_but_open": [{"path": d["path"], "size": parse.nice_bytes(d["bytes"]), "process": d["process"]} for d in data["deleted"][:3]],
+            "grew_since_previous": [{"path": g["path"], "grew": parse.nice_bytes(g["bytes"]), "kind": g["kind"]} for g in (grew or {"growth": []})["growth"][:4]]}
+
+
+def device_enabled(conn, device_id: int) -> bool:
+    from app.hostprobe import service as probes
+
+    return probes.device_config(conn, device_id)["enabled"]
+
+
+def r_storage_use(r: dict) -> str:
+    text = f"{r['device']} (snapshot {r['taken']})."
+    for m in r["disks"][:2]:
+        text += f" {m['mount']} is {m['used_pct']}% full ({m['used']}); biggest: " + ", ".join(f"{d['path']} {d['size']}" for d in m["biggest"][:4]) + "."
+        if m["big_files"]:
+            text += " Big files: " + ", ".join(f"{f['path']} {f['size']}" for f in m["big_files"][:3]) + "."
+    if r["grew_since_previous"]:
+        text += " Grew since the previous snapshot: " + ", ".join(f"{g['path']} +{g['grew']}" for g in r["grew_since_previous"]) + "."
+    if r["docker"]:
+        text += " Docker (logs/layers): " + ", ".join(f"{c['container']} {c['log']}/{c['layer']}" for c in r["docker"][:3]) + "."
+    if r["deleted_but_open"]:
+        text += " Deleted but still open: " + ", ".join(f"{d['path']} {d['size']} ({d['process']})" for d in r["deleted_but_open"]) + "."
+    return text
+
+
 TOOLS = {
     "vulnerabilities": (t_vulnerabilities, "security weaknesses found by the vulnerability scanners (Greenbone, Tenable ...): counts by severity, known-exploited ones, the worst devices and the critical findings. args: none"),
     "traffic": (t_traffic, "network traffic: bandwidth in and out now and the peak, of the internet line and of the monitored devices together. args: range (1h, 6h, 24h or 7d)"),
     "notifications": (t_notifications, "who is told about what: the alert channels (e-mail, Telegram ...) and the kinds of event that nobody would hear about. args: none"),
     "oncall": (t_oncall, "who is on call now and the coming shifts. args: none"),
     "system_log": (t_system_log, "warnings and errors in Netlens' own log (why a sync, a monitor or a notification failed). args: level (warning or error)"),
+    "storage_use": (t_storage_use, "WHAT USES the disk space of a host (needs Storage inspection on that device): the biggest directories and files, Docker logs and layers, files deleted but still open, and what grew since the previous snapshot. args: device (name, optional)"),
     "investigate": (t_investigate, "ROOT CAUSE of the latest incident (or of one device's): what started it, which device moved first, what was running at the time, what else broke, whether anybody was told. args: device (optional name), days (1-30)"),
 }
-RENDERERS = {"vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "system_log": r_system_log, "investigate": r_investigate}
+RENDERERS = {"storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "system_log": r_system_log, "investigate": r_investigate}
 PRESETS = [
     {"id": "vulns", "text": "Which vulnerabilities do I have?", "tool": "vulnerabilities", "args": {}},
     {"id": "traffic", "text": "How much traffic is going through my network?", "tool": "traffic", "args": {}},
     {"id": "told", "text": "Would I be told if something broke?", "tool": "notifications", "args": {}},
+    {"id": "space", "text": "What is using the disk space?", "tool": "storage_use", "args": {}},
     {"id": "cause", "text": "What caused the latest incident?", "tool": "investigate", "args": {}},
     {"id": "log", "text": "Are there errors in the Netlens log?", "tool": "system_log", "args": {"level": "error"}},
 ]
 RULES = [
+    ("storage_use", r"what (is|are|was|has been) (using|taking|eating|filling|consuming|hogging)\b.{0,30}(space|disk|storage)|where (did|does|is) (the |my )?(disk|space|storage).{0,20}(go|going|gone)|what filled|(biggest|largest) (files?|folders?|directories|dirs?)|disk space (is )?(used|taken|used up) by|what.{0,12}(uses|using) (the )?(disk|space)"),
     ("investigate", r"root cause|investigat|what caused|cause of|post-?mortem|what went wrong|why did .{0,40}(stop|fail|crash|go down|go offline|jump|spike|slow)|why was .{0,40}(slow|full|overloaded|busy)"),
     ("vulnerabilities", r"vulnerab|\bcves?\b|exploit|greenbone|openvas|nessus|unpatched|security (hole|weakness)"),
     ("notifications", r"notification|alert channel|who (is|gets|would get) (told|alerted|notified)|would i (get|be) (a |told|alerted|warned|notified)|was i (told|warned|alerted|notified)|e-?mail alerts?|quiet hours|nobody (is |was )?told"),
@@ -181,6 +242,9 @@ def route(q: str, names: list[str]) -> tuple[str, dict] | None:
                 args = {"device": name} if name else {}
             elif tool == "traffic":
                 args = {"range": next((r for r, p in (("7d", r"week|7 ?d"), ("24h", r"today|24 ?h|day"), ("6h", r"6 ?h")) if re.search(p, q)), "1h")}
+            elif tool == "storage_use":
+                name = next((n for n in sorted(names, key=len, reverse=True) if len(n) > 2 and n.lower() in q), "")
+                args = {"device": name} if name else {}
             elif tool == "system_log":
                 args = {"level": "error" if re.search(r"error|exception", q) else "warning"}
             return tool, args

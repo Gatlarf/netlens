@@ -360,8 +360,8 @@ async def run(host: str, port: int, username: str, password: str | None, private
 
 
 async def run_command(host: str, port: int, username: str, password: str | None, private_key: str | None, passphrase: str | None,
-                      command: str, known_fingerprint: str | None = None, timeout: float = 15.0) -> tuple[str, int | None, str | None]:
-    """Run one command. Returns (output, exit status, host key fingerprint)."""
+                      command: str, known_fingerprint: str | None = None, timeout: float = 15.0, certificate: str | None = None) -> tuple[str, int | None, str | None]:
+    """Run one command. Returns (output, exit status, host key fingerprint). `certificate` is an OpenSSH user certificate for `private_key` (a short-lived login)."""
     seen: dict[str, str] = {}
 
     class Client(asyncssh.SSHClient):
@@ -372,7 +372,8 @@ async def run_command(host: str, port: int, username: str, password: str | None,
     keys = None
     if private_key:
         try:
-            keys = [asyncssh.import_private_key(private_key, passphrase or None)]
+            key = asyncssh.import_private_key(private_key, passphrase or None)
+            keys = [(key, asyncssh.import_certificate(certificate))] if certificate else [key]
         except (asyncssh.Error, ValueError) as exc:
             raise SshError(f"the private key cannot be read: {exc}") from None
     try:

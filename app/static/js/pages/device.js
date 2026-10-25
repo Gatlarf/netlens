@@ -6,6 +6,7 @@ import { mountTerminal, isTerminalActive } from "../terminal.js";
 import { buildDeviceUptimeCard } from "../cards/device_uptime.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 import { buildDeviceMonitorCard, isMonitorFormOpen } from "../cards/device_monitor.js";
+import { buildDeviceProbeCard } from "../cards/device_probe.js";
 import { buildHealthGlance } from "../cards/health_glance.js";
 import { buildDevicePortsCard, PORT_METRICS } from "../cards/device_ports.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
@@ -876,6 +877,9 @@ export async function render(container, params) {
       const monitorSlot = slot("monitor", "Health monitoring");
       hLeft.appendChild(monitorSlot);
       buildDeviceMonitorCard(device, { onChange: () => load() }).then((c) => { if (c && !disposed) monitorSlot.appendChild(c); }).catch(() => {});
+      const probeSlot = slot("probe", "Storage inspection");
+      hLeft.appendChild(probeSlot);
+      buildDeviceProbeCard(device).then((c) => { if (c && !disposed) probeSlot.appendChild(c); }).catch(() => {});
     }
     const servicesSlot = slot("services", "Service checks", false, "list");
     hRight.appendChild(servicesSlot);

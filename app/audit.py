@@ -16,7 +16,7 @@ from app.db import ago, utcnow
 RETENTION_DAYS = 365
 MAX_ROWS = 50000
 # what is not worth a line: personal preferences, probes reporting with their token, the browser's own speed test, the terminal protocol
-SKIP = re.compile(r"^/api/(login|logout|me/preferences|dashboard/layout|probe/(push|relay)|speedtest/(up|down|ping|browser)|devices/\d+/(ping|trace)|insights/(ask|identify|model-check|incidents/\d+/words))")
+SKIP = re.compile(r"^/api/(login|logout|me/preferences|dashboard/layout|probe/(push|relay)|speedtest/(up|down|ping|browser)|devices/\d+/(ping|trace)|insights/(ask|identify|model-check|incidents/\d+/words)|hostprobe/(ca|settings)$|devices/\d+/hostprobe/run$)")
 
 # (method, path regex, sentence). {0}, {1}... are the groups; a device id becomes the device's name.
 PATTERNS: list[tuple[str, str, str]] = [
@@ -68,6 +68,7 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("DELETE", r"^/api/shares/", "Removed a share link"),
     ("PUT", r"^/api/config", "Changed the scan settings"),
     ("POST", r"^/api/vault", "Changed the stored-password protection"),
+    ("PUT", r"^/api/devices/(\d+)/hostprobe$", "Changed the storage inspection of {d0}"),
 ]
 _COMPILED = [(m, re.compile(rx), text) for m, rx, text in PATTERNS]
 
@@ -101,6 +102,25 @@ def record(conn: sqlite3.Connection, user: str, role: str, ip: str, method: str,
     conn.execute("INSERT INTO audit_log (ts, user, role, ip, method, path, status, action) VALUES (?,?,?,?,?,?,?,?)",
                  (utcnow(), (user or "")[:60], (role or "")[:20], (ip or "")[:60], method[:10], path[:200], int(status), action[:300]))
     conn.commit()
+
+
+def record_system(conn: sqlite3.Connection, action: str, path: str, status: int = 200) -> None:
+    """A line for something Netlens did on its own (a scheduled job): no user, no address. Forwarded to the SIEM like the others."""
+    record(conn, "netlens", "system", "", "SYSTEM", path, status, action)
+
+
+def record_by(conn: sqlite3.Connection, principal, ip: str, method: str, path: str, status: int, action: str) -> None:
+    """An explicit line written by the code that knows more than the request path (who, on which host, with which login)."""
+    record(conn, getattr(principal, "username", "") or "", getattr(principal, "role", "") or "", ip, method, path, status, action)
+
+
+def record_read(conn: sqlite3.Connection, principal, ip: str, path: str, action: str, quiet_s: int = 600) -> bool:
+    """A line for looking at sensitive data (file names of a host). The same user looking at the same thing again within `quiet_s` seconds is one line."""
+    user = getattr(principal, "username", "") or ""
+    if conn.execute("SELECT 1 FROM audit_log WHERE method = 'GET' AND user = ? AND path = ? AND ts >= ? LIMIT 1", (user, path[:200], ago(seconds=quiet_s))).fetchone():
+        return False
+    record(conn, user, getattr(principal, "role", "") or "", ip, "GET", path, 200, action)
+    return True
 
 
 def log_request(conn: sqlite3.Connection, principal, ip: str, method: str, path: str, status: int) -> bool:

@@ -65,3 +65,17 @@ def test_traffic_reports_the_newest_reading_and_the_peak(conn):
     r = ask.TOOLS["traffic"][0](conn, {}, NOW)
     assert r["devices"]["in_mbps_now"] == 8.0 and r["devices"]["in_mbps_peak"] == 8.0 and r["devices"]["out_mbps_now"] == 0.5
     assert "8.0 Mbit/s in" in ask.render("traffic", r)
+
+
+def test_what_uses_the_disk_space(conn):
+    from app.hostprobe import service as probes
+    from tests.test_hostprobe import snapshot
+
+    assert "No host is being inspected" in ask.answer(conn, "what is using the disk space?", NOW)["answer"]
+    probes.save_settings(conn, {"devices": {"1": {"enabled": True}}})
+    assert "No storage snapshot" in ask.answer(conn, "what is using the disk space on web1", NOW)["answer"]
+    probes.store(conn, 1, True, "locked", None, snapshot(0), now=NOW.timestamp() - 7200)
+    probes.store(conn, 1, True, "locked", None, snapshot(16, with_big=True, log_bytes=2 * 1024 ** 3), now=NOW.timestamp() - 60)
+    a = ask.answer(conn, "what is using the disk space on web1?", NOW)
+    assert a["tools"] == ["storage_use"] and "/media/torrents/transmission/incomplete" in a["answer"] and "+16.0 GB" in a["answer"] and "sonarr" in a["answer"]
+    assert ask.route("what is using the disk space?", ["web1"], conn)[0] == "storage_use"

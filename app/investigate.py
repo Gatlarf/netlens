@@ -206,6 +206,32 @@ def _told(conn: sqlite3.Connection, kind: str, when: datetime) -> dict[str, Any]
             "excluded_by_severity": len(include) - len(passing)}
 
 
+def _storage_cause(conn: sqlite3.Connection, device_id: int, name: str, start: str, end: str) -> list[dict[str, Any]]:
+    """What grew on the host according to its storage snapshots (Settings → Host probes): the directory, file or container log that explains a full disk."""
+    try:
+        from app.hostprobe import service as probes
+
+        found = probes.explain(conn, device_id, start, end)
+    except Exception:  # noqa: BLE001 - the snapshots are an extra; they never break an investigation
+        return []
+    if not found or not found["growth"]:
+        return []
+    top = found["growth"][0]
+    from app.hostprobe import parse
+
+    span = f"between the snapshots of {found['from'].replace('T', ' ')[:16]} and {found['to'].replace('T', ' ')[:16]} UTC"
+    lines = probes.describe(found, 3)
+    first = f"Probable cause: on {name}, {lines[0][0].lower() + lines[0][1:]} {span}."
+    if found.get("baseline_is_later_than_start"):
+        first += " (There is no snapshot from before the incident, so this is the growth since the first one.)"
+    out = [{"level": "cause", "text": first, "private": True,
+            "llm_text": f"Probable cause: on {name} one {top['kind']} grew by {parse.nice_bytes(top['bytes'])} {span} (names withheld)."}]
+    for g, line in zip(found["growth"][1:3], lines[1:]):
+        out.append({"level": "fact", "text": f"Also on {name}: {line[0].lower() + line[1:]}.", "private": True,
+                    "llm_text": f"Also on {name}: another {g['kind']} grew by {parse.nice_bytes(g['bytes'])} (names withheld)."})
+    return out
+
+
 def investigate(conn: sqlite3.Connection, incident_id: int, now: datetime | None = None) -> dict[str, Any] | None:
     now = now or datetime.now(timezone.utc)
     found = next((i for i in incidents.incidents(conn, 30, now=now) if i["id"] == incident_id), None)
@@ -233,6 +259,7 @@ def investigate(conn: sqlite3.Connection, incident_id: int, now: datetime | None
     onsets = {d["id"]: min((datetime.fromtimestamp(r["shape"]["at"], timezone.utc) for r in d["readings"] if r["shape"]["kind"] in ("step", "surge") and r["metric"] != "disk_pct"), default=None) for d in core}
     onset = min((o for o in onsets.values() if o), default=None)
     findings: list[dict[str, str]] = []
+    seen_storage: set = set()
     for d in core:
         for rd in d["readings"]:
             sh = rd["shape"]
@@ -254,6 +281,9 @@ def investigate(conn: sqlite3.Connection, incident_id: int, now: datetime | None
                 findings.append({"level": "fact", "text": f"The {what} rose from {_bits(sh['from_value'])} to {_bits(sh['to_value'])} from {_clock(at)}."})
             elif sh["kind"] == "climb":
                 findings.append({"level": "fact", "text": f"The {what} climbed from {sh['from_value']}{rd['unit']} to {sh['to_value']}{rd['unit']}, about {sh['per_day']} points a day."})
+            if rd["metric"] == "disk_pct" and sh["kind"] in ("step", "climb") and (d["id"], "storage") not in seen_storage:
+                seen_storage.add((d["id"], "storage"))
+                findings.extend(_storage_cause(conn, d["id"], d["name"], found["start"], found["end"]))
             if rd["level"] in ("warning", "critical"):
                 findings.append({"level": "warn", "text": f"The {what} is still {rd['level']} ({rd['now']}{rd['unit']})."})
     # host and guest: the one that moved first is the origin, the other one shows the load
@@ -327,8 +357,14 @@ def investigate(conn: sqlite3.Connection, incident_id: int, now: datetime | None
     names_core = [d["name"] for d in core]
     changed = sorted({WORDS.get(r["metric"], r["metric"]) for d in core for r in d["readings"] if r["shape"]["kind"] in ("step", "surge")})
     title = f"{', '.join(names_core[:2])}: {' and '.join(changed[:3])} jumped" if changed else found["title"]
+    try:
+        from app.hostprobe import service as probes
+
+        names_ok = bool(probes._load(conn)["names_to_llm"])
+    except Exception:  # noqa: BLE001
+        names_ok = False
     facts = {"title": title, "start": found["start"], "end": found["end"], "over": found["resolved"], "devices": names_core, "unrelated_devices": [u["name"] for u in unrelated],
-             "findings": [f["text"] for f in findings if f["level"] != "noise"][:12]}
+             "findings": [f.get("llm_text") if f.get("private") and not names_ok else f["text"] for f in findings if f["level"] != "noise"][:12]}
     return {"id": found["id"], "title": title, "start": found["start"], "end": found["end"], "resolved": found["resolved"], "devices": core, "unrelated": [{"id": u["id"], "name": u["name"], "why": u["why"]} for u in unrelated],
             "notifications": told, "findings": findings, "facts": facts}
 

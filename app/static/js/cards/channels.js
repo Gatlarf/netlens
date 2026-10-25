@@ -40,7 +40,7 @@ function filterBox(filters, groups, devices) {
   const box = h("div", { class: "filter-box" },
     h("div", { class: "field" }, h("label", {}, "How serious"), level),
     h("div", { class: "field" }, h("label", {}, "How important"), tier, h("p", { class: "hint" }, "The importance is set on each device (its Settings tab) and each service check.")),
-    h("div", { class: "field" }, h("label", { class: "check-row" }, alwaysOn, " Only for always-on devices"), h("p", { class: "hint" }, ""Went offline" and "back online" are sent only for devices marked always-on (their Settings tab), so a phone leaving the Wi-Fi stays quiet. Everything else (disks, services, backups) is not affected.")),
+    h("div", { class: "field" }, h("label", { class: "check-row" }, alwaysOn, " Only for always-on devices"), h("p", { class: "hint" }, "“Went offline” and “back online” are sent only for devices marked always-on (their Settings tab), so a phone leaving the Wi-Fi stays quiet. Everything else (disks, services, backups) is not affected.")),
     groups.length ? h("div", { class: "field" }, h("label", {}, "Only these groups"), h("div", { class: "event-boxes" }, groupBoxes)) : null,
     devices.length ? h("div", { class: "field" }, h("label", {}, "Only these devices"), search, list, h("p", { class: "hint" }, "Leave all unticked to hear about every device. With groups and devices both ticked, an event counts when it is about one of them.")) : null);
   box.read = () => ({ min_severity: level.value, min_tier: tier.value, always_on_only: alwaysOn.checked, groups: groupBoxes.map((l) => l.firstChild).filter((i) => i.checked).map((i) => Number(i.dataset.group)), devices: [...picked] });

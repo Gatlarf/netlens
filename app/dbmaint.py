@@ -212,6 +212,7 @@ def purge(conn: sqlite3.Connection, dry_run: bool = False, now: datetime | None 
 ORPHANS = (
     ("service_results", "check_id", "service_checks", "id"),
     ("metric_state", "monitor_id", "host_monitors", "id"),
+    ("probe_snapshots", "device_id", "devices", "id"),
     ("checks", "device_id", "devices", "id"),
     ("checks_hourly", "device_id", "devices", "id"),
     ("port_baselines", "device_id", "devices", "id"),

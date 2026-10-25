@@ -2,6 +2,18 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.254 — 2026-10-25
+
+### Added
+- ★ **Storage inspection: find out what fills a disk, read-only, for Linux and Windows.** Switch it on for a device (device page → Storage inspection; it needs health monitoring over SSH or WinRM) and Netlens looks every few hours, and at once when a disk goes over its limit, at the biggest folders and files, Docker images, layers and logs, and files deleted but still open. It keeps the snapshots and says which folder grew and when. An investigation of a full disk now names the folder ("Probable cause: on lxc-docker1 the directory ... grew by 16.0 GB"); you can ask "what is using the disk space on <host>?", and the assistant (MCP) has `get_storage_breakdown`.
+- **A host can be locked down for it.** Settings → Host probes generates the files for a root-owned read-only script and an account that can run nothing else, for a key or for certificates (Linux, and Windows with the OpenSSH server).
+- ★ **Short-lived logins.** Netlens can be the SSH certificate authority: every look uses a new key pair and a certificate that is valid for a few minutes (the host only trusts the CA public key). A Vault or OpenBao SSH secrets engine can sign instead, and other systems plug in as credential sources.
+- **Records for compliance.** Every look (also a failed one and a scheduled one) is an audit line with who started it, the kind of login, the certificate id (the one the host's sshd logs) and the outcome; creating or replacing the CA, changing the settings (field names, never values) and viewing folder and file names are audit lines too, and they are forwarded with Log forwarding. Snapshots are kept 1 to 365 days (default 30). A language model gets no file or folder names unless you allow it.
+- The AI side: the "what is using the disk space" question, the MCP tool, the investigation, and a privacy setting. See docs/HOST-PROBES.md. The Windows script and Vault/OpenBao are tested against test servers only.
+
+### Fixed
+- The notification channels page did not load in 0.4.253: a quotation mark in the new "Only for always-on devices" hint broke the script. It works again.
+
 ## 0.4.253 — 2026-10-25
 
 ### Added
