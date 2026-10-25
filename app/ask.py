@@ -262,6 +262,9 @@ def route(question: str, known_names: list[str], conn=None) -> tuple[str, dict]:
     """(tool, args) for a question, by its words: a device name wins, then the first keyword group that matches."""
     q = question.lower()
     if conn is not None:
+        extra = ask_extra.route(q, known_names)
+        if extra:
+            return extra
         more = ask_more.route(conn, q, known_names)
         if more:
             return more
@@ -490,6 +493,7 @@ def _answer(conn, question: str, now, ask, mode: str) -> dict[str, Any]:
     return {"answer": render(tool, result), "source": "rules", "tools": [tool], "fell_back": fell_back}
 
 
-from app import ask_more  # noqa: E402 - the other questions register themselves into the tables above
+from app import ask_extra, ask_more  # noqa: E402 - the other questions register themselves into the tables above
 
 ask_more.register()
+ask_extra.register()

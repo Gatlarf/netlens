@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.251 — 2026-10-25
+
+### Added
+- ★ **The AI can analyse far more.** "Ask your network" (with or without a language model) now also answers about vulnerabilities, traffic and bandwidth, who would be told about what (and what nobody would hear about), who is on call, the warnings and errors in Netlens' own log, and the root cause of the latest incident (or of one device's). The assistant endpoint (MCP) gained matching tools: investigate an incident, traffic, on-call, smart home, DNS, health monitors, automatic fixes and network checks.
+- The incident engine now also understands critical vulnerabilities, unexpected open ports, firewall cluster and licence problems, failed DNS checks, hosts that stop answering their health check, failed plugin updates and low smart-home batteries, so they are grouped into incidents and investigated like the rest.
+- A test now fails when a new kind of event is added without deciding what the AI does with it.
+
 ## 0.4.250 — 2026-10-25
 
 ### Fixed

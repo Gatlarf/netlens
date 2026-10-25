@@ -108,6 +108,16 @@ tool("get_reliability", "overview", "Reliability of the devices and services tha
      {"days": i("7, 30 or 90")}, query=("days",))
 tool("get_coverage", "overview", "Monitoring gaps: devices marked always-on or critical that have no service check, health monitor, backup or alerts.", "GET", "/api/coverage")
 tool("get_weekly_report", "overview", "The weekly report as it would be sent now.", "GET", "/api/reports/weekly")
+tool("investigate_incident", "overview", "Find the probable cause of an incident (ids come from get_insights): what started it, which device moved first (host or guest), what was running at the time, what else broke, devices that only flapped, and whether anybody was told.", "GET", "/api/insights/incidents/{incident_id}/investigate",
+     {"incident_id": i("Incident id"), "words": b("Also write it out in plain language with the language model")}, ("incident_id",), query=("words",))
+tool("get_traffic", "overview", "Bandwidth in and out of the internet line and of the monitored devices together, over 1h, 6h, 24h or 7d.", "GET", "/api/traffic",
+     {"range": s("Period", ["1h", "6h", "24h", "7d"]), "mode": s("all, or endpoints (no double counting)", ["all", "endpoints"])}, query=("range", "mode"))
+tool("get_oncall", "overview", "Who is on call now and the shifts of the coming week.", "GET", "/api/oncall")
+tool("get_smart_home", "overview", "Smart-home devices (Home Assistant and others): unavailable ones, low batteries, updates.", "GET", "/api/inventory")
+tool("get_dns", "overview", "DNS names of the devices and the conflicts between them.", "GET", "/api/dns")
+tool("get_monitors", "overview", "The health monitors (memory, processor, disk, temperature ...) of the monitored hosts, their latest readings and the readings past their limit.", "GET", "/api/monitors")
+tool("get_remediation", "overview", "The automatic fixes: rules, what ran, what waits for approval and whether it helped.", "GET", "/api/remediation")
+tool("get_network_checks", "overview", "DHCP servers seen on the network (trusted or not), the gateway and the DNS registration.", "GET", "/api/netchecks")
 
 # devices
 tool("list_devices", "devices", "Every device Netlens knows: name, addresses, vendor, type, online, group, always-on, trusted.", "GET", "/api/devices",

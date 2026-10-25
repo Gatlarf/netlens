@@ -21,14 +21,17 @@ from app.remediation import RECOVERY
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
 GAP = timedelta(minutes=10)
 PROBLEMS = set(RECOVERY) | {"anomaly", "capacity_warning", "capacity_critical", "container_unhealthy", "container_restarting", "container_stopped", "backup_failed", "dhcp_rogue",
-                            "gateway_changed", "cert_expiring", "guest_backup_late", "guest_backup_failed", "storage_degraded"}
+                            "gateway_changed", "cert_expiring", "guest_backup_late", "guest_backup_failed", "storage_degraded",
+                            "vuln_critical", "port_unexpected", "firewall_ha", "firewall_licence", "dns_failed", "host_timeout", "plugin_update_failed", "inventory_battery_low"}
 RECOVERS = {v: k for k, v in RECOVERY.items()}
 RECOVERS["storage_recovered"] = "storage_degraded"
 REMEDIATION = {"remediation_pending", "remediation_ran", "remediation_failed", "remediation_recovered"}
 WORDS = {"device_offline": "went offline", "service_down": "a service went down", "metric_critical": "a health reading went critical", "metric_warning": "a health reading went past its warning limit",
          "anomaly": "a reading was unusual", "capacity_warning": "a disk is filling up", "capacity_critical": "a disk is almost full", "remote_offline": "a remote device went offline",
          "probe_offline": "a remote site went silent", "central_unreachable": "the central Netlens could not be reached", "guest_backup_failed": "a backup failed", "storage_degraded": "a storage system had a problem", "backup_failed": "a backup failed", "container_unhealthy": "a container was unhealthy",
-         "container_restarting": "a container kept restarting", "container_stopped": "a container stopped", "inventory_unavailable": "a smart-home device became unavailable"}
+         "container_restarting": "a container kept restarting", "container_stopped": "a container stopped", "inventory_unavailable": "a smart-home device became unavailable",
+         "vuln_critical": "a critical vulnerability was found", "port_unexpected": "an unexpected port opened", "firewall_ha": "a firewall cluster changed state", "firewall_licence": "a firewall licence needs attention",
+         "dns_failed": "a DNS check failed", "host_timeout": "a monitored host stopped answering its health check", "plugin_update_failed": "a plugin update failed", "inventory_battery_low": "a smart-home battery is low"}
 SYSTEM = ("You write one short paragraph (at most four sentences) for the administrator of a home or small-business network about an incident. "
           "Use only the facts in the JSON. Say what happened, the probable cause if one is given, whether it is over and whether an automatic fix ran. "
           "Do not invent causes, times or devices, and give no advice. Plain language.")
