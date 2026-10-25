@@ -1640,6 +1640,24 @@
    ],
    "releases": [
     {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.1.0/openwrt.zip",
+     "sha256": "97bdef121724412354cbc759eb0211057e3c894fa837ca4acf136a3ac0de2306",
+     "api_version": 1,
+     "min_netlens": "0.4.237",
+     "released": "2026-10-25",
+     "changelog": "The health of the router: processor, memory, load, temperature, uptime, the OpenWrt version, and the network devices as ports with link, speed and counters; the internet interface is named WAN. New setting Read the health of the devices; the login needs two extra ACL lines for processor and temperature (see the box on the plugin's page). Needs Netlens 0.4.237.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-25",
+      "tested_on": [
+       "OpenWrt 25.12.5 (QEMU): login with the read-only user from the setup box, memory, load, uptime, processor counters and the port with its counters were read; the VM has no temperature sensor, no radio and no WAN, and virtio gives no link speed, so those follow the documentation"
+      ],
+      "notes": "Written with the assistant Claude. New: a few extra read-only reads per device. Reviewed, not yet confirmed by the maintainer."
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.0.1/openwrt.zip",
      "sha256": "17d9f6dde3b533f9a0364679970cc56642fcc7c0fccca8883e25db0b27aadf2a",
@@ -1690,6 +1708,24 @@
     "DHCP lease lists (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.1.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.1.0/opnsense.zip",
+     "sha256": "dbf067c65b3af8eabebfecdc32933efcabc2dd259f25fc5ed92ca2cbc25dc292",
+     "api_version": 1,
+     "min_netlens": "0.4.237",
+     "released": "2026-10-25",
+     "changelog": "The health of the firewall: processor, memory, load, temperature, uptime, the version and a waiting update, and the interfaces as ports with link, speed and counters; the internet interface is named WAN. New setting Read the health of the firewalls. Needs Netlens 0.4.237.",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-25",
+      "tested_on": [
+       "OPNsense 26.7 (QEMU): the interface list with link and speed was read; the lab API key was refused (HTTP 403) on the other new endpoints, so processor, memory, uptime, temperature, firmware and counters follow the OPNsense documentation and simulated answers"
+      ],
+      "notes": "Written with the assistant Claude. New: a few extra read-only reads per device. Reviewed, not yet confirmed by the maintainer."
+     }
+    },
     {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.0.1/opnsense.zip",

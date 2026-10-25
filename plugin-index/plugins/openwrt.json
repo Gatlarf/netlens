@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.1.0/openwrt.zip",
+      "sha256": "97bdef121724412354cbc759eb0211057e3c894fa837ca4acf136a3ac0de2306",
+      "api_version": 1,
+      "min_netlens": "0.4.237",
+      "released": "2026-10-25",
+      "changelog": "The health of the router: processor, memory, load, temperature, uptime, the OpenWrt version, and the network devices as ports with link, speed and counters; the internet interface is named WAN. New setting Read the health of the devices; the login needs two extra ACL lines for processor and temperature (see the box on the plugin's page). Needs Netlens 0.4.237."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.0.1/openwrt.zip",
       "sha256": "17d9f6dde3b533f9a0364679970cc56642fcc7c0fccca8883e25db0b27aadf2a",

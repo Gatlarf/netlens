@@ -2,6 +2,17 @@
   "id": "opnsense",
   "reviews": [
     {
+      "version": "1.1.0",
+      "sha256": "dbf067c65b3af8eabebfecdc32933efcabc2dd259f25fc5ed92ca2cbc25dc292",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-25",
+      "tested_on": [
+        "OPNsense 26.7 (QEMU): the interface list with link and speed was read; the lab API key was refused (HTTP 403) on the other new endpoints, so processor, memory, uptime, temperature, firmware and counters follow the OPNsense documentation and simulated answers"
+      ],
+      "notes": "Written with the assistant Claude. New: a few extra read-only reads per device. Reviewed, not yet confirmed by the maintainer."
+    },
+    {
       "version": "1.0.1",
       "sha256": "7fb65f70581b908cded0c41f2c18534b15265e935f4833bc86077ade28d4766c",
       "level": "reviewed",

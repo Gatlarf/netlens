@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.1.0/opnsense.zip",
+      "sha256": "dbf067c65b3af8eabebfecdc32933efcabc2dd259f25fc5ed92ca2cbc25dc292",
+      "api_version": 1,
+      "min_netlens": "0.4.237",
+      "released": "2026-10-25",
+      "changelog": "The health of the firewall: processor, memory, load, temperature, uptime, the version and a waiting update, and the interfaces as ports with link, speed and counters; the internet interface is named WAN. New setting Read the health of the firewalls. Needs Netlens 0.4.237."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.0.1/opnsense.zip",
       "sha256": "7fb65f70581b908cded0c41f2c18534b15265e935f4833bc86077ade28d4766c",

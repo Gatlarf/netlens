@@ -2,6 +2,17 @@
   "id": "openwrt",
   "reviews": [
     {
+      "version": "1.1.0",
+      "sha256": "97bdef121724412354cbc759eb0211057e3c894fa837ca4acf136a3ac0de2306",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-25",
+      "tested_on": [
+        "OpenWrt 25.12.5 (QEMU): login with the read-only user from the setup box, memory, load, uptime, processor counters and the port with its counters were read; the VM has no temperature sensor, no radio and no WAN, and virtio gives no link speed, so those follow the documentation"
+      ],
+      "notes": "Written with the assistant Claude. New: a few extra read-only reads per device. Reviewed, not yet confirmed by the maintainer."
+    },
+    {
       "version": "1.0.1",
       "sha256": "17d9f6dde3b533f9a0364679970cc56642fcc7c0fccca8883e25db0b27aadf2a",
       "level": "reviewed",
