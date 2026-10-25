@@ -146,10 +146,10 @@ export async function buildDeviceProbeCard(device, mode = "health") {
       try {
         const r = await post(`/api/devices/${device.id}/hostprobe/install`, { action, username: user.value, password: pass.value, private_key: key.value, enable_sshd: sshd.checked });
         pass.value = ""; key.value = "";
-        out.replaceChildren(h("ul", { class: "plain" }, r.log.map((l) => h("li", { class: l.startsWith("Error") ? "error" : "" }, l))),
+        out.replaceChildren(...[h("ul", { class: "plain" }, r.log.map((l) => h("li", { class: l.startsWith("Error") ? "error" : "" }, l))),
           r.error ? h("p", { class: "error" }, r.error) : null,
           r.verified ? h("p", { class: r.verified.ok ? "hint" : "error" }, r.verified.ok ? `Verified: Netlens logged in as the probe account with a one-time certificate and ran a probe (script version ${r.verified.script_version}).` : `The install worked but the check failed: ${r.verified.error}`) : null,
-          r.created_ca ? h("p", { class: "hint" }, "The Netlens certificate authority was created for this.") : null);
+          r.created_ca ? h("p", { class: "hint" }, "The Netlens certificate authority was created for this.") : null].filter(Boolean));
         if (r.probes) info = r;                                   // keep the log on screen: no redraw
       } catch (err) { out.replaceChildren(h("p", { class: "error" }, err.message || "Failed")); }
       finally { card.dataset.working = "0"; card.dataset.dirty = "0"; }
