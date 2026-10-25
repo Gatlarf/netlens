@@ -45,7 +45,8 @@ export async function buildHostProbeCard() {
       mount: h("input", { type: "text", value: v.mount }), role: h("input", { type: "text", value: v.role }), ns: h("input", { type: "text", value: v.namespace }),
       user: h("input", { type: "text", value: v.username }), token: h("input", { type: "password", autocomplete: "off", placeholder: v.has_token ? "(set; type to replace)" : "" }),
       roleId: h("input", { type: "text", autocomplete: "off" }), secretId: h("input", { type: "password", autocomplete: "off", placeholder: v.has_approle ? "(set; type to replace)" : "" }),
-      names: h("input", { type: "checkbox", checked: s.names_to_llm }), auto: h("input", { type: "checkbox", checked: s.analysis_auto }), base: h("input", { type: "url", value: s.base_url || "", placeholder: "https://netlens.example.lan" }), keep: h("input", { type: "number", min: 1, max: 365, value: s.keep_days }),
+      names: h("input", { type: "checkbox", checked: s.names_to_llm }), auto: h("input", { type: "checkbox", checked: s.analysis_auto }),
+      words: h("select", {}, [["rules", "Built-in logic only"], ["auto", "Automatic: a language model when one is connected"], ["model", "Language model (the report says when it was not available)"]].map(([v, t]) => h("option", { value: v, selected: v === (s.analysis_words || "rules") }, t))), base: h("input", { type: "url", value: s.base_url || "", placeholder: "https://netlens.example.lan" }), keep: h("input", { type: "number", min: 1, max: 365, value: s.keep_days }),
     };
     const field = (label, input, hint) => h("div", { class: "field" }, h("label", {}, label), input, hint ? h("p", { class: "hint" }, hint) : null);
     const save = h("button", { class: "btn primary", type: "button" }, "Save");
@@ -55,7 +56,7 @@ export async function buildHostProbeCard() {
       if (f.roleId.value) vault.role_id = f.roleId.value;
       if (f.secretId.value) vault.secret_id = f.secretId.value;
       try {
-        s = await put("/api/hostprobe/settings", { names_to_llm: f.names.checked, analysis_auto: f.auto.checked, base_url: f.base.value, keep_days: Number(f.keep.value), providers: { netlens_ca: { ttl_s: Number(f.ttl.value) }, vault_ssh: vault } });
+        s = await put("/api/hostprobe/settings", { names_to_llm: f.names.checked, analysis_auto: f.auto.checked, analysis_words: f.words.value, base_url: f.base.value, keep_days: Number(f.keep.value), providers: { netlens_ca: { ttl_s: Number(f.ttl.value) }, vault_ssh: vault } });
         toast("Saved", "success");
         draw();
       } catch (err) { toast(err.message || "Could not save", "error"); }
@@ -68,6 +69,7 @@ export async function buildHostProbeCard() {
       field("Token", f.token, "A token that may sign with this role. Or use an AppRole:"), field("AppRole role id", f.roleId), field("AppRole secret id", f.secretId),
       h("h3", {}, "Analysis reports"),
       h("p", { class: "hint" }, "Information only: the digital engineer reads and reports, it changes nothing on any host. Every incident gets an id (INC-…) and every analysis a report id (AR-…), so another system that is allowed to act (an automation platform, an AI agent) knows what is meant and fetches the report: GET /api/analysis/<id>, or the assistant tools get_analysis_report and get_incident_analysis. To have them pushed, include the event \"The digital engineer finished an analysis\" in an alert channel: e-mail gets a formatted report, a webhook gets the whole report as JSON."),
+      field("Write the short summary of a report with", f.words, "The findings, the cause and the chains always come from the built-in logic. A language model (Settings → AI) can only add a short plain-language summary on top, from the findings; names of files and folders are withheld from it unless you allow them below. The built-in text is always there, with or without it."),
       h("div", { class: "field" }, h("label", { class: "check-row" }, f.auto, " Analyse every incident automatically, about 10 minutes after it starts")),
       field("Address of this Netlens (for links in e-mails and messages)", f.base, "For example https://netlens.example.lan. Without it the links are paths on this Netlens."),
       h("h3", {}, "Privacy and records"),

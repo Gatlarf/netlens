@@ -31,6 +31,11 @@ AUTO_AFTER = timedelta(minutes=10)         # an incident is analysed this long a
 DONE_KEY = "analysis.done"
 BASE_URL_KEY = "analysis.base_url"
 AUTO_KEY = "analysis.auto"
+WORDS_KEY = "analysis.words"
+WORDS_MODES = ("rules", "auto", "model")
+WORDS_SYSTEM = ("You are an experienced systems engineer. Below are the findings of a read-only analysis of one or more hosts. Write a short summary in plain language for an administrator: "
+                "what is most likely wrong, what supports that and what was ruled out. Two to five sentences, no lists, no advice to run commands, and only what the findings say. "
+                "A finding that says names were withheld stays general.")
 NOTE_BODY = ("This analysis was made from read-only probes and from what Netlens already knows. Nothing was changed on any host. "
              "Whoever acts on it (a person, an automation system) needs their own rights, and can fetch this report again with its id.")
 NOTE = "Information only: " + NOTE_BODY
@@ -54,6 +59,39 @@ def set_auto(conn, on: bool) -> bool:
     set_setting(conn, AUTO_KEY, "1" if on else "0")
     conn.commit()
     return on
+
+
+def words_mode(conn) -> str:
+    """How the short summary of a report is written: "rules" (the built-in text only), "auto" (a language model when one is connected) or "model" (the model, and the report says when it was not available)."""
+    value = get_setting(conn, WORDS_KEY) or "rules"
+    return value if value in WORDS_MODES else "rules"
+
+
+def set_words_mode(conn, mode: str) -> str:
+    if mode not in WORDS_MODES:
+        raise ValueError("the summary is written by 'rules', 'auto' or 'model'")
+    set_setting(conn, WORDS_KEY, mode)
+    conn.commit()
+    return mode
+
+
+def write_words(conn, doc: dict[str, Any], ask=None) -> None:
+    """Adds `words` (a short plain-language summary by the language model) when the setting asks for it. The findings stay the built-in logic's; names are withheld from the model unless allowed."""
+    from app import insights
+    from app.hostprobe import service as probes
+
+    doc["words"], doc["words_source"] = None, "rules"
+    mode = words_mode(conn)
+    if mode == "rules":
+        return
+    names_ok = bool(probes._load(conn)["names_to_llm"])
+    facts = {"title": doc["title"], "devices": doc.get("devices", []), "symptom": doc.get("symptom", ""),
+             "findings": [(f.get("llm_text") or "A finding with names was withheld.") if f.get("private") and not names_ok else f["text"] for f in doc["findings"] if f["level"] != "noise"][:12]}
+    text = insights.complete(conn, WORDS_SYSTEM, json.dumps(facts, indent=1), names=list(doc.get("devices", [])), ask=ask, own_switch=True)
+    if text:
+        doc["words"], doc["words_source"] = text, "model"
+    elif mode == "model":
+        doc["words_source"] = "unavailable"
 
 
 def base_url(conn) -> str:
@@ -91,6 +129,7 @@ def _causes(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _store(conn, doc: dict[str, Any], trigger: str) -> dict[str, Any]:
+    write_words(conn, doc)
     doc["created"] = utcnow()
     doc["trigger"] = trigger
     doc["read_only"] = True
@@ -186,6 +225,8 @@ def render_text(doc: dict[str, Any], hide_private: bool = False) -> str:
         w = doc["window"]
         lines.append(f"From {w['start']}" + (f" to {w['end']}" if w["end"] != w["start"] else "") + f" ({'over' if w['resolved'] else 'still going'})")
     lines.append("")
+    if doc.get("words"):
+        lines += ["IN SHORT (written by a language model from the findings below)", doc["words"], ""]
     if doc.get("probable_cause"):
         lines += ["PROBABLE CAUSE", doc["probable_cause"].removeprefix("Probable cause: "), ""]
     shown = [f for f in doc["findings"] if f["text"] != doc.get("probable_cause") and not f["text"].startswith("Ruled out")]
@@ -212,6 +253,8 @@ _COLORS = {"cause": "#b42318", "warn": "#b54708", "fact": "#344054"}
 def render_chat(doc: dict[str, Any]) -> str:
     """For chat and push channels: short, with the ids, the cause and the best findings."""
     lines = [summary_line(doc)]
+    if doc.get("words"):
+        lines.append(doc["words"])
     top = [f["text"] for f in doc["findings"] if f["level"] in ("cause", "warn") and f["text"] != doc.get("probable_cause")][:4]
     lines += [f"- {t}" for t in top]
     lines += [f"Full report: {doc['links']['report_html']}" if doc["links"]["report_html"].startswith("http") else f"Fetch it: GET /api/analysis/{doc['report_id']} or MCP get_analysis_report({doc['report_id']})", "Information only: nothing was changed on any host."]
@@ -227,6 +270,9 @@ def render_html(doc: dict[str, Any]) -> str:
                  f'<div style="font-size:20px;font-weight:600;margin-top:4px">{e(doc["title"])}</div>'
                  f'<div style="font-size:13px;margin-top:6px;opacity:.85">{e(doc["report_ref"])}' + (f' · incident {e(doc["incident_ref"])}' if doc.get("incident_ref") else "")
                  + (f' · {e(doc["window"]["start"].replace("T", " ")[:16])}' + (f' to {e(doc["window"]["end"].replace("T", " ")[:16])}' if doc["window"]["end"] != doc["window"]["start"] else "") + f' UTC · {"over" if doc["window"]["resolved"] else "still going"}' if doc.get("window") else "") + '</div></td></tr>')
+    if doc.get("words"):
+        parts.append(f'<tr><td style="padding:18px 24px 0"><div style="font-size:12px;font-weight:700;color:#475467;letter-spacing:.06em">IN SHORT</div><div style="margin-top:6px;font-size:15px;line-height:1.5;color:#101828">{e(doc["words"])}</div>'
+                     '<div style="margin-top:4px;font-size:11px;color:#98a2b3">Written by a language model from the findings below.</div></td></tr>')
     if doc.get("probable_cause"):
         parts.append(f'<tr><td style="padding:20px 24px 4px"><div style="font-size:12px;font-weight:700;color:#b42318;letter-spacing:.06em">PROBABLE CAUSE</div>'
                      f'<div style="margin-top:6px;padding:12px 14px;background:#fef3f2;border-left:4px solid #b42318;border-radius:6px;font-size:16px;line-height:1.45">{e(doc["probable_cause"].removeprefix("Probable cause: "))}</div></td></tr>')
@@ -259,7 +305,7 @@ def payload(doc: dict[str, Any]) -> dict[str, Any]:
     """The report for another system (a webhook, an automation platform): the whole document, flat and stable."""
     return {"type": "netlens.analysis", "version": 1, "read_only": True, "report_id": doc["report_id"], "report_ref": doc["report_ref"], "incident_id": doc.get("incident_id"), "incident_ref": doc.get("incident_ref"),
             "kind": doc["kind"], "title": doc["title"], "created": doc["created"], "devices": doc["devices"], "device_ids": doc["device_ids"], "window": doc.get("window"), "symptom": doc.get("symptom", ""),
-            "probable_cause": doc.get("probable_cause"), "chains": doc.get("chains", []), "findings": [{"level": f["level"], "text": f["text"], "probes": f["probes"], "unusual": f["unusual"], "weight": f["weight"]} for f in doc["findings"]],
+            "probable_cause": doc.get("probable_cause"), "summary": doc.get("words"), "summary_source": doc.get("words_source", "rules"), "chains": doc.get("chains", []), "findings": [{"level": f["level"], "text": f["text"], "probes": f["probes"], "unusual": f["unusual"], "weight": f["weight"]} for f in doc["findings"]],
             "ruled_out": doc.get("ruled_out"), "notified": doc.get("notified", []), "links": doc["links"], "note": NOTE}
 
 

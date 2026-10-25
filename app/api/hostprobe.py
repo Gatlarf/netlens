@@ -32,7 +32,7 @@ def _note(request: Request, conn, method: str, action: str) -> None:
 @router.get("/hostprobe/settings")
 def get_settings(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     _admin(request)
-    return {**service.public_settings(conn), "analysis_auto": analysis.auto_enabled(conn), "base_url": analysis.base_url(conn)}
+    return {**service.public_settings(conn), "analysis_auto": analysis.auto_enabled(conn), "base_url": analysis.base_url(conn), "analysis_words": analysis.words_mode(conn)}
 
 
 @router.put("/hostprobe/settings")
@@ -42,12 +42,14 @@ def put_settings(body: dict, request: Request, conn=Depends(get_conn)) -> dict[s
         out = service.save_settings(conn, body)
         if "analysis_auto" in body:
             analysis.set_auto(conn, bool(body["analysis_auto"]))
+        if "analysis_words" in body:
+            analysis.set_words_mode(conn, str(body["analysis_words"]))
         if "base_url" in body:
             analysis.set_base_url(conn, str(body["base_url"] or ""))
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    out = {**out, "analysis_auto": analysis.auto_enabled(conn), "base_url": analysis.base_url(conn)}
-    changed = sorted([f"{name}.{k}" for name, v in (body.get("providers") or {}).items() if isinstance(v, dict) for k in v] + [k for k in ("names_to_llm", "keep_days", "analysis_auto", "base_url") if k in body])
+    out = {**out, "analysis_auto": analysis.auto_enabled(conn), "base_url": analysis.base_url(conn), "analysis_words": analysis.words_mode(conn)}
+    changed = sorted([f"{name}.{k}" for name, v in (body.get("providers") or {}).items() if isinstance(v, dict) for k in v] + [k for k in ("names_to_llm", "keep_days", "analysis_auto", "analysis_words", "base_url") if k in body])
     _note(request, conn, "PUT", "Changed the host probe settings: " + (", ".join(changed) or "nothing") + " (secret values are never written to the log)")
     return out
 

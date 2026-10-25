@@ -283,3 +283,27 @@ def test_ask_finds_a_report_by_its_id_and_the_model_does_not_get_names(conn):
     finally:
         ask._FOR_MODEL.reset(token)
     assert "No analysis found" in ask.answer(conn, "what does AR-9999 say?", NOW)["answer"]
+
+
+def test_the_short_summary_is_written_by_a_model_only_when_the_setting_asks_for_it(tmp_path):
+    from app import analysis
+    from app.db import connect, init_db
+
+    c = connect(tmp_path / "w.db")
+    init_db(c)
+    doc = {"title": "box: slow", "devices": ["box"], "symptom": "", "findings": [{"level": "cause", "text": "Probable cause: x", "private": False}]}
+    seen = []
+    ask = lambda m: seen.append(m) or "It is x."
+    analysis.write_words(c, doc, ask=ask)
+    assert doc["words"] is None and not seen                                        # built-in logic is the default
+    analysis.set_words_mode(c, "auto")
+    analysis.write_words(c, doc, ask=ask)
+    assert doc["words"] == "It is x." and doc["words_source"] == "model"
+    analysis.set_words_mode(c, "model")
+    analysis.write_words(c, doc, ask=lambda m: "")
+    assert doc["words"] is None and doc["words_source"] == "unavailable"
+    try:
+        analysis.set_words_mode(c, "bogus")
+        assert False
+    except ValueError:
+        pass

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.268 — 2026-10-25
+
+### Added
+- ★ **Host probe reports: built-in logic or a language model, one global setting.** Settings → Host probes → "Write the short summary of a report with": built-in logic only (the default), automatic (a language model when one is connected) or language model. The findings, the cause and the chains always come from the built-in logic; a model can only add a short plain-language "In short" on top (in the report, the e-mail, the chat message and the JSON as `summary`), and file and folder names are withheld from it unless allowed.
+
 ## 0.4.267 — 2026-10-25
 
 ### Changed
