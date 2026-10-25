@@ -98,6 +98,7 @@ def channel(kind, **settings):
 def run_channels(conn, chans):
     path = conn.execute("PRAGMA database_list").fetchone()[2]
     ch.save_channels(conn, [{**c, "last_event_id": ch.current_max_event_id(conn)} for c in chans])
+    analysis.set_setting(conn, analysis.DONE_KEY, "[]")                                    # not the first run
     made = analysis.auto_analyse(conn, NOW)
     sent = {"mail": [], "post": []}
 
@@ -125,11 +126,20 @@ def test_an_incident_is_analysed_automatically_and_pushed_in_the_right_shape_per
     assert hook["type"] == "netlens.analysis" and hook["analysis"]["incident_id"] == mine["incident_id"] and hook["analysis"]["read_only"] is True
     chat = next(p for p in sent["post"] if "telegram" in p["url"] and mine["report_ref"] in p["json"]["text"])["json"]["text"]
     assert "Information only" in chat
-    again, sent2 = run_channels(conn, [])
-    assert again == []                                                                      # one automatic analysis per incident, not one per minute
+    assert analysis.auto_analyse(conn, NOW) == []                                           # one automatic analysis per incident, not one per minute
+
+
+def test_the_first_run_treats_what_already_happened_as_history(conn):
+    make_incident(conn)
+    assert analysis.auto_analyse(conn, NOW) == []                                         # first run: nothing is analysed
+    assert json.loads(analysis.get_setting(conn, analysis.DONE_KEY))                      # ... the incidents that exist are marked as handled
+    assert analysis.auto_analyse(conn, NOW) == [] and conn.execute("SELECT COUNT(*) FROM analysis_reports").fetchone()[0] == 0
+    add_event(conn, "device_offline", "lxc-docker1 is offline", device_id=1, now=(NOW - timedelta(minutes=20)).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    assert len(analysis.auto_analyse(conn, NOW)) == 1                                    # a new incident is analysed
 
 
 def test_the_automatic_analysis_waits_for_the_probes_and_can_be_switched_off(conn):
+    analysis.set_setting(conn, analysis.DONE_KEY, "[]")
     add_event(conn, "metric_critical", "lxc-docker1: disk full on / is 96% (limit 95%)", device_id=1, now=(NOW - timedelta(minutes=4)).strftime("%Y-%m-%dT%H:%M:%SZ"))
     assert analysis.auto_analyse(conn, NOW) == []                                         # 4 minutes old and still going: the alarm probes need time
     assert [d["report_ref"] for d in analysis.auto_analyse(conn, NOW + timedelta(minutes=8))] != []
@@ -139,6 +149,7 @@ def test_the_automatic_analysis_waits_for_the_probes_and_can_be_switched_off(con
 
 
 def test_a_report_with_nothing_to_say_is_kept_but_not_announced(conn):
+    analysis.set_setting(conn, analysis.DONE_KEY, "[]")
     add_event(conn, "device_offline", "x is offline", device_id=1, now=(NOW - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"))
     before = conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'analysis_ready'").fetchone()[0]
     made = analysis.auto_analyse(conn, NOW)
@@ -158,6 +169,7 @@ def test_a_failing_channel_resumes_at_the_report(conn):
     with_probe_data(conn)
     path = conn.execute("PRAGMA database_list").fetchone()[2]
     ch.save_channels(conn, [{**channel("email"), "last_event_id": ch.current_max_event_id(conn)}])
+    analysis.set_setting(conn, analysis.DONE_KEY, "[]")
     analysis.auto_analyse(conn, NOW)
 
     def broken(cfg, subject, body, **kw):

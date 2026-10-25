@@ -299,8 +299,14 @@ def auto_analyse(conn, now: datetime | None = None) -> list[dict[str, Any]]:
     if not auto_enabled(conn) or not licence.allows(conn, "insights"):
         return []
     done = _done(conn)
+    current = incidents.incidents(conn, 2, now=now)
+    if get_setting(conn, DONE_KEY) is None:          # the first time: what already happened is history, not news (only incidents from now on are analysed by themselves)
+        old = [i["id"] for i in current if i["resolved"] or now - datetime.strptime(i["start"], STAMP).replace(tzinfo=timezone.utc) >= AUTO_AFTER]
+        set_setting(conn, DONE_KEY, json.dumps(old[-300:]))
+        conn.commit()
+        return []
     made = []
-    for inc in incidents.incidents(conn, 2, now=now):
+    for inc in current:
         if inc["id"] in done:
             continue
         started = datetime.strptime(inc["start"], STAMP).replace(tzinfo=timezone.utc)

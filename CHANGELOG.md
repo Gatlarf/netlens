@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.259 — 2026-10-25
+
+### Fixed
+- The automatic analysis of incidents no longer goes back over everything that already happened when it starts for the first time (it made a report and an "analysis ready" event for each of the last two days' incidents). Existing incidents are history; only new incidents are analysed.
+
 ## 0.4.258 — 2026-10-25
 
 ### Added
