@@ -1,6 +1,16 @@
 import { get, post, put, upload } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 import { groupByCategory, openSet, remember } from "./plugin_groups.js";
+import { confirmText } from "./plugin_browse.js";
+
+// {plugin id: the plugin store's entry} for the installed plugins that have a newer version (kept between redraws)
+let waiting = {};
+async function checkUpdates(refresh) {
+  const data = await get(`/api/plugin-index${refresh ? "?refresh=true" : ""}`);
+  waiting = Object.fromEntries((data.plugins || []).filter((p) => p.installed && p.update_available && p.latest).map((p) => [p.id, p]));
+  document.dispatchEvent(new CustomEvent("netlens:plugins-changed"));
+  return data;
+}
 
 
 // one coloured dot and a short text: green synced, red failed or in trouble, grey off or waiting
@@ -153,6 +163,20 @@ function fillPluginsCard(card, data, notice = null) {
     none.addEventListener("click", set(false));
     card.appendChild(h("p", { class: "hint" }, `${data.plugins.length} plugins · ${data.plugins.filter((p) => p.enabled && health(p) !== "bad").length} running `, all, " ", none));
   }
+  const check = h("button", { type: "button", class: "btn admin-only" }, "Check for updates");
+  const waitingCount = Object.keys(waiting).length;
+  check.addEventListener("click", async () => {
+    check.disabled = true;
+    try {
+      const idx = await checkUpdates(true);
+      const n = Object.keys(waiting).length;
+      toast(idx.index && idx.index.stale ? "The plugin store could not be reached; showing the last copy" : n ? `${n} plugin update${n === 1 ? "" : "s"} available` : "All your plugins are up to date", n ? "success" : "info");
+    } catch (err) {
+      toast(err.message || "Could not check for updates", "error");
+    }
+    fillPluginsCard(card, data, notice);
+  });
+  card.appendChild(h("p", {}, check, " ", h("span", { class: "hint" }, waitingCount ? `${waitingCount} update${waitingCount === 1 ? "" : "s"} available` : "Looks in the Plugin store for newer versions of the plugins you have.")));
   for (const group of groups) {
     const failing = group.items.filter((p) => health(p) === "bad").length;
     const on = group.items.filter((p) => p.enabled && health(p) !== "bad").length;
@@ -197,13 +221,31 @@ function fillPluginsCard(card, data, notice = null) {
         });
         auto = h("td", { title: "Install new reviewed or verified versions of this plugin automatically" }, h("label", { class: "inline" }, box, " Auto-update"));
       }
+      const news = waiting[p.id];
+      let upgrade = null;
+      if (news) {
+        upgrade = h("button", { type: "button", class: "btn primary admin-only", title: news.latest.changelog || "" }, `Update to ${news.latest.version}`);
+        upgrade.addEventListener("click", async () => {
+          if (!window.confirm(confirmText(news, news.latest))) return;
+          upgrade.disabled = true;
+          try {
+            const res = await post(`/api/plugin-index/${p.id}/install`, { version: news.latest.version, accept_risk: news.latest.review.level === "community" });
+            toast(`${p.name} updated to ${res.version}`, "success");
+            delete waiting[p.id];
+          } catch (err) {
+            toast(err.message || "Update failed", "error");
+          }
+          document.dispatchEvent(new CustomEvent("netlens:plugins-changed"));
+          try { fillPluginsCard(card, await get("/api/plugins")); } catch (err) { toast(err.message || "Could not refresh the list", "error"); }
+        });
+      }
       body.appendChild(h("tr", {},
         h("td", {}, h("a", { href: `#/settings/plugin-${p.id}` }, p.name)),
         h("td", {}, p.version || ""),
         statusCell(p),
         runCell(p),
         auto,
-        h("td", {}, toggle)));
+        h("td", {}, upgrade, upgrade ? " " : null, toggle)));
     }
     table.appendChild(body);
     section.appendChild(h("div", { class: "table-wrap" }, table));
@@ -262,6 +304,7 @@ function fillPluginsCard(card, data, notice = null) {
 
 export async function buildPluginsCard() {
   const card = h("div", { class: "card" });
+  try { await checkUpdates(false); } catch (e) { /* the store may be off or unreachable: the list still works */ }
   fillPluginsCard(card, await get("/api/plugins"));
   return card;
 }

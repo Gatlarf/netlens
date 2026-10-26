@@ -8,7 +8,7 @@ function badge(level) {
   return h("span", { class: `level-badge level-${level}`, title: level }, LEVEL_TEXT[level] || level);
 }
 
-function confirmText(p, release) {
+export function confirmText(p, release) {
   const level = release.review.level;
   if (level === "verified") {
     return `Install ${p.name} ${release.version}?\n\nVerified: a trusted reviewer read this code and tested it on ${release.review.tested_on.join(", ") || "real hardware"}.`;
