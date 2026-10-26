@@ -367,6 +367,9 @@ def parse_target(row, config):
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise HyperVError(f"{row.get('host')!r} is not an address like https://192.168.0.115:5986")
     https = parts.scheme == "https"
+    if not https and not config.get("allow_plain_http"):
+        raise HyperVError(f"{row.get('host')!r}: plain http (port 5985) is not used. Over plain http the only login that works is Basic, which sends the Windows password unencrypted over the network. "
+                          "Use https://host:5986 (the setup lines on this page switch it on), or tick 'Allow plain http' below if this is a lab")
     return parts.hostname, parts.port or (5986 if https else 5985), https
 
 

@@ -77,3 +77,9 @@ The **Run diagnostic** button reports how far the connection gets, as yes/no and
 ## Restarting a guest (auto-remediation)
 
 Netlens can reset, restart, shut down or start a guest from a remediation rule (Monitoring → Remediation, action "Restart the virtual machine"). Reading needs only read access; **doing** needs the right to change power state. The Windows user already has to be in *Hyper-V Administrators*, which is enough. *Reset* is the hard reset, *shutdown* asks the guest through its integration services, *start* powers it on. There is no clean restart. (Written from the Hyper-V WMI documentation; not yet tried on a real host.) If the action is refused, Netlens shows why in the run's result.
+
+## Security: https only (1.2.1)
+
+The plugin talks WinRM over **https** (port 5986), where the connection is encrypted. An address that starts with `http://` (port 5985) is refused: over plain http Windows
+wants NTLM messages sealed, which this plugin cannot do, so the only login left is Basic, and Basic would send the Windows password across the network unencrypted. Before 1.2.1 such
+an address was accepted. If you really run a lab on a network you fully trust, the setting *Allow plain http (not recommended)* brings it back.

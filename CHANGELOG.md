@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.285 — 2026-10-26
+
+### Security
+- **Hyper-V plugin 1.2.1: plain http is refused.** The plugin documented "WinRM over https only", but an address that started with `http://` was accepted, and with the Basic login the Windows password then crossed the network unencrypted. Such an address is now refused unless *Allow plain http (not recommended)* is ticked in the plugin settings.
+
 ## 0.4.284 — 2026-10-26
 
 ### Security

@@ -27,7 +27,7 @@ VMS = {"Host": "ILLUSION-265K", "Vms": [
 
 
 def config(server, **extra):
-    return {"servers": [{"host": server.url, "username": server.user, "password": server.password, "lan": "192.168.0.115"}], "verify_tls": False, "timeout": 10, **extra}
+    return {"servers": [{"host": server.url, "username": server.user, "password": server.password, "lan": "192.168.0.115"}], "verify_tls": False, "timeout": 10, "allow_plain_http": True, **extra}
 
 
 # ---------------------------------------------------------------- the cryptography, against the published values
@@ -140,7 +140,11 @@ def test_ntlm_over_plain_http_is_refused_with_advice():
 
 def test_addresses_are_understood_and_unreachable_hosts_reported():
     assert plugin.parse_target({"host": "192.168.0.115"}, {}) == ("192.168.0.115", 5986, True)
-    assert plugin.parse_target({"host": "http://h:5985"}, {}) == ("h", 5985, False)
+    assert plugin.parse_target({"host": "http://h:5985"}, {"allow_plain_http": True}) == ("h", 5985, False)
+    with pytest.raises(plugin.HyperVError, match="unencrypted"):                         # plain http is refused unless it was allowed on purpose
+        plugin.parse_target({"host": "http://h:5985"}, {})
+    with pytest.raises(plugin.HyperVError, match="plain http"):
+        plugin.fetch({"servers": [{"host": "http://192.168.0.115:5985", "username": "u", "password": "p"}], "auth": "basic"})
     assert plugin.parse_target({"host": "https://h"}, {}) == ("h", 5986, True)
     with pytest.raises(plugin.HyperVError):
         plugin.parse_target({"host": "ftp://h"}, {})

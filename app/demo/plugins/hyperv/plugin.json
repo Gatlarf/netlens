@@ -1,7 +1,7 @@
 {
   "id": "hyperv",
   "name": "Microsoft Hyper-V",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",
@@ -70,6 +70,13 @@
       "label": "Verify TLS certificate",
       "default": false,
       "help": "Leave this off while the host uses a self-signed certificate (what the setup lines create)."
+    },
+    {
+      "key": "allow_plain_http",
+      "type": "bool",
+      "label": "Allow plain http (not recommended)",
+      "default": false,
+      "help": "Off: an address that starts with http:// is refused. Plain http can only carry the Basic login, which sends the Windows password across the network unencrypted. Only for a lab on a network you fully trust."
     },
     {
       "key": "timeout",
