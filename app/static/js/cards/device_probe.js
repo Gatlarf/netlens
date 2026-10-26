@@ -193,11 +193,11 @@ export async function buildDeviceProbeCard(device, mode = "health") {
       h("div", { class: "field" }, h("label", {}, "Log in with"), source, h("p", { class: "hint" }, "A certificate is made for each look and stops working after a few minutes; the host only has to trust the Netlens CA. Set it up under Settings → Host probes.")),
       h("div", { class: "field" }, h("label", {}, "User name on the host (certificates)"), user), h("div", { class: "form-actions" }, save));
     if (setup) { card.appendChild(settings); card.appendChild(installBox()); return; }
-    if (!cfg.enabled) { card.appendChild(h("p", { class: "hint" }, "Probing is off for this host. Turn it on under Settings → Host probes → Hosts.")); return; }
+    if (!cfg.enabled) { card.appendChild(h("p", { class: "hint" }, "Probing is off for this host. Turn it on under Settings → Hosts.")); return; }
     card.appendChild(diagnosisBox());
     for (const u of info.hidden || []) card.appendChild(h("p", { class: "error" }, u.text + "."));
     const stale = Object.values(info.probes).some((p) => p.mode === "locked") && info.latest && info.latest.data && info.latest.data.script_version && info.latest.data.script_version < info.script_version;
-    if (stale) card.appendChild(h("p", { class: "hint" }, "The script installed on the host is older than this Netlens expects. Update it under Settings → Host probes → Hosts."));
+    if (stale) card.appendChild(h("p", { class: "hint" }, "The script installed on the host is older than this Netlens expects. Update it under Settings → Hosts."));
     const tabs = h("div", { class: "btn-row" }, Object.entries(info.probes).map(([name, p]) => {
       const b = h("button", { class: `btn${open === name ? " primary" : ""}`, type: "button", title: p.error ? `Last try failed: ${p.error}` : p.taken ? `Looked ${timeAgo(p.taken)}` : "Not looked at yet" }, p.title + (p.error ? " ⚠" : ""));
       b.addEventListener("click", () => { open = open === name ? "diagnosis" : name; draw(); });

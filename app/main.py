@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from starlette.middleware.gzip import GZipMiddleware
 
-from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, guest_backups as guest_backups_api, storage as storage_api, features as features_api, reliability as reliability_api, interface as interface_api, traffic as traffic_api, layouts as layouts_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, switchports as switchports_api, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api, probes as probes_api, central as central_api, database as database_api, syslog as syslog_api, licence as licence_api, ipv6 as ipv6_api, inventory as inventory_api, remediation as remediation_api, escalation as escalation_api, sso as sso_api, siem as siem_api, reports as reports_api, preferences as preferences_api, snoozes as snoozes_api, audit as audit_api, changes as changes_api, insights as insights_api, vulns as vulns_api, cvecheck as cvecheck_api, usage as usage_api, siteview as siteview_api, documentation as documentation_api, inbound as inbound_api, oncall as oncall_api, assistant as assistant_api, mcp as mcp_api, hostprobe as hostprobe_api, analysis as analysis_api
+from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, guest_backups as guest_backups_api, storage as storage_api, features as features_api, reliability as reliability_api, interface as interface_api, traffic as traffic_api, layouts as layouts_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, switchports as switchports_api, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api, probes as probes_api, central as central_api, database as database_api, syslog as syslog_api, licence as licence_api, ipv6 as ipv6_api, inventory as inventory_api, remediation as remediation_api, escalation as escalation_api, sso as sso_api, siem as siem_api, reports as reports_api, preferences as preferences_api, snoozes as snoozes_api, audit as audit_api, changes as changes_api, insights as insights_api, vulns as vulns_api, cvecheck as cvecheck_api, usage as usage_api, siteview as siteview_api, documentation as documentation_api, inbound as inbound_api, oncall as oncall_api, assistant as assistant_api, mcp as mcp_api, hostprobe as hostprobe_api, analysis as analysis_api, credentials as credentials_api, hosts as hosts_api
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, identify, require_auth
@@ -79,6 +79,12 @@ async def lifespan(app: FastAPI):
     from app import vault
 
     vault.migrate(conn)                      # passwords and tokens that are still plain text get encrypted (once)
+    try:
+        from app import credstore
+
+        credstore.migrate_monitors(conn)     # logins typed into health monitors move into the credential store (once)
+    except Exception:  # noqa: BLE001 - a failed move leaves the monitors as they were
+        logging.getLogger(__name__).exception("could not move the monitor logins into the credential store")
     config.apply_overrides(app)
     app.state.scan_manager.recover()
     # identification: use the vendor registry copy in the data directory, and apply the current rules to what is already known
@@ -279,6 +285,8 @@ def create_app(
     app.include_router(monitors_api.router, dependencies=auth_deps)
     app.include_router(hostprobe_api.router, dependencies=auth_deps)
     app.include_router(analysis_api.router, dependencies=auth_deps)
+    app.include_router(credentials_api.router, dependencies=auth_deps)
+    app.include_router(hosts_api.router, dependencies=auth_deps)
     app.include_router(probes_api.router, dependencies=auth_deps)
     app.include_router(central_api.router, dependencies=auth_deps)
     app.include_router(mcp_api.router, dependencies=auth_deps)

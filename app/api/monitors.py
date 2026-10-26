@@ -6,10 +6,11 @@ import json
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app import tsdb
+from app import credstore, tsdb
+from app.auth import identify
 from app.api.devices import get_conn
 from app.hostmetrics import service as hm
 from app.hostmetrics.snmp import GROUP_TITLES
@@ -36,6 +37,7 @@ class MonitorBody(BaseModel):
     private_key: str | None = None
     passphrase: str | None = None
     clear_password: bool | None = None
+    credential_id: str | None = None
     alerts: bool | None = None
     enabled: bool | None = None
 
@@ -45,6 +47,16 @@ def _device(conn, device_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail="device not found")
     return row
+
+
+def _may_use(request: Request, conn, data: dict[str, Any]) -> None:
+    """Binding a monitor to a stored login is allowed to whoever may see that login (the owner, or an administrator for a shared one)."""
+    cred_id = data.get("credential_id")
+    if not cred_id:
+        return
+    principal = getattr(request.state, "user", None) or identify(request)
+    if credstore.peek(conn, getattr(principal, "username", "") or "", str(cred_id)) is None:
+        raise HTTPException(status_code=422, detail="no such stored login")
 
 
 def _data(body: MonitorBody) -> dict[str, Any]:
@@ -65,7 +77,7 @@ def _state(conn, monitor_id: int) -> list[dict]:
 
 
 @router.post("/devices/{device_id}/monitor/test")
-async def test_monitor(device_id: int, body: MonitorBody, conn=Depends(get_conn)) -> dict:
+async def test_monitor(device_id: int, body: MonitorBody, request: Request, conn=Depends(get_conn)) -> dict:
     """Try the readings with what is in the form (or what is stored, for the secrets left empty). Nothing is saved."""
     device = _device(conn, device_id)
     row = hm.get_monitor(conn, device_id)
@@ -74,11 +86,15 @@ async def test_monitor(device_id: int, body: MonitorBody, conn=Depends(get_conn)
     current = None
     if row is not None and data.get("method") in (None, row["method"]):
         current = {"method": row["method"], "address": row["address"], "port": row["port"], "interval_s": row["interval_s"],
-                   "alerts": bool(row["alerts"]), "enabled": bool(row["enabled"]), "secret": hm.load_secret(conn, row)}
+                   "alerts": bool(row["alerts"]), "enabled": bool(row["enabled"]), "secret": hm.raw_secret(conn, row)}
+    _may_use(request, conn, data)
     try:
         d = hm.validate(data, current)
     except hm.MonitorError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    d["secret"] = hm.resolve_secret(conn, d["method"], d["secret"])
+    if d["secret"].get("credential_id") and not d["secret"].get("username"):
+        raise HTTPException(status_code=422, detail="the stored login is gone: pick another one")
     known = None
     if d["method"] == "ssh":
         from app.terminal.hostkeys import get_fingerprint
@@ -101,13 +117,14 @@ async def test_monitor(device_id: int, body: MonitorBody, conn=Depends(get_conn)
 
 
 @router.put("/devices/{device_id}/monitor")
-async def put_monitor(device_id: int, body: MonitorBody, conn=Depends(get_conn)) -> dict:
+async def put_monitor(device_id: int, body: MonitorBody, request: Request, conn=Depends(get_conn)) -> dict:
     device = _device(conn, device_id)
     existing = hm.get_monitor(conn, device_id)
     if existing is not None and existing["source"] == "central":
         raise HTTPException(status_code=409, detail="this monitor is managed by the central Netlens and cannot be changed here")
     data = _data(body)
     data.setdefault("address", device["primary_ip"])
+    _may_use(request, conn, data)
     try:
         saved = hm.save_monitor(conn, device_id, data)
     except hm.MonitorError as exc:

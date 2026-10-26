@@ -104,6 +104,29 @@ def t_oncall(conn, args, now=None) -> dict:
     return {"people": [p.get("name") for p in cur["people"]], "shift": cur["source"], "until": cur["until"], "upcoming": [str(x)[:100] for x in oncall.timeline(conn)[:6]]}
 
 
+def t_coverage(conn, args, now=None) -> dict:
+    from app import hosts
+
+    rows = hosts.overview(conn)
+    reachable = [h for h in rows if h["can_monitor"]]
+    return {"hosts": len(rows), "reachable": len(reachable),
+            "not_monitored": [h["name"] for h in reachable if not h["monitor"]][:15],
+            "cannot_log_in": [h["name"] for h in rows if h["monitor"] and h["monitor"].get("ok") is False][:15],
+            "probes_on": [h["name"] for h in rows if h["probes"]["enabled"]][:15],
+            "old_probe": [h["name"] for h in rows if h["probes"]["update_available"]][:15]}
+
+
+def r_coverage(r: dict) -> str:
+    parts = [f"{r['reachable']} of {r['hosts']} devices can be monitored over SSH or WinRM."]
+    parts.append(("Not monitored yet: " + ", ".join(r["not_monitored"]) + ".") if r["not_monitored"] else "Every reachable host has a health monitor.")
+    if r["cannot_log_in"]:
+        parts.append("The monitor cannot log in on: " + ", ".join(r["cannot_log_in"]) + ".")
+    parts.append(("Read-only probes are on for: " + ", ".join(r["probes_on"]) + ".") if r["probes_on"] else "The read-only probes are not on for any host.")
+    if r["old_probe"]:
+        parts.append("An older probe script runs on: " + ", ".join(r["old_probe"]) + " (Settings → Hosts updates them).")
+    return " ".join(parts)
+
+
 def r_oncall(r: dict) -> str:
     if not r["people"]:
         return "Nobody is on call right now (no schedule, or a gap in it)."
@@ -292,6 +315,7 @@ TOOLS = {
     "vulnerabilities": (t_vulnerabilities, "security weaknesses found by the vulnerability scanners (Greenbone, Tenable ...): counts by severity, known-exploited ones, the worst devices and the critical findings. args: none"),
     "traffic": (t_traffic, "network traffic: bandwidth in and out now and the peak, of the internet line and of the monitored devices together. args: range (1h, 6h, 24h or 7d)"),
     "notifications": (t_notifications, "who is told about what: the alert channels (e-mail, Telegram ...) and the kinds of event that nobody would hear about. args: none"),
+    "coverage": (t_coverage, "which hosts are monitored and how: which can be reached over SSH or WinRM but have no health monitor, which monitors cannot log in, where the read-only probes are on and where their script is old. args: none"),
     "oncall": (t_oncall, "who is on call now and the coming shifts. args: none"),
     "system_log": (t_system_log, "warnings and errors in Netlens' own log (why a sync, a monitor or a notification failed). args: level (warning or error)"),
     "storage_use": (t_storage_use, "WHAT USES the disk space of a host (needs Storage inspection on that device): the biggest directories and files, Docker logs and layers, files deleted but still open, and what grew since the previous snapshot. args: device (name, optional)"),
@@ -299,8 +323,9 @@ TOOLS = {
     "host_activity": (t_host_activity, "WHAT IS GOING ON on one host according to the read-only host probes: what uses the processor, memory and network, which applications or containers are failing or restarting, what changed or was scheduled lately, hardware and security state, chained into a probable cause. Use for 'why is X slow', 'what is using the CPU/memory/network on X', 'why did X restart'. args: device (name), symptom (optional words such as slow, memory, network, restart)"),
     "investigate": (t_investigate, "ROOT CAUSE of the latest incident (or of one device's): what started it, which device moved first, what was running at the time, what else broke, whether anybody was told. args: device (optional name), days (1-30)"),
 }
-RENDERERS = {"analysis": r_analysis, "host_activity": r_host_activity, "storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "system_log": r_system_log, "investigate": r_investigate}
+RENDERERS = {"analysis": r_analysis, "host_activity": r_host_activity, "storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "coverage": r_coverage, "system_log": r_system_log, "investigate": r_investigate}
 PRESETS = [
+    {"id": "coverage", "text": "Which hosts are not monitored yet?", "tool": "coverage", "args": {}},
     {"id": "vulns", "text": "Which vulnerabilities do I have?", "tool": "vulnerabilities", "args": {}},
     {"id": "traffic", "text": "How much traffic is going through my network?", "tool": "traffic", "args": {}},
     {"id": "told", "text": "Would I be told if something broke?", "tool": "notifications", "args": {}},
@@ -317,6 +342,7 @@ RULES = [
     ("vulnerabilities", r"vulnerab|\bcves?\b|exploit|greenbone|openvas|nessus|unpatched|security (hole|weakness)"),
     ("notifications", r"notification|alert channel|who (is|gets|would get) (told|alerted|notified)|would i (get|be) (a |told|alerted|warned|notified)|was i (told|warned|alerted|notified)|e-?mail alerts?|quiet hours|nobody (is |was )?told"),
     ("oncall", r"on[- ]?call"),
+    ("coverage", r"(which|what) (hosts?|servers?|devices?|machines?).{0,30}(not |un)?monitored|monitoring coverage|(not|isn'?t|aren'?t|un)monitored|without monitoring|(is|are) .{0,30}(being )?monitored|probes? (installed|on|enabled)|where (are|is) the probes?"),
     ("traffic", r"\btraffic\b|throughput|top talkers?|how much (data|bandwidth)|bandwidth (use|usage|is being)|wan (load|usage)"),
     ("system_log", r"system log|netlens log|error log|errors? in (the )?log|log (says|shows)|exceptions?"),
 ]

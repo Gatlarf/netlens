@@ -2,6 +2,16 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.279 — 2026-10-26
+
+### Added
+- ★ **Credential store (Settings → Credentials).** Every login Netlens uses for a host is now stored once, encrypted, and picked by name: remote desktop (RDP/VNC), the SSH terminal, the health monitors (SSH and WinRM) and the host probes. A login is private to the administrator who made it, who can share it with other administrators; nobody can read a stored secret back, it can only be replaced or deleted. Every use is in the audit log. The logins that were saved for remote desktop and typed into the health monitors are moved in automatically (monitors with the same login share one entry, so a changed password is changed once).
+- ★ **Settings → Hosts: set up or remove monitoring for many hosts in one go.** Tick hosts (or select "not monitored", "monitored", "with an old probe"), choose a level (basic monitoring; monitoring + the read-only probes; update the probe script; take the probes off; remove everything), choose the stored login, and apply. For the probes an administrator login is typed once or picked from the store; it is used for this run only. Each host gets its own result and a host that fails does not stop the others.
+- The assistant and the built-in answers know the coverage ("Which hosts are not monitored yet?"), and MCP has `get_monitoring_coverage`.
+
+### Changed
+- The health monitor form, the remote desktop form and the SSH terminal have a "Stored login" choice, and can save a typed login into the store. A monitor that uses a stored login follows it when the login changes.
+
 ## 0.4.274 — 2026-10-26
 
 ### Added

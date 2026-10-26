@@ -170,9 +170,9 @@ def test_saved_credentials_are_encrypted_and_never_returned(client, guacd):
         ws.receive_text()
     listing = client.get("/api/remote").json()
     vnc = next(s for s in listing["devices"][0]["services"] if s["proto"] == "vnc")
-    assert vnc["saved"] == {"username": "", "domain": ""} and "vncpw" not in json.dumps(listing)
+    assert vnc["saved"] == {"username": "", "domain": "", "name": "VNC winbox"} and "vncpw" not in json.dumps(listing)
     conn = connect(client.app.state.db_path)
-    stored = conn.execute("SELECT value FROM settings WHERE key = 'remote.credentials'").fetchone()[0]
+    stored = conn.execute("SELECT value FROM settings WHERE key = 'credstore.entries'").fetchone()[0]
     conn.close()
     assert stored.startswith("enc:v1:") and "vncpw" not in stored
     # connecting with the saved login does not need the password again
@@ -180,6 +180,8 @@ def test_saved_credentials_are_encrypted_and_never_returned(client, guacd):
     with client.websocket_connect(f"/api/remote/ws?ticket={t2}", headers=AUTH) as ws:
         ws.receive_text()
     assert [a for op, a in guacd.received if op == "connect"][-1][4] == "vncpw"
+    stored_list = client.get("/api/credentials").json()["credentials"]
+    assert [c["name"] for c in stored_list] == ["VNC winbox"] and "vncpw" not in json.dumps(stored_list) and stored_list[0]["has_secret"]
     assert client.delete("/api/remote/1/saved/vnc").json() == {"forgotten": True}
     assert client.post("/api/remote/1/session", json={"proto": "vnc", "use_saved": True}).status_code == 404
 

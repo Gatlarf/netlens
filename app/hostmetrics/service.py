@@ -224,8 +224,17 @@ def validate(data: dict[str, Any], current: dict[str, Any] | None = None) -> dic
             if not secret.get("community"):
                 secret["community"] = "public"
     elif method == "winrm":
-        secret = {k: v for k, v in secret.items() if k in ("username", "password", "auth", "verify_tls")}
-        if data.get("username") is not None:
+        secret = {k: v for k, v in secret.items() if k in ("username", "password", "auth", "verify_tls", "credential_id")}
+        bound = _bound(data, secret)
+        if bound:
+            for k in ("username", "password"):
+                secret.pop(k, None)
+            secret["credential_id"] = bound
+        elif "credential_id" in secret:
+            secret.pop("credential_id")
+        if bound:
+            pass
+        elif data.get("username") is not None:
             secret["username"] = str(data["username"]).strip()
         if data.get("password") not in (None, ""):
             secret["password"] = str(data["password"])
@@ -237,7 +246,7 @@ def validate(data: dict[str, Any], current: dict[str, Any] | None = None) -> dic
         if data.get("verify_tls") is not None:
             secret["verify_tls"] = bool(data["verify_tls"])
         secret.setdefault("verify_tls", False)
-        if not secret.get("username") or not secret.get("password"):
+        if not bound and (not secret.get("username") or not secret.get("password")):
             raise MonitorError("give the user name and the password of a Windows account that may use remote management")
         if port == 5985:
             import ipaddress
@@ -250,26 +259,40 @@ def validate(data: dict[str, Any], current: dict[str, Any] | None = None) -> dic
             if not private:
                 raise MonitorError("plain http (port 5985) is only used on your own network; use https, port 5986")
     else:
-        secret = {k: v for k, v in secret.items() if k in ("username", "password", "private_key", "passphrase", "platform")}
+        secret = {k: v for k, v in secret.items() if k in ("username", "password", "private_key", "passphrase", "platform", "credential_id")}
+        bound = _bound(data, secret)
+        if bound:
+            for k in ("username", "password", "private_key", "passphrase"):
+                secret.pop(k, None)
+            secret["credential_id"] = bound
+        else:
+            secret.pop("credential_id", None)
         if data.get("platform") is not None:
             if data["platform"] not in ("auto", "linux", "windows"):
                 raise MonitorError("the system must be Automatic, Linux or Windows")
             secret["platform"] = data["platform"]
         for key in ("username", "password", "private_key", "passphrase"):
-            if key in data and data[key] is not None and (str(data[key]) != "" or key == "username"):
+            if not bound and key in data and data[key] is not None and (str(data[key]) != "" or key == "username"):
                 secret[key] = str(data[key])
         if data.get("clear_password"):
             secret.pop("password", None)
-        if not secret.get("username"):
+        if not bound and not secret.get("username"):
             raise MonitorError("give the user name to sign in with")
-        if not secret.get("password") and not secret.get("private_key"):
+        if not bound and not secret.get("password") and not secret.get("private_key"):
             raise MonitorError("give a password or a private key")
     return {"method": method, "address": address, "port": port, "interval_s": interval, "secret": secret,
             "alerts": bool(data.get("alerts", cur.get("alerts", True))), "enabled": bool(data.get("enabled", cur.get("enabled", True)))}
 
 
-def load_secret(conn, row) -> dict[str, Any]:
-    """The decrypted login of a monitor row; {} when it cannot be read (the key is missing)."""
+def _bound(data: dict[str, Any], secret: dict[str, Any]) -> str:
+    """The id of the stored login (Settings → Credentials) the monitor uses: sent now (an empty text unbinds it), or kept from before."""
+    if "credential_id" in data:
+        return str(data["credential_id"] or "")
+    return str(secret.get("credential_id") or "")
+
+
+def raw_secret(conn, row) -> dict[str, Any]:
+    """What the monitor row stores (a reference to a stored login stays a reference); {} when it cannot be read."""
     raw = row["credential"] or ""
     if not raw:
         return {}
@@ -277,6 +300,26 @@ def load_secret(conn, row) -> dict[str, Any]:
         return json.loads(vault.decrypt(conn, raw))
     except (vault.VaultError, ValueError):
         return {}
+
+
+def resolve_secret(conn, method: str, secret: dict[str, Any]) -> dict[str, Any]:
+    """The login to use: a monitor that uses a stored login gets its user name and secret from the store each time, so changing the stored login changes every monitor that uses it. {} when that login is gone."""
+    if not secret.get("credential_id"):
+        return secret
+    from app import credstore
+
+    stored = credstore.peek_bound(conn, secret["credential_id"])
+    if stored is None:
+        return {}
+    user = stored.get("username", "")
+    if method == "winrm" and stored.get("domain") and "\\" not in user and "@" not in user:
+        user = f"{stored['domain']}\\{user}"
+    return {**secret, "username": user, **{k: stored[k] for k in ("password", "private_key", "passphrase") if stored.get(k)}}
+
+
+def load_secret(conn, row) -> dict[str, Any]:
+    """The decrypted login of a monitor row, ready to use; {} when it cannot be read (the key is missing, or the stored login it points to is gone)."""
+    return resolve_secret(conn, row["method"], raw_secret(conn, row))
 
 
 def get_monitor(conn, device_id: int):
@@ -304,6 +347,7 @@ def public(conn, row) -> dict[str, Any]:
         "auth": secret.get("auth", "ntlm") if row["method"] == "winrm" else None,
         "verify_tls": bool(secret.get("verify_tls")) if row["method"] == "winrm" else None,
         "secret_unreadable": bool(row["credential"]) and not secret,
+        "credential_id": raw_secret(conn, row).get("credential_id") or None,
     }
 
 
@@ -312,7 +356,7 @@ def save_monitor(conn, device_id: int, data: dict[str, Any], groups: list[str] |
     cur = None
     if row is not None:
         cur = {"method": row["method"], "address": row["address"], "port": row["port"], "interval_s": row["interval_s"],
-               "alerts": bool(row["alerts"]), "enabled": bool(row["enabled"]), "secret": load_secret(conn, row)}
+               "alerts": bool(row["alerts"]), "enabled": bool(row["enabled"]), "secret": raw_secret(conn, row)}
         if data.get("method") not in (None, row["method"]):
             cur["secret"] = {}                       # another method: the old login does not apply
     d = validate(data, cur)

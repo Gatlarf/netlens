@@ -181,6 +181,14 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     const v3Box = h("div", {}, field("SNMPv3 user name", v3user, "A read-only user created on the device."), field("Authentication", authProto), field("Authentication password", authPw),
       field("Encryption", privProto), field("Encryption password", privPw));
     const snmpBox = h("div", {}, field("SNMP version", version), communityField, v3Box);
+    const stored = h("select", {}, h("option", { value: "" }, "Type a login"));
+    get("/api/credentials").then((r) => {
+      for (const c of r.credentials) stored.appendChild(h("option", { value: c.id }, `${c.name}${c.username ? ` (${c.username})` : ""}`));
+      stored.value = m && m.credential_id ? m.credential_id : "";
+      show();
+    }).catch(() => {});
+    const storedBox = field("Stored login", stored, "A login from Settings → Credentials. Change it there once and every host that uses it follows.");
+    stored.addEventListener("change", () => show());
     const sshBox = h("div", {}, field("User name", username, "An ordinary account is enough; nothing is changed on the host."), field("Password", password), field("Private key (instead of a password)", key),
       field("System", platform, "Windows needs the OpenSSH server (Settings → Optional features) and a user that may read performance data. Nothing is installed."));
     const winBox = h("div", {},
@@ -191,6 +199,9 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
         "# PowerShell as administrator on the Windows computer\nEnable-PSRemoting -Force -SkipNetworkProfileCheck\n$cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(10)\nNew-Item -Path WSMan:\\localhost\\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force\nNew-NetFirewallRule -DisplayName 'Netlens WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow\n# let 'Remote Management Users' open a shell (WinRM only lets administrators in by default)\n$sddl = (Get-Item WSMan:\\localhost\\Service\\RootSDDL).Value\nif ($sddl -notmatch ';;;RM\\)') { $dacl, $sacl = $sddl -split 'S:', 2; Set-Item WSMan:\\localhost\\Service\\RootSDDL -Value ($dacl + '(A;;GXGR;;;RM)S:' + $sacl) -Force }\nRestart-Service WinRM -Force")));
     const result = h("div", { class: "monitor-result" });
     const show = () => {
+      const typed = stored.value === "";
+      storedBox.hidden = method.value !== "ssh" && method.value !== "winrm";
+      for (const el of [username, password, key, wUser, wPass]) el.closest(".field") && (el.closest(".field").hidden = !typed);
       snmpBox.hidden = method.value !== "snmp"; sshBox.hidden = method.value !== "ssh"; winBox.hidden = method.value !== "winrm"; port.placeholder = PORTS[method.value];
       communityField.hidden = version.value === "3"; v3Box.hidden = version.value !== "3";
     };
@@ -202,10 +213,11 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
       const out = { method: method.value, address: address.value.trim(), interval_s: Number(interval.value), alerts: alerts.checked };
       if (port.value) out.port = Number(port.value);
       if (method.value === "winrm") {
-        out.username = wUser.value.trim();
+        if (stored.value) out.credential_id = stored.value;
+        else { out.credential_id = ""; out.username = wUser.value.trim(); }
         out.auth = wAuth.value;
         out.verify_tls = wVerify.checked;
-        if (wPass.value) out.password = wPass.value;
+        if (!stored.value && wPass.value) out.password = wPass.value;
       } else if (method.value === "snmp") {
         out.version = version.value;
         if (version.value === "3") {
@@ -218,10 +230,14 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
           out.community = community.value;
         }
       } else {
-        out.username = username.value.trim();
         out.platform = platform.value;
-        if (password.value) out.password = password.value;
-        if (key.value.trim()) out.private_key = key.value.trim();
+        if (stored.value) out.credential_id = stored.value;
+        else {
+          out.credential_id = "";
+          out.username = username.value.trim();
+          if (password.value) out.password = password.value;
+          if (key.value.trim()) out.private_key = key.value.trim();
+        }
       }
       return out;
     };
@@ -266,7 +282,7 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     });
     const form = h("form", { class: "edit-form", onsubmit: (e) => e.preventDefault() },
       field("How to ask", method), field("Address", address, "Where to ask. It is the device's address unless it has a separate management address."),
-      field("Port", port, "Leave empty for the usual one (5986 is WinRM over https; 5985 is plain http, only on your own network)."), snmpBox, sshBox, winBox, field("How often", interval),
+      field("Port", port, "Leave empty for the usual one (5986 is WinRM over https; 5985 is plain http, only on your own network)."), storedBox, snmpBox, sshBox, winBox, field("How often", interval),
       h("label", {}, alerts, " Warn me when a value gets too high or too low (limits under Monitoring → Health)"),
       h("div", { class: "form-actions" }, test, save, h("button", { class: "btn", type: "button", onclick: () => draw() }, "Cancel")), result);
     card.appendChild(form);

@@ -6,7 +6,8 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from fastapi.responses import Response
 
-from app.auth import identify, require_auth
+from app import audit, credstore
+from app.auth import client_ip, identify, require_auth
 from app.db import connect
 from app.terminal.base import AuthFailed, ConnectFailed, HostKeyMismatch
 from app.terminal.hostkeys import forget_fingerprint, get_fingerprint, remember_fingerprint
@@ -127,6 +128,19 @@ async def terminal_ws(
         passphrase = data.get("passphrase")
         cols = data.get("cols", 80)
         rows = data.get("rows", 24)
+        if proto == "ssh" and data.get("credential_id"):
+            principal = identify(websocket)
+            try:
+                stored = credstore.resolve(conn, getattr(principal, "username", "") or "", str(data["credential_id"]), f"SSH terminal to {primary_ip}")
+            except credstore.CredentialError:
+                await websocket.send_json({"type": "error", "code": "auth_message", "message": "no such stored login"})
+                await websocket.close(code=1008)
+                return
+            username = stored.get("username", "")
+            password = stored.get("password")
+            private_key = stored.get("private_key")
+            passphrase = stored.get("passphrase")
+            audit.record_by(conn, principal, client_ip(websocket), "WS", f"/api/terminal/{device_id}/ws", 200, f"Opened SSH to {primary_ip} with the stored login \"{stored['name']}\"")
 
         if proto == "ssh":
             if not username or len(username) > 128:

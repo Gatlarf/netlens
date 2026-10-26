@@ -1,4 +1,4 @@
-import { get, del, ApiError } from "./api.js";
+import { get, post, del, ApiError } from "./api.js";
 import { h, clear, toast } from "./util.js";
 
 const activeTerminals = new WeakMap();
@@ -109,7 +109,11 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
 
     if (proto === "ssh") {
       const form = h("form", { class: "ssh-form" });
-      const usernameInput = h("input", { type: "text", name: "username", autocomplete: "off", required: true });
+      const stored = h("select", { name: "stored" }, h("option", { value: "" }, "Type a login below"));
+      get("/api/credentials").then((r) => { for (const c of r.credentials) stored.appendChild(h("option", { value: c.id }, `${c.name}${c.username ? ` (${c.username})` : ""}`)); }).catch(() => {});
+      const usernameInput = h("input", { type: "text", name: "username", autocomplete: "off" });
+      const saveBox = h("input", { type: "checkbox", name: "save" });
+      stored.addEventListener("change", () => { for (const el of [usernameInput, passwordInput, keyTextarea, passphraseInput, saveBox]) el.disabled = stored.value !== ""; });
       const passwordInput = h("input", { type: "password", name: "password", autocomplete: "off" });
       const keySection = h("details", { class: "collapsible" });
       const keySummary = h("summary", {}, "Use a private key");
@@ -130,8 +134,10 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
 
       const passphraseInput = h("input", { type: "password", name: "passphrase", autocomplete: "off" });
       const connectBtn = h("button", { type: "submit", class: "btn" }, "Connect");
-      const note = h("p", { class: "muted" }, "Credentials are sent to the Netlens server only to open this session; they are not stored.");
+      const note = h("p", { class: "muted" }, "A typed login is sent to the Netlens server only to open this session, unless you save it. Stored logins are under Settings → Credentials.");
 
+      form.appendChild(h("label", {}, "Stored login"));
+      form.appendChild(stored);
       form.appendChild(h("label", {}, "Username"));
       form.appendChild(usernameInput);
       form.appendChild(h("label", {}, "Password"));
@@ -139,6 +145,7 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
       form.appendChild(keySection);
       form.appendChild(h("label", {}, "Passphrase"));
       form.appendChild(passphraseInput);
+      form.appendChild(h("label", { class: "check" }, saveBox, " Save this login in the credential store (encrypted, only you can use it)"));
       form.appendChild(connectBtn);
       form.appendChild(note);
 
@@ -148,9 +155,18 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
         const password = passwordInput.value;
         const key = keyTextarea.value;
         const passphrase = passphraseInput.value;
+        if (!stored.value && !username) { toast("Enter a user name or pick a stored login", "error"); return; }
+        if (!stored.value && saveBox.checked) {
+          try {
+            await post("/api/credentials", key ? { name: `SSH ${device.name || device.ip || device.id}`, kind: "ssh_key", username, private_key: key, passphrase }
+              : { name: `SSH ${device.name || device.ip || device.id}`, kind: "login", username, password });
+            toast("Login saved in the credential store", "success");
+          } catch (err) { toast(err.message || "Could not save the login", "error"); }
+        }
+        const credentialId = stored.value;
 
         clear(connectionArea);
-        await startTerminal(proto, port, username, password, key, passphrase);
+        await startTerminal(proto, port, username, password, key, passphrase, credentialId);
       });
 
       connectionArea.appendChild(form);
@@ -166,7 +182,7 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
     }
   }
 
-  async function startTerminal(proto, port, username, password, key, passphrase) {
+  async function startTerminal(proto, port, username, password, key, passphrase, credentialId = "") {
     try {
       await loadXterm();
     } catch (e) {
@@ -228,6 +244,7 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
         password: password || null,
         private_key: key || null,
         passphrase: passphrase || null,
+        credential_id: credentialId || null,
         cols: term.cols,
         rows: term.rows
       };

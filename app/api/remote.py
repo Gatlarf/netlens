@@ -19,7 +19,8 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Request, WebSocket
 from pydantic import BaseModel
 
-from app.auth import identify, require_admin
+from app import audit, credstore
+from app.auth import client_ip, identify, require_admin
 from app.db import connect, get_setting, set_setting
 from app.remote import guac
 from app.terminal.access import classify
@@ -119,22 +120,62 @@ async def get_remote(request: Request) -> dict:
             if services and target_allowed(d["primary_ip"], request.app.state.settings.ranges):
                 devices.append({"id": d["id"], "name": d["name"], "ip": d["primary_ip"], "online": bool(d["online"]), "type": d["device_type"], "services": services})
         saved = _saved(conn)
+        who = _username(request)
+        for d in devices:
+            for s in d["services"]:
+                bound = _binding(saved, who, d["id"], s["proto"])
+                entry = credstore.peek(conn, who, bound["credential_id"]) if bound else None
+                s["saved"] = {"username": entry.get("username", ""), "domain": entry.get("domain", ""), "name": entry["name"]} if entry else None
     finally:
         conn.close()
-    for d in devices:
-        for s in d["services"]:
-            entry = saved.get(f"{d['id']}:{s['proto']}")
-            s["saved"] = {"username": entry.get("username", ""), "domain": entry.get("domain", "")} if entry else None
     return {"available": available, "why": why, "helper": await helper_status(), "devices": devices}
 
 
 # ---------------------------------------------------------------- saved credentials (encrypted at rest: see app/vault.py)
 def _saved(conn) -> dict:
+    """device:proto (or user|device:proto) -> {"credential_id"}. Logins an older version kept here are moved into the credential store the first time they are read."""
     try:
         data = json.loads(get_setting(conn, CREDENTIALS_KEY) or "{}")
     except ValueError:
         return {}
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        return {}
+    moved = False
+    for key, entry in list(data.items()):
+        if isinstance(entry, dict) and "credential_id" not in entry and (entry.get("password") or entry.get("username")):
+            device_id, _, proto = key.rpartition(":")
+            row = conn.execute("SELECT COALESCE(custom_name, hostname, primary_ip) AS name FROM devices WHERE id = ?", (device_id,)).fetchone()
+            try:
+                cred_id = credstore.adopt(conn, f"{proto.upper()} {row['name'] if row else device_id}", "login",
+                                          {"username": entry.get("username", ""), "password": entry.get("password") or "-", "domain": entry.get("domain", "")}, f"moved from the saved {proto.upper()} logins")
+            except credstore.CredentialError:
+                continue
+            data[key] = {"credential_id": cred_id}
+            moved = True
+    if moved:
+        set_setting(conn, CREDENTIALS_KEY, json.dumps(data))
+        conn.commit()
+    return data
+
+
+def _username(request) -> str:
+    principal = getattr(request.state, "user", None) or identify(request)
+    return getattr(principal, "username", "") or ""
+
+
+def _binding(saved: dict, user: str, device_id, proto: str) -> dict | None:
+    return saved.get(f"{user}|{device_id}:{proto}") or saved.get(f"{device_id}:{proto}")
+
+
+def _binding_login(conn, saved: dict, user: str, device_id, proto: str) -> dict | None:
+    """The login remembered for this device and protocol, if this user may use it (it is a stored login: private to someone, or shared)."""
+    bound = _binding(saved, user, device_id, proto)
+    if not bound:
+        return None
+    try:
+        return credstore.resolve(conn, user, bound["credential_id"], f"remote {proto.upper()}")
+    except credstore.CredentialError:
+        return None
 
 
 def _save(conn, data: dict) -> None:
@@ -147,9 +188,11 @@ def forget_credentials(request: Request, device_id: int, proto: str) -> dict:
     conn = connect(request.app.state.db_path)
     try:
         data = _saved(conn)
-        if data.pop(f"{device_id}:{proto}", None) is None:
+        who = _username(request)
+        key = f"{who}|{device_id}:{proto}" if f"{who}|{device_id}:{proto}" in data else f"{device_id}:{proto}"
+        if data.pop(key, None) is None:
             raise HTTPException(status_code=404, detail="nothing saved")
-        _save(conn, data)
+        _save(conn, data)                         # only the link to this device goes; the login stays in the credential store (Settings → Credentials)
         return {"forgotten": True}
     finally:
         conn.close()
@@ -167,6 +210,7 @@ class SessionBody(BaseModel):
     dpi: int = 96
     timezone: str = "UTC"
     use_saved: bool = False
+    credential_id: str = ""
     remember: bool = False
 
 
@@ -198,10 +242,19 @@ async def open_session(request: Request, device_id: int, body: SessionBody) -> d
         if port is None or not any(p["proto"] == "tcp" and int(p["port"]) == port for p in open_ports):
             raise HTTPException(status_code=422, detail="that port is not open on this device")
         creds = {"username": body.username, "password": body.password, "domain": body.domain}
-        if body.use_saved:
-            creds = _saved(conn).get(f"{device_id}:{body.proto}")
+        who = _username(request)
+        if body.credential_id or body.use_saved:
+            try:
+                if body.credential_id:
+                    creds = credstore.resolve(conn, who, body.credential_id, f"remote {body.proto.upper()} to {device['name']}")
+                else:
+                    creds = _binding_login(conn, _saved(conn), who, device_id, body.proto)
+            except credstore.CredentialError:
+                creds = None
             if not creds:
-                raise HTTPException(status_code=404, detail="no saved login for this device")
+                raise HTTPException(status_code=404, detail="no such stored login for this device")
+            audit.record_by(conn, getattr(request.state, "user", None) or identify(request), client_ip(request), "POST", request.url.path, 200,
+                            f"Opened {body.proto.upper()} to {device['name']} with the stored login \"{creds['name']}\"")
     finally:
         conn.close()
     for key, limit in (("username", 256), ("password", 1024), ("domain", 256)):
@@ -217,7 +270,7 @@ async def open_session(request: Request, device_id: int, body: SessionBody) -> d
     tickets[ticket] = {
         "device_id": device_id, "proto": body.proto, "port": port, "ip": device["primary_ip"], "name": device["name"], "creds": creds,
         "width": _clamp(body.width, 320, 4096), "height": _clamp(body.height, 200, 2304), "dpi": _clamp(body.dpi, 48, 384),
-        "timezone": body.timezone[:64] or "UTC", "remember": bool(body.remember and not body.use_saved), "expires": now + TICKET_SECONDS,
+        "timezone": body.timezone[:64] or "UTC", "remember": bool(body.remember and not body.use_saved and not body.credential_id), "expires": now + TICKET_SECONDS,
         "user": (identify(request) or None) and identify(request).username,
     }
     return {"ticket": ticket, "port": port}
@@ -284,8 +337,16 @@ async def remote_ws(websocket: WebSocket, ticket: str = "") -> None:
             db = connect(websocket.app.state.db_path)
             try:
                 data = _saved(db)
-                data[f"{session['device_id']}:{session['proto']}"] = {k: session["creds"].get(k, "") for k in ("username", "password", "domain")}
-                _save(db, data)
+                who = session["user"] or ""
+                label = f"{session['proto'].upper()} {session['name']}"
+                try:
+                    made = credstore.create(db, who, label, "login", {"username": session["creds"].get("username", ""), "password": session["creds"].get("password") or "-", "domain": session["creds"].get("domain", "")})
+                except credstore.CredentialError:
+                    made = None
+                if made:
+                    data[f"{who}|{session['device_id']}:{session['proto']}"] = {"credential_id": made["id"]}
+                    _save(db, data)
+                    audit.record(db, who, "admin", "", "POST", "/api/remote/ws", 200, f"Stored the login \"{made['name']}\" in the credential store (remembered from a remote session)")
             finally:
                 db.close()
         session["creds"] = None

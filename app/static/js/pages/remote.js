@@ -85,14 +85,18 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
     const pass = h("input", { type: "password", name: "password", autocomplete: "off" });
     const domain = h("input", { type: "text", name: "domain", autocomplete: "off", value: saved ? saved.domain : "" });
     const remember = h("input", { type: "checkbox", name: "remember" });
+    const stored = h("select", { name: "stored" }, h("option", { value: "" }, "Type a login below"));
+    get("/api/credentials").then((r) => { for (const c of r.credentials.filter((x) => x.kind === "login")) stored.appendChild(h("option", { value: c.id }, `${c.name}${c.username ? ` (${c.username})` : ""}`)); }).catch(() => {});
+    stored.addEventListener("change", () => { const typed = stored.value === ""; for (const el of [user, pass, domain, remember]) el.disabled = !typed; });
     const error = h("p", { class: "error", role: "alert" }, message || "");
     const form = h("form", { class: "remote-form card" },
       h("h2", {}, `${SHORT[svc.proto]} to ${shortName(device.name) || device.ip}`),
       h("p", { class: "hint mono" }, `${device.ip}:${svc.port}`),
+      h("div", { class: "field" }, h("label", {}, "Stored login"), stored, h("p", { class: "hint" }, "Logins are kept under Settings → Credentials.")),
       h("div", { class: "field" }, h("label", {}, svc.proto === "rdp" ? "User name" : "User name (only some VNC servers ask for one)"), user),
       h("div", { class: "field" }, h("label", {}, "Password"), pass),
       svc.proto === "rdp" ? h("div", { class: "field" }, h("label", {}, "Domain (optional)"), domain) : null,
-      h("div", { class: "field" }, h("label", { class: "check" }, remember, " Remember this login (stored encrypted)")),
+      h("div", { class: "field" }, h("label", { class: "check" }, remember, " Save this login in the credential store (encrypted, only you can use it)")),
       error,
       h("div", { class: "btn-row" },
         h("button", { type: "submit", class: "btn primary" }, "Connect"),
@@ -103,7 +107,8 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
       h("p", { class: "hint" }, "The password is sent once to open the session and is not kept unless you choose to remember it."));
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      connect({ username: user.value, password: pass.value, domain: domain.value, remember: remember.checked });
+      if (stored.value) connect({ credential_id: stored.value });
+      else connect({ username: user.value, password: pass.value, domain: domain.value, remember: remember.checked });
     });
     root.appendChild(form);
     user.focus();

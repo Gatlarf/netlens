@@ -12,6 +12,8 @@ import { buildChannelsCard } from "../cards/channels.js";
 import { buildCentralCard } from "../cards/central.js";
 import { buildAiModelCard, buildAiAgentsCard } from "../cards/ai.js";
 import { buildHostProbeCard } from "../cards/hostprobe_settings.js";
+import { buildCredentialsCard } from "../cards/credentials.js";
+import { buildHostsSetupCard } from "../cards/hosts_setup.js";
 import { buildLicenceCard } from "../cards/licence.js";
 import { buildIpv6Card } from "../cards/ipv6.js";
 import { buildEscalationCard } from "../cards/escalation.js";
@@ -276,6 +278,8 @@ const STATIC_GROUPS = [
       { key: "central", label: "Report to a central Netlens", build: buildCentralCard },
       { key: "engineer", label: "AI language model", build: buildAiModelCard },
       { key: "agents", label: "AI agents (assistant, MCP)", build: buildAiAgentsCard },
+      { key: "hosts", label: "Hosts (monitoring set-up)", build: buildHostsSetupCard },
+      { key: "credentials", label: "Credentials", build: buildCredentialsCard },
       { key: "hostprobes", label: "Host probes", build: buildHostProbeCard },
     ],
   },

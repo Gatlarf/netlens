@@ -78,7 +78,7 @@ export async function buildHostProbeCard() {
       h("div", { class: "form-actions" }, save));
 
     // 3. the hosts: switch probing on, choose the probes and the login, install or update the script on the host
-    card.appendChild(h("h3", {}, "Hosts"));
+    card.appendChild(h("h3", {}, "Fine-tune one host"));
     const hostSlot = h("div", {});
     const pick = h("select", {}, h("option", { value: "" }, "Choose a host…"), monitored.map((m) => h("option", { value: m.device_id }, `${m.name} (${m.method})`)));
     pick.addEventListener("change", async () => {
@@ -86,7 +86,7 @@ export async function buildHostProbeCard() {
       if (!pick.value) return;
       try { hostSlot.appendChild(await buildDeviceProbeCard({ id: Number(pick.value) }, "setup")); } catch (err) { toast(err.message || "Could not load", "error"); }
     });
-    card.append(h("p", { class: "hint" }, "Hosts that are monitored over SSH or WinRM. What the probes find is on the device page, under Health."), field("Host", pick), hostSlot);
+    card.append(h("p", { class: "hint" }, "To set up or remove many hosts at once, use Settings → Hosts. Here you fine-tune one host (which probes, how often, how it logs in). What the probes find is on the device page, under Health."), field("Host", pick), hostSlot);
 
     // 4. prepare a host
     card.appendChild(h("h3", {}, "Prepare a host manually"));

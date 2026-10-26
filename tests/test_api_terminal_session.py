@@ -146,3 +146,15 @@ def test_session_limit(tmp_path):
             msg = ws.receive_json()
             assert msg["type"] == "error"
             assert msg["code"] == "limit"
+
+def test_a_stored_login_opens_the_session_without_the_browser_sending_a_secret(tmp_path):
+    app = make_app(tmp_path)
+    with TestClient(app, headers=AUTH) as client:
+        made = client.post("/api/credentials", json={"name": "Lab", "kind": "login", "username": "alice", "password": "stored-pw"}).json()
+        with client.websocket_connect(URL, headers=AUTH) as ws:
+            ws.send_json({"type": "auth", "credential_id": made["id"], "cols": 80, "rows": 24})
+            assert ws.receive_json()["state"] == "connected"
+        assert FakeBackend.created[0]["username"] == "alice" and FakeBackend.created[0]["password"] == "stored-pw"
+        with client.websocket_connect(URL, headers=AUTH) as ws:
+            ws.send_json({"type": "auth", "credential_id": "nope", "cols": 80, "rows": 24})
+            assert ws.receive_json()["type"] == "error"
