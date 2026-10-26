@@ -14,7 +14,7 @@
     {
       "version": "1.5.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.5.0/omada.zip",
-      "sha256": "3228e6bb5ff3d91becfa38c6277f9f5bd3fa4c4ab1bedd5a7ae635250a67f674",
+      "sha256": "f5a59ca8e44df29126f16dec2d480ca5d671ad28c599ef5316b85d10a4acd09e",
       "api_version": 1,
       "min_netlens": "0.4.237",
       "released": "2026-10-26",

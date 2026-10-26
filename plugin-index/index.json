@@ -1418,7 +1418,7 @@
    "id": "omada",
    "name": "TP-Link Omada",
    "kind": "topology",
-   "description": "Reads the Omada controller (software controller, OC200/OC300 or Omada Cloud-less hardware, version 5.1 or newer): gateway, switches and access points, which device hangs below which, which switch or access point every client is on, with Wi-Fi signal and link rate, the ports of every switch (link, speed, duplex, traffic), and each device's processor, memory, uptime and firmware (with a waiting upgrade). It also reads today's traffic per application (DPI, from the controller's own statistics; per device with an Open API client). Read-only.",
+   "description": "Reads the Omada controller (software controller, OC200/OC300, version 5.1 or newer): gateway, switches and access points, which device hangs below which, the switch or access point of every client with Wi-Fi signal and link rate, switch ports (link, speed, duplex, traffic), each device's processor, memory, uptime and firmware, and today's traffic per application (DPI). Read-only.",
    "author": "Netlens",
    "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/omada",
    "license": "PolyForm-Noncommercial-1.0.0",
@@ -1430,7 +1430,7 @@
     {
      "version": "1.5.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.5.0/omada.zip",
-     "sha256": "3228e6bb5ff3d91becfa38c6277f9f5bd3fa4c4ab1bedd5a7ae635250a67f674",
+     "sha256": "f5a59ca8e44df29126f16dec2d480ca5d671ad28c599ef5316b85d10a4acd09e",
      "api_version": 1,
      "min_netlens": "0.4.237",
      "released": "2026-10-26",
