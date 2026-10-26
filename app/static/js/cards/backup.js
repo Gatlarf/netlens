@@ -107,8 +107,11 @@ function keyBox() {
       box.appendChild(h("p", { class: "error" }, err.message || "Could not read the key status"));
       return;
     }
-    const where = state.source === "env" ? "It is set with the NETLENS_SECRET_KEY environment variable." : "It is the file secret.key in the data folder, next to the database.";
+    const where = state.source === "env" ? "It is given from outside the data folder (NETLENS_SECRET_KEY or NETLENS_SECRET_KEY_FILE)." : "It is the file secret.key in the data folder, next to the database.";
     box.appendChild(h("p", { class: "hint" }, `Saved passwords and tokens (plugins, notification channels) are stored encrypted. ${where} Keep a copy of the key: without it a restored backup cannot be read, and the passwords have to be entered again.`));
+    if (state.key_next_to_data) {
+      box.appendChild(h("p", { class: "warn-note" }, "The key is stored next to the data: whoever gets a copy of the data folder gets the key with it. For a company, hand the key in from outside with a Docker or Kubernetes secret (NETLENS_SECRET_KEY_FILE) or NETLENS_SECRET_KEY, and keep it out of the data backups."));
+    }
     if (state.unreadable) {
       box.appendChild(h("p", { class: "error", id: "vault-bad" }, `${state.unreadable} saved password setting(s) cannot be read with this key. This happens after restoring a backup on another machine.`));
       const field = (label, name, type) => { const i = h("input", { type, name, autocomplete: "off", "aria-label": label, placeholder: label }); return [i, h("div", { class: "field" }, h("label", {}, label), i)]; };

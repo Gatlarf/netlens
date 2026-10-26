@@ -140,3 +140,103 @@ def test_builtin_plugins_run_through_the_worker():
         run_subprocess(discover(None)["proxmox"], "test", {"url": "https://pve.invalid:8006"})
     with pytest.raises(PluginRunError, match="router address"):
         run_subprocess(discover(None)["asus"], "fetch", {})
+
+
+# ---------------------------------------------------------------- the plugin runner: plugins in a container of their own
+@pytest.fixture
+def runner(monkeypatch, tmp_path):
+    import threading
+
+    from app.plugins import runner_server
+
+    monkeypatch.setattr(runner_server, "_ROOT", tmp_path / "runner-files")
+    monkeypatch.setenv("NETLENS_RUNNER_TOKEN", "long-random-token")
+    monkeypatch.setattr(runner_server, "_token", lambda: "long-random-token")           # the runner's own value; the test process is both sides
+    server = runner_server.make_server("127.0.0.1", 0)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setenv("NETLENS_PLUGIN_RUNNER", f"http://127.0.0.1:{server.server_address[1]}")
+    yield server
+    server.shutdown()
+    server.server_close()
+
+
+def test_a_plugin_runs_in_the_runner_and_the_runner_holds_none_of_the_secrets(tmp_path, runner, monkeypatch):
+    from app.plugins.runner import isolation
+
+    assert isolation()["mode"] == "runner"
+    p = plugin(tmp_path, """
+        import os
+        def test(config):
+            return {"message": "host %s env %s" % (config["host"], ",".join(sorted(k for k in os.environ if k.startswith("NETLENS"))))}
+        def fetch(config):
+            return {"nodes": [], "clients": []}
+    """)
+    monkeypatch.setenv("NETLENS_SECRET_KEY", "must-not-reach-the-plugin")
+    assert run_subprocess(p, "test", {"host": "r.lan"})["message"] == "host r.lan env "
+    assert run_subprocess(p, "fetch", {}) == {"nodes": [], "clients": []}
+
+
+def test_the_runner_fails_closed_and_checks_the_token(tmp_path, runner, monkeypatch):
+    p = plugin(tmp_path, """
+        def test(config):
+            return {"message": "ran"}
+        def fetch(config):
+            return {}
+    """)
+    monkeypatch.setenv("NETLENS_RUNNER_TOKEN", "another-token")                         # Netlens and the runner no longer agree
+    with pytest.raises(PluginRunError, match="refused"):
+        run_subprocess(p, "test", {})
+    monkeypatch.setenv("NETLENS_RUNNER_TOKEN", "long-random-token")
+    monkeypatch.setenv("NETLENS_PLUGIN_RUNNER", "http://127.0.0.1:9")                  # nobody listens: the plugin is NOT run locally instead
+    with pytest.raises(PluginRunError, match="cannot be reached"):
+        run_subprocess(p, "test", {})
+    monkeypatch.delenv("NETLENS_RUNNER_TOKEN")
+    with pytest.raises(PluginRunError, match="not run"):
+        run_subprocess(p, "test", {})
+
+
+def test_the_runner_refuses_odd_calls(runner, monkeypatch):
+    import json
+    import urllib.error
+    import urllib.request
+
+    url = os.environ["NETLENS_PLUGIN_RUNNER"] + "/run"
+
+    def post(body, token="long-random-token"):
+        req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"}, method="POST")
+        try:
+            return urllib.request.urlopen(req, timeout=10).status
+        except urllib.error.HTTPError as exc:
+            return exc.code
+
+    assert post({}, token="wrong") == 401
+    assert post({"plugin": "demo", "files": {"plugin.py": "", "plugin.json": ""}, "action": "../evil"}) == 400
+    assert post({"plugin": "demo", "files": {"../x.py": "", "plugin.py": "", "plugin.json": ""}, "action": "test"}) == 400      # no path in a file name
+    assert post({"plugin": "demo", "files": {"plugin.py": "", "plugin.json": "", "run.sh": ""}, "action": "test"}) == 400         # only .py and .json
+
+
+def test_the_runner_does_not_start_without_a_token(monkeypatch):
+    from app.plugins import runner_server
+
+    monkeypatch.delenv("NETLENS_RUNNER_TOKEN", raising=False)
+    assert runner_server.main() == 2
+
+
+def test_the_key_can_come_from_a_secret_file_and_the_process_is_non_dumpable(tmp_path, monkeypatch):
+    from app import hardening, vault
+    from app.db import connect, init_db
+
+    key_file = tmp_path / "netlens_key"
+    key_file.write_text(vault.encode_key(b"k" * 32) + "\n")
+    monkeypatch.setenv("NETLENS_SECRET_KEY_FILE", str(key_file))
+    c = connect(tmp_path / "v.db")
+    init_db(c)
+    assert vault.key_source(c) == "env" and vault.status(c)["key_next_to_data"] is False
+    assert vault.decrypt(c, vault.encrypt(c, "secret")) == "secret"
+    assert not (tmp_path / "secret.key").exists()                                       # no key file was made next to the data
+    monkeypatch.setenv("NETLENS_SECRET_KEY_FILE", str(tmp_path / "missing"))
+    with pytest.raises(vault.VaultError, match="cannot be read"):
+        vault.key_source(c)
+    monkeypatch.delenv("NETLENS_SECRET_KEY_FILE")
+    assert vault.status(c)["key_next_to_data"] is True
+    assert hardening.protect_process() in (True, False)

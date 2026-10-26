@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.287 — 2026-10-26
+
+### Security
+- ★ **Plugin runner: plugins can run in a container of their own.** A plugin is code from somebody else. Run inside the Netlens container it could read the encryption key, the database and the tokens, and send them anywhere. With `NETLENS_PLUGIN_RUNNER` and `NETLENS_RUNNER_TOKEN` set, plugins run in a separate runner container that holds none of that (no data volume, no key, no database). If the runner cannot be reached the plugin is not run at all, never inside the Netlens container instead. Settings → Plugins says where plugins run and warns when it is inside Netlens. See the documentation “Plugin runner”.
+- **The Netlens process cannot be read by a plugin that runs next to it:** it is made non-dumpable, so `/proc/<pid>/environ` and memory are closed to other processes of the same user.
+- **The encryption key can be given as a file** (`NETLENS_SECRET_KEY_FILE`, for a Docker or Kubernetes secret), and Settings → Backup warns while the key is stored next to the data.
+- New file docs/SECURITY-ROADMAP.md lists what the security review found and what is still to do.
+
 ## 0.4.285 — 2026-10-26
 
 ### Security

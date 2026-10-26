@@ -31,6 +31,21 @@ log = logging.getLogger(__name__)
 PREFIX = "enc:v1:"
 KEY_FILE = "secret.key"
 ENV_KEY = "NETLENS_SECRET_KEY"
+ENV_KEY_FILE = "NETLENS_SECRET_KEY_FILE"      # a file that holds the key, for a Docker or Kubernetes secret (for example /run/secrets/netlens_key)
+
+
+def external_key() -> str:
+    """The key given from outside the data folder (the variable, or the file named by NETLENS_SECRET_KEY_FILE); "" when there is none."""
+    value = os.environ.get(ENV_KEY, "").strip()
+    if value:
+        return value
+    path = os.environ.get(ENV_KEY_FILE, "").strip()
+    if path:
+        try:
+            return Path(path).read_text().strip()
+        except OSError as exc:
+            raise VaultError(f"{ENV_KEY_FILE} names {path} but it cannot be read: {exc.strerror or exc}") from None
+    return ""
 _AAD = b"netlens-secret-v1"
 _PLUGIN_CONFIG = re.compile(r"^plugin\.[A-Za-z0-9_-]+$")          # a plugin's saved configuration (not its .status, .data ...)
 _PROBE_CONFIG = re.compile(r"^probe\.config\.\d+$")              # what the central Netlens will have a remote site check (holds logins)
@@ -79,14 +94,14 @@ def encode_key(raw: bytes) -> str:
 
 def key_source(conn: sqlite3.Connection) -> str:
     """"env" (NETLENS_SECRET_KEY), "file" (secret.key next to the database) or "memory" (a database without a file: tests)."""
-    if os.environ.get(ENV_KEY, "").strip():
+    if external_key():
         return "env"
     return "file" if _db_file(conn) else "memory"
 
 
 def _key(conn: sqlite3.Connection) -> bytes:
     path = _db_file(conn)
-    env = os.environ.get(ENV_KEY, "").strip()
+    env = external_key()
     cache_id = f"env:{env}" if env else f"file:{path}"
     with _lock:
         if cache_id in _keys:
@@ -194,7 +209,7 @@ def status(conn: sqlite3.Connection) -> dict:
             except VaultError:
                 bad += 1
     plain = sum(1 for r in conn.execute("SELECT key, value FROM settings").fetchall() if is_secret_key(r["key"]) and r["value"] and not is_encrypted(r["value"]))
-    return {"encrypted": total, "unreadable": bad, "plaintext": plain, "source": key_source(conn), "recovery": has_recovery(conn)}
+    return {"encrypted": total, "unreadable": bad, "plaintext": plain, "source": key_source(conn), "recovery": has_recovery(conn), "key_next_to_data": key_source(conn) == "file"}
 
 
 def migrate(conn: sqlite3.Connection) -> int:

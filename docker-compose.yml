@@ -67,5 +67,24 @@ services:
   #   ports:
   #     - "127.0.0.1:4822:4822"
 
+  # Recommended for a company: run plugins in a container of their own that holds none of Netlens' secrets (docs/PLUGIN-RUNNER.md).
+  # Remove the leading "#" of these lines, put NETLENS_RUNNER_TOKEN (openssl rand -hex 32) in .env, add
+  #   NETLENS_PLUGIN_RUNNER: http://127.0.0.1:8099   and   NETLENS_RUNNER_TOKEN: ${NETLENS_RUNNER_TOKEN}
+  # to the environment of netlens above, then `docker compose up -d`.
+  #
+  # plugin-runner:
+  #   image: ghcr.io/gatlarf/netlens:${NETLENS_IMAGE_TAG:-latest}
+  #   container_name: netlens-plugin-runner
+  #   restart: unless-stopped
+  #   command: ["python", "-m", "app.plugins.runner_server"]
+  #   read_only: true
+  #   tmpfs: ["/tmp"]
+  #   cap_drop: [ALL]
+  #   security_opt: ["no-new-privileges:true"]
+  #   environment:
+  #     NETLENS_RUNNER_TOKEN: ${NETLENS_RUNNER_TOKEN:?set a long random value in .env}
+  #   ports:
+  #     - "127.0.0.1:8099:8099"
+
 volumes:
   netlens-data:

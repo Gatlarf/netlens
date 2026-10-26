@@ -76,7 +76,9 @@ def _backfill_graphs(db_path: str) -> None:
 async def lifespan(app: FastAPI):
     conn = connect(app.state.db_path)
     init_db(conn)
-    from app import vault
+    from app import hardening, vault
+
+    hardening.protect_process()              # other processes of the same user (plugins) cannot read this process's memory or environment
 
     vault.migrate(conn)                      # passwords and tokens that are still plain text get encrypted (once)
     try:

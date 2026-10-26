@@ -93,6 +93,12 @@ function fillPluginsCard(card, data, notice = null) {
   card.appendChild(h("p", { class: "hint" },
     "Plugins connect Netlens to routers and hypervisors. Each one reports what is connected to what, and Netlens shows it on the map and in the hierarchy. " +
     "Turn a plugin on or off here; its own settings are on its page in the menu. Tick Auto-update to let Netlens install new reviewed versions of a plugin by itself."));
+  if (data.isolation && data.isolation.mode === "local") {
+    card.appendChild(h("p", { class: "warn-note admin-only" }, "Plugins run inside the Netlens container. A plugin is code from somebody else, and there it could read the encryption key and the database. " +
+      "For a company, run the plugin runner (a separate container that holds none of Netlens' secrets): see the documentation “Plugin runner”."));
+  } else if (data.isolation) {
+    card.appendChild(h("p", { class: "hint" }, "Plugins run in a separate plugin runner container, which holds none of Netlens' secrets."));
+  }
   const compatBox = h("div", { class: "baseline-box compat-box" });
   card.appendChild(compatBox);
   get("/api/plugin-compat").then((compat) => fillCompat(compatBox, card, compat)).catch(() => {});

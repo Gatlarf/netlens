@@ -16,6 +16,7 @@ from app.plugins.index import category_map
 from app.plugins.contract import API_VERSION, ContractError, KINDS, clean_config, missing_required
 from app.plugins.example import build_example_zip
 from app.plugins.registry import InstallError
+from app.plugins import runner
 from app.plugins.runner import PluginRunError
 from app.plugins.service import (
     PluginService,
@@ -130,7 +131,7 @@ def list_plugins(request: Request) -> dict:
         missing = missing_plugins(conn, plugins)
     finally:
         conn.close()
-    return {"plugins": items, "missing": missing, "api_version": API_VERSION, "kinds": list(KINDS), "categories": category_listing()}
+    return {"plugins": items, "missing": missing, "api_version": API_VERSION, "kinds": list(KINDS), "categories": category_listing(), "isolation": runner.isolation()}
 
 
 @router.get("/plugins/guide")
