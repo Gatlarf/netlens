@@ -4,7 +4,7 @@ Reads an **Omada controller** (software controller, OC200 / OC300 or other hardw
 Netlens which switch or access point every device is connected to and which device hangs below which. Netlens then shows the real
 network position in the hierarchy and on the map, and the Wi-Fi signal, band and link rate of wireless clients.
 
-> **Status: not yet tested on real hardware** (the application statistics of 1.2.0 least of all: they follow the Open API as used by the Home Assistant Omada integration). It is written from the API the Omada web page itself uses (the same one the open-source
+> **Status: application statistics (1.5.0) tested on a real Omada controller** (gateway with DPI): the site-wide figures from the web interface work; the per-device Open API read returned nothing there. The rest is written from the API the Omada web page itself uses (the same one the open-source
 > `tplink-omada-client` library uses) and tested against a simulated controller. Please test it and report back, see *Testing* below.
 
 ## What it does (read-only)

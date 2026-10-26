@@ -5,7 +5,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ## 0.4.274 — 2026-10-26
 
 ### Added
-- ★ **Omada plugin 1.5.0: application statistics without an Open API client.** From the diagnostic of a real controller: the web interface's own site-wide statistics (`stat/dpi/category/categoryCards`) work and list the traffic per application (BitTorrent, YouTube, Roblox …), while the per-client Open API read returned nothing. The plugin now reads those, one request per site, and the Open API read stays as the fallback. The controller gives no direction and no device in this list, so the applications show as totals.
+- ★ **Omada plugin 1.5.0: application statistics without an Open API client.** From the diagnostic of a real controller: the web interface's own site-wide statistics (`stat/dpi/category/categoryCards`) work and list the traffic per application (BitTorrent, YouTube, Roblox …), while the per-client Open API read returned nothing. The plugin now reads those, one request per site, and the Open API read stays as the fallback. The controller gives no direction and no device in this list, so the applications show as totals. Verified on a real Omada controller.
 
 ## 0.4.272 — 2026-10-26
 
