@@ -2,6 +2,16 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.282 — 2026-10-26
+
+### Added
+- ★ **Remote access keeps your sessions while you look at another page.** An SSH or RDP/VNC session stays open when you go to, say, a statistics page to debug, and is exactly where you left it when you come back to Remote access. A reload of the browser or closing the tab still ends them. Closing a terminal tab now also ends its SSH session.
+- **After a script was installed or updated, the host is looked at once**, so the version now on it is known and the "update available" mark goes away without waiting for the next scheduled look; the health monitor uses the new script immediately. The look is in the audit log like any other.
+
+### Changed
+- **Settings → Hosts: the results are a log under the apply form**, host by host, instead of lines inside the table, so a host with many steps no longer stretches the table. The table only shows Done or Failed per host.
+- **The audit log says what a host set-up did**: the action (installed, updated, took off ...), the host, which monitor login and which administrator login were used (typed ones by user name only, never the password) and the steps, or why it failed.
+
 ## 0.4.281 — 2026-10-26
 
 ### Added

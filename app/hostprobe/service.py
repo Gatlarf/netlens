@@ -412,6 +412,24 @@ async def run_one(db_path: str, device_id: int, actor=None, probe: str = "storag
         conn.close()
 
 
+async def first_look(db_path: str, device_id: int, actor=None) -> dict[str, Any]:
+    """Right after a script was installed or updated: look at the host once, so the version now on it is known (it is read from the answer) and the health monitor
+    uses the new script at once. Written to the audit log like any other look."""
+    _NO_READINGS.pop(device_id, None)
+    result = await run_one(db_path, device_id, actor=actor, probe="changes", reason="manual")
+    try:
+        conn = connect(db_path)
+        try:
+            row = hm.get_monitor(conn, device_id)
+        finally:
+            conn.close()
+        if row is not None:
+            await hm.run_monitor(db_path, row["id"])
+    except Exception:  # noqa: BLE001 - the look above is what matters
+        pass
+    return result
+
+
 async def run_probes(db_path: str, device_id: int, probes: list[str], actor=None) -> dict[str, dict[str, Any]]:
     """Several probes of one host, one after the other (a host is not asked for everything at once)."""
     return {probe: await run_one(db_path, device_id, actor=actor, probe=probe) for probe in probes}

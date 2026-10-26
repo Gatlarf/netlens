@@ -71,7 +71,7 @@ def _admin_login(conn, user: str, opts: dict[str, Any]) -> dict[str, Any]:
             "passphrase": None, "sudo_password": opts.get("admin_password") or None}
 
 
-async def _one(db_path, device_id: int, level: str, opts: dict[str, Any], who) -> dict[str, Any]:
+async def _one(db_path, device_id: int, level: str, opts: dict[str, Any], who, ip: str = "") -> dict[str, Any]:
     conn = connect(db_path)
     steps: list[str] = []
     name = f"device {device_id}"
@@ -126,11 +126,14 @@ async def _one(db_path, device_id: int, level: str, opts: dict[str, Any], who) -
                 steps += [str(l) for l in result.get("log", [])][-6:]
                 if not result["ok"]:
                     return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": str(result.get("error") or "the install failed")}
-                if level == "probes":
-                    probes.save_settings(conn, {"devices": {str(device_id): {"enabled": True}}})
-                    steps.append("Probes switched on")
+                if level in ("probes", "update"):
+                    if level == "probes":
+                        probes.save_settings(conn, {"devices": {str(device_id): {"enabled": True}}})
+                        steps.append("Probes switched on")
                     if result.get("verified") and not result["verified"].get("ok"):
                         steps.append(f"Installed, but the check afterwards failed: {result['verified'].get('error')}")
+                    first = await probes.first_look(db_path, device_id, actor=(who, ip))
+                    steps.append("Looked at the host once: " + (f"it runs script version {(first.get('data') or {}).get('script_version') or '?'}" if first.get("ok") else f"that look failed: {str(first.get('error'))[:120]}"))
                 elif level in ("unprobe", "remove"):
                     probes.save_settings(conn, {"devices": {str(device_id): {"enabled": False, "provider": "static"}}})
                     steps.append("Probes switched off")
@@ -156,12 +159,23 @@ async def apply(db_path, device_ids: list[int], level: str, opts: dict[str, Any]
 
     async def guarded(device_id: int) -> dict[str, Any]:
         async with sem:
-            result = await _one(db_path, device_id, level, opts, who)
+            result = await _one(db_path, device_id, level, opts, who, ip)
         conn = connect(db_path)
         try:
-            login = f" with the stored login {opts['credential_id']}" if opts.get("credential_id") else ""
-            audit.record_by(conn, who, ip, "POST", "/api/hosts/apply", 200 if result["ok"] else 502,
-                            f"Host setup '{level}' for {result['name']}{login}: " + ("done" if result["ok"] else f"failed: {str(result['error'])[:120]}") + " (administrator logins are used once and not stored)")
+            monitor_login = ""
+            if opts.get("credential_id"):
+                found = credstore.peek_bound(conn, str(opts["credential_id"]))
+                monitor_login = f", monitor login \"{found['name']}\"" if found else ""
+            admin_login = ""
+            if level in ("probes", "update", "unprobe", "remove"):
+                if opts.get("admin_credential_id"):
+                    found = credstore.peek_bound(conn, str(opts["admin_credential_id"]))
+                    admin_login = f", administrator login \"{found['name']}\" from the store" if found else ""
+                elif opts.get("admin_username"):
+                    admin_login = f", administrator login '{str(opts['admin_username'])[:40]}' (typed, used once, not stored)"
+            words = {"basic": "set up basic monitoring", "probes": "installed the read-only probe", "update": "updated the probe script", "unprobe": "took the probe off", "remove": "removed the probe and the monitoring"}[level]
+            outcome = ("done: " if result["ok"] else f"FAILED ({str(result['error'])[:100]}): ") + "; ".join(result["steps"])
+            audit.record_by(conn, who, ip, "POST", "/api/hosts/apply", 200 if result["ok"] else 502, f"Host setup, {result['name']}: {words}{monitor_login}{admin_login}. {outcome}")
         finally:
             conn.close()
         return result

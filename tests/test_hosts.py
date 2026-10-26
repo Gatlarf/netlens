@@ -24,6 +24,13 @@ def client(tmp_path, monkeypatch):
         return {"ok": True, "error": None, "events": []}
 
     monkeypatch.setattr(hm, "run_monitor", fake_read)
+    looks = []
+
+    async def fake_first_look(db_path, device_id, actor=None):
+        looks.append(device_id)
+        return {"ok": True, "data": {"script_version": 7}}
+
+    monkeypatch.setattr(probes, "first_look", fake_first_look)
     with TestClient(app, headers=AUTH) as c:
         conn = connect(db)
         for i, ports in ((1, [22]), (2, [22]), (3, [5986]), (4, [])):
@@ -33,6 +40,7 @@ def client(tmp_path, monkeypatch):
         conn.commit()
         conn.close()
         c.db = db
+        c.looks = looks
         yield c
 
 
@@ -70,10 +78,15 @@ def test_probes_are_installed_with_an_administrator_login_that_is_not_kept(clien
     monkeypatch.setattr(installer, "administer", fake_administer)
     r = client.post("/api/hosts/apply", json={"device_ids": [1, 2], "level": "probes", "credential_id": cred["id"], "admin_username": "bert", "admin_password": "adminpw"}).json()
     assert (r["done"], r["failed"]) == (1, 1) and sorted(s[0] for s in seen) == [1, 2] and {s[1:] for s in seen} == {("install", "bert", "adminpw")}
+    assert client.looks == [1]                                          # the host that was installed is looked at once, right away; the one that failed is not
+    assert any("Looked at the host once: it runs script version 7" in step for step in r["results"][0]["steps"])
     conn = connect(client.db)
     assert probes.device_config(conn, 1)["enabled"] is True and probes.device_config(conn, 2)["enabled"] is False
     dump = json.dumps([dict(x) for x in conn.execute("SELECT action FROM audit_log")])
     assert "adminpw" not in dump
+    lines = [x["action"] for x in conn.execute("SELECT action FROM audit_log WHERE path = '/api/hosts/apply' ORDER BY id")]
+    assert any(l.startswith("Host setup, h1: installed the read-only probe") and "administrator login 'bert' (typed, used once, not stored)" in l and "Installed on 1" in l for l in lines)
+    assert any(l.startswith("Host setup, h2:") and "FAILED (sudo asked for a password)" in l for l in lines)
     assert "adminpw" not in str(conn.execute("SELECT value FROM settings").fetchall())
     conn.close()
 

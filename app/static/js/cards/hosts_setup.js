@@ -56,11 +56,10 @@ export async function buildHostsSetupCard() {
       const result = results && results.find((r) => r.device_id === x.id);
       return h("tr", { class: result ? (result.ok ? "" : "hl-bad") : "" }, h("td", {}, box), h("td", {}, statusDot(x.online), " ", h("a", { href: `#/device/${x.id}` }, x.name), h("div", { class: "mono hint" }, x.ip)),
         h("td", {}, reach(x)), h("td", {}, monText(x)), h("td", {}, probeText(x)),
-        h("td", {}, result ? h("div", {}, h("strong", { class: result.ok ? "" : "error" }, result.ok ? "Done" : "Failed"), result.error ? h("div", { class: "error" }, result.error) : null,
-          h("ul", { class: "plain hint" }, result.steps.map((s) => h("li", {}, s)))) : null));
+        h("td", {}, result ? h("strong", { class: result.ok ? "" : "error", title: result.error || result.steps.join("\n") }, result.ok ? "Done" : "Failed") : null));
     });
     card.appendChild(h("div", { class: "table-wrap" }, h("table", { class: "data" },
-      h("thead", {}, h("tr", {}, h("th", {}, all), ["Host", "Reached over", "Basic monitoring", "Probes", "Last run"].map((t) => h("th", {}, t)))), h("tbody", {}, rows))));
+      h("thead", {}, h("tr", {}, h("th", {}, all), ["Host", "Reached over", "Basic monitoring", "Probes", "Result"].map((t) => h("th", {}, t)))), h("tbody", {}, rows))));
 
     // what they get
     const level = h("select", {}, LEVELS.map(([v, t]) => h("option", { value: v, selected: v === form.level }, t)));
@@ -103,6 +102,15 @@ export async function buildHostsSetupCard() {
       needsAdmin ? h("div", { class: "field" }, h("label", { class: "check-row" }, sshd, " Windows: also install the OpenSSH server if it is missing"),
         h("p", { class: "hint" }, "The locked-down probe needs it. Only the probe account may sign in, with one-time certificates, and only this Netlens may reach port 22.")) : null,
       h("div", { class: "form-actions" }, apply)));
+
+    // what was done, host by host, kept out of the table so that the table stays one line per host
+    if (results) {
+      card.appendChild(h("section", { class: "probe-section" }, h("h3", {}, "What was done"),
+        h("p", { class: "hint" }, "Every action is also in the audit log (Settings → Audit log)."),
+        ...results.map((r) => h("div", { class: "field" }, h("strong", { class: r.ok ? "" : "error" }, `${r.name}: ${r.ok ? "done" : "failed"}`),
+          r.error ? h("p", { class: "error" }, r.error) : null,
+          h("ul", { class: "plain hint" }, r.steps.map((t) => h("li", {}, t)))))));
+    }
   }
   draw();
   return card;

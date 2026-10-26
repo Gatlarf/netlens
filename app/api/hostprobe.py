@@ -268,6 +268,8 @@ async def install(device_id: int, body: dict, request: Request) -> dict[str, Any
                         f"{words} the host probe {'on' if action != 'check' else 'state of'} {row['name']} with the administrator account '{admin['username']}' (that login was used once and not stored)"
                         + (f"; account '{result['account']}', script version {result.get('installed_version')}" if result["ok"] else f": failed: {str(result.get('error'))[:160]}")
                         + ("; a new Netlens CA was created" if result.get("created_ca") else "") + ("; the OpenSSH server was installed or started by Netlens" if body.get("enable_sshd") and action in ("install", "update") and result["ok"] else ""))
+        if result["ok"] and action in ("install", "update"):
+            await service.first_look(request.app.state.db_path, device_id, actor=(_who(request), client_ip(request)))        # so the new script's version is known at once
         return {**result, **(_view(db, device_id) if action != "remove" or result["ok"] else {})}
     finally:
         db.close()

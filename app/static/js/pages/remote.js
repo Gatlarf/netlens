@@ -216,6 +216,24 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
 }
 
 // ---------- the page
+// Sessions stay open while you look at another page (debugging with the statistics next to a terminal, say): they live here and not in the page,
+// and the page picks them up again when you come back. A browser reload or closing the tab ends them, as the connection is the browser's.
+const kept = { sessions: new Map(), counter: 0, activeId: null, setupShown: false };
+let current = null;                  // the mounted page's own select / close, null while another page is shown
+
+function dropKept(id) {
+  const s = kept.sessions.get(id);
+  if (!s) return;
+  try { s.close(); } catch (e) { /* ignore */ }
+  s.tab.remove();
+  s.pane.remove();
+  kept.sessions.delete(id);
+  if (id === "__setup") kept.setupShown = false;
+  if (kept.activeId === id) kept.activeId = [...kept.sessions.keys()].pop() || null;
+}
+
+const closeAny = (id) => (current ? current.close(id) : dropKept(id));
+
 export async function render(container) {
   let data;
   try {
@@ -224,9 +242,8 @@ export async function render(container) {
     container.append(h("div", { class: "card" }, h("h1", {}, "Remote access"), h("p", { class: "error" }, err.message || "Remote access is not available")));
     return;
   }
-  let disposed = false, filter = "", activeId = null, setupShown = false;
-  const sessions = new Map();   // id -> { tab, pane, close }
-  let counter = 0;
+  let disposed = false, filter = "";
+  const sessions = kept.sessions;   // id -> { tab, pane, close }
 
   const list = h("div", { class: "remote-list" });
   const tabs = h("div", { class: "remote-tabs", role: "tablist" });
@@ -262,7 +279,7 @@ export async function render(container) {
   }
 
   function select(id) {
-    activeId = id;
+    kept.activeId = id;
     for (const [key, s] of sessions) {
       const on = key === id;
       s.tab.setAttribute("aria-selected", String(on));
@@ -273,8 +290,8 @@ export async function render(container) {
 
   function addSession(id, label, builder) {
     const tab = h("div", { class: "remote-tab", role: "tab" },
-      h("button", { type: "button", class: "remote-tab-name", onclick: () => select(id) }, label),
-      id === "__setup" ? null : h("button", { type: "button", class: "remote-tab-x", "aria-label": `Close ${label}`, onclick: () => close(id) }, "×"));
+      h("button", { type: "button", class: "remote-tab-name", onclick: () => current && current.select(id) }, label),
+      id === "__setup" ? null : h("button", { type: "button", class: "remote-tab-x", "aria-label": `Close ${label}`, onclick: () => closeAny(id) }, "×"));
     const pane = h("div", { class: "remote-pane", hidden: true });
     tabs.append(tab);
     panes.append(pane);
@@ -290,8 +307,8 @@ export async function render(container) {
     s.tab.remove();
     s.pane.remove();
     sessions.delete(id);
-    if (id === "__setup") setupShown = false;
-    if (activeId === id) select([...sessions.keys()].pop() || null);
+    if (id === "__setup") kept.setupShown = false;
+    if (kept.activeId === id) select([...sessions.keys()].pop() || null);
     drawEmpty();
   }
 
@@ -304,15 +321,15 @@ export async function render(container) {
       data = await get("/api/remote");
       drawHelper();
       drawList();
-      if (setupShown) { close("__setup"); showSetup(); }
+      if (kept.setupShown) { close("__setup"); showSetup(); }
     } catch (err) {
       toast(err.message || "Could not check", "error");
     }
   }
 
   function showSetup() {
-    if (setupShown) return select("__setup");
-    setupShown = true;
+    if (kept.setupShown) return select("__setup");
+    kept.setupShown = true;
     addSession("__setup", "Set up RDP & VNC", (pane) => { pane.append(setupGuide(data.helper, recheck)); });
     drawEmpty();
   }
@@ -320,19 +337,21 @@ export async function render(container) {
   function open(device, svc) {
     if (!data.available) return toast(data.why, "error");
     if ((svc.proto === "rdp" || svc.proto === "vnc") && !data.helper.reachable) return showSetup();
-    const id = `s${++counter}`;
+    const id = `s${++kept.counter}`;
     const label = `${SHORT[svc.proto]} · ${shortName(device.name) || device.ip}`;
     addSession(id, label, (pane) => {
       if (svc.proto === "ssh" || svc.proto === "telnet") {
         const slot = h("div", {});
         pane.append(slot);
-        mountTerminal(slot, { id: device.id, ports: [{ proto: "tcp", port: svc.port, state: "open", service: svc.proto }] }).then(() => {
+        let handle = null;
+        mountTerminal(slot, { id: device.id, ports: [{ proto: "tcp", port: svc.port, state: "open", service: svc.proto }] }).then((t) => {
+          handle = t;
           const btn = slot.querySelector(".btn-row .btn");
           if (btn) btn.click();
         }).catch((err) => toast(err.message || "The terminal could not start", "error"));
-        return { close: () => {} };
+        return { close: () => { if (handle && handle.dispose) handle.dispose(); } };            // closing the tab ends the session
       }
-      const session = graphicalSession(device, svc, svc.saved, data.helper.reachable, () => close(id));
+      const session = graphicalSession(device, svc, svc.saved, data.helper.reachable, () => closeAny(id));
       pane.append(session.el);
       return session;
     });
@@ -350,6 +369,13 @@ export async function render(container) {
   drawHelper();
   drawList();
 
+  // sessions that were left open on this page earlier: back into the tabs
+  current = { select, close };
+  if (kept.setupShown) dropKept("__setup");
+  for (const s of sessions.values()) { tabs.append(s.tab); panes.append(s.pane); }
+  if (sessions.size) select(sessions.has(kept.activeId) ? kept.activeId : [...sessions.keys()].pop());
+  drawEmpty();
+
   // arriving from a device page: #/remote?device=ID&proto=rdp
   const wanted = new URLSearchParams((location.hash.split("?")[1] || ""));
   if (wanted.get("device")) {
@@ -360,8 +386,7 @@ export async function render(container) {
 
   return () => {
     disposed = true;
-    for (const id of [...sessions.keys()]) {
-      try { sessions.get(id).close(); } catch (e) { /* ignore */ }
-    }
+    current = null;                  // the sessions stay open (see the top of the file); only the set-up tab is not worth keeping
+    dropKept("__setup");
   };
 }
