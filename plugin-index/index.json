@@ -1428,6 +1428,18 @@
    ],
    "releases": [
     {
+     "version": "1.4.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.4.1/omada.zip",
+     "sha256": "fd1c9806f3998f062342c87fcd0f5141d4a763b168166528b93d28355accbeac",
+     "api_version": 1,
+     "min_netlens": "0.4.237",
+     "released": "2026-10-26",
+     "changelog": "Run diagnostic has a dpi_web_api step: it reads the web interface's own site-wide application statistics (stat/dpi/overview and stat/dpi/category/categoryCards) and shows their field names, sizes and application/category names.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.4.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.4.0/omada.zip",
      "sha256": "36539662f85b29d4000a1c36ba2f6a79f3e69a72c03cc95d2e91014479eb7b54",
