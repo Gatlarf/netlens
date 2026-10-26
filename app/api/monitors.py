@@ -170,7 +170,9 @@ def overview(conn=Depends(get_conn)) -> dict:
             "level": levels.get(row["device_id"], "ok"), "latest": _latest(store, row["device_id"], known.get(row["device_id"], [])),
             "limits": hm.rules(conn, row["device_id"]) if hm.device_overrides(conn, row["device_id"], saved) else None,
         })
-    return {"monitors": out, "problems": hm.problems(conn)}
+    from app import storage
+
+    return {"monitors": out, "problems": hm.problems(conn), "storage_problems": storage.problems(conn)}
 
 
 class LimitsBody(BaseModel):

@@ -40,20 +40,26 @@ export async function render(container) {
   function draw() {
     if (!data) return;
     const rows = data.monitors;
-    const critical = rows.filter((r) => r.level === "critical").length;
-    const warning = rows.filter((r) => r.level === "warning").length;
+    const sp = data.storage_problems || [];
+    const critical = rows.filter((r) => r.level === "critical").length + sp.filter((p) => p.level === "critical").length;
+    const warning = rows.filter((r) => r.level === "warning").length + sp.filter((p) => p.level === "warning").length;
     const failing = rows.filter((r) => r.enabled && r.last_ok === false).length;
     patch(tiles,
       tile("Monitored", String(rows.length), rows.length ? "devices whose health is read" : "none set up yet", ""),
       tile("Need attention", String(critical + warning), critical ? `${critical} critical, ${warning} warning` : warning ? `${warning} warning` : "everything within its limits", critical ? "bad" : warning ? "warn" : "ok"),
       tile("Cannot be read", String(failing), failing ? "check the login or the address" : "all readings work", failing ? "warn" : "ok"));
-    if (!rows.length) {
+    if (!rows.length && !sp.length) {
       clear(problems);
       patch(list, emptyState("Nothing is monitored yet", "Open a device and choose “Set up health monitoring”. Switches, NAS boxes, printers and UPS units are read over SNMP; Linux servers over SSH. Netlens then draws processor, memory, disk and traffic graphs and warns when a disk fills up, a server runs hot or a UPS runs on battery. Nothing is installed on the devices.", h("a", { class: "btn primary", href: "#/devices" }, "Choose a device")));
       return;
     }
-    if (data.problems.length) {
+    if (data.problems.length || sp.length) {
       const card = h("div", { class: "card" }, h("h2", {}, "Needs attention"));
+      for (const p of sp) {
+        card.appendChild(h("div", { class: "kv" },
+          h("span", { class: "kv-label" }, h("span", { class: `hl-badge ${p.level === "critical" ? "bad" : "warn"}` }, p.level === "critical" ? "Critical" : "Warning"), " ", h("a", { href: "#/storage?focus=problems" }, p.system)),
+          h("span", {}, p.text)));
+      }
       for (const p of data.problems) {
         card.appendChild(h("div", { class: "kv" },
           h("span", { class: "kv-label" }, h("span", { class: `hl-badge ${p.level === "critical" ? "bad" : "warn"}` }, p.level === "critical" ? "Critical" : "Warning"), " ", h("a", { href: `#/device/${p.device_id}` }, shortName(p.device))),

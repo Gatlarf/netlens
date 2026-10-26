@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.269 — 2026-10-26
+
+### Fixed
+- ★ **Storage problems now show in Monitoring → Health.** A storage system that is running out of space (a pool at 85% or more), a pool that is not healthy, a failed disk or a system that is not reachable (TrueNAS, NetApp, Dell, Pure, Ceph …) is listed under "Needs attention" and counted in its tile. Before, it only appeared on the Storage page and the dashboard.
+
 ## 0.4.268 — 2026-10-25
 
 ### Added

@@ -163,3 +163,12 @@ def test_features_follow_the_data(tmp_path):
     c.commit()
     features = client.get("/api/features").json()
     assert features["storage"] is True and features["backups"] is False
+
+
+def test_a_filling_pool_and_a_failed_disk_are_health_page_problems(conn):
+    storage.apply_storage(conn, "ontap", doc(used=500), now=NOW)
+    assert storage.problems(conn) == []
+    storage.apply_storage(conn, "ontap", doc(used=900, disk="failed"), now=NOW)
+    got = storage.problems(conn)
+    assert [(p["kind"], p["level"]) for p in got] == [("disk", "critical"), ("pool", "warning")]
+    assert "pool aggr1 is 90% full" in got[1]["text"] and got[1]["system"] == "ontap1"

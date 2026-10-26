@@ -161,6 +161,28 @@ def summary(conn: sqlite3.Connection) -> dict[str, Any]:
             "alerts": one("SELECT COUNT(*) FROM storage_alerts"), "volumes": one("SELECT COUNT(*) FROM storage_volumes")}
 
 
+def problems(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """What is wrong with the storage systems now, in the form of the health page: a pool that is filling up or unhealthy, a failed disk, an unhealthy system."""
+    out: list[dict[str, Any]] = []
+    systems = {r["system_id"]: r["name"] for r in conn.execute("SELECT system_id, name FROM storage_systems")}
+    for r in conn.execute("SELECT * FROM storage_pools ORDER BY LOWER(name)"):
+        pct = _percent(r["used"], r["total"])
+        level = "critical" if "critical" in (r["level"], r["health"]) else "warning" if "warning" in (r["level"], r["health"]) else "ok"
+        if level == "ok":
+            continue
+        what = f"{pct:g}% full" if r["level"] != "ok" and pct is not None else f"health is {r['health']}"
+        if r["level"] != "ok" and r["health"] in ("warning", "critical"):
+            what += f", health is {r['health']}"
+        out.append({"kind": "pool", "system": systems.get(r["system_id"], r["system_id"]), "name": r["name"], "level": level, "text": f"pool {r['name']} is {what}", "percent": pct})
+    for r in conn.execute("SELECT * FROM storage_disks WHERE state = 'failed' ORDER BY system_id, slot"):
+        out.append({"kind": "disk", "system": systems.get(r["system_id"], r["system_id"]), "name": r["name"], "level": "critical", "text": f"disk {r['name']} has failed", "percent": None})
+    for r in conn.execute("SELECT * FROM storage_systems WHERE online = 0 OR health IN ('warning', 'critical')"):
+        lvl = "critical" if not r["online"] or r["health"] == "critical" else "warning"
+        out.append({"kind": "system", "system": r["name"], "name": r["name"], "level": lvl, "text": "is not reachable" if not r["online"] else f"health is {r['health']}", "percent": None})
+    out.sort(key=lambda p: (p["level"] != "critical", p["system"], p["name"]))
+    return out
+
+
 def for_device(conn: sqlite3.Connection, device_id: int) -> dict | None:
     """What the storage plugins know about a device: the array or controller it is, and the volumes it uses (as an NFS/iSCSI client)."""
     system_ids = {(r["plugin_id"], r["system_id"]) for r in conn.execute("SELECT plugin_id, system_id FROM storage_systems WHERE device_id = ?", (device_id,))}
