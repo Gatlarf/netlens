@@ -384,6 +384,44 @@ class Controller:
         except (OmadaError, ValueError) as exc:
             return [], str(exc)
 
+    def web_usage(self):
+        """(today's traffic per application for the whole site, a problem text or None), from the statistics the web interface itself shows (Statistics > Application Analytics):
+        `stat/dpi/category/categoryCards`. One read per site, no Open API client needed. The controller gives one number per application (no direction and no device), so it is
+        kept as received bytes. Never raises."""
+        if not self.allowed:
+            return [], None
+        try:
+            now = datetime.now().astimezone()
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            window = {"start": int(midnight.timestamp()), "end": int(now.timestamp()), "selectAll": "true"}
+            apps = {}
+            for site in self.sites():
+                raw = self._api(f"sites/{site['key']}/stat/dpi/category/categoryCards", window)
+                for card in (raw.get("categoryCards") if isinstance(raw, dict) else None) or []:
+                    for app in (card.get("applications") if isinstance(card, dict) else None) or []:
+                        name, traffic = app.get("applicationName") if isinstance(app, dict) else None, _number(app.get("traffic")) if isinstance(app, dict) else None
+                        if isinstance(name, str) and name and traffic:
+                            apps[name[:80]] = apps.get(name[:80], 0) + int(traffic)
+            if not apps:
+                return [], None
+            return [{"day": midnight.strftime("%Y-%m-%d"), "applications": [{"name": n, "tx_bytes": 0, "rx_bytes": v} for n, v in sorted(apps.items(), key=lambda i: -i[1])], "clients": []}], None
+        except ConnectError:
+            raise
+        except (OmadaError, ValueError, AttributeError) as exc:
+            return [], str(exc)
+
+    def site_usage(self):
+        """The application statistics: the web interface's site-wide figures first, the Open API's per-client reads (with the client id and secret) when those give nothing."""
+        days, problem = self.web_usage()
+        if days:
+            return days, None
+        if self.wants_usage:
+            other, other_problem = self.usage()
+            if other:
+                return other, other_problem
+            return [], other_problem or problem
+        return [], problem
+
     @staticmethod
     def _day(midnight, apps, per_client, per_client_apps):
         if not apps and not per_client:
@@ -504,14 +542,19 @@ def test(config):
     try:
         sites = controller.sites()
         nodes, clients = controller.snapshot()
+        web_days, web_problem = controller.web_usage()
     finally:
         controller.logout()
     message = f"Connected to Omada controller {controller.version or '?'}: {len(sites)} site(s), {len(nodes)} device(s), {len(clients)} client(s)"
-    if controller.wants_usage:
+    if web_days:
+        message += f". Application statistics: working ({len(web_days[0]['applications'])} applications today, read from the controller's own statistics)"
+    elif controller.wants_usage:
         # one client is enough to prove the Open API login, the site ids and the DPI read
         controller.targets = controller.targets[:1]
         days, problem = controller.usage()
         message += ". Application statistics: " + (f"not available ({problem})" if problem and not days else "working" if days else "the Open API works, but no application traffic was reported (is DPI switched on at the gateway?)")
+    elif controller.allowed and not (controller.client_id and controller.client_secret):
+        message += ". Application statistics: " + ("not available from this controller" if web_problem else "none reported by the controller (is DPI with Logging Traffic switched on at the gateway?)")
     elif controller.client_id and controller.client_secret and not controller.allowed:
         message += ". Application statistics are switched off in Netlens (Settings > Statistics), so none are read"
     return {"message": message}
@@ -522,9 +565,9 @@ def fetch(config):
     controller.login()
     try:
         nodes, clients = controller.snapshot()
+        days, _problem_text = controller.site_usage()
     finally:
         controller.logout()
-    days, _problem_text = controller.usage()
     return to_topology(nodes, clients, days)
 
 
@@ -693,7 +736,7 @@ def diagnose(config):
             step("application_traffic", read_usage)
         else:
             report["steps"]["application_traffic"] = {"ok": True, "shape": "not asked for: no Open API client entered"}
-        days, usage_problem = controller.usage()
+        days, usage_problem = controller.site_usage()
         out = to_topology(nodes, clients, days)
         report["result"] = {
             "nodes": len(out["nodes"]), "nodes_with_parent": sum(1 for n in out["nodes"] if n["parent_mac"]),

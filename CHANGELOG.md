@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.274 — 2026-10-26
+
+### Added
+- ★ **Omada plugin 1.5.0: application statistics without an Open API client.** From the diagnostic of a real controller: the web interface's own site-wide statistics (`stat/dpi/category/categoryCards`) work and list the traffic per application (BitTorrent, YouTube, Roblox …), while the per-client Open API read returned nothing. The plugin now reads those, one request per site, and the Open API read stays as the fallback. The controller gives no direction and no device in this list, so the applications show as totals.
+
 ## 0.4.272 — 2026-10-26
 
 ### Added

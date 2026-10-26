@@ -80,6 +80,10 @@ class Fake(BaseHTTPRequestHandler):
         s["calls"].append(("GET", url.path))
         if url.path == "/api/info":
             return self._send({"errorCode": 0, "result": {"controllerVer": s["version"], "omadacId": "ctl1", "apiVer": "3"}})
+        if url.path.endswith("/stat/dpi/category/categoryCards") and s.get("dpi"):
+            q = parse_qs(url.query)
+            s["dpi_calls"] = s.get("dpi_calls", []) + [(url.path, int(q["start"][0]), int(q["end"][0]), q.get("selectAll"))]
+            return self._send({"errorCode": 0, "result": {"categoryCards": s["dpi"]}})
         if url.path.startswith("/openapi/v1/ctl1/"):
             if self.headers.get("Authorization") != "AccessToken=AT1":
                 return self._send({"errorCode": -44112, "msg": "The access token has expired or is invalid."})
@@ -236,7 +240,7 @@ def test_lost_session_is_an_error_not_empty_data(server):
 
 def test_test_message(server):
     url, _ = server
-    assert plugin.test(cfg(url))["message"] == "Connected to Omada controller 5.14.26.1: 1 site(s), 4 device(s), 4 client(s)"
+    assert plugin.test(cfg(url))["message"].startswith("Connected to Omada controller 5.14.26.1: 1 site(s), 4 device(s), 4 client(s)")
 
 
 @pytest.mark.parametrize("bad", [{"url": ""}, {"username": ""}, {"password": ""}, {"url": "http://"}])
@@ -361,7 +365,7 @@ def test_the_connection_test_says_whether_the_statistics_work(server):
     url, state = server
     assert "Application statistics: working" in plugin.test(with_api(url))["message"]
     assert "not available" in plugin.test(cfg(url, client_id="cid", client_secret="wrong"))["message"]
-    assert "Application statistics" not in plugin.test(cfg(url))["message"]
+    assert "not available from this controller" in plugin.test(cfg(url))["message"]
     state["apps"] = {}
     assert "no application traffic" in plugin.test(with_api(url))["message"]
 
@@ -450,3 +454,16 @@ def test_devices_report_processor_memory_uptime_and_the_firmware_that_waits(serv
     assert {m["metric"]: m["value"] for m in nodes["Rack switch"]["metrics"]} == {"cpu_pct": 12.0, "mem_pct": 55.0, "uptime_s": 93784.0}      # "1day(s) 2h 3m 4s"
     assert nodes["Rack switch"]["firmware"] == {"version": "1.0.4", "latest": None}
     assert not nodes["Living room"]["metrics"] and nodes["Living room"]["firmware"] is None
+
+
+def test_the_site_wide_statistics_of_the_web_interface_need_no_open_api_client(server):
+    url, state = server
+    state["dpi"] = [{"familyId": 1, "familyName": "Streaming", "totalTraffic": 900, "applications": [{"applicationId": 1, "applicationName": "YouTube", "traffic": 700}, {"applicationId": 2, "applicationName": "Netflix", "traffic": 200}]},
+                    {"familyId": 2, "familyName": "Gaming", "totalTraffic": 50, "applications": [{"applicationId": 3, "applicationName": "Roblox", "traffic": 50}, {"applicationId": 4, "applicationName": "Quiet", "traffic": 0}]}]
+    out = plugin.fetch(cfg(url))                                    # no client id or secret
+    (day,) = out["usage"]
+    assert [(a["name"], a["rx_bytes"], a["tx_bytes"]) for a in day["applications"]] == [("YouTube", 700, 0), ("Netflix", 200, 0), ("Roblox", 50, 0)] and day["clients"] == []
+    path, start, end, select = state["dpi_calls"][0]
+    assert 0 < end - start <= 86400 + 3600 and select == ["true"] and state["token_calls"] == []
+    assert "Application statistics: working (3 applications today" in plugin.test(cfg(url))["message"]
+    assert plugin.fetch(cfg(url, collect_usage=False))["usage"] == []

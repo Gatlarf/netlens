@@ -31,10 +31,17 @@ The session is closed again afterwards, so no sessions pile up.
    OC200/OC300), the account, the site name (empty = all sites) and leave *Verify TLS certificate* off unless you installed a real certificate.
 3. **Test connection**, **Save**, **Turn on**, **Sync now**.
 
-### Application statistics (optional, version 1.2.0)
+### Application statistics
 
-Statistics > Network > Applications shows which applications and which devices used the traffic. Omada only hands out these DPI figures
-through its **Open API**, which has its own login, so this part needs one extra step:
+Statistics > Application Analytics shows which applications used the traffic.
+
+**Since 1.5.0 (no extra login):** Netlens reads the same site-wide figures the Omada web page shows (`stat/dpi/category/categoryCards`): today's traffic per application, one
+read per site. The controller gives one number per application, with no direction and no device, so it is kept as "received" and the Network tab shows the sites' totals only.
+It needs DPI **and Logging Traffic** switched on at the gateway (step 1 below) and **Settings > Traffic statistics in Netlens** switched on. Test connection says
+*Application statistics: working (N applications today ...)*.
+
+**Per device (optional, version 1.2.0):** the figures per device come only through the **Open API**, which has its own login, so this part needs one extra step.
+Tested on a real controller, that read returned nothing for any client although the site-wide figures above were there, so do not rely on it.
 
 1. On the gateway, switch on **DPI** (Omada: Settings > Network Settings > Application Traffic/Deep Packet Inspection, the wording differs per version). Without a gateway
    that does DPI (an Omada router/ER-series gateway) there is nothing to read.
