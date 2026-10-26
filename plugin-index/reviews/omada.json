@@ -2,6 +2,17 @@
   "id": "omada",
   "reviews": [
     {
+      "version": "1.5.0",
+      "sha256": "f5a59ca8e44df29126f16dec2d480ca5d671ad28c599ef5316b85d10a4acd09e",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-26",
+      "tested_on": [
+        "Omada controller with a gateway doing DPI: login, sites, devices, clients, switch ports, health, and the site-wide application statistics (stat/dpi/category/categoryCards)"
+      ],
+      "notes": "Written with the assistant Claude from the diagnostic output of the real controller and confirmed on it by the maintainer. Read-only (GET and the login). Per-device application statistics through the Open API returned nothing on that controller; only site-wide totals are read."
+    },
+    {
       "version": "1.0.3",
       "sha256": "9a85874a3896363bf80b1ace7d7eb5d37b7e10c9a0269deab1a17856dfac3b60",
       "level": "reviewed",

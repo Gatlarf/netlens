@@ -1436,7 +1436,13 @@
      "released": "2026-10-26",
      "changelog": "Application statistics without an Open API client: today's traffic per application for the whole site, read from the controller's own statistics (stat/dpi/category/categoryCards). The Open API per-client read stays as the fallback.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-26",
+      "tested_on": [
+       "Omada controller with a gateway doing DPI: login, sites, devices, clients, switch ports, health, and the site-wide application statistics (stat/dpi/category/categoryCards)"
+      ],
+      "notes": "Written with the assistant Claude from the diagnostic output of the real controller and confirmed on it by the maintainer. Read-only (GET and the login). Per-device application statistics through the Open API returned nothing on that controller; only site-wide totals are read."
      }
     },
     {
