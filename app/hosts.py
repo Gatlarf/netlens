@@ -47,7 +47,7 @@ def overview(conn) -> list[dict[str, Any]]:
             pub = hm.public(conn, row)
             cred = credstore.peek_bound(conn, pub["credential_id"]) if pub.get("credential_id") else None
             mon = {"method": row["method"], "enabled": bool(row["enabled"]), "ok": pub["last_ok"], "error": pub["last_error"], "login": cred["name"] if cred else ("typed in" if pub.get("username") else None),
-                   "managed": row["source"] == "central"}
+                   "managed": row["source"] == "central", "via": (hm._STATES.get(row["id"]) or {}).get("via")}
         elif row is not None:
             mon = {"method": row["method"], "other": True}
         cfg = probes.device_config(conn, d["id"])

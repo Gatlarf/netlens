@@ -704,13 +704,23 @@ async def run_monitor(db_path: str, monitor_id: int, now_ts: float | None = None
             from app.terminal.hostkeys import get_fingerprint
 
             known = get_fingerprint(conn, row["device_id"])
-        if not secret:
+        state = _STATES.setdefault(monitor_id, {})
+        locked = None
+        if row["method"] in ("ssh", "winrm"):
+            from app.hostprobe import service as host_probes
+
+            state.pop("via", None)
+            locked = await host_probes.locked_readings(conn, row, state, now_ts)          # a host with the probe installed is asked through the locked-down account
+        if locked is not None:
+            points, found, fingerprint = locked
+            error = None
+        elif not secret:
             error = "the stored login cannot be read (the encryption key is missing), enter it again"
             points, found, fingerprint = [], [], None
         else:
             try:
-                state = _STATES.setdefault(monitor_id, {})
                 points, found, fingerprint = await read(row["method"], row["address"], row["port"], secret, groups or None, state, known, now_ts)
+                state["via"] = "login"
                 error = None
             except MonitorError as exc:
                 points, found, fingerprint, error = [], [], None, str(exc)

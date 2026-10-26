@@ -25,7 +25,7 @@ export async function buildHostsSetupCard() {
     if (!x.monitor) return h("span", { class: "hint" }, "not monitored");
     if (x.monitor.other) return h("span", { class: "hint" }, `monitored over ${x.monitor.method.toUpperCase()}`);
     const state = x.monitor.ok === false ? h("span", { class: "error", title: x.monitor.error || "" }, "cannot log in") : x.monitor.ok ? "working" : "waiting";
-    return h("span", {}, state, " ", h("span", { class: "hint" }, `${x.monitor.method.toUpperCase()}${x.monitor.login ? ` · ${x.monitor.login}` : ""}`));
+    return h("span", {}, state, " ", h("span", { class: "hint" }, x.monitor.via === "locked" ? " via the locked-down probe account (one-time certificates)" : `${x.monitor.method.toUpperCase()}${x.monitor.login ? ` · stored login ${x.monitor.login}` : ""}`));
   };
   const probeText = (x) => {
     const p = x.probes;

@@ -119,6 +119,10 @@ def test_the_lockdown_files():
     assert "authorized_keys" not in win and "ForceCommand" in win["sshd_config"] and "New-LocalUser" in win["install"]
 
 
+READINGS_OUTPUT = ("##loadavg\n0.10 0.20 0.30 1/100 123\n##stat\ncpu  100 0 100 800 0 0 0 0 0 0\n##mem\nMemTotal: 1000000 kB\nMemAvailable: 500000 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n"
+                   "##uptime\n1000.0 900.0\n##df\nFilesystem Type 1024-blocks Used Available Capacity Mounted on\n/dev/sda1 ext4 1000000 500000 500000 50% /\n##end\n")
+
+
 # ----------------------------------------------------------------------------- short-lived credentials
 @pytest.fixture
 def conn(tmp_path):
@@ -212,7 +216,10 @@ async def host(conn):
     async def start(locked: bool) -> int:
         async def handle(process):
             commands.append(process.command)
-            if locked or "netlens-probe" not in (process.command or ""):
+            if locked and process.command == "netlens-probe readings":
+                process.stdout.write(READINGS_OUTPUT)
+                process.exit(0)
+            elif locked or "netlens-probe" not in (process.command or ""):
                 process.stdout.write(OUTPUT)
                 process.exit(0)
             else:
@@ -462,3 +469,43 @@ def test_the_memory_mappings_of_dotnet_are_not_deleted_files():
     import re
 
     assert re.search(r"memfd", scripts.LINUX_SCRIPT) and "dev\\/shm" in scripts.LINUX_SCRIPT
+
+
+@pytest.mark.asyncio
+async def test_the_health_monitor_reads_through_the_locked_account_with_a_one_time_certificate(conn, host):
+    start, commands = host
+    port = await start(locked=True)
+    hm.save_monitor(conn, 1, {"method": "ssh", "address": "127.0.0.1", "port": port, "username": "root", "password": "must-not-be-used"})
+    service.save_settings(conn, {"devices": {"1": {"enabled": True, "provider": "netlens_ca", "username": "ro"}}})
+    row = hm.get_monitor(conn, 1)
+    result = await hm.run_monitor(str(conn_path(conn)), row["id"])
+    assert result["ok"], result["error"]
+    assert commands == ["netlens-probe readings"]                       # the account "ro" with a certificate; the stored password was never tried
+    assert hm._STATES[row["id"]]["via"] == "locked"
+    assert result["points"] >= 3                                         # memory, disk and load were read and recorded
+
+
+@pytest.mark.asyncio
+async def test_a_host_with_an_older_script_falls_back_to_the_stored_login(conn, host):
+    start, commands = host
+    port = await start(locked=False)                                    # answers every locked command with "not found": no readings script on the host
+    hm.save_monitor(conn, 1, {"method": "ssh", "address": "127.0.0.1", "port": port, "username": "ro", "password": "x"})
+    service.save_settings(conn, {"devices": {"1": {"enabled": True, "provider": "netlens_ca", "username": "ro"}}})
+    row = hm.get_monitor(conn, 1)
+    state: dict = {}
+    assert await service.locked_readings(conn, row, state) is None
+    assert 1 in service._NO_READINGS                                    # not asked again for a while
+    service._NO_READINGS.clear()
+
+
+def conn_path(conn):
+    return conn.execute("PRAGMA database_list").fetchone()[2]
+
+
+def test_the_host_scripts_accept_the_readings_name_and_nothing_else():
+    assert "netlens-probe readings" in scripts.linux_entry() and "probe_readings()" in scripts.linux_wrapper()
+    assert scripts.linux_setup("u", None, "ssh-ed25519 AAA")["sudoers"].count("NOPASSWD") == 1 and "netlens-probe readings" in scripts.linux_setup("u", None, "ssh-ed25519 AAA")["sudoers"]
+    assert "'readings'" in scripts.windows_wrapper()
+    assert subprocess.run(["sh", "-n"], input=scripts.linux_wrapper().encode(), capture_output=True).returncode == 0
+    for word in ("rm ", "mv ", "chmod", "chown", "kill", "tee ", "mkfs", "systemctl"):
+        assert word not in scripts.linux_body("readings"), word

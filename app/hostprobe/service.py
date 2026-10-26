@@ -202,6 +202,44 @@ async def _linux(cred: credentials.Credential, address: str, port: int, known: s
     return out, "direct", fp
 
 
+_NO_READINGS: dict[int, float] = {}        # device id -> when the host last said it has no "readings" script yet (an older install): the stored login is used meanwhile
+_NO_READINGS_FOR = 3600.0
+
+
+async def locked_readings(conn, row, state: dict, now: float | None = None) -> tuple[list, list, str | None] | None:
+    """The health monitor's numbers through the locked-down probe account, with a certificate made for this one look: no standing password or key is used.
+    Returns None when this host has no locked-down probe (or an older one without the readings script): the caller then uses the stored login.
+    Raises nothing: any trouble means None, so the monitor never depends on the probe."""
+    device_id = row["device_id"]
+    try:
+        cfg = device_config(conn, device_id)
+        if cfg["provider"] == "static" or row["method"] not in ("ssh", "winrm"):
+            return None
+        if time.time() - _NO_READINGS.get(device_id, 0.0) < _NO_READINGS_FOR:
+            return None
+        providers = _load(conn)["providers"]
+        config = {**(providers.get(cfg["provider"]) or {}), **({"username": cfg["username"]} if cfg["username"] else {})}
+        cred = await credentials.issue(conn, cfg["provider"], config, {})
+        from app.terminal.hostkeys import get_fingerprint
+
+        port = cfg["ssh_port"] if row["method"] == "winrm" else row["port"]
+        out, status, fp = await ssh.run_command(row["address"], port, cred.username, cred.password, cred.private_key, cred.passphrase, scripts.locked_command(scripts.READINGS),
+                                                get_fingerprint(conn, device_id), timeout=40.0, certificate=cred.certificate)
+        if "##netlens-windows" in out:
+            points, found = ssh.parse_windows(out, state, now)
+        elif "##loadavg" in out or "##end" in out:
+            points, found = ssh.parse(out, state, now)
+        else:                                                    # "refused" / "unknown probe": the script on the host is older than this Netlens
+            _NO_READINGS[device_id] = time.time()
+            return None
+        if not points and not found:
+            return None
+        state["via"] = "locked"
+        return points, found, fp
+    except Exception:  # noqa: BLE001 - see the docstring
+        return None
+
+
 def _parse(probe: str, platform: str, out: str) -> dict[str, Any]:
     if probe == "storage":
         return parse.parse_linux(out) if platform == "linux" else parse.parse_windows(out)

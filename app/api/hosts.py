@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app import hosts
 from app.api.devices import get_conn
 from app.auth import client_ip, identify, require_admin
+from app.terminal.access import ensure_allowed
 
 router = APIRouter(prefix="/api", tags=["hosts"])
 
@@ -19,7 +20,7 @@ def list_hosts(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     return {"hosts": hosts.overview(conn), "levels": list(hosts.LEVELS)}
 
 
-@router.post("/hosts/apply")
+@router.post("/hosts/apply", dependencies=[Depends(ensure_allowed)])
 async def apply_hosts(body: dict, request: Request) -> dict[str, Any]:
     require_admin(request)
     ids = [i for i in (body.get("device_ids") or []) if isinstance(i, int) and not isinstance(i, bool)]

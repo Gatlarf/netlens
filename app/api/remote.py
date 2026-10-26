@@ -314,6 +314,9 @@ async def remote_ws(websocket: WebSocket, ticket: str = "") -> None:
     if session is None or session["expires"] < time.monotonic():
         await _error(websocket, "This connection request has expired. Press Connect again.", "769")
         return
+    if (session.get("user") or "") != (getattr(principal, "username", "") or ""):          # a ticket is for the person who asked for it
+        await _error(websocket, "This connection request was made by someone else.", "769")
+        return
     if websocket.app.state.terminal_sessions >= MAX_SESSIONS:
         await _error(websocket, "Too many remote sessions are open.", "513")
         return

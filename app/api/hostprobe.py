@@ -10,6 +10,7 @@ from fastapi.responses import PlainTextResponse
 from app import analysis, audit
 from app.api.devices import get_conn
 from app.auth import client_ip, require_admin
+from app.terminal.access import ensure_allowed
 from app.hostmetrics import service as hm
 from app.hostprobe import baseline, credentials, diagnose as engineer, installer, scripts, service
 
@@ -245,7 +246,7 @@ async def diagnose_now(device_id: int, body: dict, request: Request) -> dict[str
     return {**diag, "report_id": doc["report_id"], "report_ref": doc["report_ref"], "links": doc["links"], "read_only": True}
 
 
-@router.post("/devices/{device_id}/hostprobe/install")
+@router.post("/devices/{device_id}/hostprobe/install", dependencies=[Depends(ensure_allowed)])
 async def install(device_id: int, body: dict, request: Request) -> dict[str, Any]:
     """Check, install, update or remove the probe on the host from here. The administrator login in the body is used for this one action: it is never stored and never logged.
     `action`: check (changes nothing), install, update, remove."""

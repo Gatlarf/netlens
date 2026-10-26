@@ -79,3 +79,37 @@ def test_the_terminal_switch_cannot_be_flipped_from_outside(client):
     assert client.put("/api/config/general", json={"terminal_enabled": True, "quick_interval": 600}, headers=outside).status_code == 200
     assert client.put("/api/config/general", json={"terminal_enabled": False}).status_code == 200      # locally it works
     assert client.put("/api/config/general", json={"terminal_enabled": True}, headers=outside).status_code == 403
+
+
+def test_a_named_reverse_proxy_counts_as_proxied_even_when_it_adds_no_headers_and_real_ip_is_only_believed_from_it():
+    from types import SimpleNamespace
+
+    from app.terminal.access import classify
+
+    def conn(peer, headers, proxies=("192.168.0.10",)):
+        return SimpleNamespace(client=SimpleNamespace(host=peer), headers=headers, app=SimpleNamespace(state=SimpleNamespace(settings=SimpleNamespace(trusted_proxies=proxies))))
+
+    # nginx in front, adding no X-Forwarded-* headers: without the named proxy this looks like a direct LAN connection
+    assert classify(conn("192.168.0.10", {}, proxies=()), "off")[0] is True
+    assert classify(conn("192.168.0.10", {}), "off")[0] is False
+    # mode lan: a client-written X-Real-IP is not believed from an unnamed sender, and from the named proxy it must be local
+    assert classify(conn("192.168.0.77", {"x-real-ip": "192.168.1.5", "via": "1.1 x"}), "lan")[0] is False
+    assert classify(conn("192.168.0.10", {"x-real-ip": "8.8.8.8"}), "lan")[0] is False
+    assert classify(conn("192.168.0.10", {"x-real-ip": "192.168.1.5"}), "lan")[0] is True
+
+
+def test_actions_on_hosts_are_refused_from_outside_like_the_terminal(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app.config import load_settings
+    from app.main import create_app
+
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    with TestClient(app, headers={"Authorization": "Bearer secret"}) as c:
+        assert c.post("/api/credentials", json={"name": "a", "kind": "login", "username": "u", "password": "p"}).status_code == 200            # direct connection (no proxy headers)
+        outside = {"X-Forwarded-For": "203.0.113.9"}
+        assert c.post("/api/credentials", json={"name": "b", "kind": "login", "username": "u", "password": "p"}, headers=outside).status_code == 403
+        assert c.post("/api/hosts/apply", json={"device_ids": [1], "level": "basic"}, headers=outside).status_code == 403
+        assert c.post("/api/devices/1/hostprobe/install", json={"action": "check"}, headers=outside).status_code == 403
+        audit = c.get("/api/audit?limit=20").text
+        assert "Refused" in audit

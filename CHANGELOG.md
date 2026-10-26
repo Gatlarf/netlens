@@ -2,6 +2,19 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.281 — 2026-10-26
+
+### Added
+- ★ **Standard monitoring through the locked-down probe account.** A host that has the probe installed is now read for the health monitor (processor, memory, disks, network …) through the probe account with a one-time certificate, so no standing password or key is used for it. The stored login stays as the fallback for hosts without the probe or with an older script. Settings → Hosts shows which way each host is read. The probe script is now version 7 (it has a tenth script, "readings"): hosts with an older one are marked, and "Update the probe script" puts the new one on. The documentation explains the difference between Standard and Deep and how each logs in.
+
+### Security
+- ★ **Remote access checked and tightened.**
+  - A reverse proxy that adds no `X-Forwarded-*` header (nginx by default) made a request from the internet look like a direct one from the local network. A proxy named in `NETLENS_TRUSTED_PROXIES` now always counts as a proxy.
+  - `X-Real-IP` and `CF-Connecting-IP` are only believed from a named proxy.
+  - Setting up monitoring, installing a probe and changing the credential store follow the same where-from rule as the terminal, and a refusal is written to the audit log.
+  - A remote-desktop ticket can only be used by the person who asked for it.
+  - New section "Security of remote access" in the documentation, including what these layers do not stop.
+
 ## 0.4.279 — 2026-10-26
 
 ### Added

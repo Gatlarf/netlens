@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app import audit, credstore
 from app.api.devices import get_conn
 from app.auth import client_ip, identify, require_admin
+from app.terminal.access import ensure_allowed
 
 router = APIRouter(prefix="/api", tags=["credentials"])
 
@@ -28,7 +29,7 @@ def list_credentials(request: Request, conn=Depends(get_conn)) -> dict[str, Any]
     return {"credentials": credstore.listing(conn, _user(request)), "kinds": {k: list(v) for k, v in credstore.KINDS.items()}}
 
 
-@router.post("/credentials")
+@router.post("/credentials", dependencies=[Depends(ensure_allowed)])
 def create_credential(body: dict, request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     require_admin(request)
     try:
@@ -39,7 +40,7 @@ def create_credential(body: dict, request: Request, conn=Depends(get_conn)) -> d
     return made
 
 
-@router.put("/credentials/{cred_id}")
+@router.put("/credentials/{cred_id}", dependencies=[Depends(ensure_allowed)])
 def update_credential(cred_id: str, body: dict, request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     require_admin(request)
     try:
@@ -51,7 +52,7 @@ def update_credential(cred_id: str, body: dict, request: Request, conn=Depends(g
     return made
 
 
-@router.delete("/credentials/{cred_id}")
+@router.delete("/credentials/{cred_id}", dependencies=[Depends(ensure_allowed)])
 def delete_credential(cred_id: str, request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     require_admin(request)
     try:
