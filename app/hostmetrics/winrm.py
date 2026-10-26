@@ -152,8 +152,15 @@ def _fault_text(root):
     return " ".join(x for x in (reason, detail if detail != reason else "", f"(code {number})" if number else "") if x) or "the server reported an error"
 
 
+ALLOW_PLAIN_HTTP = True      # the application sets it from Settings → Hosts (default there: off). Over plain http only Basic works, and Basic sends the password in clear text.
+PLAIN_HTTP_REFUSED = ("WinRM over plain http (port 5985) is switched off: Netlens could only log in with Basic, which sends the Windows password unencrypted over the network. "
+                      "Use https (port 5986: Settings → Hosts shows how to switch it on), or allow plain http there if this is a lab")
+
+
 class Session:
     def __init__(self, host, port, https, username, password, auth="ntlm", verify_tls=False, timeout=30):
+        if not https and not ALLOW_PLAIN_HTTP:
+            raise WinrmError(PLAIN_HTTP_REFUSED)
         self.host, self.port, self.https = host, port, https
         user, domain = username, ""
         if "\\" in username:

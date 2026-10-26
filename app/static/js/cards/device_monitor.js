@@ -1,4 +1,5 @@
 import { get, put, post, del } from "../api.js";
+import { WINRM_HTTPS_SCRIPT } from "./winrm_https.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
 const PORTS = { snmp: "161", ssh: "22", winrm: "5986" };
@@ -196,7 +197,7 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
       field("Password", wPass), field("Login method", wAuth),
       h("label", {}, wVerify, " Verify the TLS certificate (leave off for the self-signed one WinRM makes)"),
       h("details", {}, h("summary", {}, "How to switch WinRM over HTTPS on"), h("pre", { class: "remote-code" },
-        "# PowerShell as administrator on the Windows computer\nEnable-PSRemoting -Force -SkipNetworkProfileCheck\n$cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\\LocalMachine\\My -NotAfter (Get-Date).AddYears(10)\nNew-Item -Path WSMan:\\localhost\\Listener -Transport HTTPS -Address * -CertificateThumbPrint $cert.Thumbprint -Force\nNew-NetFirewallRule -DisplayName 'Netlens WinRM HTTPS' -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow\n# let 'Remote Management Users' open a shell (WinRM only lets administrators in by default)\n$sddl = (Get-Item WSMan:\\localhost\\Service\\RootSDDL).Value\nif ($sddl -notmatch ';;;RM\\)') { $dacl, $sacl = $sddl -split 'S:', 2; Set-Item WSMan:\\localhost\\Service\\RootSDDL -Value ($dacl + '(A;;GXGR;;;RM)S:' + $sacl) -Force }\nRestart-Service WinRM -Force")));
+        WINRM_HTTPS_SCRIPT)));
     const result = h("div", { class: "monitor-result" });
     const show = () => {
       const typed = stored.value === "";
@@ -282,7 +283,7 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     });
     const form = h("form", { class: "edit-form", onsubmit: (e) => e.preventDefault() },
       field("How to ask", method), field("Address", address, "Where to ask. It is the device's address unless it has a separate management address."),
-      field("Port", port, "Leave empty for the usual one (5986 is WinRM over https; 5985 is plain http, only on your own network)."), storedBox, snmpBox, sshBox, winBox, field("How often", interval),
+      field("Port", port, "Leave empty for the usual one (5986 is WinRM over https. 5985 is plain http: switched off unless allowed under Settings → Hosts, because it sends the password unencrypted)."), storedBox, snmpBox, sshBox, winBox, field("How often", interval),
       h("label", {}, alerts, " Warn me when a value gets too high or too low (limits under Monitoring → Health)"),
       h("div", { class: "form-actions" }, test, save, h("button", { class: "btn", type: "button", onclick: () => draw() }, "Cancel")), result);
     card.appendChild(form);

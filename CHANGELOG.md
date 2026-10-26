@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.284 — 2026-10-26
+
+### Security
+- ★ **WinRM over plain http (port 5985) is switched off.** Netlens' WinRM login can only use NTLM over https; over plain http the only option is Basic, which sends the Windows password unencrypted over the network (and needs the Windows host to allow unencrypted Basic). That was only blocked for public addresses. It is now refused everywhere unless someone allows it on purpose (Settings → Hosts → "Allow WinRM over plain http", logged in the audit log, off by default). Monitors that already use port 5986 are not affected; a monitor on 5985 stops with a message that says why.
+- **Settings → Hosts shows which Windows hosts only have the http port open**, and a copy-and-paste PowerShell that switches WinRM over HTTPS on (port 5986) on a host.
+
 ## 0.4.283 — 2026-10-26
 
 ### Fixed

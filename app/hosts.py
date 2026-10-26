@@ -18,7 +18,7 @@ from typing import Any
 
 from app import audit, credstore
 from app.db import connect
-from app.hostmetrics import service as hm
+from app.hostmetrics import service as hm, winrm
 from app.hostprobe import installer, scripts, service as probes
 
 LEVELS = ("basic", "probes", "update", "unprobe", "remove")
@@ -31,7 +31,9 @@ def _method_of(conn, device_id: int, ip: str | None) -> str | None:
     ports = {p for _proto, p in open_ports}
     if 22 in ports:
         return "ssh"
-    if ports & {5986, 5985}:
+    if 5986 in ports:
+        return "winrm"
+    if 5985 in ports and winrm.ALLOW_PLAIN_HTTP:                 # plain http sends the password unencrypted: only when it was allowed on purpose
         return "winrm"
     return None
 
@@ -61,7 +63,10 @@ def overview(conn) -> list[dict[str, Any]]:
         installed = (newest["data"].get("script_version") if newest and newest["mode"] == "locked" else None)
         probe = {"enabled": cfg["enabled"], "mode": newest["mode"] if newest else None, "installed_version": installed, "update_available": bool(installed and installed < scripts.SCRIPT_VERSION),
                  "last": newest["taken"] if newest else None}
-        out.append({"id": d["id"], "name": d["name"], "ip": d["primary_ip"], "online": bool(d["online"]), "type": d["type"], "can_monitor": method, "monitor": mon, "probes": probe})
+        ports = {r["port"] for r in conn.execute("SELECT port FROM ports WHERE device_id = ? AND state LIKE 'open%'", (d["id"],))}
+        http_only = 5985 in ports and not ports & {22, 5986}
+        out.append({"id": d["id"], "name": d["name"], "ip": d["primary_ip"], "online": bool(d["online"]), "type": d["type"], "can_monitor": method, "monitor": mon, "probes": probe,
+                    "winrm_http_only": http_only and method is None})
     return out
 
 
@@ -100,7 +105,7 @@ async def _one(db_path, device_id: int, level: str, opts: dict[str, Any], who, i
             elif row is None or not hm.raw_secret(conn, row):
                 return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": "this host has no health monitor yet: choose \"Login for the basic monitoring\" (a login from Settings → Credentials; add one there first if the list is empty)"}
             if row is None or opts.get("credential_id") or row["method"] != method:
-                data = {"method": method, "address": d["primary_ip"], **({"port": _winrm_port(conn, device_id)} if method == "winrm" else {}),
+                data = {"method": method, "address": d["primary_ip"], **({"port": _winrm_port(conn, device_id), **({"auth": "basic"} if _winrm_port(conn, device_id) == 5985 else {})} if method == "winrm" else {}),
                         **({"credential_id": opts["credential_id"]} if opts.get("credential_id") else {})}
                 try:
                     hm.save_monitor(conn, device_id, data)

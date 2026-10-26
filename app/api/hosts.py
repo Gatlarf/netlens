@@ -6,7 +6,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app import hosts
+from app import audit, hosts
+from app.hostmetrics import service as hm
 from app.api.devices import get_conn
 from app.auth import client_ip, identify, require_admin
 from app.terminal.access import ensure_allowed
@@ -17,7 +18,17 @@ router = APIRouter(prefix="/api", tags=["hosts"])
 @router.get("/hosts")
 def list_hosts(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     require_admin(request)
-    return {"hosts": hosts.overview(conn), "levels": list(hosts.LEVELS)}
+    return {"hosts": hosts.overview(conn), "levels": list(hosts.LEVELS), "settings": {"allow_plain_winrm": hm.plain_winrm_allowed(conn)}}
+
+
+@router.put("/hosts/settings", dependencies=[Depends(ensure_allowed)])
+def put_settings(body: dict, request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
+    require_admin(request)
+    if "allow_plain_winrm" in body:
+        on = hm.set_plain_winrm(conn, bool(body["allow_plain_winrm"]))
+        audit.record_by(conn, getattr(request.state, "user", None) or identify(request), client_ip(request), "PUT", request.url.path, 200,
+                        "Allowed WinRM over plain http (port 5985; the Windows password then crosses the network unencrypted)" if on else "Switched WinRM over plain http off")
+    return {"settings": {"allow_plain_winrm": hm.plain_winrm_allowed(conn)}}
 
 
 @router.post("/hosts/apply", dependencies=[Depends(ensure_allowed)])

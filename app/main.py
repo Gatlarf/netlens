@@ -83,6 +83,9 @@ async def lifespan(app: FastAPI):
         from app import credstore
 
         credstore.migrate_monitors(conn)     # logins typed into health monitors move into the credential store (once)
+        from app.hostmetrics import service as host_metrics, winrm as host_winrm
+
+        host_winrm.ALLOW_PLAIN_HTTP = host_metrics.plain_winrm_allowed(conn)          # WinRM over plain http is off unless someone allowed it on purpose
     except Exception:  # noqa: BLE001 - a failed move leaves the monitors as they were
         logging.getLogger(__name__).exception("could not move the monitor logins into the credential store")
     config.apply_overrides(app)

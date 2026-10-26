@@ -68,9 +68,15 @@ def test_definition_rules():
         hm.validate({"method": "winrm", "address": "10.0.0.7", "username": "u"})
     with pytest.raises(hm.MonitorError):
         hm.validate({"method": "winrm", "address": "10.0.0.7", "username": "u", "password": "p", "auth": "kerberos"})
-    with pytest.raises(hm.MonitorError, match="own network"):
-        hm.validate({"method": "winrm", "address": "8.8.8.8", "port": 5985, "username": "u", "password": "p"})
-    assert hm.validate({"method": "winrm", "address": "192.168.0.7", "port": 5985, "username": "u", "password": "p"})["port"] == 5985
+    with pytest.raises(hm.MonitorError, match="only the Basic login"):                 # allowed, but plain http can only carry Basic
+        hm.validate({"method": "winrm", "address": "192.168.0.7", "port": 5985, "username": "u", "password": "p"})
+    assert hm.validate({"method": "winrm", "address": "192.168.0.7", "port": 5985, "username": "u", "password": "p", "auth": "basic"})["port"] == 5985
+    from app.hostmetrics import winrm as _winrm
+
+    _winrm.ALLOW_PLAIN_HTTP = False                                                  # the application's default: refused before anything is sent
+    with pytest.raises(hm.MonitorError, match="switched off"):
+        hm.validate({"method": "winrm", "address": "192.168.0.7", "port": 5985, "username": "u", "password": "p", "auth": "basic"})
+    _winrm.ALLOW_PLAIN_HTTP = True
     kept = hm.validate({"method": "winrm", "address": "10.0.0.7", "username": "u2"}, {"method": "winrm", "secret": d["secret"]})
     assert kept["secret"]["password"] == "pw-long-enough" and kept["secret"]["username"] == "u2"
 

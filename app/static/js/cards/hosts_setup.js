@@ -1,4 +1,5 @@
-import { get, post } from "../api.js";
+import { get, post, put } from "../api.js";
+import { WINRM_HTTPS_SCRIPT } from "./winrm_https.js";
 import { h, clear, toast, timeAgo, statusDot } from "../util.js";
 
 const LEVELS = [
@@ -20,7 +21,7 @@ export async function buildHostsSetupCard() {
   let busy = false;
   const form = { level: "basic", credential: "", adminCredential: "", adminUser: "", adminPass: "", sshd: false };
 
-  const reach = (x) => (x.can_monitor ? x.can_monitor.toUpperCase() : "–");
+  const reach = (x) => (x.can_monitor ? x.can_monitor.toUpperCase() : x.winrm_http_only ? h("span", { class: "error", title: "Only the plain-http WinRM port (5985) is open. Plain http sends the Windows password unencrypted, so it is switched off. Switch WinRM over HTTPS on (see below)." }, "WinRM: http only ⚠") : "–");
   const monText = (x) => {
     if (!x.monitor) return h("span", { class: "hint" }, "not monitored");
     if (x.monitor.other) return h("span", { class: "hint" }, `monitored over ${x.monitor.method.toUpperCase()}`);
@@ -60,6 +61,22 @@ export async function buildHostsSetupCard() {
     });
     card.appendChild(h("div", { class: "table-wrap" }, h("table", { class: "data" },
       h("thead", {}, h("tr", {}, h("th", {}, all), ["Host", "Reached over", "Basic monitoring", "Probes", "Result"].map((t) => h("th", {}, t)))), h("tbody", {}, rows))));
+
+    // security: plain http WinRM, and how to get https
+    const plain = h("input", { type: "checkbox", checked: Boolean(data.settings && data.settings.allow_plain_winrm) });
+    plain.addEventListener("change", async () => {
+      if (plain.checked && !window.confirm("WinRM over plain http sends the Windows password across the network without encryption, and needs the Windows host to allow unencrypted Basic logins. Allow it anyway?")) { plain.checked = false; return; }
+      try { const r = await put("/api/hosts/settings", { allow_plain_winrm: plain.checked }); data.settings = r.settings; toast(plain.checked ? "Plain http WinRM allowed" : "Plain http WinRM is off", plain.checked ? "info" : "success"); data = await get("/api/hosts"); draw(); }
+      catch (err) { plain.checked = !plain.checked; toast(err.message || "Could not change it", "error"); }
+    });
+    const needsHttps = data.hosts.filter((x) => x.winrm_http_only).length;
+    card.appendChild(h("details", { class: "limits-box", open: needsHttps > 0 },
+      h("summary", {}, needsHttps ? `Windows hosts: switch WinRM over HTTPS on (${needsHttps} host${needsHttps === 1 ? " has" : "s have"} only the plain http port open)` : "Windows hosts: WinRM over HTTPS"),
+      h("p", { class: "hint" }, "A Windows host is monitored over WinRM with https (port 5986): the connection is encrypted. Plain http (port 5985) is switched off by default because it can only carry the Windows password unencrypted. " +
+        "Run this once in PowerShell as administrator on each Windows host (or with your software distribution), then press Rescan, and the host shows up as WinRM."),
+      h("pre", { class: "remote-code" }, WINRM_HTTPS_SCRIPT),
+      h("div", { class: "field" }, h("label", { class: "check-row" }, plain, " Allow WinRM over plain http (port 5985) anyway"),
+        h("p", { class: "hint" }, "Not recommended, and not acceptable in most companies. Only for a lab on a network you fully trust."))));
 
     // what they get
     const level = h("select", {}, LEVELS.map(([v, t]) => h("option", { value: v, selected: v === form.level }, t)));

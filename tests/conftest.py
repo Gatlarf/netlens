@@ -37,3 +37,11 @@ def shipped_plugins(request, tmp_path_factory, monkeypatch):
     for pid in ("proxmox", "asus"):
         (folder / pid).symlink_to(Path(__file__).resolve().parents[1] / "plugins" / pid, target_is_directory=True)
     monkeypatch.setattr(registry, "BUILTIN_DIR", folder)
+
+
+@pytest.fixture(autouse=True)
+def plain_winrm_flag(monkeypatch):
+    """The application switches WinRM over plain http off at start-up; the WinRM unit tests talk to a fake server over plain http, so each test starts with the library default."""
+    from app.hostmetrics import winrm
+
+    monkeypatch.setattr(winrm, "ALLOW_PLAIN_HTTP", True)

@@ -164,6 +164,20 @@ def level_of(rule: dict[str, Any], value: float) -> str:
     return "ok"
 
 
+PLAIN_WINRM_KEY = "hostmetrics.allow_plain_winrm"
+
+
+def plain_winrm_allowed(conn) -> bool:
+    return (get_setting(conn, PLAIN_WINRM_KEY) or "0") == "1"
+
+
+def set_plain_winrm(conn, allowed: bool) -> bool:
+    set_setting(conn, PLAIN_WINRM_KEY, "1" if allowed else "0")
+    conn.commit()
+    winrm.ALLOW_PLAIN_HTTP = bool(allowed)
+    return bool(allowed)
+
+
 # ----------------------------------------------------------------------------- definition
 def validate(data: dict[str, Any], current: dict[str, Any] | None = None) -> dict[str, Any]:
     """Normalise what the browser sent. Secrets that are not sent (None) keep their stored value."""
@@ -248,16 +262,10 @@ def validate(data: dict[str, Any], current: dict[str, Any] | None = None) -> dic
         secret.setdefault("verify_tls", False)
         if not bound and (not secret.get("username") or not secret.get("password")):
             raise MonitorError("give the user name and the password of a Windows account that may use remote management")
-        if port == 5985:
-            import ipaddress
-
-            try:
-                ip = ipaddress.ip_address(address)
-                private = ip.is_private or ip.is_loopback
-            except ValueError:
-                private = "." not in address or address.endswith(".local")
-            if not private:
-                raise MonitorError("plain http (port 5985) is only used on your own network; use https, port 5986")
+        if port == 5985 and not winrm.ALLOW_PLAIN_HTTP:
+            raise MonitorError(winrm.PLAIN_HTTP_REFUSED)
+        if port == 5985 and secret.get("auth") != "basic":
+            raise MonitorError("over plain http only the Basic login works (NTLM needs https, port 5986)")
     else:
         secret = {k: v for k, v in secret.items() if k in ("username", "password", "private_key", "passphrase", "platform", "credential_id")}
         bound = _bound(data, secret)

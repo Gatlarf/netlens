@@ -134,17 +134,34 @@ def test_a_windows_host_with_only_the_plain_winrm_port_open_is_monitored_on_that
     conn.commit()
     conn.close()
     cred = client.post("/api/credentials", json={"name": "Win", "kind": "login", "username": "DOMAIN\\mon", "password": "pw"}).json()
+    assert client.get("/api/hosts").json()["settings"]["allow_plain_winrm"] is False                    # off by default: plain http carries the password unencrypted
+    shown = {h["name"]: h for h in client.get("/api/hosts").json()["hosts"]}
+    assert shown["win"]["can_monitor"] is None and shown["win"]["winrm_http_only"] is True
+    r = client.post("/api/hosts/apply", json={"device_ids": [9], "level": "basic", "credential_id": cred["id"]}).json()
+    assert r["failed"] == 1 and "neither SSH nor WinRM" in r["results"][0]["error"]
+    assert client.put("/api/hosts/settings", json={"allow_plain_winrm": True}).json()["settings"]["allow_plain_winrm"] is True
     r = client.post("/api/hosts/apply", json={"device_ids": [9], "level": "basic", "credential_id": cred["id"]}).json()
     assert r["done"] == 1, r
     conn = connect(client.db)
     row = hm.get_monitor(conn, 9)
-    assert (row["method"], row["port"]) == ("winrm", 5985)
+    assert (row["method"], row["port"]) == ("winrm", 5985) and hm.load_secret(conn, row)["username"] == "DOMAIN\\mon"
+    assert "Allowed WinRM over plain http" in str([x["action"] for x in conn.execute("SELECT action FROM audit_log")])
     conn.close()
+    client.put("/api/hosts/settings", json={"allow_plain_winrm": False})
     # no login chosen: the message says what to do
     conn = connect(client.db)
     conn.execute("INSERT INTO devices (id, mac, primary_ip, hostname, online, first_seen, last_seen) VALUES (10, 'aa:bb:cc:dd:ee:10', '192.168.1.10', 'win2', 1, 'x', 'x')")
     conn.execute("INSERT INTO ports (device_id, proto, port, state, updated) VALUES (10, 'tcp', 5985, 'open', 'x')")
     conn.commit()
     conn.close()
+    from app.hostmetrics import winrm
+
+    assert winrm.ALLOW_PLAIN_HTTP is False
+    with pytest.raises(winrm.WinrmError, match="switched off"):
+        winrm.Session("192.168.1.10", 5985, False, "u", "p")                                       # no connection is even attempted
+    with pytest.raises(hm.MonitorError, match="switched off"):
+        hm.validate({"method": "winrm", "address": "192.168.1.10", "port": 5985, "username": "u", "password": "p", "auth": "basic"})
+    winrm.Session("192.168.1.10", 5986, True, "u", "p")                                             # https is fine
+    client.put("/api/hosts/settings", json={"allow_plain_winrm": True})
     r = client.post("/api/hosts/apply", json={"device_ids": [10], "level": "probes"}).json()
     assert r["failed"] == 1 and "Login for the basic monitoring" in r["results"][0]["error"]
