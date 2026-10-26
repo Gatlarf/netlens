@@ -748,6 +748,18 @@
    ],
    "releases": [
     {
+     "version": "1.2.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.2.1/hyperv.zip",
+     "sha256": "2d0d1a1a755b460814832397166704ba555bd7767ed96aa14c67fb69b308a075",
+     "api_version": 1,
+     "min_netlens": "0.3.157",
+     "released": "2026-10-26",
+     "changelog": "Security: an address that starts with http:// is refused (the Basic login would send the Windows password unencrypted). A new setting 'Allow plain http' brings it back for a lab.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.2.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.2.0/hyperv.zip",
      "sha256": "c09ca1079d9bb5c700b14fc6574ff5e2ae39eddb00065964d1cd57e35b907aec",
