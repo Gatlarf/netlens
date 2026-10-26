@@ -36,6 +36,12 @@ def _method_of(conn, device_id: int, ip: str | None) -> str | None:
     return None
 
 
+def _winrm_port(conn, device_id: int) -> int:
+    """5986 (https) when it is open, otherwise 5985 (plain http, only used on your own network)."""
+    ports = {r["port"] for r in conn.execute("SELECT port FROM ports WHERE device_id = ? AND state LIKE 'open%'", (device_id,))}
+    return 5986 if 5986 in ports or 5985 not in ports else 5985
+
+
 def overview(conn) -> list[dict[str, Any]]:
     out = []
     for d in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip, online, COALESCE(type_override, device_type) AS type FROM devices "
@@ -92,9 +98,10 @@ async def _one(db_path, device_id: int, level: str, opts: dict[str, Any], who, i
                 if credstore.peek(conn, user, str(opts["credential_id"])) is None:
                     return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": "no such stored login"}
             elif row is None or not hm.raw_secret(conn, row):
-                return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": "choose the login the health monitor uses"}
+                return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": "this host has no health monitor yet: choose \"Login for the basic monitoring\" (a login from Settings → Credentials; add one there first if the list is empty)"}
             if row is None or opts.get("credential_id") or row["method"] != method:
-                data = {"method": method, "address": d["primary_ip"], **({"credential_id": opts["credential_id"]} if opts.get("credential_id") else {})}
+                data = {"method": method, "address": d["primary_ip"], **({"port": _winrm_port(conn, device_id)} if method == "winrm" else {}),
+                        **({"credential_id": opts["credential_id"]} if opts.get("credential_id") else {})}
                 try:
                     hm.save_monitor(conn, device_id, data)
                 except hm.MonitorError as exc:

@@ -124,3 +124,27 @@ def test_the_assistant_and_the_built_in_answers_know_the_coverage(client):
     from app import mcp
 
     assert mcp.TOOLS["get_monitoring_coverage"]["path"] == "/api/hosts"
+
+
+def test_a_windows_host_with_only_the_plain_winrm_port_open_is_monitored_on_that_port(client):
+    conn = connect(client.db)
+    conn.execute("INSERT INTO devices (id, mac, primary_ip, hostname, online, first_seen, last_seen) VALUES (9, 'aa:bb:cc:dd:ee:09', '192.168.1.9', 'win', 1, 'x', 'x')")
+    for p in (3389, 5985):
+        conn.execute("INSERT INTO ports (device_id, proto, port, state, updated) VALUES (9, 'tcp', ?, 'open', 'x')", (p,))
+    conn.commit()
+    conn.close()
+    cred = client.post("/api/credentials", json={"name": "Win", "kind": "login", "username": "DOMAIN\\mon", "password": "pw"}).json()
+    r = client.post("/api/hosts/apply", json={"device_ids": [9], "level": "basic", "credential_id": cred["id"]}).json()
+    assert r["done"] == 1, r
+    conn = connect(client.db)
+    row = hm.get_monitor(conn, 9)
+    assert (row["method"], row["port"]) == ("winrm", 5985)
+    conn.close()
+    # no login chosen: the message says what to do
+    conn = connect(client.db)
+    conn.execute("INSERT INTO devices (id, mac, primary_ip, hostname, online, first_seen, last_seen) VALUES (10, 'aa:bb:cc:dd:ee:10', '192.168.1.10', 'win2', 1, 'x', 'x')")
+    conn.execute("INSERT INTO ports (device_id, proto, port, state, updated) VALUES (10, 'tcp', 5985, 'open', 'x')")
+    conn.commit()
+    conn.close()
+    r = client.post("/api/hosts/apply", json={"device_ids": [10], "level": "probes"}).json()
+    assert r["failed"] == 1 and "Login for the basic monitoring" in r["results"][0]["error"]

@@ -67,7 +67,8 @@ export async function buildHostsSetupCard() {
     const needsMonitorLogin = form.level === "basic" || form.level === "probes";
     const needsAdmin = LEVELS.find((l) => l[0] === form.level)[2];
     const option = (list, value, none) => [h("option", { value: "" }, none), ...list.map((c) => h("option", { value: c.id, selected: c.id === value }, `${c.name}${c.username ? ` (${c.username})` : ""}`))];
-    const mon = h("select", {}, option(logins, form.credential, "Keep each host's own login"));
+    const lacking = data.hosts.filter((x) => chosen.has(x.id) && !x.monitor);
+    const mon = h("select", {}, option(logins, form.credential, lacking.length ? "Choose a login…" : "Keep each host's own login"));
     mon.addEventListener("change", () => { form.credential = mon.value; });
     const adm = h("select", {}, option(logins, form.adminCredential, "Type an administrator login"));
     adm.addEventListener("change", () => { form.adminCredential = adm.value; draw(); });
@@ -80,6 +81,10 @@ export async function buildHostsSetupCard() {
 
     const apply = h("button", { class: "btn primary", type: "button", disabled: busy || chosen.size === 0 }, busy ? "Working… (this can take a minute per host)" : `Apply to ${chosen.size} host${chosen.size === 1 ? "" : "s"}`);
     apply.addEventListener("click", async () => {
+      if ((form.level === "basic" || form.level === "probes") && !form.credential && data.hosts.some((x) => chosen.has(x.id) && !x.monitor)) {
+        toast(`${lacking.length} chosen host${lacking.length === 1 ? " has" : "s have"} no health monitor yet (${lacking.slice(0, 3).map((x) => x.name).join(", ")}${lacking.length > 3 ? ", …" : ""}): choose the login for the basic monitoring first`, "error");
+        return;
+      }
       if (form.level === "remove" && !window.confirm(`Remove the probes and the monitoring of ${chosen.size} host(s)?`)) return;
       busy = true; results = null; draw();
       try {
@@ -95,7 +100,7 @@ export async function buildHostsSetupCard() {
     card.appendChild(h("section", { class: "probe-section" }, h("h3", {}, "What the chosen hosts get"),
       h("div", { class: "field" }, h("label", {}, "Level"), level),
       needsMonitorLogin ? h("div", { class: "field" }, h("label", {}, "Login for the basic monitoring"), mon,
-        h("p", { class: "hint" }, "A stored login (Settings → Credentials). A host is reached over SSH when its SSH port is open, otherwise over WinRM.")) : null,
+        h("p", { class: "hint" }, "A stored login (Settings → Credentials; add one there first if the list is empty). Needed for every host that has no monitor yet. A host is reached over SSH when its SSH port is open, otherwise over WinRM (use a Windows account for those).")) : null,
       needsAdmin ? h("div", { class: "field" }, h("label", {}, "Administrator login for the host (used once)"), adm,
         form.adminCredential ? null : h("div", {}, aUser, aPass),
         h("p", { class: "hint" }, "Only used to put the probe on the host (or take it off). A typed login is never stored or logged; a stored one is used for this run and the use is logged.")) : null,
