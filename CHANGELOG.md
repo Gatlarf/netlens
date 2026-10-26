@@ -2,7 +2,7 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
-## 0.4.271 — 2026-10-26
+## 0.4.272 — 2026-10-26
 
 ### Added
 - ★ **Plugin manager: "Check for updates" and "Update to …" buttons.** The manager now looks in the Plugin store for newer versions of the plugins you have installed, shows an "Update to x.y.z" button on each one that has one, and has its own refresh button, so you no longer have to switch to the Plugin store.
