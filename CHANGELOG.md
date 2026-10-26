@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.270 — 2026-10-26
+
+### Changed
+- **Omada plugin 1.4.1: the diagnostic also looks at the controller's own site-wide application statistics** (`stat/dpi/overview` and `stat/dpi/category/categoryCards`). It reports only field names, sizes and application/category names, so the real statistics can be built from what the controller answers without needing an Open API client.
+
 ## 0.4.269 — 2026-10-26
 
 ### Fixed

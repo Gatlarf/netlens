@@ -533,15 +533,15 @@ KEEP_WORDS = {"type", "status", "statusCategory", "connectDevType", "connectType
 SAMPLES = 3
 
 
-def describe(value, key=""):
-    """The shape of a value: types and sizes, never the content (except a few harmless enumerations)."""
+def describe(value, key="", keep=()):
+    """The shape of a value: types and sizes, never the content (except a few harmless enumerations, and the keys in `keep`)."""
     if isinstance(value, dict):
-        return {k: describe(v, k) for k, v in value.items()}
+        return {k: describe(v, k, keep) for k, v in value.items()}
     if isinstance(value, list):
-        return [describe(v, key) for v in value[:2]] + ([f"... {len(value)} items"] if len(value) > 2 else [])
+        return [describe(v, key, keep) for v in value[:2]] + ([f"... {len(value)} items"] if len(value) > 2 else [])
     if isinstance(value, bool) or value is None:
         return value
-    if key in KEEP_WORDS:
+    if key in KEEP_WORDS or key in keep:
         return value
     if isinstance(value, (int, float)):
         return f"<number {'negative' if value < 0 else 'positive' if value > 0 else 'zero'}, {len(str(abs(value)))} digits>"
@@ -637,6 +637,22 @@ def diagnose(config):
 
         step("clients", read_clients)
         nodes, clients = controller.snapshot()
+
+        def read_dpi_web():
+            """The two site-wide application statistics the web interface itself shows (no Open API client needed). Application and category names are harmless and kept."""
+            now_s = int(datetime.now().astimezone().timestamp())
+            window = {"start": now_s - 86400, "end": now_s}
+            keep = ("applicationName", "categoryName", "appName", "name", "family", "familyName", "category", "applicationId", "categoryId", "description")
+            out = {}
+            for label, path, extra in (("overview", "stat/dpi/overview", {}), ("categoryCards", "stat/dpi/category/categoryCards", {"selectAll": "true"})):
+                try:
+                    raw = controller._api(f"sites/{site['key']}/{path}", {**window, **extra})
+                    out[label] = {"type": type(raw).__name__, "count": len(raw) if isinstance(raw, (list, dict)) else None, "shape": describe(raw, "", keep)}
+                except OmadaError as exc:
+                    out[label] = {"error": _problem(exc)}
+            return out
+
+        step("dpi_web_api", read_dpi_web)
         if controller.wants_usage:
             def read_usage():
                 controller.open_login()
