@@ -228,3 +228,32 @@ def migrate(conn: sqlite3.Connection) -> int:
     conn.commit()
     log.info("encrypted %d stored secret setting(s)", len(rows))
     return len(rows)
+
+
+PRE_ENCRYPTION_KEEP_DAYS = 7
+
+
+def remove_plaintext_copy(conn: sqlite3.Connection, now: float | None = None) -> bool:
+    """The copy made before the first encryption (netlens.db.pre-encryption) holds the passwords as plain text. It is a safety net for the first days only: once every secret in the
+    database is encrypted and the copy is older than a week, it is deleted, so no plain-text password stays on the disk. Returns True when it was removed."""
+    import time
+
+    path = _db_file(conn)
+    if not path:
+        return False
+    copy = Path(path).with_name(Path(path).name + ".pre-encryption")
+    if not copy.exists():
+        return False
+    current = now if now is not None else time.time()
+    if current - copy.stat().st_mtime < PRE_ENCRYPTION_KEEP_DAYS * 86400:
+        return False
+    if status(conn)["plaintext"]:
+        return False
+    try:
+        for suffix in ("", "-wal", "-shm"):
+            Path(str(copy) + suffix).unlink(missing_ok=True)
+    except OSError as exc:
+        log.warning("could not remove %s: %s", copy, exc)
+        return False
+    log.info("removed %s: it held passwords as plain text and every secret is encrypted now", copy.name)
+    return True

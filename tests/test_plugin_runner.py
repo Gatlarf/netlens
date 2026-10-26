@@ -240,3 +240,23 @@ def test_the_key_can_come_from_a_secret_file_and_the_process_is_non_dumpable(tmp
     monkeypatch.delenv("NETLENS_SECRET_KEY_FILE")
     assert vault.status(c)["key_next_to_data"] is True
     assert hardening.protect_process() in (True, False)
+
+
+def test_the_copy_with_plain_text_passwords_made_before_the_first_encryption_goes_after_a_week(tmp_path):
+    import os
+    import time
+
+    from app import vault
+    from app.db import connect, init_db, set_setting
+
+    c = connect(tmp_path / "n.db")
+    init_db(c)
+    c.execute("INSERT INTO settings (key, value) VALUES ('engineer.api_key', 'plain-secret')")
+    c.commit()
+    assert vault.migrate(c) == 1
+    copy = tmp_path / "n.db.pre-encryption"
+    assert copy.exists() and not vault.remove_plaintext_copy(c)                       # fresh: kept as the safety net
+    old = time.time() - 8 * 86400
+    os.utime(copy, (old, old))
+    assert vault.remove_plaintext_copy(c) and not copy.exists()
+    assert not vault.remove_plaintext_copy(c)                                         # nothing left to remove

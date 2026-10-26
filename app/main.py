@@ -81,6 +81,7 @@ async def lifespan(app: FastAPI):
     hardening.protect_process()              # other processes of the same user (plugins) cannot read this process's memory or environment
 
     vault.migrate(conn)                      # passwords and tokens that are still plain text get encrypted (once)
+    vault.remove_plaintext_copy(conn)        # and the copy made before that (it holds them as plain text) goes after a week
     try:
         from app import credstore
 
