@@ -66,6 +66,10 @@
         <button id="user-menu-btn" class="btn user-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu"><span id="user-name">Account</span> &#9662;</button>
         <div id="user-menu" class="popmenu" hidden>
           <div class="menu-who" id="user-who"></div>
+          <div class="menu-level" id="menu-level" role="group" aria-label="Menu level" title="Which pages the menus list. Nothing is switched off: every page stays reachable.">
+            <span class="menu-level-label">Menu level</span>
+            <span class="lvl-switch"><button type="button" class="lvl-btn" data-level="basic">Basic</button><button type="button" class="lvl-btn" data-level="standard">Standard</button><button type="button" class="lvl-btn" data-level="advanced">Advanced</button></span>
+          </div>
           <hr>
           <a class="menu-row version-link" href="#/settings/about" title="About this version and what changed"><span>Version</span><span id="app-version" class="app-version"></span></a>
           <a id="update-badge" class="menu-row update-badge" href="#/settings/about" hidden></a>
@@ -86,41 +90,24 @@
         <div class="side-group">
           <div class="side-title">Network</div>
           <a class="nav-link" href="#/map" data-route="map">Map</a>
-          <a class="nav-link" href="#/hud" data-route="hud">HUD</a>
-          <a class="nav-link" href="#/devices" data-route="devices">Devices</a>
-          <a class="nav-link" href="#/hierarchy" data-route="hierarchy">Hierarchy</a>
-          <a class="nav-link" href="#/dns" data-route="dns" data-feature="dns">DNS</a>
-          <a class="nav-link" href="#/remote-sites" data-route="remote_sites" data-feature="remote_sites">Remote sites</a>
-          <a class="nav-link admin-only" href="#/remote" data-route="remote">Remote access</a>
+          <a class="nav-link" href="#/devices" data-route="devices" data-hub="devices">Devices</a>
+          <a class="nav-link" href="#/remote-sites" data-route="remote_sites" data-feature="remote_sites" data-level="advanced">Remote sites</a>
         </div>
         <div class="side-group">
           <div class="side-title">Monitoring</div>
-          <a class="nav-link" href="#/uptime" data-route="uptime">Uptime</a>
-          <a class="nav-link" href="#/health" data-route="health">Health</a>
-          <a class="nav-link" href="#/services" data-route="services">Services</a>
-          <a class="nav-link" href="#/backups" data-route="backups" data-feature="backups">Backups</a>
-          <a class="nav-link" href="#/storage" data-route="storage" data-feature="storage">Storage</a>
-          <a class="nav-link" href="#/smarthome" data-route="smarthome" data-feature="smarthome">Smart home</a>
+          <a class="nav-link" href="#/uptime" data-route="uptime" data-hub="uptime">Uptime &amp; services</a>
+          <a class="nav-link" href="#/health" data-route="health" data-hub="health">Health</a>
+          <a class="nav-link" href="#/storage" data-route="storage" data-hub="storage" title="Storage systems, backups and smart home, when their plugins are installed">Infrastructure</a>
         </div>
         <div class="side-group">
           <div class="side-title">Analysis</div>
-          <a class="nav-link" href="#/stats" data-route="stats">Statistics</a>
-          <a class="nav-link" href="#/network-health" data-route="network_health">Network health</a>
-          <a class="nav-link" href="#/vulnerabilities" data-route="vulnerabilities" data-feature="vulnerabilities">Vulnerabilities</a>
-          <a class="nav-link" href="#/reports" data-route="reports">Reports</a>
-          <a class="nav-link admin-only" href="#/insights" data-route="insights">Insights</a>
-          <a class="nav-link" href="#/changes" data-route="changes">What changed</a>
-          <a class="nav-link" href="#/speedtest" data-route="speedtest">Speed tests</a>
-          <a class="nav-link" href="#/scans" data-route="scans">Scans &amp; events</a>
+          <a class="nav-link" href="#/stats" data-route="stats" data-hub="stats">Statistics &amp; reports</a>
+          <a class="nav-link" href="#/changes" data-route="changes" data-hub="changes">Activity</a>
+          <a class="nav-link" href="#/vulnerabilities" data-route="vulnerabilities" data-feature="vulnerabilities" data-level="standard">Vulnerabilities</a>
+          <a class="nav-link admin-only" href="#/insights" data-route="insights" data-hub="insights">Insights &amp; fixes</a>
         </div>
-        <div class="side-group admin-only">
-          <div class="side-title">Automation</div>
-          <a class="nav-link" href="#/remediation" data-route="remediation">Remediation</a>
-        </div>
-        <div class="side-group admin-only">
-          <div class="side-title">Configuration</div>
-          <a class="nav-link" href="#/settings" data-route="settings">Settings</a>
-          <a id="nav-more" class="nav-link admin-only" href="#/settings/plugin-browse" hidden title="Backups, storage, vulnerabilities and more come from plugins">+ More features</a>
+        <div class="side-group side-bottom admin-only">
+          <a class="nav-link" href="#/settings" data-route="settings">Settings<span id="nav-more" class="nav-badge" hidden title="More features are available as plugins (Settings, Plugins, Store)">+</span></a>
         </div>
       </div>
     </nav>

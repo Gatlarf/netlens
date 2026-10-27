@@ -10,6 +10,8 @@ import { renderSetup } from "./setup.js";
 import { applyInterface } from "./interface.js";
 import { get, post, ApiError } from "./api.js";
 import { initSiteBar } from "./sitebar.js";
+import { getLevel, setLevel, levelShows } from "./levels.js";
+import { featureFlags, hubById, hubOf, usableTabs, hubLevel, tabBar } from "./hubs.js";
 import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
 
 const ROUTES = {
@@ -68,7 +70,8 @@ function parseRoute() {
 
 function updateNav(name) {
   document.querySelectorAll(".nav-link").forEach((link) => {
-    link.classList.toggle("active", link.dataset.route === (name === "device" ? "devices" : name));
+    const hub = hubOf(name);
+    link.classList.toggle("active", link.dataset.route === (name === "device" ? "devices" : hub ? hub.id : name));
   });
 }
 
@@ -120,7 +123,16 @@ async function renderPage() {
 
   try {
     const mod = await import(`./pages/${route.name}.js`);
-    const cleanup = await mod.render(fresh, route.params);
+    // a page that is a tab of a bigger page gets the tab bar above it (not in a customer view, which has its own short menu)
+    const hub = document.body.dataset.scoped ? null : hubOf(route.name);
+    const bar = hub ? tabBar(hub, route.name) : null;
+    let target = fresh;
+    if (bar) {
+      target = document.createElement("div");
+      target.className = "hub-body";
+      fresh.append(bar, target);
+    }
+    const cleanup = await mod.render(target, route.params);
     waiting.remove();
 
     if (gen !== renderGen) {
@@ -475,26 +487,47 @@ function hideBoot() {
   if (boot) boot.remove();
 }
 
-// The menu only lists the optional pages (backups, storage, ...) that have a plugin switched on or already hold data; an admin gets a link to add more.
-async function applyFeatures() {
-  let features;
-  try { features = await get("/api/features"); } catch { return; }
-  let hidden = 0;
-  for (const link of document.querySelectorAll("#side-links [data-feature]")) {
-    const on = features[link.dataset.feature] !== false;
-    link.hidden = !on;
-    if (!on) hidden += 1;
+// The menu only lists what is installed, allowed and within the chosen menu level. An admin sees a "+" on Settings when plugins could add more.
+function refreshNav() {
+  let missing = 0;
+  for (const link of document.querySelectorAll("#side-links .nav-link")) {
+    const hub = link.dataset.hub ? hubById(link.dataset.hub) : null;
+    if (hub) {
+      const usable = usableTabs(hub);
+      missing += hub.tabs.filter((t) => t.feature && featureFlags[t.feature] === false).length;
+      const shown = usable.filter((t) => levelShows(t.level));
+      link.hidden = shown.length === 0;
+      if (shown.length) link.href = shown[0].hash;            // the first tab that is on: the Infrastructure page may open on Backups
+      continue;
+    }
+    const off = link.dataset.feature ? featureFlags[link.dataset.feature] === false : false;
+    if (off) missing += 1;
+    link.hidden = off || !levelShows(link.dataset.level);
   }
   for (const group of document.querySelectorAll("#side-links .side-group")) {
     const links = group.querySelectorAll(".nav-link");
     group.hidden = links.length > 0 && [...links].every((l) => l.hidden);
   }
   const more = el("#nav-more");
-  if (more) more.hidden = !hidden;
+  if (more) more.hidden = !missing;
+}
+
+async function applyFeatures() {
+  try { Object.assign(featureFlags, await get("/api/features")); } catch { return; }
+  refreshNav();
+}
+
+// the menu level switch in the user menu
+function initLevelSwitch() {
+  const show = () => document.querySelectorAll("#menu-level .lvl-btn").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.level === getLevel())));
+  for (const b of document.querySelectorAll("#menu-level .lvl-btn")) b.addEventListener("click", () => setLevel(b.dataset.level));
+  document.addEventListener("netlens:level-changed", () => { show(); refreshNav(); renderPage(); });
+  show();
 }
 
 async function init() {
   initActions();
+  initLevelSwitch();
   const session = await applySession();
   await stylesheetsReady();
   hideBoot();

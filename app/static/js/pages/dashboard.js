@@ -502,6 +502,7 @@ export async function render(container) {
           h("span", { class: "dash-fact hint" }, `updated ${timeAgo(s.generated)}`)),
         shared && !own ? h("p", { class: "hint" }, "This is the starting dashboard set by your administrator. Press Customize to make it your own.") : null),
       h("div", { class: "dash-tools" },
+        h("a", { class: "btn", href: "#/hud", title: "Full-screen live view for a wall display" }, "Wall screen"),
         h("button", { class: `btn ${editing ? "primary" : ""}`, type: "button", "aria-pressed": String(editing), onclick: () => { editing = !editing; draw(); } }, editing ? "Done" : "Customize")));
   }
 

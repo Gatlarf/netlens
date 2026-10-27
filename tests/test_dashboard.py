@@ -78,10 +78,14 @@ def test_start_page_and_menu_groups_are_wired():
     index = (STATIC / "index.html").read_text(encoding="utf-8")
     app_js = (STATIC / "js" / "app.js").read_text(encoding="utf-8")
     assert '"#/": "dashboard"' in app_js
-    for route in ("dashboard", "map", "devices", "hierarchy", "uptime", "services", "stats", "scans", "insights", "remediation", "settings"):
+    hubs = (STATIC / "js" / "hubs.js").read_text(encoding="utf-8")
+    for route in ("dashboard", "map", "devices", "uptime", "stats", "changes", "insights", "settings"):
         assert f'data-route="{route}"' in index, route
-    assert index.count('class="side-group') == 6                       # the side menu: start pages, Network, Monitoring, Analysis, Automation, Configuration
-    assert 'class="side-group admin-only"' in index                    # Automation and Configuration are for administrators
+    for route in ("hierarchy", "services", "scans", "remediation", "backups", "storage", "smarthome", "network_health", "speedtest", "reports", "remote", "dns"):
+        assert f'route: "{route}"' in hubs, route                       # merged pages are tabs of a page and keep their own address
+    assert index.count('class="side-group') == 5                       # the side menu: start page, Network, Monitoring, Analysis, Settings
+    assert 'class="side-group side-bottom admin-only"' in index         # Settings is for administrators
+    assert 'data-route="hud"' not in index and "Wall screen" in (STATIC / "js" / "pages" / "dashboard.js").read_text(encoding="utf-8")
     assert 'data-route="overview"' not in index and '"#/overview": "dashboard"' in app_js      # the Overview widgets are dashboard cards now
     # the coffee link stays reachable on a small screen: it is in the account menu
     assert index.count("buymeacoffee.com") == 2

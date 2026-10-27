@@ -821,3 +821,17 @@ body.side-hidden .sidenav { display: none; }
 #side-links [hidden], .side-group[hidden] { display: none !important; }
 .chg-list { overflow-wrap: anywhere; }
 button[hidden], .btn[hidden] { display: none !important; }
+
+/* ---------- menu mock-up: tabs as links, level switch, bottom Settings link ---------- */
+a.tab { text-decoration: none; display: inline-block; }
+a.tab:hover { color: var(--text); }
+.hub-body { min-width: 0; }
+.side-bottom { margin-top: 18px; padding-top: 8px; border-top: 1px solid var(--border); }
+.nav-badge { margin-left: 8px; padding: 0 6px; border-radius: 9px; background: var(--accent); color: #fff; font-size: 0.75em; font-weight: 700; }
+.menu-level { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; }
+.menu-level-label { color: var(--muted); font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.06em; }
+.lvl-switch { display: flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.lvl-btn { flex: 1; padding: 5px 8px; border: none; background: transparent; color: var(--text); font: inherit; font-size: 0.85em; cursor: pointer; }
+.lvl-btn + .lvl-btn { border-left: 1px solid var(--border); }
+.lvl-btn[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 600; }
+.tabs[hidden] { display: none; }
