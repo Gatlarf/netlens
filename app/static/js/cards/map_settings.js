@@ -2,11 +2,12 @@ import { get, put } from "../api.js";
 import { h, clear, toast, setDomainSuffix } from "../util.js";
 
 const LAYOUT_LABELS = {
+  tiers: "Tiers view (bands from the gateway down, no tangle of lines)",
   free: "Free layout (drag devices where you like)",
-  tree: "Tree layout (simple top-down)",
   horizontal: "Horizontal layout (left to right, like Omada)",
   vertical: "Vertical layout (top to bottom)",
   compact: "Compact layout (small dots, left to right, like the dashboard map)",
+  hierarchy: "Hierarchy (a list of what depends on what)",
 };
 
 function browserChoice() {

@@ -78,8 +78,9 @@ def test_start_page_and_menu_groups_are_wired():
     index = (STATIC / "index.html").read_text(encoding="utf-8")
     app_js = (STATIC / "js" / "app.js").read_text(encoding="utf-8")
     assert '"#/": "dashboard"' in app_js
-    for route in ("dashboard", "map", "devices", "hierarchy", "uptime", "services", "stats", "scans", "insights", "remediation", "settings"):
+    for route in ("dashboard", "map", "devices", "uptime", "services", "stats", "scans", "insights", "remediation", "settings"):
         assert f'data-route="{route}"' in index, route
+    assert 'data-route="hierarchy"' not in index and '"#/hierarchy": "hierarchy"' in app_js        # Hierarchy is a view of the Map now; its old address opens the Map in that view
     assert index.count('class="side-group') == 6                       # the side menu: start pages, Network, Monitoring, Analysis, Automation, Configuration
     assert 'class="side-group admin-only"' in index                    # Automation and Configuration are for administrators
     assert 'data-route="overview"' not in index and '"#/overview": "dashboard"' in app_js      # the Overview widgets are dashboard cards now

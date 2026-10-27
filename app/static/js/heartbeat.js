@@ -253,9 +253,9 @@ export function sparkline(values, width = 240, height = 36) {
   return svg;
 }
 
-// ---------- 24 hours / 7 days / 30 days ----------
+// ---------- 6 hours / 24 hours / 7 days / 30 days ----------
 
-export const RANGES = [["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"]];
+export const RANGES = [["6h", "6 hours"], ["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"]];
 const RANGE_KEY = "netlens.uptime.range";
 
 // the period last chosen on any uptime view (kept in this browser only)

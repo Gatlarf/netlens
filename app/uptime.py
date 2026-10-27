@@ -13,7 +13,7 @@ def _format_ts(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _cutoff(now: str, days: int) -> str:
+def _cutoff(now: str, days: float) -> str:
     dt = _parse_ts(now)
     dt = dt - timedelta(days=days)
     return _format_ts(dt)
@@ -126,7 +126,7 @@ def device_uptime(
     device_id: int,
     now: str | None = None,
     limit: int = 60,
-    days: int | None = None,
+    days: float | None = None,
 ) -> dict:
     """days=N: `checks` are `limit` slices of time over the last N days (with their response time) instead of the last `limit` checks."""
     if now is None:
@@ -190,7 +190,7 @@ def uptime_overview(
     conn: sqlite3.Connection,
     bars: int = 60,
     now: str | None = None,
-    days: int | None = None,
+    days: float | None = None,
 ) -> list[dict]:
     """days=None: the last `bars` checks as 1/0 (the original form); days=N: `bars` slices of time with their time and response time."""
     if now is None:
@@ -203,6 +203,7 @@ def uptime_overview(
     def pct(u: int, n: int):
         return round(u / n * 100, 2) if n else None
 
+    agg_6h = {d: pct(u, n) for d, (u, n, _a, _b) in checkstats.totals(conn, _cutoff(now, 0.25)).items()}
     agg_24h = {d: pct(u, n) for d, (u, n, _a, _b) in checkstats.totals(conn, cutoff_24h).items()}
     agg_7d = {d: pct(u, n) for d, (u, n, _a, _b) in checkstats.totals(conn, cutoff_7d).items()}
     agg_30d = {d: pct(u, n) for d, (u, n, _a, _b) in checkstats.totals(conn, _cutoff(now, 30)).items()}
@@ -256,6 +257,7 @@ def uptime_overview(
             "online": bool(row["online"]),
             "behind": names.get(behind.get(device_id)),
             "always_on": bool(row["always_on"]),
+            "up_6h": agg_6h.get(device_id),
             "up_24h": agg_24h.get(device_id),
             "up_7d": agg_7d.get(device_id),
             "up_30d": agg_30d.get(device_id),
@@ -266,12 +268,12 @@ def uptime_overview(
     return result
 
 
-# ---------- the bars and response-time line for a chosen period (24 h, 7 days, 30 days) ----------
+# ---------- the bars and response-time line for a chosen period (6 hours, 24 hours, 7 days, 30 days) ----------
 
-RANGES = {"24h": 1, "7d": 7, "30d": 30}
+RANGES = {"6h": 0.25, "24h": 1, "7d": 7, "30d": 30}          # in days
 
 
-def _bucket_rows(conn: sqlite3.Connection, now: str, days: int, bars: int, device_id: int | None = None) -> dict[int, list[dict]]:
+def _bucket_rows(conn: sqlite3.Connection, now: str, days: float, bars: int, device_id: int | None = None) -> dict[int, list[dict]]:
     """Checks of the last `days` days grouped into `bars` equal slices of time, per device (oldest first). A slice that holds one check
     is exactly that measurement; a slice with several says how many there were and how many failed. A slice is down when any check in it failed."""
     end = _parse_ts(now)
@@ -281,7 +283,7 @@ def _bucket_rows(conn: sqlite3.Connection, now: str, days: int, bars: int, devic
     sql = ("SELECT device_id, b, COUNT(*) AS n, SUM(up) AS ups, AVG(rtt_ms) AS rtt, MAX(rtt_ms) AS rtt_max, MIN(ts) AS first, MAX(ts) AS last FROM ("
            "SELECT device_id, ts, up, rtt_ms, CASE WHEN x > ? THEN ? ELSE x END AS b FROM ("
            f"SELECT device_id, ts, up, rtt_ms, (({dbengine.epoch_sql('ts')} - ?) * ?) / ? AS x FROM checks WHERE ts >= ? AND ts <= ?")
-    args: list = [bars - 1, bars - 1, t0, bars, days * 86400, _format_ts(start), now]
+    args: list = [bars - 1, bars - 1, t0, bars, int(days * 86400), _format_ts(start), now]
     if device_id is not None:
         sql += " AND device_id = ?"
         args.append(device_id)
@@ -296,7 +298,7 @@ def _bucket_rows(conn: sqlite3.Connection, now: str, days: int, bars: int, devic
     return out
 
 
-def range_days(name: str | None) -> int | None:
+def range_days(name: str | None) -> float | None:
     return RANGES.get(name) if name else None
 
 

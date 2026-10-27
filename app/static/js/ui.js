@@ -8,11 +8,18 @@ export function pageHead(title, hint, ...actions) {
     actions.length ? h("div", { class: "page-actions" }, ...actions) : null);
 }
 
-// One summary tile: a small title, a big value and a line below it. `tone` is ok, warn or bad (the coloured edge).
-// href (a #/ address) or onClick makes the whole tile clickable: a problem on a tile leads to the place where it can be seen.
+// A small "?" that shows a sentence of explanation on hover, on focus and on a tap. It keeps a page quiet: the explanation is there when asked for.
+export function infoTip(text) {
+  const tip = h("span", { class: "info-tip", tabindex: "0", role: "note", "aria-label": text, "data-tip": text }, "?");
+  tip.addEventListener("click", (e) => e.stopPropagation());       // inside a clickable tile the tap must not follow the tile
+  return tip;
+}
+
+// One summary tile: a small title (with a "?" that explains it), a big value. Every tile has the same low height. `tone` is ok, warn or bad (the coloured edge).
+// `sub` is the explanation behind the "?". href (a #/ address) or onClick makes the whole tile clickable: a problem on a tile leads to the place where it can be seen.
 export function tile(title, value, sub, tone, target) {
-  const node = h("section", { class: `dcard ${tone ? `tone-${tone}` : ""}` }, h("h2", { class: "d-title" }, title),
-    h("div", { class: "d-body" }, h("div", { class: "d-value" }, String(value)), sub ? h("div", { class: "d-sub" }, sub) : null));
+  const node = h("section", { class: `dcard ${tone ? `tone-${tone}` : ""}` }, h("h2", { class: "d-title" }, title, sub ? infoTip(sub) : null),
+    h("div", { class: "d-body" }, h("div", { class: "d-value" }, String(value))));
   if (target) {
     const go = () => (typeof target === "function" ? target() : (location.hash = target));
     node.classList.add("clickable-tile");
@@ -124,4 +131,11 @@ export async function previewHtml(title, url, downloadUrl) {
   document.addEventListener("keydown", onKey);
   window.addEventListener("popstate", onPop);
   overlay.querySelector("button").focus();
+}
+
+// "Connect as <login>" with a small × beside it that forgets that saved login. The two sit together, so it is clear what the × belongs to.
+export function savedLoginButton(label, onConnect, onForget) {
+  return h("span", { class: "btn-split" },
+    h("button", { type: "button", class: "btn", onclick: onConnect }, label),
+    h("button", { type: "button", class: "btn btn-split-x", title: "Forget this saved login", "aria-label": "Forget this saved login", onclick: onForget }, "×"));
 }

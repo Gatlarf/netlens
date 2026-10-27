@@ -198,6 +198,7 @@ def test_uptime_endpoint_ranges(tmp_path):
     app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
     with TestClient(app, headers={"Authorization": "Bearer secret"}) as c:
         assert c.get("/api/uptime?range=7d&bars=30").status_code == 200
+        assert c.get("/api/uptime?range=6h&bars=30").status_code == 200            # 6 hours: a quarter of a day, still whole slices
         assert c.get("/api/uptime?range=1y").status_code == 422
         assert c.get("/api/uptime").status_code == 200
 
@@ -284,3 +285,22 @@ def test_latest_response_times_for_the_radar(tmp_path):
     got = {d["id"]: d for d in client.get("/api/uptime/latest").json()}
     assert set(got) == {1, 2} and got[1]["rtt_ms"] == 20.0 and got[1]["up"] is True
     assert got[2]["up"] is False and got[2]["rtt_ms"] is None
+
+
+def test_six_hour_range_has_its_own_percentage_and_slices(tmp_path):
+    from app.db import connect, init_db
+
+    conn = connect(tmp_path / "t.db")
+    init_db(conn)
+    conn.execute("INSERT INTO devices (id, mac, primary_ip, hostname, online, first_seen, last_seen) VALUES (1, 'aa:00:00:00:00:01', '10.0.0.1', 'a', 1, 'x', 'x')")
+    conn.commit()
+    rows = overview_for_six_hours(conn)
+    assert rows[0]["up_6h"] is None or 0 <= rows[0]["up_6h"] <= 100
+    assert "up_24h" in rows[0] and isinstance(rows[0]["bars"], list)
+
+
+def overview_for_six_hours(conn):
+    from app.uptime import RANGES, uptime_overview
+
+    assert RANGES["6h"] == 0.25
+    return uptime_overview(conn, bars=12, days=RANGES["6h"])

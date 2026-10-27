@@ -1,5 +1,6 @@
 import { get, post, del, ApiError } from "./api.js";
 import { h, clear, toast } from "./util.js";
+import { infoTip, savedLoginButton } from "./ui.js";
 
 const activeTerminals = new WeakMap();
 
@@ -41,7 +42,25 @@ function loadXterm() {
   return xtermLoaded;
 }
 
+// The stored login that last opened a session on a device (only its id and a label are kept in this browser, never a password)
+const lastKey = (device) => `netlens.ssh.last.${device.id}`;
+function readLast(device) {
+  try {
+    const v = JSON.parse(localStorage.getItem(lastKey(device)) || "null");
+    return v && typeof v.id === "string" && typeof v.label === "string" ? v : null;
+  } catch (e) {
+    return null;
+  }
+}
+function writeLast(device, value) {
+  try { localStorage.setItem(lastKey(device), JSON.stringify(value)); } catch (e) { /* not remembered */ }
+}
+function forgetLast(device) {
+  try { localStorage.removeItem(lastKey(device)); } catch (e) { /* nothing kept */ }
+}
+
 export async function mountTerminal(slot, device, { onWideChange } = {}) {
+  let pendingLast = null;          // becomes the "last used" login when the session really opens
   let cfg;
   try {
     cfg = await get("/api/config");
@@ -110,7 +129,17 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
     if (proto === "ssh") {
       const form = h("form", { class: "ssh-form" });
       const stored = h("select", { name: "stored" }, h("option", { value: "" }, "Type a login below"));
-      get("/api/credentials").then((r) => { for (const c of r.credentials) stored.appendChild(h("option", { value: c.id }, `${c.name}${c.username ? ` (${c.username})` : ""}`)); }).catch(() => {});
+      let last = readLast(device);           // the stored login that opened a session here last time
+      const lastSlot = h("span", {});
+      const drawLast = () => {
+        clear(lastSlot);
+        if (last) lastSlot.appendChild(savedLoginButton(`Connect as ${last.label}`, () => connectWith(last.id, last.label), () => { forgetLast(device); last = null; drawLast(); }));
+      };
+      get("/api/credentials").then((r) => {
+        for (const c of r.credentials) stored.appendChild(h("option", { value: c.id }, `${c.name}${c.username ? ` (${c.username})` : ""}`));
+        if (last && ![...stored.options].some((o) => o.value === last.id)) { forgetLast(device); last = null; }     // it was deleted under Settings -> Credentials
+        drawLast();
+      }).catch(() => {});
       const usernameInput = h("input", { type: "text", name: "username", autocomplete: "off" });
       const saveBox = h("input", { type: "checkbox", name: "save" });
       stored.addEventListener("change", () => { for (const el of [usernameInput, passwordInput, keyTextarea, passphraseInput, saveBox]) el.disabled = stored.value !== ""; });
@@ -133,21 +162,21 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
       keySection.appendChild(fileInput);
 
       const passphraseInput = h("input", { type: "password", name: "passphrase", autocomplete: "off" });
-      const connectBtn = h("button", { type: "submit", class: "btn" }, "Connect");
-      const note = h("p", { class: "muted" }, "A typed login is sent to the Netlens server only to open this session, unless you save it. Stored logins are under Settings → Credentials.");
+      const connectBtn = h("button", { type: "submit", class: "btn primary" }, "Connect");
+      const field = (label, input, tip) => h("div", { class: "field" }, h("label", {}, label, tip ? infoTip(tip) : null), input);
 
-      form.appendChild(h("label", {}, "Stored login"));
-      form.appendChild(stored);
-      form.appendChild(h("label", {}, "Username"));
-      form.appendChild(usernameInput);
-      form.appendChild(h("label", {}, "Password"));
-      form.appendChild(passwordInput);
-      form.appendChild(keySection);
-      form.appendChild(h("label", {}, "Passphrase"));
-      form.appendChild(passphraseInput);
-      form.appendChild(h("label", { class: "check" }, saveBox, " Save this login in the credential store (encrypted, only you can use it)"));
-      form.appendChild(connectBtn);
-      form.appendChild(note);
+      form.appendChild(field("Stored login", stored, "A typed login is sent to the Netlens server only to open this session, unless you save it. Stored logins are under Settings → Credentials."));
+      form.appendChild(h("div", { class: "ssh-cols" }, field("User name", usernameInput), field("Password", passwordInput)));
+      form.appendChild(h("div", { class: "field" }, keySection));
+      form.appendChild(field("Passphrase (for the key)", passphraseInput));
+      form.appendChild(h("div", { class: "field" }, h("label", { class: "check" }, saveBox, " Save this login in the credential store (encrypted, only you can use it)")));
+      form.appendChild(h("div", { class: "btn-row" }, connectBtn, lastSlot));
+
+      async function connectWith(credentialId, label) {
+        pendingLast = { id: credentialId, label };
+        clear(connectionArea);
+        await startTerminal(proto, port, "", "", "", "", credentialId);
+      }
 
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -156,17 +185,21 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
         const key = keyTextarea.value;
         const passphrase = passphraseInput.value;
         if (!stored.value && !username) { toast("Enter a user name or pick a stored login", "error"); return; }
+        let credentialId = stored.value;
+        let label = credentialId ? stored.selectedOptions[0].textContent : "";
         if (!stored.value && saveBox.checked) {
           try {
-            await post("/api/credentials", key ? { name: `SSH ${device.name || device.ip || device.id}`, kind: "ssh_key", username, private_key: key, passphrase }
-              : { name: `SSH ${device.name || device.ip || device.id}`, kind: "login", username, password });
+            const name = `SSH ${device.name || device.ip || device.id}`;
+            const made = await post("/api/credentials", key ? { name, kind: "ssh_key", username, private_key: key, passphrase }
+              : { name, kind: "login", username, password });
             toast("Login saved in the credential store", "success");
+            if (made && made.id) { credentialId = made.id; label = `${name} (${username})`; }       // from now on it is the last used login
           } catch (err) { toast(err.message || "Could not save the login", "error"); }
         }
-        const credentialId = stored.value;
-
+        pendingLast = credentialId ? { id: credentialId, label } : null;
         clear(connectionArea);
-        await startTerminal(proto, port, username, password, key, passphrase, credentialId);
+        if (credentialId && !stored.value) await startTerminal(proto, port, "", "", "", "", credentialId);
+        else await startTerminal(proto, port, username, password, key, passphrase, credentialId);
       });
 
       connectionArea.appendChild(form);
@@ -269,6 +302,7 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
               statusText += " · host key " + msg.fingerprint + (msg.new_key ? " (trusted on first use)" : " (verified)");
             }
             statusLine.textContent = statusText;
+            if (pendingLast) { writeLast(device, pendingLast); pendingLast = null; }
             term.focus();
           } else if (msg.type === "error") {
             term.writeln("\x1b[31m" + msg.message + "\x1b[0m");

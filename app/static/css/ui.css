@@ -41,7 +41,7 @@ a.dash-fact:hover { text-decoration: underline; }
 .row-menu-list .menu-item { text-align: left; padding: 6px 10px; background: none; border: 0; color: var(--text); font: inherit; cursor: pointer; border-radius: var(--radius-sm); }
 .row-menu-list .menu-item:hover { background: var(--bg); }
 .row-menu-list .danger-text { color: var(--bad); }
-.up-list.up-compact .up-row { grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 236px; padding: 6px 12px; }
+.up-list.up-compact .up-row { grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) 304px; padding: 6px 12px; }
 .up-list.up-compact .up-resp { display: none; }
 @media (max-width: 760px) { .up-list.up-compact .up-row { grid-template-columns: minmax(0, 1fr) auto; } }
 .ins-grid { align-items: start; } .col-left { display: flex; flex-direction: column; gap: 16px; }

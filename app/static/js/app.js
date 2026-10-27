@@ -1,4 +1,5 @@
 import { initSearch } from "./search.js";
+import { initAsk } from "./ask.js";
 import { initActions } from "./actions.js";
 import { autoResizable } from "./colresize.js";
 import { describeScan, describeTiming } from "./progress.js";
@@ -565,6 +566,7 @@ initThemeToggle();
 initUpdateBadge();
 initTopbar();
 initSearch();
+initAsk();
 autoResizable();
 
 // Installable app (needs HTTPS or localhost); the worker only caches the public interface files, see sw.js

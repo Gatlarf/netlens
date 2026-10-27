@@ -1,6 +1,6 @@
 import { get, post, patch, del } from "../api.js";
 import { h, clear, patch as patchDom, toast, timeAgo, shortName } from "../util.js";
-import { pageHead, rowMenu, emptyState } from "../ui.js";
+import { pageHead, rowMenu, emptyState, tile } from "../ui.js";
 import { heartbeatBar, uptimeText, uptimeClass } from "../heartbeat.js";
 import { buildServiceForm } from "../cards/service_form.js";
 import { buildPerformanceCard } from "../cards/performance.js";
@@ -60,7 +60,22 @@ export async function render(container) {
   const top = pageHead("Services", "HTTP pages, TCP ports, DNS lookups, certificates and processes, checked at the interval you choose.", addBtn);
   const formSlot = h("div", {});
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
-  container.append(top, formSlot, body);
+  const tiles = h("div", { class: "up-tiles" });
+  container.append(top, tiles, formSlot, body);
+
+  // the same three tiles as Health: how many checks work, how many fail, how reliable they were over the last day
+  function drawTiles(checks) {
+    if (!checks.length) return clear(tiles);
+    const active = checks.filter((c) => c.enabled);
+    const down = active.filter((c) => c.state === "down");
+    const up = active.filter((c) => c.state === "up").length;
+    const rated = active.map((c) => c.uptime_24h).filter((v) => typeof v === "number");
+    const avg = rated.length ? rated.reduce((a, b) => a + b, 0) / rated.length : null;
+    patchDom(tiles,
+      tile("Checks up", `${up} / ${active.length}`, checks.length > active.length ? `${checks.length - active.length} paused.` : "Every check is switched on.", down.length ? "warn" : "ok"),
+      tile("Down", String(down.length), down.length ? `Failing now: ${down.slice(0, 5).map((c) => c.name).join(", ")}${down.length > 5 ? " …" : ""}.` : "Nothing is failing.", down.length ? "bad" : "ok"),
+      tile("Availability, 24 h", uptimeText(avg), "Average over the checks that are switched on.", avg === null ? "" : avg >= 99 ? "ok" : avg >= 95 ? "warn" : "bad"));
+  }
 
   async function showForm(check = null) {
     clear(formSlot);
@@ -83,6 +98,7 @@ export async function render(container) {
     let plugins = [];
     try { plugins = await get("/api/plugin-runs"); } catch (err) { /* the plugins are an extra; the checks still show */ }
     if (destroyed) return;
+    drawTiles(checks);
     const plugRows = pluginRows(plugins, openPlugins);
     if (!checks.length) {
       body.replaceChildren(...[emptyState("No checks yet", "Add one to watch a web page, a port or a DNS server. Typical examples: your router's web page (HTTP), your NAS on port 445 (TCP), your DNS server resolving example.com (DNS).", h("button", { class: "btn primary admin-only", type: "button", onclick: () => addBtn.click() }, "Add check")), plugRows.length ? h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("tbody", {}, ...plugRows))) : null].filter(Boolean));

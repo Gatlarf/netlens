@@ -1,12 +1,12 @@
 import { get, put } from "../api.js";
 import { h, clear, patch, toast, statusDot, shortName } from "../util.js";
-import { pageHead } from "../ui.js";
+import { pageHead, tile } from "../ui.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 import { heartbeatBar, responseLine, rangeTabs, savedRange, RANGES, uptimeText, uptimeClass } from "../heartbeat.js";
 
-const PCT = { "24h": "up_24h", "7d": "up_7d", "30d": "up_30d" };
+const PCT = { "6h": "up_6h", "24h": "up_24h", "7d": "up_7d", "30d": "up_30d" };
 const SCOPE_KEY = "netlens.uptime.scope";
-const savedScope = () => { try { return localStorage.getItem(SCOPE_KEY) === "core" ? "core" : "all"; } catch (e) { return "all"; } };
+const savedScope = () => { try { const v = localStorage.getItem(SCOPE_KEY); return v === "core" || v === "all" ? v : null; } catch (e) { return null; } };      // null: nobody chose yet, the page then opens on the always-on devices
 const DENSE_KEY = "netlens.uptime.graphs";
 const savedGraphs = () => { try { return localStorage.getItem(DENSE_KEY) === "on"; } catch (e) { return false; } };
 const SORTS = [["name", "Name"], ["worst", "Least reliable first"], ["slow", "Slowest first"]];
@@ -19,7 +19,7 @@ const tone = (pct) => (pct === null || pct === undefined ? "off" : pct >= 99 ? "
 export async function render(container) {
   let disposed = false, inFlight = false, timer = null;
   const openGraphs = new Set();      // devices whose history graph is open (kept when the list is redrawn)
-  let range = savedRange(), scope = savedScope(), sort = "worst", filterText = "", onlyProblems = false, data = null;
+  let range = savedRange(), scope = savedScope() || "all", scopeChosen = savedScope() !== null, sort = "worst", filterText = "", onlyProblems = false, data = null;
 
   const phone = () => window.matchMedia("(max-width: 700px)").matches;
   const slots = () => (phone() ? 30 : 60);
@@ -40,13 +40,11 @@ export async function render(container) {
     const online = data_.filter((d) => d.online).length;
     const withDowntime = data_.filter((d) => (d.bars || []).some((b) => typeof b === "object" && !b.up)).length;
     const rt = mean(data_.map(avgResponse).filter((v) => v !== null));
-    const tile = (title, value, sub, kind) => h("section", { class: `dcard ${kind ? `tone-${kind}` : ""}` }, h("h2", { class: "d-title" }, title),
-      h("div", { class: "d-body" }, h("div", { class: "d-value" }, value), h("div", { class: "d-sub" }, sub)));
     patch(tiles,
-      tile("Online now", `${online} / ${data_.length}`, online === data_.length ? "every device answers" : `${data_.length - online} not answering`, online === data_.length ? "ok" : "warn"),
-      tile("Availability", uptimeText(avg), `${scopeLabel()}, average over ${periodLabel().toLowerCase()}`, avg === null ? "" : avg >= 99 ? "ok" : avg >= 95 ? "warn" : "bad"),
-      tile("With downtime", String(withDowntime), withDowntime ? `devices missed a check in ${periodLabel().toLowerCase()}` : `no device missed a check in ${periodLabel().toLowerCase()}`, withDowntime ? "warn" : "ok"),
-      tile("Response time", fmtMs(rt), `average over ${periodLabel().toLowerCase()}`, ""));
+      tile("Online now", `${online} / ${data_.length}`, online === data_.length ? "Every device answers." : `${data_.length - online} not answering.`, online === data_.length ? "ok" : "warn"),
+      tile("Availability", uptimeText(avg), `${scopeLabel()}, average over ${periodLabel().toLowerCase()}.`, avg === null ? "" : avg >= 99 ? "ok" : avg >= 95 ? "warn" : "bad"),
+      tile("With downtime", String(withDowntime), withDowntime ? `Devices that missed a check in ${periodLabel().toLowerCase()}.` : `No device missed a check in ${periodLabel().toLowerCase()}.`, withDowntime ? "warn" : "ok"),
+      tile("Response time", fmtMs(rt), `Average over ${periodLabel().toLowerCase()}.`, ""));
   }
 
   function row(item) {
@@ -68,7 +66,7 @@ export async function render(container) {
         item.ip && item.ip !== item.name ? h("div", { class: "mono hint" }, item.ip) : null),
       h("div", { class: "up-avail" }, h("span", { class: "up-graph-label" }, "Availability"), heartbeatBar(item.bars || [], n)),
       h("div", { class: "up-resp" }, h("span", { class: "up-graph-label" }, `Response time · average ${fmtMs(resp)}`), responseLine(item.bars || [], n, { height: 34 })),
-      h("div", { class: "up-nums" }, num("24h", "24 h"), num("7d", "7 days"), num("30d", "30 days")), detail);
+      h("div", { class: "up-nums" }, num("6h", "6 h"), num("24h", "24 h"), num("7d", "7 days"), num("30d", "30 days")), detail);
     // a click on the row opens the graph, except on the device link and the bars (they show their own details)
     rowEl.addEventListener("click", (e) => {
       if (e.target.closest("a, button, .hb-bar, .rl, .up-detail")) return;
@@ -160,6 +158,10 @@ export async function render(container) {
       const result = await get(`/api/uptime?range=${range}&bars=${slots()}`);
       if (disposed) return;
       data = result;
+      if (!scopeChosen) {          // nobody picked a view yet: open on the always-on devices (when there are any)
+        scopeChosen = true;
+        if (data.some((d) => d.always_on)) { scope = "core"; syncScope(); }
+      }
       draw();
     } catch (err) {
       if (!disposed) toast("Failed to load uptime", "error");
@@ -168,13 +170,15 @@ export async function render(container) {
     }
   }
 
+  let scopeWrap = null;
+  const syncScope = () => { if (scopeWrap) for (const b of scopeWrap.children) b.setAttribute("aria-pressed", String(b.dataset.scope === scope)); };
   function scopeTabs() {
-    const wrap = h("div", { class: "range-tabs", role: "group", "aria-label": "Which devices" });
+    const wrap = scopeWrap = h("div", { class: "range-tabs", role: "group", "aria-label": "Which devices" });
     for (const [key, label, title] of [["all", "All devices", "Every device, including phones and tablets that come and go"], ["core", "Always-on", "Only the devices marked as always-on (router, switches, servers ...)"]]) {
-      wrap.append(h("button", { type: "button", title, "aria-pressed": String(key === scope), onclick: (e) => {
+      wrap.append(h("button", { type: "button", title, "data-scope": key, "aria-pressed": String(key === scope), onclick: () => {
         scope = key;
         try { localStorage.setItem(SCOPE_KEY, key); } catch (err) { /* only this page remembers it */ }
-        for (const b of wrap.children) b.setAttribute("aria-pressed", String(b === e.currentTarget));
+        syncScope();
         draw();
       } }, label));
     }

@@ -5,7 +5,7 @@ import { pageHead } from "../ui.js";
 import { applyLayout, loadLayout, startBoard } from "../layout_cards.js";
 import { barList, columnChart, donut, emptyNote, fmtBytes, fmtDuration, fmtNumber, fmtPct, lineChart, tile } from "../charts.js";
 
-const RANGES = [["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["90d", "90 days"]];
+const RANGES = [["6h", "6 hours"], ["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"], ["90d", "90 days"]];
 
 const dev = (item) => ({ ...item, href: `#/device/${item.id}` });
 
@@ -107,7 +107,7 @@ function build(s) {
     tile(fmtNumber(o.stale_30d), "not seen for 30 days", { tone: o.stale_30d ? "warn" : "" }), tile(fmtNumber(o.unknown), "unknown (not marked as known)", { tone: o.unknown ? "warn" : "" }), tile(fmtNumber(o.ignored), "ignored"))));
 
   // ------------------------------------------------------------------ history
-  const online = hist.online_series.map((r) => ({ x: r.t.replace("T", " ").slice(5, hist.bucket === "hour" ? 16 : 10), online: r.online, monitored: r.monitored }));
+  const online = hist.online_series.map((r) => ({ x: r.t.replace("T", " ").slice(5, hist.bucket === "day" ? 10 : 16), online: r.online, monitored: r.monitored }));
   const daily = hist.daily.map((r) => ({ x: r.day.slice(5), devices: r.devices, online: r.online }));
   root.appendChild(section("history", "History",
     card(`Devices online (per ${hist.bucket})`, lineChart(online, [{ key: "online", label: "online" }, { key: "monitored", label: "monitored" }])),
@@ -184,7 +184,7 @@ function build(s) {
         tile(rate(sp.down.avg), "download, average"), tile(rate(sp.up.avg), "upload, average"), tile(msText(sp.latency.avg), "ping, average"),
         tile(fmtNumber(sp.tests), "internet tests", { tone: sp.failed ? "warn" : "" }), tile(fmtNumber(sp.failed), "failed", { tone: sp.failed ? "warn" : "" })),
       card("Internet speed over time", sp.series.length > 1
-        ? lineChart(sp.series.map((r) => ({ x: r.ts.slice(5, s.range === "24h" ? 16 : 10).replace("T", " "), down: r.down, up: r.up })), [{ key: "down", label: "Download (Mbps)" }, { key: "up", label: "Upload (Mbps)" }], { height: 150 })
+        ? lineChart(sp.series.map((r) => ({ x: r.ts.slice(5, s.range === "6h" || s.range === "24h" ? 16 : 10).replace("T", " "), down: r.down, up: r.up })), [{ key: "down", label: "Download (Mbps)" }, { key: "up", label: "Upload (Mbps)" }], { height: 150 })
         : emptyNote("Needs two tests in this period.")),
       card("Spread in this period", table(["", "Lowest", "Average", "Highest"], [["Download", rate(sp.down.min), rate(sp.down.avg), rate(sp.down.max)], ["Upload", rate(sp.up.min), rate(sp.up.avg), rate(sp.up.max)], ["Ping", msText(sp.latency.min), msText(sp.latency.avg), msText(sp.latency.max)]])),
       card("Latest iperf3 tests", sp.iperf.length ? table(["When", "With", "Download", "Upload"], sp.iperf.map((r) => [timeAgo(r.ts), r.target, rate(r.down_mbps), rate(r.up_mbps)])) : emptyNote("No iperf3 tests yet.")),

@@ -110,11 +110,19 @@ def facts_from(conn: sqlite3.Connection, ranges: list[str]) -> dict[str, Any]:
     """What Netlens knows: devices, the scanned ranges, the DHCP servers, the gateway it remembers and the notable events of 30 days."""
     from app import netchecks
 
-    devices = [{"id": r["id"], "name": r["name"], "ip": r["primary_ip"], "mac": (r["mac"] or "").lower(), "online": bool(r["online"])}
-               for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip, mac, online FROM devices WHERE primary_ip IS NOT NULL")]
+    from app.scanner.vendor import mac_kind
+
+    recent_since = ago(days=RECENT_DAYS)
+    devices = [{"id": r["id"], "name": r["name"], "ip": r["primary_ip"], "mac": (r["mac"] or "").lower(), "online": bool(r["online"]),
+                "recent": bool(r["online"]) or (r["last_seen"] or "") >= recent_since,          # an address of a device that has been gone for weeks is free again on most DHCP servers
+                "private": mac_kind(r["mac"]) == "randomized"}
+               for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip, mac, online, last_seen FROM devices WHERE primary_ip IS NOT NULL")]
     events = {r["kind"]: r["n"] for r in conn.execute("SELECT kind, COUNT(*) AS n FROM events WHERE kind IN ('ip_reused', 'gateway_changed', 'dhcp_rogue') AND ts >= ? GROUP BY kind", (ago(days=30),))}
     reused = conn.execute("SELECT COUNT(DISTINCT detail) FROM events WHERE kind = 'ip_reused' AND ts >= ?", (ago(days=30),)).fetchone()[0]
     return {"devices": devices, "ranges": ranges, "dhcp": netchecks.list_servers(conn), "dhcp_last": netchecks.get_last(conn), "gateway": netchecks.get_gateway(conn), "events": events, "reused_addresses": reused}
+
+
+RECENT_DAYS = 14        # a device not seen for this long no longer counts as using an address
 
 
 # ----------------------------------------------------------------------------- judging
@@ -181,15 +189,21 @@ def analyse(raw: dict[str, Any], facts: dict[str, Any]) -> dict[str, Any]:
     attached = {a["network"] for a in mine}
     for net in nets:
         inside = [d for d in devices if _in(d["ip"], net)]
+        in_use = [d for d in inside if d.get("recent", True)]
+        gone_private = sum(1 for d in inside if not d.get("recent", True) and d.get("private"))
         hosts = max(net.num_addresses - 2, 1)
-        usage = round(100 * len(inside) / hosts)
+        usage = round(100 * len(in_use) / hosts)
         subnets.append({"range": str(net), "online": sum(1 for d in inside if d["online"]), "known": len(inside), "size": hosts, "usage": usage, "attached": str(net) in attached})
         if str(net) not in attached and mine:
             add("info", f"{net} is not directly connected to this computer", "Devices there are found with pings only: their MAC addresses (and so vendors and renamed devices) are not visible. Put a Netlens on that network or let it report to this one as a remote site.")
+        # phones that change their Wi-Fi address (private address) show up as a new device every time: the ones gone for weeks are not counted, and the user is told about them
+        privates = sum(1 for d in in_use if d.get("private"))
+        why = (f" {privates} of them use a private Wi-Fi address; a phone that changes that address is listed as a new device each time, so it may be counted more than once." if privates >= 5 else "")
+        gone = (f" {gone_private} more devices with a private address were not seen for {RECENT_DAYS} days and are left out." if gone_private else "")
         if hosts >= 100 and usage >= 95:
-            add("bad", f"{net} is nearly full", f"{len(inside)} of {hosts} addresses are known. New devices may not get an address. Use a bigger range or remove old devices.")
+            add("bad", f"{net} is nearly full", f"{len(in_use)} of {hosts} addresses were in use in the last {RECENT_DAYS} days.{why}{gone} New devices may not get an address. Use a bigger range or remove old devices.")
         elif hosts >= 100 and usage >= 80:
-            add("warn", f"{net} is filling up", f"{len(inside)} of {hosts} addresses are known ({usage}%). Plan a larger range before it runs out.")
+            add("warn", f"{net} is filling up", f"{len(in_use)} of {hosts} addresses were in use in the last {RECENT_DAYS} days ({usage}%).{why}{gone} Plan a larger range before it runs out.")
     outside = [d for d in devices if d["online"] and nets and not any(_in(d["ip"], n) for n in nets)]
     if outside:
         add("info", f"{len(outside)} online device{'s' if len(outside) != 1 else ''} outside the scanned ranges", ", ".join(sorted(d["name"] for d in outside)[:10]) + ". They are known but not on a range Netlens scans, so they are only seen by other means.")

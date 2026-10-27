@@ -35,7 +35,7 @@ def get_uptime_latest(request: Request, conn=Depends(get_conn)) -> list[dict]:
 
 
 @router.get("/uptime")
-def get_uptime_overview(request: Request, bars: int = Query(60, ge=1, le=240), range: Literal["24h", "7d", "30d"] | None = None) -> list[dict]:
+def get_uptime_overview(request: Request, bars: int = Query(60, ge=1, le=240), range: Literal["6h", "24h", "7d", "30d"] | None = None) -> list[dict]:
     """Per-device heartbeat bars and 24h/7d/30d uptime, like Uptime Kuma's dashboard. With `range` each bar is a slice of that period with its
     time and response time (what the page uses); without it the bars are the last checks as 1/0."""
     def build():
@@ -61,7 +61,7 @@ def get_uptime_overview(request: Request, bars: int = Query(60, ge=1, le=240), r
 def get_device_uptime(
     device_id: int,
     limit: int = Query(60, ge=1, le=500),
-    range: Literal["24h", "7d", "30d"] | None = None,
+    range: Literal["6h", "24h", "7d", "30d"] | None = None,
     conn=Depends(get_conn),
 ) -> dict:
     if conn.execute("SELECT 1 FROM devices WHERE id = ?", (device_id,)).fetchone() is None:

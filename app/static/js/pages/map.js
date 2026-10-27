@@ -3,10 +3,12 @@ import { get, post, patch, del, ApiError } from "../api.js";
 import { popMenu } from "../ui.js";
 import { h, clear, toast, foldToolbarOnPhone, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { renderTiers } from "./map_tiers.js";
+import { render as renderHierarchy } from "./hierarchy.js";
 import { buildTree, defaultCollapsed, layoutHorizontal, layoutVertical, leafIds } from "../layout_horizontal.js";
 
-const LAYOUTS = ["free", "tree", "horizontal", "vertical", "compact"];
-const LAYOUT_OPTIONS = [["free", "Free layout"], ["tree", "Tree layout"], ["horizontal", "Horizontal layout"], ["vertical", "Vertical layout"], ["compact", "Compact layout"], ["tiers", "Tiers view"]];
+const LAYOUTS = ["free", "horizontal", "vertical", "compact"];       // the layouts drawn with the graph library
+const VIEWS = ["tiers", ...LAYOUTS, "hierarchy"];                      // every view of the map; Tiers is the default
+const LAYOUT_OPTIONS = [["tiers", "Tiers view"], ["free", "Free layout"], ["horizontal", "Horizontal layout"], ["vertical", "Vertical layout"], ["compact", "Compact layout"], ["hierarchy", "Hierarchy (list)"]];
 // the compact layout is the dashboard's mini-map at full size: small dots in columns, flattened, with curved links
 const compactPos = (p) => (p ? { x: p.x * 1.1, y: p.y * 0.6 } : undefined);
 const cardMode = (mode) => mode === "horizontal" || mode === "vertical";   // the layouts that draw a card per device
@@ -150,7 +152,7 @@ function shorten(text, max) {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-// mode: "free" | "tree" | "horizontal" | "vertical" | "compact"; extra.folded = number of hidden client devices below this one
+// mode: "free" | "horizontal" | "vertical" | "compact"; extra.folded = number of hidden client devices below this one
 function buildNodeData(node, mode = "free", extra = {}) {
   const treeLayout = mode !== "free";
   const color = colorMode === "group" ? node.group_color || NO_GROUP_COLOR : nodeColor(node.type);
@@ -293,11 +295,7 @@ function applyFilters(nodesDS, edgesDS, nodes, edges, search, typeFilter, status
 }
 
 export async function render(container, params) {
-  if (readPref("netlens.map.layout", ["tiers"], "") === "tiers") {       // the Tiers view is drawn without the graph library
-    return renderTiers(container, { layouts: LAYOUT_OPTIONS, current: "tiers", onLayout: (value) => { savePref("netlens.map.layout", value); window.dispatchEvent(new Event("hashchange")); } });
-  }
-  await loadVis();
-  let serverLayout = "free";
+  let serverLayout = "tiers";
   let serverGuests = false;
   try {
     const mapSettings = await get("/api/map-settings");
@@ -306,7 +304,21 @@ export async function render(container, params) {
   } catch (e) {
     // the map still works with the built-in default
   }
-  if (!LAYOUTS.includes(serverLayout)) serverLayout = "free";
+  if (!VIEWS.includes(serverLayout)) serverLayout = "tiers";
+  // a view chosen in this browser wins over the default set under Settings -> Map
+  const view = readPref("netlens.map.layout", VIEWS, serverLayout);
+  const changeView = (value) => { savePref("netlens.map.layout", value); window.dispatchEvent(new Event("hashchange")); };
+  if (view === "tiers") {       // the Tiers view is drawn without the graph library
+    return renderTiers(container, { layouts: LAYOUT_OPTIONS, current: "tiers", onLayout: changeView });
+  }
+  if (view === "hierarchy") {   // the list of what depends on what: the page that used to be "Hierarchy"
+    const select = h("select", { class: "layout-mode", title: "How the devices are shown" }, ...LAYOUT_OPTIONS.map(([v, l]) => h("option", { value: v, selected: v === view }, l)));
+    select.addEventListener("change", () => changeView(select.value));
+    const body = h("div", {});
+    container.append(h("div", { class: "toolbar" }, select), body);
+    return renderHierarchy(body, { embedded: true });
+  }
+  await loadVis();
 
   const toolbar = h("div", { class: "toolbar" });
   const searchInput = h("input", { type: "text", placeholder: "Search label, IP, MAC, vendor" });
@@ -321,12 +333,12 @@ export async function render(container, params) {
   statusSelect.appendChild(h("option", { value: "Offline" }, "Offline"));
 
   // a layout chosen in this browser wins over the default set under Settings -> Map
-  const layoutMode = readPref("netlens.map.layout", LAYOUTS, serverLayout);
+  const layoutMode = view;
   const treeLayout = layoutMode !== "free"; // the layout arranges itself
   const vertical = layoutMode === "vertical";
   const horizontal = cardMode(layoutMode);   // both card layouts: folding, fitting and the drawn elbows
   const compact = layoutMode === "compact";    // dots in columns, nothing folded; fitted like the card layouts
-  // the tree layout needs the parent -> child links, so it always shows the hierarchy
+  // the layouts that arrange themselves need the parent -> child links, so they always show the hierarchy
   const linksMode = treeLayout ? "hierarchy" : readPref("netlens.map.links", ["hierarchy", "all"], "hierarchy");
   // containers and apps under their host: the default is set under Settings -> Map, a choice made here is kept per browser
   const showGuests = readPref("netlens.map.guests", ["on", "off"], serverGuests ? "on" : "off") === "on";
@@ -353,12 +365,7 @@ export async function render(container, params) {
     refreshView();
   });
   const layoutSelect = h("select", { class: "layout-mode", title: "How the devices are arranged" });
-  layoutSelect.appendChild(h("option", { value: "free" }, "Free layout"));
-  layoutSelect.appendChild(h("option", { value: "tree" }, "Tree layout"));
-  layoutSelect.appendChild(h("option", { value: "horizontal" }, "Horizontal layout"));
-  layoutSelect.appendChild(h("option", { value: "vertical" }, "Vertical layout"));
-  layoutSelect.appendChild(h("option", { value: "compact" }, "Compact layout"));
-  layoutSelect.appendChild(h("option", { value: "tiers" }, "Tiers view"));
+  for (const [value, label] of LAYOUT_OPTIONS) layoutSelect.appendChild(h("option", { value }, label));
   layoutSelect.value = layoutMode;
   layoutSelect.addEventListener("change", () => {
     savePref("netlens.map.layout", layoutSelect.value);
@@ -486,18 +493,7 @@ export async function render(container, params) {
       arrows: "to",
       smooth: { type: "continuous" },
     },
-    layout: layoutMode === "tree"
-      ? {
-          hierarchical: {
-            enabled: true,
-            direction: "UD",
-            sortMethod: "directed",
-            levelSeparation: 120,
-            nodeSpacing: 150,
-            treeSpacing: 200,
-          },
-        }
-      : {},
+    layout: {},
     physics: treeLayout ? { enabled: false } : {
       enabled: true,
       barnesHut: {

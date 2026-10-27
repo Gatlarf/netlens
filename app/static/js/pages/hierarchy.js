@@ -1,6 +1,5 @@
 import { get } from "../api.js";
 import { h, clear, toast, statusDot, typeBadge, shortName } from "../util.js";
-import { pageHead } from "../ui.js";
 
 const SOURCE_LABEL = {
   manual: "set manually",
@@ -62,8 +61,14 @@ export async function render(container, params) {
   let filterText = "";
   let showGuests = loadShowGuests();
 
+  // opened by its old address: it is a view of the map now
+  if (!params || !params.embedded) {
+    try { localStorage.setItem("netlens.map.layout", "hierarchy"); } catch (e) { /* the map then opens in its usual view */ }
+    location.replace("#/map");
+    return;
+  }
   clear(container);
-  container.appendChild(pageHead("Hierarchy", 
+  container.appendChild(h("p", { class: "hint" },
     "Which device depends on which. A device's parent comes from your plugins (a hypervisor such as Proxmox, a router), the traceroute path or the default gateway, " +
     "or you set it by hand on the device page."));
 

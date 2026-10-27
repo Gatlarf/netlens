@@ -4,6 +4,7 @@
 import { get, post, del } from "../api.js";
 import { h, clear, toast, shortName, statusDot } from "../util.js";
 import { mountTerminal } from "../terminal.js";
+import { savedLoginButton } from "../ui.js";
 
 let guacLoaded = null;
 function loadGuac() {
@@ -41,12 +42,12 @@ function codeBlock(text) {
   return h("div", { class: "remote-code-wrap" }, pre, copy);
 }
 
-function setupGuide(helper, recheck) {
+function setupGuide(helper, recheck, onClose) {
   const state = helper.reachable
     ? h("p", { class: "remote-ok" }, `✓ The helper answers at ${helper.address}. RDP and VNC are ready to use.`)
     : h("p", { class: "remote-bad" }, helper.configured ? `The helper at ${helper.address} cannot be reached: ${helper.error}.` : "The helper is switched off (NETLENS_GUACD).");
   return h("div", { class: "card remote-setup" },
-    h("h2", {}, "Set up RDP and VNC"),
+    h("div", { class: "remote-setup-head" }, h("h2", {}, "Set up RDP and VNC"), h("button", { type: "button", class: "btn", onclick: onClose }, "Close")),
     h("p", {}, "SSH and Telnet work out of the box. To use a Windows machine through RDP, or any machine through VNC, Netlens needs a small helper: ",
       h("strong", {}, "guacd"), " from the Apache Guacamole project. It is a separate container because it does the heavy lifting of the remote desktop protocols. Netlens is the only thing that talks to it, and your passwords are only passed on while a session opens."),
     state,
@@ -100,10 +101,9 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
       error,
       h("div", { class: "btn-row" },
         h("button", { type: "submit", class: "btn primary" }, "Connect"),
-        saved ? h("button", { type: "button", class: "btn", onclick: () => connect({ use_saved: true }) }, `Connect as ${saved.username || "saved login"}`) : null,
-        saved ? h("button", { type: "button", class: "btn danger", onclick: async () => {
+        saved ? savedLoginButton(`Connect as ${saved.username || "saved login"}`, () => connect({ use_saved: true }), async () => {
           try { await del(`/api/remote/${device.id}/saved/${svc.proto}`); saved = null; svc.saved = null; toast("Saved login forgotten", "success"); showForm(); } catch (e) { toast(e.message || "Failed", "error"); }
-        } }, "Forget the saved login") : null),
+        }) : null),
       h("p", { class: "hint" }, "The password is sent once to open the session and is not kept unless you choose to remember it."));
     form.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -256,9 +256,9 @@ export async function render(container) {
   function drawHelper() {
     clear(helperLine);
     const hp = data.helper;
-    helperLine.append(
-      h("span", { class: hp.reachable ? "remote-ok" : "remote-bad" }, hp.reachable ? "✓ RDP/VNC helper connected" : "RDP/VNC helper not set up"),
-      " ", h("button", { type: "button", class: "btn", onclick: showSetup }, hp.reachable ? "Info" : "Set up"));
+    helperLine.append(h("span", { class: hp.reachable ? "remote-ok" : "remote-bad", title: hp.reachable ? `The helper answers at ${hp.address}` : "RDP and VNC need a small helper container" },
+      hp.reachable ? "✓ RDP/VNC helper connected" : "RDP/VNC helper not set up"));
+    if (!hp.reachable) helperLine.append(" ", h("button", { type: "button", class: "btn", onclick: showSetup }, "Set up RDP & VNC"));      // once it is set up there is nothing left to do
   }
 
   function drawList() {
@@ -291,7 +291,7 @@ export async function render(container) {
   function addSession(id, label, builder) {
     const tab = h("div", { class: "remote-tab", role: "tab" },
       h("button", { type: "button", class: "remote-tab-name", onclick: () => current && current.select(id) }, label),
-      id === "__setup" ? null : h("button", { type: "button", class: "remote-tab-x", "aria-label": `Close ${label}`, onclick: () => closeAny(id) }, "×"));
+      h("button", { type: "button", class: "remote-tab-x", "aria-label": `Close ${label}`, onclick: () => closeAny(id) }, "×"));
     const pane = h("div", { class: "remote-pane", hidden: true });
     tabs.append(tab);
     panes.append(pane);
@@ -330,7 +330,7 @@ export async function render(container) {
   function showSetup() {
     if (kept.setupShown) return select("__setup");
     kept.setupShown = true;
-    addSession("__setup", "Set up RDP & VNC", (pane) => { pane.append(setupGuide(data.helper, recheck)); });
+    addSession("__setup", "Set up RDP & VNC", (pane) => { pane.append(setupGuide(data.helper, recheck, () => closeAny("__setup"))); });
     drawEmpty();
   }
 
@@ -364,7 +364,7 @@ export async function render(container) {
 
   container.append(
     h("div", { class: "remote" },
-      h("aside", { class: "remote-side" }, h("h1", {}, "Remote access"), search, list, helperLine),
+      h("aside", { class: "remote-side" }, h("div", { class: "remote-title" }, h("h1", {}, "Remote access"), helperLine), search, list),
       h("section", { class: "remote-main" }, tabs, panes, emptyNote)));
   drawHelper();
   drawList();

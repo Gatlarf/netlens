@@ -186,3 +186,13 @@
 .hud-tchart .tfrom { left: 6px; bottom: 0; }
 .hud-tchart .tto { right: 4px; bottom: 0; }
 .hud-traffic .hud-cap { margin: 2px 0 0; }
+
+.hud-top-right { display: inline-flex; align-items: baseline; gap: 12px; }
+.hud-fs { font: inherit; font-size: 0.8rem; padding: 2px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text); cursor: pointer; }
+.hud-fs:hover { border-color: var(--accent); color: var(--accent); }
+.hud:fullscreen { height: 100vh !important; padding: 14px; background: var(--bg); box-sizing: border-box; }
+
+/* the chosen button of a group (time range, filter chip) stays readable: dark text on the bright accent, and it beats the dark button background above */
+:root[data-skin="hud"] button.btn.active, :root[data-skin="hud"] .range-tabs button[aria-pressed="true"], :root[data-skin="hud"] button.stat-chip.active, :root[data-skin="hud"] .chg-chip.active, :root[data-skin="hud"] .lvl-btn[aria-pressed="true"] {
+  background-color: var(--accent); background-image: none; color: var(--accent-text); border-color: var(--accent); font-weight: 700;
+}

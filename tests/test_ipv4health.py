@@ -69,6 +69,19 @@ def test_no_gateway_no_address_and_full_ranges():
     assert titles(h.analyse(raw(), facts(devices=crowd[:210], ranges=["10.0.0.0/24"])))["10.0.0.0/24 is filling up"] == "warn"
 
 
+def test_phones_with_a_changing_address_do_not_fill_the_range():
+    """A phone that rotates its private Wi-Fi address is listed as a new device each time. The ones gone for weeks no longer count as using an address."""
+    crowd = [dev(i, f"d{i}", f"10.0.0.{i}", f"aa:00:00:00:{i // 256:02x}:{i % 256:02x}") for i in range(1, 246)]
+    gone = [{**d, "online": False, "recent": False, "private": True} for d in crowd[:200]]
+    res = h.analyse(raw(), facts(devices=gone + crowd[200:], ranges=["10.0.0.0/24"]))
+    t = titles(res)
+    assert "10.0.0.0/24 is nearly full" not in t and "10.0.0.0/24 is filling up" not in t
+    assert res["subnets"][0]["known"] == 245 and res["subnets"][0]["usage"] == 18             # 45 of 254 are in use
+    recent_private = [{**d, "private": True} for d in crowd]
+    text = next(f["text"] for f in h.analyse(raw(), facts(devices=recent_private, ranges=["10.0.0.0/24"]))["findings"] if f["title"].endswith("is nearly full"))
+    assert "private Wi-Fi address" in text and "in the last 14 days" in text
+
+
 def test_dhcp_variants_and_outside_ranges():
     t = titles(h.analyse(raw(), facts(dhcp=[server(), server("192.168.1.2")])))
     assert t["2 DHCP servers answer"] == "warn"

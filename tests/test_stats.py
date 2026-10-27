@@ -143,7 +143,8 @@ def test_history_ranges_and_snapshots(db):
     assert conn.execute("SELECT COUNT(*) FROM stats_daily WHERE day = '2024-01-01'").fetchone()[0] == 0  # retention
     with pytest.raises(ValueError):
         compute_stats(conn, "1y", NOW)
-    assert set(RANGES) == {"24h", "7d", "30d", "90d"}
+    assert set(RANGES) == {"6h", "24h", "7d", "30d", "90d"}
+    assert compute_stats(conn, "6h", NOW)["history"]["bucket"] == "minute"                 # a short window is drawn per scan
 
 
 def test_system_and_plugins(db):

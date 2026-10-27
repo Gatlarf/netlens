@@ -52,7 +52,7 @@ def _passive(request: Request) -> dict | None:
 
 @router.get("/stats")
 def get_stats(request: Request, range: str = Query("7d")) -> dict:
-    """Everything for the Statistics page. `range` is 24h, 7d, 30d or 90d (the window of the history groups)."""
+    """Everything for the Statistics page. `range` is 6h, 24h, 7d, 30d or 90d (the window of the history groups)."""
     if range not in RANGES:
         raise HTTPException(status_code=422, detail=f"range must be one of {', '.join(RANGES)}")
     db_path = request.app.state.db_path

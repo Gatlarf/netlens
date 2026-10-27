@@ -261,7 +261,7 @@ dialog.whats-new h2 { margin: 0; }
 .range-tabs { display: inline-flex; padding: 3px; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; }
 .range-tabs button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 0.85rem; padding: 5px 14px; border-radius: 999px; cursor: pointer; }
 .range-tabs button:hover { color: var(--text); }
-.range-tabs button[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 600; }
+.range-tabs button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text, #fff); font-weight: 600; }
 .range-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* the uptime page */
@@ -273,7 +273,7 @@ dialog.whats-new h2 { margin: 0; }
 .up-tools input[type="text"] { flex: 1 1 220px; max-width: 320px; margin: 0; }
 .up-tools label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; color: var(--muted); }
 .up-list { display: grid; gap: 8px; }
-.up-row { display: grid; grid-template-columns: 190px minmax(0, 1fr) minmax(0, 1fr) 236px; align-items: center; gap: 8px 18px; padding: 10px 14px;
+.up-row { display: grid; grid-template-columns: 190px minmax(0, 1fr) minmax(0, 1fr) 304px; align-items: center; gap: 8px 18px; padding: 10px 14px;
   background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--ok); border-radius: var(--radius); }
 .up-row.bad { border-left-color: var(--bad); }
 .up-row.warn { border-left-color: var(--warn); }
@@ -331,7 +331,7 @@ dialog.whats-new h2 { margin: 0; }
 .up-choose-row input { width: auto; margin: 0; }
 .up-choose-name { min-width: 0; overflow-wrap: anywhere; }
 .up-choose-pct { text-align: right; font-variant-numeric: tabular-nums; }
-.up-suggest { background: var(--accent); color: #fff; }
+.up-suggest { background: var(--accent); color: var(--accent-text, #fff); }
 @media (max-width: 500px) { .up-choose-row { grid-template-columns: auto minmax(0, 1fr) auto; } .up-choose-row > .hint, .up-choose-row .up-suggest { display: none; } }
 
 /* getting-started wizard */
@@ -339,8 +339,8 @@ dialog.whats-new h2 { margin: 0; }
 .wiz-head h1 { margin: 0 0 4px; }
 .wiz-dots { display: flex; gap: 6px; list-style: none; padding: 0; margin: 12px 0 0; flex-wrap: wrap; }
 .wiz-dots button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border, #8884); background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
-.wiz-dots .past button { background: var(--accent, #3b82f6); color: #fff; border-color: transparent; opacity: .7; }
-.wiz-dots .now button { background: var(--accent, #3b82f6); color: #fff; border-color: transparent; font-weight: 700; }
+.wiz-dots .past button { background: var(--accent, #3b82f6); color: var(--accent-text, #fff); border-color: transparent; opacity: .7; }
+.wiz-dots .now button { background: var(--accent, #3b82f6); color: var(--accent-text, #fff); border-color: transparent; font-weight: 700; }
 .wiz-body { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .wiz-nav { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .wiz-nav-end { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -502,7 +502,8 @@ dialog.whats-new h2 { margin: 0; }
 .limits-table .limits-head { color: var(--muted); font-size: 0.8rem; }
 
 /* Reports page */
-.rep-page { display: flex; flex-direction: column; gap: 16px; }
+.rep-page { display: flex; flex-direction: column; gap: 8px; }
+.rep-page > .page-head { margin-bottom: 0; }
 .rep-text { white-space: pre-wrap; margin: 0 0 12px; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--font); font-size: 0.92rem; line-height: 1.5; }
 .rep-schedule { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .rep-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -535,7 +536,7 @@ dialog.whats-new h2 { margin: 0; }
 .chg-periods { display: flex; flex-wrap: wrap; gap: 6px; }
 .chg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
 .chg-chip { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 0.9em; cursor: pointer; }
-.chg-chip.active { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); color: #fff; }
+.chg-chip.active { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); color: var(--accent-text, #fff); }
 .chg-chip:disabled { opacity: 0.45; cursor: default; }
 .chg-day { font-size: 1em; margin: 18px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .chg-card { padding: 4px 0; }
@@ -681,7 +682,7 @@ table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 /* "?" marker with a short explanation in the analysis cards */
 .info-tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1.25em; height: 1.25em; margin-left: 8px; border: 1px solid var(--border, #888); border-radius: 50%; font-size: 0.75em; font-weight: 600; color: var(--muted, #888); cursor: help; vertical-align: middle; }
 .info-tip:hover, .info-tip:focus { color: var(--text, inherit); border-color: currentColor; outline: none; }
-.info-tip::after { content: attr(data-tip); position: absolute; z-index: 20; left: 0; top: calc(100% + 6px); width: max-content; max-width: min(280px, 70vw); padding: 8px 10px; border-radius: var(--radius); background: var(--surface, #222); color: var(--text, #eee); border: 1px solid var(--border, #555); box-shadow: 0 4px 14px rgba(0,0,0,.35); font-size: 1.1em; font-weight: 400; line-height: 1.4; text-align: left; white-space: normal; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .12s; }
+.info-tip::after { content: attr(data-tip); text-transform: none; letter-spacing: normal; position: absolute; z-index: 20; left: 0; top: calc(100% + 6px); width: max-content; max-width: min(280px, 70vw); padding: 8px 10px; border-radius: var(--radius); background: var(--surface, #222); color: var(--text, #eee); border: 1px solid var(--border, #555); box-shadow: 0 4px 14px rgba(0,0,0,.35); font-size: 1.1em; font-weight: 400; line-height: 1.4; text-align: left; white-space: normal; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity .12s; }
 .info-tip:hover::after, .info-tip:focus::after { opacity: 1; visibility: visible; }
 .ai-ref { font-size: 0.8rem; padding: 0 6px; border: 1px solid var(--border, #d0d7e2); border-radius: 999px; text-decoration: none; white-space: nowrap; }
 .ai-check { color: var(--muted); }
@@ -790,3 +791,38 @@ button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background:
 .hb-bar .hb-part:hover { opacity: 1; filter: brightness(1.12); }
 .probe-section { border: 1px solid var(--border, #3333); border-radius: 8px; padding: 10px 14px 12px; margin: 12px 0; }
 .probe-section > h3:first-child { margin-top: 0; }
+
+/* summary tiles: low and all the same height on every page (Uptime, Health, Services, Backups, Storage, Vulnerabilities) */
+.up-tiles .dcard { padding: 8px 12px; gap: 2px; justify-content: center; }
+.up-tiles .d-value { font-size: 1.5rem; }
+.up-tiles .d-title .info-tip { z-index: 2; position: relative; }
+
+/* Remote access: the helper state sits beside the title; the set-up guide has a Close button; "Connect as ..." carries its own forget button */
+.remote-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 8px; }
+.remote-title h1 { margin: 0; }
+.remote-title .remote-helper { margin: 0; }
+.remote-setup-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.remote-setup-head h2 { margin: 0; }
+.btn-split { display: inline-flex; }
+.btn-split > .btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.btn-split > .btn-split-x { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 0; padding-left: 10px; padding-right: 10px; color: var(--muted); }
+.btn-split > .btn-split-x:hover { color: var(--bad); }
+/* the SSH login form lays out like the RDP one */
+.ssh-form { display: grid; gap: 12px; max-width: 460px; }
+.ssh-form .field { margin: 0; }
+.ssh-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.ssh-form .field label { display: flex; align-items: center; }
+.ssh-form .check { display: flex; align-items: center; gap: 6px; }
+
+/* "Ask your network" in the top bar */
+.ask-form { position: relative; display: flex; align-items: center; gap: 2px; }
+.ask-form input { width: clamp(150px, 20vw, 300px); margin: 0; padding: 5px 10px; }
+.ask-go { padding: 4px 9px; }
+.ask-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: min(480px, 92vw); max-height: 70vh; overflow: auto; padding: 12px 14px; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
+.ask-panel[hidden] { display: none; }
+.ask-q { margin: 0 0 8px; font-weight: 600; overflow-wrap: anywhere; }
+.ask-a { margin: 0 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ask-actions { display: flex; gap: 8px; margin-top: 10px; }
+@media (max-width: 700px) { .ask-form { order: 3; flex: 1 0 100%; margin-bottom: 8px; } .ask-form input { width: 100%; flex: 1; } .ask-panel { left: 0; right: 0; width: auto; } }
+.rep-page .dev-tabs { margin: 0 0 10px; }

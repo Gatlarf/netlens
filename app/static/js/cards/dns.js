@@ -36,7 +36,7 @@ function describeChange(c) {
 
 // mode "page": the preview of what would be registered (the DNS page); mode "settings": the rules for registering (Settings -> DNS registration)
 export async function buildDnsCard(mode = "page") {
-  const card = h("div", { class: "card", id: "dns-card" });
+  const card = h("div", { class: mode === "settings" ? "card" : "dns-flat", id: "dns-card" });       // the DNS page is the list itself: no box around it
   const state = await get("/api/dns");
   render(card, state, mode);
   return card;
@@ -45,11 +45,9 @@ export async function buildDnsCard(mode = "page") {
 function render(card, state, mode = "page") {
   clear(card);
   if (mode === "settings") card.appendChild(h("h2", {}, "DNS registration"));
-  card.appendChild(h("p", { class: "hint" },
-    mode === "settings"
-      ? "Netlens can register the devices it knows in your DNS server, and keep the address right when a device gets a new one from DHCP. It only ever changes records it created itself (marked with a comment) and never touches records that something else made, such as a Windows machine that registers itself."
-      : "It only ever changes records it created itself (marked with a comment) and never touches records that something else made. Nothing is written before you approve it here. The rules (networks, zones, what to register) are under ",
-    mode === "settings" ? null : h("a", { href: "#/settings/dns" }, "Settings → DNS registration"), mode === "settings" ? null : "."));
+  if (mode === "settings") {
+    card.appendChild(h("p", { class: "hint" }, "Netlens can register the devices it knows in your DNS server, and keep the address right when a device gets a new one from DHCP. It only ever changes records it created itself (marked with a comment) and never touches records that something else made, such as a Windows machine that registers itself."));
+  }
 
   if (!state.plugins.length) {
     card.appendChild(h("p", {}, "No DNS plugin is installed yet. Install one under ", h("a", { href: "#/settings/plugin-browse" }, "Settings → Plugin store"), " (for example Technitium DNS)."));

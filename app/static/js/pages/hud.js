@@ -262,6 +262,9 @@ export async function render(container) {
       if (lastList) drawRadar();
     } }, label))));
   const clock = h("span", { class: "hud-clock" });
+  const fsButton = h("button", { type: "button", class: "hud-fs", title: "Show the HUD on the whole screen (Esc to leave)", "aria-label": "Full screen", onclick: () => {
+    if (document.fullscreenElement) document.exitFullscreen(); else if (root.requestFullscreen) root.requestFullscreen().catch(() => {});
+  } }, "Full screen");
   const scopeBtns = {};
   const scopeSwitch = h("div", { class: "hud-scope", role: "group", "aria-label": "Which devices" },
     ...[["all", "All devices"], ["core", "Always-on"]].map(([key, label]) => (scopeBtns[key] = h("button", { type: "button", "aria-pressed": String(key === scope), onclick: () => {
@@ -307,7 +310,7 @@ export async function render(container) {
   const ticker = h("div", { class: "hud-ticker" });
 
   const root = h("div", { class: "hud" },
-    h("div", { class: "hud-top" }, h("span", { class: "hud-title" }, h("i", { class: "hud-live" }), "Netlens // situation"), scopeSwitch, clock),
+    h("div", { class: "hud-top" }, h("span", { class: "hud-title" }, h("i", { class: "hud-live" }), "Netlens // situation"), scopeSwitch, h("span", { class: "hud-top-right" }, clock, fsButton)),
     h("div", { class: "hud-left" }, h("section", { class: "hud-panel" }, h("h3", {}, "Vitals"), gauges), h("section", { class: "hud-panel", style: "flex:1" }, h("h3", {}, "Needs attention"), attn)),
     h("div", { class: "hud-mid" }, h("section", { class: "hud-panel hud-radar-panel", style: "flex:1;display:flex;flex-direction:column" }, h("div", { class: "hud-panel-head" }, h("h3", {}, "Network scope"), viewSwitch), caption, radarBox), h("section", { class: "hud-panel" }, stats)),
     h("div", { class: "hud-right" }, h("section", { class: "hud-panel hud-feed", style: "flex:1" }, h("h3", {}, "Live event stream"), feed), trafficPanel),
@@ -361,6 +364,8 @@ export async function render(container) {
   // the page fills the window exactly: from where it starts to the bottom edge
   const size = () => { root.style.height = `${Math.max(360, window.innerHeight - root.getBoundingClientRect().top - 30)}px`; drawFeed(); drawAttn(true); };
   window.addEventListener("resize", size);
+  root.addEventListener("fullscreenchange", () => { const on = document.fullscreenElement === root; fsButton.textContent = on ? "Exit full screen" : "Full screen"; size(); });
+  if (!document.fullscreenEnabled) fsButton.hidden = true;       // some browsers (and iframes) do not allow it
 
   async function events(first) {
     try {

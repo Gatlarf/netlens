@@ -352,7 +352,7 @@ def summary(conn, now: str | None = None) -> dict:
     }
 
 
-def stats(conn, now: str, days: int) -> dict:
+def stats(conn, now: str, days: float) -> dict:
     """For the Statistics page: the internet tests of the chosen window with their spread, plus the latest iperf3 and browser tests."""
     since = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ") - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     rows = [r for r in reversed(history(conn, "internet", 2000)) if r["ts"] >= since]

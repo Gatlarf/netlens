@@ -26,7 +26,7 @@ from app.hierarchy import children_map, load_hierarchy
 from app.version import VERSION
 
 SUMMARY_API = 1
-RANGES = {"24h": 1, "7d": 7, "30d": 30, "90d": 90}
+RANGES = {"6h": 0.25, "24h": 1, "7d": 7, "30d": 30, "90d": 90}          # in days
 SNAPSHOT_RETENTION_DAYS = 400
 FLAP_TRANSITIONS = 6  # up/down changes within 24 h that make a device "flapping"
 MIN_CHECKS = 10  # fewer checks than this say nothing about reliability
@@ -380,12 +380,12 @@ def core_numbers(conn, now: str) -> dict:
     return {"devices": row["n"], "online": row["o"], "uptime": {"24h": pct(1), "7d": pct(7), "30d": pct(30)}, "flapping": flapping_devices(conn, now, True) if row["n"] else 0}
 
 
-def _history(conn, now: str, days: int) -> dict:
+def _history(conn, now: str, days: float) -> dict:
     cutoff_day = _ago(now, days=days)[:10]
     daily = [dict(r) for r in conn.execute("SELECT day, devices, online, new_devices, open_ports, events, scans FROM stats_daily WHERE day >= ? ORDER BY day", (cutoff_day,))]
     # devices online per hour (24 h / 7 d) or per day (30 d / 90 d), from the uptime checks
     cutoff = _ago(now, days=min(days, 90))
-    width = 13 if days <= 7 else 10  # characters of the timestamp that make up the bucket
+    width = 16 if days < 1 else 13 if days <= 7 else 10  # characters of the timestamp that make up the bucket: per scan (minute), hour or day
     per_scan = conn.execute("SELECT ts, SUM(up) AS u, COUNT(*) AS n FROM checks WHERE ts >= ? AND beat = 0 GROUP BY ts ORDER BY ts", (cutoff,)).fetchall()
     buckets: dict[str, list[tuple[int, int]]] = defaultdict(list)
     for r in per_scan:
@@ -398,7 +398,7 @@ def _history(conn, now: str, days: int) -> dict:
     for r in conn.execute("SELECT substr(ts, 1, 10) AS d, kind, COUNT(*) AS n FROM events WHERE ts >= ? GROUP BY d, kind", (_ago(now, days=days),)):
         per_day[r["d"]][r["kind"]] = r["n"]
     events_series = [{"day": d, "total": sum(c.values()), "new": c.get("device_new", 0), "offline": c.get("device_offline", 0)} for d, c in sorted(per_day.items())]
-    return {"daily": daily, "online_series": online_series, "events_series": events_series, "bucket": "hour" if width == 13 else "day"}
+    return {"daily": daily, "online_series": online_series, "events_series": events_series, "bucket": "minute" if width == 16 else "hour" if width == 13 else "day"}
 
 
 def _ports(conn, now: str) -> dict:
@@ -473,7 +473,7 @@ def _structure(conn, devs: dict, hierarchy: dict) -> dict:
     }
 
 
-def _scans(conn, now: str, days: int) -> dict:
+def _scans(conn, now: str, days: float) -> dict:
     cutoff = _ago(now, days=days)
     rows = conn.execute("SELECT id, kind, status, started, finished, hosts_found FROM scans WHERE started >= ? ORDER BY id", (cutoff,)).fetchall()
     by_kind: dict[str, dict] = {}
@@ -495,7 +495,7 @@ def _scans(conn, now: str, days: int) -> dict:
     return {"by_kind": by_kind, "hosts_trend": trend, "last": dict(last) if last else None, "host_timeouts": timeouts, "total": len(rows)}
 
 
-def _events(conn, now: str, days: int) -> dict:
+def _events(conn, now: str, days: float) -> dict:
     cutoff = _ago(now, days=days)
     kinds = Counter({r["kind"]: r["n"] for r in conn.execute("SELECT kind, COUNT(*) AS n FROM events WHERE ts >= ? GROUP BY kind", (cutoff,))})
     active = [
@@ -595,7 +595,7 @@ def _shared(fn):
 
 @_shared
 def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | None = None, db_path: str | None = None, passive: dict | None = None) -> dict:
-    """Everything the Statistics page shows. `range_key` (24h, 7d, 30d, 90d) sets the window of the history groups."""
+    """Everything the Statistics page shows. `range_key` (6h, 24h, 7d, 30d, 90d) sets the window of the history groups."""
     if range_key not in RANGES:
         raise ValueError(f"range must be one of {', '.join(RANGES)}")
     now = now or utcnow()
@@ -610,7 +610,7 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
         "availability": _availability(conn, now),
         "history": _history(conn, now, days),
         "ports": _ports(conn, now),
-        "applications": _applications(conn, days),
+        "applications": _applications(conn, max(1, int(days))),
         "structure": _structure(conn, devs, hierarchy),
         "scans": _scans(conn, now, days),
         "events": _events(conn, now, days),

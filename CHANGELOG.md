@@ -2,6 +2,29 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.290 — 2026-10-27
+
+### Added
+- ★ **Ask your network from any page.** A box in the top bar takes a question ("what happened last night?") and shows the answer in a small panel under it, with a button to open Insights. It uses the same engine as Insights (the built-in logic, or the language model when one is connected).
+- **Map: Hierarchy is a view of the map.** Choose it in the map's view menu (and as the default under Settings → Map). The Hierarchy item is gone from the side menu; its old address opens the map in that view.
+- **Full-screen button on the HUD.**
+- **6 hours on Uptime and Statistics**, next to 24 hours, 7 days and 30 days.
+- **Services shows the same three summary boxes as Health:** checks up, down, availability over 24 hours.
+- **Remote access: the last used login.** The SSH form has a "Connect as …" button for the stored login that opened a session on that device last time, like RDP has.
+
+### Changed
+- ★ **The Map opens in the Tiers view** (bands from the gateway down, no tangle of lines). The Tree layout is gone: it was not readable. A browser that had chosen it, or a Settings → Map default of it, uses Tiers.
+- **The summary boxes are low and the same height on Uptime, Health, Services, Backups, Storage and Vulnerabilities.** The explanation that was written under the number is behind a small ? next to the title.
+- **Uptime opens on the always-on devices** (when some are marked), and the figures for 6 hours are shown with the others.
+- **DNS: no box around the list.** The sentence about the records Netlens changes is behind a ? next to the text under the title, with the link to Settings → DNS registration beside it.
+- **Remote access:** the helper's state (✓ RDP/VNC helper connected) sits next to the title; "Set up RDP & VNC" only shows while it is not set up, and the set-up guide has a Close button. The SSH login form is laid out like the RDP one, the explanation of typed logins is behind a ? next to Stored login, and "Forget the saved login" is a small × beside "Connect as …" instead of a red button of its own.
+- **Reports: less empty space** between the heading and the tabs.
+- **Network health: a range is "nearly full" only by the devices seen in the last 14 days.** Phones that change their Wi-Fi address (a private address) show up as a new device each time; the ones gone for weeks used to be counted and filled the range on paper. The message now says how many of the devices use a private address.
+
+### Fixed
+- **The chosen time range or filter button was unreadable in the HUD colours** (dark text on a dark button).
+- **The demo's questions work:** asking is read-only and is allowed in the demo.
+
 ## 0.4.289 — 2026-10-27
 
 ### Changed

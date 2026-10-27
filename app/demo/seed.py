@@ -495,7 +495,7 @@ def seed(conn, data_dir: Path, now: datetime | None = None) -> dict:
     _wifi(conn, ids, times, up, rng)
     _speedtests(conn, now, rng)
     settings = {
-        "ranges": json.dumps([f"{net.SUBNET}.0/24"]), "map_default_layout": "horizontal", "map_show_guests": "1",
+        "ranges": json.dumps([f"{net.SUBNET}.0/24"]), "map_default_layout": "tiers", "map_show_guests": "1",
         "netchecks.gateway": json.dumps({"ip": f"{net.SUBNET}.1", "mac": mac(BY_KEY["gw"]), "since": fmt(now - timedelta(days=HISTORY_DAYS))}),
         "backup.schedule": json.dumps({"enabled": True, "every_hours": 6, "keep": 28}),
         "update_check.settings": json.dumps({"enabled": False}),

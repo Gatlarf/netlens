@@ -91,14 +91,14 @@ SITE = {"site_id": i("The remote site's id, from list_sites")}
 # overview
 tool("get_dashboard", "overview", "What needs attention now: the dashboard's verdict, attention list and key numbers. The quickest overview of the whole network.", "GET", "/api/dashboard")
 tool("get_summary", "overview", "Short statistics: devices, online now, events, scans, health.", "GET", "/api/stats/summary")
-tool("get_statistics", "overview", "Statistics over a period (devices, vendors, types, scan history).", "GET", "/api/stats", {"range": s("Period, for example 24h, 7d or 30d")}, query=("range",))
+tool("get_statistics", "overview", "Statistics over a period (devices, vendors, types, scan history).", "GET", "/api/stats", {"range": s("Period: 6h, 24h, 7d, 30d or 90d")}, query=("range",))
 tool("get_insights", "overview", "Netlens' own findings: incidents, anomalies, predictions and advice, with the reason for each.", "GET", "/api/insights", {"include_all": b("Include devices that are not always-on")}, query=("include_all",))
 tool("get_changes", "overview", "What changed in a period: new, gone, moved and renamed devices, open ports, certificates.", "GET", "/api/changes",
-     {"period": s("For example 24h, 7d, 30d"), "category": s("Only this kind of change"), "limit": i("Maximum rows"), "always_on": b("Only always-on devices")}, query=("period", "category", "limit", "always_on"))
+     {"period": s("6h, 24h, 7d or 30d"), "category": s("Only this kind of change"), "limit": i("Maximum rows"), "always_on": b("Only always-on devices")}, query=("period", "category", "limit", "always_on"))
 tool("list_events", "overview", "Recent events (device offline/online, new device, service down, certificate, ...), newest first.", "GET", "/api/events",
      {"limit": i("Maximum rows, default 100"), "kind": s("Only this event kind"), "device_id": i("Only this device"), "since_id": i("Only events after this event id")}, query=("limit", "kind", "device_id", "since_id"))
 tool("get_forecast", "overview", "Predictions: disks that fill up, certificates that expire, memory trends.", "GET", "/api/forecast")
-tool("get_uptime", "overview", "Uptime of every device over a range, with the bars shown on the Uptime page.", "GET", "/api/uptime", {"bars": i("Number of bars"), "range": s("For example 24h, 7d, 30d")}, query=("bars", "range"))
+tool("get_uptime", "overview", "Uptime of every device over a range, with the bars shown on the Uptime page.", "GET", "/api/uptime", {"bars": i("Number of bars"), "range": s("6h, 24h, 7d or 30d")}, query=("bars", "range"))
 tool("get_availability_report", "overview", "Availability report for a month: per device or service, outages, target met or not.", "GET", "/api/reports/availability",
      {"month": s("YYYY-MM"), "scope": s("devices or services"), "group": i("Only this group id"), "only_outages": b("Only rows with outages"), "target": i("Target percentage"),
       "ignore_maintenance": b("Do not count maintenance windows as downtime")}, query=("month", "scope", "group", "only_outages", "target", "ignore_maintenance"))
@@ -140,7 +140,7 @@ tool("get_network_checks", "overview", "DHCP servers seen on the network (truste
 tool("list_devices", "devices", "Every device Netlens knows: name, addresses, vendor, type, online, group, always-on, trusted.", "GET", "/api/devices",
      {"online": b("Only online (true) or offline (false) devices"), "trusted": b("Only trusted (true) or untrusted (false) devices"), "q": s("Search text (name, address, vendor, MAC)")}, query=("online", "trusted", "q"))
 tool("get_device", "devices", "One device with its ports, services, history, monitoring and notes.", "GET", "/api/devices/{device_id}", DEV, ("device_id",))
-tool("get_device_uptime", "devices", "Online/offline history of one device.", "GET", "/api/devices/{device_id}/uptime", {**DEV, "limit": i("Maximum rows"), "range": s("For example 24h, 7d, 30d")}, ("device_id",), ("limit", "range"))
+tool("get_device_uptime", "devices", "Online/offline history of one device.", "GET", "/api/devices/{device_id}/uptime", {**DEV, "limit": i("Maximum rows"), "range": s("6h, 24h, 7d or 30d")}, ("device_id",), ("limit", "range"))
 tool("get_device_flapping", "devices", "How often a device went on and off, by hour of the day.", "GET", "/api/devices/{device_id}/flapping", {**DEV, "days": i("Days to look back")}, ("device_id",), ("days",))
 tool("list_metrics", "devices", "The measured series that exist for an entity (for example cpu, memory, disk, temperature for a device).", "GET", "/api/timeseries/{entity}/{entity_id}",
      {"entity": s("What it belongs to", ["device", "service", "probe", "remote", "remote_service", "plugin"]), "entity_id": i("Its id")}, ("entity", "entity_id"))
