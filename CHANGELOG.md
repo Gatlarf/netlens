@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.289 — 2026-10-27
+
+### Changed
+- ★ **The demo shows the newer parts of Netlens.** It now has a storage system with a pool that is filling up, a disk that is degrading and open alerts (Storage); a backup server with a failed and a late backup (Backups); vulnerability findings on cameras, the NAS and a web server (Vulnerabilities); a smart-home hub with batteries that are low (Smart home); stored logins that the health monitors use (Settings → Credentials, Hosts); two hosts with the read-only probe, one with an older script so "update available" shows; a weekly maintenance window; an on-call rota and remediation rules with a few runs. The demo runs with the features of the full version switched on, never sends mail and never acts by itself, and the data stays recent while it runs.
+
+### Fixed
+- **Vulnerabilities page: saving its layout failed.** The page asked for a layout the server did not know and got an error in the browser console.
+
 ## 0.4.288 — 2026-10-26
 
 ### Security

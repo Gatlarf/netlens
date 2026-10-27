@@ -296,7 +296,7 @@ def _install_plugins(conn, data_dir: Path, ids, now) -> None:
         set_setting(conn, f"plugin.{plugin_id}.install", json.dumps({"source": source, "version": plugin.manifest["version"], "sha256": "0" * 64, "level": None, "installed": fmt(now - timedelta(days=21))}))
 
     dest = data_dir / "plugins"
-    for plugin_id in ("docker", "hyperv", "npm", "snmp", "technitium", "truenas", "proxmox", "asus"):
+    for plugin_id in ("docker", "hyperv", "npm", "snmp", "technitium", "truenas", "proxmox", "asus", "pbs", "greenbone", "homeassistant"):
         target = dest / plugin_id
         if target.exists():
             shutil.rmtree(target)
@@ -312,6 +312,11 @@ def _install_plugins(conn, data_dir: Path, ids, now) -> None:
           {"proxies": 1, "sites": 12, "sites_matched": 12, "certificates": 4, "expiring": 1, "checks": 0, "alerts": 1, "warnings": 0})
     state("snmp", dest / "snmp", {"servers": [{"id": "s1", "host": f"{net.SUBNET}.10", "community": "public"}, {"id": "s2", "host": f"{net.SUBNET}.11", "community": "public"}, {"id": "s3", "host": f"{net.SUBNET}.12", "community": "public"}]},
           {"switches": 3, "hosts": 3, "links": 6})
+    state("pbs", dest / "pbs", {"servers": [{"id": "s1", "host": f"https://{net.SUBNET}.32:8007", "token_id": "netlens@pbs!demo", "secret": "demo-secret", "fingerprint": ""}], "verify_tls": False},
+          {"servers": 1, "stores": 1, "targets": 8, "problems": 2})
+    state("greenbone", dest / "greenbone", {"servers": [{"id": "s1", "host": f"{net.SUBNET}.34", "username": "netlens", "password": "demo-password", "fingerprint": ""}]},
+          {"servers": 1, "findings": 9, "matched": 9})
+    state("homeassistant", dest / "homeassistant", {"url": f"http://{net.SUBNET}.70:8123", "token": "demo-token"}, {"servers": 1, "devices": 12})
     state("technitium", dest / "technitium", {"servers": [{"id": "s1", "host": f"http://{net.SUBNET}.74:5380", "token": "demo-token"}]}, {"zones": 2, "records": 0, "managed": 0, "planned": 0, "conflicts": 0})
 
 
@@ -516,4 +521,7 @@ def seed(conn, data_dir: Path, now: datetime | None = None) -> dict:
         series.backfill(conn, force=True)
     health.seed(conn, ids, now)
     health.seed_remote(conn, now)
+    from app.demo import extras
+
+    extras.seed(conn, data_dir, ids, now)
     return ids

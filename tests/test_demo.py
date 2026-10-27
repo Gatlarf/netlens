@@ -145,3 +145,39 @@ def test_demo_has_always_on_devices_and_suggestions(tmp_path):
     core = core_numbers(conn, utcnow())
     assert 10 <= core["devices"] < 30 and core["uptime"]["30d"] > 97              # the always-on view looks healthy next to ~80% for everything
     assert any(c["suggested"] for c in core_choices(conn))                           # and the chooser has something to suggest
+
+
+def test_demo_shows_the_newer_pages(seeded):
+    """Storage, backups, vulnerabilities, smart home, stored logins, host probes, a maintenance window and the paid features all have something to show."""
+    from app import credstore, dashboard, guestbackups, inventory, licence, maintenance, storage, vulns
+    from app.hostprobe import scripts, service as probes
+    from app.hosts import overview
+
+    conn, _path, _dir = seeded
+    assert licence.allows(conn, "vulnerabilities", NOW) and licence.allows(conn, "insights", NOW)
+    assert conn.execute("SELECT COUNT(*) FROM storage_pools").fetchone()[0] == 3 and conn.execute("SELECT COUNT(*) FROM storage_alerts").fetchone()[0] == 2
+    assert conn.execute("SELECT COUNT(*) FROM storage_pools WHERE health = 'warning'").fetchone()[0] == 1          # the pool that is filling up
+    assert conn.execute("SELECT COUNT(*) FROM storage_volumes WHERE clients != '[]'").fetchone()[0] >= 3             # hosts using the shares are linked
+    assert conn.execute("SELECT COUNT(*) FROM vuln_findings WHERE device_id IS NOT NULL").fetchone()[0] == 9           # every finding is tied to a device
+    assert conn.execute("SELECT COUNT(*) FROM inventory_devices").fetchone()[0] == 12
+    assert guestbackups.summary(conn)["failed"] == 1 and guestbackups.summary(conn)["late"] == 1
+    assert len(credstore.listing(conn, "demo")) == 4 and not any("demo-password" in json.dumps(e) for e in credstore.listing(conn, "demo"))
+    hosts = {h["name"]: h for h in overview(conn)}
+    assert hosts["Proxmox host"]["probes"]["installed_version"] == scripts.SCRIPT_VERSION and hosts["rpi-docker"]["probes"]["update_available"] is True
+    assert hosts["Proxmox host"]["monitor"]["login"] == "Linux servers (read-only)"                                  # monitors use stored logins
+    assert len(maintenance.load_windows(conn)) == 1
+    assert probes.snapshots(conn, hosts["rpi-docker"]["id"])
+    problems = json.dumps(dashboard.current_problems(conn))
+    assert "storage" in problems.lower() and "backup" in problems.lower()
+
+
+def test_demo_extras_stay_recent_and_never_send_anything(seeded):
+    from app.demo import extras
+    from app.notify import channels
+
+    conn, _path, _dir = seeded
+    later = NOW + timedelta(days=1, hours=3)
+    extras.refresh(conn, later)
+    assert conn.execute("SELECT MAX(last_backup) FROM backup_targets").fetchone()[0] >= "2026-10-13T17:00:00Z"
+    assert all(c["enabled"] is False for c in channels.load_channels(conn))                    # a demo never sends mail
+    assert all(r["mode"] in ("ask", "suggest") for r in conn.execute("SELECT mode FROM remediation_rules"))  # and never acts by itself

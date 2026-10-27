@@ -1,0 +1,70 @@
+{
+  "id": "homeassistant",
+  "name": "Home Assistant",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "inventory",
+  "author": "Netlens",
+  "description": "Brings the device registry of Home Assistant into Netlens: manufacturer, model, area, firmware, protocol (Zigbee, Bluetooth, Wi-Fi), battery level and whether a device has gone unavailable. Devices with a MAC address are matched to the devices Netlens found; the others are listed on the Smart home page with the device they are paired through. Events for devices that go unavailable and for low batteries. Read-only.",
+  "timeout": 90,
+  "diagnose": true,
+  "info": {
+    "title": "Let Netlens read Home Assistant",
+    "text": "Best: make a long-lived access token. In Home Assistant open your profile (bottom left) > Security > Long-lived access tokens > Create token, and paste it below. The token has the rights of its user, so use a dedicated user (for example netlens); the plugin only reads. Alternatively fill in a user name and password and Netlens signs in with them (they are kept encrypted in Netlens). Use the address you open Home Assistant with, for example https://ha.example.com or http://192.168.0.20:8123."
+  },
+  "config": [
+    {
+      "key": "url",
+      "type": "text",
+      "label": "Home Assistant address",
+      "required": true,
+      "placeholder": "https://ha.example.com"
+    },
+    {
+      "key": "token",
+      "type": "password",
+      "label": "Long-lived access token",
+      "help": "Recommended. Leave empty to sign in with a user name and password instead."
+    },
+    {
+      "key": "username",
+      "type": "text",
+      "label": "User name (when there is no token)"
+    },
+    {
+      "key": "password",
+      "type": "password",
+      "label": "Password (when there is no token)"
+    },
+    {
+      "key": "include_services",
+      "type": "bool",
+      "label": "Also list services and add-ons",
+      "default": false,
+      "help": "Home Assistant keeps integrations such as Uptime Kuma, the Supervisor or add-ons in the same registry as devices. Off by default."
+    },
+    {
+      "key": "battery_low",
+      "type": "number",
+      "label": "Low battery below (percent)",
+      "default": 20,
+      "min": 1,
+      "max": 90
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true
+    },
+    {
+      "key": "timeout",
+      "type": "number",
+      "label": "Timeout per request (seconds)",
+      "default": 30,
+      "min": 3,
+      "max": 120
+    }
+  ],
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/homeassistant"
+}
