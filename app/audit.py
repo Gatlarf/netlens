@@ -16,7 +16,7 @@ from app.db import ago, utcnow
 RETENTION_DAYS = 365
 MAX_ROWS = 50000
 # what is not worth a line: personal preferences, probes reporting with their token, the browser's own speed test, the terminal protocol
-SKIP = re.compile(r"^/api/(login|logout|me/preferences|dashboard/layout|probe/(push|relay)|speedtest/(up|down|ping|browser)|devices/\d+/(ping|trace)|insights/(ask|identify|model-check|incidents/\d+/words)|hostprobe/(ca|settings)$|credentials(/[0-9a-f]+)?$|hosts/(apply|settings)$|devices/\d+/hostprobe/(run|diagnose|install)$|analysis/\d+/send$)")
+SKIP = re.compile(r"^/api/(login|logout|me/totp/(confirm|disable|recovery)|me/preferences|dashboard/layout|probe/(push|relay)|speedtest/(up|down|ping|browser)|devices/\d+/(ping|trace)|insights/(ask|identify|model-check|incidents/\d+/words)|hostprobe/(ca|settings)$|credentials(/[0-9a-f]+)?$|hosts/(apply|settings)$|devices/\d+/hostprobe/(run|diagnose|install)$|analysis/\d+/send$)")
 
 # (method, path regex, sentence). {0}, {1}... are the groups; a device id becomes the device's name.
 PATTERNS: list[tuple[str, str, str]] = [
@@ -73,6 +73,7 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("PUT", r"^/api/ingest$", "Changed the agent ingest settings"),
     ("POST", r"^/api/ingest/window$", "Opened the enrolment window for agents"),
     ("DELETE", r"^/api/ingest/window$", "Closed the enrolment window for agents"),
+    ("POST", r"^/api/me/totp/begin$", "Started setting up a second factor"),
     ("POST", r"^/api/ingest/ca/rotate$", "Started rotating the certificate authority for host agents"),
     ("POST", r"^/api/ingest/ca/finish$", "Finished rotating the certificate authority for host agents"),
     ("POST", r"^/api/ingest/ca/cancel$", "Cancelled the rotation of the certificate authority for host agents"),

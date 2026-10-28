@@ -155,6 +155,11 @@
         <label for="login-password">Password</label>
         <input id="login-password" type="password" autocomplete="current-password">
       </div>
+      <div id="login-totp-fields" hidden>
+        <p>Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
+        <label for="login-code">Code</label>
+        <input id="login-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="24" spellcheck="false">
+      </div>
       <a id="login-sso" class="btn" href="api/auth/oidc/login" hidden>Single sign-on</a>
       <p id="login-demo" class="hint" hidden></p>
       <p id="login-error" class="error" hidden></p>

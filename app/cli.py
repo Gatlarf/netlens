@@ -40,6 +40,8 @@ def run(argv: list[str]) -> int:
     parser.add_argument("--db", help="path of netlens.db (default: the data directory)")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("list-users")
+    p = sub.add_parser("reset-totp", help="switch off the second factor of a user who lost the authenticator and the recovery codes")
+    p.add_argument("username")
     for name in ("reset-password", "create-admin"):
         p = sub.add_parser(name)
         p.add_argument("username")
@@ -53,7 +55,16 @@ def run(argv: list[str]) -> int:
             return 0
         row = conn.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (args.username,)).fetchone()
         try:
-            if args.command == "reset-password":
+            if args.command == "reset-totp":
+                if row is None:
+                    sys.exit(f"No user named {args.username!r}. Use list-users.")
+                from app import totp
+
+                totp.remove(conn, row["id"])
+                conn.execute("DELETE FROM sessions WHERE user_id = ?", (row["id"],))
+                conn.commit()
+                print(f"The second factor of {args.username} is off and its logins ended; it can set one up again after signing in.")
+            elif args.command == "reset-password":
                 if row is None:
                     sys.exit(f"No user named {args.username!r}. Use list-users, or create-admin to add one.")
                 users.update_user(conn, row["id"], password=_password(args), disabled=False)

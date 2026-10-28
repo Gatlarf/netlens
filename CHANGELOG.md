@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.306 — 2026-10-28
+
+### Added
+- ★ **A second factor for local accounts (free, every edition): TOTP with the authenticator you already have.** Netlens is not a TOTP provider: it only verifies the standard codes (RFC 6238) made by Google or Microsoft Authenticator, Authy, 1Password or a hardware token. Set it up under Settings → Account → Second factor (QR code, confirmation with a first code, ten recovery codes shown once). The secret is stored encrypted; a code works once (no replay); between the password and the code there is no session, only a single-use challenge that ends after five wrong codes; wrong codes count towards the same limits and alarms as wrong passwords and a correct password does not reset them; recovery codes are stored as hashes, work once and raise an event when used. `python -m app.cli reset-totp <user>` helps a user who lost both. Single sign-on users use their identity provider's second factor. The design for what builds on it (requiring it, step-up for privileged actions, session limits, the customer's PAM) is in `docs/DESIGN-PRIVILEGED-ACCESS.md`.
+- ★ **A software bill of materials (SBOM) of the installation:** Settings → About → Download SBOM, `GET /api/sbom` or `python -m app.sbom`, in CycloneDX 1.5 and SPDX 2.3, made from what is installed (Python packages with licences, vendored browser libraries with SHA-256, operating-system packages) with package URLs for vulnerability scanners. The published image carries a build-time SBOM and provenance attestation, and the build keeps both documents as an artifact. Vendored since this version: qrcode-generator 1.4.4 (MIT) for the QR code.
+
+### Changed
+- `users.login` no longer starts a session for a user who has a second factor (the sign-in goes through the challenge and the code), so no caller can skip the factor by accident.
+
 ## 0.4.304 — 2026-10-28
 
 ### Added

@@ -135,7 +135,7 @@ function userRow(user, data, refresh, shown) {
   parts.push(del);
   actions.append(...parts);
 
-  row.appendChild(h("td", {}, h("strong", {}, user.username), user.disabled ? h("span", { class: "tag" }, "disabled") : null));
+  row.appendChild(h("td", {}, h("strong", {}, user.username), user.disabled ? h("span", { class: "tag" }, "disabled") : null, user.totp ? h("span", { class: "tag ok", title: "Signs in with a code from an authenticator app" }, "2FA") : null));
   row.appendChild(h("td", {}, role, user.sites ? h("span", { class: "tag", title: "Sees only these remote sites" }, `${user.sites.length} site${user.sites.length === 1 ? "" : "s"}`) : null, user.scope ? h("span", { class: "tag", title: "Sees only the devices of these groups" }, `${user.scope.length} group${user.scope.length === 1 ? "" : "s"}`) : null));
   row.appendChild(h("td", {}, user.last_login ? fmtTime(user.last_login) : "never"));
   row.appendChild(actions);

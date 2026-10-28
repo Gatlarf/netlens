@@ -73,7 +73,25 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: NETLENS_VERSION=${{ steps.ver.outputs.version }}
+          sbom: true                      # an SBOM attestation made from the image layers, attached to the image in the registry
+          provenance: mode=max            # and a SLSA provenance attestation (what was built, from which commit, by which workflow)
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # The SBOM of the application as it runs (Python packages with licences, the vendored browser libraries with SHA-256, the operating-system packages),
+      # in both standard formats, kept with the build. The same document is available from a running Netlens: Settings, or GET /api/sbom.
+      - name: SBOM of the application (CycloneDX and SPDX)
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          IMAGE=$(echo "$TAGS" | grep -m1 ":${VERSION}$")
+          docker run --rm --entrypoint python "$IMAGE" -m app.sbom > "netlens-${VERSION}.cdx.json"
+          docker run --rm --entrypoint python "$IMAGE" -m app.sbom --format spdx > "netlens-${VERSION}.spdx.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ steps.ver.outputs.version }}
+          path: netlens-*.json

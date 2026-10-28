@@ -394,22 +394,75 @@ function goToStartPage(session) {
   }
 }
 
+let loginChallenge = null;              // set between the password and the code of a second factor: no session exists yet
+
+let loginStash = [];                    // what the first step showed, to put it back when the second step ends
+
+function showTotpStep() {
+  loginStash = [];
+  for (const id of ["#login-user-fields", "#login-token-fields", "#login-sso", "#login-switch", "#login-demo"]) {
+    const node = el(id);
+    if (node) {
+      loginStash.push([node, node.hidden]);
+      node.hidden = true;
+    }
+  }
+  el("#login-totp-fields").hidden = false;
+  el("#login-code").value = "";
+  el("#login-code").focus();
+}
+
+function resetLoginSteps() {
+  loginChallenge = null;
+  el("#login-totp-fields").hidden = true;
+  el("#login-code").value = "";
+  for (const [node, was] of loginStash) node.hidden = was;
+  loginStash = [];
+  clearLoginError();
+  el("#login-password").focus();
+}
+
+async function finishLogin() {
+  closeLoginDialog();
+  clearLoginError();
+  el("#login-password").value = "";
+  el("#login-code").value = "";
+  loginChallenge = null;
+  const session = await applySession();
+  goToStartPage(session);
+  displayLoaded = false;
+  startPoll();
+  renderPage();
+}
+
 async function handleLogin(e) {
   e.preventDefault();
+  if (loginChallenge) {                                                  // the second step: the code
+    try {
+      await post("/api/login/totp", { challenge: loginChallenge, code: el("#login-code").value.trim() });
+      await finishLogin();
+    } catch (err) {
+      const detail = err instanceof ApiError ? err.detail : err.message;
+      showLoginError(detail);
+      if (/expired|ended/.test(detail || "")) resetLoginSteps();
+      else el("#login-code").select();
+    }
+    return;
+  }
   const body = loginByUser
     ? { username: el("#login-user").value.trim(), password: el("#login-password").value }
     : { token: (el("#login-token").value || "").trim() };
 
   try {
-    await post("/api/login", body);
-    closeLoginDialog();
-    clearLoginError();
-    el("#login-password").value = "";
-    const session = await applySession();
-    goToStartPage(session);
-    displayLoaded = false;
-    startPoll();
-    renderPage();
+    const result = await post("/api/login", body);
+    if (result && result.totp_required) {
+      loginChallenge = result.challenge;
+      el("#login-password").value = "";                                  // the password is not needed again
+      clearLoginError();
+      showTotpStep();
+      return;
+    }
+    await finishLogin();
   } catch (err) {
     const detail = err instanceof ApiError ? err.detail : err.message;
     showLoginError(detail);

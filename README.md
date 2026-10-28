@@ -769,6 +769,20 @@ New installs have no shared token: you create the first administrator in the [fi
 
 An administrator can create **API tokens** for a user (shown once). They are Bearer tokens that act with the role of their user, for scripts, Prometheus (`/metrics`) and the Home Assistant integration; a viewer's token is enough for those because they only read. To be sure a token can never change anything, tick **read-only** when you create it: it then only reads, even when its user is an administrator. The [API reference](https://www.codeshrimp.com/docs/netlens/using-netlens/api-reference/) lists every endpoint.
 
+### Second factor (authenticator app)
+
+Free in every edition. A user with a local account can add a **second factor**: after the password, Netlens asks for a 6-digit code from the user's own authenticator app (Google or Microsoft Authenticator, Authy, 1Password, a hardware token ...). **Netlens is not a TOTP provider**: it only checks codes made by the standard algorithm (RFC 6238, tested against the RFC's own test values), so nothing is installed or paid for on Netlens's side and the user keeps the authenticator they already use.
+
+Set it up under **Settings → Account → Second factor**: enter your password, scan the QR code (or type the key), enter the code it shows, and keep the **ten recovery codes** that appear once. Optional, per user; a user who has it sees a **2FA** mark in *Users & tokens*.
+
+How it is kept safe: the secret is stored **encrypted** with the same key as the other secrets and shown only at set-up; a code works **once** (an observed code cannot be replayed); between the password and the code there is no session, only a single-use challenge that ends after five wrong codes or five minutes; wrong codes count towards the same limits and alarms as wrong passwords, and a correct password does not reset them; recovery codes are stored only as hashes and work once, and signing in with one raises an event so a lost authenticator is noticed. Removing the factor or making new recovery codes needs the password and a code.
+
+If the authenticator **and** the recovery codes are lost: `docker exec -it netlens python -m app.cli reset-totp <user>` (needs access to the container, like a password reset; there is deliberately no reset by e-mail). People who sign in through **single sign-on** use their identity provider's own second factor. The access token and API tokens are not interactive and have no second factor.
+
+### Software bill of materials (SBOM)
+
+**Settings → About → Download SBOM** (administrators) or `GET /api/sbom` gives the software bill of materials of **this installation**, made from what is actually installed: the Python packages with their declared licences, the vendored browser libraries with the SHA-256 of each file, and the operating-system packages of the image. Two standard formats: **CycloneDX 1.5** (default) and **SPDX 2.3** (`?format=spdx`); every package has a package URL (purl) so scanners such as Grype, Trivy, Dependency-Track or OSV can match it to known vulnerabilities. `python -m app.sbom [--format spdx]` prints the same from the command line. A test fails when a library is added under `app/static/vendor` without being added to the bill. The container image that the project publishes carries its own build-time SBOM and provenance attestation, and the build keeps the CycloneDX and SPDX documents as an artifact.
+
 ### Large networks and performance
 
 Netlens keeps everything in one SQLite file and is meant for homes, offices and a few sites. `tools/bench.py` builds a made-up network of any size and times what you wait for (`python tools/bench.py --devices 2000 --days 7`). `tools/dbbench.py` counts the database statements per page and shows what a slower database would cost. The numbers below are the **first request after nothing was cached**, measured in the application itself (no network) on a fast desktop processor with an SSD; a small ARM board or a NAS will be several times slower. Pages that are cached for 30 seconds answer in a few milliseconds after that, and an answer up to two minutes old is shown at once while a fresh one is made in the background.
@@ -1327,6 +1341,7 @@ Netlens is made in spare time. If it saved you some work, you can [buy me a coff
 
 - **vis-network** 9.1.9 (MIT) — vendored under `app/static/vendor`
 - **xterm.js** 5.5.0 with addon-fit 0.10.0 (MIT) — vendored under `app/static/vendor`
+- **qrcode-generator** 1.4.4 (MIT, Kazuhiko Arase; shows the QR code when a second factor is set up) — vendored under `app/static/vendor`, licence text in `licenses/`
 - **guacamole-common-js** 1.5.0 (Apache License 2.0, the browser client of Apache Guacamole) — vendored under `app/static/vendor`, licence text in `licenses/`; the optional **guacd** helper is a separate container image from the Apache Guacamole project (Apache License 2.0), not part of Netlens
 - **Python deps:** FastAPI, uvicorn, asyncssh, zeroconf
 - **nmap** is required and installed in the image

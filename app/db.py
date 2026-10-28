@@ -1183,6 +1183,13 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     # --- schema v24: a health monitor can be set up by the central Netlens (source = 'central')
     _add_column_if_missing(conn, "host_monitors", "source", "TEXT")
+    # --- a second factor for local accounts (TOTP, app/totp.py): the secret is encrypted, the counter makes a code usable once -------------------
+    _add_column_if_missing(conn, "users", "totp_secret", "TEXT")
+    _add_column_if_missing(conn, "users", "totp_enabled", "INTEGER NOT NULL DEFAULT 0")
+    _add_column_if_missing(conn, "users", "totp_counter", "INTEGER NOT NULL DEFAULT 0")
+    _add_column_if_missing(conn, "users", "totp_since", "TEXT")
+    conn.execute("CREATE TABLE IF NOT EXISTS user_recovery_codes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, code_hash TEXT NOT NULL, "
+                 "created TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (user_id, code_hash))")
     _add_column_if_missing(conn, "ingest_agents", "cert_ca", "TEXT")          # fingerprint of the CA that issued the current certificate (CA rotation)
 
     # --- schema v26: the outcome of every plugin sync (heartbeats and response time of the plugins) ---------------

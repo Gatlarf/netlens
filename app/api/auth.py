@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from app import users
+from app import totp, users
 from app.auth import COOKIE_NAME, BUILTIN, LoginLimiter, client_ip, identify, session_value
 from app.db import add_event, connect
 
@@ -14,6 +14,11 @@ class LoginBody(BaseModel):
     token: Optional[str] = None  # the access token (administrator), or
     username: Optional[str] = None  # a user name and password
     password: Optional[str] = None
+
+
+class TotpLoginBody(BaseModel):
+    challenge: str
+    code: str
 
 
 class PasswordBody(BaseModel):
@@ -79,10 +84,16 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
     if body.username is not None:
         db = connect(request.app.state.db_path)
         try:
-            cookie = users.login(db, body.username, body.password or "")
+            row = users.authenticate(db, body.username, body.password or "")
+            cookie = challenge = None
+            if row is not None:
+                if row["totp_enabled"]:
+                    challenge = _challenges(request).issue(row["id"], row["username"])      # no session yet: only the code can make one
+                else:
+                    cookie = users.start_session(db, row["id"])
         finally:
             db.close()
-        if cookie is None:
+        if row is None:
             limiter.record_failure(host)
             user_limiter.record_failure(user_key)
             _audit(request, _clean(body.username)[:40] if body.username else "", "", f"Failed sign-in as {_clean(body.username)[:40]!r}", 401)
@@ -91,6 +102,10 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
             if user_limiter.reached(user_key):
                 _alarm(request, f"{user_limiter.max_failures} wrong passwords for the user {_clean(body.username)!r} within 15 minutes (latest from {host}); further attempts are blocked for a while")
             raise HTTPException(status_code=401, detail="wrong user name or password")
+        if challenge is not None:
+            # the failures stay counted until the code is right too: a correct password must not give an unlimited number of tries at the code
+            _audit(request, body.username.strip(), "", "Password accepted; waiting for the second factor", 200)
+            return JSONResponse({"totp_required": True, "challenge": challenge})
         limiter.reset(host)
         user_limiter.reset(user_key)
         _audit(request, body.username.strip(), "", "Signed in", 200)
@@ -109,6 +124,69 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
     response = JSONResponse({"ok": True})
     _session_cookie(response, request, session_value(settings.token))
     return response
+
+
+def _challenges(request: Request) -> totp.Challenges:
+    state = request.app.state
+    if getattr(state, "totp_challenges", None) is None:
+        state.totp_challenges = totp.Challenges()
+    return state.totp_challenges
+
+
+@router.post("/login/totp")
+async def login_totp(request: Request, body: TotpLoginBody) -> JSONResponse:
+    """The second step of a sign-in: the single-use challenge from the password step, and a code from the authenticator (or a recovery code)."""
+    from fastapi import HTTPException
+
+    limiter: LoginLimiter = request.app.state.login_limiter
+    user_limiter: LoginLimiter = request.app.state.user_limiter
+    host = client_ip(request)
+    challenges = _challenges(request)
+    item = challenges.get(body.challenge)
+    if item is None:
+        raise HTTPException(status_code=401, detail="this sign-in has expired: enter the password again")
+    user_key = f"user:{item['username'].lower()}"
+    if not limiter.allowed(host) or not user_limiter.allowed(user_key):
+        raise HTTPException(status_code=429, detail="too many attempts")
+    db = connect(request.app.state.db_path)
+    try:
+        row = users.get_user(db, item["user_id"])
+        how = totp.check_second_factor(db, item["user_id"], body.code) if row is not None and not row["disabled"] else None      # a disabled account does not use up a code
+        cookie = users.start_session(db, item["user_id"]) if how else None
+        left = db.execute("SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = ? AND used = 0", (item["user_id"],)).fetchone()[0] if how == "recovery" else 0
+    finally:
+        db.close()
+    name = _clean(item["username"])
+    if how is None:
+        limiter.record_failure(host)
+        user_limiter.record_failure(user_key)
+        tries = challenges.fail(body.challenge)
+        _audit(request, name, "", f"Wrong second-factor code for {name!r}", 401)
+        if limiter.reached(host):
+            _alarm(request, f"{limiter.max_failures} wrong second-factor codes from {host} within a minute (user {name!r}); that address is blocked for a minute")
+        if user_limiter.reached(user_key):
+            _alarm(request, f"{user_limiter.max_failures} wrong codes or passwords for the user {name!r} within 15 minutes (latest from {host}); further attempts are blocked for a while")
+        raise HTTPException(status_code=401, detail="wrong code" if tries else "wrong code: this sign-in has ended, enter the password again")
+    challenges.done(body.challenge)
+    limiter.reset(host)
+    user_limiter.reset(user_key)
+    _audit(request, name, "", "Signed in (recovery code)" if how == "recovery" else "Signed in (second factor)", 200)
+    if how == "recovery":
+        _alarm_kind(request, "totp_recovery_used", f"{name} signed in with a recovery code ({left} left): the authenticator may be lost")
+    response = JSONResponse({"ok": True})
+    _session_cookie(response, request, cookie)
+    return response
+
+
+def _alarm_kind(request: Request, kind: str, text: str) -> None:
+    try:
+        conn = connect(request.app.state.db_path)
+        try:
+            add_event(conn, kind, text)
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 @router.post("/logout")
@@ -234,7 +312,7 @@ async def change_password(request: Request, body: PasswordBody) -> JSONResponse:
             users.update_user(db, principal.user_id, password=body.new)
         except users.UserError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
-        cookie = users.login(db, row["username"], body.new)  # keep this browser signed in
+        cookie = users.start_session(db, row["id"])  # keep this browser signed in (the user is already authenticated; a user with a second factor could not use login())
     finally:
         db.close()
     response = JSONResponse({"ok": True})

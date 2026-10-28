@@ -166,6 +166,22 @@ async function buildAboutCard() {
   card.appendChild(h("p", { class: "hint" }, "Netlens is free for noncommercial use and made in spare time. If it helps you, a coffee keeps the updates coming."));
   card.appendChild(h("a", { class: "btn", href: "https://buymeacoffee.com/Gatlarf", target: "_blank", rel: "noopener noreferrer" }, "\u2615 Buy me a coffee"));
   card.appendChild(h("a", { class: "btn", href: "#/wizard" }, "Open the setup guide"));
+  if (isAdmin()) {
+    // The bill of materials of this very installation (what it is made of, with versions, licences and hashes), for supply-chain and vulnerability reviews.
+    const sbomButton = (label, format, file) => {
+      const b = h("button", { class: "btn", type: "button", title: "The software bill of materials of this installation" }, label);
+      b.addEventListener("click", async () => {
+        try {
+          const doc = await get(`/api/sbom?format=${format}`);
+          const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" })), download: file });
+          document.body.appendChild(a); a.click(); a.remove();
+        } catch (err) { toast(err.message || "Could not make the SBOM", "error"); }
+      });
+      return b;
+    };
+    card.appendChild(h("p", { class: "hint" }, "Software bill of materials (SBOM): every package this installation is made of, with versions, licences and hashes, for supply-chain and vulnerability reviews."));
+    card.appendChild(h("div", { class: "btn-row" }, sbomButton("Download SBOM (CycloneDX)", "cyclonedx", `netlens-${cfg.version || "sbom"}.cdx.json`), sbomButton("Download SBOM (SPDX)", "spdx", `netlens-${cfg.version || "sbom"}.spdx.json`)));
+  }
   const wrap = h("div", {}, card);
   try {
     wrap.appendChild(await buildUpdateCard());

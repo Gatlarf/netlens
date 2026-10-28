@@ -232,17 +232,27 @@ def delete_user(conn: sqlite3.Connection, user_id: int) -> None:
 
 def list_users(conn: sqlite3.Connection) -> list[dict]:
     users = []
-    for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope, site_scope FROM users ORDER BY LOWER(username)"):
+    for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope, site_scope, totp_enabled FROM users ORDER BY LOWER(username)"):
         tokens = conn.execute("SELECT id, name, created, last_used, readonly, assistant FROM api_tokens WHERE user_id = ? ORDER BY id", (u["id"],)).fetchall()
-        users.append({**{k: v for k, v in dict(u).items() if k not in ("scope", "site_scope")}, "scope": parse_scope(u["scope"]), "sites": parse_scope(u["site_scope"]), "disabled": bool(u["disabled"]), "last_admin": u["role"] == "admin" and not u["disabled"] and _other_admins(conn, u["id"]) == 0, "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
+        users.append({**{k: v for k, v in dict(u).items() if k not in ("scope", "site_scope", "totp_enabled")}, "scope": parse_scope(u["scope"]), "sites": parse_scope(u["site_scope"]), "disabled": bool(u["disabled"]), "totp": bool(u["totp_enabled"]), "last_admin": u["role"] == "admin" and not u["disabled"] and _other_admins(conn, u["id"]) == 0, "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
     return users
 
 
-def login(conn: sqlite3.Connection, username: str, password: str) -> str | None:
-    """Check a password; returns a new session cookie value, or None. Takes equally long for unknown users."""
+def authenticate(conn: sqlite3.Connection, username: str, password: str):
+    """The user row when the user name and password are right and the account is not disabled, else None. Takes equally long for unknown users. This is only the
+    FIRST factor: a user whose second factor is on (app/totp.py) still has to give a code before a session is started."""
     row = conn.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?)", (username or "",)).fetchone()
     ok = verify_password(password or "", row["password_hash"] if row else _DUMMY)
     if not row or not ok or row["disabled"]:
+        return None
+    return row
+
+
+def login(conn: sqlite3.Connection, username: str, password: str) -> str | None:
+    """Check a password; returns a new session cookie value, or None. A user with a second factor never gets a session from here: the login goes through
+    `authenticate`, the challenge and the code (so no caller can skip the second factor by accident)."""
+    row = authenticate(conn, username, password)
+    if row is None or row["totp_enabled"]:
         return None
     return start_session(conn, row["id"])
 
