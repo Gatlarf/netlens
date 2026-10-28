@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.291 — 2026-10-28
+
+### Changed
+- ★ **Every page explains itself behind a "?" next to its title.** The sentence under the page title is now a small pop-up (hover, focus or tap), so the content starts higher and all pages begin the same way. The DNS page keeps its Settings link next to the title.
+
 ## 0.4.290 — 2026-10-27
 
 ### Added

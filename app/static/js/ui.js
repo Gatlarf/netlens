@@ -2,9 +2,10 @@
 // right, summary tiles in one style, and an empty state that says what the page is for.
 import { h } from "./util.js";
 
+// `hint` says what the page does; it sits behind a "?" next to the title so the content starts higher and every page begins the same way.
 export function pageHead(title, hint, ...actions) {
   return h("div", { class: "page-head up-head" },
-    h("div", { class: "page-title" }, h("h1", {}, title), hint ? h("p", { class: "hint" }, hint) : null),
+    h("div", { class: "page-title" }, h("h1", {}, title, hint ? infoTip(hint) : null)),
     actions.length ? h("div", { class: "page-actions" }, ...actions) : null);
 }
 

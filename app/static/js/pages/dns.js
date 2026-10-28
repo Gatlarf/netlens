@@ -1,13 +1,12 @@
 // The DNS page: what Netlens would register in your DNS server, and the settings behind it.
 import { h, clear } from "../util.js";
-import { pageHead, infoTip } from "../ui.js";
+import { pageHead } from "../ui.js";
 import { buildDnsCard } from "../cards/dns.js";
 
 export async function render(container) {
   clear(container);
-  container.append(pageHead("DNS", h("span", {}, "Register the devices Netlens knows in your DNS server and keep the addresses right when DHCP changes them. Nothing is written before you approve it. ",
-    infoTip("Netlens only ever changes records it created itself (marked with a comment) and never touches records that something else made, such as a Windows machine that registers itself."),
-    " ", h("a", { href: "#/settings/dns" }, "Settings → DNS registration"))));
+  container.append(pageHead("DNS", "Register the devices Netlens knows in your DNS server and keep the addresses right when DHCP changes them. Nothing is written before you approve it. Netlens only ever changes records it created itself (marked with a comment) and never touches records that something else made, such as a Windows machine that registers itself.",
+    h("a", { href: "#/settings/dns" }, "Settings → DNS registration")));
   const slot = h("div", {}, h("p", { class: "hint" }, "Loading…"));
   container.append(slot);
   try {

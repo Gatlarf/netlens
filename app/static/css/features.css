@@ -826,3 +826,8 @@ button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background:
 .ask-actions { display: flex; gap: 8px; margin-top: 10px; }
 @media (max-width: 700px) { .ask-form { order: 3; flex: 1 0 100%; margin-bottom: 8px; } .ask-form input { width: 100%; flex: 1; } .ask-panel { left: 0; right: 0; width: auto; } }
 .rep-page .dev-tabs { margin: 0 0 10px; }
+
+/* The "?" next to a page title: normal text size, and room for a longer explanation */
+.page-head h1 .info-tip { font-size: 14px; margin-left: 10px; }
+.page-head h1 .info-tip::after { max-width: min(420px, 80vw); font-size: 13px; }
+.page-head .page-title { display: flex; align-items: center; }
