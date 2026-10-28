@@ -49,7 +49,7 @@ def external_key() -> str:
 _AAD = b"netlens-secret-v1"
 _PLUGIN_CONFIG = re.compile(r"^plugin\.[A-Za-z0-9_-]+$")          # a plugin's saved configuration (not its .status, .data ...)
 _PROBE_CONFIG = re.compile(r"^probe\.config\.\d+$")              # what the central Netlens will have a remote site check (holds logins)
-SECRET_KEYS = frozenset({"notify.channels", "remote.credentials", "central.link", "engineer.api_key", "oidc.client_secret", "cvecheck.api_key", "hostprobe.settings", "hostprobe.ca", "credstore.entries"})
+SECRET_KEYS = frozenset({"notify.channels", "remote.credentials", "central.link", "engineer.api_key", "oidc.client_secret", "cvecheck.api_key", "hostprobe.settings", "hostprobe.ca", "credstore.entries", "ingest.ca", "ingest.server"})
 
 _lock = threading.Lock()
 _keys: dict[str, bytes] = {}

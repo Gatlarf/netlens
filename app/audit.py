@@ -70,6 +70,17 @@ PATTERNS: list[tuple[str, str, str]] = [
     ("POST", r"^/api/vault", "Changed the stored-password protection"),
     ("POST", r"^/api/insights/incidents/(\d+)/analysis$", "Made a new analysis of incident INC-{0}"),
     ("PUT", r"^/api/devices/(\d+)/hostprobe$", "Changed the host probes of {d0}"),
+    ("PUT", r"^/api/ingest$", "Changed the agent ingest settings"),
+    ("POST", r"^/api/ingest/window$", "Opened the enrolment window for agents"),
+    ("DELETE", r"^/api/ingest/window$", "Closed the enrolment window for agents"),
+    ("PUT", r"^/api/ingest/own-ca$", "Changed the CA certificates trusted for agents"),
+    ("PUT", r"^/api/ingest/server-certificate$", "Changed the server certificate of the agent ingest"),
+    ("POST", r"^/api/ingest/agents$", "Added an agent and made an enrolment token"),
+    ("PUT", r"^/api/ingest/agents/(\d+)$", "Changed agent {0}"),
+    ("POST", r"^/api/ingest/agents/(\d+)/token$", "Made a new enrolment token for agent {0} (its old certificate stopped working)"),
+    ("POST", r"^/api/ingest/agents/(\d+)/revoke$", "Revoked the certificate of agent {0}"),
+    ("POST", r"^/api/ingest/agents/(\d+)/reinstate$", "Allowed agent {0} again"),
+    ("DELETE", r"^/api/ingest/agents/(\d+)$", "Deleted agent {0}"),
 ]
 _COMPILED = [(m, re.compile(rx), text) for m, rx, text in PATTERNS]
 

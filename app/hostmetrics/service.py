@@ -680,7 +680,7 @@ _STATES: dict[int, dict] = {}        # monitor id -> counters kept between round
 
 def _due(conn, now_ts: float) -> list[Any]:
     out = []
-    for row in conn.execute("SELECT * FROM host_monitors WHERE enabled = 1 AND method != 'plugin'"):          # a plugin feeds its own rows (app/plugins/enrich.py)
+    for row in conn.execute("SELECT * FROM host_monitors WHERE enabled = 1 AND method NOT IN ('plugin', 'agent')"):          # a plugin feeds its own rows (app/plugins/enrich.py), an agent pushes its own (app/ingest)
         if row["last_ts"] is None:
             out.append(row)
             continue

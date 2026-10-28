@@ -122,6 +122,8 @@ async def put_monitor(device_id: int, body: MonitorBody, request: Request, conn=
     existing = hm.get_monitor(conn, device_id)
     if existing is not None and existing["source"] == "central":
         raise HTTPException(status_code=409, detail="this monitor is managed by the central Netlens and cannot be changed here")
+    if existing is not None and existing["method"] == "agent":
+        raise HTTPException(status_code=409, detail="this host reports through an agent (Settings → Agents); remove the agent link first to monitor it another way")
     data = _data(body)
     data.setdefault("address", device["primary_ip"])
     _may_use(request, conn, data)
@@ -154,6 +156,8 @@ def delete_monitor(device_id: int, conn=Depends(get_conn)) -> dict:
         raise HTTPException(status_code=404, detail="this device has no monitor")
     if row["source"] == "central":
         raise HTTPException(status_code=409, detail="this monitor is managed by the central Netlens and cannot be removed here")
+    if row["method"] == "agent":
+        raise HTTPException(status_code=409, detail="this host reports through an agent (Settings → Agents); delete the agent or its link there")
     conn.execute("DELETE FROM metric_state WHERE monitor_id = ?", (row["id"],))
     conn.execute("DELETE FROM host_monitors WHERE id = ?", (row["id"],))
     conn.commit()

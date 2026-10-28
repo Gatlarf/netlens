@@ -1041,6 +1041,45 @@ def init_db(conn: sqlite3.Connection) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_analysis_incident ON analysis_reports (incident_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_analysis_created ON analysis_reports (created)")
 
+    # --- agent ingest (Enterprise): hosts that push metrics through a collector, identified by a client certificate (app/ingest) -----------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ingest_agents (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            identity TEXT NOT NULL DEFAULT '',
+            state TEXT NOT NULL DEFAULT 'pending',
+            token_hash TEXT,
+            token_expires TEXT,
+            cert_fp TEXT,
+            cert_expires TEXT,
+            prev_fp TEXT,
+            prev_expires TEXT,
+            interval_s INTEGER NOT NULL DEFAULT 60,
+            last_seen TEXT,
+            last_ip TEXT,
+            accepted INTEGER NOT NULL DEFAULT 0,
+            dropped INTEGER NOT NULL DEFAULT 0,
+            rejected INTEGER NOT NULL DEFAULT 0,
+            silent INTEGER NOT NULL DEFAULT 0,
+            renewed TEXT,
+            created TEXT NOT NULL
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ingest_targets (
+            agent_id INTEGER NOT NULL REFERENCES ingest_agents(id) ON DELETE CASCADE,
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            host_name TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (agent_id, device_id)
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ingest_token ON ingest_agents (token_hash)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ingest_fp ON ingest_agents (cert_fp)")
+
     # --- schema v22: host monitors (health readings over SNMP or SSH) and the level each reading is at ---------
     cur.execute(
         """

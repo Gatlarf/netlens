@@ -201,12 +201,30 @@ def t_network_health(conn, args, now=None) -> dict:
     return out
 
 
+def t_agents(conn, args, now=None) -> dict:
+    """Which hosts report through an agent (a collector on a locked-down host) and whether they are healthy."""
+    from app.ingest import core
+
+    return core.status_summary(conn)
+
+
 TOOLS = {
+    "agents": (t_agents, "the hosts that PUSH their readings through an agent/collector (locked-down hosts that cannot be probed): which exist, whether any is silent, when each last sent data, and how long its certificate lasts. Use for 'is the agent on X sending', 'which agents are silent', 'collector status'. args: none"),
     "metric": (t_metric, "ANY STORED READING over time of the monitored devices: cpu, memory (ram), swap, load, disk use or free space, temperature (switches, servers), UPS battery, fans, traffic in and out, ping time, interface errors, link state, and UPTIME and REBOOTS. Ranks the devices (highest or lowest) or shows one device's minimum, average, maximum and trend over a period. Use it for 'which devices rebooted', 'how hot is the switch', 'swap in use', 'CPU of X yesterday', 'which has the least free space'. Call it without args.metric to see which readings exist. args: metric (name or plain word), device (optional name), days (0.25 to 30, default 1), order (highest or lowest), limit, label (optional, such as eth0 or C:\\)"),
     "host_findings": (t_host_findings, "what the read-only host probes found on ALL hosts at once, filtered by a topic: failed services, who logged in, kernel or disk errors, swap, containers restarting, updates, listening ports, scheduled jobs. Use for 'which systems have ...' questions about the inside of a host. args: topic (words such as failed service, login, swap, restart)"),
     "usage": (t_usage, "TRAFFIC PER DEVICE and PER APPLICATION (who and what uses the bandwidth) over some days, as the router counts it. args: days (1-30)"),
     "network_health": (t_network_health, "the NETWORK HEALTH checks (IPv4 and IPv6): gateway, internet, DNS, DHCP servers, rogue DHCP, and how full each address range is with roughly how many addresses are free. Use for 'is my network in good order', 'free IP addresses', 'DHCP range'. args: none"),
 }
+
+
+def r_agents(r: dict) -> str:
+    if not r["available"]:
+        return "Receiving data from locked-down hosts through agents is part of the Enterprise edition."
+    if not r["agents"]:
+        return "No agent is set up" + ("." if r["enabled"] else " and the agent ingest is switched off (Settings → Agents).")
+    bad = [a for a in r["agents"] if a["silent"] or a["state"] != "active"]
+    head = f"{len(r['agents'])} agent{'s' if len(r['agents']) != 1 else ''}: {len(r['agents']) - len(bad)} fine" + (f", {len(bad)} need attention." if bad else ".")
+    return head + "".join(f" {a['name']} ({', '.join(a['devices'])}): " + ("silent" if a["silent"] else a["state"]) + f", last data {a['last_seen'] or 'never'}." for a in bad[:6]) + "".join(f" {p}." for p in r["problems"] if "certificate" in p)
 
 
 def r_metric(r: dict) -> str:
@@ -253,7 +271,7 @@ def r_network_health(r: dict) -> str:
     return " ".join(parts)
 
 
-RENDERERS = {"metric": r_metric, "host_findings": r_host_findings, "usage": r_usage, "network_health": r_network_health}
+RENDERERS = {"agents": r_agents, "metric": r_metric, "host_findings": r_host_findings, "usage": r_usage, "network_health": r_network_health}
 PRESETS = [
     {"id": "reboots", "text": "Which devices rebooted in the last week?", "tool": "metric", "args": {"metric": "uptime", "days": 7}},
     {"id": "hot", "text": "Which devices run the hottest?", "tool": "metric", "args": {"metric": "temperature"}},
@@ -261,6 +279,7 @@ PRESETS = [
     {"id": "usage", "text": "Which devices and applications use the most traffic?", "tool": "usage", "args": {"days": 7}},
 ]
 RULES = [
+    ("agents", r"\bagents?\b.{0,40}(silent|sending|reporting|status|healthy|down|working)|(silent|stopped|not sending).{0,20}\b(agents?|collectors?)\b|\bcollectors?\b.{0,30}(status|silent|sending)|locked.?down hosts?|which agents"),
     ("network_health", r"free (ip|address)|ip addresses? (are )?(free|left|available)|dhcp (range|scope|pool)|address (range|space)|network health|is my network (healthy|in good order|ok)|packet loss to .{0,20}gateway|(gateway|internet|dns) (check|ok|working)"),
     ("usage", r"(which|what) (devices?|clients?|machines?|applications?|apps?).{0,30}(most|biggest|top).{0,20}(traffic|bandwidth|data)|(most|top|biggest) (talkers?|bandwidth|traffic|data users?)|(who|what|which).{0,25}(uses?|using|eats?|hogs?).{0,15}(the )?(bandwidth|data|traffic|internet)"),
     ("metric", r"\breboot(s|ed)?\b|restarted|\buptime\b|how long .{0,30}(been )?(up|running|online)|swap|how (hot|warm)|temperatures?|which .{0,20}(hottest|coolest)|battery level|ups battery"),
@@ -274,6 +293,8 @@ def route(q: str, names: list[str]) -> tuple[str, dict] | None:
                 days = 7 if re.search(r"week|7 ?d", q) else 30 if "month" in q else 1
                 name = next((n for n in sorted(names, key=len, reverse=True) if len(n) > 2 and n.lower() in q), "")
                 return tool, {k: v for k, v in (("metric", pick_metric(q) or ""), ("device", name), ("days", days)) if v}
+            if tool == "agents":
+                return tool, {}
             if tool == "usage":
                 return tool, {"days": 7 if re.search(r"week|7 ?d", q) else 30 if "month" in q else 1}
             return tool, {}

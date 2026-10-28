@@ -189,8 +189,9 @@ def status(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, A
     return out
 
 
-PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights", "vulnerabilities", "teams", "schedules", "sharing", "assistant")      # beyond the free Community edition (trial and every licence include them)
+PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights", "vulnerabilities", "teams", "schedules", "sharing", "assistant", "agents")      # beyond the free Community edition (trial and every licence include them)
 BUSINESS_ONLY = ("sso", "siem", "teams", "schedules", "sharing")      # of those, the ones the Supporter edition does not have: they mostly help organisations (the trial has them)
+ENTERPRISE_ONLY = ("agents",)      # receiving metrics from locked-down hosts (app/ingest): the Enterprise edition and the free trial, not Small business
 
 
 def allows(conn: sqlite3.Connection, feature: str, now: datetime | None = None) -> bool:
@@ -200,6 +201,8 @@ def allows(conn: sqlite3.Connection, feature: str, now: datetime | None = None) 
     edition = status(conn, now)["edition"]
     if edition == "free":
         return False
+    if feature in ENTERPRISE_ONLY:
+        return edition in ("enterprise", "trial")
     return not (feature in BUSINESS_ONLY and edition == "supporter")
 
 

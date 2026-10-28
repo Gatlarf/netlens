@@ -91,10 +91,11 @@ def test_supporter_has_the_business_features_except_the_ones_for_organisations(c
     licence.install(conn, key("supporter"), NOW)
     for feature in ("remediation", "engineer", "insights", "vulnerabilities", "oncall"):
         assert licence.allows(conn, feature, NOW), feature
-    for feature in ("sso", "siem", "teams", "schedules"):
+    for feature in ("sso", "siem", "teams", "schedules", "agents"):
         assert not licence.allows(conn, feature, NOW), feature
     licence.install(conn, key("business"), NOW)
-    assert all(licence.allows(conn, f, NOW) for f in licence.PAID_FEATURES)
+    assert all(licence.allows(conn, f, NOW) for f in licence.PAID_FEATURES if f not in licence.ENTERPRISE_ONLY)
+    assert not licence.allows(conn, "agents", NOW)                              # host agents (locked-down hosts) are Enterprise only
     licence.install(conn, key("enterprise"), NOW)
     assert all(licence.allows(conn, f, NOW) for f in licence.PAID_FEATURES)
 

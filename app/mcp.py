@@ -132,6 +132,7 @@ tool("get_traffic", "overview", "Bandwidth in and out of the internet line and o
 tool("get_oncall", "overview", "Who is on call now and the shifts of the coming week.", "GET", "/api/oncall")
 tool("get_smart_home", "overview", "Smart-home devices (Home Assistant and others): unavailable ones, low batteries, updates.", "GET", "/api/inventory")
 tool("get_dns", "overview", "DNS names of the devices and the conflicts between them.", "GET", "/api/dns")
+tool("get_agent_status", "overview", "Which hosts report through an agent (a collector on a locked-down host that pushes its readings): state, last time it sent data, whether it is silent, days left on its certificate. No secrets.", "GET", "/api/agent-status")
 tool("get_monitors", "overview", "The health monitors (memory, processor, disk, temperature ...) of the monitored hosts, their latest readings and the readings past their limit.", "GET", "/api/monitors")
 tool("get_remediation", "overview", "The automatic fixes: rules, what ran, what waits for approval and whether it helped.", "GET", "/api/remediation")
 tool("get_network_checks", "overview", "DHCP servers seen on the network (trusted or not), the gateway and the DNS registration.", "GET", "/api/netchecks")

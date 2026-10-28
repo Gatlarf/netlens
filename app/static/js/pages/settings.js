@@ -12,6 +12,7 @@ import { buildChannelsCard } from "../cards/channels.js";
 import { buildCentralCard } from "../cards/central.js";
 import { buildAiModelCard, buildAiAgentsCard } from "../cards/ai.js";
 import { buildHostProbeCard } from "../cards/hostprobe_settings.js";
+import { buildIngestCard } from "../cards/ingest.js";
 import { buildCredentialsCard } from "../cards/credentials.js";
 import { buildHostsSetupCard } from "../cards/hosts_setup.js";
 import { buildLicenceCard } from "../cards/licence.js";
@@ -281,6 +282,7 @@ const STATIC_GROUPS = [
       { key: "hosts", label: "Hosts (monitoring set-up)", build: buildHostsSetupCard },
       { key: "credentials", label: "Credentials", build: buildCredentialsCard },
       { key: "hostprobes", label: "Host probes", build: buildHostProbeCard },
+      { key: "ingest", label: "Host agents (locked-down hosts)", build: buildIngestCard },
     ],
   },
   {

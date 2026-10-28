@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.302 — 2026-10-28
+
+### Added
+- ★ **Host agents: monitor locked-down hosts that cannot be reached from Netlens (Enterprise edition and the free trial).** The host probes, SSH, WinRM and SNMP all connect *to* a host; a locked-down host allows only an outbound connection. A standard collector on the host, the **OpenTelemetry Collector** or **Telegraf**, now pushes its readings (processor, memory, swap, disks, network traffic, load, uptime) to Netlens over HTTPS (**Settings → Host agents**). Netlens only listens: it never sends a command, a setting or an update to a host and stores no login for it. The readings are handled like those of any monitored host: graphs, limits, alerts, dashboard, reports, Ask, the assistant and MCP. Security first: the readings port (4318) needs a **client certificate** (mutual TLS), so a connection without one ends in the handshake before anything is read; certificates come from a dedicated Netlens CA via a request made on the host (the private key never leaves it), last 30 days, belong to one agent and are revoked at once, also on open connections, or come from **your own CA**; enrolment uses a one-time token (24 hours, stored as a hash) on a separate port that is open only during a window you start; JSON only, an allow-list of numeric metrics, strict limits (size also after decompression, depth, points, rate, connections), and nothing a sender writes is stored or shown, so it cannot manipulate the screens, alerts or the AI. A **gateway** collector can report for many hosts. An agent that stops sending is **silent** (event, alert, dashboard problem, Ask: "which agents are silent?", MCP `get_agent_status`); a certificate that ends within 7 days is reported too. Setup instructions for Debian/Ubuntu, Red Hat family, SUSE, Windows Server, Telegraf, FreeBSD, AIX, Solaris and other Unix (a small shell script), containers and gateways, renewal scripts (`contrib/netlens-renew.sh`, `.ps1`), the security model and the troubleshooting table are in `HOST-AGENTS.md`. Tested with the real OpenTelemetry Collector 0.164 (also as the Debian package under systemd) and Telegraf 1.40.
+
+### Changed
+- Event kinds `agent_silent`, `agent_back`, `ingest_cert_expiring` and `ingest_enrolled` are known to the alert channels, log forwarding and the incident engine. An AI assistant token can never use `/api/ingest` (it can read `GET /api/agent-status`).
+
 ## 0.4.299 — 2026-10-28
 
 ### Added

@@ -49,6 +49,7 @@ Each workflow lists the calls to look at and the ones that change things. Fetch 
 ### Monitoring
 * Service checks (web, ports, certificates): `GET /api/service-checks`, add with `POST /api/service-checks`, try one with `POST /api/service-checks/{id}/run`.
 * Health monitoring and limits: `GET/PUT /api/monitoring/limits`, `GET /api/monitors`.
+* Hosts that push their readings through a collector (Enterprise): `GET /api/agent-status` shows each agent, whether it is silent and how long its certificate lasts. Setting agents up, tokens and certificates are for people (Settings → Agents); you cannot use them.
 * Planned work: a maintenance window silences alerts for the devices it covers: `POST /api/maintenance`, `POST /api/maintenance/now`.
 * Network checks (DHCP, DNS, gateway): `GET/PUT /api/netchecks`. IPv6: `GET/PUT /api/ipv6`.
 

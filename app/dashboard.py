@@ -188,6 +188,12 @@ def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
         if days is not None and days <= 14 and (f.get("device_id"), f["label"]) not in full:
             out.append({"level": "bad" if days <= 3 else "warn", "text": f"{f['device']}: {f['label']} is {f['current']:g}% full and will be full in {days:g} day{'s' if days != 1 else ''}",
                         "href": f"#/device/{f['device_id']}" if f.get("device_id") else "#/insights"})
+    from app import licence
+    from app.ingest import core as ingest
+
+    if licence.allows(conn, "agents"):
+        for p in ingest.problems(conn):          # a collector that stopped sending, a certificate that is about to end
+            out.append({"level": "warn", "text": p["text"], "href": "#/settings/ingest", "snooze": f"agent:{p['agent_id']}"})
     for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY LOWER(name)"):
         site = probes_mod.present(conn, row)
         href = f"#/remote-sites?id={site['id']}"

@@ -3,3 +3,4 @@ uvicorn[standard]>=0.30
 asyncssh>=2.14
 cryptography>=41
 zeroconf>=0.130
+h11>=0.14

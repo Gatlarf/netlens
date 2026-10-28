@@ -9,7 +9,7 @@ from app import ask, incidents
 INFORMATION_ONLY = {
     "central_reachable", "device_deleted", "device_log", "device_new", "device_online", "guest_backup_recovered", "inventory_available", "ip_changed", "ip_reused", "licence_expiring",
     "link_up", "llm_model_unavailable", "login_failed", "metric_ok", "net_ok", "os_changed", "plugin_update_skipped", "plugin_updated", "service_up", "vpn_up", "wake_sent", "wifi_roamed",
-    "firmware_update", "analysis_ready", "remediation_pending", "remediation_ran", "remediation_recovered",
+    "firmware_update", "ingest_enrolled", "analysis_ready", "remediation_pending", "remediation_ran", "remediation_recovered",
 }
 
 
