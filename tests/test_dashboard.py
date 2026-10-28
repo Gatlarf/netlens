@@ -295,3 +295,11 @@ def test_card_widths_are_kept_and_cleaned(tmp_path):
     saved = dashboard.set_layout(c, None, ["devices", "uptime"], [], {"devices": "f", "uptime": "huge", "gone": "w", "bad id": "w"})
     assert saved["sizes"] == {"devices": "f"}
     assert dashboard.get_layout(c, None)["sizes"] == {"devices": "f"}
+
+
+def test_remote_desktop_keeps_the_keyboard():
+    """The display's mouse handler stops clicks, so the screen must take focus while the click goes down, and the global shortcuts must leave it alone."""
+    root = Path(__file__).resolve().parent.parent / "app" / "static" / "js"
+    remote = (root / "pages" / "remote.js").read_text()
+    assert '"mousedown", "touchstart"' in remote and "screen.focus({ preventScroll: true }), true)" in remote
+    assert ".remote-screen" in (root / "search.js").read_text()

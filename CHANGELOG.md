@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.293 — 2026-10-28
+
+### Fixed
+- ★ **Remote access: the keyboard works in an RDP or VNC session again.** Clicking the remote screen did not give it the keyboard (the screen's own mouse handling swallowed the click), so typing went nowhere while the mouse worked. The screen now takes focus on every click or touch. The "/" and Ctrl+K shortcuts of Netlens no longer fire while you type in a remote session either.
+
 ## 0.4.292 — 2026-10-28
 
 ### Added

@@ -243,7 +243,7 @@ export async function openSearch(initial = "") {
 export function initSearch() {
   document.addEventListener("keydown", (e) => {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "") || (e.target && e.target.isContentEditable);
-    const inTerminal = e.target && e.target.closest && e.target.closest(".terminal-wrap, .xterm");
+    const inTerminal = e.target && e.target.closest && e.target.closest(".terminal-wrap, .xterm, .remote-screen");
     if (inTerminal) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openSearch(); }
     else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); openSearch(); }

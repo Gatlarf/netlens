@@ -172,7 +172,8 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
     keyboard = new Guacamole.Keyboard(screen);
     keyboard.onkeydown = (sym) => client && client.sendKeyEvent(1, sym);
     keyboard.onkeyup = (sym) => client && client.sendKeyEvent(0, sym);
-    screen.addEventListener("mousedown", () => screen.focus());
+    // the mouse handler of the display stops the click, so a bubbling listener never hears it and the keys would stay with whatever had focus before: listen while the event goes down
+    for (const type of ["mousedown", "touchstart"]) screen.addEventListener(type, () => screen.focus({ preventScroll: true }), true);
     // clipboard: what is pasted into the window goes to the remote machine; what the remote machine copies is put on this one
     screen.addEventListener("paste", (e) => {
       const text = e.clipboardData && e.clipboardData.getData("text/plain");
