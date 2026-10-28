@@ -2,6 +2,19 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.295 — 2026-10-28
+
+### Added
+- ★ **Ask can read any stored reading.** A new open-ended question covers every number Netlens stores for a device: uptime and **reboots**, temperature, swap, memory, processor, load, free disk space, UPS battery, fans, traffic in and out, ping time, interface errors and link state. It ranks the devices (highest or lowest) or shows one device's minimum, average, maximum and trend over hours or days. "Which devices rebooted last week?", "How hot is my switch?" and "Which servers use swap?" now have an answer.
+- **Ask about what is inside the hosts, on all hosts at once:** the host probes' findings (failed services, logins, kernel and disk errors, restarts) filtered by a topic.
+- **Ask about traffic per device and per application** (from the router's traffic analyser), **the network checks** (gateway, DNS, DHCP, roughly how many addresses are free in each range) and **the last backup of each guest**.
+- **Device lists can be sorted, filtered and paged in Ask:** oldest or newest device, gone the longest, not seen for N days, devices without a host name, vendor or type, and page 2 of a long list. The count is always complete.
+- ★ **Insights shows the questions that got no answer** (administrators only), so you can see what people ask that Netlens cannot answer yet. Only the question's text, how often and when are kept (200 at most, 90 days, no answers, no names of who asked); a switch turns it off and one button clears it.
+
+### Changed
+- A language model that gives up with "the data does not tell" is shown the tools it has not tried and gets one more chance.
+- The built-in logic suggests the closest ready-made questions when it does not understand one. The model may read up to 5000 characters per tool result (was 3500).
+
 ## 0.4.294 — 2026-10-28
 
 ### Fixed

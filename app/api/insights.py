@@ -9,7 +9,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app import aireport, anomaly, relevance, ask, forecast, identify, incidents, insights, investigate, modelcheck, postmortem
+from app import aireport, anomaly, asklog, relevance, ask, forecast, identify, incidents, insights, investigate, modelcheck, postmortem
 from app import engineer
 from app.api.devices import get_conn
 
@@ -64,6 +64,27 @@ class Question(BaseModel):
 async def ask_question(body: Question, conn=Depends(get_conn)) -> dict:
     _allowed(conn)
     return await asyncio.to_thread(lambda: ask.answer(conn, body.question, mode=body.mode, scope="all" if body.include_all else "important"))
+
+
+class MissLog(BaseModel):
+    enabled: bool
+
+
+@router.get("/insights/ask/misses")
+def ask_misses(conn=Depends(get_conn)) -> dict:
+    """The questions nobody could answer (administrators only: the default for everything not listed as readable by a viewer)."""
+    return {"enabled": asklog.enabled(conn), "items": asklog.items(conn)}
+
+
+@router.put("/insights/ask/misses")
+def ask_misses_switch(body: MissLog, conn=Depends(get_conn)) -> dict:
+    asklog.set_enabled(conn, body.enabled)
+    return {"enabled": asklog.enabled(conn)}
+
+
+@router.delete("/insights/ask/misses")
+def ask_misses_clear(conn=Depends(get_conn)) -> dict:
+    return {"removed": asklog.clear(conn)}
 
 
 @router.post("/insights/incidents/{incident_id}/words")

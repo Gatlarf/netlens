@@ -21,6 +21,9 @@ STAMP = "%Y-%m-%dT%H:%M:%SZ"
 SERVICE_PORTS = {"ssh": 22, "telnet": 23, "ftp": 21, "smtp": 25, "dns": 53, "http": 80, "https": 443, "smb": 445, "samba": 445, "rdp": 3389, "vnc": 5900, "mqtt": 1883, "snmp": 161,
                  "mysql": 3306, "postgres": 5432, "printing": 631, "ntp": 123}
 ETYPE = "COALESCE(d.type_override, d.device_type, 'unknown')"
+MISSING = {"hostname": "COALESCE(d.hostname, '') = '' AND COALESCE(d.custom_name, '') = ''", "name": "COALESCE(d.hostname, '') = '' AND COALESCE(d.custom_name, '') = ''",
+           "vendor": "COALESCE(d.vendor, '') = ''", "type": f"{ETYPE} = 'unknown'", "os": "COALESCE(d.os_name, '') = ''", "ip": "COALESCE(d.primary_ip, '') = ''"}
+SORTS = {"oldest": "d.first_seen ASC", "newest": "d.first_seen DESC", "last_seen": "d.last_seen DESC", "longest_gone": "d.last_seen ASC", "name": "LOWER(COALESCE(d.custom_name, d.hostname, d.primary_ip))"}
 
 
 def _like(text: Any) -> str:
@@ -91,8 +94,35 @@ def t_search_devices(conn, args, now=None) -> dict:
     if _bool(args.get("untrusted")):
         where.append("d.trusted = 0")
         shown["untrusted"] = True
-    rows = conn.execute(f"SELECT d.* FROM devices d WHERE {' AND '.join(where)} ORDER BY d.online DESC, d.last_seen DESC", params).fetchall()
-    return {"filters": shown, "count": len(rows), "devices": [_short(r) for r in rows[:20]]}
+    try:
+        gone = max(0, min(int(args.get("not_seen_days") or 0), 3650))
+    except (TypeError, ValueError):
+        gone = 0
+    if gone:                                           # gone for N days or more (an old last-seen time)
+        where.append("d.last_seen < ?")
+        params.append(_since_days(gone, now))
+        shown["not_seen_for_days"] = gone
+    missing = str(args.get("missing") or "").strip().lower()
+    if missing in MISSING:
+        where.append(MISSING[missing])
+        shown["missing"] = missing
+    sort = str(args.get("sort") or "").strip().lower()
+    order = SORTS.get(sort, "d.online DESC, d.last_seen DESC")
+    if sort in SORTS:
+        shown["sort"] = sort
+    try:
+        limit = max(1, min(int(args.get("limit") or 20), 50))
+        offset = max(0, int(args.get("offset") or 0))
+    except (TypeError, ValueError):
+        limit, offset = 20, 0
+    rows = conn.execute(f"SELECT d.* FROM devices d WHERE {' AND '.join(where)} ORDER BY {order}", params).fetchall()
+    detailed = bool(sort or gone or missing)
+    return {"filters": shown, "count": len(rows), "shown": f"{offset + 1}-{min(offset + limit, len(rows))}" if rows else "none",
+            "devices": [{**_short(r), **({"first_seen": r["first_seen"], "last_seen": r["last_seen"]} if detailed else {})} for r in rows[offset:offset + limit]]}
+
+
+def _since_days(days: int, now: datetime | None) -> str:
+    return ((now or datetime.now(timezone.utc)) - timedelta(days=days)).strftime(STAMP)
 
 
 def t_counts(conn, args, now=None) -> dict:
@@ -152,6 +182,7 @@ def t_guests(conn, args, now=None) -> dict:
 def t_backups(conn, args, now=None) -> dict:
     from app import guestbackups
 
+    needle = str(args.get("guest") or "").strip().lower()
     o = guestbackups.overview(conn, now)
     s = o["summary"]
     if not s["configured"]:
@@ -159,7 +190,9 @@ def t_backups(conn, args, now=None) -> dict:
     bad = [{"name": t["name"], "state": t["last_state"], "last_backup": t["last_backup"], "late": t["late"]} for t in o["targets"] if t["last_state"] == "failed" or t["late"]][:LIMIT]
     return {"configured": True, "summary": {k: s[k] for k in ("guests", "protected", "unprotected", "targets", "failed", "late", "stores_at_risk", "problems")}, "failing_or_late": bad,
             "unprotected_guests": [g["name"] for g in o["unprotected"]][:LIMIT], "stores": [{"name": x["name"], "used_pct": x["percent"], "full_in_days": x["days_to_full"], "level": x["level"]} for x in o["stores"]][:6],
-            "newest_backup": max((t["last_backup"] for t in o["targets"] if t["last_backup"]), default=None)}
+            "newest_backup": max((t["last_backup"] for t in o["targets"] if t["last_backup"]), default=None),
+            "each_guest": [{"name": t["name"], "last_backup": t["last_backup"], "state": t["last_state"]} for t in sorted(o["targets"], key=lambda t: t["last_backup"] or "")
+                           if not needle or needle in (t["name"] or "").lower()][:40]}
 
 
 def t_certificates(conn, args, now=None) -> dict:
@@ -796,11 +829,11 @@ RENDERERS = {"storage": r_storage, "reliability": r_reliability, "coverage": r_c
              "wifi": r_wifi, "maintenance": r_maintenance, "system": r_system, "updates": r_updates, "changes": r_changes, "ipv6": r_ipv6}
 
 TOOLS = {
-    "search_devices": (t_search_devices, "find devices by a property and count them. args (all optional): type (printer, camera, nas, switch ...), vendor (manufacturer word), os (windows, linux, android ...), online (true/false), port (number), service (name), group, tag, text (part of the name or address, for anything that is not a kind: iphone, raspberry ...), new_days, untrusted (true)"),
+    "search_devices": (t_search_devices, "find devices by a property and count them. args (all optional): type (printer, camera, nas, switch ...), vendor (manufacturer word), os (windows, linux, android ...), online (true/false), port (number), service (name), group, tag, text (part of the name or address, for anything that is not a kind: iphone, raspberry ...), new_days, untrusted (true), missing (hostname, vendor, type, os or ip: devices that have none), not_seen_days (offline for at least that many days), sort (oldest, newest, last_seen, longest_gone or name), limit (up to 50), offset (to page through a long list). Counts are always complete; the devices shown are one page. Rows carry first_seen and last_seen when sorted or filtered by time"),
     "counts": (t_counts, "how many devices there are, split by type, vendor, os or group. args: by (type, vendor, os or group)"),
     "ports": (t_ports, "open network ports: which devices have a port or service open (args: port or service such as ssh, rdp, smb, http), or which ports one device has open (args: device)"),
     "guests": (t_guests, "virtual machines and containers of the hypervisor plugins (Proxmox, Docker, Hyper-V ...) with their state, restarts and health. args (optional): status (running, stopped, restarting, unhealthy), kind (qemu, lxc, container), text"),
-    "backups": (t_backups, "backup status: guests with or without a backup, failed or late backups, backup stores filling up. args: none"),
+    "backups": (t_backups, "backup status: guests with or without a backup, failed or late backups, backup stores filling up, and the last backup of EACH guest (oldest first). args: guest (optional name)"),
     "certificates": (t_certificates, "TLS certificates that are watched and how many days they have left, soonest first. args: none"),
     "speedtest": (t_speedtest, "internet speed tests: latest, average, slowest and fastest. args: days (1-30)"),
     "network_services": (t_network_services, "DHCP servers on the network (and whether they are trusted), gateway and DNS record registration. args: none"),

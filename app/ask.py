@@ -14,12 +14,12 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
-from app import engineer, forecast, incidents, insights, anomaly, relevance, reports
+from app import asklog, engineer, forecast, incidents, insights, anomaly, relevance, reports
 from app.insights import complete  # noqa: F401 - re-exported for the tests
 
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
 MAX_STEPS = 4
-MAX_RESULT = 3500
+MAX_RESULT = 5000
 LIMIT = 15
 
 
@@ -267,6 +267,9 @@ def route(question: str, known_names: list[str], conn=None) -> tuple[str, dict]:
     """(tool, args) for a question, by its words: a device name wins, then the first keyword group that matches."""
     q = question.lower()
     if conn is not None:
+        wide = ask_data.route(q, known_names)           # the open-ended questions first: their words are specific (reboot, free addresses, most bandwidth)
+        if wide:
+            return wide
         extra = ask_extra.route(q, known_names)
         if extra:
             return extra
@@ -389,6 +392,9 @@ EXAMPLES = [
     ("Who changed settings this week?", "audit", {"days": 7}), ("Is anything suspicious going on?", "security", {"days": 7}), ("Which smart-home batteries are low?", "smart_home", {}),
     ("How many devices are there per type?", "counts", {"by": "type"}), ("Which version of Netlens is this?", "system", {}),
     ("Which systems drop packets on eth0?", "interface_errors", {"interface": "eth0"}),
+    ("Which devices rebooted last week?", "metric", {"metric": "uptime", "days": 7}), ("How hot is the switch?", "metric", {"metric": "temperature", "device": "switch"}),
+    ("Which systems have a failed service?", "host_findings", {"topic": "failed service"}), ("Which devices use the most traffic?", "usage", {"days": 7}),
+    ("Which devices have no hostname?", "search_devices", {"missing": "hostname"}), ("Which device has been gone the longest?", "search_devices", {"sort": "longest_gone", "online": False}),
 ]
 
 
@@ -402,6 +408,7 @@ def system_prompt() -> str:
             "- Use at most four tool calls. Pick the tool that fits the question. If the first result does not help, you may try one other tool that fits.\n"
             "- For a list or a count of devices with some property (a kind, a manufacturer, an operating system, online or offline, an open port) use search_devices or ports. For one named device use device. For a kind of device (printer, switch, nas, camera ...) use search_devices with type, or device with that word.\n"
             "- For a website or domain (example.com) use site, also for 'why is it down': it shows whether the site is disabled on the reverse proxy, which is often the real reason; say so plainly when it is.\n"
+            "- A reading OVER TIME or any number the hosts report (uptime and reboots, temperature of a switch, swap, UPS battery, traffic, free space, history of one device) is in metric; call it without args.metric to see what exists. What the host probes found INSIDE the hosts (failed services, logins, kernel errors) is in host_findings for all hosts at once. Lists of devices can be sorted, filtered on what is missing, and paged in search_devices.\n"
             "- Current readings (memory, processor, disk, temperature, battery) are in health. Forecasts (a disk that will fill up) are in disks.\n"
             "- Copy names and numbers exactly as they appear in the results. If a result is a list, mention every item that matters; say \"only\" only when the list has one item. Round long numbers to one decimal.\n"
             "- The user cares about problems that matter: always-on devices (servers, routers, switches, NAS, cameras ...), services and network faults. The tools already leave out phones, tablets and other devices that come and go; never bring them up yourself.\n"
@@ -411,6 +418,25 @@ def system_prompt() -> str:
             "- Names such as <device1> or <ip2> are placeholders: write them exactly as they are.\n"
             "Examples:\n" + "\n".join(f"Question: {q} -> {json.dumps({'tool': t, 'args': a})}" for q, t, a in EXAMPLES) + "\n"
             "Tools:\n" + "\n".join(f"- {n}: {d}" for n, (_f, d) in TOOLS.items()))
+
+
+def _words(text: str) -> set[str]:
+    return {w[:-1] if w.endswith("s") and len(w) > 4 else w for w in re.findall(r"[a-z0-9]{4,}", (text or "").lower())} - {"which", "what", "have", "does", "that", "with", "from", "this", "there", "their", "when", "were", "your", "show", "much", "many"}
+
+
+def untried_tools(question: str, used: list[str], limit: int = 6) -> list[str]:
+    """The tools not yet tried whose description shares the most words with the question; the open-ended ones are always offered."""
+    q = _words(question)
+    scored = sorted(((len(q & _words(desc)), name) for name, (_f, desc) in TOOLS.items() if name not in used), key=lambda x: (-x[0], x[1]))
+    picks = [n for score, n in scored if score > 0][:limit]
+    return picks + [n for n in ("metric", "host_findings", "search_devices") if n in TOOLS and n not in used and n not in picks]
+
+
+def suggest(question: str, limit: int = 3) -> list[str]:
+    """The ready-made questions that share the most words with a question the built-in logic did not understand."""
+    q = _words(question)
+    scored = sorted(((len(q & _words(p["text"])), p["text"]) for p in PRESETS), key=lambda x: -x[0])
+    return [t for score, t in scored if score > 0][:limit]
 
 
 def _restore_args(args: Any, redact: engineer.Redactor | None) -> dict:
@@ -435,7 +461,7 @@ def _ask_model(conn, question: str, names: list[str], now, ask) -> dict | None:
     hide = redact or (lambda t: t)
     messages = [{"role": "system", "content": system_prompt()}, {"role": "user", "content": hide(question)}]
     used: list[str] = []
-    nudged = {"json": False, "tool": False}
+    nudged = {"json": False, "tool": False, "retry": False}
     for _ in range(MAX_STEPS + 3):
         try:
             reply = (ask or (lambda m: engineer.chat(conn, m)))(messages)
@@ -454,6 +480,13 @@ def _ask_model(conn, question: str, names: list[str], now, ask) -> dict | None:
                 messages += [{"role": "assistant", "content": json.dumps(doc)}, {"role": "user", "content": 'Look at the data first: call one of the tools. If none of them can tell, answer {"answer": "The data does not tell."}.'}]
                 continue
             text = doc["answer"].strip()[:2000]
+            if not nudged["retry"] and len(used) < MAX_STEPS and asklog.GAVE_UP.search(text):     # it gave up: show it the tools it has not looked at, once
+                left = untried_tools(question, used)
+                if left:
+                    nudged["retry"] = True
+                    messages += [{"role": "assistant", "content": json.dumps({"answer": text})},
+                                 {"role": "user", "content": "You have not tried: " + ", ".join(left) + ". If one of them could hold the answer, call it now with the right args; if none can, repeat your answer."}]
+                    continue
             return {"answer": redact.restore(text) if redact else text, "source": "model", "tools": used}
         tool = doc.get("tool")
         if tool not in TOOLS or len(used) >= MAX_STEPS:
@@ -478,6 +511,7 @@ def answer(conn: sqlite3.Connection, question: str, now: datetime | None = None,
     finally:
         _SCOPE.reset(token)
     got["scope"] = scope
+    asklog.record(conn, question, got)                  # what could not be answered is kept for the administrator
     return got
 
 
@@ -498,13 +532,14 @@ def _answer(conn, question: str, now, ask, mode: str) -> dict[str, Any]:
     if not tool:
         return {"answer": "The built-in logic cannot answer that: it understands questions about what is wrong now, what happened, availability, response times, current readings (memory, processor, disks, temperature), "
                           "devices by kind, manufacturer, operating system or open port, virtual machines and containers, backups, certificates, speed tests, remote sites, smart home, security, Wi-Fi, "
-                          "who changed what, what is connected to what, maintenance, versions and updates, or one device by name. Pick one below, or connect a language model for free-form questions.",
+                          "who changed what, what is connected to what, maintenance, versions and updates, or one device by name. Pick one below, or connect a language model for free-form questions." + (" Did you mean: " + " / ".join(suggest(question)) + "?" if suggest(question) else ""),
                 "source": "rules", "tools": [], "understood": False, "fell_back": fell_back}
     result = TOOLS[tool][0](conn, args, now)
     return {"answer": render(tool, result), "source": "rules", "tools": [tool], "fell_back": fell_back}
 
 
-from app import ask_extra, ask_more  # noqa: E402 - the other questions register themselves into the tables above
+from app import ask_data, ask_extra, ask_more  # noqa: E402 - the other questions register themselves into the tables above
 
 ask_more.register()
 ask_extra.register()
+ask_data.register()

@@ -1,4 +1,4 @@
-import { get, post, put, patch } from "../api.js";
+import { get, post, put, patch, del } from "../api.js";
 import { h, clear, toast, timeAgo, fmtTime, isAdmin } from "../util.js";
 import { pageHead } from "../ui.js";
 import { boardPage } from "../layout_cards.js";
@@ -65,6 +65,27 @@ export async function render(container) {
     const presets = h("div", { class: "ins-presets" }, ...data.presets.slice(0, 7).map(button));
     const more = data.presets.length > 7 ? h("details", {}, h("summary", { class: "hint" }, `More questions you can ask (${data.presets.length - 7})`), h("div", { class: "ins-presets" }, ...data.presets.slice(7).map(button))) : null;
     return h("div", { class: "card" }, h("h2", {}, "Ask your network"), form, data.status.llm_configured ? switcher : null, scopeRow, presets, more, out, h("hr", {}), settingsCard());
+  }
+
+  // The questions nobody could answer: what people ask that Netlens has no tool for, so it can be added. Administrators only; the text of the question is all that is kept.
+  function missesCard() {
+    const list = h("div", {});
+    const card = h("div", { class: "card" }, h("h2", {}, "Questions without an answer"),
+      h("p", { class: "hint" }, "What was asked here, in the top bar or through an assistant, and could not be answered. Only the question, how often and when are kept (200 at most, 90 days); no answers and no names of who asked."), list);
+    async function show() {
+      let r;
+      try { r = await get("/api/insights/ask/misses"); } catch (err) { clear(list); list.appendChild(h("p", { class: "error" }, err.message || "Could not load the list")); return; }
+      clear(list);
+      const on = h("input", { type: "checkbox" });
+      on.checked = r.enabled;
+      on.addEventListener("change", async () => { try { await put("/api/insights/ask/misses", { enabled: on.checked }); toast(on.checked ? "Unanswered questions are kept" : "Unanswered questions are no longer kept", "success"); } catch (err) { toast(err.message || "Failed", "error"); on.checked = !on.checked; } });
+      list.appendChild(h("label", { class: "check" }, on, " Keep a list of questions that got no answer"));
+      if (!r.items.length) { list.appendChild(h("p", { class: "hint" }, "Nothing yet: every question so far was answered.")); return; }
+      list.appendChild(h("ul", { class: "ins-list" }, ...r.items.slice(0, 30).map((x) => h("li", {}, h("strong", {}, x.q), " ", h("span", { class: "hint" }, `${x.n > 1 ? `${x.n}× · ` : ""}${timeAgo(x.last)}${x.tools && x.tools.length ? ` · tried: ${x.tools.join(", ")}` : " · no tool fitted"}`)))));
+      list.appendChild(h("button", { class: "btn", type: "button", onclick: async () => { try { await del("/api/insights/ask/misses"); toast("The list was cleared", "success"); show(); } catch (err) { toast(err.message || "Failed", "error"); } } }, "Clear the list"));
+    }
+    show();
+    return card;
   }
 
   function incidentsCard() {
@@ -246,7 +267,7 @@ export async function render(container) {
     }
     const tag = (el, id, title, kind, size) => { el.dataset.card = id; el.dataset.title = title; el.dataset.kind = kind; if (size) el.dataset.size = size; return el; };
     const flow = h("div", { class: "dev-flow" }, ...[
-      tag(askCard(), "ask", "Ask your network", "tiles", "f"), tag(incidentsCard(), "incidents", "Incidents", "list", "w"), tag(unusualCard(), "unusual", "Unusual right now", "list"),
+      tag(askCard(), "ask", "Ask your network", "tiles", "f"), isAdmin() ? tag(missesCard(), "misses", "Questions without an answer", "list") : null, tag(incidentsCard(), "incidents", "Incidents", "list", "w"), tag(unusualCard(), "unusual", "Unusual right now", "list"),
       coverage ? tag(coverageCard(), "coverage", "Monitoring coverage", "list") : null,
       tag(predictionsCard(), "predictions", "Predictions", "list"), tag(unknownCard(), "unknown", "Devices without a type", "list")].filter(Boolean));
     body.append(flow);
