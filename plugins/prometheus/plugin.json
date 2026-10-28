@@ -1,0 +1,85 @@
+{
+  "id": "prometheus",
+  "name": "Prometheus (host metrics)",
+  "version": "1.0.0",
+  "api_version": 1,
+  "diagnose": true,
+  "kind": "metrics",
+  "author": "Netlens",
+  "description": "Reads the processor, memory, swap, disks, network traffic, load and uptime of hosts from a Prometheus, VictoriaMetrics, Mimir or Thanos that already scrapes them (node_exporter for Linux, BSD and macOS; windows_exporter for Windows), so a host that cannot be probed needs no second agent. The store's own history fills the graphs. Read-only: only GET requests to /api/v1; nothing is sent to the hosts.",
+  "timeout": 120,
+  "info": {
+    "title": "What it reads",
+    "text": "Hosts are matched to the devices Netlens knows by IP address, then MAC address, then name. A device that is monitored another way (SNMP, SSH, WinRM, a host agent) is left alone. Use a read-only user or token on the Prometheus side: the plugin only needs /api/v1/query and /api/v1/query_range."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Prometheus",
+      "required": true,
+      "help": "The address of a Prometheus, VictoriaMetrics, Mimir or Thanos Query (HTTPS is assumed when you leave the scheme out). A path prefix is allowed (https://example.com/prometheus).",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "https://prometheus.example.com:9090", "required": true},
+        {"key": "token", "label": "Bearer token", "type": "password", "optional": true},
+        {"key": "username", "label": "User name (basic login)", "optional": true},
+        {"key": "password", "label": "Password", "type": "password", "optional": true},
+        {"key": "fingerprint", "label": "Certificate fingerprint", "placeholder": "B7:5B:65:5B:...", "optional": true,
+         "help": "SHA-256 fingerprint of the server's certificate. When filled in, exactly that certificate is trusted (also a self-signed one)."}
+      ]
+    },
+    {
+      "key": "job",
+      "type": "text",
+      "label": "Only these jobs",
+      "placeholder": "node, windows",
+      "section": "What to read",
+      "help": "Leave empty to read every host. Otherwise a comma separated list of Prometheus job names (letters, digits and _ . : - only)."
+    },
+    {
+      "key": "history_minutes",
+      "type": "number",
+      "label": "History to take over (minutes)",
+      "default": 20,
+      "min": 0,
+      "max": 120,
+      "section": "What to read",
+      "help": "Each sync also takes the store's own readings of the last minutes, so graphs are as dense as the store's even when Netlens syncs rarely. 0 reads only the newest value. Should be longer than the time between syncs."
+    },
+    {
+      "key": "step",
+      "type": "number",
+      "label": "Time between history points (seconds)",
+      "default": 60,
+      "min": 15,
+      "max": 600,
+      "section": "What to read"
+    },
+    {
+      "key": "max_hosts",
+      "type": "number",
+      "label": "Most hosts to read",
+      "default": 500,
+      "min": 1,
+      "max": 2000,
+      "section": "What to read"
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "section": "Security",
+      "help": "Turn off for a self-signed certificate. Better: fill in the certificate fingerprint."
+    },
+    {
+      "key": "allow_http",
+      "type": "bool",
+      "label": "Allow plain http",
+      "default": false,
+      "section": "Security",
+      "help": "Off: an address that starts with http:// is refused, because a token or password would cross the network unencrypted. Turn on only for a lab or a store on the same machine."
+    }
+  ],
+  "dashboard": []
+}

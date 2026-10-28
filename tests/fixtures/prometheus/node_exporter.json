@@ -1,0 +1,483 @@
+{
+ "source": "Prometheus 3.15.1 + node_exporter (lab), anonymised",
+ "requests": [
+  {
+   "path": "/api/v1/status/buildinfo",
+   "query": "",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "version": "3.15.1",
+     "revision": "bae3eced0a5369e050e83ea73bc381d7c4b1a719",
+     "branch": "HEAD",
+     "buildUser": "root@03bc6b0f3ef7",
+     "buildDate": "20261021-13:31:17",
+     "goVersion": "go1.27.3"
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query",
+   "query": "count(node_uname_info{})",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "vector",
+     "result": [
+      {
+       "metric": {},
+       "value": [
+        1793220973.791,
+        "1"
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query",
+   "query": "count(windows_cs_hostname{})",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "vector",
+     "result": []
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query",
+   "query": "node_uname_info{}",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "vector",
+     "result": [
+      {
+       "metric": {
+        "__name__": "node_uname_info",
+        "domainname": "(none)",
+        "instance": "10.0.0.5:9100",
+        "job": "node",
+        "machine": "x86_64",
+        "nodename": "web01",
+        "release": "6.12.111+deb13-amd64",
+        "sysname": "Linux",
+        "version": "#1 SMP PREEMPT_DYNAMIC Debian 6.12.111-1 (2026-09-28)"
+       },
+       "value": [
+        1793220973.806,
+        "1"
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query",
+   "query": "windows_cs_hostname{}",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "vector",
+     "result": []
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100)",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": [
+      {
+       "metric": {
+        "instance": "10.0.0.5:9100"
+       },
+       "values": [
+        [
+         1793220914,
+         "82.22986666663948"
+        ],
+        [
+         1793220974,
+         "35.537058333311734"
+        ]
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "node_load1{}",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": [
+      {
+       "metric": {
+        "__name__": "node_load1",
+        "instance": "10.0.0.5:9100",
+        "job": "node"
+       },
+       "values": [
+        [
+         1793220914,
+         "0.47"
+        ],
+        [
+         1793220974,
+         "0.25"
+        ]
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "100 * (1 - node_memory_MemAvailable_bytes{} / node_memory_MemTotal_bytes{})",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": [
+      {
+       "metric": {
+        "instance": "10.0.0.5:9100",
+        "job": "node"
+       },
+       "values": [
+        [
+         1793220914,
+         "38.04661003810477"
+        ],
+        [
+         1793220974,
+         "38.060306952490265"
+        ]
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "100 * (1 - node_memory_SwapFree_bytes{} / node_memory_SwapTotal_bytes{}) and node_memory_SwapTotal_bytes{} > 0",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": [
+      {
+       "metric": {
+        "instance": "10.0.0.5:9100",
+        "job": "node"
+       },
+       "values": [
+        [
+         1793220914,
+         "24.025177025963806"
+        ],
+        [
+         1793220974,
+         "24.01907350451804"
+        ]
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "100 * (1 - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|iso9660|proc|sysfs|cgroup.*|fuse.*|nsfs|autofs|tracefs|debugfs|securityfs|pstore|efivarfs|configfs|mqueue|hugetlbfs|bpf\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|iso9660|proc|sysfs|cgroup.*|fuse.*|nsfs|autofs|tracefs|debugfs|securityfs|pstore|efivarfs|configfs|mqueue|hugetlbfs|bpf\"}) and node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|iso9660|proc|sysfs|cgroup.*|fuse.*|nsfs|autofs|tracefs|debugfs|securityfs|pstore|efivarfs|configfs|mqueue|hugetlbfs|bpf\"} > 67108864",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": [
+      {
+       "metric": {
+        "device": "/dev/sda1",
+        "fstype": "ext4",
+        "instance": "10.0.0.5:9100",
+        "job": "node",
+        "mountpoint": "/"
+       },
+       "values": [
+        [
+         1793220914,
+         "62.18511563119393"
+        ],
+        [
+         1793220974,
+         "62.184953383015674"
+        ]
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|iso9660|proc|sysfs|cgroup.*|fuse.*|nsfs|autofs|tracefs|debugfs|securityfs|pstore|efivarfs|configfs|mqueue|hugetlbfs|bpf\"} and node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs|ramfs|devtmpfs|iso9660|proc|sysfs|cgroup.*|fuse.*|nsfs|autofs|tracefs|debugfs|securityfs|pstore|efivarfs|configfs|mqueue|hugetlbfs|bpf\"} > 67108864",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": [
+      {
+       "metric": {
+        "__name__": "node_filesystem_avail_bytes",
+        "device": "/dev/sda1",
+        "fstype": "ext4",
+        "instance": "10.0.0.5:9100",
+        "job": "node",
+        "mountpoint": "/"
+       },
+       "values": [
+        [
+         1793220914,
+         "47732359168"
+        ],
+        [
+         1793220974,
+         "47732563968"
+        ]
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|tap.*|cali.*|flannel.*|cni.*\"}[2m]) * 8",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": [
+      {
+       "metric": {
+        "device": "ens18",
+        "instance": "10.0.0.5:9100",
+        "job": "node"
+       },
+       "values": [
+        [
+         1793220914,
+         "1707.3818666666666"
+        ],
+        [
+         1793220974,
+         "8531.805333333334"
+        ]
+       ]
+      },
+      {
+       "metric": {
+        "device": "incusbr0",
+        "instance": "10.0.0.5:9100",
+        "job": "node"
+       },
+       "values": [
+        [
+         1793220914,
+         "0"
+        ],
+        [
+         1793220974,
+         "0"
+        ]
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|tap.*|cali.*|flannel.*|cni.*\"}[2m]) * 8",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": [
+      {
+       "metric": {
+        "device": "ens18",
+        "instance": "10.0.0.5:9100",
+        "job": "node"
+       },
+       "values": [
+        [
+         1793220914,
+         "426.3306666666667"
+        ],
+        [
+         1793220974,
+         "3389.2394666666664"
+        ]
+       ]
+      },
+      {
+       "metric": {
+        "device": "incusbr0",
+        "instance": "10.0.0.5:9100",
+        "job": "node"
+       },
+       "values": [
+        [
+         1793220914,
+         "0"
+        ],
+        [
+         1793220974,
+         "0"
+        ]
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "time() - node_boot_time_seconds{}",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": [
+      {
+       "metric": {
+        "instance": "10.0.0.5:9100",
+        "job": "node"
+       },
+       "values": [
+        [
+         1793220914,
+         "437009"
+        ],
+        [
+         1793220974,
+         "437069"
+        ]
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "100 - (avg by (instance) (rate(windows_cpu_time_total{mode=\"idle\"}[2m])) * 100)",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": []
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "100 * (1 - windows_os_physical_memory_free_bytes{} / windows_cs_physical_memory_bytes{})",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": []
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "100 * (1 - windows_logical_disk_free_bytes{volume!~\"HarddiskVolume.*\"} / windows_logical_disk_size_bytes{volume!~\"HarddiskVolume.*\"})",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": []
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "windows_logical_disk_free_bytes{volume!~\"HarddiskVolume.*\"}",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": []
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "rate(windows_net_bytes_received_total{nic!~\".*(Loopback|isatap|Teredo|6to4|vEthernet).*\"}[2m]) * 8",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": []
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "rate(windows_net_bytes_sent_total{nic!~\".*(Loopback|isatap|Teredo|6to4|vEthernet).*\"}[2m]) * 8",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": []
+    }
+   }
+  },
+  {
+   "path": "/api/v1/query_range",
+   "query": "time() - (windows_system_boot_time_timestamp_seconds{} or windows_system_boot_time_timestamp{})",
+   "status": 200,
+   "body": {
+    "status": "success",
+    "data": {
+     "resultType": "matrix",
+     "result": []
+    }
+   }
+  }
+ ]
+}

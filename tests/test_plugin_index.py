@@ -457,7 +457,7 @@ def test_a_removed_plugin_is_not_listed_as_missing(client):
 def test_category_comes_from_the_entry_or_the_default_of_its_kind():
     from app.plugins.categories import category_of, listing
 
-    assert [c["id"] for c in listing()] == ["virtualization", "network", "dns", "backup", "proxy", "smarthome", "security", "storage", "hardware", "documentation"]
+    assert [c["id"] for c in listing()] == ["virtualization", "network", "dns", "backup", "proxy", "smarthome", "security", "storage", "hardware", "documentation", "monitoring"]
     assert category_of("hypervisor") == "virtualization" and category_of("topology") == "network" and category_of("dns") == "dns" and category_of("proxy") == "proxy"
     assert category_of("hypervisor", "storage") == "storage"
     assert category_of("hypervisor", "not-a-category") == "virtualization" and category_of("topology", 7) == "network"
@@ -476,5 +476,5 @@ def test_api_lists_categories_and_installed_plugins_get_theirs(client):
     assert all({"id", "label", "short"} <= set(c) for c in body["categories"])
     assert client.post("/api/plugin-index/omada/install", json={}).status_code == 200
     listing = client.get("/api/plugins").json()
-    assert next(p for p in listing["plugins"] if p["id"] == "omada")["category"] == "documentation" and len(listing["categories"]) == 10
+    assert next(p for p in listing["plugins"] if p["id"] == "omada")["category"] == "documentation" and len(listing["categories"]) == 11
     assert next(p for p in listing["plugins"] if p["builtin"])["category"] in {c["id"] for c in listing["categories"]}

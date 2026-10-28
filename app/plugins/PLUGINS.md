@@ -1,7 +1,7 @@
 # Writing Netlens plugins
 
 Netlens can learn about your network from other systems through **plugins**. A plugin talks to one kind of device
-(a router, a hypervisor, ...) and hands Netlens the result in a fixed format. Four kinds exist today:
+(a router, a hypervisor, ...) and hands Netlens the result in a fixed format. Several kinds exist:
 
 | Kind | Reports | Examples |
 | :--- | :--- | :--- |
@@ -11,6 +11,7 @@ Netlens can learn about your network from other systems through **plugins**. A p
 | `proxy` | a reverse proxy and the sites it publishes (domain → upstream host and port, certificate) | Nginx Proxy Manager (more welcome: Traefik, Caddy, HAProxy) |
 | `storage` | a storage system (array, NAS, Ceph): health, pools, volumes with the hosts that use them, disks and alerts | NetApp ONTAP, Ceph |
 | `backup` | a backup server: what is backed up (per guest), how old, whether it worked, and how full its stores are | Proxmox Backup Server, Xen Orchestra |
+| `metrics` | a store of host readings (processor, memory, disks, network, load, uptime) that Netlens records like any monitored host | Prometheus, VictoriaMetrics, Mimir |
 
 Plugin API version: **1**.
 
@@ -56,7 +57,7 @@ my-router/            (the folder is optional)
 | `name` | yes | Shown in the menu and plugin list (max 60). |
 | `version` | yes | Like `1.0.0`. |
 | `api_version` | yes | Must be `1`. |
-| `kind` | yes | `hypervisor`, `topology`, `dns`, `proxy`, `backup` or `storage`. |
+| `kind` | yes | `hypervisor`, `topology`, `dns`, `proxy`, `backup`, `storage` or `metrics`. |
 | `description` | no | A sentence or two (max 500). |
 | `author`, `homepage` | no | Shown in the plugin list. |
 | `info` | no | A collapsed box at the top of the plugin's settings page: `{"title": ..., "text": ..., "code": ...}`. `code` is shown in a block with a Copy button, for example the docker-compose lines the plugin needs on the other side. Needs Netlens 0.3.115; older versions ignore it. |
@@ -399,6 +400,34 @@ Return `{"systems": [...], "controllers": [...], "pools": [...], "volumes": [...
 Netlens matches a system or controller to the device with that address, links the `clients` of a volume to their devices (the device page then says which volumes it uses) and raises events when a system, pool or disk becomes unhealthy or recovers, when a pool passes 85 and 95 percent, and when a new critical alert appears. The first sync after switching a plugin on is not news.
 
 **Storage from other kinds** (Netlens 0.4.180): a plugin of any other kind, typically a `hypervisor` plugin for a NAS or a hyperconverged system (Synology, TrueNAS, Unraid, Nutanix ...), may add a `storage` object to its output with the same lists (`systems`, `controllers`, `pools`, `volumes`, `disks`, `alerts`). Netlens shows them on the Storage page next to the guests; leave the key out (or `null`) when there is nothing to report. A mistake in the `storage` part fails the whole answer like any other part of the contract.
+
+## Output for kind `metrics`
+
+For a plugin that reads host readings from a store the customer already runs (Prometheus, VictoriaMetrics, Mimir ...). Return `{"hosts": [...]}`. Netlens matches each host to a
+device (IP address, then MAC, then name) and records the readings like those of any monitored host: graphs, limits and alerts, the dashboard, reports, Ask, the assistant and MCP.
+A device that is monitored another way (SNMP, SSH, WinRM, a host agent, another plugin) is left alone. Needs Netlens 0.4.304.
+
+| Host field | Required | Meaning |
+| :--- | :--- | :--- |
+| `id` | yes | Unique in the answer (up to 120 characters). |
+| `name` | no | Host name (default: the id); used to match when there is no IP or MAC match. |
+| `ip` | no | IPv4 address (the strongest way to match). |
+| `macs` | no | MAC addresses. |
+| `readings` | no | Up to 400 readings, below. |
+
+A *reading*: `metric` (required: `cpu_pct`, `load1`, `mem_pct`, `swap_pct`, `disk_pct`, `disk_free_b`, `net_rx_bps`, `net_tx_bps`, `uptime_s` or `temp_c`), `label` (up to 40 characters: the mount point
+or interface name, empty for a whole-host figure), `value` (the newest figure) and optionally `samples`: up to 240 `[unix time, value]` pairs from the store's own history since the last sync. With samples
+the graphs are as dense as the store's, not as sparse as the sync interval; a sample that is already stored is overwritten, so a window that repeats does no harm. A reading with neither `value` nor
+samples is left out. Percentages are 0 to 100, rates are per second in bits (`net_*_bps`), `disk_free_b` is bytes.
+
+```json
+{"hosts": [
+  {"id": "web01:9100", "name": "web01", "ip": "10.0.0.5",
+   "readings": [
+     {"metric": "cpu_pct", "value": 12.5, "samples": [[1790000000, 11.0], [1790000060, 12.5]]},
+     {"metric": "disk_pct", "label": "/", "value": 61.0},
+     {"metric": "net_rx_bps", "label": "eth0", "value": 85000}]}]}
+```
 
 ## Output for kind `topology`
 

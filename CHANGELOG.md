@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.304 — 2026-10-28
+
+### Added
+- ★ **A new plugin kind, `metrics`, and the Prometheus (host metrics) plugin.** A host that cannot be probed (no SSH, WinRM or SNMP, no stored login) no longer needs a second agent when the company already runs **Prometheus, VictoriaMetrics, Mimir or Thanos**: the plugin reads the processor, memory, swap, disks, network traffic, load and uptime that `node_exporter` (Linux, BSD, macOS) and `windows_exporter` already report, and Netlens records them like those of any monitored host: graphs, limits and alerts, the dashboard, reports, Ask, the assistant and MCP. Hosts are matched to devices by IP address, then MAC, then name (a name two devices share is never guessed); a device that is monitored another way (SNMP, SSH, WinRM, a host agent, another plugin) is left alone. Each sync also takes the store's own history of the last minutes, so the graphs are as dense as the store's even when Netlens syncs rarely. Read-only (`GET /api/v1/...` only), HTTPS by default with optional certificate pinning, fixed queries (a job name is the only typed part, checked character by character), no names or addresses in the diagnostic report. Tested against a real Prometheus 3.15.1 with a real node_exporter; `windows_exporter`, VictoriaMetrics, Mimir and Thanos are untested. The kind is documented for plugin authors in `PLUGINS.md` (monitoring category "Monitoring & metrics").
+
 ## 0.4.303 — 2026-10-28
 
 ### Added

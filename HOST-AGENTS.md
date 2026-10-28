@@ -31,6 +31,8 @@ a host, and it holds no login for it.
 | What you get | the full picture: the nine read-only probes (storage, SMART, RAID, services, logins, updates, ports ...) | the numbers: processor, memory, swap, disks, network traffic, load, uptime, with the same limits, alerts, graphs and AI as any other monitored host |
 | Good for | hosts you may log in to | locked-down hosts, DMZs, regulated zones, hosts the security team will not give a login |
 
+**If the company already runs Prometheus** (or VictoriaMetrics, Mimir, Thanos), you may not need an agent at all: the *Prometheus (host metrics)* plugin reads the readings of the hosts that `node_exporter` and `windows_exporter` already report, with no new listener in Netlens and nothing installed on the hosts (see `plugins/prometheus`). The host agents on this page are for hosts with no such stack.
+
 The two are not mixed on one device: a device is monitored one way. Link a device to an agent and remove its other monitor first (Netlens refuses otherwise, and says so).
 
 ## How it works

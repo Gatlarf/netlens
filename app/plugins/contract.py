@@ -12,7 +12,7 @@ import re
 from typing import Any
 
 API_VERSION = 1
-KINDS = ("hypervisor", "topology", "dns", "proxy", "backup", "inventory", "vulnerability", "storage")
+KINDS = ("hypervisor", "topology", "dns", "proxy", "backup", "inventory", "vulnerability", "storage", "metrics")
 DNS_CAPABILITIES = ("marker", "delete")   # what a DNS plugin can do besides adding and updating records
 DNS_TYPES = ("A", "AAAA", "PTR", "CNAME")
 MAX_DNS_RECORDS = 50000
@@ -472,7 +472,49 @@ def _validate_kind(kind: str, data: Any) -> dict:
         return _vulnerability(data)
     if kind == "storage":
         return _storage(data)
+    if kind == "metrics":
+        return _metrics(data)
     raise ContractError(f"unknown plugin kind {kind!r}")
+
+
+METRICS_KIND_METRICS = {"cpu_pct": "%", "load1": "", "mem_pct": "%", "swap_pct": "%", "disk_pct": "%", "disk_free_b": "B", "net_rx_bps": "bps", "net_tx_bps": "bps",
+                        "uptime_s": "s", "temp_c": "\u00b0C"}        # what a metrics source may report about a host: the readings Netlens already knows
+MAX_SAMPLES = 240
+
+
+def _metrics(data: Any) -> dict:
+    """The output of a `metrics` plugin (a store of host readings such as Prometheus): hosts with their readings. A reading has its newest `value` and,
+    optionally, `samples` ([unix time, value] pairs from the source's own history) so the graphs are as dense as the source's."""
+    data = _dict(data, "output")
+    hosts, ids = [], set()
+    for i, raw in enumerate(_list(data.get("hosts"), "hosts")):
+        path = f"hosts[{i}]"
+        raw = _dict(raw, path)
+        host_id = _text(raw.get("id"), f"{path}.id", required=True, max_len=120)
+        if host_id in ids:
+            _fail(f"{path}.id", f"{host_id} is listed twice")
+        ids.add(host_id)
+        readings = []
+        for j, r in enumerate(_list(raw.get("readings"), f"{path}.readings")[:400]):
+            rp = f"{path}.readings[{j}]"
+            r = _dict(r, rp)
+            metric = r.get("metric")
+            if metric not in METRICS_KIND_METRICS:
+                _fail(f"{rp}.metric", f"must be one of {', '.join(METRICS_KIND_METRICS)}, got {metric!r}")
+            value = _optional_number(r.get("value"), f"{rp}.value", -1e18, 1e18)
+            samples = []
+            for k, pair in enumerate(_list(r.get("samples"), f"{rp}.samples")[:MAX_SAMPLES]):
+                if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+                    _fail(f"{rp}.samples[{k}]", "must be [unix time, value]")
+                ts, v = _optional_number(pair[0], f"{rp}.samples[{k}][0]", 1e9, 4e9), _optional_number(pair[1], f"{rp}.samples[{k}][1]", -1e18, 1e18)
+                if ts is not None and v is not None:
+                    samples.append([int(ts), v])
+            if value is None and not samples:
+                continue                                           # the source had no figure for it
+            readings.append({"metric": metric, "label": _text(r.get("label"), f"{rp}.label", max_len=40), "unit": METRICS_KIND_METRICS[metric], "value": value, "samples": samples})
+        hosts.append({"id": host_id, "name": _text(raw.get("name"), f"{path}.name", default=host_id, max_len=120), "ip": _ipv4(raw.get("ip"), f"{path}.ip"),
+                      "macs": [_mac(m, f"{path}.macs[{n}]", required=True) for n, m in enumerate(_list(raw.get("macs"), f"{path}.macs"))], "readings": readings})
+    return {"hosts": hosts}
 
 
 def _dns_name(value: Any, path: str) -> str:

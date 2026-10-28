@@ -20,7 +20,7 @@ from app.plugins.registry import Plugin, discover
 from app.plugins.runner import PluginRunError, run_subprocess
 
 log = logging.getLogger(__name__)
-KIND_ORDER = {"hypervisor": 0, "topology": 1, "proxy": 2, "dns": 3, "backup": 4, "inventory": 5, "vulnerability": 6, "storage": 7}   # a backup plugin is matched against the guests, so it runs after the hypervisors  # hypervisor links first: they rank higher in the hierarchy anyway
+KIND_ORDER = {"hypervisor": 0, "topology": 1, "proxy": 2, "dns": 3, "backup": 4, "inventory": 5, "vulnerability": 6, "storage": 7, "metrics": 8}   # a backup plugin is matched against the guests, so it runs after the hypervisors  # hypervisor links first: they rank higher in the hierarchy anyway
 
 
 def source_of(plugin_id: str) -> str:
@@ -271,6 +271,10 @@ def _apply_kind(conn: sqlite3.Connection, plugin: Plugin) -> dict:
         from app import vulns
 
         return vulns.apply_vulns(conn, plugin.id, data, get_state(conn, plugin)["config"])
+    if kind == "metrics":   # a metrics plugin makes no links: it reports readings of hosts (from a store such as Prometheus), matched to the devices
+        from app import metricsource
+
+        return metricsource.apply_metrics(conn, plugin.id, data, get_state(conn, plugin)["config"])
     if kind == "inventory":   # an inventory plugin makes no links: it describes devices (matched to the ones on the network) and what a hub knows
         from app import inventory
 

@@ -17,9 +17,10 @@ CATEGORIES = [   # (id, label, short label for the narrow Settings menu)
     ("storage", "Storage & NAS", "Storage & NAS"),
     ("hardware", "Server hardware", "Hardware"),
     ("documentation", "Documentation", "Documentation"),
+    ("monitoring", "Monitoring & metrics", "Monitoring"),
 ]
 IDS = tuple(c for c, _, _ in CATEGORIES)
-KIND_DEFAULT = {"hypervisor": "virtualization", "topology": "network", "dns": "dns", "proxy": "proxy", "backup": "backup", "inventory": "smarthome", "vulnerability": "security", "storage": "storage"}
+KIND_DEFAULT = {"hypervisor": "virtualization", "topology": "network", "dns": "dns", "proxy": "proxy", "backup": "backup", "inventory": "smarthome", "vulnerability": "security", "storage": "storage", "metrics": "monitoring"}
 
 
 def category_of(kind: str | None, named: object = None) -> str:
