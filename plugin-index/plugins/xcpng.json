@@ -1,0 +1,25 @@
+{
+  "id": "xcpng",
+  "name": "XCP-ng / XenServer / Xen Orchestra",
+  "kind": "hypervisor",
+  "description": "Reads the pools of Vates VMS (XCP-ng with Xen Orchestra) and of XenServer: hosts, virtual machines with their addresses and the storage repositories. Talks to a Xen Orchestra, or straight to a pool master when there is none. Read-only, unless you let auto-remediation restart a VM.",
+  "author": "Netlens",
+  "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/xcpng",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "supports": [
+    "XCP-ng 8.3 with Xen Orchestra 6 (tested)",
+    "XCP-ng 8.3 pool master over the XAPI (tested)",
+    "XenServer pool masters over the XAPI (same API; not tested)"
+  ],
+  "releases": [
+    {
+      "version": "1.0.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-xcpng-v1.0.0/xcpng.zip",
+      "sha256": "9a36bbc9f966d1a4dbf0dad977b36493a72c6e91abf4a022a8b516676caa75d8",
+      "api_version": 1,
+      "min_netlens": "0.4.180",
+      "released": "2026-10-28",
+      "changelog": "First release. Needs Netlens 0.4.180 or newer (storage reported by a hypervisor plugin)."
+    }
+  ]
+}

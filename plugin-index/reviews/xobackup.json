@@ -1,0 +1,16 @@
+{
+  "id": "xobackup",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "dbfffa0de5cdd6e3642346773d3def49eaaad6bbfed34f77025a2faaf7f0c2a4",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-28",
+      "tested_on": [
+        "Xen Orchestra 6 (REST API 0.41) with a local backup repository, a nightly full-backup job, one failed run and one good run of a VM, also with a user that only has the built-in Read only role: repositories, per-VM backup overview, schedule interval, failed runs, wrong password, the diagnostic"
+      ],
+      "notes": "Written and lab-tested on 2026-10-28 with the assistant Claude on a throwaway Xen Orchestra. Remote repositories (NFS, SMB, S3), replication and mirror jobs, delta backups and large installations were not tested and follow the Xen Orchestra API. Plain http is refused unless switched on."
+    }
+  ]
+}

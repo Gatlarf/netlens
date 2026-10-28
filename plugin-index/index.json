@@ -3079,6 +3079,72 @@
      }
     }
    ]
+  },
+  {
+   "id": "xcpng",
+   "name": "XCP-ng / XenServer / Xen Orchestra",
+   "kind": "hypervisor",
+   "description": "Reads the pools of Vates VMS (XCP-ng with Xen Orchestra) and of XenServer: hosts, virtual machines with their addresses and the storage repositories. Talks to a Xen Orchestra, or straight to a pool master when there is none. Read-only, unless you let auto-remediation restart a VM.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/xcpng",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "XCP-ng 8.3 with Xen Orchestra 6 (tested)",
+    "XCP-ng 8.3 pool master over the XAPI (tested)",
+    "XenServer pool masters over the XAPI (same API; not tested)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-xcpng-v1.0.0/xcpng.zip",
+     "sha256": "9a36bbc9f966d1a4dbf0dad977b36493a72c6e91abf4a022a8b516676caa75d8",
+     "api_version": 1,
+     "min_netlens": "0.4.180",
+     "released": "2026-10-28",
+     "changelog": "First release. Needs Netlens 0.4.180 or newer (storage reported by a hypervisor plugin).",
+     "review": {
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-28",
+      "tested_on": [
+       "XCP-ng 8.3 (single host, two VMs without an operating system) nested in QEMU/KVM, through Xen Orchestra 6 (REST API 0.41, also with a user that only has the built-in Read only role) and straight from the pool master (XAPI JSON-RPC): hosts, VMs, MAC addresses, storage repositories, hard reboot / start / shutdown, wrong password, certificate fingerprint (right and wrong), the diagnostic"
+      ],
+      "notes": "Written and lab-tested on 2026-10-28 with the assistant Claude on a throwaway XCP-ng and Xen Orchestra. Reviewed, not verified: the lab had no guest tools (the IP addresses of VMs follow the Xen documentation and a simulated test), one host only, no XenServer, no shared or XOSTOR storage, no Active Directory logins. Plain http is refused unless switched on."
+     }
+    }
+   ]
+  },
+  {
+   "id": "xobackup",
+   "name": "Xen Orchestra backup",
+   "kind": "backup",
+   "description": "Shows what Xen Orchestra (Vates VMS) backs up: for every virtual machine the newest backup, its age, the copies kept and whether the last run worked, plus the free space of the backup repositories and the failed runs of the last week. Netlens ties each backup to its VM by the UUID the XCP-ng / XenServer plugin uses, warns when a backup fails or is late, and lists VMs that have no backup. Read-only (GET).",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/xobackup",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Xen Orchestra 6 (tested, local backup repository)"
+   ],
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-xobackup-v1.0.0/xobackup.zip",
+     "sha256": "dbfffa0de5cdd6e3642346773d3def49eaaad6bbfed34f77025a2faaf7f0c2a4",
+     "api_version": 1,
+     "min_netlens": "0.4.31",
+     "released": "2026-10-28",
+     "changelog": "First release. Needs Netlens 0.4.31 or newer (the Backups page).",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-28",
+      "tested_on": [
+       "Xen Orchestra 6 (REST API 0.41) with a local backup repository, a nightly full-backup job, one failed run and one good run of a VM, also with a user that only has the built-in Read only role: repositories, per-VM backup overview, schedule interval, failed runs, wrong password, the diagnostic"
+      ],
+      "notes": "Written and lab-tested on 2026-10-28 with the assistant Claude on a throwaway Xen Orchestra. Remote repositories (NFS, SMB, S3), replication and mirror jobs, delta backups and large installations were not tested and follow the Xen Orchestra API. Plain http is refused unless switched on."
+     }
+    }
+   ]
   }
  ]
 }

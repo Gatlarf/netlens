@@ -1,0 +1,16 @@
+{
+  "id": "xcpng",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "9a36bbc9f966d1a4dbf0dad977b36493a72c6e91abf4a022a8b516676caa75d8",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-28",
+      "tested_on": [
+        "XCP-ng 8.3 (single host, two VMs without an operating system) nested in QEMU/KVM, through Xen Orchestra 6 (REST API 0.41, also with a user that only has the built-in Read only role) and straight from the pool master (XAPI JSON-RPC): hosts, VMs, MAC addresses, storage repositories, hard reboot / start / shutdown, wrong password, certificate fingerprint (right and wrong), the diagnostic"
+      ],
+      "notes": "Written and lab-tested on 2026-10-28 with the assistant Claude on a throwaway XCP-ng and Xen Orchestra. Reviewed, not verified: the lab had no guest tools (the IP addresses of VMs follow the Xen documentation and a simulated test), one host only, no XenServer, no shared or XOSTOR storage, no Active Directory logins. Plain http is refused unless switched on."
+    }
+  ]
+}
