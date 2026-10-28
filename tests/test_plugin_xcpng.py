@@ -20,11 +20,11 @@ VM1, VM2 = "d2377fad-e72f-a3bc-2e00-dc4823a80efd", "b35fce12-befd-a53c-1fd1-55c6
 
 
 def xo_config(fake, **row):
-    return {"servers": [{"host": fake.url, "username": "admin@admin.net", "password": "admin", **row}], "verify_tls": False}
+    return {"servers": [{"host": fake.url, "username": "admin@admin.net", "password": "admin", **row}], "verify_tls": False, "allow_http": True}
 
 
 def xapi_config(fake, **row):
-    return {"servers": [{"host": fake.url, "username": "root", "password": "secret", **row}], "verify_tls": False}
+    return {"servers": [{"host": fake.url, "username": "root", "password": "secret", **row}], "verify_tls": False, "allow_http": True}
 
 
 def by_name(out):
@@ -74,7 +74,7 @@ def test_xapi_session_is_closed_again():
 
 def test_xo_token_login():
     with FakeXen() as fake:
-        out = plugin.fetch({"servers": [{"host": fake.url, "token": "tok"}], "verify_tls": False})
+        out = plugin.fetch({"servers": [{"host": fake.url, "token": "tok"}], "verify_tls": False, "allow_http": True})
     assert len(out["guests"]) == 2
 
 
@@ -96,7 +96,7 @@ def test_an_address_that_is_neither_is_explained():
 def test_missing_login_is_explained():
     with FakeXen() as fake:
         with pytest.raises(ValueError, match="token, or a user name and password"):
-            plugin.test({"servers": [{"host": fake.url}], "verify_tls": False})
+            plugin.test({"servers": [{"host": fake.url}], "verify_tls": False, "allow_http": True})
     with pytest.raises(ValueError, match="at least one"):
         plugin.test({"servers": []})
 
@@ -135,7 +135,7 @@ def test_a_vm_without_a_nic_or_a_paused_vm():
 
 def test_two_servers_that_show_the_same_pool_are_merged():
     with FakeXen(xo=True, xapi=False) as xo, FakeXen(xo=False, xapi=True) as master:
-        cfg = {"servers": [{"host": xo.url, "username": "admin@admin.net", "password": "admin"}, {"host": master.url, "username": "root", "password": "secret"}], "verify_tls": False}
+        cfg = {"servers": [{"host": xo.url, "username": "admin@admin.net", "password": "admin"}, {"host": master.url, "username": "root", "password": "secret"}], "verify_tls": False, "allow_http": True}
         out = plugin.fetch(cfg)
     validate_output("hypervisor", out)
     assert len(out["hosts"]) == 1 and len(out["guests"]) == 2
@@ -191,8 +191,18 @@ def test_fingerprint_must_be_a_sha256():
     plugin.make_transport(True, 5, "x", ":".join(["ab"] * 32))
 
 
+def test_plain_http_is_refused_unless_allowed():
+    with FakeXen() as fake:
+        cfg = xo_config(fake)
+        cfg["allow_http"] = False
+        with pytest.raises(ValueError, match="unencrypted"):
+            plugin.test(cfg)
+        assert fake.seen == []                      # nothing was sent, not even the probe
+        assert plugin.normalize_base("http://10.0.0.5", True) == "http://10.0.0.5"
+
+
 def test_addresses_are_normalised():
     assert plugin.normalize_base("xo.example.com") == "https://xo.example.com"
-    assert plugin.normalize_base("http://10.0.0.5:8080/foo/") == "http://10.0.0.5:8080"
+    assert plugin.normalize_base("http://10.0.0.5:8080/foo/", True) == "http://10.0.0.5:8080"
     with pytest.raises(ValueError):
         plugin.normalize_base("ftp://x")

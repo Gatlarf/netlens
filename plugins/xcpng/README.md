@@ -32,6 +32,10 @@ Enter the address of the **pool master** and a login for it. XCP-ng and XenServe
 
 Netlens can reset (hard reboot), reboot, shut down or start a VM when a remediation rule says so. That needs more than the read-only role: give the Netlens user the role **VM operator** (XO), or use a login that may operate VMs. *Reboot* and *shutdown* ask the guest through the Xen tools; a VM without tools answers that it cannot, and *reset* is the hard way.
 
+## Security
+
+The address must be `https://`: a login over plain `http://` would cross the network unencrypted, so it is refused unless you switch on *Allow plain http* (for a lab). A certificate fingerprint pins exactly one certificate. Netlens only reads; nothing is written to the Xen side except the power actions you allow.
+
 ## What was tested
 
 - **XCP-ng 8.3** (ISO 20260806, nested in QEMU/KVM) and **Xen Orchestra 6** (REST API 0.41, from the community Docker image): both ways in, a read-only user, a wrong password, a pinned certificate (right and wrong fingerprint), the power actions, the diagnostic. Two VMs without an operating system, so no guest-tools addresses: those follow the Xen documentation and are covered by a test with simulated agent data.

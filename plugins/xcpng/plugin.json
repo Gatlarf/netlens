@@ -29,7 +29,14 @@
       "type": "bool",
       "label": "Verify TLS certificate",
       "default": true,
-      "help": "Turn off for the self-signed certificate XCP-ng and Xen Orchestra use by default."
+      "help": "Turn off for the self-signed certificate XCP-ng and Xen Orchestra use by default. Better: fill in the certificate fingerprint."
+    },
+    {
+      "key": "allow_http",
+      "type": "bool",
+      "label": "Allow plain http",
+      "default": false,
+      "help": "Off: an address that starts with http:// is refused, because the password or token would cross the network unencrypted. Turn on only for a lab."
     }
   ],
   "dashboard": [

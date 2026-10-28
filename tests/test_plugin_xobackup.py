@@ -21,7 +21,7 @@ REPO = "8f461b19-7e34-4544-965c-73f0c96001c3"
 
 
 def config(fake, **row):
-    return {"servers": [{"host": fake.url, "username": "admin@admin.net", "password": "admin", **row}], "verify_tls": False}
+    return {"servers": [{"host": fake.url, "username": "admin@admin.net", "password": "admin", **row}], "verify_tls": False, "allow_http": True}
 
 
 RECORDED = 1793208545  # the successful run in the recording (2026-10-28 17:29:05 UTC)
@@ -103,7 +103,7 @@ def test_login_and_address_problems():
 
 def test_two_servers_get_their_own_ids():
     with FakeXen() as a, FakeXen() as b:
-        out = plugin.fetch({"servers": [{"host": a.url, "token": "tok"}, {"host": b.url, "token": "tok"}], "verify_tls": False})
+        out = plugin.fetch({"servers": [{"host": a.url, "token": "tok"}, {"host": b.url, "token": "tok"}], "verify_tls": False, "allow_http": True})
     validate_output("backup", out)
     assert [s["id"] for s in out["servers"]] == ["xo1", "xo2"] and len(out["targets"]) == 2
 

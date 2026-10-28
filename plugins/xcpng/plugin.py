@@ -94,8 +94,9 @@ class XenAuthError(XenError):
 Transport = Callable[[str, str, dict, bytes | None], tuple[int, bytes]]
 
 
-def normalize_base(host: str) -> str:
-    """https://host[:port] without a path. A bare address means HTTPS on the default port."""
+def normalize_base(host: str, allow_http: bool = False) -> str:
+    """https://host[:port] without a path. A bare address means HTTPS on the default port. Plain http would send the password or token
+    unencrypted, so it is refused unless the plugin setting 'Allow plain http' is on (for a lab)."""
     host = (host or "").strip().rstrip("/")
     if not host:
         raise ValueError("enter the address of the Xen Orchestra, or of the pool master")
@@ -104,6 +105,8 @@ def normalize_base(host: str) -> str:
     parsed = urllib.parse.urlparse(host)
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
         raise ValueError("the address must look like https://192.168.0.10")
+    if parsed.scheme == "http" and not allow_http:
+        raise ValueError("an address that starts with http:// would send the login unencrypted; use https://, or switch on 'Allow plain http' for a lab")
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
@@ -473,7 +476,7 @@ def _hosts(config: dict) -> list[str]:
 
 
 def _client(config: dict, row: dict):
-    base = normalize_base(row.get("host", ""))
+    base = normalize_base(row.get("host", ""), bool(config.get("allow_http")))
     send = TRANSPORT_FACTORY(bool(config.get("verify_tls", True)), TIMEOUT, base, row.get("fingerprint") or "")
     status, raw = send("GET", base + "/rest/v0/ping", {"Accept": "application/json"}, None)
     is_xo = status == 200 and b"pong" in raw

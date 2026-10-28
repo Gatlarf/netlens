@@ -17,6 +17,10 @@ A pool master has no backups to read: this plugin needs a Xen Orchestra.
 - Only VMs that have an archive or a run are reported as backed up.
 - Metadata and mirror jobs are not reported yet.
 
+## Security
+
+The address must be `https://`: a login over plain `http://` would cross the network unencrypted, so it is refused unless you switch on *Allow plain http* (for a lab). A certificate fingerprint pins exactly one certificate. Netlens only reads; nothing is written to the Xen side except the power actions you allow.
+
 ## What was tested
 
 Xen Orchestra 6 (REST API 0.41, community Docker image) with a local backup repository, a nightly job, a failed run (a wrongly configured job) and a good run of a VM, also as the read-only user. Not tested: remote repositories (NFS, S3, SMB), replication and mirror jobs, delta backups, large installations.
