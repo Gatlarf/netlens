@@ -337,7 +337,7 @@ that is linked to **several devices**, and for each device the host name the dat
 
 * A certificate made by Netlens is valid for **30 days**. The collectors do **not** renew it by themselves: schedule the renewal script. Without it the host goes
   silent when the certificate ends. Netlens warns 7 days before (an event, and a problem on the dashboard).
-* **Renewal** presents the current certificate and a new request to `https://NETLENS:4318/renew`. The old certificate keeps working for at most 7 more days, so a failed
+* **Renewal** presents the current certificate and a new request to `https://NETLENS:4318/renew`; the answer is the new certificate followed by the CA certificate(s) Netlens uses, which the scripts merge into `ca.pem`. The old certificate keeps working for at most 7 more days, so a failed
   restart does not lose the host. A certificate that has already ended cannot renew: enrol again. At most one renewal per hour.
 
   Linux (`contrib/netlens-renew.sh`, needs `openssl` and `curl`), once a day from cron or a timer:
@@ -359,7 +359,18 @@ that is linked to **several devices**, and for each device the host name the dat
 * **Revoke** (Settings → Host agents → Revoke): refused from the next request on, including on connections that are already open. **Enrol again** makes a new token and
   cancels the current certificate. **Delete** removes the agent and the monitor it fed; the stored readings stay.
 * **Server certificate:** the one Netlens makes lasts about 13 months and is renewed when you change the names. Replace it with your own under *Server certificate*.
-* **CA lifetime:** the ingest CA lasts 10 years. Replacing it (rotation) is not built yet; if your policy needs a particular key hierarchy or rotation, use certificates from your own CA.
+* **CA lifetime and rotation:** the ingest CA lasts 10 years. Netlens reports it in its last year (an event and a problem on the dashboard), and you can rotate it at any
+  time (Settings → Host agents → **Rotate the CA**) without losing a host:
+  1. A new CA is made. New and renewed certificates come from it. The **old CA stays trusted** and keeps signing the server certificate, because the hosts still trust only
+     the old one.
+  2. **Every host renews.** The renewal brings the new CA: the renewal scripts add it to `ca.pem` (the old one stays, so the host trusts Netlens before and after).
+     Run the script with `NETLENS_RENEW_DAYS=40` (PowerShell: `-RenewDays 40`) to renew at once; with the daily schedule every host renews by itself within about ten days.
+  3. The panel lists the agents that still hold a certificate from the old CA. When it says every agent has one from the new CA, press **Finish the rotation**. Netlens
+     stops trusting the old CA and signs the server certificate with the new one.
+  4. **Finish anyway** locks out the agents still on the old CA until they are enrolled again (Netlens asks first and writes it to the audit log). **Cancel the rotation**
+     is possible until the first agent has a certificate from the new CA.
+
+  Certificates from your own CA are not affected.
 * **Your own CA:** certificates are checked against the CA certificates you uploaded; renew them with your own tooling; see [above](#enrol-a-host).
 
 ## What you see in Netlens
@@ -455,7 +466,7 @@ The format Telegraf produces; any script can send it. One object, a list, or `{"
 
 ### Settings API (administrators, local network)
 
-`GET/PUT /api/ingest`, `POST/DELETE /api/ingest/window`, `GET /api/ingest/ca.pem`, `PUT /api/ingest/own-ca`, `PUT /api/ingest/server-certificate`,
+`GET/PUT /api/ingest`, `POST/DELETE /api/ingest/window`, `GET /api/ingest/ca.pem`, `POST /api/ingest/ca/rotate|finish|cancel`, `PUT /api/ingest/own-ca`, `PUT /api/ingest/server-certificate`,
 `POST /api/ingest/agents`, `PUT/DELETE /api/ingest/agents/{id}`, `POST /api/ingest/agents/{id}/token|revoke|reinstate`. Read-only for everyone who may view:
 `GET /api/agent-status`. An AI assistant token cannot use `/api/ingest`.
 
@@ -463,7 +474,7 @@ The format Telegraf produces; any script can send it. One object, a list, or `{"
 
 * **Automatically (every release):** enrolment (one-time token, expiry, generic refusal, weak key, rate limit, closed window), mutual TLS (no certificate, foreign CA,
   unknown certificate, revoked on an open connection, re-enrolment), the limits (size, gzip bomb, nesting, points, content type), identity (host name in the data ignored,
-  gateway mapping), your own CA (identity matching, refused leaf and expired CAs), renewal and overlap, silence and expiry events, the licence gate, the API, the
+  gateway mapping), your own CA (identity matching, refused leaf and expired CAs), renewal and overlap, CA rotation from start to finish (with the real renewal script and a forced finish), silence and expiry events, the licence gate, the API, the
   encrypted CA key, nothing from a sender stored, and a fuzz test of the parsers.
 * **With the real software:** OpenTelemetry Collector 0.164.0 (as a process and as the Debian package under systemd) and Telegraf 1.40.2 against a running Netlens;
   enrolment with `openssl` and `curl` and with PowerShell 7.4; the RPM installs on Rocky Linux 9 and openSUSE Leap 15.6; the shell sender and both renewal scripts.

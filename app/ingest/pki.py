@@ -59,19 +59,27 @@ def load_cert(text: str) -> x509.Certificate:
         raise PkiError("that is not a PEM certificate") from None
 
 
-def create_ca() -> tuple[str, str]:
+def create_ca(days: int | None = None) -> tuple[str, str]:
     """(certificate PEM, private key PEM) of a new ingest CA: EC P-256, ten years, may sign end certificates only."""
     key = ec.generate_private_key(ec.SECP256R1())
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f"{CA_NAME} {secrets.token_hex(4)}")])      # unique: two CAs with one name confuse the chain building
     now = _now()
     cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(x509.random_serial_number())
-            .not_valid_before(now - dt.timedelta(minutes=5)).not_valid_after(now + dt.timedelta(days=365 * CA_YEARS))
+            .not_valid_before(now - dt.timedelta(minutes=5)).not_valid_after(now + dt.timedelta(days=days if days is not None else 365 * CA_YEARS))
             .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
             .add_extension(x509.KeyUsage(digital_signature=True, key_cert_sign=True, crl_sign=True, content_commitment=False, key_encipherment=False,
                                          data_encipherment=False, key_agreement=False, encipher_only=False, decipher_only=False), critical=True)
             .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
             .sign(key, hashes.SHA256()))
     return pem(cert), key_pem(key)
+
+
+def cert_der(cert_pem: str) -> bytes:
+    return load_cert(cert_pem).public_bytes(serialization.Encoding.DER)
+
+
+def pem_blocks(text: str) -> list[str]:
+    return re.findall(r"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----", text, re.S)
 
 
 def check_names(names: list[str]) -> list[str]:

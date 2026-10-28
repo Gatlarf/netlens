@@ -24,12 +24,14 @@ from app.ingest import pki
 
 POLICY_KEY = "ingest.policy"
 CA_KEY = "ingest.ca"                # {"cert", "key"}: encrypted at rest (app/vault.py)
+CA_PREV_KEY = "ingest.ca_prev"      # {"cert", "key", "retired"} while a CA rotation runs (encrypted at rest)
 SERVER_KEY = "ingest.server"        # {"cert", "key", "source", "names"}: encrypted at rest
 BYO_KEY = "ingest.byo_ca"           # the customer's CA certificates (public)
 TOKEN_HOURS = 24
 ENROL_WINDOW_MIN, ENROL_WINDOW_MAX, ENROL_WINDOW_DEFAULT = 5, 240, 30
 MIN_INTERVAL, MAX_INTERVAL, DEFAULT_INTERVAL = 10, 3600, 60
 SILENT_FACTOR, SILENT_MIN_S = 3, 180
+CA_WARN_DAYS = 365                  # the ingest CA lasts 10 years; it is reported in its last year
 NEVER_SEEN_S = 3600                 # an agent that never sent anything is reported after an hour, not after three minutes
 RENEW_EVERY_S = 3600
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
@@ -152,8 +154,83 @@ def ensure_ca(conn) -> dict[str, str]:
     return ca
 
 
+def ca_id(cert_pem: str) -> str:
+    return pki.fingerprint(pki.cert_der(cert_pem))
+
+
+def _prev(conn) -> dict[str, str] | None:
+    p = _load(conn, CA_PREV_KEY)
+    return p if p and "cert" in p and "key" in p else None
+
+
 def ca_certificate(conn) -> str:
-    return ensure_ca(conn)["cert"]
+    """What a host needs to trust Netlens: the current CA and, while a rotation runs, the old one as well."""
+    cur = ensure_ca(conn)["cert"]
+    prev = _prev(conn)
+    return cur.strip() + "\n" + (prev["cert"].strip() + "\n" if prev else "")
+
+
+def _issuer(conn) -> dict[str, str]:
+    """The CA that signs the server certificate: the OLD one during a rotation (hosts still trust only that one), the current one otherwise."""
+    return _prev(conn) or ensure_ca(conn)
+
+
+def rotation(conn) -> dict[str, Any] | None:
+    """None, or what a running rotation looks like: since when, and which agents still hold a certificate from the old CA."""
+    prev = _prev(conn)
+    if prev is None:
+        return None
+    cur = ca_id(ensure_ca(conn)["cert"])
+    stale = [r["name"] for r in conn.execute("SELECT name, cert_ca FROM ingest_agents WHERE state = 'active' AND identity = '' AND cert_fp IS NOT NULL ORDER BY LOWER(name)") if r["cert_ca"] != cur]
+    return {"since": prev.get("retired"), "old_ca_expires": pki.load_cert(prev["cert"]).not_valid_after_utc.strftime(STAMP), "agents_on_old_ca": stale}
+
+
+def ca_info(conn) -> dict[str, Any]:
+    ca = pki.load_cert(ensure_ca(conn)["cert"])
+    return {"fingerprint": pki.fingerprint(ca.public_bytes(pki.serialization.Encoding.DER)), "expires": ca.not_valid_after_utc.strftime(STAMP), "rotation": rotation(conn)}
+
+
+def rotate_ca(conn) -> None:
+    """Start replacing the ingest CA. New certificates (enrolment and renewal) come from the new CA; the old one stays trusted, and keeps signing the server
+    certificate, until `finish_rotation`, because the hosts only trust the old one until they have renewed (the renewal brings them the new CA)."""
+    cur = ensure_ca(conn)
+    if _prev(conn) is not None:
+        raise IngestError("a rotation is already running: finish or cancel it first")
+    cert, key = pki.create_ca()
+    set_setting(conn, CA_PREV_KEY, json.dumps({"cert": cur["cert"], "key": cur["key"], "retired": utcnow()}))
+    set_setting(conn, CA_KEY, json.dumps({"cert": cert, "key": key}))
+    conn.commit()
+    ensure_server(conn, rebuild=True)
+    _audit(conn, "Started rotating the certificate authority for agent ingest (the old one stays trusted until the rotation is finished)", "/ingest/ca/rotate")
+
+
+def finish_rotation(conn, force: bool = False) -> None:
+    """Stop trusting the old CA. Refused while an agent still holds a certificate from it (it would be locked out), unless forced."""
+    r = rotation(conn)
+    if r is None:
+        raise IngestError("no rotation is running")
+    if r["agents_on_old_ca"] and not force:
+        n = len(r["agents_on_old_ca"])
+        raise IngestError(f"{n} agent{'s' if n != 1 else ''} still use{'' if n != 1 else 's'} a certificate from the old CA ({', '.join(r['agents_on_old_ca'][:5])}): they must renew first, or finish anyway to lock them out")
+    set_setting(conn, CA_PREV_KEY, "")
+    conn.commit()
+    ensure_server(conn, rebuild=True)
+    _audit(conn, "Finished rotating the certificate authority for agent ingest" + (f" (forced: {len(r['agents_on_old_ca'])} agents locked out)" if r["agents_on_old_ca"] else ""), "/ingest/ca/finish")
+
+
+def cancel_rotation(conn) -> None:
+    """Go back to the old CA, when no agent has a certificate from the new one yet."""
+    prev = _prev(conn)
+    if prev is None:
+        raise IngestError("no rotation is running")
+    cur = ca_id(ensure_ca(conn)["cert"])
+    if conn.execute("SELECT 1 FROM ingest_agents WHERE cert_ca = ?", (cur,)).fetchone():
+        raise IngestError("agents already received certificates from the new CA: finish the rotation instead")
+    set_setting(conn, CA_KEY, json.dumps({"cert": prev["cert"], "key": prev["key"]}))
+    set_setting(conn, CA_PREV_KEY, "")
+    conn.commit()
+    ensure_server(conn, rebuild=True)
+    _audit(conn, "Cancelled the rotation of the certificate authority for agent ingest", "/ingest/ca/cancel")
 
 
 def _uploaded(conn) -> bool:
@@ -166,10 +243,11 @@ def ensure_server(conn, rebuild: bool = False) -> dict[str, Any]:
     names = get_policy(conn)["server_names"]
     if s and s.get("source") == "uploaded":
         return s
-    if not s or rebuild or sorted(s.get("names", [])) != sorted(names):
-        ca = ensure_ca(conn)
-        cert, key = pki.issue_server(ca["cert"], ca["key"], names)
-        s = {"cert": cert, "key": key, "source": "generated", "names": names}
+    issuer = _issuer(conn)
+    iid = ca_id(issuer["cert"])
+    if not s or rebuild or sorted(s.get("names", [])) != sorted(names) or s.get("issuer") != iid:
+        cert, key = pki.issue_server(issuer["cert"], issuer["key"], names)
+        s = {"cert": cert, "key": key, "source": "generated", "names": names, "issuer": iid}
         set_setting(conn, SERVER_KEY, json.dumps(s))
         conn.commit()
     return s
@@ -390,11 +468,11 @@ def enrol(conn, token: str, csr_pem: str, ip: str = "") -> str:
     except pki.PkiError as exc:
         raise IngestError(str(exc)) from None                                    # the token is NOT used up by a bad request
     conn.execute("UPDATE ingest_agents SET state = 'active', token_hash = NULL, token_expires = NULL, cert_fp = ?, cert_expires = ?, prev_fp = NULL, prev_expires = NULL, "
-                 "renewed = ?, silent = 0 WHERE id = ?", (fp, end, utcnow(), row["id"]))
+                 "renewed = ?, silent = 0, cert_ca = ? WHERE id = ?", (fp, end, utcnow(), ca_id(ca["cert"]), row["id"]))
     conn.commit()
     _audit(conn, f"Issued a certificate to agent '{row['name']}' (enrolment from {ip or 'unknown'}), valid until {end}", "/ingest/enrol")
     add_event(conn, "ingest_enrolled", f"Agent '{row['name']}' enrolled and received a certificate", subject=f"ingest:{row['id']}")
-    return cert + ca["cert"]
+    return cert + ca_certificate(conn)
 
 
 def renew(conn, agent_row, csr_pem: str) -> str:
@@ -410,11 +488,11 @@ def renew(conn, agent_row, csr_pem: str) -> str:
     except pki.PkiError as exc:
         raise IngestError(str(exc)) from None
     keep = min(_parse(agent_row["cert_expires"]) or 0, time.time() + 7 * 86400)
-    conn.execute("UPDATE ingest_agents SET prev_fp = cert_fp, prev_expires = ?, cert_fp = ?, cert_expires = ?, renewed = ? WHERE id = ?",
-                 (_stamp(keep), fp, end, utcnow(), agent_row["id"]))
+    conn.execute("UPDATE ingest_agents SET prev_fp = cert_fp, prev_expires = ?, cert_fp = ?, cert_expires = ?, renewed = ?, cert_ca = ? WHERE id = ?",
+                 (_stamp(keep), fp, end, utcnow(), ca_id(ca["cert"]), agent_row["id"]))
     conn.commit()
     _audit(conn, f"Renewed the certificate of agent '{agent_row['name']}', valid until {end}", "/ingest/renew")
-    return cert + ca["cert"]
+    return cert + ca_certificate(conn)
 
 
 # ----------------------------------------------------------------------------------------------- who is this connection
@@ -530,6 +608,13 @@ def check_silence(conn, now: float | None = None) -> list[str]:
                 add_event(conn, "ingest_cert_expiring",
                           f"The certificate of agent '{r['name']}' " + (f"ends in {left} day{'s' if left != 1 else ''}" if exp > now else "has expired"), subject=f"ingest:{r['id']}")
                 raised.append("ingest_cert_expiring")
+    ca = pki.load_cert(ensure_ca(conn)["cert"]) if _load(conn, CA_KEY) else None
+    if ca is not None and (ca.not_valid_after_utc.timestamp() - now) < CA_WARN_DAYS * 86400:
+        recent = any(e for e in conn.execute("SELECT 1 FROM events WHERE kind = 'ingest_ca_expiring' AND ts >= ?", (_stamp(now - 7 * 86400),)))
+        if not recent and rotation(conn) is None:
+            left = int((ca.not_valid_after_utc.timestamp() - now) // 86400)
+            add_event(conn, "ingest_ca_expiring", f"The certificate authority for host agents ends in {left} days: rotate it (Settings → Host agents)", subject="ingest:ca")
+            raised.append("ingest_ca_expiring")
     conn.commit()
     return raised
 
@@ -538,6 +623,10 @@ def problems(conn) -> list[dict[str, Any]]:
     """For the dashboard and the AI: silent agents and certificates that are about to end (the same list everywhere)."""
     out = []
     now = time.time()
+    if _load(conn, CA_KEY) and rotation(conn) is None:
+        left = (pki.load_cert(ensure_ca(conn)["cert"]).not_valid_after_utc.timestamp() - now) / 86400
+        if left < CA_WARN_DAYS:
+            out.append({"agent_id": 0, "name": "CA", "kind": "ca", "since": None, "text": f"The certificate authority for host agents ends in {int(left)} days: rotate it (Settings → Host agents)"})
     for r in conn.execute("SELECT * FROM ingest_agents WHERE state = 'active'"):
         exp = _parse(r["cert_expires"])
         if r["silent"]:

@@ -21,10 +21,18 @@ from cryptography.x509.oid import NameOID
 from app.ingest import server as srv
 
 
+_handed_out: set[int] = set()
+
+
 def free_port() -> int:
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    """A port nobody listens on, never the same one twice in a run (two calls in a row could otherwise get the same number)."""
+    while True:
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        if port not in _handed_out:
+            _handed_out.add(port)
+            return port
 
 
 class Live:

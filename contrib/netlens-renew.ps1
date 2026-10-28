@@ -36,9 +36,16 @@ try {
   $new = [System.Security.Cryptography.X509Certificates.X509Certificate2]::CreateFromPem(
     [regex]::Match((Get-Content -Raw -Path (Join-Path $tmp "agent.crt")), "-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----", "Singleline").Value)
   if (($new.PublicKey.ExportSubjectPublicKeyInfo() -join ",") -ne ($key.ExportSubjectPublicKeyInfo() -join ",")) { throw "key and certificate do not match" }
+  # The answer holds the new certificate first, then the CA certificate(s) Netlens uses. During a CA rotation that is how the host learns the new CA: add the ones
+  # that ca.pem does not have yet (the old ones stay, so the host trusts Netlens before and after the rotation is finished).
+  $pemRx = "-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----"
+  $answer = [regex]::Matches((Get-Content -Raw -Path (Join-Path $tmp "agent.crt")), $pemRx, "Singleline") | ForEach-Object { $_.Value }
+  $known = [regex]::Matches((Get-Content -Raw -Path $caPath), $pemRx, "Singleline") | ForEach-Object { ($_.Value -replace "\s", "") }
+  $added = @($answer | Select-Object -Skip 1 | Where-Object { $known -notcontains ($_ -replace "\s", "") })
   if ($IsWindows) {      # the key stays readable for SYSTEM and the administrators only
     icacls (Join-Path $tmp "agent.key") /inheritance:r /grant:r "SYSTEM:(R)" "BUILTIN\Administrators:(F)" | Out-Null
   }
+  if ($added.Count -gt 0) { Add-Content -Path $caPath -Value ($added -join "`n"); Write-Output ("ca.pem: " + $added.Count + " new CA certificate(s) added") }
   Move-Item -Force (Join-Path $tmp "agent.key") $keyPath
   Move-Item -Force (Join-Path $tmp "agent.crt") $crtPath
   Write-Output ("renewed: valid until " + $new.NotAfter.ToUniversalTime().ToString("u"))

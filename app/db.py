@@ -1183,6 +1183,7 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     # --- schema v24: a health monitor can be set up by the central Netlens (source = 'central')
     _add_column_if_missing(conn, "host_monitors", "source", "TEXT")
+    _add_column_if_missing(conn, "ingest_agents", "cert_ca", "TEXT")          # fingerprint of the CA that issued the current certificate (CA rotation)
 
     # --- schema v26: the outcome of every plugin sync (heartbeats and response time of the plugins) ---------------
     cur.execute(

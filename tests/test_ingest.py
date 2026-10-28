@@ -589,3 +589,127 @@ def test_the_token_and_the_certificate_never_reach_the_log(env):
     dump = json.dumps([dict(r) for r in env.conn.execute("SELECT * FROM audit_log")] + [dict(r) for r in env.conn.execute("SELECT * FROM events")])
     assert token not in dump and token[4:] not in dump and "PRIVATE" not in dump and "BEGIN" not in dump
     assert "Refused an enrolment" in dump and "Issued a certificate" in dump
+
+
+# ------------------------------------------------------------------ CA rotation
+import shutil
+import subprocess
+from pathlib import Path
+
+needs_tools = pytest.mark.skipif(not (shutil.which("curl") and shutil.which("openssl")), reason="curl and openssl are needed to run the renewal script")
+
+
+def run_renew(env, folder: Path, days=40):
+    e = {"PATH": __import__("os").environ["PATH"], "NETLENS_DIR": str(folder), "NETLENS_RENEW_URL": f"https://127.0.0.1:{env.ingest}/renew", "NETLENS_RENEW_DAYS": str(days)}
+    return subprocess.run(["sh", "contrib/netlens-renew.sh"], env=e, capture_output=True, text=True, timeout=60)
+
+
+def make_host_files(env, key, chain, tmp_path) -> Path:
+    d = tmp_path / "host"
+    d.mkdir()
+    (d / "ca.pem").write_text(env.ca)
+    (d / "agent.key").write_text(key)
+    (d / "agent.crt").write_text(chain)
+    return d
+
+
+def talk(env, d: Path, trust_only: str | None = None):
+    ctx = client_context(trust_only or (d / "ca.pem").read_text(), (d / "agent.crt").read_text(), (d / "agent.key").read_text())
+    return post_json(env.ingest, ctx, "/v1/metrics", otlp_doc(time.time(), 1, 2))[0]
+
+
+@needs_tools
+def test_a_ca_rotation_from_start_to_finish_without_losing_the_host(env, tmp_path):
+    agent, key, chain = enrolled(env)
+    host = make_host_files(env, key, chain, tmp_path)
+    old_ca = env.ca
+    assert core.rotation(env.conn) is None
+    core.rotate_ca(env.conn)
+    env.live.apply()
+    r = core.rotation(env.conn)
+    assert r["agents_on_old_ca"] == ["web01"]
+    assert talk(env, host, trust_only=old_ca) == 200                                  # the host knows only the old CA: the server certificate is still signed by it
+    with pytest.raises(core.IngestError, match="web01"):
+        core.finish_rotation(env.conn)                                                # it would be locked out
+    with pytest.raises(core.IngestError, match="already running"):
+        core.rotate_ca(env.conn)
+    env.conn.execute("UPDATE ingest_agents SET renewed = '2020-01-01T00:00:00Z'")
+    env.conn.commit()
+    out = run_renew(env, host)
+    assert out.returncode == 0, out.stderr
+    assert "new CA certificate" in out.stdout
+    assert (host / "ca.pem").read_text().count("BEGIN CERTIFICATE") == 2              # old and new
+    assert core.rotation(env.conn)["agents_on_old_ca"] == []
+    assert talk(env, host) == 200                                                     # new certificate, both CAs trusted
+    core.finish_rotation(env.conn)
+    env.live.apply()
+    assert core.rotation(env.conn) is None
+    assert talk(env, host) == 200                                                     # the server certificate is now signed by the new CA; the host has it
+    with pytest.raises((ssl.SSLError, OSError)):
+        talk(env, host, trust_only=old_ca)                                            # a host that never got the new CA could not verify Netlens
+    run = run_renew(env, host, days=40)
+    assert run.returncode != 0                                                        # renewed a moment ago: refused, and nothing was changed
+    assert talk(env, host) == 200
+
+
+def test_an_agent_that_never_renewed_is_locked_out_by_a_forced_finish(env):
+    agent, key, chain = enrolled(env)
+    core.rotate_ca(env.conn)
+    env.live.apply()
+    assert post_json(env.ingest, agent_ctx(env, key, chain), "/v1/metrics", otlp_doc(time.time(), 1, 2))[0] == 200
+    core.finish_rotation(env.conn, force=True)
+    env.live.apply()
+    new_ca = core.ca_certificate(env.conn)
+    with pytest.raises((ssl.SSLError, OSError)):
+        post_json(env.ingest, client_context(new_ca, chain, key), "/v1/metrics", otlp_doc(time.time(), 1, 2))
+    actions = " ".join(r["action"] for r in env.conn.execute("SELECT action FROM audit_log"))
+    assert "Started rotating" in actions and "forced: 1 agents locked out" in actions
+
+
+def test_a_rotation_can_be_cancelled_until_an_agent_has_a_new_certificate(env):
+    agent, key, chain = enrolled(env)
+    before = core.ca_id(core.ensure_ca(env.conn)["cert"])
+    core.rotate_ca(env.conn)
+    core.cancel_rotation(env.conn)
+    env.live.apply()
+    assert core.ca_id(core.ensure_ca(env.conn)["cert"]) == before and core.rotation(env.conn) is None
+    assert post_json(env.ingest, agent_ctx(env, key, chain), "/v1/metrics", otlp_doc(time.time(), 1, 2))[0] == 200
+    core.rotate_ca(env.conn)
+    env.live.apply()
+    a2, key2, chain2 = enrolled(env, "web02", [{"device_id": 2}])                      # enrolled during the rotation: its certificate is from the new CA
+    assert core.rotation(env.conn)["agents_on_old_ca"] == ["web01"]
+    with pytest.raises(core.IngestError, match="finish"):
+        core.cancel_rotation(env.conn)
+    with pytest.raises(core.IngestError):
+        core.finish_rotation(env.conn)
+    core.finish_rotation(env.conn, force=True)
+    for fn in (core.finish_rotation, core.cancel_rotation):
+        with pytest.raises(core.IngestError, match="no rotation"):
+            fn(env.conn)
+
+
+def test_the_ca_in_its_last_year_is_reported_once_a_week(env):
+    from app.db import set_setting
+    cert, key = pki.create_ca(days=100)
+    set_setting(env.conn, core.CA_KEY, json.dumps({"cert": cert, "key": key}))
+    env.conn.commit()
+    assert "ingest_ca_expiring" in core.check_silence(env.conn)
+    assert "ingest_ca_expiring" not in core.check_silence(env.conn)
+    assert any(p["kind"] == "ca" for p in core.problems(env.conn))
+    core.rotate_ca(env.conn)
+    assert not any(p["kind"] == "ca" for p in core.problems(env.conn))                 # the new CA is fresh
+
+
+def test_the_api_for_rotation(api):
+    ports = {"port": free_port(), "enrol_port": free_port(), "bind": "127.0.0.1", "server_names": ["127.0.0.1"], "enabled": True}
+    s = api.put("/api/ingest", json=ports).json()
+    assert s["ca"]["rotation"] is None and s["ca"]["expires"] > "2035"
+    fp = s["ca"]["fingerprint"]
+    s = api.post("/api/ingest/ca/rotate").json()
+    assert s["ca"]["rotation"]["agents_on_old_ca"] == [] and s["ca"]["fingerprint"] != fp
+    assert api.post("/api/ingest/ca/rotate").status_code == 422
+    pem = api.get("/api/ingest/ca.pem").text
+    assert pem.count("BEGIN CERTIFICATE") == 2 and "PRIVATE" not in pem                # both CAs while the rotation runs
+    assert api.post("/api/ingest/ca/finish", json={}).json()["ca"]["rotation"] is None
+    assert api.get("/api/ingest/ca.pem").text.count("BEGIN CERTIFICATE") == 1
+    assert api.post("/api/ingest/ca/cancel").status_code == 422

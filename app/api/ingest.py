@@ -41,11 +41,11 @@ def _doc(conn, control) -> dict[str, Any]:
             cert_info = {"source": server.get("source"), "names": server.get("names", []), "expires": c.not_valid_after_utc.strftime(core.STAMP)}
         except pki.PkiError:
             cert_info = None
-    ca_cert = pki.load_cert(core.ca_certificate(conn)) if policy["enabled"] or core._load(conn, core.CA_KEY) else None
+    ca = core.ca_info(conn) if policy["enabled"] or core._load(conn, core.CA_KEY) else None
     byo = core.byo_bundle(conn)
     return {
         "allowed": licence.allows(conn, "agents"), "policy": policy, "window_open": core.window_open(policy), "status": control.status(),
-        "server_certificate": cert_info, "ca_fingerprint": pki.fingerprint(ca_cert.public_bytes(pki.serialization.Encoding.DER)) if ca_cert else None,
+        "server_certificate": cert_info, "ca": ca, "ca_fingerprint": ca["fingerprint"] if ca else None,
         "own_ca": len(pki.parse_bundle(byo)) if byo else 0, "agents": core.list_agents(conn), "problems": core.problems(conn),
     }
 
@@ -107,6 +107,43 @@ def download_ca(request: Request, conn=Depends(get_conn)) -> PlainTextResponse:
     require_admin(request)
     _need_licence(conn)
     return PlainTextResponse(core.ca_certificate(conn), headers={"Content-Disposition": 'attachment; filename="netlens-ingest-ca.pem"', "Cache-Control": "no-store"})
+
+
+@router.post("/ingest/ca/rotate", dependencies=[Depends(ensure_allowed)])
+async def rotate_ca(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
+    require_admin(request)
+    _need_licence(conn)
+    try:
+        core.rotate_ca(conn)
+    except core.IngestError as exc:
+        raise _fail(exc)
+    control = _control(request)
+    await control.apply()
+    return _doc(conn, control)
+
+
+@router.post("/ingest/ca/finish", dependencies=[Depends(ensure_allowed)])
+async def finish_rotation(body: dict, request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
+    require_admin(request)
+    try:
+        core.finish_rotation(conn, force=body.get("force") is True)
+    except core.IngestError as exc:
+        raise _fail(exc)
+    control = _control(request)
+    await control.apply()
+    return _doc(conn, control)
+
+
+@router.post("/ingest/ca/cancel", dependencies=[Depends(ensure_allowed)])
+async def cancel_rotation(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
+    require_admin(request)
+    try:
+        core.cancel_rotation(conn)
+    except core.IngestError as exc:
+        raise _fail(exc)
+    control = _control(request)
+    await control.apply()
+    return _doc(conn, control)
 
 
 @router.put("/ingest/own-ca", dependencies=[Depends(ensure_allowed)])

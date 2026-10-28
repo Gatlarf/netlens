@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.303 — 2026-10-28
+
+### Added
+- ★ **Host agents: the certificate authority can be rotated without losing a host.** Settings → Host agents → *Rotate the CA* makes a new CA. New and renewed certificates come from it; the old CA stays trusted, and keeps signing the server certificate, until every host has renewed, so no host loses contact. The renewal scripts (`contrib/netlens-renew.sh`, `.ps1`) now add the new CA to `ca.pem` when they renew. The page lists the agents that still hold a certificate from the old CA; *Finish the rotation* stops trusting the old CA (refused while an agent would be locked out, or forced, which is written to the audit log), *Cancel* goes back until the first agent has a certificate from the new CA. The CA is reported in its last year (event *Agent CA ending* and a problem on the dashboard). Tested end to end with the real renewal script and the real TLS listener. Procedure in `HOST-AGENTS.md`.
+
 ## 0.4.302 — 2026-10-28
 
 ### Added

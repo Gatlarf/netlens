@@ -35,7 +35,27 @@ openssl x509 -in "$work/agent.crt" -noout -subject >/dev/null 2>&1 || { echo "th
 # the new certificate must match the new key
 [ "$(openssl x509 -in "$work/agent.crt" -noout -pubkey | openssl sha256)" = "$(openssl pkey -in "$work/agent.key" -pubout | openssl sha256)" ] || { echo "key and certificate do not match" >&2; exit 1; }
 
+# The answer holds the new certificate first and then the CA certificate(s) Netlens uses. During a CA rotation that is how the host learns the new CA: add the ones
+# that ca.pem does not have yet (the old ones stay, so the host trusts Netlens before and after the rotation is finished).
+split_pem() {   # split_pem FILE DIR : one file per certificate, DIR/1.pem, DIR/2.pem ...
+  n=0; out=""
+  while IFS= read -r line; do
+    case "$line" in *"BEGIN CERTIFICATE"*) n=$((n + 1)); out="$2/$n.pem"; : > "$out" ;; esac
+    [ -n "$out" ] && printf '%s\n' "$line" >> "$out"
+    case "$line" in *"END CERTIFICATE"*) out="" ;; esac
+  done < "$1"
+}
+mkdir "$work/new" "$work/old" && split_pem "$work/agent.crt" "$work/new" && split_pem "$DIR/ca.pem" "$work/old" && cp "$DIR/ca.pem" "$work/ca.merged" || exit 1
+added=0
+for f in "$work"/new/*.pem; do
+  [ "$f" = "$work/new/1.pem" ] && continue
+  have=0
+  for g in "$work"/old/*.pem; do [ -f "$g" ] && cmp -s "$f" "$g" && have=1; done
+  if [ "$have" = 0 ]; then cat "$f" >> "$work/ca.merged"; added=$((added + 1)); fi
+done
+
 if [ -n "${NETLENS_OWNER:-}" ]; then chown "$NETLENS_OWNER" "$work/agent.key" "$work/agent.crt" || exit 1; chmod 640 "$work/agent.key" "$work/agent.crt"; fi
+if [ "$added" -gt 0 ]; then chmod 644 "$work/ca.merged"; mv -f "$work/ca.merged" "$DIR/ca.pem" || exit 1; echo "ca.pem: $added new CA certificate(s) added"; fi
 mv -f "$work/agent.key" "$DIR/agent.key" && mv -f "$work/agent.crt" "$DIR/agent.crt" || exit 1
 echo "renewed: $(openssl x509 -in "$DIR/agent.crt" -noout -enddate)"
 if [ -n "${NETLENS_RESTART:-}" ]; then sh -c "$NETLENS_RESTART" || { echo "restart failed" >&2; exit 1; }; fi

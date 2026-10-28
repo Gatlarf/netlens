@@ -96,6 +96,37 @@ export async function buildIngestCard() {
     const sc = info.server_certificate;
     if (sc) card.appendChild(h("p", { class: "hint" }, `Server certificate: ${sc.source === "uploaded" ? "uploaded by you" : "made by Netlens"} for ${(sc.names || []).join(", ") || "-"}, valid until ${sc.expires.slice(0, 10)}.`));
     if (info.ca_fingerprint) card.appendChild(h("p", { class: "hint", style: "overflow-wrap:anywhere;word-break:break-all" }, `Netlens ingest CA (SHA-256): ${info.ca_fingerprint.match(/.{1,2}/g).join(":")}`));
+    const caInfo = info.ca;
+    if (caInfo) {
+      card.appendChild(h("p", { class: "hint" }, `The Netlens ingest CA is valid until ${caInfo.expires.slice(0, 10)}.`));
+      const rot = caInfo.rotation;
+      if (rot) {
+        const stale = rot.agents_on_old_ca || [];
+        const finish = h("button", { class: "btn", type: "button" }, stale.length ? `Finish anyway (locks out ${stale.length})` : "Finish the rotation");
+        finish.addEventListener("click", async () => {
+          if (stale.length && !confirm(`${stale.join(", ")} still use a certificate from the old CA and will be locked out until they are enrolled again. Finish anyway?`)) return;
+          const r = await act(() => post("/api/ingest/ca/finish", { force: stale.length > 0 }), "The old CA is no longer trusted");
+          if (r) info = r;
+          draw();
+        });
+        const cancel = h("button", { class: "btn", type: "button" }, "Cancel the rotation");
+        cancel.addEventListener("click", async () => { const r = await act(() => post("/api/ingest/ca/cancel", {}), "Cancelled"); if (r) info = r; draw(); });
+        card.appendChild(h("div", { class: "card", style: "border:1px solid var(--warn, #c9a227)" },
+          h("h3", {}, "CA rotation running"),
+          h("p", { class: "hint" }, `Started ${rot.since ? rot.since.slice(0, 16).replace("T", " ") + " UTC" : ""}. New and renewed certificates come from the new CA. The old CA stays trusted, and still signs the server certificate, until you finish: hosts get the new CA when they renew (the renewal scripts add it to ca.pem), so run the renewal on every host first (NETLENS_RENEW_DAYS=40 renews at once).`),
+          stale.length ? h("p", { class: "warn-text" }, `Still on the old CA: ${stale.join(", ")}.`) : h("p", { class: "hint" }, "Every agent has a certificate from the new CA."),
+          h("div", { class: "btn-row" }, finish, cancel)));
+      } else {
+        const rotate = h("button", { class: "btn", type: "button", title: "Makes a new CA. Hosts keep working during the rotation." }, "Rotate the CA");
+        rotate.addEventListener("click", async () => {
+          if (!confirm("Start a CA rotation? Hosts keep working: both CAs are trusted until you finish, and every host must renew its certificate in between.")) return;
+          const r = await act(() => post("/api/ingest/ca/rotate", {}), "Rotation started");
+          if (r) info = r;
+          draw();
+        });
+        card.appendChild(h("div", { class: "btn-row" }, rotate));
+      }
+    }
     const dl = h("button", { class: "btn", type: "button" }, "Download the CA certificate (ca.pem)");
     dl.addEventListener("click", async () => {
       const text = await act(() => api("/api/ingest/ca.pem"));

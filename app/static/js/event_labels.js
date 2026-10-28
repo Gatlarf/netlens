@@ -33,6 +33,7 @@ export const EVENT_LABELS = {
   agent_back: "Agent sending again",
   ingest_enrolled: "Agent enrolled",
   ingest_cert_expiring: "Agent certificate ending",
+  ingest_ca_expiring: "Agent CA ending",
   capacity_warning: "Disk filling up",
   anomaly: "Unusual reading",
   llm_model_unavailable: "Language model unavailable",
