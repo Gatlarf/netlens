@@ -267,9 +267,8 @@ function stopPoll() {
 
 function openLoginDialog() {
   const dialog = el("#login-dialog");
-  if (dialog && !dialog.open) {
-    dialog.showModal();
-  }
+  if (dialog && dialog.open) return;                  // already showing: the background refresh asks again, and must not pull the cursor back to the user name while the password is typed
+  if (dialog) dialog.showModal();
   const first = el(loginByUser ? "#login-user" : "#login-token");
   if (first) {
     first.focus();

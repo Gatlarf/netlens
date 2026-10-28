@@ -303,3 +303,8 @@ def test_remote_desktop_keeps_the_keyboard():
     remote = (root / "pages" / "remote.js").read_text()
     assert '"mousedown", "touchstart"' in remote and "screen.focus({ preventScroll: true }), true)" in remote
     assert ".remote-screen" in (root / "search.js").read_text()
+
+
+def test_an_open_sign_in_form_keeps_the_focus():
+    app_js = (Path(__file__).resolve().parent.parent / "app" / "static" / "js" / "app.js").read_text()
+    assert "if (dialog && dialog.open) return;" in app_js
