@@ -450,3 +450,18 @@ def test_windows_answers_from_a_limited_account_are_read_and_say_what_could_not_
     sec = parsers.parse_probe("security", "windows", wrap({"failed_total": 4, "firewall": [{"n": "Domain", "on": False}, {"n": "Public", "on": False}], "time_synced": False, "admins": ["PC\\Administrator"]}))
     t = " | ".join(e["text"] for e in analyze.analyze("security", sec, {}))
     assert "firewall is switched off" in t and "clock is not synchronised" in t
+
+
+def test_ask_lists_the_interface_errors_of_every_host(conn):
+    nic = lambda name, drop, err: {"name": name, "rx_bps": 0, "tx_bps": 0, "rx_pkts": 0, "tx_pkts": 0, "rx_err": 0, "tx_err": 0, "rx_drop": 0, "tx_drop": 0,
+                                   "rx_err_total": err, "tx_err_total": 0, "rx_drop_total": drop, "tx_drop_total": 0, "rx_pkts_total": 1000, "tx_pkts_total": 1000}
+    service.store(conn, 1, True, "locked", None, {"platform": "linux", "interfaces": [nic("eth0", 552, 0), nic("eth1", 0, 0)]}, now=time.time() - 60, probe="network")
+    for q in ("Which systems have errors or dropped packets on their eth0 interface?", "any bad cable?", "which nics drop packets"):
+        assert ask.route(q, ["web1"], conn)[0] == "interface_errors", q
+    assert ask.route("errors on eth0", ["web1"], conn)[1] == {"interface": "eth0"}
+    res = ask.TOOLS["interface_errors"][0](conn, {"interface": "eth0"}, None)
+    assert res["hosts_with_interface_data"] == 1 and [(f["device"], f["interface"], f["dropped"]) for f in res["with_errors_or_drops"]] == [("web1", "eth0", 552)]
+    assert ask.TOOLS["interface_errors"][0](conn, {"interface": "eth1"}, None)["with_errors_or_drops"] == []
+    a = ask.answer(conn, "Which systems have errors or dropped packets on their eth0 interface?", None)
+    assert a["tools"] == ["interface_errors"] and "web1 eth0" in a["answer"] and "552 dropped" in a["answer"]
+    assert "interface_errors" in ask.system_prompt()

@@ -273,6 +273,65 @@ def t_host_activity(conn, args, now=None) -> dict:
             "findings": [{"level": f["level"], "text": pick_text(f)} for f in rep["findings"]]}
 
 
+def t_interface_errors(conn, args, now=None) -> dict:
+    """Errors and dropped packets on network interfaces, of every host at once: the counters of the read-only host probes (a Linux or Windows host)
+    and the error rate of switch ports and SNMP interfaces. Answers "which systems have errors on eth0" without naming a host."""
+    import json as _json
+
+    from app import tsdb
+    from app.hostprobe import service as probes
+
+    wanted = str(args.get("interface") or "").strip().lower()
+    only = str(args.get("device") or "").strip().lower()
+    keep = ask.important_ids(conn)
+    names = {r["id"]: r["n"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices")}
+    found: list[dict] = []
+    looked: set[int] = set()
+    for did, name in names.items():
+        if (keep is not None and did not in keep) or (only and only not in (name or "").lower()):
+            continue
+        snap = probes.latest_ok(conn, did, probe="network")
+        for n in ((snap or {}).get("data") or {}).get("interfaces", []):
+            looked.add(did)
+            if wanted and wanted not in n["name"].lower():
+                continue
+            bad = n["rx_err_total"] + n["tx_err_total"] + n["rx_drop_total"] + n["tx_drop_total"]
+            pk = n["rx_pkts_total"] + n["tx_pkts_total"]
+            if bad:
+                found.append({"device": name, "interface": n["name"], "errors": n["rx_err_total"] + n["tx_err_total"], "dropped": n["rx_drop_total"] + n["tx_drop_total"],
+                              "percent_of_packets": round(100 * bad / pk, 2) if pk else None, "since_boot": True, "source": "host probe", "seen": snap["taken"]})
+    store = tsdb.for_conn(conn)
+    stamp = int((now or datetime.now(timezone.utc)).timestamp())
+    for did, series in (store.metrics_of_many("device", [i for i in names if keep is None or i in keep]) if store else {}).items():
+        if only and only not in (names.get(did) or "").lower():
+            continue
+        for m in series:
+            if m["metric"] != "if_err_ps" or (wanted and wanted not in (m["label"] or "").lower()) or stamp - (m["last_ts"] or 0) > 86400:
+                continue
+            looked.add(did)
+            if (m["last"] or 0) > 0:
+                found.append({"device": names.get(did), "interface": m["label"], "errors_per_second": round(m["last"], 3), "since_boot": False, "source": "port or interface monitor"})
+    found.sort(key=lambda f: -(f.get("errors", 0) + f.get("dropped", 0) + 1000 * (f.get("errors_per_second") or 0)))
+    return {"interface_filter": wanted or None, "hosts_with_interface_data": len(looked), "with_errors_or_drops": found[:20],
+            "note": "Counters from a host probe count since the host started; errors_per_second is the current rate. An empty list with hosts_with_interface_data above 0 means none of them has any."}
+
+
+def r_interface_errors(r: dict) -> str:
+    rows = r["with_errors_or_drops"]
+    where = f" on {r['interface_filter']}" if r["interface_filter"] else ""
+    if not r["hosts_with_interface_data"]:
+        return "No host or port reports interface counters yet: switch on the Host probes (network) for a host, or add a port monitor."
+    if not rows:
+        return f"None of the {r['hosts_with_interface_data']} systems that report interface counters has errors or dropped packets{where}."
+    parts = []
+    for f in rows[:8]:
+        if "errors_per_second" in f:
+            parts.append(f"{f['device']} {f['interface']}: {f['errors_per_second']} errors/s now")
+        else:
+            parts.append(f"{f['device']} {f['interface']}: {f['errors']} errors, {f['dropped']} dropped" + (f" ({f['percent_of_packets']}% of packets)" if f["percent_of_packets"] is not None else "") + " since the host started")
+    return f"{len(rows)} of {r['hosts_with_interface_data']} systems have errors or dropped packets{where}: " + "; ".join(parts) + "."
+
+
 def for_model_view() -> bool:
     return ask.for_model()
 
@@ -312,6 +371,7 @@ def r_storage_use(r: dict) -> str:
 
 
 TOOLS = {
+    "interface_errors": (t_interface_errors, "ERRORS AND DROPPED PACKETS on network interfaces of ALL hosts at once (host probes, switch ports, SNMP). Use for 'which systems have errors or drops on eth0', 'any bad cable or port', 'packet loss on the network cards'. args: interface (optional, such as eth0), device (optional name)"),
     "vulnerabilities": (t_vulnerabilities, "security weaknesses found by the vulnerability scanners (Greenbone, Tenable ...): counts by severity, known-exploited ones, the worst devices and the critical findings. args: none"),
     "traffic": (t_traffic, "network traffic: bandwidth in and out now and the peak, of the internet line and of the monitored devices together. args: range (1h, 6h, 24h or 7d)"),
     "notifications": (t_notifications, "who is told about what: the alert channels (e-mail, Telegram ...) and the kinds of event that nobody would hear about. args: none"),
@@ -323,8 +383,9 @@ TOOLS = {
     "host_activity": (t_host_activity, "WHAT IS GOING ON on one host according to the read-only host probes: what uses the processor, memory and network, which applications or containers are failing or restarting, what changed or was scheduled lately, hardware and security state, chained into a probable cause. Use for 'why is X slow', 'what is using the CPU/memory/network on X', 'why did X restart'. args: device (name), symptom (optional words such as slow, memory, network, restart)"),
     "investigate": (t_investigate, "ROOT CAUSE of the latest incident (or of one device's): what started it, which device moved first, what was running at the time, what else broke, whether anybody was told. args: device (optional name), days (1-30)"),
 }
-RENDERERS = {"analysis": r_analysis, "host_activity": r_host_activity, "storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "coverage": r_coverage, "system_log": r_system_log, "investigate": r_investigate}
+RENDERERS = {"interface_errors": r_interface_errors, "analysis": r_analysis, "host_activity": r_host_activity, "storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "coverage": r_coverage, "system_log": r_system_log, "investigate": r_investigate}
 PRESETS = [
+    {"id": "nicerrors", "text": "Which systems have errors or dropped packets on their network interface?", "tool": "interface_errors", "args": {}},
     {"id": "coverage", "text": "Which hosts are not monitored yet?", "tool": "coverage", "args": {}},
     {"id": "vulns", "text": "Which vulnerabilities do I have?", "tool": "vulnerabilities", "args": {}},
     {"id": "traffic", "text": "How much traffic is going through my network?", "tool": "traffic", "args": {}},
@@ -335,6 +396,7 @@ PRESETS = [
     {"id": "log", "text": "Are there errors in the Netlens log?", "tool": "system_log", "args": {"level": "error"}},
 ]
 RULES = [
+    ("interface_errors", r"(errors?|dropped|drops?|discards?|collisions?|packet loss).{0,50}(interfaces?|nics?|network cards?|\beth\d|\bens\d+|\benp\w+|ports?)\b|(interfaces?|nics?|\beth\d|\bens\d+|\benp\w+|ports?).{0,40}(errors?|drop(s|ped|ping)?|discards?|packet loss)|dropped packets|bad cable"),
     ("analysis", r"\b(inc|ar)-\d+\b|analysis report|latest analysis|the report of (the )?incident"),
     ("host_activity", r"why is .{0,40}(slow|sluggish|laggy|unresponsive|hanging|overloaded|busy)|what('s| is| are) (using|eating|hogging|consuming|taking) .{0,20}(cpu|processor|memory|ram|bandwidth|network)|what('s| is) (going on|wrong|happening) (on|with) |why did .{0,40}(restart|reboot|crash)|what('s| is| are) (killing|crashing)|(cpu|memory|ram|network) (usage|hog|hogs|spike)|who is using the (cpu|memory|network|bandwidth)|diagnos"),
     ("storage_use", r"what (is|are|was|has been) (using|taking|eating|filling|consuming|hogging)\b.{0,30}(space|disk|storage)|where (did|does|is) (the |my )?(disk|space|storage).{0,20}(go|going|gone)|what filled|(biggest|largest) (files?|folders?|directories|dirs?)|disk space (is )?(used|taken|used up) by|what.{0,12}(uses|using) (the )?(disk|space)"),
@@ -364,6 +426,10 @@ def route(q: str, names: list[str]) -> tuple[str, dict] | None:
                 name = next((n for n in sorted(names, key=len, reverse=True) if len(n) > 2 and n.lower() in q), "")
                 symptom = next((w for w, pat in (("memory", r"memory|ram|oom"), ("cpu", r"cpu|processor|slow|sluggish|busy|overload"), ("network", r"network|bandwidth|latency|connect"), ("restart", r"restart|reboot|crash|die|stop|go down|killing")) if re.search(pat, q)), "")
                 args = {k: v for k, v in (("device", name), ("symptom", symptom)) if v}
+            elif tool == "interface_errors":
+                m = re.search(r"\b(eth\d+|ens\d+\w*|enp\w+|wlan\d|eno\d+|bond\d+)\b", q)
+                name = next((n for n in sorted(names, key=len, reverse=True) if len(n) > 2 and n.lower() in q), "")
+                args = {k: v for k, v in (("interface", m.group(1) if m else ""), ("device", name)) if v}
             elif tool == "storage_use":
                 name = next((n for n in sorted(names, key=len, reverse=True) if len(n) > 2 and n.lower() in q), "")
                 args = {"device": name} if name else {}

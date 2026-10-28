@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.292 — 2026-10-28
+
+### Added
+- ★ **Ask: "which systems have errors or dropped packets on eth0?"** now has an answer. A new question looks at the network interfaces of every host at once (host probes, switch ports and SNMP interfaces), optionally for one interface name such as eth0, and lists the ones with errors or drops, with the share of all packets. Before, only one host at a time could be looked at, so the language model found nothing and said the data does not tell.
+
+### Changed
+- The language model is told to pick a tool that covers all systems for "which systems ..." questions, to try the closest tool before giving up, and to say what it looked at when a result is empty.
+
 ## 0.4.291 — 2026-10-28
 
 ### Changed

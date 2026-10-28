@@ -388,6 +388,7 @@ EXAMPLES = [
     ("When does my certificate expire?", "certificates", {}), ("How fast is my internet?", "speedtest", {"days": 30}), ("What is the NAS connected to?", "connections", {"device": "nas"}),
     ("Who changed settings this week?", "audit", {"days": 7}), ("Is anything suspicious going on?", "security", {"days": 7}), ("Which smart-home batteries are low?", "smart_home", {}),
     ("How many devices are there per type?", "counts", {"by": "type"}), ("Which version of Netlens is this?", "system", {}),
+    ("Which systems drop packets on eth0?", "interface_errors", {"interface": "eth0"}),
 ]
 
 
@@ -405,7 +406,8 @@ def system_prompt() -> str:
             "- Copy names and numbers exactly as they appear in the results. If a result is a list, mention every item that matters; say \"only\" only when the list has one item. Round long numbers to one decimal.\n"
             "- The user cares about problems that matter: always-on devices (servers, routers, switches, NAS, cameras ...), services and network faults. The tools already leave out phones, tablets and other devices that come and go; never bring them up yourself.\n"
             "- Answer in the language of the question, in a few plain sentences.\n"
-            '- If the data does not contain the answer, answer exactly: {"answer": "The data does not tell."}\n'
+            "- A question about SEVERAL systems (\"which systems/hosts have ...\") needs a tool that covers all of them, not one that looks at a single host. Read the tool descriptions for the words of the question (errors, drops, packets, interface, disk, temperature ...) and try the closest tool before you give up; a loose or vaguely worded question still has a nearest tool.\n"
+            '- Only when you have tried a fitting tool and it holds nothing about the question, answer exactly: {"answer": "The data does not tell."} Say what you did look at when the result was empty, e.g. none of the N systems has any.\n'
             "- Names such as <device1> or <ip2> are placeholders: write them exactly as they are.\n"
             "Examples:\n" + "\n".join(f"Question: {q} -> {json.dumps({'tool': t, 'args': a})}" for q, t, a in EXAMPLES) + "\n"
             "Tools:\n" + "\n".join(f"- {n}: {d}" for n, (_f, d) in TOOLS.items()))
