@@ -68,11 +68,15 @@ def _stats(store, did: int, metric: str, label: str, span: int, end: int) -> dic
         spread = (hi - lo) or 1
         out["trend"] = "rising" if (b - a) > 0.25 * spread else "falling" if (a - b) < -0.25 * spread else "steady"
     if metric == "uptime_s":                                  # the counter starts again at 0 when a machine restarts
+        # the moment of the last start is (time - uptime); it stays the same while the machine runs and jumps forward at a reboot. Averaged buckets blur it by up to
+        # a few steps, so only a jump larger than that counts (a counter that merely dips, or reads oddly between two samples, is not a reboot).
+        tol = max(900, 3 * (q.get("step") or 0))
         boots, prev = [], None
         for t, v, *_ in pts:
-            if prev is not None and v < prev[1] - 120:
-                boots.append(datetime.fromtimestamp(t - v, timezone.utc).strftime("%Y-%m-%d %H:%M"))
-            prev = (t, v)
+            start = t - v
+            if prev is not None and start - prev > tol:
+                boots.append(datetime.fromtimestamp(start, timezone.utc).strftime("%Y-%m-%d %H:%M"))
+            prev = start
         out["reboots"] = len(boots)
         out["rebooted_at"] = boots[-3:]
     return out
