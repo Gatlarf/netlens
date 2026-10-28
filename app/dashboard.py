@@ -188,8 +188,17 @@ def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
         if days is not None and days <= 14 and (f.get("device_id"), f["label"]) not in full:
             out.append({"level": "bad" if days <= 3 else "warn", "text": f"{f['device']}: {f['label']} is {f['current']:g}% full and will be full in {days:g} day{'s' if days != 1 else ''}",
                         "href": f"#/device/{f['device_id']}" if f.get("device_id") else "#/insights"})
-    from app import licence
+    from app import licence, secpolicy
     from app.ingest import core as ingest
+
+    try:        # the access token signs in as administrator with no second factor: say so once somebody has one
+        if conn.execute("SELECT 1 FROM users WHERE disabled = 0 AND role = 'admin' AND totp_enabled = 1 LIMIT 1").fetchone() and secpolicy.get(conn)["static_token"] == "allowed":
+            import os
+
+            if os.environ.get("NETLENS_TOKEN", "").strip():
+                out.append({"level": "warn", "text": "The access token (NETLENS_TOKEN) still signs in as administrator without a second factor: remove it from the container's environment", "href": "#/settings/security"})
+    except Exception:  # noqa: BLE001 - a warning must never break the dashboard
+        pass
 
     if licence.allows(conn, "agents"):
         for p in ingest.problems(conn):          # a collector that stopped sending, a certificate that is about to end

@@ -9,6 +9,7 @@ provider at every sign-in.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import base64
 import hashlib
 import ipaddress
@@ -96,6 +97,12 @@ def public(conn: sqlite3.Connection) -> dict[str, Any]:
 
 # ----------------------------------------------------------------------------- talking to the provider
 def _fetch(url: str, data: bytes | None = None, timeout: float = 15.0) -> Any:
+    from app import safenet
+
+    try:
+        safenet.check_url(url, what="an address of the identity provider")
+    except safenet.BlockedAddress as exc:
+        raise OidcError(str(exc)) from None
     request = urllib.request.Request(url, data=data, headers={"Accept": "application/json", "User-Agent": "Netlens-sso", **({"Content-Type": "application/x-www-form-urlencoded"} if data else {})})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as resp:        # noqa: S310 - the address is the administrator's own setting
@@ -190,8 +197,17 @@ def redirect_uri(conn: sqlite3.Connection, base_url: str) -> str:
     return (settings(conn)["redirect_base"] or base_url.rstrip("/")) + "/api/auth/oidc/callback"
 
 
-def begin(conn: sqlite3.Connection, base_url: str) -> str:
-    """The address to send the browser to."""
+@dataclass(frozen=True)
+class StepUp:
+    """The result of a sign-in that was a step-up: the user has proved who they are again at the identity provider; `session` is the session to mark."""
+
+    user_id: int
+    session: str
+    back: str
+
+
+def begin(conn: sqlite3.Connection, base_url: str, stepup: tuple[int, str, str] | None = None) -> str:
+    """The address to send the browser to. `stepup` = (user id, session hash, where to go back to): a fresh sign-in at the provider (prompt=login, max_age=0) to confirm a privileged action."""
     cfg = settings(conn)
     secret = get_setting(conn, "oidc.client_secret")
     if not (cfg["enabled"] and cfg["issuer"] and cfg["client_id"] and secret) or not licence.allows(conn, "sso"):
@@ -204,14 +220,14 @@ def begin(conn: sqlite3.Connection, base_url: str) -> str:
             del _pending[k]
         if len(_pending) > 500:
             raise OidcError("too many sign-ins at once")
-        _pending[state] = {"nonce": nonce, "verifier": verifier, "until": now + PENDING_SECONDS, "redirect": redirect_uri(conn, base_url)}
+        _pending[state] = {"nonce": nonce, "verifier": verifier, "until": now + PENDING_SECONDS, "redirect": redirect_uri(conn, base_url), "stepup": stepup}
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     query = urllib.parse.urlencode({"response_type": "code", "client_id": cfg["client_id"], "redirect_uri": _pending[state]["redirect"], "scope": cfg["scopes"], "state": state, "nonce": nonce,
-                                    "code_challenge": challenge, "code_challenge_method": "S256"})
+                                    "code_challenge": challenge, "code_challenge_method": "S256", **({"prompt": "login", "max_age": "0"} if stepup else {})})
     return doc["authorization_endpoint"] + ("&" if "?" in doc["authorization_endpoint"] else "?") + query
 
 
-def finish(conn: sqlite3.Connection, state: str, code: str) -> str:
+def finish(conn: sqlite3.Connection, state: str, code: str, ip: str = "", user_agent: str = "") -> str:
     """Exchange the code, verify the ID token, find or make the user. Returns a Netlens session cookie value."""
     with _lock:
         pending = _pending.pop(state or "", None)
@@ -226,10 +242,19 @@ def finish(conn: sqlite3.Connection, state: str, code: str) -> str:
         raise OidcError("the provider did not return an ID token")
     jwks = _fetch(doc["jwks_uri"])
     claims = verify_id_token(id_token, jwks, issuer=doc["issuer"], audience=cfg["client_id"], nonce=pending["nonce"])
-    return sign_in(conn, claims, cfg)
+    if pending.get("stepup"):
+        user_id, session, back = pending["stepup"]
+        row = conn.execute("SELECT oidc_sub FROM users WHERE id = ?", (user_id,)).fetchone()
+        if row is None or not row["oidc_sub"] or not secrets.compare_digest(str(claims.get("sub", "")), row["oidc_sub"]):
+            raise OidcError("the identity provider confirmed another account than the one signed in here")
+        auth_time = claims.get("auth_time")
+        if not isinstance(auth_time, (int, float)) or abs(time.time() - auth_time) > 180:
+            raise OidcError("the identity provider did not confirm a fresh sign-in (no recent auth_time): it must honour prompt=login")
+        return StepUp(user_id, session, back)
+    return sign_in(conn, claims, cfg, ip, user_agent)
 
 
-def sign_in(conn: sqlite3.Connection, claims: dict, cfg: dict) -> str:
+def sign_in(conn: sqlite3.Connection, claims: dict, cfg: dict, ip: str = "", user_agent: str = "") -> str:
     groups = claims.get(cfg["groups_claim"]) or []
     groups = [groups] if isinstance(groups, str) else [str(g) for g in groups] if isinstance(groups, list) else []
     wanted = {g.strip().lower() for g in cfg["admin_groups"].split(",") if g.strip()}
@@ -255,4 +280,4 @@ def sign_in(conn: sqlite3.Connection, claims: dict, cfg: dict) -> str:
         user_id = row["id"]
         conn.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
         conn.commit()
-    return users.start_session(conn, user_id)
+    return users.start_session(conn, user_id, ip, user_agent, "oidc")

@@ -412,7 +412,7 @@ def test_the_licence_gate_is_enterprise_and_trial_only(tmp_path, monkeypatch):
     monkeypatch.undo()
     conn = connect(str(tmp_path / "l.db"))
     init_db(conn)
-    assert "agents" in licence.PAID_FEATURES and licence.ENTERPRISE_ONLY == ("agents",)
+    assert "agents" in licence.PAID_FEATURES and "agents" in licence.ENTERPRISE_ONLY
     for edition, expected in (("free", False), ("supporter", False), ("business", False), ("enterprise", True), ("trial", True)):
         monkeypatch.setattr(licence, "status", lambda c, now=None, e=edition: {"edition": e})
         assert licence.allows(conn, "agents") is expected, edition

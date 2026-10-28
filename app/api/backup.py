@@ -68,6 +68,9 @@ async def upload_restore(request: Request) -> dict:
             pass
 
     config_api.apply_overrides(app)  # the restored settings (ranges, intervals, ...) take effect now
+    from app import secpolicy
+
+    secpolicy.forget()  # so does the restored sign-in policy (it is cached for a while)
     conn = connect(db_path)
     try:
         devices = conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0]

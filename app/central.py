@@ -73,6 +73,12 @@ def _check_url(url: str) -> str:
         raise LinkError("the address must start with https:// (or http:// for a server on your own network)")
     if parts.path not in ("", "/") or parts.query or parts.fragment:
         raise LinkError("give only the address of the central Netlens, for example https://netlens.example.com")
+    from app import safenet
+
+    try:
+        safenet.check_url(url, what="the address of the central Netlens")
+    except safenet.BlockedAddress as exc:
+        raise LinkError(str(exc)) from None
     if parts.scheme == "http":
         host = parts.hostname
         try:

@@ -52,6 +52,19 @@ async def terminal_ws(
         await websocket.close(code=1008)
         return
 
+    # a shell on a host is a privileged action: with step-up on it needs a fresh confirmation (a WebSocket does not pass through the route dependency)
+    from fastapi import HTTPException
+
+    from app import stepup
+
+    try:
+        stepup.check(websocket, principal, "WS", websocket.url.path)
+    except HTTPException as exc:
+        await websocket.accept()
+        await websocket.send_json({"type": "error", "code": "step_up", "message": str(exc.detail)})
+        await websocket.close(code=1008)
+        return
+
     # 2. Accept
     await websocket.accept()
 

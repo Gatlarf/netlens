@@ -28,7 +28,7 @@ CHANNELS_KEY = "notify.channels"
 QUIET_KEY = "notify.quiet"
 MAX_CHANNELS = 20
 MAX_EVENTS_PER_MESSAGE = 40
-CRITICAL = {"service_down", "dhcp_rogue", "gateway_changed", "metric_critical", "capacity_critical", "remote_service_down", "remote_metric_critical", "probe_offline"}  # these break through quiet hours
+CRITICAL = {"break_glass_login", "service_down", "dhcp_rogue", "gateway_changed", "metric_critical", "capacity_critical", "remote_service_down", "remote_metric_critical", "probe_offline"}  # these break through quiet hours
 _lock = asyncio.Lock()
 
 MIGRATED_KEY = "notify.email_migrated"
@@ -113,6 +113,8 @@ EVENT_LABELS = {
     "probe_offline": "A remote site stops reporting",
     "licence_expiring": "The licence is about to end (or has ended)",
     "agent_silent": "A host that reports through an agent (collector) stops sending data",
+    "break_glass_login": "Someone signed in with a break-glass administrator account (the emergency way in)",
+    "totp_reset": "An administrator reset somebody's second factor",
     "totp_recovery_used": "Someone signed in with a recovery code of the second factor (the authenticator may be lost)",
     "agent_back": "An agent sends data again after a silence",
     "ingest_cert_expiring": "The certificate of an agent is about to end",
@@ -444,7 +446,7 @@ def _line(e: dict) -> str:
         "remote_new": detail, "remote_offline": f"OFFLINE: {detail}", "remote_online": detail, "remote_service_down": f"SERVICE DOWN: {detail}", "remote_service_up": detail,
         "remote_metric_warning": f"Warning: {detail}", "remote_metric_critical": f"CRITICAL: {detail}", "remote_metric_ok": f"Normal again: {detail}",
         "probe_offline": f"REMOTE SITE SILENT: {detail}", "probe_online": detail, "licence_expiring": f"Licence: {detail}",
-        "agent_silent": f"AGENT SILENT: {detail}", "totp_recovery_used": f"SECOND FACTOR: {detail}", "agent_back": detail, "ingest_cert_expiring": f"AGENT CERTIFICATE: {detail}", "ingest_ca_expiring": f"AGENT CA: {detail}", "ingest_enrolled": detail,
+        "agent_silent": f"AGENT SILENT: {detail}", "totp_recovery_used": f"SECOND FACTOR: {detail}", "totp_reset": f"SECOND FACTOR: {detail}", "break_glass_login": f"BREAK-GLASS SIGN-IN: {detail}", "agent_back": detail, "ingest_cert_expiring": f"AGENT CERTIFICATE: {detail}", "ingest_ca_expiring": f"AGENT CA: {detail}", "ingest_enrolled": detail,
         "central_unreachable": f"CENTRAL NETLENS UNREACHABLE: {detail}", "central_reachable": detail,
         "metric_warning": f"Warning: {detail}",
         "metric_critical": f"CRITICAL: {detail}",
@@ -490,6 +492,9 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
 
 # ----------------------------------------------------------------------------- sending
 def http_post(url: str, data: bytes, headers: dict[str, str], timeout: float = 15.0) -> tuple[int, str]:
+    from app import safenet
+
+    safenet.check_url(url, what="the address of the channel")              # not the cloud metadata service, not a file: (checked again at every use)
     request = urllib.request.Request(url, data=data, headers={"User-Agent": "Netlens", **headers}, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310 - scheme validated when saved

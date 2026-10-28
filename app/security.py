@@ -1,3 +1,4 @@
+import json
 import re
 from typing import Any, Callable, Optional
 
@@ -69,3 +70,80 @@ class SecurityHeadersMiddleware:
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
+
+
+# ----------------------------------------------------------------------------- request size
+MIB = 1024 * 1024
+DEFAULT_LIMIT = 4 * MIB                  # an ordinary API request (settings, a list of ids ...) is tiny; nothing legitimate needs more
+LIMITS: list[tuple[str, int]] = [        # (path prefix, bytes): the few requests that carry a file or a whole report
+    ("/api/restore", 1024 * MIB),          # a backup of the database
+    ("/api/plugins", 3 * MIB),             # a plugin archive (the plugin loader allows 2 MiB)
+    ("/api/probe/", 64 * MIB),             # what a remote site reports to the central Netlens
+    ("/api/siteview/", 8 * MIB),
+    ("/api/speedtest/up", 1024 * MIB),     # the upload test sends data on purpose (and has its own limit)
+    ("/api/login", 16 * 1024),
+    ("/share-api/", 16 * 1024),
+]
+
+
+def limit_for(path: str) -> int:
+    for prefix, limit in LIMITS:
+        if path.startswith(prefix):
+            return limit
+    return DEFAULT_LIMIT
+
+
+class _TooLarge(BaseException):        # not an Exception: the framework's own error handling must not turn it into a 500
+    pass
+
+
+class BodyLimitMiddleware:
+    """Refuses a request whose body is larger than its limit: by the declared Content-Length, and again while the body arrives (a chunked body declares nothing).
+    Without it the framework reads whatever it is sent into memory before the application sees it."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope.get("method") in ("GET", "HEAD", "OPTIONS"):
+            await self.app(scope, receive, send)
+            return
+        limit = limit_for(scope.get("path", ""))
+        declared = dict(scope.get("headers") or []).get(b"content-length")
+        try:
+            if declared is not None and int(declared) > limit:
+                await self._refuse(send, limit)
+                return
+        except ValueError:
+            await self._refuse(send, limit, 400, "the Content-Length is not a number")
+            return
+        received = 0
+        started = False
+
+        async def limited_receive() -> dict[str, Any]:
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit:
+                    raise _TooLarge()
+            return message
+
+        async def tracking_send(message: dict[str, Any]) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, limited_receive, tracking_send)
+        except _TooLarge:
+            if not started:
+                await self._refuse(send, limit)
+
+    @staticmethod
+    async def _refuse(send: Send, limit: int, status: int = 413, text: str | None = None) -> None:
+        size = f"{limit // 1024} KiB" if limit < MIB else f"{limit // MIB} MiB"
+        body = json.dumps({"detail": text or f"the request is too large (at most {size} for this address)"}).encode()
+        await send({"type": "http.response.start", "status": status, "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()), (b"connection", b"close")]})
+        await send({"type": "http.response.body", "body": body})

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from app import totp, users
+from app import secpolicy, totp, users
 from app.auth import COOKIE_NAME, BUILTIN, LoginLimiter, client_ip, identify, session_value
 from app.db import add_event, connect
 
@@ -85,12 +85,17 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
         db = connect(request.app.state.db_path)
         try:
             row = users.authenticate(db, body.username, body.password or "")
-            cookie = challenge = None
+            cookie = challenge = refusal = None
             if row is not None:
-                if row["totp_enabled"]:
+                pol = secpolicy.get(db)
+                if pol["local_login"] == "break_glass_only" and not row["break_glass"]:
+                    refusal = "password sign-in is switched off: use single sign-on (Settings → Sign-in security)"
+                elif row["break_glass"] and not row["totp_enabled"]:
+                    refusal = "a break-glass account must have a second factor before it can sign in"
+                elif row["totp_enabled"]:
                     challenge = _challenges(request).issue(row["id"], row["username"])      # no session yet: only the code can make one
                 else:
-                    cookie = users.start_session(db, row["id"])
+                    cookie = users.start_session(db, row["id"], host, request.headers.get("user-agent", ""), "password")
         finally:
             db.close()
         if row is None:
@@ -102,6 +107,9 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
             if user_limiter.reached(user_key):
                 _alarm(request, f"{user_limiter.max_failures} wrong passwords for the user {_clean(body.username)!r} within 15 minutes (latest from {host}); further attempts are blocked for a while")
             raise HTTPException(status_code=401, detail="wrong user name or password")
+        if refusal:
+            _audit(request, _clean(body.username)[:40], "", f"Refused a password sign-in for {_clean(body.username)[:40]!r}: {refusal}", 403)
+            raise HTTPException(status_code=403, detail=refusal)
         if challenge is not None:
             # the failures stay counted until the code is right too: a correct password must not give an unlimited number of tries at the code
             _audit(request, body.username.strip(), "", "Password accepted; waiting for the second factor", 200)
@@ -113,6 +121,11 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
         _session_cookie(response, request, cookie)
         return response
 
+    from app.auth import _static_token_allowed
+
+    if settings.token and body.token is not None and not _static_token_allowed(request):
+        _audit(request, "access token", "", "Refused: the access token sign-in is switched off or limited to the local network (Settings → Sign-in security)", 401)
+        raise HTTPException(status_code=401, detail="the access token sign-in is switched off here")
     if not settings.token or body.token is None or not hmac.compare_digest(body.token.encode(), settings.token.encode()):
         limiter.record_failure(host)
         if limiter.reached(host):
@@ -152,7 +165,7 @@ async def login_totp(request: Request, body: TotpLoginBody) -> JSONResponse:
     try:
         row = users.get_user(db, item["user_id"])
         how = totp.check_second_factor(db, item["user_id"], body.code) if row is not None and not row["disabled"] else None      # a disabled account does not use up a code
-        cookie = users.start_session(db, item["user_id"]) if how else None
+        cookie = users.start_session(db, item["user_id"], host, request.headers.get("user-agent", ""), "recovery" if how == "recovery" else "totp") if how else None
         left = db.execute("SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = ? AND used = 0", (item["user_id"],)).fetchone()[0] if how == "recovery" else 0
     finally:
         db.close()
@@ -171,6 +184,8 @@ async def login_totp(request: Request, body: TotpLoginBody) -> JSONResponse:
     limiter.reset(host)
     user_limiter.reset(user_key)
     _audit(request, name, "", "Signed in (recovery code)" if how == "recovery" else "Signed in (second factor)", 200)
+    if row is not None and row["break_glass"]:
+        _alarm_kind(request, "break_glass_login", f"Break-glass sign-in: {name} signed in from {host}")
     if how == "recovery":
         _alarm_kind(request, "totp_recovery_used", f"{name} signed in with a recovery code ({left} left): the authenticator may be lost")
     response = JSONResponse({"ok": True})
@@ -286,7 +301,7 @@ async def session(request: Request) -> JSONResponse:
         db.close()
     return JSONResponse({
         "authenticated": True,
-        "user": {"username": principal.username, "role": principal.role, "builtin": principal.builtin, **({"scoped": True, "sites": bool(principal.sites), "devices": bool(principal.scope)} if principal.scope is not None else {})},
+        "user": {"username": principal.username, "role": principal.role, "builtin": principal.builtin, **({"mfa": principal.mfa} if principal.mfa and principal.mfa["required"] else {}), **({"scoped": True, "sites": bool(principal.sites), "devices": bool(principal.scope)} if principal.scope is not None else {})},
         "start_page": (("#/remote-sites" if principal.sites and not principal.scope else "#/devices") if principal.scope is not None else start_page),
         **_demo_info(request),
         "interface": _interface(request),
@@ -312,7 +327,7 @@ async def change_password(request: Request, body: PasswordBody) -> JSONResponse:
             users.update_user(db, principal.user_id, password=body.new)
         except users.UserError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
-        cookie = users.start_session(db, row["id"])  # keep this browser signed in (the user is already authenticated; a user with a second factor could not use login())
+        cookie = users.start_session(db, row["id"], client_ip(request), request.headers.get("user-agent", ""), "password")  # keep this browser signed in (the user is already authenticated; a user with a second factor could not use login())
     finally:
         db.close()
     response = JSONResponse({"ok": True})

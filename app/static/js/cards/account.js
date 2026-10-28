@@ -75,6 +75,7 @@ function buildTotpSection(wrap) {
             try {
               const done = await post("/api/me/totp/confirm", { code: code.value.trim() });
               toast("Second factor switched on", "success");
+              document.dispatchEvent(new CustomEvent("netlens:session-changed"));
               await draw();
               wrap.appendChild(recoveryBox(done.recovery_codes));
             } catch (err) { toast(err.message || "That code is not right", "error"); }
@@ -109,6 +110,38 @@ function buildTotpSection(wrap) {
   draw();
 }
 
+
+// ---- the sessions of this user -------------------------------------------------------------------------------------------------------
+function buildSessionsSection(wrap) {
+  const phone = (ua) => {
+    const t = ua || "";
+    const browser = /Edg\//.test(t) ? "Edge" : /Firefox\//.test(t) ? "Firefox" : /Chrome\//.test(t) ? "Chrome" : /Safari\//.test(t) ? "Safari" : /curl|python|node/i.test(t) ? "a script" : "a browser";
+    const os = /Windows/.test(t) ? "Windows" : /Android/.test(t) ? "Android" : /iPhone|iPad/.test(t) ? "iOS" : /Mac OS/.test(t) ? "macOS" : /Linux/.test(t) ? "Linux" : "";
+    return os ? `${browser} on ${os}` : browser;
+  };
+  async function draw(list) {
+    wrap.replaceChildren(h("h3", {}, "Where you are signed in"));
+    let sessions = list;
+    if (!sessions) { try { sessions = (await get("/api/me/sessions")).sessions; } catch { return; } }
+    if (sessions.length < 1) return;
+    const table = h("table", { class: "table" }, h("thead", {}, h("tr", {}, ...["Where", "How", "Started", "Last used", ""].map((x) => h("th", {}, x)))));
+    const body = h("tbody", {});
+    for (const x of sessions) {
+      const end = x.current ? h("span", { class: "tag ok" }, "this session") : h("button", { class: "btn", type: "button" }, "End");
+      if (!x.current) end.addEventListener("click", async () => { try { await draw((await post("/api/me/sessions/end", { id: x.id })).sessions); toast("Session ended", "success"); } catch (err) { toast(err.message || "Failed", "error"); } });
+      body.appendChild(h("tr", {}, h("td", {}, `${phone(x.user_agent)}${x.ip ? ` · ${x.ip}` : ""}`), h("td", {}, x.method || "-"), h("td", {}, timeAgo(x.created)), h("td", {}, timeAgo(x.last_seen)), h("td", {}, end)));
+    }
+    table.appendChild(body);
+    wrap.appendChild(h("div", { class: "table-wrap" }, table));
+    if (sessions.length > 1) {
+      const all = h("button", { class: "btn", type: "button" }, "End all other sessions");
+      all.addEventListener("click", async () => { try { await draw((await post("/api/me/sessions/revoke-others", {})).sessions); toast("Other sessions ended", "success"); } catch (err) { toast(err.message || "Failed", "error"); } });
+      wrap.appendChild(h("div", { class: "btn-row" }, all));
+    }
+  }
+  draw();
+}
+
 // The signed-in account: who it is, password change (users only) and logout.
 export function buildAccountCard() {
   const me = sessionInfo();
@@ -138,6 +171,9 @@ export function buildAccountCard() {
     const totpWrap = h("div", { class: "totp-section" });
     card.appendChild(totpWrap);
     buildTotpSection(totpWrap);
+    const sessWrap = h("div", { class: "sessions-section" });
+    card.appendChild(sessWrap);
+    buildSessionsSection(sessWrap);
   }
 
   // the page Netlens opens on

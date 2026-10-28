@@ -227,7 +227,8 @@ export function sessionInfo() {
 }
 
 export function isAdmin() {
-  return !sessionUser || sessionUser.role === "admin";
+  // a user whom the policy requires to set up a second factor (and who has not) can reach only the Account page: for the interface that is not an administrator
+  return !sessionUser || (sessionUser.role === "admin" && !(sessionUser.mfa && sessionUser.mfa.restricted));
 }
 
 // On a phone a toolbar with many controls folds behind one button (the first control, usually the search box, stays;

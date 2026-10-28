@@ -311,6 +311,21 @@ function setLoginMode(byUser) {
 
 let whatsNewChecked = false;
 
+// A second factor that the administrator requires and the user has not set up yet: a banner (and, after the grace period, only the Account page opens)
+function showMfa(user) {
+  const banner = el("#mfa-banner");
+  if (!banner) return;
+  const mfa = user && user.mfa;
+  if (!mfa || !mfa.required || mfa.enrolled) { banner.hidden = true; return; }
+  banner.textContent = mfa.restricted ? "Your administrator requires a second factor. Set one up now to continue. " : `Your administrator requires a second factor: set one up before ${mfa.deadline ? mfa.deadline.slice(0, 10) : "the end of the grace period"}. `;
+  const link = document.createElement("a");
+  link.href = "#/settings/session";
+  link.textContent = "Set it up";
+  banner.append(link);
+  banner.hidden = false;
+  if (mfa.restricted && !location.hash.startsWith("#/settings/session")) location.replace("#/settings/session");
+}
+
 // Demo mode: a banner on every page, and the demo account filled in on the sign-in page
 function showDemo(demo) {
   const banner = el("#demo-banner");
@@ -357,6 +372,7 @@ async function applySession() {
     }
   }
   showDemo(session.demo);
+  showMfa(session.authenticated ? session.user : null);
   initSiteBar(session).catch(() => {});
   if (session.authenticated && !whatsNewChecked && !session.demo) {
     whatsNewChecked = true;
@@ -598,6 +614,7 @@ async function init() {
     scanDeep.addEventListener("click", () => handleScan("deep"));
   }
 
+  document.addEventListener("netlens:session-changed", () => { applySession().then(() => renderPage()).catch(() => {}); });
   document.addEventListener("netlens:unauth", () => {
     if (setupMode) return; // a background request before the first account exists must not cover the wizard
     stopPoll();

@@ -61,7 +61,8 @@ def _cipher(kind: str, key: bytes, iv: bytes):
         from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
     except ImportError:                                           # an older cryptography
         from cryptography.hazmat.primitives.ciphers.algorithms import TripleDES
-    return Cipher(TripleDES(key[:8] * 3), modes.CBC(iv))
+    # the DES privacy protocol of SNMPv3 exists only to talk to old devices that cannot do AES; AES is the preferred choice
+    return Cipher(TripleDES(key[:8] * 3), modes.CBC(iv))  # nosec B304
 
 
 def _octets(value: bytes) -> bytes:

@@ -10,6 +10,8 @@ from typing import Optional
 
 import xml.etree.ElementTree as ET
 
+from app import safexml
+
 
 def parse_ssdp_response(text: str) -> dict[str, str]:
     """
@@ -51,12 +53,9 @@ def parse_upnp_description(xml_text: str) -> dict[str, str]:
     Keys: "friendly_name", "manufacturer", "model_name", "model_number".
     Invalid XML returns {}.
     """
-    if "<!ENTITY" in xml_text:
-        return {}
-
     try:
-        root = ET.fromstring(xml_text)
-    except ET.ParseError:
+        root = safexml.fromstring(xml_text)          # a device on the network wrote this: no DOCTYPE, no entities, not huge
+    except (ET.ParseError, safexml.UnsafeXml):
         return {}
 
     result: dict[str, str] = {}

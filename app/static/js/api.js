@@ -8,7 +8,7 @@ export class ApiError extends Error {
 
 import { currentSite, routed } from "./site.js";
 
-export async function api(path, { method = "GET", body } = {}) {
+export async function api(path, { method = "GET", body, _retried = false } = {}) {
   if (method !== "GET" && currentSite() && routed(path) !== path) throw new ApiError(0, "A remote site is shown read-only through this Netlens. Go back to this site to change things.");
   try {
     const res = await fetch(routed(path), {
@@ -40,6 +40,12 @@ export async function api(path, { method = "GET", body } = {}) {
         detail = res.statusText;
       }
 
+      if (res.status === 401 && typeof detail === "string" && detail.startsWith("step_up_required")) {
+        // a privileged action: ask the person to confirm once and repeat it; this is not a sign-out
+        const { prompt } = await import("./stepup.js");
+        if (!_retried && (await prompt(detail.split(":")[1] || "password"))) return api(path, { method, body, _retried: true });
+        throw new ApiError(401, "Confirmation cancelled");
+      }
       if (res.status === 401) {
         document.dispatchEvent(new CustomEvent("netlens:unauth"));
       }

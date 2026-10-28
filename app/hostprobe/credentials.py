@@ -132,6 +132,12 @@ async def _netlens_ca(conn, config: dict, secret: dict) -> Credential:
 
 # ----------------------------------------------------------------------------- Vault / OpenBao
 def _post(url: str, body: dict, headers: dict, timeout: float = 10.0) -> dict:
+    from app import safenet
+
+    try:
+        safenet.check_url(url, what="the address of the secrets server")
+    except safenet.BlockedAddress as exc:
+        raise CredentialError(str(exc)) from None
     request = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json", **headers}, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:      # noqa: S310 - the address is the administrator's own setting

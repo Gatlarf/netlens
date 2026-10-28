@@ -126,10 +126,14 @@ class Principal:
     scope: Optional[tuple] = None  # group ids a (viewer) user is limited to; None = no limit. () for a customer who sees remote sites only
     sites: Optional[tuple] = None  # remote site ids a (viewer) user is limited to; None = not a site customer
     assistant: Optional[str] = None  # 'read' or 'change' for a token made for an AI assistant (app/assistant.py); it is never a full administrator
+    restricted: bool = False  # a second factor is required of this user, the grace period is over and none is set up: only the set-up pages work (app/secpolicy.py)
+    mfa: Optional[dict] = None  # {"required", "enrolled", "deadline", "restricted"} for a signed-in user session
+    auth_at: Optional[str] = None  # when this session last proved the user's identity (sign-in, or step-up)
+    auth_method: Optional[str] = None  # password | totp | recovery | oidc
 
     @property
     def is_admin(self) -> bool:
-        return self.role == "admin" and self.assistant is None
+        return self.role == "admin" and self.assistant is None and not self.restricted
 
 
 BUILTIN = Principal(username="access token", role="admin", builtin=True)
@@ -138,9 +142,9 @@ BUILTIN = Principal(username="access token", role="admin", builtin=True)
 VIEWER_READABLE = re.compile(
     r"^/(metrics"
     r"|api/(session|update|changelog|map|map-settings|hierarchy|relations|events|uptime|uptime/core|scans|scans/current|service-checks|service-checks/\d+/results|monitors|agent-status|monitoring/limits|forecast|snoozes|changes|reports/availability|reports/availability\.csv|reports/weekly|probes|probes/\d+|probes/\d+/availability(\.csv)?|timeseries/(device|service|probe)/\d+|timeseries/(device|service|probe)/\d+/[A-Za-z0-9_.-]+"
-    r"|me/totp|stats|stats/summary|dashboard|dashboard/layout|dashboard/default|dashboard/shared|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
+    r"|me/totp|me/sessions|me/stepup|stats|stats/summary|dashboard|dashboard/layout|dashboard/default|dashboard/shared|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
 )
-VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery", "/api/speedtest/up", "/api/speedtest/browser")  # a viewer may test the line from their own device
+VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery", "/api/me/sessions/end", "/api/me/sessions/revoke-others", "/api/me/stepup", "/api/speedtest/up", "/api/speedtest/browser")  # a viewer may test the line from their own device
 
 # An operator looks like a viewer and may also act on what happens: scan, test, wake, acknowledge, snooze, plan maintenance, approve fixes, edit a device's
 # name and group. Settings, users, credentials, backups, plugins, remote access and deleting things stay with the administrator.
@@ -155,9 +159,9 @@ OPERATOR_WRITABLE = (
 )
 # A viewer limited to some groups (a customer view) reads only the devices of those groups: the device list, a device and its history, the uptime page and the events.
 SCOPED_READABLE = re.compile(
-    r"^/api/(session|me/totp|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)|events|uptime|timeseries/device/\d+|timeseries/device/\d+/[A-Za-z0-9_.-]+)$"
+    r"^/api/(session|me/totp|me/sessions|me/stepup|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)|events|uptime|timeseries/device/\d+|timeseries/device/\d+/[A-Za-z0-9_.-]+)$"
 )
-SCOPED_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery")
+SCOPED_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery", "/api/me/sessions/end", "/api/me/sessions/revoke-others", "/api/me/stepup")
 SCOPED_SITE_READABLE = re.compile(r"^/api/(probes|probes/\d+|probes/\d+/availability(\.csv)?|timeseries/(remote|remote_service)/\d+(/[A-Za-z0-9_.-]+)?)$")
 _SITE_IN_PATH = re.compile(r"^/api/probes/(\d+)")
 _REMOTE_IN_PATH = re.compile(r"^/api/timeseries/(remote|remote_service)/(\d+)")
@@ -192,14 +196,14 @@ def identify(conn: HTTPConnection) -> Optional[Principal]:
     token = conn.app.state.settings.token
     cookie = conn.cookies.get(COOKIE_NAME)
     authorization = conn.headers.get("authorization")
-    if is_authorized(token, cookie, authorization):
+    if is_authorized(token, cookie, authorization) and _static_token_allowed(conn):
         return BUILTIN
     bearer = authorization[7:] if authorization and authorization.startswith("Bearer ") else None
     if (cookie and cookie.startswith(users.SESSION_PREFIX)) or (bearer and bearer.startswith(users.TOKEN_PREFIX)):
         db = connect(conn.app.state.db_path)
         try:
             row = users.user_for_session(db, cookie) if cookie and cookie.startswith(users.SESSION_PREFIX) else None
-            token_row = None if row else (users.user_for_token(db, bearer) if bearer else None)
+            token_row = None if row else (users.user_for_token(db, bearer, client_ip(conn)) if bearer else None)
             row = row or token_row
         finally:
             db.close()
@@ -226,8 +230,39 @@ def identify(conn: HTTPConnection) -> Optional[Principal]:
                     db.close()
             groups = tuple(users.parse_scope(row["scope"]) or ()) or None
             sites = tuple(users.parse_scope(row["site_scope"]) or ()) or None
-            return Principal(username=row["username"], role=role, user_id=row["id"], scope=groups if groups is not None else (() if sites is not None else None), sites=sites)
+            mfa = None
+            if token_row is None:                       # a signed-in user (a person); an API token is not interactive and has no second factor
+                from app import secpolicy
+
+                db = connect(conn.app.state.db_path)
+                try:
+                    mfa = secpolicy.mfa_state(db, {"role": row["role"], "created": row["user_created"], "oidc_sub": row["oidc_sub"], "totp_enabled": row["totp_enabled"]})
+                finally:
+                    db.close()
+            return Principal(username=row["username"], role=role, user_id=row["id"], scope=groups if groups is not None else (() if sites is not None else None), sites=sites,
+                             restricted=bool(mfa and mfa["restricted"]), mfa=mfa, auth_at=row["auth_at"] if token_row is None else None, auth_method=row["auth_method"] if token_row is None else None)
     return None
+
+
+def secpolicy_enrol_paths() -> tuple[str, ...]:
+    from app import secpolicy
+
+    return secpolicy.ENROL_PATHS
+
+
+def _static_token_allowed(conn: HTTPConnection) -> bool:
+    """The access token (NETLENS_TOKEN) may be switched off, or limited to the local network (Settings → Sign-in security, Enterprise)."""
+    from app import secpolicy
+
+    mode = secpolicy.get_by_path(getattr(conn.app.state, "db_path", None))["static_token"]
+    if mode == "allowed":
+        return True
+    if mode == "off":
+        return False
+    from app.terminal.access import _address, is_local_address
+
+    peer = _address(client_ip(conn))
+    return peer is not None and is_local_address(peer)
 
 
 def require_auth(request: HTTPConnection) -> None:
@@ -235,11 +270,16 @@ def require_auth(request: HTTPConnection) -> None:
     if principal is None:
         raise HTTPException(status_code=401, detail="authentication required")
     request.state.user = principal
+    if principal.restricted and request.url.path not in secpolicy_enrol_paths():
+        raise HTTPException(status_code=403, detail="mfa_enrolment_required")       # the administrator requires a second factor; only the set-up pages work until it is set up
     if principal.assistant:
         from app import assistant
 
         assistant.check(request.scope.get("method", "GET"), request.url.path, principal.assistant)
         return
+    from app import stepup
+
+    stepup.check(request, principal, request.scope.get("method") or "WS", request.url.path)
     if principal.role != "admin":
         method = request.scope.get("method", "GET")
         path = request.url.path

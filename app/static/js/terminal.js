@@ -1,6 +1,7 @@
 import { get, post, del, ApiError } from "./api.js";
 import { h, clear, toast } from "./util.js";
 import { infoTip, savedLoginButton } from "./ui.js";
+import { ensureFresh, prompt as stepUpPrompt } from "./stepup.js";
 
 const activeTerminals = new WeakMap();
 
@@ -215,7 +216,8 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
     }
   }
 
-  async function startTerminal(proto, port, username, password, key, passphrase, credentialId = "") {
+  async function startTerminal(proto, port, username, password, key, passphrase, credentialId = "", confirmed = false) {
+    if (!confirmed && !(await ensureFresh())) { toast("This action needs a fresh confirmation, which was not given (or is not possible with this sign-in)", "error"); return; }
     try {
       await loadXterm();
     } catch (e) {
@@ -304,6 +306,10 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
             statusLine.textContent = statusText;
             if (pendingLast) { writeLast(device, pendingLast); pendingLast = null; }
             term.focus();
+          } else if (msg.type === "error" && msg.code === "step_up") {
+            // the confirmation ran out while the form was open: ask once more and start again
+            statusLine.textContent = "Confirmation needed";
+            stepUpPrompt(String(msg.message).split(":")[1] || "password").then((ok) => { if (ok) { clear(connectionArea); startTerminal(proto, port, username, password, key, passphrase, credentialId, true); } });
           } else if (msg.type === "error") {
             term.writeln("\x1b[31m" + msg.message + "\x1b[0m");
             statusLine.textContent = msg.message;

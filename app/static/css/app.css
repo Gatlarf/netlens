@@ -641,6 +641,7 @@ body.setup-mode .app-shell { display: block; }
 
 .demo-banner { background: #fef3c7; color: #78350f; border-bottom: 1px solid #f59e0b; padding: 6px 16px; text-align: center; font-size: 0.85rem; }
 .demo-banner a { color: inherit; font-weight: 600; }
+.mfa-banner { background: #fee2e2; color: #7f1d1d; border-bottom-color: #ef4444; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .demo-banner { background: #422006; color: #fde68a; border-color: #b45309; } }
 :root[data-theme="dark"] .demo-banner { background: #422006; color: #fde68a; border-color: #b45309; }
 

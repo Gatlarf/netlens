@@ -13,6 +13,7 @@ import { buildCentralCard } from "../cards/central.js";
 import { buildAiModelCard, buildAiAgentsCard } from "../cards/ai.js";
 import { buildHostProbeCard } from "../cards/hostprobe_settings.js";
 import { buildIngestCard } from "../cards/ingest.js";
+import { buildSecurityCard } from "../cards/security.js";
 import { buildCredentialsCard } from "../cards/credentials.js";
 import { buildHostsSetupCard } from "../cards/hosts_setup.js";
 import { buildLicenceCard } from "../cards/licence.js";
@@ -274,6 +275,7 @@ const STATIC_GROUPS = [
     items: [
       { key: "users", label: "Users & tokens", build: buildUsersCard },
       { key: "sso", label: "Single sign-on", build: buildSsoCard },
+      { key: "security", label: "Sign-in security", build: buildSecurityCard },
       { key: "terminal", label: "Web terminal", build: buildTerminalCard },
     ],
   },

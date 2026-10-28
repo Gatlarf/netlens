@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -13,6 +14,7 @@ from pydantic import BaseModel
 from app import licence, oidc
 from app.api.auth import _audit, _is_https, _session_cookie
 from app.api.devices import get_conn
+from app.auth import client_ip
 from app.db import connect
 
 public_router = APIRouter(prefix="/api/auth/oidc", tags=["sso"])
@@ -41,19 +43,51 @@ async def login(request: Request):
     return RedirectResponse(url, status_code=302)
 
 
+@public_router.get("/stepup")
+async def stepup(request: Request, back: str = ""):
+    """Confirm a privileged action by signing in again at the identity provider (for users who signed in through it). Needs the signed-in session."""
+    from app import users
+    from app.auth import identify
+
+    principal = identify(request)
+    cookie = request.cookies.get("netlens_session") or ""
+    if principal is None or principal.user_id is None or principal.auth_method != "oidc" or not cookie.startswith(users.SESSION_PREFIX):
+        return _page("Sign in with single sign-on first.", 401)
+    back = back if re.fullmatch(r"#/[A-Za-z0-9/_?=&.-]{0,150}", back) else "#/"
+    db = connect(request.app.state.db_path)
+    try:
+        url = await asyncio.to_thread(oidc.begin, db, _base(request), (principal.user_id, users._digest(cookie[len(users.SESSION_PREFIX):]), back))
+    except oidc.OidcError as exc:
+        return _page(str(exc))
+    finally:
+        db.close()
+    return RedirectResponse(url, status_code=302)
+
+
 @public_router.get("/callback")
 async def callback(request: Request, code: str = "", state: str = "", error: str = "", error_description: str = ""):
     if error:
         return _page(f"The identity provider refused the sign-in: {error_description or error}")
     db = connect(request.app.state.db_path)
     try:
-        cookie = await asyncio.to_thread(oidc.finish, db, state, code)
+        cookie = await asyncio.to_thread(oidc.finish, db, state, code, client_ip(request), request.headers.get("user-agent", ""))
         user = db.execute("SELECT u.username, u.role FROM sessions s JOIN users u ON u.id = s.user_id ORDER BY s.created DESC LIMIT 1").fetchone()
     except oidc.OidcError as exc:
         _audit(request, "", "", "Failed single sign-on", 401)
         return _page(str(exc), 401)
     finally:
         db.close()
+    if isinstance(cookie, oidc.StepUp):
+        db = connect(request.app.state.db_path)
+        try:
+            from app import users
+
+            db.execute("UPDATE sessions SET auth_at = ? WHERE token_hash = ? AND user_id = ?", (users._iso(users._now()), cookie.session, cookie.user_id))
+            db.commit()
+            _audit(request, "", "", "Confirmed their identity for privileged actions (single sign-on)", 200)
+        finally:
+            db.close()
+        return HTMLResponse(f"<!doctype html><meta charset=utf-8><meta http-equiv='refresh' content='0;url=/{html.escape(cookie.back)}'><title>Confirmed</title><body style='font:16px system-ui;padding:2em'>Confirmed. <a href='/{html.escape(cookie.back)}'>Continue</a>")
     # the browser arrives from another site; a page that moves on by itself makes the next request a same-site one, so the strict session cookie is sent
     response = HTMLResponse("<!doctype html><meta charset=utf-8><meta http-equiv='refresh' content='0;url=/'><title>Signing in…</title><body style='font:16px system-ui;padding:2em'>Signing in… <a href='/'>continue</a>")
     _session_cookie(response, request, cookie)

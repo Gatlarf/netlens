@@ -190,10 +190,23 @@ def _device(conn: sqlite3.Connection, device_id: int | None) -> sqlite3.Row | No
     return conn.execute("SELECT id, mac, primary_ip, hostname, custom_name FROM devices WHERE id = ?", (device_id,)).fetchone() if device_id else None
 
 
-def _fill(text: str, device: sqlite3.Row | None, run: dict) -> str:
+def _fill(text: str, device: sqlite3.Row | None, run: dict, mode: str = "text") -> str:
+    """Put the device and the event into a template. What goes in comes from the network (a device chooses its own host name), so it is escaped for where it lands:
+    `url` percent-encodes it (a name like "x/../admin?y=" cannot change the address), `json` escapes it for a JSON string, `text` leaves it alone."""
+    import json as _json
+    import urllib.parse as _up
+
+    def esc(value: str) -> str:
+        value = str(value or "")
+        if mode == "url":
+            return _up.quote(value, safe="")
+        if mode == "json":
+            return _json.dumps(value)[1:-1]
+        return value
+
     name = (device["custom_name"] or device["hostname"] or device["primary_ip"] or "") if device else ""
-    return (text.replace("{device}", name).replace("{ip}", (device["primary_ip"] or "") if device else "").replace("{event}", run.get("kind") or "")
-            .replace("{detail}", run.get("detail") or ""))
+    return (text.replace("{device}", esc(name)).replace("{ip}", esc((device["primary_ip"] or "") if device else "")).replace("{event}", esc(run.get("kind") or ""))
+            .replace("{detail}", esc(run.get("detail") or "")))
 
 
 def run_wake(conn: sqlite3.Connection, rule: dict, run: dict) -> str:
@@ -208,8 +221,15 @@ def run_wake(conn: sqlite3.Connection, rule: dict, run: dict) -> str:
 def run_webhook(conn: sqlite3.Connection, rule: dict, run: dict) -> str:
     action, secret = rule["action"], rule.get("secret") or {}
     device = _device(conn, run.get("device_id"))
-    body = _fill(action.get("body") or "", device, run).encode() if action["method"] == "POST" else None
-    request = urllib.request.Request(_fill(action["url"], device, run), data=body, method=action["method"], headers={"User-Agent": "Netlens-remediation", "Content-Type": "application/json"})
+    template = action.get("body") or ""
+    body = _fill(template, device, run, "json" if template.lstrip().startswith(("{", "[")) else "text").encode() if action["method"] == "POST" else None
+    from app import safenet
+
+    try:
+        url = safenet.check_url(_fill(action["url"], device, run, "url"), what="the address of the rule")
+    except safenet.BlockedAddress as exc:
+        raise RuntimeError(str(exc)) from None
+    request = urllib.request.Request(url, data=body, method=action["method"], headers={"User-Agent": "Netlens-remediation", "Content-Type": "application/json"})
     if action.get("header_name") and secret.get("header_value"):
         request.add_header(action["header_name"], secret["header_value"])
 

@@ -79,6 +79,12 @@ def _bearer(challenge: str, registry: str, repo: str) -> str | None:
     parsed = urllib.parse.urlsplit(realm)
     if parsed.scheme != "https" and not (parsed.scheme == "http" and _private_host(parsed.netloc)):
         return None
+    from app import safenet
+
+    try:
+        safenet.check_url(realm, what="the token address of the registry")            # a registry must not be able to point Netlens at the metadata service
+    except safenet.BlockedAddress:
+        return None
     query = urllib.parse.urlencode({"service": fields.get("service", ""), "scope": fields.get("scope") or f"repository:{repo}:pull"})
     with _open(urllib.request.Request(f"{realm}{'&' if '?' in realm else '?'}{query}", headers={"User-Agent": "netlens"})) as response:
         body = json.loads(response.read(100_000) or b"{}")

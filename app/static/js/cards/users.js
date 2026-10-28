@@ -106,10 +106,48 @@ function userRow(user, data, refresh, shown) {
     const name = window.prompt("What is the token for? (for example Home Assistant)");
     if (!name) return;
     const readonly = window.confirm("Make it read-only?\n\nOK: the token can only read (right for Prometheus, Grafana and dashboards).\nCancel: it acts with the role of its user.");
-    call(() => api(`/api/users/${user.id}/tokens`, { method: "POST", body: { name, readonly } }), null);
+    const body = { name, readonly };
+    const policy = data.token_policy || {};
+    if (policy.max_days || policy.may_restrict) {
+      const days = window.prompt(`How many days may the token be used?${policy.max_days ? ` (at most ${policy.max_days})` : " Leave empty for no end."}`, policy.max_days ? String(policy.max_days) : "");
+      if (days === null) return;
+      if (days.trim()) body.expires_days = Number(days);
+      if (policy.may_restrict) {
+        const where = window.prompt("Only from these addresses or networks (comma separated, for example 10.0.0.0/24). Leave empty for anywhere.", "");
+        if (where === null) return;
+        if (where.trim()) body.allowed_ips = where.split(",").map((x) => x.trim()).filter(Boolean);
+      }
+    }
+    call(() => api(`/api/users/${user.id}/tokens`, { method: "POST", body }), null);
   });
   if (user.last_admin) for (const b of [toggle, del]) { b.disabled = true; b.title = "This is the last administrator: make another user an administrator first"; }
   const parts = [pw, " ", toggle, " ", tok, " "];
+  if (user.totp) {
+    const reset = h("button", { type: "button", class: "btn", title: "For a user who lost the authenticator and the recovery codes" }, "Reset 2FA");
+    reset.addEventListener("click", async () => {
+      let mine = { enabled: false };
+      try { mine = await api("/api/me/totp"); } catch { /* the access token has no second factor: the server explains */ }
+      const proof = window.prompt(mine.enabled ? `Reset the second factor of ${user.username}? Enter a code from your own authenticator to confirm.` : `Reset the second factor of ${user.username}? Enter your own password to confirm.`);
+      if (!proof) return;
+      call(() => api(`/api/users/${user.id}/totp/reset`, { method: "POST", body: mine.enabled ? { code: proof } : { password: proof } }), "Second factor reset: their sessions ended");
+    });
+    parts.push(reset, " ");
+  }
+  if (user.role === "admin" && data.privileged_allowed !== false) {
+    const bg = h("button", { type: "button", class: "btn", title: "A local administrator who may still sign in with a password when password sign-in is limited to break-glass accounts. Needs a second factor; every use raises a critical event." }, user.break_glass ? "Not break-glass" : "Make break-glass");
+    bg.addEventListener("click", () => call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { break_glass: !user.break_glass } }), user.break_glass ? "No longer a break-glass account" : "Marked as a break-glass account"));
+    parts.push(bg, " ");
+  }
+  const sess = h("button", { type: "button", class: "btn", title: "Enterprise: see and end the sessions of this user" }, "Sessions");
+  sess.addEventListener("click", async () => {
+    try {
+      const r = await api(`/api/users/${user.id}/sessions`);
+      const list = r.sessions.map((x) => `${x.ip || "?"} · ${x.method || "-"} · last used ${x.last_seen}`).join("\n") || "No active sessions.";
+      if (r.sessions.length && window.confirm(`${user.username} is signed in:\n\n${list}\n\nEnd all of these sessions?`)) call(() => api(`/api/users/${user.id}/sessions/end`, { method: "POST", body: {} }), "Sessions ended");
+      else if (!r.sessions.length) window.alert(list);
+    } catch (err) { toast(err.message || "Failed", "error"); }
+  });
+  parts.push(sess, " ");
   if (user.role === "viewer") {
     const lim = h("button", { type: "button", class: "btn" }, user.scope ? "Change groups" : "Limit to groups");
     lim.addEventListener("click", () => {
@@ -135,7 +173,7 @@ function userRow(user, data, refresh, shown) {
   parts.push(del);
   actions.append(...parts);
 
-  row.appendChild(h("td", {}, h("strong", {}, user.username), user.disabled ? h("span", { class: "tag" }, "disabled") : null, user.totp ? h("span", { class: "tag ok", title: "Signs in with a code from an authenticator app" }, "2FA") : null));
+  row.appendChild(h("td", {}, h("strong", {}, user.username), user.disabled ? h("span", { class: "tag" }, "disabled") : null, user.totp ? h("span", { class: "tag ok", title: "Signs in with a code from an authenticator app" }, "2FA") : null, user.break_glass ? h("span", { class: "tag warn", title: "Break-glass account: may sign in with a password when that is limited; each use raises a critical event" }, "break-glass") : null));
   row.appendChild(h("td", {}, role, user.sites ? h("span", { class: "tag", title: "Sees only these remote sites" }, `${user.sites.length} site${user.sites.length === 1 ? "" : "s"}`) : null, user.scope ? h("span", { class: "tag", title: "Sees only the devices of these groups" }, `${user.scope.length} group${user.scope.length === 1 ? "" : "s"}`) : null));
   row.appendChild(h("td", {}, user.last_login ? fmtTime(user.last_login) : "never"));
   row.appendChild(actions);
@@ -145,7 +183,7 @@ function userRow(user, data, refresh, shown) {
     const remove = h("button", { type: "button", class: "btn danger" }, "Revoke");
     remove.addEventListener("click", () => call(() => api(`/api/users/${user.id}/tokens/${t.id}`, { method: "DELETE" }), "Token revoked"));
     rows.push(h("tr", { class: "token-row" },
-      h("td", { colspan: "2" }, `API token "${t.name}"`, t.readonly ? h("span", { class: "tag" }, "read-only") : null),
+      h("td", { colspan: "2" }, `API token "${t.name}"`, t.readonly ? h("span", { class: "tag" }, "read-only") : null, t.expires ? h("span", { class: "tag", title: "The token stops working then" }, `ends ${t.expires.slice(0, 10)}`) : null, t.allowed_ips ? h("span", { class: "tag", title: "Only usable from these addresses" }, t.allowed_ips) : null),
       h("td", {}, t.last_used ? `used ${fmtTime(t.last_used)}` : "never used"),
       h("td", {}, remove)));
   }

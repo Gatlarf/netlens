@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from starlette.middleware.gzip import GZipMiddleware
 
-from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, guest_backups as guest_backups_api, storage as storage_api, features as features_api, reliability as reliability_api, interface as interface_api, traffic as traffic_api, layouts as layouts_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, switchports as switchports_api, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api, probes as probes_api, central as central_api, database as database_api, syslog as syslog_api, licence as licence_api, ipv6 as ipv6_api, inventory as inventory_api, remediation as remediation_api, escalation as escalation_api, sso as sso_api, siem as siem_api, reports as reports_api, preferences as preferences_api, snoozes as snoozes_api, audit as audit_api, changes as changes_api, insights as insights_api, vulns as vulns_api, cvecheck as cvecheck_api, usage as usage_api, siteview as siteview_api, documentation as documentation_api, inbound as inbound_api, oncall as oncall_api, assistant as assistant_api, mcp as mcp_api, hostprobe as hostprobe_api, analysis as analysis_api, credentials as credentials_api, hosts as hosts_api, ingest as ingest_api, totp as totp_api, sbom as sbom_api
+from app.api import changelog as changelog_api, dns as dns_api, passive as passive_api, backup as backup_api, backups as backups_api, channels as channels_api, config, devices, events, export, groups as groups_api, hierarchy as hierarchy_api, ignored, maintenance as maintenance_api, mapsettings, sites as sites_api, guest_backups as guest_backups_api, storage as storage_api, features as features_api, reliability as reliability_api, interface as interface_api, traffic as traffic_api, layouts as layouts_api, metrics as metrics_api, plugin_index, plugins, relations, scans, services as services_api, speedtest as speedtest_api, stats as stats_api, dashboard as dashboard_api, netchecks as netchecks_api, public_share, setup as setup_api, vendor_db as vendor_db_api, shares as shares_api, update as update_api, users as users_api, uptime, wifi, switchports as switchports_api, wizard as wizard_api, vault as vault_api, remote as remote_api, timeseries as timeseries_api, monitors as monitors_api, probes as probes_api, central as central_api, database as database_api, syslog as syslog_api, licence as licence_api, ipv6 as ipv6_api, inventory as inventory_api, remediation as remediation_api, escalation as escalation_api, sso as sso_api, siem as siem_api, reports as reports_api, preferences as preferences_api, snoozes as snoozes_api, audit as audit_api, changes as changes_api, insights as insights_api, vulns as vulns_api, cvecheck as cvecheck_api, usage as usage_api, siteview as siteview_api, documentation as documentation_api, inbound as inbound_api, oncall as oncall_api, assistant as assistant_api, mcp as mcp_api, hostprobe as hostprobe_api, analysis as analysis_api, credentials as credentials_api, hosts as hosts_api, ingest as ingest_api, totp as totp_api, sbom as sbom_api, security as security_api
 from app.api.auth import router as auth_router
 from app.api.terminal import router as terminal_router
 from app.auth import LoginLimiter, identify, require_auth
@@ -22,7 +22,7 @@ from app.config import load_settings
 from app.db import connect, init_db
 from app.scanner.orchestrator import ScanManager
 from app.scanner.scheduler import scheduler_loop
-from app.security import SecurityHeadersMiddleware
+from app.security import BodyLimitMiddleware, SecurityHeadersMiddleware
 from app.terminal.ssh import SSHBackend
 from app.terminal.telnet import TelnetBackend
 from app.services import service_loop
@@ -89,7 +89,10 @@ async def _ingest_loop(control) -> None:
 async def lifespan(app: FastAPI):
     conn = connect(app.state.db_path)
     init_db(conn)
-    from app import hardening, vault
+    from app import hardening, secpolicy, vault
+
+    secpolicy.forget()
+    secpolicy.get(conn)          # warm: the per-request checks (the access token, step-up, sessions) then cost no query
 
     hardening.protect_process()              # other processes of the same user (plugins) cannot read this process's memory or environment
 
@@ -230,6 +233,7 @@ def create_app(
                   openapi_url="/openapi.json" if docs else None)
 
     app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)     # the JSON lists and the script files shrink to a quarter; streams and images are left alone
+    app.add_middleware(BodyLimitMiddleware)             # a request body is capped before the framework reads it (app/security.py)
     app.add_middleware(SecurityHeadersMiddleware)
 
     @app.middleware("http")
@@ -257,6 +261,9 @@ def create_app(
 
         guard.install(app)
 
+    from app import safenet
+
+    safenet.install_redirect_guard()          # an outbound request that is redirected is checked at every step (not to the cloud metadata service, not to a file)
     app.state.settings = settings
     app.state.env_settings = settings
     app.state.overrides = set()
@@ -315,6 +322,7 @@ def create_app(
     app.include_router(ingest_api.router, dependencies=auth_deps)
     app.include_router(totp_api.router, dependencies=auth_deps)
     app.include_router(sbom_api.router, dependencies=auth_deps)
+    app.include_router(security_api.router, dependencies=auth_deps)
     app.include_router(probes_api.router, dependencies=auth_deps)
     app.include_router(central_api.router, dependencies=auth_deps)
     app.include_router(mcp_api.router, dependencies=auth_deps)
@@ -395,7 +403,7 @@ def main() -> None:
     logging.getLogger("netlens").info("Netlens %s started", VERSION)
     if STALE_ENV:
         logging.getLogger("netlens").warning("The container has NETLENS_VERSION=%s set, but this image is %s. The variable is ignored; remove it from the container or stack settings (Portainer copies it from the old container when you edit one).", FROM_ENV, VERSION)
-    uvicorn.run(app, host=settings.bind_host, port=settings.bind_port)
+    uvicorn.run(app, host=settings.bind_host, port=settings.bind_port, server_header=False)         # no 'Server: uvicorn' for a scanner to read
 
 
 if __name__ == "__main__":

@@ -22,6 +22,8 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 
+from app import safexml
+
 SOAP_ACTIONS = {
     "create": "http://schemas.xmlsoap.org/ws/2004/09/transfer/Create",
     "delete": "http://schemas.xmlsoap.org/ws/2004/09/transfer/Delete",
@@ -227,9 +229,9 @@ class Session:
                 raise AuthRefused(f"{self.id} refused the login: wrong user name or password, or this account may not use remote management (it must be a member of Remote Management Users)")
             if status in (200, 500) and text.lstrip().startswith("<"):
                 try:
-                    root = ET.fromstring(text)
-                except ET.ParseError:
-                    raise WinrmError(f"{self.id} sent an answer that is not XML")
+                    root = safexml.fromstring(text)
+                except (ET.ParseError, safexml.UnsafeXml):
+                    raise WinrmError(f"{self.id} sent an answer that is not XML (or one Netlens refuses: a DOCTYPE or entities)")
                 fault = _fault_text(root)
                 if fault:
                     if "(code 5)" in fault or "access is denied" in fault.lower():

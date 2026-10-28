@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app import licence, users
+from app import licence, secpolicy, users
 from app.db import connect
 
 router = APIRouter(prefix="/api", tags=["users"])
@@ -16,6 +16,7 @@ class NewUser(BaseModel):
 
 
 class UserPatch(BaseModel):
+    break_glass: bool | None = None
     role: str | None = None
     password: str | None = None
     disabled: bool | None = None
@@ -26,6 +27,8 @@ class UserPatch(BaseModel):
 class NewToken(BaseModel):
     name: str
     readonly: bool = False
+    expires_days: int | None = None        # the life of the token (the policy may cap it, Enterprise)
+    allowed_ips: list[str] | None = None   # addresses or networks it may be used from (Enterprise)
 
 
 def _db(request: Request):
@@ -52,9 +55,11 @@ def get_users(request: Request) -> dict:
     db = _db(request)
     try:
         return {
-            "users": users.list_users(db), "roles": list(users.ROLES), "min_password": users.MIN_PASSWORD,
+            "users": users.list_users(db), "roles": list(users.ROLES), "min_password": max(users.MIN_PASSWORD, secpolicy.get(db)["min_password"]),
             "token_configured": bool(request.app.state.settings.token),  # NETLENS_TOKEN is set in the environment
             "teams_allowed": licence.allows(db, "teams"),
+            "token_policy": {"max_days": secpolicy.get(db)["api_token_max_days"], "may_restrict": licence.allows(db, "privileged")},
+            "privileged_allowed": licence.allows(db, "privileged"),
             "sites": [{"id": r["id"], "name": r["name"], "customer": r["customer"] or ""} for r in db.execute("SELECT id, name, customer FROM probes ORDER BY LOWER(name)")],
         }
     finally:
@@ -80,6 +85,19 @@ def edit_user(request: Request, user_id: int, body: UserPatch) -> dict:
     db = _db(request)
     try:
         _check_teams(db, body.role, (body.scope if "scope" in body.model_fields_set else None) or (body.sites if "sites" in body.model_fields_set else None))
+        if body.break_glass is not None:
+            if not licence.allows(db, "privileged"):
+                raise HTTPException(status_code=402, detail="break-glass accounts are part of the Enterprise edition (or the free trial)")
+            target = users.get_user(db, user_id)
+            if target is None:
+                raise HTTPException(status_code=404, detail="no such user")
+            if body.break_glass and (target["role"] != "admin" or target["oidc_sub"]):
+                raise HTTPException(status_code=422, detail="a break-glass account is a local administrator account (not a single-sign-on user)")
+            if not body.break_glass and target["break_glass"] and secpolicy.get(db)["local_login"] == "break_glass_only" and db.execute(
+                    "SELECT COUNT(*) FROM users WHERE disabled = 0 AND role = 'admin' AND break_glass = 1 AND totp_enabled = 1 AND id != ?", (user_id,)).fetchone()[0] < 1:
+                raise HTTPException(status_code=409, detail="this is the last break-glass account while password sign-in is limited to them: allow password sign-in again first")
+            db.execute("UPDATE users SET break_glass = ? WHERE id = ?", (1 if body.break_glass else 0, user_id))
+            db.commit()
         try:
             users.update_user(db, user_id, role=body.role, password=body.password, disabled=body.disabled,
                               **({"scope": body.scope} if "scope" in body.model_fields_set else {}), **({"sites": body.sites} if "sites" in body.model_fields_set else {}))
@@ -109,7 +127,9 @@ def add_token(request: Request, user_id: int, body: NewToken) -> dict:
     db = _db(request)
     try:
         try:
-            token_id, secret = users.create_api_token(db, user_id, body.name, body.readonly)
+            if (body.allowed_ips or body.expires_days) and not licence.allows(db, "privileged") and not secpolicy.get(db)["api_token_max_days"]:
+                raise HTTPException(status_code=402, detail="limiting a token to addresses or a life time is part of the Enterprise edition (or the free trial)")
+            token_id, secret = users.create_api_token(db, user_id, body.name, body.readonly, expires_days=body.expires_days, allowed_ips=body.allowed_ips)
         except users.UserError as exc:
             raise _fail(exc)
         return {"id": token_id, "token": secret, "users": users.list_users(db)}

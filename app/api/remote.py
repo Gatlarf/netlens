@@ -309,6 +309,15 @@ async def remote_ws(websocket: WebSocket, ticket: str = "") -> None:
     if not settings.terminal_enabled or settings.demo or not allowed:
         await websocket.close(code=1008)
         return
+    from fastapi import HTTPException
+
+    from app import stepup
+
+    try:
+        stepup.check(websocket, principal, "WS", websocket.url.path)
+    except HTTPException:                                                    # the ticket was made by a privileged request; this is the second look
+        await websocket.close(code=1008)
+        return
     await websocket.accept(subprotocol="guacamole" if "guacamole" in (websocket.headers.get("sec-websocket-protocol") or "") else None)
     session = getattr(websocket.app.state, "remote_tickets", {}).pop(ticket, None)
     if session is None or session["expires"] < time.monotonic():
