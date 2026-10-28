@@ -78,7 +78,7 @@ def _stats(store, did: int, metric: str, label: str, span: int, end: int) -> dic
             while j + 1 < len(starts) and abs(starts[j + 1] - starts[i]) <= tol:
                 j += 1
             if j > i:
-                if accepted is not None and starts[i] - accepted > tol:
+                if accepted is not None and starts[i] - accepted > tol and starts[i] >= end - span - tol:      # the new start must itself fall in the period asked about
                     boots.append(datetime.fromtimestamp(starts[i], timezone.utc).strftime("%Y-%m-%d %H:%M"))
                 accepted = starts[i]
             i = j + 1
