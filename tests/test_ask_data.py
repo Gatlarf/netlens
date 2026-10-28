@@ -141,3 +141,9 @@ def test_the_list_of_questions_is_for_administrators(tmp_path, monkeypatch):
         assert c.put("/api/insights/ask/misses", headers=h, json={"enabled": False}).json() == {"enabled": False}
         assert c.delete("/api/insights/ask/misses", headers=h).json() == {"removed": 0}
         assert c.get("/api/insights/ask/misses").status_code == 401
+
+
+def test_readings_that_flip_between_two_values_are_not_reboots(conn):
+    """Two collectors, or a blip, can make the counter jump back and forth; a reboot is a new start time that stays."""
+    record(conn, 1, "uptime_s", [(age, 1_000_000.0 - age + (0 if i % 2 else 90_000)) for i, age in enumerate(range(20000, 0, -1000))], unit="s")
+    assert ask.TOOLS["metric"][0](conn, {"metric": "uptime", "days": 1}, NOW)["rebooted"] == []
