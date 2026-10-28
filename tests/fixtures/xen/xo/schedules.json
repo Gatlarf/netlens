@@ -1,0 +1,12 @@
+[
+  {
+    "cron": "0 3 * * *",
+    "enabled": true,
+    "jobId": "9b495ffd-ac13-4cd7-911c-9ce78e27ea97",
+    "name": "nightly",
+    "timezone": "UTC",
+    "userId": "8de34b8c-420a-4667-82ae-5cd15e63585e",
+    "id": "ddd31420-9b97-423c-abb3-2503ae52aa43",
+    "href": "/rest/v0/schedules/ddd31420-9b97-423c-abb3-2503ae52aa43"
+  }
+]

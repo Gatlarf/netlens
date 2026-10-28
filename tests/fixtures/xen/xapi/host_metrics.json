@@ -1,0 +1,14 @@
+{
+ "jsonrpc": "2.0",
+ "result": {
+  "OpaqueRef:c61ccfb9-c08d-9103-a0f1-f5404d0a7805": {
+   "uuid": "fd638608-416f-e56b-293b-409414b43a4c",
+   "memory_total": 6441922560,
+   "memory_free": 4436459520,
+   "live": true,
+   "last_updated": "20261028T17:17:23Z",
+   "other_config": {}
+  }
+ },
+ "id": 1
+}

@@ -1,0 +1,42 @@
+{
+  "quickInfo": {
+    "id": "b35fce12-befd-a53c-1fd1-55c62eb4abb2",
+    "power_state": "Running",
+    "uuid": "b35fce12-befd-a53c-1fd1-55c62eb4abb2",
+    "name_description": "Installed via xe CLI",
+    "CPUs": {
+      "number": 1
+    },
+    "os_version": {},
+    "memory": {
+      "size": 268427264
+    },
+    "creation": {},
+    "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "virtualizationMode": "hvm",
+    "tags": [],
+    "host": "792dad78-f5db-4b35-bf1d-3634774d080a",
+    "pvDriversDetected": false,
+    "startTime": 1793208757
+  },
+  "alarms": [],
+  "backupsInfo": {
+    "lastRuns": [
+      {
+        "backupJobId": "9b495ffd-ac13-4cd7-911c-9ce78e27ea97",
+        "timestamp": 1793208545539,
+        "status": "success"
+      }
+    ],
+    "vmProtection": "protected",
+    "replication": {},
+    "backupArchives": [
+      {
+        "id": "8f461b19-7e34-4544-965c-73f0c96001c3//xo-vm-backups/b35fce12-befd-a53c-1fd1-55c62eb4abb2/20261028T172902Z.json",
+        "timestamp": 1793208542834,
+        "backupRepository": "8f461b19-7e34-4544-965c-73f0c96001c3",
+        "size": 2119168
+      }
+    ]
+  }
+}

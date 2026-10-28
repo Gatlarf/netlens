@@ -1,0 +1,171 @@
+[
+  {
+    "type": "VM",
+    "addresses": {},
+    "auto_poweron": false,
+    "bios_strings": {
+      "bios-vendor": "Xen",
+      "bios-version": "",
+      "system-manufacturer": "Xen",
+      "system-product-name": "HVM domU",
+      "system-version": "",
+      "system-serial-number": "",
+      "baseboard-manufacturer": "",
+      "baseboard-product-name": "",
+      "baseboard-version": "",
+      "baseboard-serial-number": "",
+      "baseboard-asset-tag": "",
+      "baseboard-location-in-chassis": "",
+      "enclosure-asset-tag": "",
+      "hp-rombios": "",
+      "oem-1": "Xen",
+      "oem-2": "MS_VM_CERT/SHA1/bdbeb6e0a816d43fa6d3fe8aaef04c2bad9d3e3d"
+    },
+    "blockedOperations": {},
+    "boot": {
+      "firmware": "bios",
+      "order": "cd"
+    },
+    "CPUs": {
+      "max": 1,
+      "number": 1
+    },
+    "current_operations": {},
+    "expNestedHvm": false,
+    "isNestedVirtEnabled": false,
+    "vulnerabilities": {
+      "xsa468": false
+    },
+    "viridian": true,
+    "high_availability": "",
+    "isFirmwareSupported": true,
+    "memory": {
+      "dynamic": [
+        268435456,
+        268435456
+      ],
+      "static": [
+        134217728,
+        268435456
+      ],
+      "size": 268427264
+    },
+    "installTime": 1793208214,
+    "name_description": "Installed via xe CLI",
+    "name_label": "lab-vm1",
+    "needsVtpm": false,
+    "other": {
+      "base_template_name": "Other install media",
+      "import_task": "OpaqueRef:16d3dbae-489e-e6c8-1998-425a900fcb0a",
+      "mac_seed": "d330b629-833a-e519-406a-b62d2e2e6899",
+      "install-methods": "cdrom"
+    },
+    "os_version": {},
+    "power_state": "Running",
+    "hasVendorDevice": false,
+    "snapshots": [],
+    "startDelay": 0,
+    "startTime": 1793208218,
+    "secureBoot": false,
+    "tags": [],
+    "VIFs": [
+      "fae2229f-3f6d-5279-789e-0a43e85dcfd1"
+    ],
+    "VTPMs": [],
+    "virtualizationMode": "hvm",
+    "xenTools": false,
+    "managementAgentDetected": false,
+    "pvDriversDetected": false,
+    "$container": "792dad78-f5db-4b35-bf1d-3634774d080a",
+    "$VBDs": [],
+    "VGPUs": [],
+    "$VGPUs": [],
+    "xenStoreData": {
+      "vm-data/mmio-hole-size": "268435456",
+      "vm-data": ""
+    },
+    "vga": "cirrus",
+    "videoram": 4,
+    "coresPerSocket": 1,
+    "id": "d2377fad-e72f-a3bc-2e00-dc4823a80efd",
+    "uuid": "d2377fad-e72f-a3bc-2e00-dc4823a80efd",
+    "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "_xapiRef": "OpaqueRef:2f5be4ef-f9fb-7e5f-5975-53d00c6afd70",
+    "href": "/rest/v0/vms/d2377fad-e72f-a3bc-2e00-dc4823a80efd"
+  },
+  {
+    "type": "VM",
+    "addresses": {},
+    "auto_poweron": false,
+    "bios_strings": {},
+    "blockedOperations": {},
+    "boot": {
+      "firmware": "bios",
+      "order": "cd"
+    },
+    "CPUs": {
+      "max": 1,
+      "number": 1
+    },
+    "current_operations": {},
+    "expNestedHvm": false,
+    "isNestedVirtEnabled": false,
+    "vulnerabilities": {
+      "xsa468": false
+    },
+    "viridian": true,
+    "high_availability": "",
+    "isFirmwareSupported": true,
+    "memory": {
+      "dynamic": [
+        268435456,
+        268435456
+      ],
+      "static": [
+        134217728,
+        268435456
+      ],
+      "size": 268435456
+    },
+    "installTime": 1793208215,
+    "name_description": "Installed via xe CLI",
+    "name_label": "lab-vm2",
+    "needsVtpm": false,
+    "other": {
+      "base_template_name": "Other install media",
+      "import_task": "OpaqueRef:16d3dbae-489e-e6c8-1998-425a900fcb0a",
+      "mac_seed": "5cb90d89-b839-3caa-c2c0-dc4948cebcfe",
+      "install-methods": "cdrom"
+    },
+    "os_version": null,
+    "power_state": "Halted",
+    "hasVendorDevice": false,
+    "snapshots": [],
+    "startDelay": 0,
+    "startTime": null,
+    "secureBoot": false,
+    "tags": [],
+    "VIFs": [
+      "a56d39b9-2bc7-dcd0-9772-0397fc5842f3"
+    ],
+    "VTPMs": [],
+    "virtualizationMode": "hvm",
+    "$container": "792dad78-f5db-4b35-bf1d-3634774d080a",
+    "$VBDs": [
+      "7d9a6093-c72a-e4bd-5662-67941f27287d"
+    ],
+    "VGPUs": [],
+    "$VGPUs": [],
+    "xenStoreData": {},
+    "vga": "cirrus",
+    "videoram": 4,
+    "coresPerSocket": 1,
+    "id": "b35fce12-befd-a53c-1fd1-55c62eb4abb2",
+    "uuid": "b35fce12-befd-a53c-1fd1-55c62eb4abb2",
+    "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "_xapiRef": "OpaqueRef:09a0a0bc-d28b-5e27-1781-6829d853ea87",
+    "href": "/rest/v0/vms/b35fce12-befd-a53c-1fd1-55c62eb4abb2"
+  }
+]

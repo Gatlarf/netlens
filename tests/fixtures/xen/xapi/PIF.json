@@ -1,0 +1,45 @@
+{
+ "jsonrpc": "2.0",
+ "result": {
+  "OpaqueRef:d52b6ff7-4508-c298-da44-43bd869ab326": {
+   "uuid": "aa1ae5d3-26bd-0387-c702-7d6b20613e94",
+   "device": "eth0",
+   "network": "OpaqueRef:5311989d-72d3-bd1d-9c43-4cc86287efc4",
+   "host": "OpaqueRef:e2212734-d67a-bfcb-ad42-dc7e2d8d8038",
+   "MAC": "52:54:00:12:34:56",
+   "MTU": 1500,
+   "VLAN": -1,
+   "metrics": "OpaqueRef:d8bb5c7d-9764-a513-bb63-be4c42fda41b",
+   "physical": true,
+   "currently_attached": true,
+   "ip_configuration_mode": "DHCP",
+   "IP": "10.0.2.15",
+   "netmask": "255.255.255.0",
+   "gateway": "10.0.2.2",
+   "DNS": "10.0.2.3",
+   "bond_slave_of": "OpaqueRef:NULL",
+   "bond_master_of": [],
+   "VLAN_master_of": "OpaqueRef:NULL",
+   "VLAN_slave_of": [],
+   "management": true,
+   "other_config": {},
+   "disallow_unplug": false,
+   "tunnel_access_PIF_of": [],
+   "tunnel_transport_PIF_of": [],
+   "ipv6_configuration_mode": "None",
+   "IPv6": [],
+   "ipv6_gateway": "",
+   "primary_address_type": "IPv4",
+   "managed": true,
+   "properties": {
+    "gro": "on"
+   },
+   "capabilities": [],
+   "igmp_snooping_status": "disabled",
+   "sriov_physical_PIF_of": [],
+   "sriov_logical_PIF_of": [],
+   "PCI": "OpaqueRef:82a0da65-7f4d-2c5c-eb6a-96cea59627bc"
+  }
+ },
+ "id": 1
+}

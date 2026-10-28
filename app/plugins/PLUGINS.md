@@ -5,12 +5,12 @@ Netlens can learn about your network from other systems through **plugins**. A p
 
 | Kind | Reports | Examples |
 | :--- | :--- | :--- |
-| `hypervisor` | hosts, and the VMs/containers that run on them | Proxmox VE, ESXi, Hyper-V, libvirt |
+| `hypervisor` | hosts, and the VMs/containers that run on them | Proxmox VE, ESXi, Hyper-V, XCP-ng / XenServer, libvirt |
 | `dns` | a DNS server that Netlens writes device names and addresses to | Technitium DNS (more welcome: BIND with RFC 2136, Pi-hole, AdGuard Home, dnsmasq) |
 | `topology` | network nodes (router, switch, access point, mesh node) and the clients connected to them | ASUS AiMesh, Omada, UniFi, Fritz!Box, MikroTik |
 | `proxy` | a reverse proxy and the sites it publishes (domain → upstream host and port, certificate) | Nginx Proxy Manager (more welcome: Traefik, Caddy, HAProxy) |
 | `storage` | a storage system (array, NAS, Ceph): health, pools, volumes with the hosts that use them, disks and alerts | NetApp ONTAP, Ceph |
-| `backup` | a backup server: what is backed up (per guest), how old, whether it worked, and how full its stores are | Proxmox Backup Server |
+| `backup` | a backup server: what is backed up (per guest), how old, whether it worked, and how full its stores are | Proxmox Backup Server, Xen Orchestra |
 
 Plugin API version: **1**.
 

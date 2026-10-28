@@ -1,0 +1,49 @@
+{
+  "id": "xcpng",
+  "name": "XCP-ng / XenServer / Xen Orchestra",
+  "version": "1.0.0",
+  "api_version": 1,
+  "diagnose": true,
+  "kind": "hypervisor",
+  "author": "Netlens",
+  "description": "Reads the pools of Vates VMS (XCP-ng with Xen Orchestra) and of XenServer: hosts, virtual machines with their addresses and the storage repositories. Talks to a Xen Orchestra, or straight to a pool master when there is none. Read-only, unless you let auto-remediation restart a VM.",
+  "timeout": 120,
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Xen Orchestra or pool master",
+      "required": true,
+      "help": "The address of a Xen Orchestra (it manages every pool it knows, one line is enough), or of the pool master of an XCP-ng / XenServer pool when you have no Xen Orchestra. Netlens finds out which one it is. HTTPS is assumed when you leave the scheme out.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "https://xo.example.com", "required": true},
+        {"key": "token", "label": "Xen Orchestra token", "type": "password", "optional": true},
+        {"key": "username", "label": "Username", "placeholder": "readonly@example.com or root", "optional": true},
+        {"key": "password", "label": "Password", "type": "password", "optional": true},
+        {"key": "fingerprint", "label": "Certificate fingerprint", "placeholder": "B7:5B:65:5B:...", "optional": true,
+         "help": "SHA-256 fingerprint of the server's certificate. When filled in, exactly that certificate is trusted (also a self-signed one)."}
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Turn off for the self-signed certificate XCP-ng and Xen Orchestra use by default."
+    }
+  ],
+  "dashboard": [
+    {
+      "id": "guests",
+      "title": "Xen virtual machines",
+      "about": "Virtual machines on your XCP-ng / XenServer hosts: running, stopped and how many in all.",
+      "href": "#/hierarchy",
+      "rows": [
+        {"label": "Running", "count": "guests", "where": {"status": "running"}},
+        {"label": "Stopped", "count": "guests", "where": {"status": ["stopped"]}, "tone_if_positive": "warn"},
+        {"label": "Paused", "count": "guests", "where": {"status": ["paused"]}, "tone_if_positive": "warn"}
+      ]
+    }
+  ],
+  "power": ["reset", "reboot", "shutdown", "start"]
+}

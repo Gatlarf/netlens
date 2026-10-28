@@ -1,0 +1,42 @@
+[
+  {
+    "type": "VIF",
+    "allowedIpv4Addresses": [],
+    "allowedIpv6Addresses": [],
+    "attached": false,
+    "device": "0",
+    "lockingMode": "network_default",
+    "MAC": "aa:70:d3:eb:5b:99",
+    "MTU": 1500,
+    "other_config": {},
+    "txChecksumming": true,
+    "$network": "bec4ca58-83c5-1826-e27d-d66415310d94",
+    "$VM": "d2377fad-e72f-a3bc-2e00-dc4823a80efd",
+    "id": "fae2229f-3f6d-5279-789e-0a43e85dcfd1",
+    "uuid": "fae2229f-3f6d-5279-789e-0a43e85dcfd1",
+    "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "_xapiRef": "OpaqueRef:04a17c86-a9a7-97b9-268d-3d097508e99c",
+    "href": "/rest/v0/vifs/fae2229f-3f6d-5279-789e-0a43e85dcfd1"
+  },
+  {
+    "type": "VIF",
+    "allowedIpv4Addresses": [],
+    "allowedIpv6Addresses": [],
+    "attached": false,
+    "device": "0",
+    "lockingMode": "network_default",
+    "MAC": "5e:a9:c0:1e:1a:bf",
+    "MTU": 1500,
+    "other_config": {},
+    "txChecksumming": true,
+    "$network": "bec4ca58-83c5-1826-e27d-d66415310d94",
+    "$VM": "b35fce12-befd-a53c-1fd1-55c62eb4abb2",
+    "id": "a56d39b9-2bc7-dcd0-9772-0397fc5842f3",
+    "uuid": "a56d39b9-2bc7-dcd0-9772-0397fc5842f3",
+    "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "_xapiRef": "OpaqueRef:46f2eb9c-0591-d3c6-a57e-7d4e55b3a331",
+    "href": "/rest/v0/vifs/a56d39b9-2bc7-dcd0-9772-0397fc5842f3"
+  }
+]

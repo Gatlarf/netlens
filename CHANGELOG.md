@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.299 — 2026-10-28
+
+### Added
+- ★ **Two new plugins for Vates VMS and XenServer.** *XCP-ng / XenServer / Xen Orchestra* (a hypervisor plugin) shows the hosts, the virtual machines with their state and addresses, and the storage repositories of Xen pools, through a Xen Orchestra or straight from a pool master (Netlens works out which); a Xen Orchestra user with the built-in *Read only* role is enough. *Xen Orchestra backup* (a backup plugin) shows what Xen Orchestra backs up per VM, the repository space and the failed runs, on the Backups page. Both can trust a self-signed certificate by its fingerprint. Tested on a real XCP-ng 8.3 and Xen Orchestra 6; install them from the Plugin store once released.
+
 ## 0.4.295 — 2026-10-28
 
 ### Added

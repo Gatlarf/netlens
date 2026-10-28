@@ -1,0 +1,109 @@
+{
+ "jsonrpc": "2.0",
+ "result": {
+  "OpaqueRef:dfe47e01-6ea6-1eec-4582-156cd4d81547": {
+   "uuid": "93cb5925-b2ed-6981-c8f3-069eb61ee0e4",
+   "memory_actual": 0,
+   "VCPUs_number": 0,
+   "VCPUs_utilisation": {
+    "0": 0.0
+   },
+   "VCPUs_CPU": {},
+   "VCPUs_params": {},
+   "VCPUs_flags": {},
+   "state": [],
+   "start_time": "19700101T00:00:00Z",
+   "install_time": "19700101T00:00:00Z",
+   "last_updated": "19700101T00:00:00Z",
+   "other_config": {},
+   "hvm": false,
+   "nested_virt": false,
+   "nomigrate": false,
+   "current_domain_type": "unspecified"
+  },
+  "OpaqueRef:dcac8fe8-22e6-8c37-5945-bff649c54fd7": {
+   "uuid": "c2499e4a-83a5-f8ca-768b-e5731226c25e",
+   "memory_actual": 1392508928,
+   "VCPUs_number": 4,
+   "VCPUs_utilisation": {
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0,
+    "4": 0.0
+   },
+   "VCPUs_CPU": {},
+   "VCPUs_params": {},
+   "VCPUs_flags": {},
+   "state": [],
+   "start_time": "19700101T00:00:00Z",
+   "install_time": "19700101T00:00:00Z",
+   "last_updated": "19700101T00:00:00Z",
+   "other_config": {},
+   "hvm": false,
+   "nested_virt": false,
+   "nomigrate": false,
+   "current_domain_type": "pv"
+  },
+  "OpaqueRef:d8d243fd-874f-32ef-41da-f2ffa70c701d": {
+   "uuid": "b89b22e6-b306-d5a1-5cef-af925468fcea",
+   "memory_actual": 0,
+   "VCPUs_number": 0,
+   "VCPUs_utilisation": {
+    "0": 0.0
+   },
+   "VCPUs_CPU": {},
+   "VCPUs_params": {},
+   "VCPUs_flags": {},
+   "state": [],
+   "start_time": "19700101T00:00:00Z",
+   "install_time": "20261028T17:23:35Z",
+   "last_updated": "19700101T00:00:00Z",
+   "other_config": {},
+   "hvm": false,
+   "nested_virt": false,
+   "nomigrate": false,
+   "current_domain_type": "unspecified"
+  },
+  "OpaqueRef:cc00320c-2fac-8767-1187-c8fb65dbf939": {
+   "uuid": "c023fd54-bac2-d5c2-a7d5-66658f39b01a",
+   "memory_actual": 0,
+   "VCPUs_number": 0,
+   "VCPUs_utilisation": {
+    "0": 0.0
+   },
+   "VCPUs_CPU": {},
+   "VCPUs_params": {},
+   "VCPUs_flags": {},
+   "state": [],
+   "start_time": "19700101T00:00:00Z",
+   "install_time": "19700101T00:00:00Z",
+   "last_updated": "19700101T00:00:00Z",
+   "other_config": {},
+   "hvm": false,
+   "nested_virt": false,
+   "nomigrate": false,
+   "current_domain_type": "unspecified"
+  },
+  "OpaqueRef:88bcaa14-bc3f-39d7-dae5-348b70f8d984": {
+   "uuid": "3e945c66-e2d0-0ce7-4820-8d8ecd1d2228",
+   "memory_actual": 268427264,
+   "VCPUs_number": 1,
+   "VCPUs_utilisation": {
+    "0": 0.0
+   },
+   "VCPUs_CPU": {},
+   "VCPUs_params": {},
+   "VCPUs_flags": {},
+   "state": [],
+   "start_time": "20261028T17:23:38Z",
+   "install_time": "20261028T17:23:34Z",
+   "last_updated": "19700101T00:00:00Z",
+   "other_config": {},
+   "hvm": true,
+   "nested_virt": false,
+   "nomigrate": false,
+   "current_domain_type": "hvm"
+  }
+ },
+ "id": 1
+}

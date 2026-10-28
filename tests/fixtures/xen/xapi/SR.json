@@ -1,0 +1,177 @@
+{
+ "jsonrpc": "2.0",
+ "result": {
+  "OpaqueRef:b31f4bff-7186-e9d8-3e9d-c56250367aed": {
+   "uuid": "ae4f552c-c4da-9171-23f3-3fd5fbceb65b",
+   "name_label": "Local storage",
+   "name_description": "",
+   "allowed_operations": [
+    "vdi_enable_cbt",
+    "vdi_list_changed_blocks",
+    "unplug",
+    "plug",
+    "pbd_create",
+    "vdi_disable_cbt",
+    "update",
+    "pbd_destroy",
+    "vdi_resize",
+    "vdi_clone",
+    "vdi_data_destroy",
+    "scan",
+    "vdi_snapshot",
+    "vdi_mirror",
+    "vdi_create",
+    "vdi_destroy",
+    "vdi_set_on_boot"
+   ],
+   "current_operations": {},
+   "VDIs": [
+    "OpaqueRef:373cc8fb-6989-18d3-79cf-ae9ad7bac1a2"
+   ],
+   "PBDs": [
+    "OpaqueRef:643f7c2c-1fa6-07b5-11f2-360b628598a0"
+   ],
+   "virtual_allocation": 1073741824,
+   "physical_utilisation": 2129920,
+   "physical_size": 8861896704,
+   "type": "ext",
+   "content_type": "user",
+   "shared": false,
+   "other_config": {
+    "i18n-original-value-name_label": "Local storage",
+    "i18n-key": "local-storage"
+   },
+   "tags": [],
+   "sm_config": {
+    "devserial": "scsi-1ATA_QEMU_HARDDISK_QM00001"
+   },
+   "blobs": {},
+   "local_cache_enabled": true,
+   "introduced_by": "OpaqueRef:NULL",
+   "clustered": false,
+   "is_tools_sr": false
+  },
+  "OpaqueRef:5aa0da75-46cb-9dd2-5a96-ee2181b04351": {
+   "uuid": "5bfaba3a-f3fc-362a-3840-987d57ec88b0",
+   "name_label": "Removable storage",
+   "name_description": "",
+   "allowed_operations": [
+    "vdi_introduce",
+    "unplug",
+    "plug",
+    "pbd_create",
+    "update",
+    "pbd_destroy",
+    "vdi_clone",
+    "scan"
+   ],
+   "current_operations": {},
+   "VDIs": [],
+   "PBDs": [
+    "OpaqueRef:adb8c16c-cc94-c63e-3064-35a2afdb1241"
+   ],
+   "virtual_allocation": 0,
+   "physical_utilisation": 0,
+   "physical_size": 0,
+   "type": "udev",
+   "content_type": "disk",
+   "shared": false,
+   "other_config": {
+    "i18n-original-value-name_label": "Removable storage",
+    "i18n-key": "local-hotplug-disk"
+   },
+   "tags": [],
+   "sm_config": {
+    "type": "block"
+   },
+   "blobs": {},
+   "local_cache_enabled": false,
+   "introduced_by": "OpaqueRef:NULL",
+   "clustered": false,
+   "is_tools_sr": false
+  },
+  "OpaqueRef:55d7b129-f51c-c9bc-fb33-858ecc9d076b": {
+   "uuid": "017bd796-45a5-5037-d101-39560828d1a2",
+   "name_label": "DVD drives",
+   "name_description": "Physical DVD drives",
+   "allowed_operations": [
+    "vdi_introduce",
+    "unplug",
+    "plug",
+    "pbd_create",
+    "update",
+    "pbd_destroy",
+    "vdi_clone",
+    "scan"
+   ],
+   "current_operations": {},
+   "VDIs": [
+    "OpaqueRef:31f7e645-9113-870b-6318-31f5b44abdcb"
+   ],
+   "PBDs": [
+    "OpaqueRef:d51210c2-1b0a-cfbf-8249-80470f455d17"
+   ],
+   "virtual_allocation": 1073741312,
+   "physical_utilisation": 1073741312,
+   "physical_size": 1073741312,
+   "type": "udev",
+   "content_type": "iso",
+   "shared": false,
+   "other_config": {
+    "i18n-original-value-name_description": "Physical DVD drives",
+    "i18n-original-value-name_label": "DVD drives",
+    "i18n-key": "local-hotplug-cd"
+   },
+   "tags": [],
+   "sm_config": {
+    "type": "cd"
+   },
+   "blobs": {},
+   "local_cache_enabled": false,
+   "introduced_by": "OpaqueRef:NULL",
+   "clustered": false,
+   "is_tools_sr": false
+  },
+  "OpaqueRef:158a2fd3-edaa-0640-719a-58192b9353f8": {
+   "uuid": "00e2da81-27f4-b7b4-5fa5-672f04f21599",
+   "name_label": "XCP-ng Tools",
+   "name_description": "XCP-ng Tools ISOs",
+   "allowed_operations": [
+    "unplug",
+    "plug",
+    "pbd_create",
+    "pbd_destroy",
+    "vdi_clone",
+    "scan"
+   ],
+   "current_operations": {},
+   "VDIs": [
+    "OpaqueRef:e0561456-7166-8aed-12b6-e1a76704bb8f"
+   ],
+   "PBDs": [
+    "OpaqueRef:b6e3458c-d5d6-9112-8b24-35bd2e4d79b2"
+   ],
+   "virtual_allocation": 20066304,
+   "physical_utilisation": -1,
+   "physical_size": -1,
+   "type": "iso",
+   "content_type": "iso",
+   "shared": true,
+   "other_config": {
+    "xensource_internal": "true",
+    "xenserver_tools_sr": "true",
+    "i18n-key": "xenserver-tools",
+    "i18n-original-value-name_label": "XCP-ng Tools",
+    "i18n-original-value-name_description": "XCP-ng Tools ISOs"
+   },
+   "tags": [],
+   "sm_config": {},
+   "blobs": {},
+   "local_cache_enabled": false,
+   "introduced_by": "OpaqueRef:NULL",
+   "clustered": false,
+   "is_tools_sr": true
+  }
+ },
+ "id": 1
+}

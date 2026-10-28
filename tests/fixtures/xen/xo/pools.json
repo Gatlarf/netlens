@@ -1,0 +1,29 @@
+[
+ {
+  "auto_poweron": false,
+  "current_operations": {},
+  "default_SR": "ae4f552c-c4da-9171-23f3-3fd5fbceb65b",
+  "HA_enabled": false,
+  "haRebootVmOnInternalShutdown": true,
+  "haSrs": [],
+  "master": "792dad78-f5db-4b35-bf1d-3634774d080a",
+  "tags": [],
+  "name_description": "",
+  "name_label": "xcp-lab",
+  "migrationCompression": false,
+  "cpus": {
+   "cores": 4,
+   "sockets": 1
+  },
+  "zstdSupported": true,
+  "vtpmSupported": true,
+  "platform_version": "3.4.0",
+  "id": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+  "type": "pool",
+  "uuid": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+  "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+  "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+  "_xapiRef": "OpaqueRef:8d218c51-bb0b-141a-ec14-ea799389c64a",
+  "href": "/rest/v0/pools/93a1fe1a-9d5a-c8e5-a081-925221e035ae"
+ }
+]

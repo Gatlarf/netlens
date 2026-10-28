@@ -1,0 +1,137 @@
+{
+ "jsonrpc": "2.0",
+ "result": {
+  "OpaqueRef:e0561456-7166-8aed-12b6-e1a76704bb8f": {
+   "uuid": "d188890f-8a33-475b-936e-cb6624ae08f3",
+   "name_label": "guest-tools.iso",
+   "name_description": "",
+   "allowed_operations": [
+    "copy",
+    "forget"
+   ],
+   "current_operations": {},
+   "SR": "OpaqueRef:158a2fd3-edaa-0640-719a-58192b9353f8",
+   "VBDs": [],
+   "crash_dumps": [],
+   "virtual_size": 20066304,
+   "physical_utilisation": 20066304,
+   "type": "user",
+   "sharable": false,
+   "read_only": true,
+   "other_config": {},
+   "storage_lock": false,
+   "location": "guest-tools-8.3-18.xcpng8.3.iso",
+   "managed": true,
+   "missing": false,
+   "parent": "OpaqueRef:NULL",
+   "xenstore_data": {},
+   "sm_config": {
+    "xs-tools-version": "8.3",
+    "xs-tools-build": "18.xcpng8.3",
+    "xs-tools": "true"
+   },
+   "is_a_snapshot": false,
+   "snapshot_of": "OpaqueRef:NULL",
+   "snapshots": [],
+   "snapshot_time": "19700101T00:00:00Z",
+   "tags": [],
+   "allow_caching": false,
+   "on_boot": "persist",
+   "metadata_of_pool": "OpaqueRef:NULL",
+   "metadata_latest": false,
+   "is_tools_iso": true,
+   "cbt_enabled": false
+  },
+  "OpaqueRef:373cc8fb-6989-18d3-79cf-ae9ad7bac1a2": {
+   "uuid": "9d385ea3-ac54-467e-adb6-7d02c403e85a",
+   "name_label": "lab-vm2-disk",
+   "name_description": "",
+   "allowed_operations": [
+    "copy",
+    "generate_config",
+    "clone",
+    "forget",
+    "update",
+    "resize",
+    "snapshot",
+    "destroy"
+   ],
+   "current_operations": {},
+   "SR": "OpaqueRef:b31f4bff-7186-e9d8-3e9d-c56250367aed",
+   "VBDs": [
+    "OpaqueRef:6b5ea6f5-8626-2fbc-42dd-a8e5f06c4c55"
+   ],
+   "crash_dumps": [],
+   "virtual_size": 1073741824,
+   "physical_utilisation": 5120,
+   "type": "user",
+   "sharable": false,
+   "read_only": false,
+   "other_config": {
+    "content_id": "e0af20e2-d48f-747f-c5cf-04667f6e9a3e"
+   },
+   "storage_lock": false,
+   "location": "9d385ea3-ac54-467e-adb6-7d02c403e85a",
+   "managed": true,
+   "missing": false,
+   "parent": "OpaqueRef:NULL",
+   "xenstore_data": {},
+   "sm_config": {
+    "image-format": "vhd"
+   },
+   "is_a_snapshot": false,
+   "snapshot_of": "OpaqueRef:NULL",
+   "snapshots": [],
+   "snapshot_time": "19700101T00:00:00Z",
+   "tags": [],
+   "allow_caching": false,
+   "on_boot": "persist",
+   "metadata_of_pool": "",
+   "metadata_latest": false,
+   "is_tools_iso": false,
+   "cbt_enabled": false
+  },
+  "OpaqueRef:31f7e645-9113-870b-6318-31f5b44abdcb": {
+   "uuid": "df4ad766-f2d1-4356-a56e-1395e28e56dd",
+   "name_label": "SCSI 1:0:0:0",
+   "name_description": "QEMU model QEMU DVD-ROM rev 2.5+ type 5",
+   "allowed_operations": [
+    "copy",
+    "forget",
+    "update"
+   ],
+   "current_operations": {},
+   "SR": "OpaqueRef:55d7b129-f51c-c9bc-fb33-858ecc9d076b",
+   "VBDs": [],
+   "crash_dumps": [],
+   "virtual_size": 1073741312,
+   "physical_utilisation": 1073741312,
+   "type": "user",
+   "sharable": false,
+   "read_only": true,
+   "other_config": {},
+   "storage_lock": false,
+   "location": "/dev/xapi/cd/sr0",
+   "managed": true,
+   "missing": false,
+   "parent": "OpaqueRef:NULL",
+   "xenstore_data": {},
+   "sm_config": {
+    "image-format": "raw",
+    "hotplugged_at": "2026-10-28T17:15:10Z"
+   },
+   "is_a_snapshot": false,
+   "snapshot_of": "OpaqueRef:NULL",
+   "snapshots": [],
+   "snapshot_time": "19700101T00:00:00Z",
+   "tags": [],
+   "allow_caching": false,
+   "on_boot": "persist",
+   "metadata_of_pool": "OpaqueRef:NULL",
+   "metadata_latest": false,
+   "is_tools_iso": false,
+   "cbt_enabled": false
+  }
+ },
+ "id": 1
+}

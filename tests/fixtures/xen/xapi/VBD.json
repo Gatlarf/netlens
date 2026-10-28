@@ -1,0 +1,32 @@
+{
+ "jsonrpc": "2.0",
+ "result": {
+  "OpaqueRef:6b5ea6f5-8626-2fbc-42dd-a8e5f06c4c55": {
+   "uuid": "7d9a6093-c72a-e4bd-5662-67941f27287d",
+   "allowed_operations": [
+    "attach"
+   ],
+   "current_operations": {},
+   "VM": "OpaqueRef:09a0a0bc-d28b-5e27-1781-6829d853ea87",
+   "VDI": "OpaqueRef:373cc8fb-6989-18d3-79cf-ae9ad7bac1a2",
+   "device": "",
+   "userdevice": "0",
+   "bootable": true,
+   "mode": "RW",
+   "type": "Disk",
+   "unpluggable": true,
+   "storage_lock": false,
+   "empty": false,
+   "other_config": {},
+   "currently_attached": false,
+   "status_code": 0,
+   "status_detail": "",
+   "runtime_properties": {},
+   "qos_algorithm_type": "",
+   "qos_algorithm_params": {},
+   "qos_supported_algorithms": [],
+   "metrics": "OpaqueRef:79a4abae-595d-09ba-c51d-07b3183c09f0"
+  }
+ },
+ "id": 1
+}

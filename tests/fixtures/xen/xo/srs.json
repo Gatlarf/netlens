@@ -1,0 +1,145 @@
+[
+  {
+    "type": "SR",
+    "content_type": "disk",
+    "is_tools_sr": false,
+    "physical_usage": 0,
+    "allocationStrategy": "thick",
+    "current_operations": {},
+    "inMaintenanceMode": false,
+    "name_description": "",
+    "name_label": "Removable storage",
+    "size": 0,
+    "shared": false,
+    "SR_type": "udev",
+    "tags": [],
+    "usage": 0,
+    "VDIs": [],
+    "other_config": {
+      "i18n-original-value-name_label": "Removable storage",
+      "i18n-key": "local-hotplug-disk"
+    },
+    "sm_config": {
+      "type": "block"
+    },
+    "$container": "792dad78-f5db-4b35-bf1d-3634774d080a",
+    "$PBDs": [
+      "4b9d7af4-a583-ce5f-7ba5-5d2735333d2e"
+    ],
+    "id": "5bfaba3a-f3fc-362a-3840-987d57ec88b0",
+    "uuid": "5bfaba3a-f3fc-362a-3840-987d57ec88b0",
+    "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "_xapiRef": "OpaqueRef:5aa0da75-46cb-9dd2-5a96-ee2181b04351",
+    "href": "/rest/v0/srs/5bfaba3a-f3fc-362a-3840-987d57ec88b0"
+  },
+  {
+    "type": "SR",
+    "content_type": "iso",
+    "is_tools_sr": false,
+    "physical_usage": 1073741312,
+    "allocationStrategy": "thick",
+    "current_operations": {},
+    "inMaintenanceMode": false,
+    "name_description": "Physical DVD drives",
+    "name_label": "DVD drives",
+    "size": 1073741312,
+    "shared": false,
+    "SR_type": "udev",
+    "tags": [],
+    "usage": 1073741312,
+    "VDIs": [
+      "df4ad766-f2d1-4356-a56e-1395e28e56dd"
+    ],
+    "other_config": {
+      "i18n-original-value-name_description": "Physical DVD drives",
+      "i18n-original-value-name_label": "DVD drives",
+      "i18n-key": "local-hotplug-cd"
+    },
+    "sm_config": {
+      "type": "cd"
+    },
+    "$container": "792dad78-f5db-4b35-bf1d-3634774d080a",
+    "$PBDs": [
+      "b82647db-5e9c-d99c-7858-7599478530e8"
+    ],
+    "id": "017bd796-45a5-5037-d101-39560828d1a2",
+    "uuid": "017bd796-45a5-5037-d101-39560828d1a2",
+    "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "_xapiRef": "OpaqueRef:55d7b129-f51c-c9bc-fb33-858ecc9d076b",
+    "href": "/rest/v0/srs/017bd796-45a5-5037-d101-39560828d1a2"
+  },
+  {
+    "type": "SR",
+    "content_type": "iso",
+    "is_tools_sr": true,
+    "physical_usage": -1,
+    "current_operations": {},
+    "inMaintenanceMode": false,
+    "name_description": "XCP-ng Tools ISOs",
+    "name_label": "XCP-ng Tools",
+    "size": -1,
+    "shared": true,
+    "SR_type": "iso",
+    "tags": [],
+    "usage": 20066304,
+    "VDIs": [
+      "d188890f-8a33-475b-936e-cb6624ae08f3"
+    ],
+    "other_config": {
+      "xensource_internal": "true",
+      "xenserver_tools_sr": "true",
+      "i18n-key": "xenserver-tools",
+      "i18n-original-value-name_label": "XCP-ng Tools",
+      "i18n-original-value-name_description": "XCP-ng Tools ISOs"
+    },
+    "sm_config": {},
+    "$container": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "$PBDs": [
+      "67e24207-335f-e6e9-7f0c-9e073bcd6607"
+    ],
+    "id": "00e2da81-27f4-b7b4-5fa5-672f04f21599",
+    "uuid": "00e2da81-27f4-b7b4-5fa5-672f04f21599",
+    "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "_xapiRef": "OpaqueRef:158a2fd3-edaa-0640-719a-58192b9353f8",
+    "href": "/rest/v0/srs/00e2da81-27f4-b7b4-5fa5-672f04f21599"
+  },
+  {
+    "type": "SR",
+    "content_type": "user",
+    "is_tools_sr": false,
+    "physical_usage": 2129920,
+    "allocationStrategy": "thin",
+    "current_operations": {},
+    "inMaintenanceMode": false,
+    "name_description": "",
+    "name_label": "Local storage",
+    "size": 8861896704,
+    "shared": false,
+    "SR_type": "ext",
+    "tags": [],
+    "usage": 1073741824,
+    "VDIs": [
+      "9d385ea3-ac54-467e-adb6-7d02c403e85a"
+    ],
+    "other_config": {
+      "i18n-original-value-name_label": "Local storage",
+      "i18n-key": "local-storage"
+    },
+    "sm_config": {
+      "devserial": "scsi-1ATA_QEMU_HARDDISK_QM00001"
+    },
+    "$container": "792dad78-f5db-4b35-bf1d-3634774d080a",
+    "$PBDs": [
+      "4414db56-007c-908c-153f-0a3445b580b2"
+    ],
+    "id": "ae4f552c-c4da-9171-23f3-3fd5fbceb65b",
+    "uuid": "ae4f552c-c4da-9171-23f3-3fd5fbceb65b",
+    "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+    "_xapiRef": "OpaqueRef:b31f4bff-7186-e9d8-3e9d-c56250367aed",
+    "href": "/rest/v0/srs/ae4f552c-c4da-9171-23f3-3fd5fbceb65b"
+  }
+]

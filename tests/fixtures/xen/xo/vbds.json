@@ -1,0 +1,19 @@
+[
+ {
+  "type": "VBD",
+  "attached": true,
+  "bootable": true,
+  "device": "xvda",
+  "is_cd_drive": false,
+  "position": "0",
+  "read_only": false,
+  "VDI": "9d385ea3-ac54-467e-adb6-7d02c403e85a",
+  "VM": "b35fce12-befd-a53c-1fd1-55c62eb4abb2",
+  "id": "7d9a6093-c72a-e4bd-5662-67941f27287d",
+  "uuid": "7d9a6093-c72a-e4bd-5662-67941f27287d",
+  "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+  "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+  "_xapiRef": "OpaqueRef:6b5ea6f5-8626-2fbc-42dd-a8e5f06c4c55",
+  "href": "/rest/v0/vbds/7d9a6093-c72a-e4bd-5662-67941f27287d"
+ }
+]

@@ -1,0 +1,104 @@
+[
+  {
+    "data": {
+      "mode": "full",
+      "reportWhen": "failure"
+    },
+    "id": "1793208508655",
+    "jobId": "9b495ffd-ac13-4cd7-911c-9ce78e27ea97",
+    "jobName": "lab-nightly",
+    "message": "backup",
+    "scheduleId": "ddd31420-9b97-423c-abb3-2503ae52aa43",
+    "start": 1793208508655,
+    "status": "failure",
+    "end": 1793208508672,
+    "result": {
+      "message": "Cannot read properties of undefined (reading 'healthCheckSr')",
+      "name": "TypeError",
+      "stack": "TypeError: Cannot read properties of undefined (reading 'healthCheckSr')\n    at executor (file:///etc/xen-orchestra/packages/xo-server/src/xo-mixins/backups-ng/index.mjs:319:41)\n    at file:///etc/xen-orchestra/packages/xo-server/src/xo-mixins/jobs/index.mjs:312:30\n    at Jobs.runJob (file:///etc/xen-orchestra/packages/xo-server/src/xo-mixins/jobs/index.mjs:360:7)\n    at Jobs.runJobSequence (file:///etc/xen-orchestra/packages/xo-server/src/xo-mixins/jobs/index.mjs:412:7)\n    at Task.runInside (/etc/xen-orchestra/@vates/task/index.js:204:22)\n    at Task.run (/etc/xen-orchestra/@vates/task/index.js:188:20)\n    at Api.#callApiMethod (file:///etc/xen-orchestra/packages/xo-server/src/xo-mixins/api.mjs:475:18)"
+    },
+    "href": "/rest/v0/backup-logs/1793208508655"
+  },
+  {
+    "data": {
+      "mode": "full",
+      "reportWhen": "failure"
+    },
+    "id": "1793208539648",
+    "jobId": "9b495ffd-ac13-4cd7-911c-9ce78e27ea97",
+    "jobName": "lab-nightly",
+    "message": "backup",
+    "scheduleId": "ddd31420-9b97-423c-abb3-2503ae52aa43",
+    "start": 1793208539648,
+    "status": "success",
+    "tasks": [
+      {
+        "id": "0mvse2eu5-lapdao7er4",
+        "start": 1793208542621,
+        "status": "success",
+        "tasks": [
+          {
+            "id": "0mvse2f0w-9jwp57ah2zg",
+            "start": 1793208542864,
+            "status": "success",
+            "tasks": [
+              {
+                "id": "0mvse2f15-aeatzyltlah",
+                "start": 1793208542874,
+                "status": "success",
+                "end": 1793208545324,
+                "result": {
+                  "size": 2119168
+                },
+                "message": "transfer",
+                "data": {
+                  "progress": 0
+                }
+              }
+            ],
+            "end": 1793208545328,
+            "message": "export",
+            "data": {
+              "id": "8f461b19-7e34-4544-965c-73f0c96001c3",
+              "type": "remote",
+              "isFull": true
+            }
+          },
+          {
+            "id": "0mvse2h2w-odgdlolzok",
+            "start": 1793208545528,
+            "status": "success",
+            "end": 1793208545537,
+            "result": {
+              "removedFiles": [],
+              "changedFiles": [],
+              "merge": false,
+              "size": 0
+            },
+            "message": "clean-vm"
+          }
+        ],
+        "end": 1793208545537,
+        "message": "backup VM",
+        "data": {
+          "id": "b35fce12-befd-a53c-1fd1-55c62eb4abb2",
+          "type": "VM",
+          "name_label": "lab-vm2",
+          "progress": 0
+        }
+      }
+    ],
+    "end": 1793208545539,
+    "infos": [
+      {
+        "data": {
+          "vms": [
+            "b35fce12-befd-a53c-1fd1-55c62eb4abb2"
+          ]
+        },
+        "message": "vms"
+      }
+    ],
+    "href": "/rest/v0/backup-logs/1793208539648"
+  }
+]

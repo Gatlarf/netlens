@@ -1,0 +1,12 @@
+[
+  {
+    "enabled": true,
+    "name": "lab-local",
+    "size": 126226378752,
+    "used": 79752990720,
+    "available": 40492515328,
+    "id": "8f461b19-7e34-4544-965c-73f0c96001c3",
+    "url": "file:///storage/backups",
+    "href": "/rest/v0/backup-repositories/8f461b19-7e34-4544-965c-73f0c96001c3"
+  }
+]

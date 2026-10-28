@@ -1,0 +1,23 @@
+[
+  {
+    "name": "lab-nightly",
+    "mode": "full",
+    "remotes": {
+      "id": "8f461b19-7e34-4544-965c-73f0c96001c3"
+    },
+    "vms": {
+      "id": "b35fce12-befd-a53c-1fd1-55c62eb4abb2"
+    },
+    "settings": {
+      "": {
+        "reportWhen": "failure"
+      },
+      "ddd31420-9b97-423c-abb3-2503ae52aa43": {
+        "exportRetention": 3
+      }
+    },
+    "type": "backup",
+    "id": "9b495ffd-ac13-4cd7-911c-9ce78e27ea97",
+    "href": "/rest/v0/backup-jobs/9b495ffd-ac13-4cd7-911c-9ce78e27ea97"
+  }
+]

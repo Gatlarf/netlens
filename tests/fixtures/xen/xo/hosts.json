@@ -1,0 +1,98 @@
+[
+ {
+  "CPUs": {
+   "cpu_count": "4",
+   "socket_count": "1",
+   "threads_per_core": "1",
+   "nr_nodes": "1",
+   "vendor": "GenuineIntel",
+   "speed": "2496.092",
+   "modelname": "12th Gen Intel(R) Core(TM) i7-1260P",
+   "family": "6",
+   "model": "154",
+   "stepping": "3",
+   "flags": "fpu de tsc msr pae mce cx8 apic sep mca cmov pat clflush mmx fxsr sse sse2 ss ht syscall nx rdtscp lm constant_tsc rep_good nopl cpuid pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced fsgsbase bmi1 avx2 bmi2 erms rdseed adx clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 gfni vaes vpclmulqdq rdpid arch_capabilities",
+   "features_pv": "1f89cbf5-f6f83203-2991cbf5-00000123-00000007-218c0329-18400700-00000000-00001000-ac004410-00000810-00000000-00000000-00000001-00000000-00000000-140ae067-00000000-00000000-00000000-00000000-00000000-00000000",
+   "features_hvm": "1f8bfbff-f7fa3223-2d93fbff-00000523-0000000f-219c07ab-1840070c-00000000-0310d000-bc004410-00000810-00000000-00000000-00000017-00000000-00000000-140ae067-00000000-00000000-00000000-00000000-00000000-00000000",
+   "features_hvm_host": "1f8bfbff-f7fa3203-2c100800-00000121-0000000f-219c07ab-0040070c-00000000-0110d000-bc004410-00000810-00000000-00000000-00000017-00000000-00000000-1408e063-00000000-00000000-00000000-00000000-00000000-00000000",
+   "features_pv_host": "1f89cbf5-f6d83203-28100800-00000121-00000007-218c0329-00400700-00000000-00001000-ac004410-00000810-00000000-00000000-00000001-00000000-00000000-1408e063-00000000-00000000-00000000-00000000-00000000-00000000"
+  },
+  "address": "10.0.2.15",
+  "build": "cloud",
+  "enabled": true,
+  "controlDomain": "ad3b595f-929e-4456-83f4-0376ad4769ca",
+  "cpus": {
+   "cores": 4,
+   "sockets": 1
+  },
+  "current_operations": {},
+  "hostname": "xcp-lab",
+  "iscsiIqn": "iqn.2026-10.com.example:e4c5032b",
+  "zstdSupported": true,
+  "license_server": {
+   "address": "localhost",
+   "port": "27000"
+  },
+  "license_expiry": null,
+  "logging": {},
+  "name_description": "Default install",
+  "name_label": "xcp-lab",
+  "memory": {
+   "usage": 2005991424,
+   "size": 6442450944
+  },
+  "multipathing": false,
+  "powerOnMode": "",
+  "power_state": "Running",
+  "residentVms": [
+   "d2377fad-e72f-a3bc-2e00-dc4823a80efd",
+   "ad3b595f-929e-4456-83f4-0376ad4769ca"
+  ],
+  "startTime": 1793207702,
+  "agentStartTime": 1793207844,
+  "rebootRequired": false,
+  "tags": [],
+  "version": "8.3.0",
+  "productBrand": "XCP-ng",
+  "hvmCapable": true,
+  "PIFs": [
+   "aa1ae5d3-26bd-0387-c702-7d6b20613e94"
+  ],
+  "$PIFs": [
+   "aa1ae5d3-26bd-0387-c702-7d6b20613e94"
+  ],
+  "PCIs": [
+   "6500cf0c-2bce-849b-ee08-49f52287e8c4",
+   "ff37b1e3-2171-c6c7-9906-b834910619b1",
+   "42823e87-0ece-6551-26fa-da3696b25715",
+   "f0bd3874-6927-388e-758f-14e434914a0d",
+   "0aa85ca4-a3b2-9fd8-53c6-675d549d4235"
+  ],
+  "$PCIs": [
+   "6500cf0c-2bce-849b-ee08-49f52287e8c4",
+   "ff37b1e3-2171-c6c7-9906-b834910619b1",
+   "42823e87-0ece-6551-26fa-da3696b25715",
+   "f0bd3874-6927-388e-758f-14e434914a0d",
+   "0aa85ca4-a3b2-9fd8-53c6-675d549d4235"
+  ],
+  "PGPUs": [
+   "a62c8eab-1514-c677-3cfa-6fe4378123b2"
+  ],
+  "$PGPUs": [
+   "a62c8eab-1514-c677-3cfa-6fe4378123b2"
+  ],
+  "$PBDs": [
+   "b82647db-5e9c-d99c-7858-7599478530e8",
+   "4b9d7af4-a583-ce5f-7ba5-5d2735333d2e",
+   "4414db56-007c-908c-153f-0a3445b580b2",
+   "67e24207-335f-e6e9-7f0c-9e073bcd6607"
+  ],
+  "id": "792dad78-f5db-4b35-bf1d-3634774d080a",
+  "type": "host",
+  "uuid": "792dad78-f5db-4b35-bf1d-3634774d080a",
+  "$pool": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+  "$poolId": "93a1fe1a-9d5a-c8e5-a081-925221e035ae",
+  "_xapiRef": "OpaqueRef:e2212734-d67a-bfcb-ad42-dc7e2d8d8038",
+  "href": "/rest/v0/hosts/792dad78-f5db-4b35-bf1d-3634774d080a"
+ }
+]

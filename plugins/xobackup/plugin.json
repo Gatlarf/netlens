@@ -1,0 +1,39 @@
+{
+  "id": "xobackup",
+  "name": "Xen Orchestra backup",
+  "version": "1.0.0",
+  "api_version": 1,
+  "kind": "backup",
+  "author": "Netlens",
+  "description": "Shows what Xen Orchestra (Vates VMS) backs up: for every virtual machine the newest backup, its age, the copies kept and whether the last run worked, plus the free space of the backup repositories and the failed runs of the last week. Netlens ties each backup to its VM by the UUID the XCP-ng / XenServer plugin uses, warns when a backup fails or is late, and lists VMs that have no backup. Read-only (GET).",
+  "timeout": 180,
+  "diagnose": true,
+  "info": {
+    "title": "A read-only login for Netlens",
+    "text": "In Xen Orchestra open Settings > Users and make a user for Netlens (for example netlens), then Settings > ACLs or Roles and give it only the right to read the backup jobs, repositories and logs. An admin account also works but can do far more than Netlens needs. Or create an authentication token for that user (xo-cli create-token) and paste it instead of the password. For a self-signed certificate fill in its fingerprint (the browser shows it under the certificate details): Netlens then trusts exactly that certificate."
+  },
+  "config": [
+    {
+      "key": "servers",
+      "type": "servers",
+      "label": "Xen Orchestra",
+      "required": true,
+      "help": "One line per Xen Orchestra. A pool master (no Xen Orchestra) has no backups to read.",
+      "columns": [
+        {"key": "host", "label": "Address", "placeholder": "https://xo.example.com", "required": true},
+        {"key": "token", "label": "Authentication token", "type": "password", "optional": true},
+        {"key": "username", "label": "Username", "placeholder": "netlens", "optional": true},
+        {"key": "password", "label": "Password", "type": "password", "optional": true},
+        {"key": "fingerprint", "label": "Certificate fingerprint", "placeholder": "B7:5B:65:5B:...", "optional": true,
+         "help": "SHA-256 fingerprint of the server's certificate. When filled in, exactly that certificate is trusted (also a self-signed one)."}
+      ]
+    },
+    {
+      "key": "verify_tls",
+      "type": "bool",
+      "label": "Verify TLS certificate",
+      "default": true,
+      "help": "Turn off only for a self-signed certificate when you do not want to use the fingerprint."
+    }
+  ]
+}

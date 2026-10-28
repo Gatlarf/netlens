@@ -1,0 +1,28 @@
+{
+ "jsonrpc": "2.0",
+ "result": {
+  "OpaqueRef:2628ef05-ce49-c73e-cb95-2ecc1ebad991": {
+   "uuid": "0cd78bc8-64a6-e01c-a03e-e6582b5ae329",
+   "os_version": {},
+   "netbios_name": {},
+   "PV_drivers_version": {},
+   "PV_drivers_up_to_date": false,
+   "memory": {},
+   "disks": {},
+   "networks": {},
+   "other": {
+    "platform-feature-xs_reset_watches": "1",
+    "platform-feature-multiprocessor-suspend": "1",
+    "has-vendor-device": "0"
+   },
+   "last_updated": "20261028T17:23:39Z",
+   "other_config": {},
+   "live": true,
+   "can_use_hotplug_vbd": "unspecified",
+   "can_use_hotplug_vif": "unspecified",
+   "PV_drivers_detected": false,
+   "services": {}
+  }
+ },
+ "id": 1
+}
