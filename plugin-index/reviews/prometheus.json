@@ -1,0 +1,16 @@
+{
+  "id": "prometheus",
+  "reviews": [
+    {
+      "version": "1.0.0",
+      "sha256": "6d94daa7fc52f5415b64ffe1c723089e95c8996df65f3f1c6bdcc060e081ff48",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-28",
+      "tested_on": [
+        "Prometheus 3.15.1 scraping a real node_exporter on Debian 13, read through a running Netlens (plugin test, enable, sync with history, readings on the device, the diagnostic with no names or addresses), HTTPS certificate pinning against a local server, bearer and basic login, the job filter with hostile input"
+      ],
+      "notes": "Written and lab-tested on 2026-10-28 with the assistant Claude. Verified for the Linux path (node_exporter) against a real Prometheus. Not tested: windows_exporter (its answers in the tests follow its documentation; metric names changed between versions, the uptime query tries both), VictoriaMetrics, Mimir, Thanos, a store behind a reverse proxy with a path prefix, an authenticated store. Plain http is refused unless switched on."
+    }
+  ]
+}

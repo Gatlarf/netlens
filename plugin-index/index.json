@@ -2069,6 +2069,41 @@
    ]
   },
   {
+   "id": "prometheus",
+   "name": "Prometheus (host metrics)",
+   "kind": "metrics",
+   "description": "Reads the processor, memory, swap, disks, network traffic, load and uptime of hosts from a Prometheus, VictoriaMetrics, Mimir or Thanos that already scrapes them (node_exporter for Linux, BSD and macOS; windows_exporter for Windows), so a host that cannot be probed needs no second agent. The store's own history fills the graphs. Read-only: only GET requests to /api/v1; nothing is sent to the hosts.",
+   "author": "Netlens",
+   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/prometheus",
+   "license": "PolyForm-Noncommercial-1.0.0",
+   "supports": [
+    "Prometheus 3.15 with node_exporter (tested)",
+    "windows_exporter (answers written from its documentation; not tested)",
+    "VictoriaMetrics, Mimir, Thanos Query (same API; not tested)"
+   ],
+   "category": "monitoring",
+   "releases": [
+    {
+     "version": "1.0.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-prometheus-v1.0.0/prometheus.zip",
+     "sha256": "6d94daa7fc52f5415b64ffe1c723089e95c8996df65f3f1c6bdcc060e081ff48",
+     "api_version": 1,
+     "min_netlens": "0.4.304",
+     "released": "2026-10-28",
+     "changelog": "First release. Needs Netlens 0.4.304 or newer (plugin kind metrics).",
+     "review": {
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-10-28",
+      "tested_on": [
+       "Prometheus 3.15.1 scraping a real node_exporter on Debian 13, read through a running Netlens (plugin test, enable, sync with history, readings on the device, the diagnostic with no names or addresses), HTTPS certificate pinning against a local server, bearer and basic login, the job filter with hostile input"
+      ],
+      "notes": "Written and lab-tested on 2026-10-28 with the assistant Claude. Verified for the Linux path (node_exporter) against a real Prometheus. Not tested: windows_exporter (its answers in the tests follow its documentation; metric names changed between versions, the uptime query tries both), VictoriaMetrics, Mimir, Thanos, a store behind a reverse proxy with a path prefix, an authenticated store. Plain http is refused unless switched on."
+     }
+    }
+   ]
+  },
+  {
    "id": "proxmox",
    "name": "Proxmox VE",
    "kind": "hypervisor",
