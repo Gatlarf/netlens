@@ -107,15 +107,15 @@ export async function buildCredentialsCard() {
     card.appendChild(h("p", { class: "hint" }, "The logins Netlens uses to reach your hosts: remote desktop, SSH, health monitoring and host probes. Each is stored once, encrypted, and picked by name wherever it is needed. " +
       "A password or key can be replaced but is never shown again. Every use is in the audit log."));
     const rows = data.credentials.map((c) => h("tr", {},
-      h("td", {}, c.name), h("td", {}, c.kind === "pam" ? h("span", {}, `PAM · ${c.pam.provider_name}`, h("br"), h("span", { class: "hint mono" }, c.pam.where)) : c.kind === "ssh_key" ? "SSH key" : "Password"), h("td", {}, c.username || "–"),
+      h("td", {}, c.name), h("td", {}, c.kind === "pam" ? h("span", {}, `PAM · ${c.pam.provider_name.split(" (")[0]}`, h("br"), h("span", { class: "hint mono" }, c.pam.where)) : c.kind === "ssh_key" ? "SSH key" : "Password"), h("td", {}, c.username || "–"),
       h("td", {}, c.shared ? (c.mine ? "shared by you" : `shared by ${c.owner}`) : "only you"),
       h("td", { class: "hint" }, c.last_used ? `${c.used_for || "used"} · ${timeAgo(c.last_used)}` : "not used yet", c.pam && c.pam.last ? h("div", { class: c.pam.last.ok ? "hint" : "error" }, c.pam.last.ok ? "PAM: last check-out worked" : `PAM: ${c.pam.last.message}`) : null),
-      h("td", {}, c.kind === "pam" ? h("span", {}, h("button", { class: "btn", type: "button", onclick: () => tryPam(c) }, "Try it"), " ") : null,
-        h("button", { class: "btn", type: "button", onclick: () => { editing = c.id; draw(); } }, "Change"), " ",
+      h("td", {}, h("div", { class: "row-actions" }, c.kind === "pam" ? h("button", { class: "btn", type: "button", onclick: () => tryPam(c) }, "Try it") : null,
+        h("button", { class: "btn", type: "button", onclick: () => { editing = c.id; draw(); } }, "Change"),
         h("button", { class: "btn danger", type: "button", onclick: async () => {
           if (!window.confirm(`Delete “${c.name}”? Whatever uses it asks for a login again.`)) return;
           try { await del(`/api/credentials/${c.id}`); data = await get("/api/credentials"); draw(); } catch (err) { toast(err.message || "Could not delete", "error"); }
-        } }, "Delete"))));
+        } }, "Delete")))));
     card.appendChild(rows.length
       ? h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("thead", {}, h("tr", {}, ["Name", "Kind", "User", "Who can use it", "Last used", ""].map((t) => h("th", {}, t)))), h("tbody", {}, rows)))
       : h("p", { class: "hint" }, "No logins stored yet."));
