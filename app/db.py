@@ -534,6 +534,9 @@ def init_db(conn: sqlite3.Connection) -> None:
     # --- networks: the scanned ranges and whether they keep answering (app/networks.py) -----------------------------------------------------------
     conn.execute("CREATE TABLE IF NOT EXISTS networks (id INTEGER PRIMARY KEY, cidr TEXT NOT NULL UNIQUE, name TEXT, active INTEGER NOT NULL DEFAULT 1, status TEXT, quiet_since TEXT, "
                  "first_seen TEXT NOT NULL, last_scan TEXT, last_hosts INTEGER, baseline REAL, low_scans INTEGER NOT NULL DEFAULT 0)")
+    _add_column_if_missing(conn, "networks", "source", "TEXT NOT NULL DEFAULT 'manual'")      # detected (a network card of this host), manual (added by you) or env (NETLENS_RANGES)
+    _add_column_if_missing(conn, "networks", "scan", "INTEGER NOT NULL DEFAULT 1")             # the owner's switch: scan this network or not
+    _add_column_if_missing(conn, "networks", "present", "INTEGER NOT NULL DEFAULT 0")          # a detected network: its interface exists now
     # --- link groups: the switch ports of a host's bond (app/linkgroups.py) ---------------------------------------------------------------------
     conn.execute("CREATE TABLE IF NOT EXISTS link_groups (id INTEGER PRIMARY KEY, name TEXT NOT NULL, host_device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE, "
                  "switch_device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE, ports TEXT NOT NULL, status TEXT, status_since TEXT, created TEXT NOT NULL)")

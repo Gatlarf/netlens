@@ -239,7 +239,11 @@ tool("set_site_config", "sites_edit", "Change the checks and monitors the centra
 
 # settings
 tool("set_scan_intervals", "settings", "Set how often Netlens does a quick and a deep scan (seconds).", "PUT", "/api/config/general", {"quick_interval": i("Seconds between quick scans"), "deep_interval": i("Seconds between deep scans")})
-tool("set_scan_ranges", "settings", "Set the networks that are scanned, for example 192.168.1.0/24. Use only networks the person named.", "PUT", "/api/config/ranges", {"ranges": a("Networks in CIDR notation", s("cidr"))}, ("ranges",))
+tool("add_network", "settings", "Add a network to scan (it is scanned from the next scan on), for example 10.0.20.0/24 for a VLAN. Private IPv4 only, /20 or smaller. Use only networks the person named.", "POST", "/api/networks",
+     {"cidr": s("The range, for example 10.0.20.0/24"), "name": s("A name for it (optional)")}, ("cidr",))
+tool("update_network", "settings", "Name a network or switch scanning on or off for it. Ids come from get_networks.", "PATCH", "/api/networks/{network_id}",
+     {"network_id": i("The network's id"), "name": s("The new name (empty removes it)"), "scan": b("true to scan this network, false to stop scanning it")}, ("network_id",))
+tool("set_scan_ranges", "settings", "Older way: exactly these networks are scanned and every other one is switched off (they are added to the list of networks). Prefer add_network and update_network. Use only networks the person named.", "PUT", "/api/config/ranges", {"ranges": a("Networks in CIDR notation", s("cidr"))}, ("ranges",))
 tool("set_data_retention", "settings", "Set how many days events, scans, check results and the audit log are kept.", "PUT", "/api/database/retention",
      {"events_days": i("Events"), "scans_days": i("Scans"), "checks_days": i("Health checks"), "service_results_days": i("Service check results"), "audit_days": i("Audit log")})
 tool("run_database_maintenance", "settings", "Run a database task: optimize, reindex, integrity, tidy, compact, or purge/orphans (these two only report what they would remove unless dry_run is false).", "POST", "/api/database/{task}",

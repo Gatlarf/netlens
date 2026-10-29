@@ -144,14 +144,14 @@ async def test_settings_ranges_used_when_set(db_path: Path, fake_runner: tuple[d
     async def ranges() -> list[str]:
         nonlocal ranges_called
         ranges_called = True
-        return ["192.168.1.0/24"]
+        return ["10.9.0.0/24"]                 # a network card of this host
 
     manager = ScanManager(db_path, settings, runner=runner, names_provider=fake_names, ranges_provider=ranges)
     await manager.start("quick")
     await manager.wait()
-    assert not ranges_called
+    assert ranges_called                        # the card is looked at (it is listed under Settings > Networks) ...
     assert len(calls) == 1
-    assert calls[0][1] == ["192.168.1.0/24"]
+    assert calls[0][1] == ["192.168.1.0/24"]    # ... but ranges that were given are the only ones scanned until the card's network is ticked
 
 
 @pytest.mark.asyncio

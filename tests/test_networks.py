@@ -79,13 +79,18 @@ def test_a_small_or_new_range_has_nothing_to_lose(db):
         assert networks.record_scan(db, ["10.9.9.0/24"], [], now=at(i)) == []
 
 
-def test_single_addresses_are_not_networks_and_removed_ranges_leave_the_list(db):
+def test_single_addresses_are_not_networks_and_a_network_can_be_switched_off(db):
     scan(db, 0)
-    assert {n["cidr"] for n in networks.listing(db)} == {LAN, IOT}
-    networks.record_scan(db, [LAN], ips("192.168.1", 10), now=at(1))               # the IoT range is no longer scanned
-    assert {n["cidr"] for n in networks.listing(db)} == {LAN}
+    rows = {n["cidr"]: n for n in networks.listing(db)}
+    assert set(rows) == {LAN, IOT} and all(r["scan"] for r in rows.values())        # the single address is not tracked as a network
+    networks.set_scan(db, rows[IOT]["id"], False)
+    assert networks.scan_targets(db) == [LAN]
+    assert {n["cidr"]: n for n in networks.listing(db)}[IOT]["status"] == "off"      # still listed, with its devices and its history
+    networks.record_scan(db, [LAN], ips("192.168.1", 10), now=at(1))                 # a scan without it says nothing about it
+    assert kinds(db) == []
+    networks.set_scan(db, rows[IOT]["id"], True)
     scan(db, 2)
-    assert {n["cidr"] for n in networks.listing(db)} == {LAN, IOT}                 # and it comes back with its history
+    assert {n["cidr"]: n for n in networks.listing(db)}[IOT]["status"] == "ok"
 
 
 def test_most_specific_range_wins_and_devices_are_counted_per_network(db):
@@ -114,7 +119,12 @@ def test_api_and_summary(tmp_path):
     scan(conn, 6, iot=0)
     assert networks.summary(conn) == {"tracked": 2, "quiet": 1, "quiet_names": [IOT]}
     conn.close()
-    with TestClient(create_app(load_settings({"NETLENS_TOKEN": "t"}), db_path=path), headers={"Authorization": "Bearer t"}) as client:
+    app = create_app(load_settings({"NETLENS_TOKEN": "t"}), db_path=path)
+
+    async def no_cards():
+        return []
+    app.state.scan_manager.ranges_provider = no_cards
+    with TestClient(app, headers={"Authorization": "Bearer t"}) as client:
         rows = client.get("/api/networks").json()["networks"]
         assert [r["status"] for r in rows] == ["quiet", "ok"]            # in order of address
         nid = rows[0]["id"]

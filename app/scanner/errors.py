@@ -19,8 +19,8 @@ _RULES: list[tuple[tuple[str, ...], str]] = [
     ),
     (
         ("no scan ranges",),
-        "There is nothing to scan: no scan ranges are set and none could be detected. "
-        "Set a range under Settings → Scan ranges (or NETLENS_RANGES), and make sure the container uses host networking.",
+        "There is nothing to scan: no network is ticked for scanning and none could be detected. "
+        "Tick or add a network under Settings → Networks (or set NETLENS_RANGES), and make sure the container uses host networking.",
     ),
     (
         ("no targets were specified", "failed to resolve"),

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.327 — 2026-10-29
+
+### Changed
+- ★ **Networks are the list of what is scanned; "Scan ranges" is gone.** *Settings → Networks* has a **Scan** switch per network. The networks on this host's own network cards appear by themselves and are scanned; add a VLAN or a routed network (or a network behind a VPN) with *Add a network*; untick one to leave it out (its devices and history stay). A network you added can be removed, a detected one only switched off, and `NETLENS_RANGES` puts its ranges in the list at start. The setup guide's network step uses the same list (tick the networks, add another). An installation that had its own ranges keeps scanning exactly those, the networks of its cards are listed but not ticked, so nothing changes until you decide. The web terminal is limited to the scanned networks. For scripts, `PUT /api/config/ranges` still works (exactly those networks are scanned); `/api/networks` and the MCP tools `add_network` and `update_network` are the new way.
+
 ## 0.4.326 — 2026-10-29
 
 ### Added

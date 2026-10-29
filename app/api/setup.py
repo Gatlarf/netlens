@@ -13,7 +13,8 @@ from pydantic import BaseModel
 from app import users
 from app.api.auth import _session_cookie
 from app.api.wizard import write_state
-from app.api.config import RANGES_KEY, apply_overrides, normalize_ranges
+from app import networks
+from app.api.config import apply_overrides, normalize_ranges
 from app.db import connect, set_setting
 from app.scanner.orchestrator import ScanBusy
 
@@ -61,7 +62,7 @@ async def do_setup(request: Request, body: SetupBody) -> JSONResponse:
         if users.create_first_admin(conn, username, password) is None:
             raise HTTPException(status_code=409, detail="setup is already done")
         if ranges:
-            set_setting(conn, RANGES_KEY, json.dumps(ranges))
+            networks.set_exact(conn, ranges)
         write_state(conn, "pending")      # a fresh install is sent into the getting-started wizard
         cookie = users.login(conn, username, password)
     finally:

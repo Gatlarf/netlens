@@ -55,6 +55,7 @@ class ScanManager:
         self.plugin_runner = None  # tests replace the subprocess runner of the plugins
         self.after_scan = [self._plugins_after_scan, self._ipv6_after_scan, self._stats_after_scan, self._netchecks_after_scan, process_channels] if after_scan is None else list(after_scan)
         self.db_path = db_path
+        self.ranges_changed = None          # f(targets): told what is scanned, so the rest of the program (terminal limits, the documentation) uses the same list
         self.settings = settings
         self.runner = runner
         self.names_provider = names_provider
@@ -230,6 +231,25 @@ class ScanManager:
         finally:
             conn.close()
 
+    async def _scan_targets(self) -> list[str]:
+        """The networks that are ticked for scanning (Settings -> Networks): the ones found on this host's network cards appear by themselves."""
+        try:
+            detected = await self.ranges_provider()
+        except Exception:  # noqa: BLE001 - detection only suggests
+            detected = []
+        conn = connect(self.db_path)
+        try:
+            network_ranges.absorb_legacy(conn, self.settings.ranges)         # ranges given to the scanner directly are networks as well (and then the only ones)
+            network_ranges.refresh_detected(conn, detected)
+            targets = network_ranges.scan_targets(conn)
+        finally:
+            conn.close()
+        if not targets:
+            raise ScanError("no scan ranges found: tick a network under Settings > Networks (or add one)")
+        if self.ranges_changed is not None:
+            self.ranges_changed(targets)
+        return targets
+
     async def _run(self, kind: str, scan_id: int, target: str | None = None) -> None:
         conn: sqlite3.Connection | None = None
         self.progress = {"scan_id": scan_id, "kind": kind, "target": target, "phase": "preparing", "task": None, "percent": None, "hosts_found": 0}
@@ -237,11 +257,7 @@ class ScanManager:
             if kind == "full":
                 targets = [target]
             else:
-                targets = list(self.settings.ranges)
-                if not targets:
-                    targets = await self.ranges_provider()
-                if not targets:
-                    raise ScanError("no scan ranges found")
+                targets = await self._scan_targets()
 
             self._set_progress(phase="scanning", targets=targets)
             kwargs: dict[str, Any] = {"nmap_path": self.nmap_path}

@@ -1,5 +1,5 @@
 import { buildMaintenanceCard } from "../cards/maintenance.js";
-import { get, patch, post, put } from "../api.js";
+import { del, get, patch, post, put } from "../api.js";
 import { groupButtons } from "../ui.js";
 import { h, clear, toast, isAdmin, can, fmtTime } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
@@ -62,130 +62,98 @@ function downloadLink(href, label) {
   return a;
 }
 
-const SOURCE_TEXT = {
-  ui: "set on this page",
-  env: "from the NETLENS_RANGES environment variable",
-  auto: "auto-detected from this host's network interfaces",
+const NETWORK_STATUS = {
+  ok: ["answering", ""],
+  quiet: ["QUIET", "bad"],
+  empty: ["no hosts found yet", "muted"],
+  off: ["not scanned", "muted"],
+  single: ["a single address", "muted"],
 };
+const SOURCE_TEXT = { detected: "found on a network card of this host", manual: "added by you", env: "set by NETLENS_RANGES" };
 
-function fillRangesCard(card, cfg) {
-  clear(card);
-  card.appendChild(h("h2", {}, "Scan ranges"));
-
-  const current = cfg.ranges && cfg.ranges.length > 0
-    ? cfg.ranges.join(", ")
-    : (cfg.detected_ranges && cfg.detected_ranges.length > 0
-      ? cfg.detected_ranges.join(", ")
-      : "none found");
-  card.appendChild(kvRow("Scanning", current));
-  card.appendChild(kvRow("Source", SOURCE_TEXT[cfg.ranges_source] || ""));
-  if (cfg.ranges_source !== "auto" && cfg.detected_ranges && cfg.detected_ranges.length > 0) {
-    card.appendChild(kvRow("Detected on this host", cfg.detected_ranges.join(", ")));
-  }
-
-  const form = h("form", { class: "edit-form" });
-  const field = h("div", { class: "field" });
-  field.appendChild(h("label", {}, "Ranges to scan"));
-  const input = h("input", {
-    type: "text",
-    name: "ranges",
-    placeholder: "e.g. 192.168.1.0/24, 10.0.0.0/22",
-    value: cfg.ranges_source === "ui" ? cfg.ranges.join(", ") : "",
-  });
-  field.appendChild(input);
-  field.appendChild(h("p", { class: "hint" },
-    "Separate several ranges with commas. Private IPv4 only (10.x, 172.16-31.x, 192.168.x), " +
-    "each /20 or smaller. Applies from the next scan. It also limits which devices the web " +
-    "terminal may connect to. Leave empty and save, or use Reset, to go back to the default."));
-  form.appendChild(field);
-
-  const errorEl = h("p", { class: "error" }, "");
-  form.appendChild(errorEl);
-
-  const saveBtn = h("button", { type: "submit", class: "btn" }, "Save");
-  const resetBtn = h("button", { type: "button", class: "btn" }, "Reset to default");
-  form.appendChild(saveBtn);
-  form.appendChild(resetBtn);
-
-  async function submit(ranges, doneMessage) {
-    errorEl.textContent = "";
-    saveBtn.disabled = true;
-    resetBtn.disabled = true;
-    try {
-      const updated = await put("/api/config/ranges", { ranges });
-      toast(doneMessage, "success");
-      fillRangesCard(card, updated);
-    } catch (err) {
-      errorEl.textContent = err.message || "Failed to save";
-      saveBtn.disabled = false;
-      resetBtn.disabled = false;
-    }
-  }
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const ranges = input.value.split(/[\s,;]+/).filter(Boolean);
-    submit(ranges, ranges.length > 0 ? "Scan ranges saved" : "Scan ranges reset");
-  });
-  resetBtn.addEventListener("click", () => submit([], "Scan ranges reset"));
-
-  card.appendChild(form);
-}
-
-export async function buildRangesCard() {
-  const card = h("div", { class: "card" });
-  fillRangesCard(card, await get("/api/config"));
-  return card;
-}
-
-const NETWORK_STATUS = { ok: ["answering", ""], quiet: ["QUIET", "bad"], empty: ["no hosts found yet", "muted"] };
-
-// "Networks": every scanned range with its name, whether it keeps answering, and what is in it
+// "Networks": every range Netlens can scan, with a switch to scan it or not, a name, whether it keeps answering, and what is in it
 export async function buildNetworksCard() {
-  const card = h("div", { class: "card" });
+  const card = h("div", { class: "card networks-card" });
   async function draw(data) {
     clear(card);
     card.appendChild(h("h2", {}, "Networks"));
     card.appendChild(h("p", { class: "hint" },
-      "Every range above is a network. Give it a name (for example the VLAN it is) and Netlens shows what lives in it. When a range that had hosts stops answering for two scans in a row " +
-      "(a route, a firewall rule or a VPN that went down) Netlens warns you; the devices in it would otherwise just go offline one by one."));
+      "These are the networks Netlens scans. Tick Scan to include one. The networks found on this host's network cards appear by themselves; add the others (a VLAN, a network behind a router or a VPN) below. " +
+      "Private IPv4 ranges only, each /20 or smaller. Scanning a routed network needs a route to it (and no firewall rule in the way). It applies from the next scan. The web terminal may only connect to devices inside the scanned networks. " +
+      "When a network that had hosts stops answering for two scans in a row (a route, a firewall rule or a VPN that went down) Netlens warns you; the devices in it would otherwise just go offline one by one."));
     if (!data.networks.length) {
-      card.appendChild(h("p", {}, "The networks appear here after the first scan."));
-      return;
+      card.appendChild(h("p", {}, "No network was found yet. Add one below, for example 192.168.1.0/24."));
     }
-    const table = h("table", { class: "table" });
-    table.appendChild(h("thead", {}, h("tr", {}, ...["Name", "Range", "State", "Devices", "Hosts in the last scan", "Without MAC"].map((t) => h("th", {}, t)))));
-    const body = h("tbody", {});
     const names = [];
-    for (const n of data.networks) {
-      const [text, tone] = NETWORK_STATUS[n.status] || [n.status, ""];
-      const input = h("input", { type: "text", value: n.name, placeholder: n.cidr, maxlength: "60", "aria-label": `Name of ${n.cidr}`, disabled: !isAdmin() });
-      names.push([n, input]);
-      body.appendChild(h("tr", {},
-        h("td", {}, input), h("td", { class: "mono" }, n.cidr),
-        h("td", { class: tone }, text, n.status === "quiet" && n.since ? h("span", { class: "hint" }, ` since ${fmtTime(n.since)}`) : null),
-        h("td", {}, `${n.devices} (${n.online} online)`),
-        h("td", {}, n.last_hosts == null ? "–" : n.usual_hosts ? `${n.last_hosts} (usually ${n.usual_hosts})` : String(n.last_hosts)),
-        h("td", { title: n.no_mac ? "Devices behind a router have no visible MAC address. A health monitor (SNMP) on the router or layer-3 switch can learn them from its ARP table." : "" }, String(n.no_mac))));
-    }
-    table.appendChild(body);
-    card.appendChild(h("div", { class: "table-wrap" }, table));
-    const save = h("button", { type: "button", class: "btn admin-only" }, "Save names");
-    save.addEventListener("click", async () => {
-      save.disabled = true;
-      try {
-        let latest = data;
-        for (const [n, input] of names) {
-          if (input.value.trim() !== n.name) latest = await patch(`/api/networks/${n.id}`, { name: input.value });
+    if (data.networks.length) {
+      const table = h("table", { class: "table" });
+      table.appendChild(h("thead", {}, h("tr", {}, ...["Scan", "Name", "Range", "State", "Devices", "Hosts in the last scan", "Without MAC", ""].map((t) => h("th", {}, t)))));
+      const body = h("tbody", {});
+      for (const n of data.networks) {
+        const [text, tone] = NETWORK_STATUS[n.status] || [n.status, ""];
+        const scan = h("input", { type: "checkbox", "aria-label": `Scan ${n.cidr}`, disabled: !isAdmin() });
+        scan.checked = n.scan;
+        const input = h("input", { type: "text", value: n.name, placeholder: n.cidr, maxlength: "60", "aria-label": `Name of ${n.cidr}`, disabled: !isAdmin() });
+        names.push([n, input, scan]);
+        let remove = null;
+        if (n.source === "manual") {
+          remove = h("button", { type: "button", class: "btn danger admin-only" }, "Remove");
+          remove.addEventListener("click", async () => {
+            try {
+              await draw(await del(`/api/networks/${n.id}`));
+            } catch (err) {
+              toast(err.message || "Could not remove", "error");
+            }
+          });
         }
-        toast("Names saved", "success");
-        await draw(latest);
-      } catch (err) {
-        toast(err.message || "Could not save", "error");
-        save.disabled = false;
+        body.appendChild(h("tr", {},
+          h("td", {}, scan), h("td", {}, input), h("td", {}, h("span", { class: "mono" }, n.cidr), h("div", { class: "hint" }, SOURCE_TEXT[n.source] || "")),
+          h("td", { class: tone }, text, n.status === "quiet" && n.since ? h("span", { class: "hint" }, ` since ${fmtTime(n.since)}`) : null),
+          h("td", {}, `${n.devices} (${n.online} online)`),
+          h("td", {}, !n.scan || n.last_hosts == null ? "–" : n.usual_hosts ? `${n.last_hosts} (usually ${n.usual_hosts})` : String(n.last_hosts)),
+          h("td", { title: n.no_mac ? "Devices behind a router have no visible MAC address. A health monitor (SNMP) on the router or layer-3 switch can learn them from its ARP table." : "" }, String(n.no_mac)),
+          h("td", {}, remove)));
       }
-    });
-    card.appendChild(save);
+      table.appendChild(body);
+      card.appendChild(h("div", { class: "table-wrap" }, table));
+      const save = h("button", { type: "button", class: "btn primary admin-only" }, "Save");
+      save.addEventListener("click", async () => {
+        save.disabled = true;
+        try {
+          let latest = data;
+          for (const [n, input, scan] of names) {
+            const change = {};
+            if (input.value.trim() !== n.name) change.name = input.value;
+            if (scan.checked !== n.scan) change.scan = scan.checked;
+            if (Object.keys(change).length) latest = await patch(`/api/networks/${n.id}`, change);
+          }
+          toast("Saved", "success");
+          await draw(latest);
+        } catch (err) {
+          toast(err.message || "Could not save", "error");
+          save.disabled = false;
+        }
+      });
+      card.appendChild(save);
+    }
+    if (isAdmin()) {
+      const range = h("input", { type: "text", placeholder: "e.g. 10.0.20.0/24", autocomplete: "off", "aria-label": "Range to add" });
+      const name = h("input", { type: "text", placeholder: "Name (optional)", maxlength: "60", "aria-label": "Name of the new network" });
+      const add = h("button", { type: "button", class: "btn" }, "Add network");
+      add.addEventListener("click", async () => {
+        add.disabled = true;
+        try {
+          await draw(await post("/api/networks", { cidr: range.value.trim(), name: name.value }));
+          toast("Network added", "success");
+        } catch (err) {
+          toast(err.message || "Could not add", "error");
+          add.disabled = false;
+        }
+      });
+      card.appendChild(h("h3", {}, "Add a network"));
+      card.appendChild(h("div", { class: "edit-grid" }, h("label", {}, "Range", range), h("label", {}, "Name", name)));
+      card.appendChild(h("div", { class: "btn-row" }, add));
+    }
   }
   await draw(await get("/api/networks"));
   return card;
@@ -311,7 +279,6 @@ const STATIC_GROUPS = [
   {
     title: "Scanning",
     items: [
-      { key: "ranges", label: "Scan ranges", build: buildRangesCard },
       { key: "networks", label: "Networks", build: buildNetworksCard },
       { key: "nmap", label: "Scan performance", build: buildScanPage },
       { key: "schedule", label: "Scan schedule", build: buildScheduleCard },
@@ -393,10 +360,10 @@ const STATIC_GROUPS = [
   },
 ];
 
-const DEFAULT_PAGE = "ranges";
+const DEFAULT_PAGE = "networks";
 const VIEWER_PAGE = "session";
 // the connectors were plugins-to-be before: keep their old addresses working
-const ALIASES = { proxmox: "plugin-proxmox", asus: "plugin-asus", notifications: "channels", assistant: "agents", mcp: "agents" };  // e-mail is a channel now
+const ALIASES = { ranges: "networks", proxmox: "plugin-proxmox", asus: "plugin-asus", notifications: "channels", assistant: "agents", mcp: "agents" };  // e-mail is a channel now
 
 function integrationsGroup(plugins, updates = 0) {
   const items = [

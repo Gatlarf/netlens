@@ -115,7 +115,7 @@ It is a single Docker container (FastAPI backend, SQLite storage, vanilla JavaSc
 - Device type classification by rules (vendor, OS, ports, hostnames)
 - Network map with gateway, route, host-of, and manual edges
 - Web terminal (SSH and Telnet) via xterm.js, and remote desktop (RDP and VNC) in the browser through an optional helper container (Network → Remote access)
-- Scan ranges editable in the web UI (Settings), no restart needed
+- Networks (Settings → Networks): choose which networks are scanned, add VLANs and routed networks, see which one stops answering, no restart needed
 - CSV and JSON export of devices
 - PNG export of the network map
 - Event logging (device_new, device_online, device_offline, ip_changed, port_opened, os_changed)
@@ -483,7 +483,7 @@ Restoring the backup matters because a newer version may have changed the databa
 | Variable | Default | Description |
 |---|---|---|
 | `NETLENS_TOKEN` | *(empty)* | Optional shared access token that signs in as administrator (older installs use it; new ones create an account in the first-start wizard). Not needed for Home Assistant or Prometheus: use an API token from Settings → Users & tokens |
-| `NETLENS_RANGES` | auto-detect | Private ranges only, prefix >= /20. Can also be changed at runtime in the web UI (see below); the web setting takes precedence |
+| `NETLENS_RANGES` | auto-detect | Private ranges only, prefix >= /20. Starting list for Settings → Networks (see below); the list in the web UI is the master |
 | `NETLENS_QUICK_INTERVAL` | `900` | Quick scan interval in seconds |
 | `NETLENS_DEEP_INTERVAL` | `86400` | Deep scan interval in seconds |
 | `NETLENS_TERMINAL` | `on` | Enable/disable web terminal |
@@ -497,18 +497,21 @@ Restoring the backup matters because a newer version may have changed the databa
 
 ### Networks and hosts behind a router
 
-Every range Netlens scans is a **network** (*Settings → Networks*): a VLAN, a routed network, a network behind a VPN. Give each one a name; the page shows its state, the devices in it, how many hosts the last scan found against the usual number, and how many devices have no MAC address. A scan covers all ranges in one run, so a range that becomes unreachable (a firewall rule, a VPN that went down, a routing change) does not fail the scan, its devices just go offline one by one. Netlens therefore counts the hosts that answer in each range: when a range that had hosts has none, or less than a quarter of the usual number (from eight hosts up), for two scans in a row it raises **Network went quiet** (a dashboard problem; choose `network_quiet` and `network_back` under Settings → Alert channels), and **Network answers again** when at least 60 percent are back. Ranges of one or two addresses are not networks (a host that stops answering is a device that went offline). The Devices page can be filtered by network and the assistant (and MCP, `get_networks`) answers questions about them.
+Every range Netlens can scan is a **network** (*Settings → Networks*): a VLAN, a routed network, a network behind a VPN. Tick the ones to scan, add others, and give each one a name; the page shows its state, the devices in it, how many hosts the last scan found against the usual number, and how many devices have no MAC address. A scan covers all ranges in one run, so a range that becomes unreachable (a firewall rule, a VPN that went down, a routing change) does not fail the scan, its devices just go offline one by one. Netlens therefore counts the hosts that answer in each range: when a range that had hosts has none, or less than a quarter of the usual number (from eight hosts up), for two scans in a row it raises **Network went quiet** (a dashboard problem; choose `network_quiet` and `network_back` under Settings → Alert channels), and **Network answers again** when at least 60 percent are back. Ranges of one or two addresses are not networks (a host that stops answering is a device that went offline). The Devices page can be filtered by network and the assistant (and MCP, `get_networks`) answers questions about them.
 
 Hosts on a routed network have **no MAC address** in a scan (ARP only works on the scanner's own segment), so Netlens would identify them by address alone. A **health monitor over SNMP on the router or layer-3 switch** fixes that: it reads the device's ARP table (the classic `ipNetToMedia` and the newer `ipNetToPhysical` table, every five minutes, automatically for devices typed router or switch; the monitor's *MAC addresses from its ARP table* can force it *Always* or *Never*). A scan then gives a MAC-less host the MAC that the router reports for its address, and a device that was stored by address keeps its history. The scan's own MAC is never replaced, an entry older than an hour is not used, and a MAC that answers for more than eight addresses (a proxy-ARP router, NAT) is ignored, so it can never merge hosts into one device. Netlens scans directly first: the router's table only fills the gap.
 
 ### Choosing what to scan
 
-By default Netlens scans the networks it finds on the Docker host's interfaces. You can restrict or change that in two ways:
+**Settings → Networks** is the list of networks Netlens scans, and the place to choose them. Each network has a **Scan** switch:
 
-- **Web UI (recommended):** open **Settings → Scan ranges**, enter one or more ranges separated by commas (for example `192.168.1.0/24, 10.0.0.0/22`) and press **Save**. It takes effect from the next scan, with no restart. It is stored in the data directory, so it survives updates and rebuilds. **Reset to default** removes it.
-- **Environment variable:** `NETLENS_RANGES` in `.env`, same format.
+- The networks Netlens finds on the Docker host's own network cards appear by themselves and are scanned (a VLAN interface you add later shows up on its own).
+- **Add a network** for everything else: a VLAN or a routed network that Netlens can reach, a network behind a VPN. Scanning a routed network needs a route to it and no firewall rule in the way. Give it a name if you like.
+- Untick **Scan** to leave a network out; its devices and history stay. A network you added can be removed; a detected one only switched off.
+- `NETLENS_RANGES` (in `.env`, same format) puts its ranges in the list when Netlens starts; they are a starting point, the list in Settings is the master.
+- It takes effect from the next scan, with no restart, and is stored in the data directory, so it survives updates and rebuilds. Only private IPv4 ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, and link-local) of /20 or smaller are accepted, and a single address such as `192.168.1.10` works too. The web terminal can only connect to devices inside the networks that are scanned.
 
-Order of precedence: the web setting, then `NETLENS_RANGES`, then auto-detection. Only private IPv4 ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, and link-local) of /20 or smaller are accepted, and a single address such as `192.168.1.10` works too. When ranges are set, the web terminal can only connect to devices inside them.
+An installation that had its own list of ranges before the list of networks existed keeps scanning exactly those: they became networks when it was updated, and the networks found on its network cards are listed but not ticked. (The older `PUT /api/config/ranges` still works: exactly those networks are scanned. New code uses `/api/networks`.)
 
 ## Settings in the web interface
 
@@ -518,7 +521,7 @@ Everything below is saved in the data directory, so it survives updates and rebu
 
 | Card | What you can change |
 |---|---|
-| Scan ranges | which networks are scanned (see "Choosing what to scan") |
+| Networks | which networks are scanned, their names and whether they keep answering (see "Choosing what to scan") |
 | Scan performance (nmap) | ports, timing and detection used by quick and deep scans, with presets (see "Making scans faster"). The **Scan settings** item in the **Scan** menu of the top bar jumps straight to it |
 | Scan schedule | how often quick and deep scans run. Takes effect from the next scheduler cycle, no restart |
 | Web terminal | the web terminal on/off (System group) |

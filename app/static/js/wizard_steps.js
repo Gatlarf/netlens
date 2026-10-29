@@ -1,7 +1,7 @@
 // The steps of the getting-started guide. Each one is a small, plain form with the recommended answer filled in;
 // the full settings cards stay in Settings (every step links to them). A step is { title, intro, more, build }:
 // build() returns { el, commit? } and commit() runs when the user moves on (it may throw a message to stay on the step).
-import { api, get, post, put } from "./api.js";
+import { api, get, patch, post, put } from "./api.js";
 import { h, shortName } from "./util.js";
 
 const link = (href, text) => h("a", { href }, text);
@@ -15,24 +15,23 @@ export const IMPORTANT = ["device_new", "device_offline", "service_down", "dhcp_
 
 // ---------- 2. network
 async function networkStep() {
-  const cfg = await get("/api/config");
-  const detected = cfg.detected_ranges || [];
-  const current = cfg.ranges && cfg.ranges.length ? cfg.ranges : detected;
-  const input = h("input", { type: "text", value: current.join(", "), placeholder: "192.168.1.0/24", autocomplete: "off", "aria-label": "Networks to scan" });
+  const nets = (await get("/api/networks")).networks;
+  const boxes = nets.map((n) => [n, tick(n.scan)]);
+  const input = h("input", { type: "text", value: "", placeholder: nets.length ? "Another network, for example 10.0.20.0/24" : "192.168.1.0/24", autocomplete: "off", "aria-label": "Another network to scan" });
   const el = card(
-    say(detected.length
+    say(nets.length
       ? "Netlens found the network below and will look for devices on it. If that is your home or office network, just continue."
       : "Netlens could not find your network by itself. Type it below, for example 192.168.1.0/24. If you are unsure, leave it empty and continue."),
-    h("div", { class: "field" }, h("label", {}, "Network to scan"), input,
-      h("p", { class: "hint" }, "Several networks can be separated by commas.")));
+    ...boxes.map(([n, box]) => check(box, `${n.label === n.cidr ? n.cidr : `${n.label} (${n.cidr})`}`, n.source === "detected" ? "Found on a network card of this host." : null)),
+    h("div", { class: "field" }, h("label", {}, nets.length ? "Add a network" : "Network to scan"), input,
+      h("p", { class: "hint" }, "Several networks can be separated by commas. A network behind a router or a VPN works too, as long as there is a route to it.")));
   return {
     el,
     async commit() {
       const wanted = input.value.split(/[\s,;]+/).filter(Boolean);
-      const same = wanted.join(",") === current.join(",");
-      if (same) return;
       try {
-        await put("/api/config/ranges", { ranges: wanted });
+        for (const [n, box] of boxes) if (box.checked !== n.scan) await patch(`/api/networks/${n.id}`, { scan: box.checked });
+        for (const cidr of wanted) await post("/api/networks", { cidr });
       } catch (err) {
         throw new Error(err.message || "Those networks were not accepted. Use the form 192.168.1.0/24.");
       }
@@ -233,7 +232,7 @@ async function doneStep() {
   const add = (ok, yes, no) => rows.push(h("li", { class: ok ? "yes" : "no" }, h("span", { "aria-hidden": "true" }, ok ? "✓ " : "– "), ok ? yes : no));
   try {
     const cfg = await get("/api/config");
-    const n = (cfg.ranges && cfg.ranges.length ? cfg.ranges : cfg.detected_ranges || []);
+    const n = (cfg.ranges && cfg.ranges.length ? cfg.ranges : cfg.detected_ranges || []);          // the networks that are ticked for scanning
     add(n.length > 0, `Scanning ${n.join(", ")}`, "No network to scan yet");
   } catch (err) { /* left out */ }
   try { add((await get("/api/passive")).enabled, "Listening for device names", "Not listening for device names"); } catch (err) { /* left out */ }
@@ -260,7 +259,7 @@ export const STEPS = [
       say("This guide asks a few simple questions. Everything has a sensible answer already filled in, you can skip any step, and you can open this guide again from Settings."),
       h("p", { class: "hint" }, "Nothing here is permanent: every choice can be changed later in Settings.")) },
   { title: "Your network", intro: "Which network should Netlens look at?", build: networkStep,
-    more: [["#/settings/ranges", "Scan ranges"], ["#/settings/schedule", "How often to scan"]] },
+    more: [["#/settings/networks", "Networks"], ["#/settings/schedule", "How often to scan"]] },
   { title: "Device names", intro: "So you see names instead of numbers.", build: namesStep,
     more: [["#/settings/nmap", "Scan performance and listening"], ["#/dns", "DNS registration"]] },
   { title: "Always-on devices", intro: "Which devices should never be offline?", build: alwaysOnStep,

@@ -34,7 +34,7 @@ const PAGES = [
 
 // [title, settings page, extra words, text to scroll to on that page]
 const SETTINGS = [
-  ["Scan ranges", "ranges", "networks subnets cidr which addresses to scan", ""],
+  ["Networks", "networks", "scan ranges subnets vlan cidr which addresses to scan add network", ""],
   ["Scan performance", "nmap", "nmap speed timing quick deep ports top ports", ""],
   ["Service version detection", "nmap", "nmap versions banners", "Service version detection"],
   ["OS detection", "nmap", "operating system fingerprint nmap", "OS detection"],
@@ -155,7 +155,7 @@ function search(query, devs, plugs = []) {
 }
 
 function sectionName(key) {
-  const names = { ranges: "Scan ranges", nmap: "Scan performance", schedule: "Scan schedule", map: "Map", groups: "Groups", netchecks: "Network checks", dns: "DNS registration",
+  const names = { networks: "Networks", nmap: "Scan performance", schedule: "Scan schedule", map: "Map", groups: "Groups", netchecks: "Network checks", dns: "DNS registration",
     ignored: "Ignored devices", interface: "Interface", ipv6: "IPv6", sso: "Single sign-on", escalation: "Escalation", oncall: "On-call schedule", siem: "Log forwarding", inbound: "Device messages", engineer: "AI", licence: "Licence", wizard: "Setup guide", central: "Central Netlens", users: "Users & tokens", terminal: "Web terminal", channels: "Alert channels & quiet hours", maintenance: "Maintenance windows",
     backup: "Backup & restore", export: "Export", shares: "Share links", audit: "Audit log", about: "About", session: "Account", plugins: "Plugin manager", "plugin-browse": "Plugin store" };
   return names[key] || key;

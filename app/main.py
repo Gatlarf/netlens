@@ -108,6 +108,7 @@ async def lifespan(app: FastAPI):
     except Exception:  # noqa: BLE001 - a failed move leaves the monitors as they were
         logging.getLogger(__name__).exception("could not move the monitor logins into the credential store")
     config.apply_overrides(app)
+    app.state.scan_manager.ranges_changed = lambda targets: config.apply_ranges(app, targets)      # what is scanned is what the rest of the program uses as scan ranges
     app.state.scan_manager.recover()
     # identification: use the vendor registry copy in the data directory, and apply the current rules to what is already known
     # (new vendor table, new device types), so an update shows its effect without waiting for the next scan

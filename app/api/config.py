@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from typing import Any
 
+from app import networks
 from app.config import normalize_ranges
 from app.db import connect, delete_setting, get_setting, set_setting
 from app.scanner.options import (
@@ -31,19 +32,13 @@ MAX_INTERVAL = 30 * 86400
 router = APIRouter(prefix="/api", tags=["config"])
 
 
-def _read_overrides(db_path: str) -> dict:
-    """Overrides saved through the web UI: {ranges, quick_interval, deep_interval, terminal_enabled}."""
+def _read_overrides(db_path: str, env_ranges=()) -> dict:
+    """Overrides saved through the web UI: {ranges, quick_interval, deep_interval, terminal_enabled}. The ranges are the networks that are ticked for scanning."""
     conn = connect(db_path)
     try:
         out: dict = {}
-        raw = get_setting(conn, RANGES_KEY)
-        if raw:
-            try:
-                ranges = normalize_ranges(json.loads(raw))
-                if ranges:
-                    out["ranges"] = tuple(ranges)
-            except (ValueError, TypeError):
-                pass
+        networks.absorb_legacy(conn, env_ranges)          # ranges set the way they used to be (an older backup, the environment) become networks
+        out["ranges"] = tuple(networks.scan_targets(conn))
         for key in INTERVAL_KEYS:
             raw = get_setting(conn, key)
             if raw and raw.isdigit() and MIN_INTERVAL <= int(raw) <= MAX_INTERVAL:
@@ -58,7 +53,7 @@ def _read_overrides(db_path: str) -> dict:
 
 def apply_overrides(app) -> None:
     """Make UI overrides on top of the environment settings the effective settings."""
-    overrides = _read_overrides(app.state.db_path)
+    overrides = _read_overrides(app.state.db_path, app.state.env_settings.ranges)
     new_settings = dataclasses.replace(app.state.env_settings, **overrides)
     app.state.settings = new_settings
     app.state.scan_manager.settings = new_settings
@@ -70,6 +65,19 @@ def apply_overrides(app) -> None:
     finally:
         conn.close()
     app.state.scan_manager.options = options_from_json(saved)
+
+
+def apply_ranges(app, targets=None) -> None:
+    """The networks that are ticked for scanning are the scan ranges of the rest of the program (terminal limits, the documentation, the checks between scans)."""
+    if targets is None:
+        conn = connect(app.state.db_path)
+        try:
+            targets = networks.scan_targets(conn)
+        finally:
+            conn.close()
+    new_settings = dataclasses.replace(app.state.settings, ranges=tuple(targets))
+    app.state.settings = new_settings
+    app.state.scan_manager.settings = new_settings
 
 
 # kept for callers/tests that used the earlier names
@@ -85,11 +93,23 @@ async def _detected_ranges(request: Request) -> list[str]:
         return []
 
 
+def _ranges_source(db_path: str) -> str:
+    """Where the scanned networks come from: "ui" (added or chosen by hand), "env" (NETLENS_RANGES) or "auto" (found on the network cards)."""
+    conn = connect(db_path)
+    try:
+        for source, label in (("manual", "ui"), ("env", "env")):
+            if conn.execute("SELECT 1 FROM networks WHERE source = ? AND scan = 1", (source,)).fetchone():
+                return label
+        return "auto"
+    finally:
+        conn.close()
+
+
 def _source(request: Request, key: str, env_value) -> str:
+    if key == "ranges":
+        return _ranges_source(request.app.state.db_path)
     if key in getattr(request.app.state, "overrides", set()):
         return "ui"
-    if key == "ranges":
-        return "env" if env_value else "auto"
     return "env"
 
 
@@ -143,7 +163,8 @@ class RangesBody(BaseModel):
 
 @router.put("/config/ranges")
 async def put_ranges(request: Request, body: RangesBody) -> dict:
-    """Set the scan ranges. An empty list removes the override (env value or auto-detect)."""
+    """The older way to set the scan ranges, kept for scripts and the setup guide: exactly these networks are scanned (they are added to Settings -> Networks
+    when they are new). An empty list goes back to the default. New code uses /api/networks."""
     try:
         ranges = normalize_ranges(body.ranges)
     except ValueError as exc:
@@ -151,14 +172,11 @@ async def put_ranges(request: Request, body: RangesBody) -> dict:
 
     conn = connect(request.app.state.db_path)
     try:
-        if ranges:
-            set_setting(conn, RANGES_KEY, json.dumps(ranges))
-        else:
-            delete_setting(conn, RANGES_KEY)
+        networks.set_exact(conn, ranges)
     finally:
         conn.close()
 
-    apply_overrides(request.app)
+    apply_ranges(request.app)
     return await _config_payload(request)
 
 
