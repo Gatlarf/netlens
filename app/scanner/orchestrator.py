@@ -9,6 +9,7 @@ from app.scanner.errors import explain_scan_error, is_capability_error
 from app.scanner.nmap_runner import ScanError, _is_valid_target, run_nmap
 from app.scanner.options import ScanOptions, gentle_type_list
 from app.scanner.nmap_parser import parse_nmap_xml
+from app import networks as network_ranges
 from app.scanner.store import save_scan_results
 from app.uptime import record_checks
 from app.plugins.service import PluginService
@@ -277,6 +278,11 @@ class ScanManager:
                 now=utcnow(),
                 extra_names=extra,
             )
+            if kind in ("quick", "deep"):
+                try:           # how many hosts answered in each range: a range that goes quiet is a routing, firewall or VPN problem
+                    network_ranges.record_scan(conn, targets, [h.ip for h in hosts], now=utcnow())
+                except Exception:
+                    logging.getLogger(__name__).exception("recording the networks failed")
             if kind in ("quick", "deep") and self.options.recheck_missing:
                 hosts += await self._recheck_missing(conn, result, targets, kwargs)
             mark_offline(

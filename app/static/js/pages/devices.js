@@ -158,6 +158,19 @@ function buildToolbar(state) {
   });
   toolbar.appendChild(groupSel);
 
+  if (networkList.length > 1) {          // a filter by network (range, VLAN) is only useful when more than one is scanned
+    const netSel = h("select", { "aria-label": "Network filter", class: "group-filter" });
+    netSel.appendChild(h("option", { value: "" }, "Any network"));
+    netSel.appendChild(h("option", { value: "none" }, "No network"));
+    for (const n of networkList) netSel.appendChild(h("option", { value: String(n.id) }, n.label));
+    netSel.value = state.network;
+    netSel.addEventListener("change", () => {
+      state.network = netSel.value;
+      load();
+    });
+    toolbar.appendChild(netSel);
+  }
+
   if (groupList.length) {
     // put every device that is listed (after the filters) in one group
     const assignSel = h("select", { "aria-label": "Group for the listed devices", class: "group-assign admin-only" });
@@ -339,6 +352,8 @@ async function load() {
   }
   if (state.group === "none") devices = devices.filter((d) => d.group_id == null);
   else if (state.group) devices = devices.filter((d) => String(d.group_id) === state.group);
+  if (state.network === "none") devices = devices.filter((d) => !d.network);
+  else if (state.network) devices = devices.filter((d) => d.network && String(d.network.id) === state.network);
   if (state.ports === "changed") devices = devices.filter((d) => d.ports_drift > 0);
   else if (state.ports === "baseline") devices = devices.filter((d) => d.ports_drift !== null);
   else if (state.ports === "none") devices = devices.filter((d) => d.ports_drift === null);
@@ -357,6 +372,7 @@ async function load() {
 
 let devices = [];
 let groupList = [];
+let networkList = [];
 let tbody;
 let thead;
 let count;
@@ -369,6 +385,7 @@ const state = {
   type: "",
   ports: "",
   group: "",
+  network: "",
   sortKey: "primary_ip",
   sortDir: "asc"
 };
@@ -379,6 +396,11 @@ export async function render(container, params) {
     groupList = (await get("/api/groups")).groups;
   } catch (e) {
     groupList = [];
+  }
+  try {
+    networkList = (await get("/api/networks")).networks;
+  } catch (e) {
+    networkList = [];
   }
 
   const built = buildToolbar(state);

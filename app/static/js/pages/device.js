@@ -44,7 +44,8 @@ function buildDetailsCard(device) {
   card.appendChild(h("h2", {}, "Details"));
 
   card.appendChild(kvRow("IP", h("span", { class: "mono" }, device.primary_ip || "—")));
-  card.appendChild(kvRow("MAC", h("span", { class: "mono" }, device.mac || "—")));
+  if (device.network) card.appendChild(kvRow("Network", h("span", {}, device.network.label)));
+  card.appendChild(kvRow("MAC", device.mac ? h("span", { class: "mono" }, device.mac) : h("span", { title: "Behind a router Netlens cannot see the MAC address. A health monitor (SNMP) on the router or layer-3 switch can learn it from the router's ARP table." }, "— (not visible from here)")));
   card.appendChild(kvRow("Vendor", h("span", { title: vendorTitle(device) }, vendorText(device))));
   card.appendChild(kvRow("Hostname", h("span", {}, device.hostname || "—")));
 

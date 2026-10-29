@@ -210,6 +210,9 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
         {"ip": r["ip"], "first_seen": r["first_seen"], "last_seen": r["last_seen"]}
         for r in ips
     ]
+    from app import networks as network_registry
+
+    network_registry.assign(conn, [result])
     from app import multiip
 
     names = {r["id"]: r for r in conn.execute("SELECT id, custom_name, hostname, primary_ip, mac, online, last_seen, same_host_id FROM devices WHERE id = ? OR same_host_id = ?", (device_id, device_id))}
@@ -359,6 +362,9 @@ def list_devices(
         d["ports_drift"] = None if counts is None else counts["unexpected"] + counts["missing"]
         result.append(d)
     _add_group(conn, result)
+    from app import networks
+
+    networks.assign(conn, result)
     from app.scanner import ipv6
 
     if ipv6.showing(conn):

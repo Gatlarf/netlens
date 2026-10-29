@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.326 — 2026-10-29
+
+### Added
+- ★ **Networks: the ranges you scan, with a name, a state and the devices in them.** *Settings → Networks* lists every scanned range (a VLAN, a routed network, a network behind a VPN) with a name you can give it, how many devices live in it, how many hosts the last scan found against the usual number, and how many devices have no MAC address. A scan covers all ranges in one run, so a range that becomes unreachable (a firewall rule, a VPN that went down, a routing change) never failed the scan: its devices just went offline one by one. Now a range that had hosts and has none, or far fewer, for two scans in a row raises **Network went quiet** (`network_quiet`, a dashboard problem, selectable in alert channels), and **Network answers again** when it recovers. The Devices page can be filtered by network, the device page names its network, and the assistant and MCP (`get_networks`) can answer questions about them.
+- ★ **MAC addresses for hosts behind a router.** nmap sees a MAC address only on its own network segment, so a host on a routed VLAN or over a VPN was identified by its address alone: a DHCP lease that changed looked like a new device. A health monitor over SNMP on a router or layer-3 switch now reads its ARP table (both the classic and the newer IP-MIB table, every five minutes, automatically for devices typed router or switch; choose *Always* or *Never* on the monitor), and a scan gives a MAC-less host the MAC the router reports for its address. A device that was stored by address keeps its history. The scan's own MAC is never replaced, entries older than an hour are not used, and a MAC that answers for more than eight addresses (a proxy-ARP router, NAT) is ignored, so it cannot merge hosts.
+
 ## 0.4.325 — 2026-10-29
 
 ### Added

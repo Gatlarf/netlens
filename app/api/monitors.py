@@ -40,6 +40,7 @@ class MonitorBody(BaseModel):
     credential_id: str | None = None
     alerts: bool | None = None
     enabled: bool | None = None
+    arp_mode: str | None = None            # SNMP: read the device's ARP table to learn MAC addresses: auto, on or off
 
 
 def _device(conn, device_id: int):

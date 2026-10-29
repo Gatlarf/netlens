@@ -139,6 +139,9 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
         add("warn", f"{st['pools_filling']} storage pool{'s' if st['pools_filling'] != 1 else ''} filling up or unhealthy", "#/storage?focus=problems")
     if st.get("alerts"):
         add("warn", f"{st['alerts']} open storage alert{'s' if st['alerts'] != 1 else ''}", "#/storage?focus=problems")
+    nw = s.get("networks") or {}
+    if nw.get("quiet"):
+        add("bad", f"{nw['quiet']} scanned network{'s' if nw['quiet'] != 1 else ''} stopped answering: {', '.join(nw['quiet_names'][:3])}", "#/settings/networks")
     lg = s.get("link_groups") or {}
     if lg.get("down"):
         add("bad", f"{lg['down']} bonded connection{'s' if lg['down'] != 1 else ''} lost every link", f"#/device/{lg['first_host']}" if lg.get("first_host") else "#/devices")

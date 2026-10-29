@@ -2,7 +2,7 @@ import json
 from dataclasses import replace
 from typing import Any, Optional
 
-from app import multiip
+from app import arpcache, multiip
 from app.baselines import baseline_ports
 from app.db import BatchedCommits, add_event, get_or_create_device, utcnow
 from app.plugins.enrich import refresh_hostname
@@ -34,6 +34,9 @@ def save_scan_results(
 
     if now is None:
         now = utcnow()
+
+    # a host behind a router has no MAC address of its own in the scan: the router's ARP table (read by a monitor) knows it
+    hosts = arpcache.fill_macs(conn, hosts, now)
 
     # Devices the user chose to ignore are not stored again
     ignored_macs = {r["mac"] for r in conn.execute("SELECT mac FROM ignored_devices WHERE mac IS NOT NULL")}

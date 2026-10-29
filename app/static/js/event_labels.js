@@ -71,6 +71,8 @@ export const EVENT_LABELS = {
   guest_backup_failed: "Guest backup failed",
   guest_backup_late: "Guest backup late",
   guest_backup_recovered: "Guest backup recovered",
+  network_quiet: "Network went quiet",
+  network_back: "Network answers again",
   link_degraded: "Link down in a bond",
   link_recovered: "Bond links all up",
   storage_degraded: "Storage problem",

@@ -529,6 +529,11 @@ def init_db(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "devices", "pinned_ip", "TEXT")
     _add_column_if_missing(conn, "devices", "multi_score", "INTEGER NOT NULL DEFAULT 0")
     _add_column_if_missing(conn, "devices", "same_host_id", "INTEGER REFERENCES devices(id) ON DELETE SET NULL")      # this device is another network card of that host (set by the owner)
+    # --- the ARP table of a router (app/arpcache.py): MAC addresses for hosts behind it; a monitor chooses whether to read it ------------------------
+    conn.execute("CREATE TABLE IF NOT EXISTS arp_cache (ip TEXT PRIMARY KEY, mac TEXT NOT NULL, device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE, iface INTEGER, seen TEXT NOT NULL)")
+    # --- networks: the scanned ranges and whether they keep answering (app/networks.py) -----------------------------------------------------------
+    conn.execute("CREATE TABLE IF NOT EXISTS networks (id INTEGER PRIMARY KEY, cidr TEXT NOT NULL UNIQUE, name TEXT, active INTEGER NOT NULL DEFAULT 1, status TEXT, quiet_since TEXT, "
+                 "first_seen TEXT NOT NULL, last_scan TEXT, last_hosts INTEGER, baseline REAL, low_scans INTEGER NOT NULL DEFAULT 0)")
     # --- link groups: the switch ports of a host's bond (app/linkgroups.py) ---------------------------------------------------------------------
     conn.execute("CREATE TABLE IF NOT EXISTS link_groups (id INTEGER PRIMARY KEY, name TEXT NOT NULL, host_device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE, "
                  "switch_device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE, ports TEXT NOT NULL, status TEXT, status_since TEXT, created TEXT NOT NULL)")
@@ -1191,6 +1196,7 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     # --- schema v24: a health monitor can be set up by the central Netlens (source = 'central')
     _add_column_if_missing(conn, "host_monitors", "source", "TEXT")
+    _add_column_if_missing(conn, "host_monitors", "arp_mode", "TEXT NOT NULL DEFAULT 'auto'")       # whether an SNMP monitor reads the ARP table of the device: auto (routers and switches), on, off
     # --- a second factor for local accounts (TOTP, app/totp.py): the secret is encrypted, the counter makes a code usable once -------------------
     _add_column_if_missing(conn, "users", "totp_secret", "TEXT")
     _add_column_if_missing(conn, "users", "totp_enabled", "INTEGER NOT NULL DEFAULT 0")

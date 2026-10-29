@@ -194,7 +194,10 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     const communityField = field("Community", community, "The read community string set on the device. Many devices use “public”. Read-only access is all that is needed.");
     const v3Box = h("div", {}, field("SNMPv3 user name", v3user, "A read-only user created on the device."), field("Authentication", authProto), field("Authentication password", authPw),
       field("Encryption", privProto), field("Encryption password", privPw));
-    const snmpBox = h("div", {}, field("SNMP version", version), communityField, v3Box);
+    const arpMode = h("select", { "aria-label": "ARP table" }, h("option", { value: "auto" }, "Automatic (routers and switches)"), h("option", { value: "on" }, "Always"), h("option", { value: "off" }, "Never"));
+    arpMode.value = (m && m.arp_mode) || "auto";
+    const snmpBox = h("div", {}, field("SNMP version", version), communityField, v3Box,
+      field("MAC addresses from its ARP table", arpMode, "A router or layer-3 switch knows the MAC address of every host on the networks it is attached to. Netlens cannot see those behind a router, so it reads this table now and then and gives scanned hosts the MAC address the router reports. Automatic does it for routers and switches only." + (m && m.arp_entries ? ` It knows ${m.arp_entries} addresses now.` : "")));
     const stored = h("select", {}, h("option", { value: "" }, "Type a login"));
     get("/api/credentials").then((r) => {
       for (const c of r.credentials.filter((x) => !(x.pam && x.pam.reason_required))) stored.appendChild(h("option", { value: c.id }, `${c.name}${c.username ? ` (${c.username})` : ""}`));
@@ -234,6 +237,7 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
         if (!stored.value && wPass.value) out.password = wPass.value;
       } else if (method.value === "snmp") {
         out.version = version.value;
+        out.arp_mode = arpMode.value;
         if (version.value === "3") {
           out.username = v3user.value.trim();
           out.auth_proto = authProto.value;

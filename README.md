@@ -495,6 +495,12 @@ Restoring the backup matters because a newer version may have changed the databa
 | `NETLENS_BIND` | `0.0.0.0:8080` | Bind address and port |
 | `NETLENS_DATA_DIR` | `/data` | Data directory |
 
+### Networks and hosts behind a router
+
+Every range Netlens scans is a **network** (*Settings → Networks*): a VLAN, a routed network, a network behind a VPN. Give each one a name; the page shows its state, the devices in it, how many hosts the last scan found against the usual number, and how many devices have no MAC address. A scan covers all ranges in one run, so a range that becomes unreachable (a firewall rule, a VPN that went down, a routing change) does not fail the scan, its devices just go offline one by one. Netlens therefore counts the hosts that answer in each range: when a range that had hosts has none, or less than a quarter of the usual number (from eight hosts up), for two scans in a row it raises **Network went quiet** (a dashboard problem; choose `network_quiet` and `network_back` under Settings → Alert channels), and **Network answers again** when at least 60 percent are back. Ranges of one or two addresses are not networks (a host that stops answering is a device that went offline). The Devices page can be filtered by network and the assistant (and MCP, `get_networks`) answers questions about them.
+
+Hosts on a routed network have **no MAC address** in a scan (ARP only works on the scanner's own segment), so Netlens would identify them by address alone. A **health monitor over SNMP on the router or layer-3 switch** fixes that: it reads the device's ARP table (the classic `ipNetToMedia` and the newer `ipNetToPhysical` table, every five minutes, automatically for devices typed router or switch; the monitor's *MAC addresses from its ARP table* can force it *Always* or *Never*). A scan then gives a MAC-less host the MAC that the router reports for its address, and a device that was stored by address keeps its history. The scan's own MAC is never replaced, an entry older than an hour is not used, and a MAC that answers for more than eight addresses (a proxy-ARP router, NAT) is ignored, so it can never merge hosts into one device. Netlens scans directly first: the router's table only fills the gap.
+
 ### Choosing what to scan
 
 By default Netlens scans the networks it finds on the Docker host's interfaces. You can restrict or change that in two ways:

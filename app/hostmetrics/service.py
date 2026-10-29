@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from app import dbengine, tsdb, vault
+from app import arpcache, dbengine, tsdb, vault
 from app.db import add_event, connect, get_setting, set_setting, utcnow
 from app.hostmetrics import snmp, snmpv3, ssh, winrm
 
@@ -305,7 +305,10 @@ def validate(data: dict[str, Any], current: dict[str, Any] | None = None) -> dic
             raise MonitorError("give the user name to sign in with")
         if not bound and not secret.get("password") and not secret.get("private_key"):
             raise MonitorError("give a password or a private key")
-    return {"method": method, "address": address, "port": port, "interval_s": interval, "secret": secret,
+    arp_mode = data.get("arp_mode", cur.get("arp_mode", "auto")) if method == "snmp" else "auto"
+    if arp_mode not in ("auto", "on", "off"):
+        raise MonitorError("reading the ARP table is automatic, on or off")
+    return {"method": method, "address": address, "port": port, "interval_s": interval, "secret": secret, "arp_mode": arp_mode,
             "alerts": bool(data.get("alerts", cur.get("alerts", True))), "enabled": bool(data.get("enabled", cur.get("enabled", True)))}
 
 
@@ -417,6 +420,8 @@ def public(conn, row) -> dict[str, Any]:
         "verify_tls": bool(secret.get("verify_tls")) if row["method"] == "winrm" else None,
         "secret_unreadable": bool(row["credential"]) and not secret,
         "credential_id": raw_secret(conn, row).get("credential_id") or None,
+        "arp_mode": row["arp_mode"] if row["method"] == "snmp" else None,
+        "arp_entries": arpcache.entries_of(conn, row["device_id"]) if row["method"] == "snmp" else None,
     }
 
 
@@ -425,21 +430,21 @@ def save_monitor(conn, device_id: int, data: dict[str, Any], groups: list[str] |
     cur = None
     if row is not None:
         cur = {"method": row["method"], "address": row["address"], "port": row["port"], "interval_s": row["interval_s"],
-               "alerts": bool(row["alerts"]), "enabled": bool(row["enabled"]), "secret": raw_secret(conn, row)}
+               "alerts": bool(row["alerts"]), "enabled": bool(row["enabled"]), "secret": raw_secret(conn, row), "arp_mode": row["arp_mode"]}
         if data.get("method") not in (None, row["method"]):
             cur["secret"] = {}                       # another method: the old login does not apply
     d = validate(data, cur)
     credential = vault.encrypt(conn, json.dumps(d["secret"]))
     if row is None:
         conn.execute(
-            "INSERT INTO host_monitors (device_id, method, address, port, credential, interval_s, groups, alerts, enabled, created) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (device_id, d["method"], d["address"], d["port"], credential, d["interval_s"], json.dumps(groups or []), int(d["alerts"]), int(d["enabled"]), utcnow()))
+            "INSERT INTO host_monitors (device_id, method, address, port, credential, interval_s, groups, alerts, enabled, created, arp_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (device_id, d["method"], d["address"], d["port"], credential, d["interval_s"], json.dumps(groups or []), int(d["alerts"]), int(d["enabled"]), utcnow(), d["arp_mode"]))
     else:
         changed = (d["method"], d["address"], d["port"]) != (row["method"], row["address"], row["port"])
         conn.execute(
-            "UPDATE host_monitors SET method=?, address=?, port=?, credential=?, interval_s=?, alerts=?, enabled=?"
+            "UPDATE host_monitors SET method=?, address=?, port=?, credential=?, interval_s=?, alerts=?, enabled=?, arp_mode=?"
             + (", groups=?, last_ts=NULL, last_ok=NULL, last_error=NULL, since=NULL" if changed else "") + " WHERE device_id=?",
-            (d["method"], d["address"], d["port"], credential, d["interval_s"], int(d["alerts"]), int(d["enabled"]))
+            (d["method"], d["address"], d["port"], credential, d["interval_s"], int(d["alerts"]), int(d["enabled"]), d["arp_mode"])
             + ((json.dumps(groups or []),) if changed else ()) + (device_id,))
     conn.commit()
     return public(conn, get_monitor(conn, device_id))
@@ -760,6 +765,34 @@ def _due(conn, now_ts: float) -> list[Any]:
     return out
 
 
+ARP_EVERY = 300           # seconds between two reads of a router's ARP table (it can hold thousands of rows)
+
+
+def reads_arp(conn, row) -> bool:
+    """Does this SNMP monitor read the ARP table of its device? Automatic for a router or a switch (they know the MAC addresses of the hosts on their networks)."""
+    mode = row["arp_mode"] if "arp_mode" in row.keys() else "auto"
+    if mode != "auto":
+        return mode == "on"
+    d = conn.execute("SELECT type_override, device_type FROM devices WHERE id = ?", (row["device_id"],)).fetchone()
+    return bool(d) and (d["type_override"] or d["device_type"]) in arpcache.AUTO_TYPES
+
+
+async def _learn_arp(conn, row, secret: dict[str, Any], state: dict, now_ts: float, stamp: str) -> None:
+    """Keep the ARP table of the device (app/arpcache.py), now and then. A failure here never fails the monitor."""
+    if now_ts - state.get("arp_ts", 0) < ARP_EVERY or not reads_arp(conn, row):
+        return
+    state["arp_ts"] = now_ts
+    try:
+        def work():
+            return snmp.read_arp(make_agent(row["address"], row["port"], secret))
+
+        entries = await asyncio.to_thread(work)
+    except (snmp.SnmpError, OSError):
+        log.debug("the ARP table of %s could not be read", row["address"], exc_info=True)
+        return
+    arpcache.learn(conn, row["device_id"], entries, stamp)
+
+
 async def run_monitor(db_path: str, monitor_id: int, now_ts: float | None = None) -> dict[str, Any]:
     """Read one monitor now and store the outcome. Returns {"ok", "error", "events"}."""
     now_ts = now_ts if now_ts is not None else time.time()
@@ -810,6 +843,8 @@ async def run_monitor(db_path: str, monitor_id: int, now_ts: float | None = None
                 conn.execute("UPDATE host_monitors SET groups = ? WHERE id = ?", (json.dumps(found), monitor_id))
             if row["alerts"]:
                 raised = evaluate(conn, monitor_id, row["device_id"], name, points, stamp)
+        if error is None and row["method"] == "snmp":
+            await _learn_arp(conn, row, secret, state, now_ts, stamp)
         since = row["since"] if row["last_ok"] == (1 if error is None else 0) and row["since"] else stamp
         conn.execute("UPDATE host_monitors SET last_ts = ?, last_ok = ?, last_error = ?, since = ? WHERE id = ?",
                      (stamp, 1 if error is None else 0, error, since, monitor_id))

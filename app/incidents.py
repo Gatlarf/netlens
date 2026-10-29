@@ -21,16 +21,17 @@ from app.remediation import RECOVERY
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
 GAP = timedelta(minutes=10)
 PROBLEMS = set(RECOVERY) | {"anomaly", "capacity_warning", "capacity_critical", "container_unhealthy", "container_restarting", "container_stopped", "backup_failed", "dhcp_rogue",
-                            "gateway_changed", "cert_expiring", "guest_backup_late", "guest_backup_failed", "storage_degraded", "link_degraded",
+                            "gateway_changed", "cert_expiring", "guest_backup_late", "guest_backup_failed", "storage_degraded", "link_degraded", "network_quiet",
                             "vuln_critical", "port_unexpected", "firewall_ha", "firewall_licence", "dns_failed", "host_timeout", "plugin_update_failed", "inventory_battery_low", "agent_silent", "ingest_cert_expiring", "ingest_ca_expiring", "audit_tampered"}
 RECOVERS = {v: k for k, v in RECOVERY.items()}
 RECOVERS["storage_recovered"] = "storage_degraded"
 RECOVERS["agent_back"] = "agent_silent"
 RECOVERS["link_recovered"] = "link_degraded"
+RECOVERS["network_back"] = "network_quiet"
 REMEDIATION = {"remediation_pending", "remediation_ran", "remediation_failed", "remediation_recovered"}
 WORDS = {"audit_tampered": "the audit log failed its integrity check (a line was changed, inserted or removed)", "agent_silent": "a host agent stopped sending data", "ingest_cert_expiring": "the certificate of a host agent is about to end", "ingest_ca_expiring": "the certificate authority for host agents is in its last year", "device_offline": "went offline", "service_down": "a service went down", "metric_critical": "a health reading went critical", "metric_warning": "a health reading went past its warning limit",
          "anomaly": "a reading was unusual", "capacity_warning": "a disk is filling up", "capacity_critical": "a disk is almost full", "remote_offline": "a remote device went offline",
-         "probe_offline": "a remote site went silent", "central_unreachable": "the central Netlens could not be reached", "guest_backup_failed": "a backup failed", "storage_degraded": "a storage system had a problem", "link_degraded": "a link of a bonded connection went down", "backup_failed": "a backup failed", "container_unhealthy": "a container was unhealthy",
+         "probe_offline": "a remote site went silent", "central_unreachable": "the central Netlens could not be reached", "guest_backup_failed": "a backup failed", "storage_degraded": "a storage system had a problem", "link_degraded": "a link of a bonded connection went down", "network_quiet": "a scanned network stopped answering", "backup_failed": "a backup failed", "container_unhealthy": "a container was unhealthy",
          "container_restarting": "a container kept restarting", "container_stopped": "a container stopped", "inventory_unavailable": "a smart-home device became unavailable",
          "vuln_critical": "a critical vulnerability was found", "port_unexpected": "an unexpected port opened", "firewall_ha": "a firewall cluster changed state", "firewall_licence": "a firewall licence needs attention",
          "dns_failed": "a DNS check failed", "host_timeout": "a monitored host stopped answering its health check", "plugin_update_failed": "a plugin update failed", "inventory_battery_low": "a smart-home battery is low"}

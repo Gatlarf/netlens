@@ -1,5 +1,5 @@
 import { buildMaintenanceCard } from "../cards/maintenance.js";
-import { get, post, put } from "../api.js";
+import { get, patch, post, put } from "../api.js";
 import { groupButtons } from "../ui.js";
 import { h, clear, toast, isAdmin, can, fmtTime } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
@@ -138,6 +138,59 @@ export async function buildRangesCard() {
   return card;
 }
 
+const NETWORK_STATUS = { ok: ["answering", ""], quiet: ["QUIET", "bad"], empty: ["no hosts found yet", "muted"] };
+
+// "Networks": every scanned range with its name, whether it keeps answering, and what is in it
+export async function buildNetworksCard() {
+  const card = h("div", { class: "card" });
+  async function draw(data) {
+    clear(card);
+    card.appendChild(h("h2", {}, "Networks"));
+    card.appendChild(h("p", { class: "hint" },
+      "Every range above is a network. Give it a name (for example the VLAN it is) and Netlens shows what lives in it. When a range that had hosts stops answering for two scans in a row " +
+      "(a route, a firewall rule or a VPN that went down) Netlens warns you; the devices in it would otherwise just go offline one by one."));
+    if (!data.networks.length) {
+      card.appendChild(h("p", {}, "The networks appear here after the first scan."));
+      return;
+    }
+    const table = h("table", { class: "table" });
+    table.appendChild(h("thead", {}, h("tr", {}, ...["Name", "Range", "State", "Devices", "Hosts in the last scan", "Without MAC"].map((t) => h("th", {}, t)))));
+    const body = h("tbody", {});
+    const names = [];
+    for (const n of data.networks) {
+      const [text, tone] = NETWORK_STATUS[n.status] || [n.status, ""];
+      const input = h("input", { type: "text", value: n.name, placeholder: n.cidr, maxlength: "60", "aria-label": `Name of ${n.cidr}`, disabled: !isAdmin() });
+      names.push([n, input]);
+      body.appendChild(h("tr", {},
+        h("td", {}, input), h("td", { class: "mono" }, n.cidr),
+        h("td", { class: tone }, text, n.status === "quiet" && n.since ? h("span", { class: "hint" }, ` since ${fmtTime(n.since)}`) : null),
+        h("td", {}, `${n.devices} (${n.online} online)`),
+        h("td", {}, n.last_hosts == null ? "–" : n.usual_hosts ? `${n.last_hosts} (usually ${n.usual_hosts})` : String(n.last_hosts)),
+        h("td", { title: n.no_mac ? "Devices behind a router have no visible MAC address. A health monitor (SNMP) on the router or layer-3 switch can learn them from its ARP table." : "" }, String(n.no_mac))));
+    }
+    table.appendChild(body);
+    card.appendChild(h("div", { class: "table-wrap" }, table));
+    const save = h("button", { type: "button", class: "btn admin-only" }, "Save names");
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      try {
+        let latest = data;
+        for (const [n, input] of names) {
+          if (input.value.trim() !== n.name) latest = await patch(`/api/networks/${n.id}`, { name: input.value });
+        }
+        toast("Names saved", "success");
+        await draw(latest);
+      } catch (err) {
+        toast(err.message || "Could not save", "error");
+        save.disabled = false;
+      }
+    });
+    card.appendChild(save);
+  }
+  await draw(await get("/api/networks"));
+  return card;
+}
+
 // "Manufacturer database": which copy of the IEEE registry names the manufacturers, with an update button
 async function buildVendorDbRow() {
   const info = await get("/api/vendor-db");
@@ -259,6 +312,7 @@ const STATIC_GROUPS = [
     title: "Scanning",
     items: [
       { key: "ranges", label: "Scan ranges", build: buildRangesCard },
+      { key: "networks", label: "Networks", build: buildNetworksCard },
       { key: "nmap", label: "Scan performance", build: buildScanPage },
       { key: "schedule", label: "Scan schedule", build: buildScheduleCard },
       { key: "netchecks", label: "Network checks", build: buildNetchecksCard },

@@ -301,6 +301,11 @@ SYNO_DISK_STATUS = (1, 3, 6, 1, 4, 1, 6574, 2, 1, 1, 5)     # 1 normal, 2 initia
 SYNO_DISK_TEMP = (1, 3, 6, 1, 4, 1, 6574, 2, 1, 1, 6)
 SYNO_RAID_NAME = (1, 3, 6, 1, 4, 1, 6574, 3, 1, 1, 2)       # one row per volume / RAID group
 SYNO_RAID_STATUS = (1, 3, 6, 1, 4, 1, 6574, 3, 1, 1, 3)     # 1 normal ... 11 degraded, 12 crashed
+IP_NET_TO_MEDIA_PHYS = (1, 3, 6, 1, 2, 1, 4, 22, 1, 2)     # ARP table (RFC 1213): index ifIndex.a.b.c.d, value the MAC address
+IP_NET_TO_MEDIA_TYPE = (1, 3, 6, 1, 2, 1, 4, 22, 1, 4)     # 1 other, 2 invalid, 3 dynamic, 4 static
+IP_NET_TO_PHYS_PHYS = (1, 3, 6, 1, 2, 1, 4, 35, 1, 4)      # the newer table (RFC 4293): index ifIndex.addrType.len.a.b.c.d
+IP_NET_TO_PHYS_STATE = (1, 3, 6, 1, 2, 1, 4, 35, 1, 7)     # 1 reachable, 2 stale, 3 delay, 4 probe, 5 invalid, 6 unknown, 7 incomplete
+MAX_ARP = 5000
 HR_SW_RUN_NAME = (1, 3, 6, 1, 2, 1, 25, 4, 2, 1, 2)       # the programs that run, one row each
 ENT_SENSOR = (1, 3, 6, 1, 2, 1, 99, 1, 1, 1)               # ENTITY-SENSOR-MIB (RFC 3433): .1 type, .2 scale, .3 precision, .4 value, .5 operating status
 ENT_PHYS_NAME = (1, 3, 6, 1, 2, 1, 47, 1, 1, 1, 1, 7)
@@ -563,6 +568,31 @@ MT_FAN1, MT_FAN2 = MIKROTIK + (1, 1, 3, 17, 0), MIKROTIK + (1, 1, 3, 18, 0)
 
 def _under(oid, base):
     return tuple(oid[:len(base)]) == base
+
+
+def read_arp(agent):
+    """The ARP table of a router or layer-3 switch as [(ip, mac, ifindex)]: which MAC address answers for which address on the networks the device is
+    attached to. Entries that are invalid, incomplete or not a station address are left out."""
+    out = []
+    types = _table(agent, IP_NET_TO_MEDIA_TYPE)
+    for suffix, value in agent.walk(IP_NET_TO_MEDIA_PHYS):
+        suffix = tuple(suffix)
+        if len(suffix) != 5 or not isinstance(value, (bytes, bytearray)) or len(value) != 6 or types.get(suffix) == 2:
+            continue
+        out.append((".".join(str(x) for x in suffix[1:]), bytes(value).hex(":"), suffix[0]))
+        if len(out) >= MAX_ARP:
+            return out
+    if out:
+        return out
+    states = _table(agent, IP_NET_TO_PHYS_STATE)
+    for suffix, value in agent.walk(IP_NET_TO_PHYS_PHYS):
+        suffix = tuple(suffix)
+        if len(suffix) != 7 or suffix[1] != 1 or suffix[2] != 4 or not isinstance(value, (bytes, bytearray)) or len(value) != 6 or states.get(suffix) in (5, 7):
+            continue
+        out.append((".".join(str(x) for x in suffix[3:]), bytes(value).hex(":"), suffix[0]))
+        if len(out) >= MAX_ARP:
+            break
+    return out
 
 
 def read_vendor(agent):
