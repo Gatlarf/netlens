@@ -4,7 +4,11 @@ import { h, clear, toast, timeAgo } from "../util.js";
 // Settings -> Approvals: requests from other administrators that wait for a decision, your own requests, and what was decided lately.
 export async function buildApprovalsCard() {
   const card = h("div", { class: "card admin-only" });
-  let data = await get("/api/approvals");
+  let data;
+  try { data = await get("/api/approvals"); } catch (err) {
+    card.append(h("h2", {}, "Approvals"), h("p", { class: "hint" }, err.message || "Approvals could not be loaded. They are for people signed in with a user account, not the access token."));
+    return card;
+  }
 
   async function decide(item, approve) {
     const comment = approve ? "" : (window.prompt("Why not? (they see this)", "") || "");

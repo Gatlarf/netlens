@@ -179,7 +179,7 @@ def create(conn: sqlite3.Connection, body: dict, allowed: bool) -> dict[str, Any
     user_name = _text(body.get("userName"), "userName")
     if not user_name:
         raise ScimError(400, "userName is required", "invalidValue")
-    if conn.execute("SELECT 1 FROM users WHERE scim_user_name = ? COLLATE NOCASE", (user_name,)).fetchone():
+    if conn.execute("SELECT 1 FROM users WHERE LOWER(scim_user_name) = LOWER(?)", (user_name,)).fetchone():
         raise ScimError(409, "a user with that userName exists", "uniqueness")
     external = _text(body.get("externalId") or "", "externalId")
     if external and conn.execute("SELECT 1 FROM users WHERE scim_external = ?", (external,)).fetchone():
@@ -204,7 +204,7 @@ def apply(conn: sqlite3.Connection, row, changes: dict[str, Any]) -> None:
         sets["disabled"] = 0 if _bool(changes["active"]) else 1
     if "userName" in changes:
         value = _text(changes["userName"], "userName")
-        if conn.execute("SELECT 1 FROM users WHERE scim_user_name = ? COLLATE NOCASE AND id != ?", (value, row["id"])).fetchone():
+        if conn.execute("SELECT 1 FROM users WHERE LOWER(scim_user_name) = LOWER(?) AND id != ?", (value, row["id"])).fetchone():
             raise ScimError(409, "a user with that userName exists", "uniqueness")
         sets["scim_user_name"] = value
     if "externalId" in changes:
@@ -270,7 +270,7 @@ def listing(conn: sqlite3.Connection, filter_text: str, start: int, count: int) 
         m = re.fullmatch(r'\s*(userName|externalId)\s+eq\s+"([^"\\]{1,200})"\s*', filter_text)
         if not m:
             raise ScimError(400, 'only the filters userName eq "x" and externalId eq "x" are supported', "invalidFilter")
-        where += " AND " + ("scim_user_name = ? COLLATE NOCASE" if m.group(1) == "userName" else "scim_external = ?")
+        where += " AND " + ("LOWER(scim_user_name) = LOWER(?)" if m.group(1) == "userName" else "scim_external = ?")
         args.append(m.group(2))
     total = conn.execute(f"SELECT COUNT(*) FROM users WHERE {where}", args).fetchone()[0]
     start, count = max(1, start), max(0, min(count, 100))
