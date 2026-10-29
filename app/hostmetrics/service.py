@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from app import tsdb, vault
+from app import dbengine, tsdb, vault
 from app.db import add_event, connect, get_setting, set_setting, utcnow
 from app.hostmetrics import snmp, snmpv3, ssh, winrm
 
@@ -310,8 +310,9 @@ def raw_secret(conn, row) -> dict[str, Any]:
         return {}
 
 
-def resolve_secret(conn, method: str, secret: dict[str, Any]) -> dict[str, Any]:
-    """The login to use: a monitor that uses a stored login gets its user name and secret from the store each time, so changing the stored login changes every monitor that uses it. {} when that login is gone."""
+def resolve_secret(conn, method: str, secret: dict[str, Any], fetch: bool = True, device: str = "") -> dict[str, Any]:
+    """The login to use: a monitor that uses a stored login gets its user name and secret from the store each time, so changing the stored login changes every monitor that uses it. {} when that login is gone.
+    A login that lives in the customer's PAM is fetched at this moment (fetch=True) and kept nowhere; {} when the PAM refuses (fail closed). With fetch=False (listing a monitor) the PAM is not asked."""
     if not secret.get("credential_id"):
         return secret
     from app import credstore
@@ -319,15 +320,55 @@ def resolve_secret(conn, method: str, secret: dict[str, Any]) -> dict[str, Any]:
     stored = credstore.peek_bound(conn, secret["credential_id"])
     if stored is None:
         return {}
+    if stored.get("kind") == "pam":
+        if not fetch:
+            return {**secret, "username": stored.get("username", ""), "via_pam": True}
+        try:
+            stored = credstore.use_bound(conn, secret["credential_id"], f"monitoring {method.upper()}", device) or {}
+        except credstore.CredentialError as exc:
+            log.warning("PAM login for a monitor refused: %s", exc)
+            return {}
     user = stored.get("username", "")
     if method == "winrm" and stored.get("domain") and "\\" not in user and "@" not in user:
         user = f"{stored['domain']}\\{user}"
     return {**secret, "username": user, **{k: stored[k] for k in ("password", "private_key", "passphrase") if stored.get(k)}}
 
 
-def load_secret(conn, row) -> dict[str, Any]:
-    """The decrypted login of a monitor row, ready to use; {} when it cannot be read (the key is missing, or the stored login it points to is gone)."""
-    return resolve_secret(conn, row["method"], raw_secret(conn, row))
+async def load_secret_async(conn, row) -> dict[str, Any]:
+    """`load_secret` for code that runs on the event loop: a login in the PAM is a network call, which must not hold up everything else. Only a login that lives in the PAM
+    leaves the loop (with a connection of its own); everything else is read as before."""
+    stored = raw_secret(conn, row)
+    cred = stored.get("credential_id")
+    if not cred:
+        return load_secret(conn, row)
+    from app import credstore
+
+    entry = credstore.peek_bound(conn, cred)
+    path = dbengine.database_path(conn)
+    if entry is None or entry.get("kind") != "pam" or not path:
+        return load_secret(conn, row)
+
+    def work() -> dict[str, Any]:
+        own = connect(path)
+        try:
+            return load_secret(own, row)
+        finally:
+            own.close()
+    return await asyncio.to_thread(work)
+
+
+def unreadable_text(conn, row, default: str) -> str:
+    """Why `load_secret` came back empty: the PAM's own sentence when the login lives there and was refused, otherwise `default`."""
+    from app import pam
+
+    cid = raw_secret(conn, row).get("credential_id")
+    status = pam.last_status(cid) if cid else None
+    return f"the PAM system did not hand out the login: {status['message']}" if status and not status["ok"] else default
+
+
+def load_secret(conn, row, fetch: bool = True) -> dict[str, Any]:
+    """The decrypted login of a monitor row, ready to use; {} when it cannot be read (the key is missing, or the stored login it points to is gone, or the PAM refused)."""
+    return resolve_secret(conn, row["method"], raw_secret(conn, row), fetch, f"device {row['device_id']}")
 
 
 def get_monitor(conn, device_id: int):
@@ -336,7 +377,7 @@ def get_monitor(conn, device_id: int):
 
 def public(conn, row) -> dict[str, Any]:
     """The monitor as the API shows it: never the secrets, only whether they are set."""
-    secret = load_secret(conn, row)
+    secret = load_secret(conn, row, fetch=False)
     return {
         "id": row["id"], "device_id": row["device_id"], "method": row["method"], "source": row["source"], "address": row["address"], "port": row["port"],
         "interval_s": row["interval_s"], "alerts": bool(row["alerts"]), "enabled": bool(row["enabled"]),
@@ -349,7 +390,7 @@ def public(conn, row) -> dict[str, Any]:
         "priv_proto": secret.get("priv_proto", "") if row["method"] == "snmp" else None,
         "has_auth_password": bool(secret.get("auth_password")) if row["method"] == "snmp" else None,
         "has_priv_password": bool(secret.get("priv_password")) if row["method"] == "snmp" else None,
-        "has_password": bool(secret.get("password")) if row["method"] in ("ssh", "winrm") else None,
+        "has_password": bool(secret.get("password") or secret.get("via_pam")) if row["method"] in ("ssh", "winrm") else None,
         "has_private_key": bool(secret.get("private_key")) if row["method"] == "ssh" else None,
         "platform": secret.get("platform", "auto") if row["method"] == "ssh" else None,
         "auth": secret.get("auth", "ntlm") if row["method"] == "winrm" else None,
@@ -512,7 +553,8 @@ async def check_process(db_path: str, device_id: int | None, name: str, timeout:
     conn = connect(db_path)
     try:
         row = get_monitor(conn, device_id)
-        secret = load_secret(conn, row) if row is not None else {}
+        secret = await load_secret_async(conn, row) if row is not None else {}
+        why = unreadable_text(conn, row, "the stored login cannot be read, enter it again on the device page") if row is not None and not secret else ""
         known = None
         if row is not None and row["method"] == "ssh":
             from app.terminal.hostkeys import get_fingerprint
@@ -523,7 +565,7 @@ async def check_process(db_path: str, device_id: int | None, name: str, timeout:
     if row is None:
         return False, "this device has no health monitoring; set it up on the device page first", None
     if not secret:
-        return False, "the stored login cannot be read, enter it again on the device page", None
+        return False, why, None
     start = time.monotonic()
     try:
         if row["method"] == "winrm":
@@ -703,7 +745,7 @@ async def run_monitor(db_path: str, monitor_id: int, now_ts: float | None = None
         row = conn.execute("SELECT * FROM host_monitors WHERE id = ?", (monitor_id,)).fetchone()
         if row is None:
             return {"ok": False, "error": "gone", "events": []}
-        secret = load_secret(conn, row)
+        secret = await load_secret_async(conn, row)
         device = conn.execute("SELECT COALESCE(custom_name, hostname, primary_ip) AS n FROM devices WHERE id = ?", (row["device_id"],)).fetchone()
         name = device["n"] if device else f"device {row['device_id']}"
         groups = json.loads(row["groups"] or "[]")
@@ -723,7 +765,7 @@ async def run_monitor(db_path: str, monitor_id: int, now_ts: float | None = None
             points, found, fingerprint = locked
             error = None
         elif not secret:
-            error = "the stored login cannot be read (the encryption key is missing), enter it again"
+            error = unreadable_text(conn, row, "the stored login cannot be read (the encryption key is missing), enter it again")
             points, found, fingerprint = [], [], None
         else:
             try:

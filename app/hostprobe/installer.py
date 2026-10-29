@@ -305,7 +305,7 @@ async def administer(conn, device_id: int, action: str, admin: dict[str, Any], p
     if ca is None and action not in ("check", "remove"):
         ca = credentials.ca_create(conn)
         created = True
-    secret = hm.load_secret(conn, row)
+    secret = await hm.load_secret_async(conn, row)
     as_root = admin["username"] == "root"
     try:
         if row["method"] == "winrm":

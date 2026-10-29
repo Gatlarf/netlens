@@ -254,7 +254,7 @@ async def run(conn, device_id: int, probe: str = "storage", reason: str = "manua
     if row is None or row["method"] not in ("ssh", "winrm"):
         raise ProbeFailed("this device needs a host monitor over SSH or WinRM first (Health monitoring on the device page): it supplies the address and the login")
     cfg = device_config(conn, device_id)
-    secret = hm.load_secret(conn, row)
+    secret = await hm.load_secret_async(conn, row)
     providers = _load(conn)["providers"]
     config = {**(providers.get(cfg["provider"]) or {}), **({"username": cfg["username"]} if cfg["username"] else {})}
     started = time.time()

@@ -1,6 +1,7 @@
 import { get, post, put } from "../api.js";
 import { WINRM_HTTPS_SCRIPT } from "./winrm_https.js";
 import { h, clear, toast, timeAgo, statusDot } from "../util.js";
+import { reasonFor } from "../reason.js";
 
 const LEVELS = [
   ["basic", "Basic monitoring (processor, memory, disks, network, services)", false],
@@ -85,7 +86,7 @@ export async function buildHostsSetupCard() {
     const needsAdmin = LEVELS.find((l) => l[0] === form.level)[2];
     const option = (list, value, none) => [h("option", { value: "" }, none), ...list.map((c) => h("option", { value: c.id, selected: c.id === value }, `${c.name}${c.username ? ` (${c.username})` : ""}`))];
     const lacking = data.hosts.filter((x) => chosen.has(x.id) && !x.monitor);
-    const mon = h("select", {}, option(logins, form.credential, lacking.length ? "Choose a login…" : "Keep each host's own login"));
+    const mon = h("select", {}, option(logins.filter((x) => !(x.pam && x.pam.reason_required)), form.credential, lacking.length ? "Choose a login…" : "Keep each host's own login"));
     mon.addEventListener("change", () => { form.credential = mon.value; });
     const adm = h("select", {}, option(logins, form.adminCredential, "Type an administrator login"));
     adm.addEventListener("change", () => { form.adminCredential = adm.value; draw(); });
@@ -103,10 +104,12 @@ export async function buildHostsSetupCard() {
         return;
       }
       if (form.level === "remove" && !window.confirm(`Remove the probes and the monitoring of ${chosen.size} host(s)?`)) return;
+      const reason = await reasonFor(form.adminCredential);
+      if (reason === null) return;
       busy = true; results = null; draw();
       try {
         const res = await post("/api/hosts/apply", { device_ids: [...chosen], level: form.level, credential_id: form.credential, admin_credential_id: form.adminCredential,
-          admin_username: form.adminUser, admin_password: form.adminPass, enable_sshd: form.sshd });
+          admin_username: form.adminUser, admin_password: form.adminPass, enable_sshd: form.sshd, reason });
         results = res.results;
         form.adminPass = "";
         toast(res.failed ? `${res.done} done, ${res.failed} failed` : `${res.done} host${res.done === 1 ? "" : "s"} done`, res.failed ? "error" : "success");

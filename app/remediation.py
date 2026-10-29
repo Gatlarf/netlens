@@ -260,7 +260,7 @@ def run_ssh(conn: sqlite3.Connection, rule: dict, run: dict) -> str:
         raise RuntimeError("the device needs an SSH host monitor (device page, Monitor) so Netlens has a login to use")
     secret = hm.load_secret(conn, monitor)
     if not secret:
-        raise RuntimeError("the login of the host monitor cannot be read")
+        raise RuntimeError(hm.unreadable_text(conn, monitor, "the login of the host monitor cannot be read"))
     out, status, _fp = asyncio.run(ssh.run_command(monitor["address"], monitor["port"], secret.get("username", ""), secret.get("password"), secret.get("private_key"), secret.get("passphrase"),
                                                    rule["action"]["command"], get_fingerprint(conn, device_id), timeout=60.0))
     text = " ".join(out.split())[:300]

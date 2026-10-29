@@ -2,6 +2,7 @@ import { get, post, del, ApiError } from "./api.js";
 import { h, clear, toast } from "./util.js";
 import { infoTip, savedLoginButton } from "./ui.js";
 import { ensureFresh, prompt as stepUpPrompt } from "./stepup.js";
+import { reasonFor } from "./reason.js";
 
 const activeTerminals = new WeakMap();
 
@@ -218,6 +219,8 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
 
   async function startTerminal(proto, port, username, password, key, passphrase, credentialId = "", confirmed = false) {
     if (!confirmed && !(await ensureFresh())) { toast("This action needs a fresh confirmation, which was not given (or is not possible with this sign-in)", "error"); return; }
+    const reason = await reasonFor(credentialId);
+    if (reason === null) return;
     try {
       await loadXterm();
     } catch (e) {
@@ -280,6 +283,7 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
         private_key: key || null,
         passphrase: passphrase || null,
         credential_id: credentialId || null,
+        reason: reason || null,
         cols: term.cols,
         rows: term.rows
       };

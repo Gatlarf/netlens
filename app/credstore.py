@@ -12,6 +12,7 @@ import secrets
 import sqlite3
 from typing import Any
 
+from app import dbengine
 from app.db import get_setting, set_setting, utcnow
 
 KEY = "credstore.entries"
@@ -19,9 +20,15 @@ SYSTEM = "system"                       # the owner of entries that were moved h
 KINDS = {
     "login": ("username", "password", "domain"),                         # a user name and password (RDP, SSH, WinRM, the install login)
     "ssh_key": ("username", "private_key", "passphrase"),                # a private key
+    # Enterprise: the login lives in the customer's PAM; only where it is, and how Netlens signs in to the PAM, is stored here (app/pam)
+    "pam": ("provider", "url", "namespace", "mount", "kv_version", "path", "approle_mount", "role_id", "secret_id", "token", "ca_cert", "username", "domain",
+            "username_field", "password_field", "key_field", "passphrase_field", "domain_field", "reason_required"),
 }
-SECRET_FIELDS = ("password", "private_key", "passphrase")
-LIMITS = {"name": 80, "username": 256, "domain": 256, "password": 1024, "private_key": 16384, "passphrase": 1024}
+SECRET_FIELDS = ("password", "private_key", "passphrase", "token", "secret_id")
+BOOL_FIELDS = ("reason_required",)
+LIMITS = {"name": 80, "username": 256, "domain": 256, "password": 1024, "private_key": 16384, "passphrase": 1024, "provider": 40, "url": 512, "namespace": 200, "mount": 200,
+          "kv_version": 2, "path": 512, "approle_mount": 100, "role_id": 200, "secret_id": 512, "token": 4096, "ca_cert": 16384, "username_field": 100, "password_field": 100,
+          "key_field": 100, "passphrase_field": 100, "domain_field": 100}
 
 
 class CredentialError(ValueError):
@@ -49,7 +56,22 @@ def public(entry: dict[str, Any], user: str) -> dict[str, Any]:
     """What the API may show: never a secret, only whether one is set."""
     return {"id": entry["id"], "name": entry["name"], "kind": entry["kind"], "owner": entry["owner"], "shared": bool(entry.get("shared")), "mine": entry["owner"] == user,
             "username": entry.get("username", ""), "domain": entry.get("domain", ""), "has_secret": any(entry.get(f) for f in SECRET_FIELDS),
-            "created": entry.get("created"), "updated": entry.get("updated"), "last_used": entry.get("last_used"), "used_for": entry.get("used_for", "")}
+            "created": entry.get("created"), "updated": entry.get("updated"), "last_used": entry.get("last_used"), "used_for": entry.get("used_for", "")} | _pam_public(entry)
+
+
+def _pam_public(entry: dict[str, Any]) -> dict[str, Any]:
+    """For a `pam` entry: where the secret lives (no secret), and how the latest check-out went."""
+    if entry.get("kind") != "pam":
+        return {}
+    from app import pam
+
+    where = "/".join(x for x in (entry.get("mount") or "secret", entry.get("path") or "") if x)
+    return {"pam": {"provider": entry.get("provider", ""), "provider_name": pam.providers().get(entry.get("provider", ""), entry.get("provider", "")), "url": entry.get("url", ""),
+                    "where": where, "namespace": entry.get("namespace", ""), "kv_version": entry.get("kv_version") or "2", "auth": "token" if entry.get("token") else "approle",
+                    "approle_mount": entry.get("approle_mount", ""), "role_id": entry.get("role_id", ""), "has_ca": bool(entry.get("ca_cert")),
+                    "username_field": entry.get("username_field", ""), "password_field": entry.get("password_field", ""), "key_field": entry.get("key_field", ""),
+                    "passphrase_field": entry.get("passphrase_field", ""), "domain_field": entry.get("domain_field", ""),
+                    "reason_required": bool(entry.get("reason_required")), "last": pam.last_status(entry["id"])}}
 
 
 def listing(conn: sqlite3.Connection, user: str) -> list[dict[str, Any]]:
@@ -59,12 +81,23 @@ def listing(conn: sqlite3.Connection, user: str) -> list[dict[str, Any]]:
 def _clean(kind: str, fields: dict[str, Any]) -> dict[str, str]:
     out: dict[str, str] = {}
     for name in KINDS[kind]:
-        if name in fields and fields[name] is not None:
+        if name in BOOL_FIELDS and name in fields:
+            out[name] = bool(fields[name])
+        elif name in fields and fields[name] is not None:
             value = str(fields[name])
             if len(value) > LIMITS[name]:
                 raise CredentialError(f"{name} is too long")
             out[name] = value
     return out
+
+
+def _check_pam(values: dict[str, Any]) -> None:
+    from app import pam
+
+    try:
+        pam.validate(values)
+    except pam.PamError as exc:
+        raise CredentialError(str(exc)) from None
 
 
 def create(conn: sqlite3.Connection, user: str, name: str, kind: str, fields: dict[str, Any], shared: bool = False, owner: str | None = None) -> dict[str, Any]:
@@ -80,7 +113,9 @@ def create(conn: sqlite3.Connection, user: str, name: str, kind: str, fields: di
     values = _clean(kind, fields)
     if kind == "ssh_key" and not values.get("username"):
         raise CredentialError("a user name is needed")
-    if not any(values.get(f) for f in SECRET_FIELDS):
+    if kind == "pam":
+        _check_pam(values)
+    elif not any(values.get(f) for f in SECRET_FIELDS):
         raise CredentialError("a password or a key is needed")
     entry = {"id": secrets.token_hex(6), "name": name, "kind": kind, "owner": owner, "shared": bool(shared), "created": utcnow(), "updated": utcnow(), **values}
     data[entry["id"]] = entry
@@ -103,7 +138,14 @@ def update(conn: sqlite3.Connection, user: str, cred_id: str, fields: dict[str, 
         if any(e["id"] != cred_id and e["owner"] == entry["owner"] and e["name"].lower() == name.lower() for e in data.values()):
             raise CredentialError("that owner already has a login with that name")
         entry["name"] = name
-    for key, value in _clean(entry["kind"], {k: v for k, v in fields.items() if k not in SECRET_FIELDS or v}).items():
+    changes = _clean(entry["kind"], {k: v for k, v in fields.items() if k not in SECRET_FIELDS or v})
+    if entry["kind"] == "pam":
+        if fields.get("token") and not fields.get("secret_id"):
+            entry.pop("secret_id", None)                       # switching to a token: the old AppRole secret goes
+        if (fields.get("role_id") or fields.get("secret_id")) and not fields.get("token"):
+            entry.pop("token", None)
+        _check_pam({**entry, **changes})
+    for key, value in changes.items():
         entry[key] = value
     if "shared" in fields:
         entry["shared"] = bool(fields["shared"])
@@ -124,27 +166,112 @@ def delete(conn: sqlite3.Connection, user: str, cred_id: str, is_admin: bool) ->
     return entry
 
 
-def resolve(conn: sqlite3.Connection, user: str, cred_id: str, used_for: str = "") -> dict[str, Any]:
-    """The full login (secret included) for code on the server, if `user` may use it. Records when and what it was used for."""
+def _login_from_pam(conn: sqlite3.Connection, entry: dict[str, Any], user: str, purpose: str, reason: str, interactive: bool, device: str = "") -> dict[str, Any]:
+    """Ask the customer's PAM for the login of a `pam` entry. Fail closed: any problem is a CredentialError with a sentence. One audit line per check-out (a
+    background job that repeats it, such as a monitor, writes one line an hour per entry and purpose, and always one for a refusal). The secret is returned to the
+    caller and kept nowhere else."""
+    from app import audit, pam
+
+    ctx = pam.Context(purpose=purpose, user=user or "netlens", reason=reason, device=device)
+    try:
+        fetched = pam.checkout(entry, ctx, interactive)
+    except pam.PamError as exc:
+        audit.record(conn, user or "netlens", "", "", "PAM", "/pam/checkout", 403, pam.audit_line(entry, ctx, "", False, str(exc)))
+        raise CredentialError(str(exc)) from None
+    try:
+        values = dict(fetched.values)
+    finally:
+        fetched.done()
+    if interactive or _due(entry["id"], purpose):
+        audit.record(conn, user or "netlens", "", "", "PAM", "/pam/checkout", 200, pam.audit_line(entry, ctx, fetched.lease, True))
+    return {"id": entry["id"], "name": entry["name"], "kind": "ssh_key" if values.get("private_key") and not values.get("password") else "login", **values}
+
+
+_AUDITED: dict[tuple[str, str], float] = {}
+
+
+def _due(cred_id: str, purpose: str, every_s: float = 3600.0) -> bool:
+    import time
+
+    now, key = time.time(), (cred_id, purpose[:60])
+    if now - _AUDITED.get(key, 0.0) < every_s:
+        return False
+    if len(_AUDITED) > 5000:
+        _AUDITED.clear()
+    _AUDITED[key] = now
+    return True
+
+
+def resolve(conn: sqlite3.Connection, user: str, cred_id: str, used_for: str = "", reason: str = "", device: str = "") -> dict[str, Any]:
+    """The full login (secret included) for code on the server, if `user` may use it. Records when and what it was used for. A login in the customer's PAM is fetched
+    now (and needs a reason if the entry says so); this is for a person's action."""
     data = _load(conn)
     entry = data.get(cred_id)
     if entry is None or not _visible(entry, user):
         raise CredentialError("no such login")
+    if entry.get("kind") == "pam":
+        found = _login_from_pam(conn, entry, user, used_for or "use", reason, True, device)
+        entry["last_used"], entry["used_for"] = utcnow(), used_for[:120]
+        _save(conn, data)
+        return found
     entry["last_used"], entry["used_for"] = utcnow(), used_for[:120]
     _save(conn, data)
     return dict(entry)
 
 
+def pam_problems(conn: sqlite3.Connection) -> list[dict[str, str]]:
+    """Logins in the customer's PAM whose latest check-out was refused or failed (memory of this run; nothing secret). For the dashboard, the answers and the reports."""
+    from app import pam
+
+    out = []
+    for entry in _load(conn).values():
+        if entry.get("kind") == "pam":
+            last = pam.last_status(entry["id"])
+            if last and not last["ok"]:
+                out.append({"id": entry["id"], "text": f"The PAM system did not hand out the login \"{entry['name']}\": {last['message']}"})
+    return sorted(out, key=lambda p: p["text"])
+
+
+async def resolve_async(conn: sqlite3.Connection, user: str, cred_id: str, used_for: str = "", reason: str = "", device: str = "") -> dict[str, Any]:
+    """`resolve` for code that runs on the event loop. A login in the PAM is a network call, so it runs in a thread with a connection of its own; the others are as before."""
+    import asyncio
+
+    entry = _load(conn).get(cred_id)
+    path = dbengine.database_path(conn)
+    if entry is None or entry.get("kind") != "pam" or not path:
+        return resolve(conn, user, cred_id, used_for, reason, device)
+    from app.db import connect
+
+    def work() -> dict[str, Any]:
+        own = connect(path)
+        try:
+            return resolve(own, user, cred_id, used_for, reason, device)
+        finally:
+            own.close()
+    return await asyncio.to_thread(work)
+
+
 def peek(conn: sqlite3.Connection, user: str, cred_id: str) -> dict[str, Any] | None:
-    """Like resolve, but for showing a name: nothing is recorded as used."""
+    """Like resolve, but for showing a name: nothing is recorded as used and the PAM is not asked."""
     entry = _load(conn).get(cred_id)
     return dict(entry) if entry and _visible(entry, user) else None
 
 
 def peek_bound(conn: sqlite3.Connection, cred_id: str) -> dict[str, Any] | None:
-    """For background jobs (a monitor, a probe): the login a person chose to bind to a host. Who may bind it was checked when they did."""
+    """For showing the login a person bound to a host (its name, its user): never the PAM. To use it, see use_bound."""
     entry = _load(conn).get(cred_id)
     return dict(entry) if entry else None
+
+
+def use_bound(conn: sqlite3.Connection, cred_id: str, purpose: str, device: str = "") -> dict[str, Any] | None:
+    """For background jobs (a monitor, a probe): the login a person chose to bind to a host, with its secret. Who may bind it was checked when they did. A login in the
+    PAM is fetched now and may not need a reason (a job cannot give one). None when the login is gone."""
+    entry = _load(conn).get(cred_id)
+    if entry is None:
+        return None
+    if entry.get("kind") == "pam":
+        return _login_from_pam(conn, entry, "", purpose, "", False, device)
+    return dict(entry)
 
 
 def find(conn: sqlite3.Connection, user: str, name: str) -> dict[str, Any] | None:

@@ -792,6 +792,10 @@ If the authenticator **and** the recovery codes are lost: `docker exec -it netle
 - **API tokens** (Enterprise): a longest life for new tokens (they get it by default), and a list of addresses or networks a token may be used from; both are shown in the token list. An expired token, or a token used from another address, is refused.
 - **A setting stays in force when a licence ends.** Only changing it needs the edition; a lapsing licence never weakens security.
 
+### Logins from your privileged-access system (Enterprise)
+
+A stored login (Settings → Credentials) can be of kind **PAM**: Netlens keeps where the secret lives and how it signs in to your vault, and asks the vault each time a terminal, remote desktop, monitor, probe or host set-up needs it. No copy is kept; if the vault refuses or cannot be reached the use does not happen. HashiCorp Vault and OpenBao (KV 1 and 2, AppRole or token) are supported and tested; a login can require a reason from the person using it; every check-out is one audit line without the secret. Set-up, policy examples and troubleshooting are in [PAM.md](PAM.md).
+
 ### Software bill of materials (SBOM)
 
 **Settings → About → Download SBOM** (administrators) or `GET /api/sbom` gives the software bill of materials of **this installation**, made from what is actually installed: the Python packages with their declared licences, the vendored browser libraries with the SHA-256 of each file, and the operating-system packages of the image. Two standard formats: **CycloneDX 1.5** (default) and **SPDX 2.3** (`?format=spdx`); every package has a package URL (purl) so scanners such as Grype, Trivy, Dependency-Track or OSV can match it to known vulnerabilities. `python -m app.sbom [--format spdx]` prints the same from the command line. A test fails when a library is added under `app/static/vendor` without being added to the bill. The container image that the project publishes carries its own build-time SBOM and provenance attestation, and the build keeps the CycloneDX and SPDX documents as an artifact.

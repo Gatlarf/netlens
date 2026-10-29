@@ -13,6 +13,11 @@ import os
 import sqlite3
 
 
+def database_path(conn: sqlite3.Connection) -> str:
+    """The file of a SQLite connection ("" for an in-memory database): for work that must run in a thread with a connection of its own."""
+    return next((r[2] for r in conn.execute("PRAGMA database_list") if r[1] == "main"), "")
+
+
 def table_names(conn: sqlite3.Connection) -> list[str]:
     """The tables of the application (no engine-internal ones), by name."""
     return [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]

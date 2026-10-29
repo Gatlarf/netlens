@@ -5,6 +5,7 @@ import { get, post, del } from "../api.js";
 import { h, clear, toast, shortName, statusDot } from "../util.js";
 import { mountTerminal } from "../terminal.js";
 import { savedLoginButton } from "../ui.js";
+import { reasonFor } from "../reason.js";
 
 let guacLoaded = null;
 function loadGuac() {
@@ -87,7 +88,7 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
     const domain = h("input", { type: "text", name: "domain", autocomplete: "off", value: saved ? saved.domain : "" });
     const remember = h("input", { type: "checkbox", name: "remember" });
     const stored = h("select", { name: "stored" }, h("option", { value: "" }, "Type a login below"));
-    get("/api/credentials").then((r) => { for (const c of r.credentials.filter((x) => x.kind === "login")) stored.appendChild(h("option", { value: c.id }, `${c.name}${c.username ? ` (${c.username})` : ""}`)); }).catch(() => {});
+    get("/api/credentials").then((r) => { for (const c of r.credentials.filter((x) => x.kind === "login" || x.kind === "pam")) stored.appendChild(h("option", { value: c.id }, `${c.name}${c.username ? ` (${c.username})` : ""}`)); }).catch(() => {});
     stored.addEventListener("change", () => { const typed = stored.value === ""; for (const el of [user, pass, domain, remember]) el.disabled = !typed; });
     const error = h("p", { class: "error", role: "alert" }, message || "");
     const form = h("form", { class: "remote-form card" },
@@ -107,7 +108,7 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
       h("p", { class: "hint" }, "The password is sent once to open the session and is not kept unless you choose to remember it."));
     form.addEventListener("submit", (e) => {
       e.preventDefault();
-      if (stored.value) connect({ credential_id: stored.value });
+      if (stored.value) reasonFor(stored.value).then((reason) => { if (reason !== null) connect({ credential_id: stored.value, reason }); });
       else connect({ username: user.value, password: pass.value, domain: domain.value, remember: remember.checked });
     });
     root.appendChild(form);

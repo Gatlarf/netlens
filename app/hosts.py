@@ -70,13 +70,13 @@ def overview(conn) -> list[dict[str, Any]]:
     return out
 
 
-def _admin_login(conn, user: str, opts: dict[str, Any]) -> dict[str, Any]:
+async def _admin_login(conn, user: str, opts: dict[str, Any], device: str = "") -> dict[str, Any]:
     """The administrator login for the install, used for this run only: from the store, or typed (never stored, never logged)."""
     if opts.get("admin_credential_id"):
         try:
-            c = credstore.resolve(conn, user, str(opts["admin_credential_id"]), "installing host probes")
-        except credstore.CredentialError:
-            raise installer.InstallError("no such stored administrator login")
+            c = await credstore.resolve_async(conn, user, str(opts["admin_credential_id"]), "installing host probes", str(opts.get("reason") or ""), device)
+        except credstore.CredentialError as exc:
+            raise installer.InstallError("no such stored administrator login" if str(exc) == "no such login" else str(exc))
         return {"username": c.get("username", ""), "password": c.get("password"), "private_key": c.get("private_key"), "passphrase": c.get("passphrase"), "sudo_password": c.get("password")}
     return {"username": str(opts.get("admin_username") or "").strip(), "password": opts.get("admin_password") or None, "private_key": opts.get("admin_private_key") or None,
             "passphrase": None, "sudo_password": opts.get("admin_password") or None}
@@ -133,7 +133,7 @@ async def _one(db_path, device_id: int, level: str, opts: dict[str, Any], who, i
             if level in ("unprobe", "remove") and not have_probe:
                 steps.append("No probe on this host")
             else:
-                admin = _admin_login(conn, user, opts)
+                admin = await _admin_login(conn, user, opts, str(device_id))
                 result = await installer.administer(conn, device_id, action, admin, None, bool(opts.get("enable_sshd")), str(opts.get("allow_from") or ""))
                 steps += [str(l) for l in result.get("log", [])][-6:]
                 if not result["ok"]:

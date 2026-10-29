@@ -184,7 +184,7 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     const snmpBox = h("div", {}, field("SNMP version", version), communityField, v3Box);
     const stored = h("select", {}, h("option", { value: "" }, "Type a login"));
     get("/api/credentials").then((r) => {
-      for (const c of r.credentials) stored.appendChild(h("option", { value: c.id }, `${c.name}${c.username ? ` (${c.username})` : ""}`));
+      for (const c of r.credentials.filter((x) => !(x.pam && x.pam.reason_required))) stored.appendChild(h("option", { value: c.id }, `${c.name}${c.username ? ` (${c.username})` : ""}`));
       stored.value = m && m.credential_id ? m.credential_id : "";
       show();
     }).catch(() => {});

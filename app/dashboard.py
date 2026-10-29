@@ -203,6 +203,10 @@ def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
     if licence.allows(conn, "agents"):
         for p in ingest.problems(conn):          # a collector that stopped sending, a certificate that is about to end
             out.append({"level": "warn", "text": p["text"], "href": "#/settings/ingest", "snooze": f"agent:{p['agent_id']}"})
+    from app import credstore
+
+    for p in credstore.pam_problems(conn):       # the customer's PAM refused a login (nothing can use it until that is fixed)
+        out.append({"level": "warn", "text": p["text"], "href": "#/settings/credentials", "snooze": f"pam:{p['id']}"})
     for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY LOWER(name)"):
         site = probes_mod.present(conn, row)
         href = f"#/remote-sites?id={site['id']}"

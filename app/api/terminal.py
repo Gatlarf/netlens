@@ -144,9 +144,9 @@ async def terminal_ws(
         if proto == "ssh" and data.get("credential_id"):
             principal = identify(websocket)
             try:
-                stored = credstore.resolve(conn, getattr(principal, "username", "") or "", str(data["credential_id"]), f"SSH terminal to {primary_ip}")
-            except credstore.CredentialError:
-                await websocket.send_json({"type": "error", "code": "auth_message", "message": "no such stored login"})
+                stored = await credstore.resolve_async(conn, getattr(principal, "username", "") or "", str(data["credential_id"]), f"SSH terminal to {primary_ip}", str(data.get("reason") or ""), primary_ip)
+            except credstore.CredentialError as exc:
+                await websocket.send_json({"type": "error", "code": "auth_message", "message": str(exc) if str(exc) != "no such login" else "no such stored login"})
                 await websocket.close(code=1008)
                 return
             username = stored.get("username", "")

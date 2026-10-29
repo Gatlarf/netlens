@@ -167,17 +167,6 @@ def _binding(saved: dict, user: str, device_id, proto: str) -> dict | None:
     return saved.get(f"{user}|{device_id}:{proto}") or saved.get(f"{device_id}:{proto}")
 
 
-def _binding_login(conn, saved: dict, user: str, device_id, proto: str) -> dict | None:
-    """The login remembered for this device and protocol, if this user may use it (it is a stored login: private to someone, or shared)."""
-    bound = _binding(saved, user, device_id, proto)
-    if not bound:
-        return None
-    try:
-        return credstore.resolve(conn, user, bound["credential_id"], f"remote {proto.upper()}")
-    except credstore.CredentialError:
-        return None
-
-
 def _save(conn, data: dict) -> None:
     set_setting(conn, CREDENTIALS_KEY, json.dumps(data))
 
@@ -212,6 +201,7 @@ class SessionBody(BaseModel):
     use_saved: bool = False
     credential_id: str = ""
     remember: bool = False
+    reason: str = ""
 
 
 def _clamp(value: int, low: int, high: int) -> int:
@@ -245,11 +235,12 @@ async def open_session(request: Request, device_id: int, body: SessionBody) -> d
         who = _username(request)
         if body.credential_id or body.use_saved:
             try:
-                if body.credential_id:
-                    creds = credstore.resolve(conn, who, body.credential_id, f"remote {body.proto.upper()} to {device['name']}")
-                else:
-                    creds = _binding_login(conn, _saved(conn), who, device_id, body.proto)
-            except credstore.CredentialError:
+                bound = None if body.credential_id else _binding(_saved(conn), who, device_id, body.proto)
+                cred_id = body.credential_id or (bound or {}).get("credential_id")
+                creds = await credstore.resolve_async(conn, who, cred_id, f"remote {body.proto.upper()} to {device['name']}", body.reason, device["name"]) if cred_id else None
+            except credstore.CredentialError as exc:
+                if str(exc) != "no such login":
+                    raise HTTPException(status_code=403, detail=str(exc))                # the PAM said no, or wants a reason: say so
                 creds = None
             if not creds:
                 raise HTTPException(status_code=404, detail="no such stored login for this device")

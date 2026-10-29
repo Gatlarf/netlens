@@ -40,7 +40,7 @@ async def apply_hosts(body: dict, request: Request) -> dict[str, Any]:
     level = str(body.get("level") or "")
     if level not in hosts.LEVELS:
         raise HTTPException(status_code=422, detail="level must be one of: " + ", ".join(hosts.LEVELS))
-    opts = {k: body.get(k) for k in ("method", "credential_id", "admin_credential_id", "admin_username", "admin_password", "admin_private_key", "enable_sshd", "allow_from")}
+    opts = {k: body.get(k) for k in ("method", "credential_id", "admin_credential_id", "admin_username", "admin_password", "admin_private_key", "enable_sshd", "allow_from", "reason")}
     who = getattr(request.state, "user", None) or identify(request)
     results = await hosts.apply(request.app.state.db_path, ids, level, opts, who, client_ip(request))
     return {"results": results, "done": sum(1 for r in results if r["ok"]), "failed": sum(1 for r in results if not r["ok"])}
