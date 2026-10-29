@@ -20,7 +20,7 @@ from app import licence
 GUIDE = Path(__file__).resolve().parent / "assistant_guide.md"
 MODES = ("read", "change")
 # nothing here, not even to read: secrets, accounts, ways to run commands, ways to take everything
-NEVER = re.compile(r"^/api/(users|vault|shares|sso|backup|restore|auth|setup|login|logout|me|assistant/token|terminal|remote|central|mcp|ingest)(/|$)")
+NEVER = re.compile(r"^/api/(users|roles|vault|shares|sso|backup|restore|auth|setup|login|logout|me|assistant/token|terminal|remote|central|mcp|ingest)(/|$)")
 # reading is fine, changing is not
 READ_ONLY_FOR_CHANGE = re.compile(r"^/api/(licence|remediation|engineer|update|backups|siem|documentation|probes/[^/]+/token)(/|$)")
 DELETABLE = re.compile(r"^/api/((service-checks|maintenance|notify-channels|groups)/[^/]+|snoozes)$")      # snoozes are ended with DELETE /api/snoozes?subject=...

@@ -76,7 +76,9 @@ function userRow(user, data, refresh, shown) {
   const row = h("tr", { class: user.disabled ? "disabled-user" : "" });
   const role = h("select", { "aria-label": `Role of ${user.username}` });
   for (const r of data.roles) role.appendChild(h("option", { value: r }, ROLE_TEXT[r] || r));
-  role.value = user.role;
+  const customs = (data.custom_roles || []).filter((c) => !user.scope && !user.sites);          // a customer view cannot have a custom role
+  if (user.role !== "admin") for (const c of customs) role.appendChild(h("option", { value: `custom:${c.id}` }, `${c.name} (custom, based on ${c.base})`));
+  role.value = user.custom_role && customs.some((c) => c.id === user.custom_role) ? `custom:${user.custom_role}` : user.role;
   if (user.last_admin) { role.disabled = true; role.title = "This is the last administrator: make another user an administrator first"; }
   const call = async (request, done) => {
     try {
@@ -87,7 +89,7 @@ function userRow(user, data, refresh, shown) {
       toast(err.message || "Failed", "error");
     }
   };
-  role.addEventListener("change", () => call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { role: role.value } }), "Role changed"));
+  role.addEventListener("change", () => call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: role.value.startsWith("custom:") ? { custom_role: role.value.slice(7) } : { role: role.value, custom_role: "" } }), "Role changed"));
 
   const actions = h("td", {});
   const pw = h("button", { type: "button", class: "btn" }, "New password");

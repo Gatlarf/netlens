@@ -24,7 +24,7 @@ WRITE = ("POST", "PUT", "PATCH", "DELETE")
 _BARE = r"(?:/[^/]+)*"
 # (methods, path regex) of what is privileged
 PRIVILEGED: list[tuple[tuple[str, ...], re.Pattern]] = [
-    (WRITE, re.compile(r"^/api/(credentials|users|vault|ingest|sso|assistant|mcp|security-policy|restore|central|hostprobe|hosts|engineer|siem)(/|$)")),
+    (WRITE, re.compile(r"^/api/(credentials|users|roles|vault|ingest|sso|assistant|mcp|security-policy|restore|central|hostprobe|hosts|engineer|siem)(/|$)")),
     (("PUT", "DELETE"), re.compile(r"^/api/licence$")),
     (WRITE, re.compile(r"^/api/plugins(/[^/]+)?$")),                                        # install by upload, change the settings (they hold logins), remove
     (WRITE, re.compile(r"^/api/plugin-index/(settings|[^/]+/(install|rollback|auto-update))$")),

@@ -130,6 +130,7 @@ class Principal:
     mfa: Optional[dict] = None  # {"required", "enrolled", "deadline", "restricted"} for a signed-in user session
     auth_at: Optional[str] = None  # when this session last proved the user's identity (sign-in, or step-up)
     auth_method: Optional[str] = None  # password | totp | recovery | webauthn | oidc
+    grants: tuple = ()  # the read-only capabilities of a custom role (app/roles.py), already checked against the licence
 
     @property
     def is_admin(self) -> bool:
@@ -239,7 +240,16 @@ def identify(conn: HTTPConnection) -> Optional[Principal]:
                     mfa = secpolicy.mfa_state(db, {"role": row["role"], "created": row["user_created"], "oidc_sub": row["oidc_sub"], "totp_enabled": row["totp_enabled"], "webauthn_enabled": row["webauthn_enabled"]})
                 finally:
                     db.close()
-            return Principal(username=row["username"], role=role, user_id=row["id"], scope=groups if groups is not None else (() if sites is not None else None), sites=sites,
+            grants: tuple = ()
+            if row["custom_role"] and role in ("viewer", "operator") and groups is None and sites is None:
+                from app import roles
+
+                db = connect(conn.app.state.db_path)
+                try:
+                    grants = roles.grants_of(db, row["custom_role"])
+                finally:
+                    db.close()
+            return Principal(username=row["username"], role=role, user_id=row["id"], grants=grants, scope=groups if groups is not None else (() if sites is not None else None), sites=sites,
                              restricted=bool(mfa and mfa["restricted"]), mfa=mfa, auth_at=row["auth_at"] if token_row is None else None, auth_method=row["auth_method"] if token_row is None else None)
     return None
 
@@ -289,6 +299,10 @@ def require_auth(request: HTTPConnection) -> None:
         allowed = ((method in ("GET", "HEAD") and VIEWER_READABLE.match(path)) or (method == "POST" and path in VIEWER_MAY_POST)
                    or (method in ("PUT", "DELETE") and path == "/api/dashboard/layout")     # everybody arranges their own dashboard
                    or (method in ("GET", "PUT") and path == "/api/me/preferences"))          # and chooses the page to start on
+        if not allowed and principal.grants:
+            from app import roles
+
+            allowed = roles.allows(principal.grants, method, path)               # a custom role: more reading, nothing else
         if not allowed and principal.role == "operator":
             allowed = ((method in ("GET", "HEAD") and OPERATOR_READABLE.match(path))
                        or any(method == m and rx.match(path) for m, rx in OPERATOR_WRITABLE))

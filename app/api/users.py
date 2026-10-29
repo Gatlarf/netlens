@@ -18,6 +18,7 @@ class NewUser(BaseModel):
 class UserPatch(BaseModel):
     break_glass: bool | None = None
     role: str | None = None
+    custom_role: str | None = None         # a custom role (Settings -> Roles); "" takes it away. Its base becomes the user's role.
     password: str | None = None
     disabled: bool | None = None
     scope: list[int] | None = None
@@ -55,7 +56,7 @@ def get_users(request: Request) -> dict:
     db = _db(request)
     try:
         return {
-            "users": users.list_users(db), "roles": list(users.ROLES), "min_password": max(users.MIN_PASSWORD, secpolicy.get(db)["min_password"]),
+            "users": users.list_users(db), "roles": list(users.ROLES), "custom_roles": [{"id": r["id"], "name": r["name"], "base": r["base"]} for r in __import__("app.roles", fromlist=["load"]).load(db)], "min_password": max(users.MIN_PASSWORD, secpolicy.get(db)["min_password"]),
             "token_configured": bool(request.app.state.settings.token),  # NETLENS_TOKEN is set in the environment
             "teams_allowed": licence.allows(db, "teams"),
             "token_policy": {"max_days": secpolicy.get(db)["api_token_max_days"], "may_restrict": licence.allows(db, "privileged")},
@@ -97,6 +98,18 @@ def edit_user(request: Request, user_id: int, body: UserPatch) -> dict:
                     "SELECT COUNT(*) FROM users WHERE disabled = 0 AND role = 'admin' AND break_glass = 1 AND (totp_enabled = 1 OR webauthn_enabled = 1) AND id != ?", (user_id,)).fetchone()[0] < 1:
                 raise HTTPException(status_code=409, detail="this is the last break-glass account while password sign-in is limited to them: allow password sign-in again first")
             db.execute("UPDATE users SET break_glass = ? WHERE id = ?", (1 if body.break_glass else 0, user_id))
+            db.commit()
+        if body.custom_role is not None:
+            from app import roles
+
+            if body.custom_role and not licence.allows(db, "privileged"):
+                raise HTTPException(status_code=402, detail="custom roles are part of the Enterprise edition (or the free trial)")
+            try:
+                roles.assign(db, user_id, body.custom_role or None)
+            except roles.RoleError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from None
+        elif body.role is not None:
+            db.execute("UPDATE users SET custom_role = NULL WHERE id = ?", (user_id,))          # an explicit change of the plain role ends a custom role
             db.commit()
         try:
             users.update_user(db, user_id, role=body.role, password=body.password, disabled=body.disabled,

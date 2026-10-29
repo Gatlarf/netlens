@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { h, clear, fmtTime, isAdmin, toast } from "../util.js";
+import { h, clear, fmtTime, can, toast } from "../util.js";
 
 // Settings → Audit log: who changed what, and when (kept for a year; request bodies, passwords and tokens are never stored).
 export async function buildAuditCard() {
@@ -48,7 +48,7 @@ export async function buildAuditCard() {
       ? `Integrity: intact when checked ${when} (${r.checked} lines linked${r.unchained ? `, ${r.unchained} older lines from before the chain existed` : ""}${r.anchors_checked ? `, ${r.anchors_checked} anchors` : ""}).`
       : `Integrity: FAILED when checked ${when}, at line ${r.problem.id}: ${r.problem.text}`;
   };
-  if (isAdmin()) {
+  if (can("audit")) {
     get("/api/audit/integrity").then((d) => showIntegrity(d.result)).catch(() => {});
     checkNow.addEventListener("click", async () => {
       checkNow.disabled = true;
@@ -58,7 +58,7 @@ export async function buildAuditCard() {
   }
   card.append(h("h2", {}, "Audit log"),
     h("p", { class: "hint" }, "Who changed what, and when: settings, devices, users, monitors, backups and sign-ins. Kept for a year. Passwords and request contents are never stored."),
-    isAdmin() ? h("div", { class: "rep-tools" }, integrity, checkNow) : null,
+    can("audit") ? h("div", { class: "rep-tools" }, integrity, checkNow) : null,
     h("div", { class: "rep-tools" }, userSelect, search, h("a", { class: "btn", href: "/api/audit.csv", download: "" }, "Download as CSV")),
     h("div", { class: "rep-scroll" }, h("table", { class: "rep-table" }, h("thead", {}, h("tr", {}, ...["When", "Who", "What", "From"].map((t) => h("th", {}, t)))), body)),
     note, more);

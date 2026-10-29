@@ -5,11 +5,10 @@ from __future__ import annotations
 import csv
 import io
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 
-from app import audit, auditchain
-from app.auth import require_admin
+from app import audit, auditchain, roles
 from app.api.devices import get_conn
 
 router = APIRouter(prefix="/api", tags=["audit"])
@@ -25,7 +24,8 @@ def list_audit(limit: int = Query(100, ge=1, le=1000), before: int | None = None
 @router.get("/audit/integrity")
 def integrity(request: Request, run: bool = False, conn=Depends(get_conn)) -> dict:
     """Is the audit log intact? `run=true` checks now (it reads the whole log); otherwise the latest result is returned. Administrators only."""
-    require_admin(request)
+    if not roles.has(request, "audit"):
+        raise HTTPException(status_code=403, detail="this needs an administrator, or a role with access to the audit log")
     result = auditchain.check(conn) if run else auditchain.last_result(conn)
     return {"result": result, "anchors": "Audit lines that start with 'Audit chain anchor:' hold the newest chain value; log forwarding sends them to your SIEM, which keeps a copy that Netlens cannot change."}
 

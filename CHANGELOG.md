@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.318 — 2026-10-29
+
+### Added
+- ★ **Custom roles (Enterprise and the trial).** Settings → Roles: a role is a viewer or an operator plus a few read-only extras from a fixed list (the audit log and its integrity check, the reports, the backups page, vulnerabilities, storage, DNS, the inventory), for example an *auditor*. Give it to a user under Users & tokens. A custom role can never change anything or reach logins, users, remote access or settings; a test checks every capability against the real routes. The base role stays the user's role (so everything keeps denying by default), customer views and administrators cannot hold one, and without the licence the user is simply their base role again. Tokens of such a user carry the extras; a read-only token still only reads. Settings → Account shows the Audit log to a user who may read it.
+
 ## 0.4.317 — 2026-10-29
 
 ### Added

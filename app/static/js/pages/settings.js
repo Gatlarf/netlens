@@ -1,7 +1,7 @@
 import { buildMaintenanceCard } from "../cards/maintenance.js";
 import { get, post, put } from "../api.js";
 import { groupButtons } from "../ui.js";
-import { h, clear, toast, isAdmin, fmtTime } from "../util.js";
+import { h, clear, toast, isAdmin, can, fmtTime } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
 import { buildScheduleCard, buildTerminalCard } from "../cards/general.js";
 import { buildPluginCard } from "../cards/plugin.js";
@@ -29,6 +29,7 @@ import { buildBrowseCard } from "../cards/plugin_browse.js";
 import { buildBackupCard } from "../cards/backup.js";
 import { buildDatabaseCard } from "../cards/database.js";
 import { buildAccountCard } from "../cards/account.js";
+import { buildRolesCard } from "../cards/roles.js";
 import { buildAuditCard } from "../cards/audit.js";
 import { buildUsersCard } from "../cards/users.js";
 import { buildSharesCard } from "../cards/shares.js";
@@ -274,6 +275,7 @@ const STATIC_GROUPS = [
     title: "Access",
     items: [
       { key: "users", label: "Users & tokens", build: buildUsersCard },
+      { key: "roles", label: "Roles", build: buildRolesCard },
       { key: "sso", label: "Single sign-on", build: buildSsoCard },
       { key: "security", label: "Sign-in security", build: buildSecurityCard },
       { key: "terminal", label: "Web terminal", build: buildTerminalCard },
@@ -342,7 +344,7 @@ function integrationsGroup(plugins, updates = 0) {
 }
 
 async function loadGroups() {
-  if (!isAdmin()) return [{ title: "Account", items: [{ key: "session", label: "Account", build: buildAccountCard }] }];
+  if (!isAdmin()) return [{ title: "Account", items: [{ key: "session", label: "Account", build: buildAccountCard }, ...(can("audit") ? [{ key: "audit", label: "Audit log", build: buildAuditCard }] : [])] }];
   let plugins = [];
   let updates = 0;
   try {

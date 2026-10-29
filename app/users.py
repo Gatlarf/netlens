@@ -248,7 +248,7 @@ def delete_user(conn: sqlite3.Connection, user_id: int) -> None:
 
 def list_users(conn: sqlite3.Connection) -> list[dict]:
     users = []
-    for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope, site_scope, totp_enabled, webauthn_enabled, break_glass FROM users ORDER BY LOWER(username)"):
+    for u in conn.execute("SELECT id, username, role, custom_role, disabled, created, last_login, scope, site_scope, totp_enabled, webauthn_enabled, break_glass FROM users ORDER BY LOWER(username)"):
         tokens = conn.execute("SELECT id, name, created, last_used, readonly, assistant, expires, allowed_ips FROM api_tokens WHERE user_id = ? ORDER BY id", (u["id"],)).fetchall()
         users.append({**{k: v for k, v in dict(u).items() if k not in ("scope", "site_scope", "totp_enabled", "webauthn_enabled", "break_glass")}, "scope": parse_scope(u["scope"]), "sites": parse_scope(u["site_scope"]), "disabled": bool(u["disabled"]), "totp": bool(u["totp_enabled"]), "webauthn": bool(u["webauthn_enabled"]), "second_factor": bool(u["totp_enabled"] or u["webauthn_enabled"]), "break_glass": bool(u["break_glass"]), "last_admin": u["role"] == "admin" and not u["disabled"] and _other_admins(conn, u["id"]) == 0, "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
     return users
@@ -304,7 +304,7 @@ def user_for_session(conn: sqlite3.Connection, cookie: str):
         return None
     digest = _digest(cookie[len(SESSION_PREFIX):])
     row = conn.execute(
-        "SELECT u.id, u.username, u.role, u.scope, u.site_scope, u.created AS user_created, u.oidc_sub, u.totp_enabled, u.webauthn_enabled, s.created AS session_created, s.last_seen, s.auth_at, s.auth_method "
+        "SELECT u.id, u.username, u.role, u.custom_role, u.scope, u.site_scope, u.created AS user_created, u.oidc_sub, u.totp_enabled, u.webauthn_enabled, s.created AS session_created, s.last_seen, s.auth_at, s.auth_method "
         "FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires > ? AND u.disabled = 0",
         (digest, _iso(_now())),
     ).fetchone()
@@ -422,7 +422,7 @@ def user_for_token(conn: sqlite3.Connection, bearer: str, ip: str = ""):
     if not bearer or not bearer.startswith(TOKEN_PREFIX):
         return None
     row = conn.execute(
-        "SELECT t.id AS token_id, t.readonly, t.assistant, t.name AS token_name, t.expires, t.allowed_ips, u.id, u.username, u.role, u.scope, u.site_scope FROM api_tokens t JOIN users u ON u.id = t.user_id "
+        "SELECT t.id AS token_id, t.readonly, t.assistant, t.name AS token_name, t.expires, t.allowed_ips, u.id, u.username, u.role, u.custom_role, u.scope, u.site_scope FROM api_tokens t JOIN users u ON u.id = t.user_id "
         "WHERE t.token_hash = ? AND u.disabled = 0",
         (_digest(bearer),),
     ).fetchone()

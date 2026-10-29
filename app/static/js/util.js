@@ -226,6 +226,11 @@ export function sessionInfo() {
   return sessionUser;
 }
 
+// An administrator, or a user whose custom role grants this extra reading (Settings -> Roles): "audit", "reports", "backups" ...
+export function can(grant) {
+  return isAdmin() || Boolean(sessionUser && (sessionUser.grants || []).includes(grant));
+}
+
 export function isAdmin() {
   // a user whom the policy requires to set up a second factor (and who has not) can reach only the Account page: for the interface that is not an administrator
   return !sessionUser || (sessionUser.role === "admin" && !(sessionUser.mfa && sessionUser.mfa.restricted));

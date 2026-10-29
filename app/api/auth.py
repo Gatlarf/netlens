@@ -316,7 +316,7 @@ async def session(request: Request) -> JSONResponse:
         db.close()
     return JSONResponse({
         "authenticated": True,
-        "user": {"username": principal.username, "role": principal.role, "builtin": principal.builtin, **({"mfa": principal.mfa} if principal.mfa and principal.mfa["required"] else {}), **({"scoped": True, "sites": bool(principal.sites), "devices": bool(principal.scope)} if principal.scope is not None else {})},
+        "user": {"username": principal.username, "role": principal.role, "builtin": principal.builtin, **({"mfa": principal.mfa} if principal.mfa and principal.mfa["required"] else {}), **({"grants": list(principal.grants)} if principal.grants else {}), **({"scoped": True, "sites": bool(principal.sites), "devices": bool(principal.scope)} if principal.scope is not None else {})},
         "start_page": (("#/remote-sites" if principal.sites and not principal.scope else "#/devices") if principal.scope is not None else start_page),
         **_demo_info(request),
         "interface": _interface(request),
