@@ -130,6 +130,7 @@ class Principal:
     mfa: Optional[dict] = None  # {"required", "enrolled", "deadline", "restricted"} for a signed-in user session
     auth_at: Optional[str] = None  # when this session last proved the user's identity (sign-in, or step-up)
     auth_method: Optional[str] = None  # password | totp | recovery | webauthn | oidc
+    break_glass: bool = False  # an emergency administrator account: not held to the list of networks administration is limited to (app/secpolicy.py)
     grants: tuple = ()  # the read-only capabilities of a custom role (app/roles.py), already checked against the licence
 
     @property
@@ -249,7 +250,7 @@ def identify(conn: HTTPConnection) -> Optional[Principal]:
                     grants = roles.grants_of(db, row["custom_role"])
                 finally:
                     db.close()
-            return Principal(username=row["username"], role=role, user_id=row["id"], grants=grants, scope=groups if groups is not None else (() if sites is not None else None), sites=sites,
+            return Principal(username=row["username"], role=role, user_id=row["id"], grants=grants, break_glass=bool(row["break_glass"]), scope=groups if groups is not None else (() if sites is not None else None), sites=sites,
                              restricted=bool(mfa and mfa["restricted"]), mfa=mfa, auth_at=row["auth_at"] if token_row is None else None, auth_method=row["auth_method"] if token_row is None else None)
     return None
 
@@ -287,6 +288,12 @@ def require_auth(request: HTTPConnection) -> None:
 
         assistant.check(request.scope.get("method", "GET"), request.url.path, principal.assistant)
         return
+    if principal.role == "admin" and not principal.break_glass and principal.username != "central Netlens":
+        from app import secpolicy
+
+        pol = secpolicy.get_by_path(getattr(request.app.state, "db_path", None))
+        if pol["admin_networks"] and not secpolicy.admin_allowed(pol, client_ip(request)):
+            raise HTTPException(status_code=403, detail="administration is limited to certain networks (Settings → Sign-in security); this address is not one of them")
     from app import stepup
 
     stepup.check(request, principal, request.scope.get("method") or "WS", request.url.path)

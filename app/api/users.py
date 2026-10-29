@@ -18,6 +18,7 @@ class NewUser(BaseModel):
 class UserPatch(BaseModel):
     break_glass: bool | None = None
     role: str | None = None
+    cert_identity: str | None = None       # who a client certificate must say it is (Settings -> Sign-in security); "" removes it
     custom_role: str | None = None         # a custom role (Settings -> Roles); "" takes it away. Its base becomes the user's role.
     password: str | None = None
     disabled: bool | None = None
@@ -36,13 +37,16 @@ def _db(request: Request):
     return connect(request.app.state.db_path)
 
 
-NEEDS_LICENCE = "operators and customer views (viewers limited to some groups) are part of the Small business and Enterprise editions (or the free trial): Settings → Licence"
+NEEDS_LICENCE = "operators are part of the Small business and Enterprise editions (or the free trial): Settings → Licence"
+NEEDS_ENTERPRISE = "customer views (viewers limited to some groups or remote sites) are part of the Enterprise edition (or the free trial): Settings → Licence"
 
 
 def _check_teams(db, role: str | None, scope) -> None:
-    """Operators and customer views are business features. Existing ones keep working; only creating or changing them asks for a licence."""
-    if (role == "operator" or scope) and not licence.allows(db, "teams"):
+    """Operators are a business feature, customer views an Enterprise one. Existing ones keep working (and keep their limits); only creating or changing them asks for a licence."""
+    if role == "operator" and not licence.allows(db, "teams"):
         raise HTTPException(status_code=402, detail=NEEDS_LICENCE)
+    if scope and not licence.allows(db, "customer_views"):
+        raise HTTPException(status_code=402, detail=NEEDS_ENTERPRISE)
 
 
 def _fail(exc: users.UserError, status: int = 422) -> HTTPException:
@@ -58,7 +62,7 @@ def get_users(request: Request) -> dict:
         return {
             "users": users.list_users(db), "roles": list(users.ROLES), "custom_roles": [{"id": r["id"], "name": r["name"], "base": r["base"]} for r in __import__("app.roles", fromlist=["load"]).load(db)], "min_password": max(users.MIN_PASSWORD, secpolicy.get(db)["min_password"]),
             "token_configured": bool(request.app.state.settings.token),  # NETLENS_TOKEN is set in the environment
-            "teams_allowed": licence.allows(db, "teams"),
+            "teams_allowed": licence.allows(db, "teams"), "customer_views_allowed": licence.allows(db, "customer_views"),
             "token_policy": {"max_days": secpolicy.get(db)["api_token_max_days"], "may_restrict": licence.allows(db, "privileged")},
             "privileged_allowed": licence.allows(db, "privileged"),
             "sites": [{"id": r["id"], "name": r["name"], "customer": r["customer"] or ""} for r in db.execute("SELECT id, name, customer FROM probes ORDER BY LOWER(name)")],
@@ -99,6 +103,15 @@ def edit_user(request: Request, user_id: int, body: UserPatch) -> dict:
                 raise HTTPException(status_code=409, detail="this is the last break-glass account while password sign-in is limited to them: allow password sign-in again first")
             db.execute("UPDATE users SET break_glass = ? WHERE id = ?", (1 if body.break_glass else 0, user_id))
             db.commit()
+        if body.cert_identity is not None:
+            from app import certlogin
+
+            if body.cert_identity and not licence.allows(db, "privileged"):
+                raise HTTPException(status_code=402, detail="client-certificate sign-in is part of the Enterprise edition (or the free trial)")
+            try:
+                certlogin.set_identity(db, user_id, body.cert_identity)
+            except certlogin.CertLoginError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from None
         if body.custom_role is not None:
             from app import roles
 

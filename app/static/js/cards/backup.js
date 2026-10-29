@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { h, clear, toast, fmtTime } from "../util.js";
+import { ask as askApproval, isApprovalRequired, parse as parseApproval } from "../approval.js";
 
 const INTERVAL_LABELS = { 6: "every 6 hours", 12: "every 12 hours", 24: "every day", 72: "every 3 days", 168: "every week" };
 
@@ -67,6 +68,12 @@ function fillSchedule(box, data) {
           if ((res.plugins_failed || []).length) toast(`Could not restore: ${res.plugins_failed.join(", ")}`, "error");
           setTimeout(() => location.reload(), 1200);
         } catch (err) {
+          if (isApprovalRequired(err.message)) {
+            const ok = await askApproval("restore", b.name, b.name);
+            restore.disabled = false;
+            if (ok) restore.click();
+            return;
+          }
           toast(err.message || "Restore failed", "error");
           restore.disabled = false;
         }
@@ -107,7 +114,23 @@ function keyBox() {
       box.appendChild(h("p", { class: "error" }, err.message || "Could not read the key status"));
       return;
     }
-    const where = state.source === "env" ? "It is given from outside the data folder (NETLENS_SECRET_KEY or NETLENS_SECRET_KEY_FILE)." : "It is the file secret.key in the data folder, next to the database.";
+    if (state.source === "kms") {
+      const k = state.kms || {};
+      box.appendChild(h("p", { class: "hint" }, `The master key is held by your key service (${k.provider === "vault_transit" ? "HashiCorp Vault / OpenBao transit" : k.provider}): this server keeps only a wrapped copy, readable only through ${k.url || "the service"} with the transit key “${k.key}”${k.version ? ` (version ${k.version})` : ""}.`));
+      if (k.error) box.appendChild(h("p", { class: "error" }, k.error));
+      if (k.plaintext_key_on_disk) {
+        const finish = h("button", { class: "btn danger", type: "button" }, "Delete the plain-text key file");
+        finish.addEventListener("click", async () => {
+          if (!window.confirm("Delete secret.key from the data folder? The key service then holds the only copy: if it is lost, stored passwords cannot be read. Make sure the service is backed up.")) return;
+          try { await api("/api/vault/kms/finish", { method: "POST", body: { confirm: true } }); toast("The plain-text key file is deleted", "success"); await draw(); } catch (err) { toast(err.message || "Failed", "error"); }
+        });
+        box.append(h("p", { class: "warn-note" }, "The key is also still in the file secret.key next to the data. Once you have checked that Netlens starts with the key service, delete the file."), h("div", { class: "btn-row" }, finish));
+      }
+      const rewrap = h("button", { class: "btn", type: "button" }, "Wrap the key under the newest version");
+      rewrap.addEventListener("click", async () => { try { await api("/api/vault/kms/rewrap", { method: "POST", body: {} }); toast("Wrapped again", "success"); await draw(); } catch (err) { toast(err.message || "Failed", "error"); } });
+      box.appendChild(h("div", { class: "btn-row" }, rewrap, h("span", { class: "hint" }, " after you rotated the transit key in the service")));
+    }
+    const where = state.source === "kms" ? "" : state.source === "env" ? "It is given from outside the data folder (NETLENS_SECRET_KEY or NETLENS_SECRET_KEY_FILE)." : "It is the file secret.key in the data folder, next to the database.";
     box.appendChild(h("p", { class: "hint" }, `Saved passwords and tokens (plugins, notification channels) are stored encrypted. ${where} Keep a copy of the key: without it a restored backup cannot be read, and the passwords have to be entered again.`));
     if (state.key_next_to_data) {
       box.appendChild(h("p", { class: "warn-note" }, "The key is stored next to the data: whoever gets a copy of the data folder gets the key with it. For a company, hand the key in from outside with a Docker or Kubernetes secret (NETLENS_SECRET_KEY_FILE) or NETLENS_SECRET_KEY, and keep it out of the data backups."));
@@ -250,6 +273,13 @@ export function buildBackupCard() {
         const msg = data && data.detail
           ? data.detail
           : `Restore failed (HTTP ${res.status})`;
+        if (isApprovalRequired(msg)) {
+          restoreBtn.disabled = false;
+          restoreBtn.textContent = "Restore from file";
+          const ok = await askApproval("restore", "upload", "an uploaded backup");
+          errorEl.textContent = ok ? "Approved. Choose Restore again now: the approval is good for one use, for a few minutes." : "No approval: nothing was restored.";
+          return;
+        }
         errorEl.textContent = msg;
         toast(msg, "error");
         restoreBtn.disabled = false;

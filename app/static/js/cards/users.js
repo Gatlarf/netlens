@@ -140,6 +140,15 @@ function userRow(user, data, refresh, shown) {
     bg.addEventListener("click", () => call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { break_glass: !user.break_glass } }), user.break_glass ? "No longer a break-glass account" : "Marked as a break-glass account"));
     parts.push(bg, " ");
   }
+  if (data.privileged_allowed !== false) {
+    const cert = h("button", { type: "button", class: "btn", title: user.cert_identity ? `Linked to: ${user.cert_identity}` : "Link a client certificate (Enterprise): what the reverse proxy reports for it, for example the subject" }, user.cert_identity ? "Certificate ✓" : "Certificate");
+    cert.addEventListener("click", () => {
+      const id = window.prompt(`What must the client certificate of ${user.username} say it is? (exactly what your proxy puts in the identity header, for example CN=anna,O=Example). Empty removes the link.`, user.cert_identity || "");
+      if (id === null) return;
+      call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { cert_identity: id.trim() } }), id.trim() ? "Certificate linked" : "Certificate unlinked");
+    });
+    parts.push(cert, " ");
+  }
   const sess = h("button", { type: "button", class: "btn", title: "Enterprise: see and end the sessions of this user" }, "Sessions");
   sess.addEventListener("click", async () => {
     try {
@@ -210,8 +219,8 @@ function fill(card, data, shown) {
     "API tokens are for scripts, Home Assistant and Prometheus. A token acts with the role of its user, unless you make it read-only: then it can only read, whoever owns it."));
   card.appendChild(h("p", { class: data.teams_allowed === false ? "warn-text" : "hint" },
     data.teams_allowed === false
-      ? "Operators and customer views (a viewer limited to some groups) are business features: they are part of the Small business and Enterprise editions and the free trial (Settings → Licence). Existing ones keep their limits; an operator acts as a viewer until a licence is applied."
-      : "Operators (look and act, no settings) and customer views (a viewer limited to some groups) are business features, part of the Small business and Enterprise editions and the free trial."));
+      ? "Operators are part of the Small business and Enterprise editions and the free trial (Settings → Licence), customer views (a viewer limited to some groups or sites) of the Enterprise edition and the trial. Existing ones keep their limits; an operator acts as a viewer until a licence is applied."
+      : "Operators (look and act, no settings) are part of the Small business and Enterprise editions; customer views (a viewer limited to some groups or sites) of the Enterprise edition; both are included in the free trial."));
   if (data.token_configured) {
     const haveAdmin = data.users.some((u) => u.role === "admin" && !u.disabled);
     card.appendChild(h("p", { class: "hint", id: "token-note" }, haveAdmin

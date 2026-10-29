@@ -2,6 +2,18 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.319 — 2026-10-29
+
+### Added
+- ★ **Built-in HTTPS (every edition).** Netlens can serve https itself: Settings → HTTPS makes a self-signed certificate or takes your own certificate and key (checked: PEM, key unencrypted and belonging to the certificate, not expired), or reads `NETLENS_TLS_CERT` / `NETLENS_TLS_KEY` files that your tooling renews. The key is kept readable by Netlens only and is never shown. A restart applies a change. The container health check follows. Security keys and passkeys need https.
+- ★ **Four-eyes approval (Enterprise and the trial).** Opening a terminal, opening a remote desktop and restoring a backup can be made to need a second administrator's approval first (Settings → Sign-in security, Settings → Approvals): the person asks with a reason, another administrator approves or denies, an approval is good for one use, for that target, for a few minutes. Nobody can approve their own request; it needs at least two administrators; break-glass accounts are exempt; the access token cannot ask. An alert goes out when somebody asks, and every step is in the audit log.
+- ★ **Client-certificate sign-in through a reverse proxy (Enterprise and the trial).** The proxy checks the certificate and tells Netlens who it was; Netlens believes the headers only from the proxies you list, only when verified, and only for an identity an administrator linked to a user. A user with a second factor still gives it.
+- ★ **The master key in an external key service (Enterprise and the trial).** With `NETLENS_KMS=vault_transit` the key file holds only a copy wrapped by a HashiCorp Vault or OpenBao transit key; the key is unwrapped at start and kept in memory. Revoke Netlens' access and a copy of the data volume is useless; after rotating the transit key, one button wraps it again under the new version. Tested on a real OpenBao.
+- **Limit where administration may be done from (Enterprise and the trial).** Administrators can sign in and work only from the networks you list; Netlens refuses a list that would lock you out; break-glass accounts are exempt; `python -m app.cli clear-admin-networks` is the console fix.
+
+### Changed
+- **Customer views (a viewer limited to some groups or remote sites) are now part of the Enterprise edition.** Existing ones keep their limits; only creating or changing them needs the edition. Operators stay in Small business.
+
 ## 0.4.318 — 2026-10-29
 
 ### Added

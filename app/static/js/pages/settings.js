@@ -30,6 +30,9 @@ import { buildBackupCard } from "../cards/backup.js";
 import { buildDatabaseCard } from "../cards/database.js";
 import { buildAccountCard } from "../cards/account.js";
 import { buildRolesCard } from "../cards/roles.js";
+import { buildTlsCard } from "../cards/tls.js";
+import { buildCertLoginCard } from "../cards/certlogin.js";
+import { buildApprovalsCard } from "../cards/approvals.js";
 import { buildAuditCard } from "../cards/audit.js";
 import { buildUsersCard } from "../cards/users.js";
 import { buildSharesCard } from "../cards/shares.js";
@@ -276,6 +279,9 @@ const STATIC_GROUPS = [
     items: [
       { key: "users", label: "Users & tokens", build: buildUsersCard },
       { key: "roles", label: "Roles", build: buildRolesCard },
+      { key: "approvals", label: "Approvals", build: buildApprovalsCard },
+      { key: "tls", label: "HTTPS", build: buildTlsCard },
+      { key: "certlogin", label: "Client certificates", build: buildCertLoginCard },
       { key: "sso", label: "Single sign-on", build: buildSsoCard },
       { key: "security", label: "Sign-in security", build: buildSecurityCard },
       { key: "terminal", label: "Web terminal", build: buildTerminalCard },

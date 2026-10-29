@@ -90,7 +90,9 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
             factors = {}
             if row is not None:
                 pol = secpolicy.get(db)
-                if pol["local_login"] == "break_glass_only" and not row["break_glass"]:
+                if row["role"] == "admin" and not row["break_glass"] and pol["admin_networks"] and not secpolicy.admin_allowed(pol, host):
+                    refusal = "administrators can sign in only from certain networks (Settings → Sign-in security)"
+                elif pol["local_login"] == "break_glass_only" and not row["break_glass"]:
                     refusal = "password sign-in is switched off: use single sign-on (Settings → Sign-in security)"
                 elif row["break_glass"] and not (row["totp_enabled"] or row["webauthn_enabled"]):
                     refusal = "a break-glass account must have a second factor before it can sign in"
@@ -143,6 +145,20 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
     return response
 
 
+def _cert_present(request: Request) -> bool:
+    """Whether this request carries a client certificate that the proxy vouches for (the sign-in page then offers the certificate button)."""
+    try:
+        from app import certlogin, licence
+
+        db = connect(request.app.state.db_path)
+        try:
+            return certlogin.identity_from(request, certlogin.get(db)) is not None and licence.allows(db, "privileged")
+        finally:
+            db.close()
+    except Exception:  # noqa: BLE001 - the sign-in page must always load
+        return False
+
+
 def _challenges(request: Request) -> totp.Challenges:
     state = request.app.state
     if getattr(state, "totp_challenges", None) is None:
@@ -192,6 +208,58 @@ async def login_totp(request: Request, body: TotpLoginBody) -> JSONResponse:
         _alarm_kind(request, "break_glass_login", f"Break-glass sign-in: {name} signed in from {host}")
     if how == "recovery":
         _alarm_kind(request, "totp_recovery_used", f"{name} signed in with a recovery code ({left} left): the authenticator may be lost")
+    response = JSONResponse({"ok": True})
+    _session_cookie(response, request, cookie)
+    return response
+
+
+@router.post("/login/certificate")
+async def login_certificate(request: Request) -> JSONResponse:
+    """Sign in with a client certificate that the reverse proxy in front of Netlens has checked (app/certlogin.py). The certificate replaces the password only: a user
+    with a second factor still gives it."""
+    from fastapi import HTTPException
+
+    from app import certlogin, licence
+
+    limiter: LoginLimiter = request.app.state.login_limiter
+    host = client_ip(request)
+    if not limiter.allowed(host):
+        raise HTTPException(status_code=429, detail="too many attempts")
+    db = connect(request.app.state.db_path)
+    try:
+        policy = certlogin.get(db)
+        identity = certlogin.identity_from(request, policy) if licence.allows(db, "privileged") else None
+        if identity is None:
+            raise HTTPException(status_code=401, detail="no valid client certificate was presented (or certificate sign-in is not set up for this address)")
+        row = certlogin.user_for(db, identity)
+        if row is None:
+            limiter.record_failure(host)
+            _audit(request, _clean(identity)[:40], "", f"Client certificate {_clean(identity)[:60]!r} is not linked to any user", 401)
+            raise HTTPException(status_code=401, detail="this certificate is not linked to a user")
+        pol = secpolicy.get(db)
+        cookie = challenge = refusal = key_options = None
+        factors: dict = {}
+        if row["role"] == "admin" and not row["break_glass"] and pol["admin_networks"] and not secpolicy.admin_allowed(pol, host):
+            refusal = "administrators can sign in only from certain networks (Settings → Sign-in security)"
+        elif row["break_glass"] and not (row["totp_enabled"] or row["webauthn_enabled"]):
+            refusal = "a break-glass account must have a second factor before it can sign in"
+        elif row["totp_enabled"] or row["webauthn_enabled"]:
+            challenge = _challenges(request).issue(row["id"], row["username"])
+            factors = {"totp": bool(row["totp_enabled"]), "webauthn": bool(row["webauthn_enabled"])}
+            key_options = webauthn_api.login_options(request, db, row["id"], challenge) if row["webauthn_enabled"] else None
+        else:
+            cookie = users.start_session(db, row["id"], host, request.headers.get("user-agent", ""), "certificate")
+    finally:
+        db.close()
+    name = _clean(row["username"])
+    if refusal:
+        _audit(request, name, "", f"Refused a certificate sign-in for {name!r}: {refusal}", 403)
+        raise HTTPException(status_code=403, detail=refusal)
+    if challenge is not None:
+        _audit(request, name, "", "Client certificate accepted; waiting for the second factor", 200)
+        return JSONResponse({"totp_required": True, "challenge": challenge, "methods": factors, **({"webauthn": key_options} if key_options else {})})
+    limiter.reset(host)
+    _audit(request, name, "", "Signed in (client certificate)", 200)
     response = JSONResponse({"ok": True})
     _session_cookie(response, request, cookie)
     return response
@@ -304,6 +372,7 @@ async def session(request: Request) -> JSONResponse:
             "setup_required": needs_setup,
             "token_login": bool(request.app.state.settings.token),  # False: only user name and password sign in
             "oidc": _oidc_public(request),
+            "certificate_login": _cert_present(request),
             **_demo_info(request),
             "interface": _interface(request),
         })

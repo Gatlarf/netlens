@@ -217,6 +217,15 @@ async def open_session(request: Request, device_id: int, body: SessionBody) -> d
         raise HTTPException(status_code=403, detail=why)
     if body.proto not in GRAPHICAL:
         raise HTTPException(status_code=422, detail="use the terminal for SSH and Telnet")
+    from app import approvals, secpolicy
+
+    gate = connect(request.app.state.db_path)
+    try:                                                             # four-eyes: another administrator has to have said yes (the approval is used up here)
+        approvals.require(gate, getattr(request.state, "user", None) or identify(request), secpolicy.get(gate), "remote", str(device_id))
+    except approvals.ApprovalError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+    finally:
+        gate.close()
     helper = await helper_status()
     if not helper["reachable"]:
         raise HTTPException(status_code=503, detail=f"the remote desktop helper (guacd) cannot be reached: {helper['error']}")

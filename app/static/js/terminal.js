@@ -3,6 +3,7 @@ import { h, clear, toast } from "./util.js";
 import { infoTip, savedLoginButton } from "./ui.js";
 import { ensureFresh, prompt as stepUpPrompt } from "./stepup.js";
 import { reasonFor } from "./reason.js";
+import { ask as askApproval } from "./approval.js";
 
 const activeTerminals = new WeakMap();
 
@@ -310,6 +311,9 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
             statusLine.textContent = statusText;
             if (pendingLast) { writeLast(device, pendingLast); pendingLast = null; }
             term.focus();
+          } else if (msg.type === "error" && msg.code === "approval_required") {
+            statusLine.textContent = "Waiting for approval";
+            askApproval("terminal", msg.target, device && (device.name || device.ip) || "").then((ok) => { if (ok) { clear(connectionArea); startTerminal(proto, port, username, password, key, passphrase, credentialId, true); } else statusLine.textContent = "No approval: the terminal was not opened"; });
           } else if (msg.type === "error" && msg.code === "step_up") {
             // the confirmation ran out while the form was open: ask once more and start again
             statusLine.textContent = "Confirmation needed";

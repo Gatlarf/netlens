@@ -203,7 +203,11 @@ def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
     if licence.allows(conn, "agents"):
         for p in ingest.problems(conn):          # a collector that stopped sending, a certificate that is about to end
             out.append({"level": "warn", "text": p["text"], "href": "#/settings/ingest", "snooze": f"agent:{p['agent_id']}"})
-    from app import auditchain, credstore
+    from app import approvals, auditchain, credstore
+
+    waiting = approvals.waiting_count(conn)
+    if waiting:
+        out.append({"level": "warn", "text": f"{waiting} approval request{'s' if waiting != 1 else ''} waiting for an administrator", "href": "#/settings/approvals"})
 
     verified = auditchain.last_result(conn)
     if verified and not verified.get("ok"):       # the latest integrity check of the audit log failed

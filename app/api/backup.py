@@ -42,6 +42,9 @@ async def upload_restore(request: Request) -> dict:
     if app.state.scan_manager.is_running():
         raise HTTPException(status_code=409, detail="a scan is running; wait for it to finish and try again")
 
+    from app.api.backups import _four_eyes
+
+    _four_eyes(request, "upload")
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > MAX_UPLOAD:
         raise HTTPException(status_code=413, detail="backup file is too large")

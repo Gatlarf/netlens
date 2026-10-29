@@ -25,10 +25,10 @@ KEY = "security.policy"
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
 REQUIRE_VALUES = ("off", "admins", "operators", "everyone")
 DEFAULTS: dict[str, Any] = {"require_totp": "off", "grace_days": 14, "require_since": None, "idle_minutes": 0, "absolute_hours": 0, "max_sessions": 0,
-                            "step_up": False, "step_up_minutes": 10, "static_token": "allowed", "local_login": "allowed", "api_token_max_days": 0, "min_password": 8}
-RANGES = {"grace_days": (0, 365), "idle_minutes": (0, 1440), "absolute_hours": (0, 720), "max_sessions": (0, 50), "step_up_minutes": (1, 120), "api_token_max_days": (0, 3650), "min_password": (8, 64)}
+                            "step_up": False, "step_up_minutes": 10, "static_token": "allowed", "local_login": "allowed", "api_token_max_days": 0, "min_password": 8, "admin_networks": [], "four_eyes": [], "four_eyes_minutes": 15}
+RANGES = {"grace_days": (0, 365), "idle_minutes": (0, 1440), "absolute_hours": (0, 720), "max_sessions": (0, 50), "step_up_minutes": (1, 120), "api_token_max_days": (0, 3650), "min_password": (8, 64), "four_eyes_minutes": (1, 240)}
 ENUMS = {"static_token": ("allowed", "lan", "off"), "local_login": ("allowed", "break_glass_only")}
-ENTERPRISE_FIELDS = ("idle_minutes", "absolute_hours", "max_sessions", "step_up", "step_up_minutes", "static_token", "local_login", "api_token_max_days", "min_password")
+ENTERPRISE_FIELDS = ("idle_minutes", "absolute_hours", "max_sessions", "step_up", "step_up_minutes", "static_token", "local_login", "api_token_max_days", "min_password", "admin_networks", "four_eyes", "four_eyes_minutes")
 # a restricted session (no second factor after the grace period) may use only these
 ENROL_PATHS = ("/api/session", "/api/logout", "/api/me/totp", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/webauthn", "/api/me/webauthn/begin", "/api/me/webauthn/finish", "/api/me/webauthn/remove", "/api/me/password", "/api/me/sessions", "/api/me/stepup")
 
@@ -98,7 +98,35 @@ def forget(conn=None) -> None:
         _cache.pop(_key(conn), None)
 
 
-def save(conn, data: dict[str, Any], *, may_mfa: bool, may_privileged: bool) -> dict[str, Any]:
+def _networks(value) -> list[str]:
+    import ipaddress
+
+    if not isinstance(value, list) or len(value) > 50 or any(not isinstance(x, str) for x in value):
+        raise PolicyError("admin_networks must be a list of up to 50 networks such as 10.0.0.0/8")
+    out = []
+    for text in value:
+        try:
+            out.append(str(ipaddress.ip_network(text.strip(), strict=False)))
+        except ValueError:
+            raise PolicyError(f"{text!r} is not a network (write it like 10.0.0.0/8 or 192.168.1.5/32)") from None
+    return sorted(set(out))
+
+
+def admin_allowed(policy: dict[str, Any], ip: str) -> bool:
+    """Whether administration may be done from this address (no networks listed = from anywhere)."""
+    import ipaddress
+
+    nets = policy.get("admin_networks") or []
+    if not nets:
+        return True
+    try:
+        addr = ipaddress.ip_address((ip or "").split("%")[0])
+    except ValueError:
+        return False
+    return any(addr in ipaddress.ip_network(n, strict=False) for n in nets)
+
+
+def save(conn, data: dict[str, Any], *, may_mfa: bool, may_privileged: bool, caller_ip: str | None = None) -> dict[str, Any]:
     """Validate and store changes. `may_mfa` / `may_privileged`: the licence allows changing the Small business and the Enterprise fields."""
     cur = get(conn)
     new = dict(cur)
@@ -117,7 +145,17 @@ def save(conn, data: dict[str, Any], *, may_mfa: bool, may_privileged: bool) -> 
         if field not in data:
             continue
         v = data[field]
-        if field == "step_up":
+        if field == "four_eyes":
+            from app import approvals
+
+            if not isinstance(v, list) or any(x not in approvals.ACTIONS for x in v):
+                raise PolicyError("four_eyes must be a list of: " + ", ".join(approvals.ACTIONS))
+            v = sorted(set(v))
+        elif field == "admin_networks":
+            v = _networks(v)
+            if v and caller_ip is not None and not admin_allowed({"admin_networks": v}, caller_ip):
+                raise PolicyError(f"you are signing in from {caller_ip}, which is not in that list: it would lock you out. Add your own network first")
+        elif field == "step_up":
             if not isinstance(v, bool):
                 raise PolicyError("step_up must be true or false")
         elif field in ENUMS:
@@ -143,6 +181,10 @@ def save(conn, data: dict[str, Any], *, may_mfa: bool, may_privileged: bool) -> 
 def _check_safe(conn, new: dict[str, Any], cur: dict[str, Any]) -> None:
     """Refuse a setting that would lock everybody out. Only when it is being switched on or moved now (a setting already in force is left alone)."""
     admins = conn.execute("SELECT COUNT(*) FROM users WHERE disabled = 0 AND role = 'admin'").fetchone()[0]
+    if new["four_eyes"] and not cur["four_eyes"]:
+        people = conn.execute("SELECT COUNT(*) FROM users WHERE disabled = 0 AND role = 'admin'").fetchone()[0]
+        if people < 2:
+            raise PolicyError("four-eyes approval needs at least two administrators with their own accounts (the access token cannot approve): add another administrator first")
     if new["step_up"] and not cur["step_up"] and admins < 1:
         raise PolicyError("create at least one administrator account first: the access token cannot confirm a privileged action")
     if new["static_token"] != "allowed" and cur["static_token"] == "allowed" and admins < 1:

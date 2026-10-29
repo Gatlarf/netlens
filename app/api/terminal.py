@@ -135,6 +135,14 @@ async def terminal_ws(
             await websocket.close(code=1008)
             return
 
+        from app import approvals, secpolicy
+
+        try:                                                         # four-eyes: another administrator has to have said yes (Settings -> Sign-in security)
+            approvals.require(conn, principal, secpolicy.get(conn), "terminal", str(device_id))
+        except approvals.ApprovalError as exc:
+            await websocket.send_json({"type": "error", "code": "approval_required", "message": "another administrator has to approve this first", "action": "terminal", "target": str(device_id), "detail": str(exc)})
+            await websocket.close(code=1008)
+            return
         username = data.get("username", "")
         password = data.get("password")
         private_key = data.get("private_key")

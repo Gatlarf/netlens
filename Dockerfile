@@ -55,8 +55,8 @@ VOLUME ["/data"]
 
 EXPOSE 8080
 
-# Healthcheck: extracts port from NETLENS_BIND (default 8080) and checks /api/health.
+# Healthcheck: asks /api/health on the port from NETLENS_BIND (default 8080), over http and then https (app/healthcheck.py).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD python -c "import os, urllib.request, sys; port=os.environ.get('NETLENS_BIND', '0.0.0.0:8080').split(':')[-1]; url=f'http://127.0.0.1:{port}/api/health'; resp=urllib.request.urlopen(url); sys.exit(0 if resp.status==200 else 1)"
+    CMD ["python", "-m", "app.healthcheck"]
 
 CMD ["python", "-m", "app.main"]

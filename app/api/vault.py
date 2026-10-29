@@ -24,6 +24,8 @@ def get_status(conn=Depends(get_conn)) -> dict:
 @router.get("/vault/key")
 def get_key(request: Request, conn=Depends(get_conn)) -> dict:
     _local_only(request)
+    if vault.key_source(conn) == "kms":
+        raise HTTPException(status_code=409, detail="the key is held by your key service: this installation has only a wrapped copy")
     if vault.key_source(conn) != "file":
         raise HTTPException(status_code=409, detail="the key comes from NETLENS_SECRET_KEY: keep it where you set it")
     return {"key": vault.encode_key(vault._key(conn))}
@@ -76,4 +78,58 @@ def put_recovery(body: RecoveryBody, request: Request, conn=Depends(get_conn)) -
     if len(body.passphrase) < 8:
         raise HTTPException(status_code=422, detail="the passphrase needs at least 8 characters")
     vault.set_recovery(conn, body.passphrase)
+    return vault.status(conn)
+
+
+# ----------------------------------------------------------------------------- the master key held by an external key service (app/kms.py)
+@router.post("/vault/kms/rewrap")
+def kms_rewrap(request: Request, conn=Depends(get_conn)) -> dict:
+    """After the transit key was rotated in the key service: wrap the master key again under the newest version. The master key and the stored secrets do not change."""
+    from app import audit, kms
+    from app.auth import client_ip, identify
+
+    _local_only(request)
+    if vault.key_source(conn) != "kms":
+        raise HTTPException(status_code=409, detail="the master key is not held by a key service")
+    path = vault._db_file(conn)
+    try:
+        wrapped = kms.read_wrapped(path)
+        new, version = kms.rewrap(wrapped["ciphertext"])
+        if kms.unwrap(new) != vault._key(conn):
+            raise HTTPException(status_code=502, detail="the key service returned a different key: nothing was changed")
+        kms.write_wrapped(path, new)
+    except kms.KmsError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
+    audit.record_by(conn, identify(request), client_ip(request), "POST", request.url.path, 200, f"Wrapped the master key again under version {version} of the transit key")
+    return vault.status(conn)
+
+
+class FinishBody(BaseModel):
+    confirm: bool = False
+
+
+@router.post("/vault/kms/finish")
+def kms_finish(body: FinishBody, request: Request, conn=Depends(get_conn)) -> dict:
+    """Delete the plain-text key file once the key service holds the key. Checked first: the key service must unwrap exactly the key that is in use."""
+    from app import audit, kms
+    from app.auth import client_ip, identify
+
+    _local_only(request)
+    if vault.key_source(conn) != "kms":
+        raise HTTPException(status_code=409, detail="the master key is not held by a key service")
+    if not body.confirm:
+        raise HTTPException(status_code=422, detail="confirm that you know the plain-text key can no longer be recovered from this server")
+    from pathlib import Path
+
+    path = vault._db_file(conn)
+    key_file = Path(path).parent / vault.KEY_FILE
+    if not key_file.exists():
+        return vault.status(conn)
+    try:
+        if kms.unwrap(kms.read_wrapped(path)["ciphertext"]) != vault.parse_key(key_file.read_text()):
+            raise HTTPException(status_code=409, detail="the key service does not return the key in secret.key: nothing was deleted")
+    except (kms.KmsError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from None
+    key_file.unlink()
+    audit.record_by(conn, identify(request), client_ip(request), "POST", request.url.path, 200, "Deleted the plain-text master key file: the key service now holds the only copy")
     return vault.status(conn)

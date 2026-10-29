@@ -40,6 +40,8 @@ def run(argv: list[str]) -> int:
     parser.add_argument("--db", help="path of netlens.db (default: the data directory)")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("list-users")
+    sub.add_parser("clear-four-eyes", help="switch four-eyes approval off (when nobody can approve)")
+    sub.add_parser("clear-admin-networks", help="remove the limit on the networks administration is allowed from (when it locked everybody out)")
     p = sub.add_parser("reset-totp", help="switch off the second factor of a user who lost the authenticator and the recovery codes")
     p.add_argument("username")
     for name in ("reset-password", "create-admin"):
@@ -52,6 +54,18 @@ def run(argv: list[str]) -> int:
         if args.command == "list-users":
             for u in users.list_users(conn):
                 print(f"{u['username']:<24} {u['role']:<7} {'disabled' if u['disabled'] else 'active':<9} last login: {u['last_login'] or 'never'}")
+            return 0
+        if args.command == "clear-four-eyes":
+            from app import secpolicy
+
+            secpolicy.save(conn, {"four_eyes": []}, may_mfa=True, may_privileged=True)
+            print("Four-eyes approval is off.")
+            return 0
+        if args.command == "clear-admin-networks":
+            from app import secpolicy
+
+            secpolicy.save(conn, {"admin_networks": []}, may_mfa=True, may_privileged=True)
+            print("Administration may be done from any network again.")
             return 0
         row = conn.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (args.username,)).fetchone()
         try:

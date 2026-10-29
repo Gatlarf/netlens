@@ -91,9 +91,23 @@ def delete(request: Request, name: str) -> dict:
         conn.close()
 
 
+def _four_eyes(request: Request, target: str) -> None:
+    from app import approvals, secpolicy
+    from app.auth import identify
+
+    conn = connect(str(request.app.state.db_path))
+    try:
+        approvals.require(conn, getattr(request.state, "user", None) or identify(request), secpolicy.get(conn), "restore", target[:80])
+    except approvals.ApprovalError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+    finally:
+        conn.close()
+
+
 @router.post("/backups/{name}/restore")
 async def restore(request: Request, name: str) -> dict:
     app = request.app
+    _four_eyes(request, name)
     path = bs.backup_path(app.state.db_path, name)
     if path is None:
         raise HTTPException(status_code=404, detail="no such backup")

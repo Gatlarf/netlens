@@ -6,6 +6,7 @@ import { h, clear, toast, shortName, statusDot } from "../util.js";
 import { mountTerminal } from "../terminal.js";
 import { savedLoginButton } from "../ui.js";
 import { reasonFor } from "../reason.js";
+import { ask as askApproval, isApprovalRequired, parse as parseApproval } from "../approval.js";
 
 let guacLoaded = null;
 function loadGuac() {
@@ -149,6 +150,11 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, ...credentials,
       });
     } catch (err) {
+      if (isApprovalRequired(err.message)) {
+        const a = parseApproval(err.message);
+        const ok = await askApproval(a.action, a.target, shortName(device.name) || device.ip);
+        return ok ? connect(credentials) : showForm("No approval: the session was not opened");
+      }
       return showForm(err.message || "Could not start the session");
     }
     const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${location.pathname.replace(/[^/]*$/, "")}api/remote/ws`;

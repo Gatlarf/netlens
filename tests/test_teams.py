@@ -184,7 +184,7 @@ def test_operators_and_customer_views_need_a_licence(env, monkeypatch):
     make(c, "carol", "viewer", [ids["a"]])
     olga = sign_in(app, "olga")
     assert olga.post("/api/snoozes", json={}).status_code == 422                      # licensed: reaches the handler
-    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: feature != "teams")
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: feature not in ("teams", "customer_views"))
     assert c.get("/api/users", headers=ADMIN).json()["teams_allowed"] is False
     # creating or changing them is refused ...
     assert c.post("/api/users", json={"username": "o2", "password": "longenough1", "role": "operator"}, headers=ADMIN).status_code == 402
@@ -199,3 +199,14 @@ def test_operators_and_customer_views_need_a_licence(env, monkeypatch):
     assert olga.get("/api/devices").status_code == 200
     carol = sign_in(app, "carol")
     assert [d["custom_name"] for d in carol.get("/api/devices").json()] == ["a1", "a2"]
+
+
+def test_customer_views_are_enterprise_while_operators_stay_small_business(env, monkeypatch):
+    c, app, _, ids = env
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: feature != "customer_views")          # Small business: operators yes, customer views no
+    assert c.get("/api/users", headers=ADMIN).json()["customer_views_allowed"] is False
+    assert c.post("/api/users", json={"username": "op2", "password": "longenough1", "role": "operator"}, headers=ADMIN).status_code == 201
+    r = c.post("/api/users", json={"username": "cv2", "password": "longenough1", "role": "viewer", "scope": [ids["a"]]}, headers=ADMIN)
+    assert r.status_code == 402 and "Enterprise" in r.json()["detail"]
+    r = c.post("/api/users", json={"username": "cv3", "password": "longenough1", "role": "viewer", "sites": []}, headers=ADMIN)
+    assert r.status_code == 201

@@ -16,7 +16,7 @@ from app.db import ago, utcnow
 RETENTION_DAYS = 365
 MAX_ROWS = 50000
 # what is not worth a line: personal preferences, probes reporting with their token, the browser's own speed test, the terminal protocol
-SKIP = re.compile(r"^/api/(login|logout|me/totp/(confirm|disable|recovery)|me/preferences|dashboard/layout|probe/(push|relay)|speedtest/(up|down|ping|browser)|devices/\d+/(ping|trace)|insights/(ask|identify|model-check|incidents/\d+/words)|hostprobe/(ca|settings)$|credentials(/[0-9a-f]+)?$|hosts/(apply|settings)$|devices/\d+/hostprobe/(run|diagnose|install)$|analysis/\d+/send$)")
+SKIP = re.compile(r"^/api/(login|logout|me/totp/(confirm|disable|recovery)|me/preferences|dashboard/layout|probe/(push|relay)|speedtest/(up|down|ping|browser)|devices/\d+/(ping|trace)|insights/(ask|identify|model-check|incidents/\d+/words)|hostprobe/(ca|settings)$|credentials(/[0-9a-f]+)?$|tls(/(self-signed|upload|restart))?$|vault/kms/(rewrap|finish)$|cert-login$|approvals(/\d+/(decide|cancel))?$|hosts/(apply|settings)$|devices/\d+/hostprobe/(run|diagnose|install)$|analysis/\d+/send$)")
 
 # (method, path regex, sentence). {0}, {1}... are the groups; a device id becomes the device's name.
 PATTERNS: list[tuple[str, str, str]] = [

@@ -18,7 +18,11 @@ class Fake:
         self.allowed = ("netlens/",)
         self.down = 0                               # answer 503 this many times
         self.static_token = "static-token"
+        self.transit_version = 1
+        self.transit_key = "netlens"
+        self.transit_calls: list[str] = []
         self.big = False
+        self.transit_allowed = True
         self.tokens[self.static_token] = "static"
         self.server = None
 
@@ -56,6 +60,33 @@ class Fake:
                 token = self.headers.get("X-Vault-Token", "")
                 if token not in fake.tokens or token in fake.revoked:
                     return self._send(403, {"errors": ["permission denied"]})
+                if self.path.startswith("/v1/transit/"):
+                    import base64
+
+                    parts = self.path.split("/")                          # ['', 'v1', 'transit', op, key]
+                    op, key = parts[3], parts[4] if len(parts) > 4 else ""
+                    fake.transit_calls.append(op)
+                    if key != fake.transit_key:
+                        return self._send(404, {"errors": ["no such key"]})
+                    if not fake.transit_allowed:
+                        return self._send(403, {"errors": ["permission denied"]})
+
+                    def wrap(raw_b64):
+                        return f"vault:v{fake.transit_version}:" + base64.b64encode(base64.b64decode(raw_b64)[::-1]).decode()
+
+                    def unwrap(ct):
+                        return base64.b64encode(base64.b64decode(ct.split(":", 2)[2])[::-1]).decode()
+
+                    if op == "encrypt":
+                        return self._send(200, {"data": {"ciphertext": wrap(body["plaintext"])}})
+                    if op == "decrypt":
+                        return self._send(200, {"data": {"plaintext": unwrap(body["ciphertext"])}})
+                    if op == "rewrap":
+                        return self._send(200, {"data": {"ciphertext": wrap(unwrap(body["ciphertext"]))}})
+                    if op == "keys":
+                        return self._send(200, {"data": {"latest_version": fake.transit_version}})
+                if method == "GET" and self.path == "/v1/transit/keys/" + fake.transit_key:
+                    return self._send(200, {"data": {"latest_version": fake.transit_version}})
                 if self.path == "/v1/auth/token/revoke-self":
                     fake.revoked.append(token)
                     return self._send(200, {})

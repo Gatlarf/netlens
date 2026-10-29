@@ -242,3 +242,51 @@ def test_an_administrator_resets_a_second_factor_after_proving_who_they_are(env)
     uid_b = connect(path).execute("SELECT id FROM users WHERE username='olga'").fetchone()[0]
     assert a2.post(f"/api/users/{uid_b}/totp/reset", json={"password": "longenough1"}).status_code == 403                 # the password is not enough any more
     assert a2.post(f"/api/users/{uid_b}/totp/reset", json={"code": totp.code_at(secret_a, time.time() + 30)}).status_code == 200
+
+
+# ------------------------------------------------------------------ where administration may be done from
+def test_admin_networks_validate_and_never_lock_the_caller_out(env):
+    c, app, path, state = env
+    for bad in ("10.0.0.0/8", ["nope"], [1], ["10.0.0.0/33"], [f"10.{i}.0.0/16" for i in range(51)]):
+        assert admin_put(c, admin_networks=bad).status_code == 422, bad
+    assert admin_put(c, admin_networks=["10.0.0.0/8"]).status_code == 422          # the test client is not in 10/8: that would lock the caller out
+    state["privileged"] = False
+    assert admin_put(c, admin_networks=["10.0.0.0/8"]).status_code in (402, 422)
+
+
+def test_the_list_is_enforced_for_administrators_only_and_break_glass_is_exempt():
+    from app import secpolicy as sp
+
+    pol = {"admin_networks": ["10.0.0.0/8", "192.168.1.0/24"]}
+    assert sp.admin_allowed(pol, "10.4.5.6") and sp.admin_allowed(pol, "192.168.1.77") and not sp.admin_allowed(pol, "172.16.0.1") and not sp.admin_allowed(pol, "not an ip")
+    assert sp.admin_allowed({"admin_networks": []}, "8.8.8.8")
+    assert sp.admin_allowed({}, "8.8.8.8")
+
+
+def test_through_the_api(tmp_path, monkeypatch):
+    real = licence.allows
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: True if feature in ("privileged", "mfa_policy", "teams") else real(conn, feature, now))
+    secpolicy.forget()
+    from app.db import init_db
+
+    boot = connect(tmp_path / "t.db")
+    init_db(boot)
+    boot.close()
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    inside = TestClient(app, client=("10.1.2.3", 50000))
+    outside = TestClient(app, client=("203.0.113.9", 50000))
+    for name, role in (("alice", "admin"), ("vera", "viewer")):
+        assert inside.post("/api/users", json={"username": name, "password": "longenough1", "role": role}, headers=ADMIN).status_code == 201
+    assert inside.put("/api/security-policy", json={"admin_networks": ["10.0.0.0/8"]}, headers=ADMIN).status_code == 200
+    assert inside.get("/api/security-policy", headers=ADMIN).json()["policy"]["admin_networks"] == ["10.0.0.0/8"]
+    assert outside.get("/api/users", headers=ADMIN).status_code == 403                  # the access token is an administrator too
+    refused = outside.post("/api/login", json={"username": "alice", "password": "longenough1"})
+    assert refused.status_code == 403 and "certain networks" in refused.json()["detail"]
+    assert outside.post("/api/login", json={"username": "vera", "password": "longenough1"}).status_code == 200          # a viewer is not affected
+    assert inside.post("/api/login", json={"username": "alice", "password": "longenough1"}).status_code == 200
+    # break-glass is exempt (it needs a second factor, so only the rule itself is checked here)
+    from app import cli
+
+    assert cli.run(["--db", str(tmp_path / "t.db"), "clear-admin-networks"]) == 0
+    secpolicy.forget()
+    assert outside.get("/api/users", headers=ADMIN).status_code == 200

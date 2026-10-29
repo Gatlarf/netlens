@@ -94,14 +94,59 @@ def encode_key(raw: bytes) -> str:
 
 
 def key_source(conn: sqlite3.Connection) -> str:
-    """"env" (NETLENS_SECRET_KEY), "file" (secret.key next to the database) or "memory" (a database without a file: tests)."""
+    """"kms" (wrapped by an external key service, app/kms.py), "env" (NETLENS_SECRET_KEY), "file" (secret.key next to the database) or "memory" (a database without a file: tests)."""
+    from app import kms
+
+    if kms.configured() and _db_file(conn):
+        return "kms"
     if external_key():
         return "env"
     return "file" if _db_file(conn) else "memory"
 
 
+def _kms_key(path: str, conn: sqlite3.Connection) -> bytes:
+    """The master key from the key service: unwrap the wrapped copy next to the database; the first time, wrap the key that is in use (the file or the variable, or a new one)
+    and keep the plain-text file until an administrator confirms the move (`kms finish`)."""
+    from app import kms
+
+    try:
+        wrapped = kms.read_wrapped(path)
+        if wrapped is not None:
+            return kms.unwrap(wrapped["ciphertext"])
+        from app import licence
+
+        if not licence.allows(conn, "privileged"):          # only the first wrapping needs the edition: an installation that already has a wrapped key never loses access to it
+            raise VaultError("holding the master key in an external key service is part of the Enterprise edition (or the free trial)")
+        env = external_key()
+        key_path = Path(path).parent / KEY_FILE
+        if env:
+            try:
+                key = parse_key(env)
+            except ValueError:
+                key = hashlib.scrypt(env.encode(), salt=b"netlens-secret-key", n=2 ** 14, r=8, p=1, dklen=32)
+        elif key_path.exists():
+            key = parse_key(key_path.read_text())
+        else:
+            key = secrets.token_bytes(32)
+        kms.write_wrapped(path, kms.wrap(key))
+        if kms.unwrap(kms.read_wrapped(path)["ciphertext"]) != key:
+            raise VaultError("the key service did not return the key it was given: the wrapped copy was not trusted")
+        log.info("the master key is now wrapped by the key service (%s); the plain-text copy, if any, stays until `finish` is confirmed", kms.config()["key"])
+        return key
+    except kms.KmsError as exc:
+        raise VaultError(f"the key service: {exc}") from None
+
+
 def _key(conn: sqlite3.Connection) -> bytes:
     path = _db_file(conn)
+    from app import kms
+
+    if kms.configured() and path:
+        cache_id = f"kms:{path}"
+        with _lock:
+            if cache_id not in _keys:
+                _keys[cache_id] = _kms_key(path, conn)
+            return _keys[cache_id]
     env = external_key()
     cache_id = f"env:{env}" if env else f"file:{path}"
     with _lock:
@@ -215,7 +260,10 @@ def status(conn: sqlite3.Connection) -> dict:
             except VaultError:
                 bad += 1
     plain = sum(1 for r in conn.execute("SELECT key, value FROM settings").fetchall() if is_secret_key(r["key"]) and r["value"] and not is_encrypted(r["value"]))
-    return {"encrypted": total, "unreadable": bad, "plaintext": plain, "source": key_source(conn), "recovery": has_recovery(conn), "key_next_to_data": key_source(conn) == "file"}
+    from app import kms
+
+    source = key_source(conn)
+    return {"encrypted": total, "unreadable": bad, "plaintext": plain, "source": source, "recovery": has_recovery(conn), "key_next_to_data": source == "file", "kms": kms.describe(_db_file(conn))}
 
 
 def migrate(conn: sqlite3.Connection) -> int:

@@ -62,7 +62,7 @@ def put_policy(body: dict, request: Request, conn=Depends(get_conn)) -> dict[str
     require_admin(request)
     before = secpolicy.get(conn)
     try:
-        secpolicy.save(conn, body, may_mfa=licence.allows(conn, "mfa_policy"), may_privileged=licence.allows(conn, "privileged"))
+        secpolicy.save(conn, body, may_mfa=licence.allows(conn, "mfa_policy"), may_privileged=licence.allows(conn, "privileged"), caller_ip=client_ip(request))
     except secpolicy.PolicyError as exc:
         raise HTTPException(status_code=402 if "edition" in str(exc) else 422, detail=str(exc))
     after = secpolicy.get(conn)
@@ -236,3 +236,26 @@ def stepup_confirm(body: ProofBody, request: Request, conn=Depends(get_conn)) ->
     users.mark_auth(conn, request.cookies.get("netlens_session"))
     audit.record_by(conn, principal, host, "POST", request.url.path, 200, f"Confirmed their identity for privileged actions ({how})")
     return {"fresh": True, "minutes": secpolicy.get_by_path(request.app.state.db_path)["step_up_minutes"]}
+
+
+# ----------------------------------------------------------------------------- sign in with a client certificate (through a reverse proxy)
+@router.get("/cert-login")
+def get_cert_login(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
+    require_admin(request)
+    from app import certlogin
+
+    return {"settings": certlogin.get(conn), "allowed": licence.allows(conn, "privileged"), "linked": conn.execute("SELECT COUNT(*) FROM users WHERE cert_identity IS NOT NULL").fetchone()[0]}
+
+
+@router.put("/cert-login", dependencies=[Depends(ensure_allowed)])
+def put_cert_login(body: dict, request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
+    require_admin(request)
+    from app import certlogin
+
+    _need(conn, "privileged", "client-certificate sign-in is part of the Enterprise edition (or the free trial)")
+    try:
+        saved = certlogin.save(conn, body)
+    except certlogin.CertLoginError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    audit.record_by(conn, identify(request), client_ip(request), "PUT", request.url.path, 200, f"Changed client-certificate sign-in (enabled: {saved['enabled']}, proxies: {', '.join(saved['proxies']) or 'none'})")
+    return {"settings": saved, "allowed": True, "linked": conn.execute("SELECT COUNT(*) FROM users WHERE cert_identity IS NOT NULL").fetchone()[0]}

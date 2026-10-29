@@ -1196,8 +1196,13 @@ def init_db(conn: sqlite3.Connection) -> None:
     for col in ("last_seen", "ip", "user_agent", "auth_at", "auth_method"):
         _add_column_if_missing(conn, "sessions", col, "TEXT")
     _add_column_if_missing(conn, "sessions", "seq", "INTEGER")          # a running number: "the newest sessions" without relying on a clock that has seconds only
+    # --- four-eyes approval (app/approvals.py) ----------------------------------------------------------------------------------------------------
+    conn.execute("CREATE TABLE IF NOT EXISTS approvals (id INTEGER PRIMARY KEY, action TEXT NOT NULL, target TEXT NOT NULL, label TEXT, reason TEXT NOT NULL, requester_id INTEGER NOT NULL, "
+                 "requester TEXT NOT NULL, created TEXT NOT NULL, status TEXT NOT NULL, decided_by TEXT, decided_at TEXT, comment TEXT, expires TEXT, used_at TEXT)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status, requester_id)")
     # --- security keys and passkeys as a second factor (app/webauthn.py): only public keys are kept --------------------------------------------------
     _add_column_if_missing(conn, "users", "webauthn_enabled", "INTEGER NOT NULL DEFAULT 0")
+    _add_column_if_missing(conn, "users", "cert_identity", "TEXT")          # who a client certificate must say it is (app/certlogin.py)
     _add_column_if_missing(conn, "users", "custom_role", "TEXT")          # a custom role (app/roles.py): `role` stays its base, so every role check keeps denying by default
     conn.execute("CREATE TABLE IF NOT EXISTS user_webauthn (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name TEXT NOT NULL, "
                  "credential_id TEXT NOT NULL UNIQUE, public_key TEXT NOT NULL, sign_count INTEGER NOT NULL DEFAULT 0, aaguid TEXT, transports TEXT, created TEXT NOT NULL, last_used TEXT)")

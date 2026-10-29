@@ -442,7 +442,7 @@ function showTotpStep(result) {
     ? "Use your security key. If you lost it, enter one of your recovery codes below."
     : "Enter the 6-digit code from your authenticator app, or one of your recovery codes.";
   loginKeyOptions = keys ? result.webauthn : null;
-  for (const id of ["#login-user-fields", "#login-token-fields", "#login-sso", "#login-switch", "#login-demo"]) {
+  for (const id of ["#login-user-fields", "#login-token-fields", "#login-sso", "#login-cert", "#login-switch", "#login-demo"]) {
     const node = el(id);
     if (node) {
       loginStash.push([node, node.hidden]);
@@ -602,6 +602,17 @@ async function init() {
     if (session.token_login === false) hideTokenLogin();
     const sso = el("#login-sso");
     if (sso && session.oidc && session.oidc.enabled) { sso.hidden = false; sso.textContent = session.oidc.label || "Single sign-on"; }
+    const cert = el("#login-cert");
+    if (cert && session.certificate_login) {
+      cert.hidden = false;
+      cert.addEventListener("click", async () => {
+        try {
+          const result = await post("/api/login/certificate", {});
+          if (result && result.totp_required) { loginChallenge = result.challenge; clearLoginError(); showTotpStep(result); return; }
+          await finishLogin();
+        } catch (err) { showLoginError(err instanceof ApiError ? err.detail : err.message); }
+      });
+    }
     openLoginDialog();
   } else {
     goToStartPage(session);
