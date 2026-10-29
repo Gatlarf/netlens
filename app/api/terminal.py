@@ -224,6 +224,15 @@ async def terminal_ws(
 
         websocket.app.state.terminal_sessions += 1
 
+        recorder = None
+        from app import recordings, secpolicy as _secpolicy
+
+        if _secpolicy.get(conn)["record_sessions"]:               # session recording (Settings -> Sign-in security): what the host sends to the screen, encrypted
+            try:
+                recorder = recordings.Recorder(conn, websocket.app.state.settings.data_dir, getattr(principal, "username", "") or "", device_id, str(primary_ip), proto)
+            except Exception:  # noqa: BLE001 - never refuse a session because the recording could not start; say so in the audit log
+                audit.record_by(conn, principal, client_ip(websocket), "WS", f"/api/terminal/{device_id}/ws", 500, "A terminal session could not be recorded (the recording could not be started)")
+
         try:
             await websocket.send_json({
                 "type": "status",
@@ -242,6 +251,8 @@ async def terminal_ws(
                     data = await backend.read()
                     if not data:
                         break
+                    if recorder is not None:
+                        recorder.write(data)
                     await websocket.send_bytes(data)
 
             async def input_pump() -> None:
@@ -293,6 +304,11 @@ async def terminal_ws(
                 await backend.close()
             except Exception:
                 pass
+            if recorder is not None:
+                try:
+                    recorder.close(principal, client_ip(websocket))
+                except Exception:  # noqa: BLE001
+                    pass
 
             websocket.app.state.terminal_sessions -= 1
 

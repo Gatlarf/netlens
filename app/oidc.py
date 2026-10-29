@@ -54,10 +54,71 @@ def settings(conn: sqlite3.Connection) -> dict[str, Any]:
     g = lambda k: get_setting(conn, f"oidc.{k}") or ""    # noqa: E731
     return {"enabled": g("enabled") == "1", "issuer": g("issuer"), "client_id": g("client_id"), "has_secret": bool(g("client_secret")), "scopes": g("scopes") or "openid email profile",
             "admin_groups": g("admin_groups"), "groups_claim": g("groups_claim") or "groups", "default_role": g("default_role") or "viewer", "label": g("label") or "Single sign-on",
-            "redirect_base": g("redirect_base")}
+            "redirect_base": g("redirect_base"), "group_map": group_map(conn)}
+
+
+RANK = {"viewer": 0, "operator": 1, "admin": 2}
+
+
+def group_map(conn: sqlite3.Connection) -> list[dict[str, str]]:
+    try:
+        data = json.loads(get_setting(conn, "oidc.group_map") or "[]")
+    except ValueError:
+        return []
+    return [m for m in data if isinstance(m, dict) and m.get("group") and m.get("role")] if isinstance(data, list) else []
+
+
+def _check_group_map(conn: sqlite3.Connection, value: Any) -> list[dict[str, str]]:
+    from app import roles
+
+    if not isinstance(value, list) or len(value) > 50:
+        raise OidcError("the group map is a list of up to 50 lines: group = role")
+    custom = {r["id"] for r in roles.load(conn)}
+    out, seen = [], set()
+    for item in value:
+        group, role = str((item or {}).get("group", "")).strip(), str((item or {}).get("role", "")).strip()
+        if not group or len(group) > 200 or re.search(r"[\x00-\x1f\x7f]", group):
+            raise OidcError("a group name is empty, too long or has a control character")
+        if role not in RANK and not (role.startswith("custom:") and role[7:] in custom):
+            raise OidcError(f"the role {role!r} is not viewer, operator, admin or a custom role that exists (custom:<id>)")
+        if group.lower() in seen:
+            raise OidcError(f"the group {group!r} is mapped twice")
+        seen.add(group.lower())
+        out.append({"group": group, "role": role})
+    return out
+
+
+def resolve_role(conn: sqlite3.Connection, cfg: dict, groups: list[str]) -> tuple[str, str | None]:
+    """The role a sign-in gets: the most privileged of the roles its groups map to (the admin groups and, with the Enterprise edition, the group map); else the default role.
+    Returns (base role, custom role id or None)."""
+    have = {g.lower() for g in groups}
+    best: tuple[int, str, str | None] | None = None
+    wanted = {g.strip().lower() for g in cfg["admin_groups"].split(",") if g.strip()}
+    if wanted & have:
+        best = (RANK["admin"], "admin", None)
+    if licence.allows(conn, "privileged"):
+        from app import roles
+
+        bases = {r["id"]: r["base"] for r in roles.load(conn)}
+        for m in cfg.get("group_map") or []:
+            if m["group"].lower() not in have:
+                continue
+            if m["role"] in RANK:
+                cand = (RANK[m["role"]], m["role"], None)
+            elif m["role"].startswith("custom:") and m["role"][7:] in bases:
+                cand = (RANK[bases[m["role"][7:]]] - 0.5, bases[m["role"][7:]], m["role"][7:])             # a custom role ranks just under its base: it is the narrower choice
+            else:
+                continue
+            if best is None or cand[0] > best[0]:
+                best = cand
+    if best is None:
+        return cfg["default_role"], None
+    return best[1], best[2]
 
 
 def save_settings(conn: sqlite3.Connection, data: dict) -> dict[str, Any]:
+    if "group_map" in data:
+        set_setting(conn, "oidc.group_map", json.dumps(_check_group_map(conn, data["group_map"])))
     if "issuer" in data:
         issuer = str(data["issuer"] or "").strip().rstrip("/")
         if issuer:
@@ -257,10 +318,14 @@ def finish(conn: sqlite3.Connection, state: str, code: str, ip: str = "", user_a
 def sign_in(conn: sqlite3.Connection, claims: dict, cfg: dict, ip: str = "", user_agent: str = "") -> str:
     groups = claims.get(cfg["groups_claim"]) or []
     groups = [groups] if isinstance(groups, str) else [str(g) for g in groups] if isinstance(groups, list) else []
-    wanted = {g.strip().lower() for g in cfg["admin_groups"].split(",") if g.strip()}
-    role = "admin" if wanted and wanted & {g.lower() for g in groups} else cfg["default_role"]
+    role, custom = resolve_role(conn, cfg, groups)
     sub = str(claims["sub"])[:200]
     row = conn.execute("SELECT id, disabled FROM users WHERE oidc_sub = ?", (sub,)).fetchone()
+    if row is None:
+        from app import scim
+
+        adopted = scim.adopt(conn, claims)             # the provider may have made this person's account already (SCIM)
+        row = conn.execute("SELECT id, disabled FROM users WHERE id = ?", (adopted,)).fetchone() if adopted else None
     if row is None:
         base = re.sub(r"[^A-Za-z0-9._@-]", "", str(claims.get("preferred_username") or claims.get("email") or claims.get("name") or "sso-user"))[:30] or "sso-user"
         name, n = base, 1
@@ -272,12 +337,12 @@ def sign_in(conn: sqlite3.Connection, claims: dict, cfg: dict, ip: str = "", use
         except users.UserError:
             name = f"sso-{secrets.token_hex(3)}"
         user_id = users.create_user(conn, name, secrets.token_urlsafe(24) + "Aa1", role)
-        conn.execute("UPDATE users SET oidc_sub = ? WHERE id = ?", (sub, user_id))
+        conn.execute("UPDATE users SET oidc_sub = ?, custom_role = ? WHERE id = ?", (sub, custom, user_id))
         conn.commit()
     else:
         if row["disabled"]:
             raise OidcError("this account has been disabled in Netlens")
         user_id = row["id"]
-        conn.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+        conn.execute("UPDATE users SET role = ?, custom_role = ? WHERE id = ?", (role, custom, user_id))          # the identity provider decides the role, every time
         conn.commit()
     return users.start_session(conn, user_id, ip, user_agent, "oidc")

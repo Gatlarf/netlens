@@ -82,6 +82,7 @@ LIMITS: list[tuple[str, int]] = [        # (path prefix, bytes): the few request
     ("/api/siteview/", 8 * MIB),
     ("/api/speedtest/up", 1024 * MIB),     # the upload test sends data on purpose (and has its own limit)
     ("/api/login", 16 * 1024),
+    ("/scim/", 256 * 1024),                # provisioning calls are small
     ("/share-api/", 16 * 1024),
 ]
 

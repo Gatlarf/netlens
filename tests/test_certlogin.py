@@ -58,7 +58,7 @@ def test_a_verified_certificate_from_the_proxy_signs_the_linked_user_in(env):
 def test_nothing_is_believed_from_anywhere_else_or_when_the_proxy_did_not_verify(env):
     app, path, state, proxy, stranger = env
     setup(proxy, path)
-    assert stranger.get("/api/session", headers=GOOD).json()["certificate_login"] is False
+    assert "certificate_login" not in stranger.get("/api/session", headers=GOOD).json()
     assert stranger.post("/api/login/certificate", headers=GOOD).status_code == 401           # a direct client forging the headers
     for headers in ({"X-SSL-Client-Verify": "FAILED", "X-SSL-Client-S-DN": "CN=alice,O=Example"}, {"X-SSL-Client-S-DN": "CN=alice,O=Example"}, {"X-SSL-Client-Verify": "SUCCESS"},
                     {"X-SSL-Client-Verify": "success", "X-SSL-Client-S-DN": "CN=alice,O=Example"}, {"X-SSL-Client-Verify": "SUCCESS", "X-SSL-Client-S-DN": "CN=alice,O=Example\x01"}):

@@ -27,6 +27,7 @@ BASES = ("viewer", "operator")
 MAX_ROLES = 20
 CATALOG: dict[str, dict[str, Any]] = {
     "audit": {"label": "Read the audit log", "text": "Who changed what, when; and whether the log is intact.", "get": r"^/api/(audit|audit\.csv|audit/integrity)$"},
+    "access_review": {"label": "Read the access review", "text": "Who has access, how it is protected, and the findings (no secrets).", "get": r"^/api/(access-review|access-review\.csv)$"},
     "reports": {"label": "Read the reports", "text": "Availability, weekly and monthly reports.", "get": r"^/api/reports/(availability|availability\.csv|weekly|monthly)$"},
     "backups": {"label": "See the backups page", "text": "Which backups ran and which failed (no restore, no download).", "get": r"^/api/backups$"},
     "vulnerabilities": {"label": "See vulnerabilities", "text": "The findings of the vulnerability scanners.", "get": r"^/api/vulns$"},

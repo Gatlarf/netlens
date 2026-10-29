@@ -1196,6 +1196,9 @@ def init_db(conn: sqlite3.Connection) -> None:
     for col in ("last_seen", "ip", "user_agent", "auth_at", "auth_method"):
         _add_column_if_missing(conn, "sessions", col, "TEXT")
     _add_column_if_missing(conn, "sessions", "seq", "INTEGER")          # a running number: "the newest sessions" without relying on a clock that has seconds only
+    # --- terminal session recordings (app/recordings.py): metadata here, the encrypted transcript in a file ----------------------------------------
+    conn.execute("CREATE TABLE IF NOT EXISTS session_recordings (id INTEGER PRIMARY KEY, user TEXT NOT NULL, device_id INTEGER, device TEXT, proto TEXT, started TEXT NOT NULL, ended TEXT, "
+                 "bytes INTEGER NOT NULL DEFAULT 0, chunks INTEGER NOT NULL DEFAULT 0, truncated INTEGER NOT NULL DEFAULT 0, file TEXT NOT NULL DEFAULT '', sha256 TEXT, status TEXT NOT NULL)")
     # --- four-eyes approval (app/approvals.py) ----------------------------------------------------------------------------------------------------
     conn.execute("CREATE TABLE IF NOT EXISTS approvals (id INTEGER PRIMARY KEY, action TEXT NOT NULL, target TEXT NOT NULL, label TEXT, reason TEXT NOT NULL, requester_id INTEGER NOT NULL, "
                  "requester TEXT NOT NULL, created TEXT NOT NULL, status TEXT NOT NULL, decided_by TEXT, decided_at TEXT, comment TEXT, expires TEXT, used_at TEXT)")
@@ -1203,6 +1206,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     # --- security keys and passkeys as a second factor (app/webauthn.py): only public keys are kept --------------------------------------------------
     _add_column_if_missing(conn, "users", "webauthn_enabled", "INTEGER NOT NULL DEFAULT 0")
     _add_column_if_missing(conn, "users", "cert_identity", "TEXT")          # who a client certificate must say it is (app/certlogin.py)
+    for col, decl in (("scim_managed", "INTEGER NOT NULL DEFAULT 0"), ("scim_external", "TEXT"), ("scim_user_name", "TEXT"), ("scim_email", "TEXT"), ("scim_display", "TEXT")):
+        _add_column_if_missing(conn, "users", col, decl)                    # accounts made by the identity provider (app/scim.py)
     _add_column_if_missing(conn, "users", "custom_role", "TEXT")          # a custom role (app/roles.py): `role` stays its base, so every role check keeps denying by default
     conn.execute("CREATE TABLE IF NOT EXISTS user_webauthn (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name TEXT NOT NULL, "
                  "credential_id TEXT NOT NULL UNIQUE, public_key TEXT NOT NULL, sign_count INTEGER NOT NULL DEFAULT 0, aaguid TEXT, transports TEXT, created TEXT NOT NULL, last_used TEXT)")

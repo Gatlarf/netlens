@@ -63,6 +63,16 @@ export async function buildSecurityCard() {
     card.append(h("h3", {}, "Four-eyes approval"),
       h("div", { class: "hint" }, "These actions then need a second administrator to approve first (Settings → Approvals); the person who asks cannot approve their own request. Needs at least two administrators with their own accounts. Break-glass accounts are exempt. The access token cannot ask, so it cannot do these actions while this is on. Console fix: python -m app.cli clear-four-eyes."),
       ...fourBoxes.map(([, row]) => h("div", {}, row)), h("div", { class: "field" }, h("label", {}, "An approval lasts (minutes)"), fourMinutes));
+    const rec = h("input", { type: "checkbox", checked: Boolean(p.record_sessions) });
+    const recDays = num(p.recording_days || 90, 3650, "Days recordings are kept");
+    recDays.min = "1";
+    card.append(h("h3", {}, "Session recording"),
+      h("label", { class: "check" }, rec, " Record web-terminal sessions"),
+      h("div", { class: "hint" }, "What the host sends to the screen is kept, encrypted, with its timing (Settings → Session recordings). What is typed is not recorded, so passwords typed at prompts are not kept. Remote desktop sessions are not recorded by Netlens."),
+      h("div", { class: "field" }, h("label", {}, "Keep recordings (days)"), recDays));
+    const reviewDays = num(p.review_days || 0, 365, "Access review due every (days)");
+    card.append(h("h3", {}, "Access review"),
+      h("div", { class: "field" }, h("label", {}, "Remind when the access review is older than (days)"), reviewDays, h("div", { class: "hint" }, "0 = no reminder. 90 is a common choice. The review itself is under Settings → Access review.")));
     card.append(h("h3", {}, "Where administration may be done from"),
       h("div", { class: "field" }, h("label", {}, "Networks"), adminNets,
         h("div", { class: "hint" }, "When listed, administrators can sign in and work only from these networks (viewers and operators are not affected). Break-glass accounts are exempt: they are the way in when this locks you out. Netlens refuses a list that does not contain the address you are using now. Console fix: python -m app.cli clear-admin-networks.")));
@@ -79,7 +89,7 @@ export async function buildSecurityCard() {
       save.disabled = true;
       try {
         const body = { require_totp: require.value, grace_days: Number(grace.value), idle_minutes: Number(idle.value), absolute_hours: Number(absolute.value), max_sessions: Number(most.value),
-          step_up: stepUp.checked, step_up_minutes: Number(stepMinutes.value), static_token: staticToken.value, local_login: localLogin.value, api_token_max_days: Number(tokenDays.value), min_password: Number(minPassword.value), admin_networks: adminNets.value.split(/[\s,]+/).filter(Boolean), four_eyes: fourBoxes.filter(([b]) => b.checked).map(([b]) => b.value), four_eyes_minutes: Number(fourMinutes.value) };
+          step_up: stepUp.checked, step_up_minutes: Number(stepMinutes.value), static_token: staticToken.value, local_login: localLogin.value, api_token_max_days: Number(tokenDays.value), min_password: Number(minPassword.value), admin_networks: adminNets.value.split(/[\s,]+/).filter(Boolean), four_eyes: fourBoxes.filter(([b]) => b.checked).map(([b]) => b.value), four_eyes_minutes: Number(fourMinutes.value), record_sessions: rec.checked, recording_days: Number(recDays.value), review_days: Number(reviewDays.value) };
         draw(await put("/api/security-policy", body));
         toast("Saved", "success");
       } catch (err) { toast(err.message || "Could not save", "error"); save.disabled = false; }

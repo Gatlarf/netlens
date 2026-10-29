@@ -192,6 +192,15 @@ def purge(conn: sqlite3.Connection, dry_run: bool = False, now: datetime | None 
                 out[name] = conn.execute(f"DELETE FROM {table} WHERE {column} < ?{extra}", (cutoff,)).rowcount
         except sqlite3.Error:
             out[name] = 0
+    try:       # terminal recordings older than the policy says (the files go with them)
+        from pathlib import Path
+
+        from app import dbengine, recordings, secpolicy
+
+        folder = dbengine.database_path(conn)
+        out["recordings"] = 0 if dry_run or not folder else recordings.prune(conn, Path(folder).parent, secpolicy.get(conn)["recording_days"])
+    except Exception:  # noqa: BLE001 - housekeeping of a feature must not stop the rest
+        out["recordings"] = 0
     now_s = now.strftime(STAMP)
     try:       # a sign-in session that has run out is of no use to anybody
         if dry_run:

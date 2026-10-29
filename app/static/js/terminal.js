@@ -14,7 +14,7 @@ export function isTerminalActive(slot) {
 
 let xtermLoaded = null;
 
-function loadXterm() {
+export function loadXterm() {
   if (xtermLoaded) return xtermLoaded;
 
   xtermLoaded = new Promise((resolve, reject) => {

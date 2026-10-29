@@ -21,7 +21,7 @@ def test_every_capability_matches_only_the_routes_it_is_meant_to():
     app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tempfile.mkdtemp() + "/i.db")
     routes = [(method.upper(), re.sub(r"\{[^}]+\}", "1", path)) for path, ops in app.openapi()["paths"].items() for method in ops]
     expected = {"audit": {"/api/audit", "/api/audit.csv", "/api/audit/integrity"}, "reports": {"/api/reports/availability", "/api/reports/availability.csv", "/api/reports/weekly", "/api/reports/monthly"},
-                "backups": {"/api/backups"}, "vulnerabilities": {"/api/vulns"}, "storage": {"/api/storage"}, "dns": {"/api/dns"}, "inventory": {"/api/inventory"}}
+                "backups": {"/api/backups"}, "access_review": {"/api/access-review", "/api/access-review.csv"}, "vulnerabilities": {"/api/vulns"}, "storage": {"/api/storage"}, "dns": {"/api/dns"}, "inventory": {"/api/inventory"}}
     assert set(roles.CATALOG) == set(expected)
     for cap, rx in roles._COMPILED.items():
         hit = {(m, p) for m, p in routes if rx.match(p)}
@@ -64,7 +64,7 @@ def test_the_role_rules():
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     real = licence.allows
-    state = {"privileged": True, "mfa_policy": True, "teams": True}
+    state = {"privileged": True, "mfa_policy": True, "teams": True, "customer_views": True}
     monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: state[feature] if feature in state else real(conn, feature, now))
     secpolicy.forget()
     path = tmp_path / "t.db"

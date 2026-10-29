@@ -24,8 +24,9 @@ WRITE = ("POST", "PUT", "PATCH", "DELETE")
 _BARE = r"(?:/[^/]+)*"
 # (methods, path regex) of what is privileged
 PRIVILEGED: list[tuple[tuple[str, ...], re.Pattern]] = [
-    (WRITE, re.compile(r"^/api/(credentials|users|roles|tls|approvals|vault|ingest|sso|assistant|mcp|security-policy|cert-login|restore|central|hostprobe|hosts|engineer|siem)(/|$)")),
+    (WRITE, re.compile(r"^/api/(credentials|users|roles|tls|approvals|scim|vault|ingest|sso|assistant|mcp|security-policy|cert-login|restore|central|hostprobe|hosts|engineer|siem)(/|$)")),
     (("PUT", "DELETE"), re.compile(r"^/api/licence$")),
+    (("GET", "DELETE"), re.compile(r"^/api/recordings/\d+(/download)?$")),                       # watching or deleting a recorded session
     (WRITE, re.compile(r"^/api/plugins(/[^/]+)?$")),                                        # install by upload, change the settings (they hold logins), remove
     (WRITE, re.compile(r"^/api/plugin-index/(settings|[^/]+/(install|rollback|auto-update))$")),
     (("PUT",), re.compile(r"^/api/plugin-settings$")),
@@ -55,6 +56,9 @@ NOT_PRIVILEGED: dict[tuple[str, str], str] = {
     ("PUT", "/api/remediation/paused"): "pauses automatic fixes, which makes things safer",
     ("POST", "/api/siem/test"): "sends one test message",
     ("POST", "/api/sso/test"): "tries the settings, saves nothing",
+    ("POST", "/api/access-review/pack"): "a signed report with no secrets in it; reading is not privileged",
+    ("POST", "/api/access-review/verify"): "checks a document, changes nothing",
+    ("POST", "/api/access-review/complete"): "records that a review was done: no access changes",
     ("POST", "/api/approvals"): "only asks for permission: nothing happens until another administrator approves, which is the privileged step",
     ("POST", "/api/approvals/{approval_id}/cancel"): "withdraws the person's own request",
     ("POST", "/api/ingest/window"): "covered below: every ingest write is privileged (this entry only documents the window)",

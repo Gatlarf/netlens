@@ -20,6 +20,8 @@ export async function buildSsoCard() {
     const groupsClaim = h("input", { type: "text", value: info.groups_claim });
     const adminGroups = h("input", { type: "text", value: info.admin_groups, placeholder: "netlens-admins, it" });
     const role = h("select", {}, h("option", { value: "viewer", selected: info.default_role === "viewer" }, "Viewer (can look, not change)"), h("option", { value: "admin", selected: info.default_role === "admin" }, "Administrator"));
+    const mapBox = h("textarea", { rows: 4, class: "mono", placeholder: "netlens-ops = operator\nauditors = custom:auditor\nnetlens-admins = admin", "aria-label": "Group to role map", disabled: !info.group_map_allowed });
+    mapBox.value = (info.group_map || []).map((m) => `${m.group} = ${m.role}`).join("\n");
     const label = h("input", { type: "text", value: info.label });
     const base = h("input", { type: "url", value: info.redirect_base, placeholder: "https://netlens.example.com (only behind a reverse proxy that changes the address)" });
     const save = h("button", { class: "btn primary", type: "button" }, "Save");
@@ -27,7 +29,7 @@ export async function buildSsoCard() {
       save.disabled = true;
       try {
         draw(await put("/api/sso", { enabled: enabled.checked, issuer: issuer.value, client_id: clientId.value, scopes: scopes.value, groups_claim: groupsClaim.value, admin_groups: adminGroups.value,
-          default_role: role.value, label: label.value, redirect_base: base.value, ...(secret.value ? { client_secret: secret.value } : {}) }));
+          default_role: role.value, ...(info.group_map_allowed ? { group_map: mapBox.value.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [g, ...r] = l.split("="); return { group: g.trim(), role: r.join("=").trim() }; }) } : {}), label: label.value, redirect_base: base.value, ...(secret.value ? { client_secret: secret.value } : {}) }));
         toast("Saved", "success");
       } catch (err) { toast(err.message || "Could not save", "error"); save.disabled = false; }
     });
@@ -40,7 +42,8 @@ export async function buildSsoCard() {
     card.append(h("label", { class: "check" }, enabled, " Show “sign in with …” on the sign-in page"),
       field("Redirect address (enter this at your provider)", h("input", { type: "text", readonly: true, value: info.redirect_uri, class: "mono" })),
       field("Provider address (issuer)", issuer, "The address that has /.well-known/openid-configuration below it."), field("Client id", clientId), field("Client secret", secret),
-      field("Scopes", scopes), field("Groups claim", groupsClaim, "The name of the claim that lists a person's groups."), field("Administrator groups", adminGroups, "Comma separated. Everybody else gets the default role."),
+      field("Scopes", scopes), field("Groups claim", groupsClaim, "The name of the claim that lists a person's groups."), field("Administrator groups", adminGroups, "Comma separated. Everybody else gets the default role (or the role of a group below)."),
+      field("Group → role map (Enterprise)", mapBox, info.group_map_allowed ? "One per line: group = viewer, operator, admin or custom:<role id> (Settings → Roles). A person with several groups gets the most privileged role. The identity provider decides at every sign-in." : "Part of the Enterprise edition and the free trial."),
       field("Default role", role), field("Button text", label), field("Address of Netlens", base), h("div", { class: "form-actions" }, save, test));
   }
   draw(await get("/api/sso"));

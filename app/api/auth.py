@@ -372,7 +372,7 @@ async def session(request: Request) -> JSONResponse:
             "setup_required": needs_setup,
             "token_login": bool(request.app.state.settings.token),  # False: only user name and password sign in
             "oidc": _oidc_public(request),
-            "certificate_login": _cert_present(request),
+            **({"certificate_login": True} if _cert_present(request) else {}),
             **_demo_info(request),
             "interface": _interface(request),
         })

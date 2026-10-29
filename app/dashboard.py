@@ -205,6 +205,14 @@ def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
             out.append({"level": "warn", "text": p["text"], "href": "#/settings/ingest", "snooze": f"agent:{p['agent_id']}"})
     from app import approvals, auditchain, credstore
 
+    from app import accessreview, secpolicy as _sp
+
+    days = _sp.get(conn)["review_days"]
+    if days:
+        done = accessreview.last_review(conn)
+        age = accessreview._days_since(done["at"], __import__("datetime").datetime.now(__import__("datetime").timezone.utc)) if done else None
+        if age is None or age >= days:
+            out.append({"level": "warn", "text": ("The access review has never been done" if done is None else f"The last access review was {age} days ago") + f" (due every {days} days)", "href": "#/settings/accessreview"})
     waiting = approvals.waiting_count(conn)
     if waiting:
         out.append({"level": "warn", "text": f"{waiting} approval request{'s' if waiting != 1 else ''} waiting for an administrator", "href": "#/settings/approvals"})

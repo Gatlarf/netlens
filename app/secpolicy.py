@@ -25,10 +25,10 @@ KEY = "security.policy"
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
 REQUIRE_VALUES = ("off", "admins", "operators", "everyone")
 DEFAULTS: dict[str, Any] = {"require_totp": "off", "grace_days": 14, "require_since": None, "idle_minutes": 0, "absolute_hours": 0, "max_sessions": 0,
-                            "step_up": False, "step_up_minutes": 10, "static_token": "allowed", "local_login": "allowed", "api_token_max_days": 0, "min_password": 8, "admin_networks": [], "four_eyes": [], "four_eyes_minutes": 15}
-RANGES = {"grace_days": (0, 365), "idle_minutes": (0, 1440), "absolute_hours": (0, 720), "max_sessions": (0, 50), "step_up_minutes": (1, 120), "api_token_max_days": (0, 3650), "min_password": (8, 64), "four_eyes_minutes": (1, 240)}
+                            "step_up": False, "step_up_minutes": 10, "static_token": "allowed", "local_login": "allowed", "api_token_max_days": 0, "min_password": 8, "admin_networks": [], "four_eyes": [], "four_eyes_minutes": 15, "record_sessions": False, "recording_days": 90, "review_days": 0}
+RANGES = {"grace_days": (0, 365), "idle_minutes": (0, 1440), "absolute_hours": (0, 720), "max_sessions": (0, 50), "step_up_minutes": (1, 120), "api_token_max_days": (0, 3650), "min_password": (8, 64), "four_eyes_minutes": (1, 240), "recording_days": (1, 3650), "review_days": (0, 365)}
 ENUMS = {"static_token": ("allowed", "lan", "off"), "local_login": ("allowed", "break_glass_only")}
-ENTERPRISE_FIELDS = ("idle_minutes", "absolute_hours", "max_sessions", "step_up", "step_up_minutes", "static_token", "local_login", "api_token_max_days", "min_password", "admin_networks", "four_eyes", "four_eyes_minutes")
+ENTERPRISE_FIELDS = ("idle_minutes", "absolute_hours", "max_sessions", "step_up", "step_up_minutes", "static_token", "local_login", "api_token_max_days", "min_password", "admin_networks", "four_eyes", "four_eyes_minutes", "record_sessions", "recording_days", "review_days")
 # a restricted session (no second factor after the grace period) may use only these
 ENROL_PATHS = ("/api/session", "/api/logout", "/api/me/totp", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/webauthn", "/api/me/webauthn/begin", "/api/me/webauthn/finish", "/api/me/webauthn/remove", "/api/me/password", "/api/me/sessions", "/api/me/stepup")
 
@@ -145,7 +145,10 @@ def save(conn, data: dict[str, Any], *, may_mfa: bool, may_privileged: bool, cal
         if field not in data:
             continue
         v = data[field]
-        if field == "four_eyes":
+        if field == "record_sessions":
+            if not isinstance(v, bool):
+                raise PolicyError("record_sessions must be true or false")
+        elif field == "four_eyes":
             from app import approvals
 
             if not isinstance(v, list) or any(x not in approvals.ACTIONS for x in v):

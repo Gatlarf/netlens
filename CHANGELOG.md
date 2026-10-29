@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.320 — 2026-10-29
+
+### Added
+- ★ **Session recording (Enterprise and the trial).** Web-terminal sessions can be recorded: what the host sends to the screen, with timing, each piece encrypted and authenticated with its position; what is typed is not recorded. The file's hash goes into the audit chain, playback says whether the recording is verified, retention deletes old ones, and watching, downloading and deleting are audit lines (and need step-up when it is on). Settings → Session recordings.
+- ★ **Access review and a signed evidence pack (Enterprise and the trial).** Settings → Access review: every account with role, sign-in method, second factor, tokens and last sign-in, findings in plain words, a CSV, a signed pack whose hash is in the audit log (and a way to verify one), "mark as reviewed", and a reminder when the review is old. A custom role can be given read-only access to it.
+- ★ **Group → role map for single sign-on and SCIM provisioning (Enterprise and the trial).** Map identity-provider groups to viewer, operator, admin or a custom role (the most privileged wins; the provider decides at every sign-in). SCIM 2.0 lets the provider make and deactivate accounts by itself, only its own accounts, never an administrator, never the last one; a leaver's sessions end at once. SAML is not built.
+
 ## 0.4.319 — 2026-10-29
 
 ### Added

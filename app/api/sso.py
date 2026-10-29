@@ -107,10 +107,11 @@ class SsoBody(BaseModel):
     default_role: str | None = None
     label: str | None = None
     redirect_base: str | None = None
+    group_map: list[dict] | None = None      # Enterprise: [{"group": "...", "role": "admin|operator|viewer|custom:<id>"}]
 
 
 def _doc(conn, request: Request) -> dict[str, Any]:
-    return {**oidc.settings(conn), "allowed": licence.allows(conn, "sso"), "redirect_uri": oidc.redirect_uri(conn, _base(request))}
+    return {**oidc.settings(conn), "allowed": licence.allows(conn, "sso"), "group_map_allowed": licence.allows(conn, "privileged"), "redirect_uri": oidc.redirect_uri(conn, _base(request))}
 
 
 @router.get("/sso")
@@ -122,6 +123,8 @@ def get_sso(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
 def put_sso(body: SsoBody, request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     if not licence.allows(conn, "sso"):
         raise HTTPException(status_code=402, detail="single sign-on is part of the Small business and Enterprise editions (or the free trial): Settings → Licence")
+    if body.group_map and not licence.allows(conn, "privileged"):
+        raise HTTPException(status_code=402, detail="mapping groups to roles is part of the Enterprise edition (or the free trial)")
     try:
         oidc.save_settings(conn, body.model_dump(exclude_none=True))
     except oidc.OidcError as exc:

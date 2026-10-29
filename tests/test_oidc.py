@@ -198,3 +198,50 @@ def test_a_local_account_cannot_be_taken_over_by_name(tmp_path, idp):
     assert row["id"] != local and row["username"] != "anna" and row["role"] == "viewer"
     assert c.execute("SELECT role FROM users WHERE id = ?", (local,)).fetchone()["role"] == "admin"
     c.close()
+
+
+def test_the_group_map_gives_the_most_privileged_role_and_the_provider_decides_every_time(tmp_path, monkeypatch):
+    from app import licence, roles, users
+    from app.db import connect, init_db
+
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: True)
+    c = connect(tmp_path / "t.db")
+    init_db(c)
+    roles.save(c, "Auditor", "viewer", ["audit"])
+    saved = oidc.save_settings(c, {"group_map": [{"group": "ops", "role": "operator"}, {"group": "Auditors", "role": "custom:auditor"}, {"group": "root", "role": "admin"}], "default_role": "viewer"})
+    cfg = {**saved, "admin_groups": ""}
+    assert [m["group"] for m in saved["group_map"]] == ["ops", "Auditors", "root"]
+
+    def login(sub, groups):
+        cookie = oidc.sign_in(c, {"sub": sub, "preferred_username": sub, "groups": groups}, cfg)
+        return users.user_for_session(c, cookie)
+
+    assert login("a", [])["role"] == "viewer"                                               # no group: the default role
+    row = login("b", ["AUDITORS"])                                                          # case-insensitive; a custom role
+    assert row["role"] == "viewer" and row["custom_role"] == "auditor"
+    assert login("c", ["ops", "auditors"])["role"] == "operator"                           # the operator outranks the narrower custom role
+    assert login("d", ["ops", "root"])["role"] == "admin"                                   # the most privileged wins
+    again = login("d", ["ops"])                                                             # the group was removed at the provider: the role follows at the next sign-in
+    assert again["role"] == "operator" and again["custom_role"] is None
+    assert login("b", ["ops"])["custom_role"] is None                                       # and a custom role is dropped when the group goes
+    cfg2 = {**cfg, "admin_groups": "netlens-admins"}
+    cookie = oidc.sign_in(c, {"sub": "e", "preferred_username": "e", "groups": ["netlens-admins", "ops"]}, cfg2)
+    assert users.user_for_session(c, cookie)["role"] == "admin"                             # the older admin-groups setting still works
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: feature != "privileged")
+    assert login("f", ["root"])["role"] == "viewer"                                         # without the edition the map is ignored (the default role)
+    c.close()
+
+
+def test_the_group_map_is_validated(tmp_path):
+    from app import roles
+    from app.db import connect, init_db
+
+    c = connect(tmp_path / "t.db")
+    init_db(c)
+    roles.save(c, "Auditor", "viewer", ["audit"])
+    for bad in ("x", [{"group": "", "role": "admin"}], [{"group": "g", "role": "root"}], [{"group": "g", "role": "custom:nope"}], [{"group": "g", "role": "admin"}, {"group": "G", "role": "viewer"}],
+                [{"group": "g\nx", "role": "admin"}], [{"group": "g" * 201, "role": "admin"}], [{"group": str(i), "role": "viewer"} for i in range(51)]):
+        with pytest.raises(oidc.OidcError):
+            oidc.save_settings(c, {"group_map": bad})
+    assert oidc.save_settings(c, {"group_map": [{"group": " ok ", "role": "custom:auditor"}]})["group_map"] == [{"group": "ok", "role": "custom:auditor"}]
+    c.close()

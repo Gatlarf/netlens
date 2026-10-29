@@ -33,6 +33,9 @@ import { buildRolesCard } from "../cards/roles.js";
 import { buildTlsCard } from "../cards/tls.js";
 import { buildCertLoginCard } from "../cards/certlogin.js";
 import { buildApprovalsCard } from "../cards/approvals.js";
+import { buildRecordingsCard } from "../cards/recordings.js";
+import { buildAccessReviewCard } from "../cards/accessreview.js";
+import { buildScimCard } from "../cards/scim.js";
 import { buildAuditCard } from "../cards/audit.js";
 import { buildUsersCard } from "../cards/users.js";
 import { buildSharesCard } from "../cards/shares.js";
@@ -280,9 +283,12 @@ const STATIC_GROUPS = [
       { key: "users", label: "Users & tokens", build: buildUsersCard },
       { key: "roles", label: "Roles", build: buildRolesCard },
       { key: "approvals", label: "Approvals", build: buildApprovalsCard },
+      { key: "recordings", label: "Session recordings", build: buildRecordingsCard },
+      { key: "accessreview", label: "Access review", build: buildAccessReviewCard },
       { key: "tls", label: "HTTPS", build: buildTlsCard },
       { key: "certlogin", label: "Client certificates", build: buildCertLoginCard },
       { key: "sso", label: "Single sign-on", build: buildSsoCard },
+      { key: "scim", label: "Provisioning (SCIM)", build: buildScimCard },
       { key: "security", label: "Sign-in security", build: buildSecurityCard },
       { key: "terminal", label: "Web terminal", build: buildTerminalCard },
     ],
@@ -350,7 +356,7 @@ function integrationsGroup(plugins, updates = 0) {
 }
 
 async function loadGroups() {
-  if (!isAdmin()) return [{ title: "Account", items: [{ key: "session", label: "Account", build: buildAccountCard }, ...(can("audit") ? [{ key: "audit", label: "Audit log", build: buildAuditCard }] : [])] }];
+  if (!isAdmin()) return [{ title: "Account", items: [{ key: "session", label: "Account", build: buildAccountCard }, ...(can("audit") ? [{ key: "audit", label: "Audit log", build: buildAuditCard }] : []), ...(can("access_review") ? [{ key: "accessreview", label: "Access review", build: buildAccessReviewCard }] : [])] }];
   let plugins = [];
   let updates = 0;
   try {
