@@ -352,3 +352,14 @@ def test_a_refused_login_shows_up_in_the_problem_list_the_answers_and_reports_us
     bao.down = 0
     credstore.resolve(conn, "anna", made["id"], "SSH terminal")
     assert not [p for p in dashboard.current_problems(conn) if "PAM" in p["text"]]
+
+
+def test_testing_a_monitor_with_a_refused_pam_login_says_why(api, bao):
+    c, state, path = api
+    conn = connect(path)
+    conn.execute("INSERT INTO devices (id, mac, primary_ip, hostname, online, first_seen, last_seen) VALUES (1,'aa:00:00:00:00:01','127.0.0.1','web01',1,'2026-10-29T10:00:00Z','2026-10-29T10:00:00Z')")
+    conn.commit()
+    conn.close()
+    made = c.post("/api/credentials", json=body(bao, path="netlens/missing"), headers=ADMIN).json()
+    r = c.post("/api/devices/1/monitor/test", json={"method": "ssh", "credential_id": made["id"]}, headers=ADMIN)
+    assert r.status_code == 422 and "PAM system did not hand out the login" in r.json()["detail"] and "no secret at that path" in r.json()["detail"]

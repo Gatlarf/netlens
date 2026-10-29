@@ -128,12 +128,12 @@ def checkout(entry: dict, ctx: Context, interactive: bool) -> Fetched:
 
 
 def audit_line(entry: dict, ctx: Context, lease: str, ok: bool, error: str = "") -> str:
-    """The text of the audit line for a check-out. Never contains a secret."""
+    """The text of the audit line for a check-out (the log keeps 300 characters, so what must be there comes first). Never contains a secret."""
     host = f" for {ctx.device}" if ctx.device else ""
-    reason = f", reason: {ctx.reason}" if ctx.reason else ""
-    state = f"checked out{host}" if ok else f"REFUSED{host} ({error[:120]})"
-    return (f"PAM {entry.get('provider')}: login \"{str(entry.get('name'))[:40]}\" {state}; lease {lease or '-'}; correlation {ctx.correlation}; "
-            f"purpose: {ctx.purpose[:60]}{reason}")
+    reason = f"; reason: {ctx.reason}" if ctx.reason else ""
+    head = f"PAM {entry.get('provider')}: login \"{str(entry.get('name'))[:40]}\" " + (f"checked out{host}" if ok else f"REFUSED{host}")
+    tail = f"; lease {lease or '-'}; correlation {ctx.correlation}"
+    return f"{head}; purpose: {ctx.purpose[:60]}{reason}{tail}" + ("" if ok else f"; {error[:140]}")
 
 
 from app.pam import vaultkv  # noqa: E402,F401  (registers itself)

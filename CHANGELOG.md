@@ -7,6 +7,9 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ### Added
 - ★ **Logins from your privileged-access system (Enterprise and the trial).** A stored login can now be of kind **PAM**: it says where the secret lives in your vault and how Netlens signs in, never the secret. When a terminal, a remote desktop, a monitor, a probe or the host set-up needs the login, Netlens fetches it, uses it and keeps no copy; if the vault says no or cannot be reached, the use does not happen (no fall-back to a stored password). First provider: **HashiCorp Vault and OpenBao** (KV version 1 and 2, AppRole or token, namespaces, a private CA, mapped field names), tested on a real OpenBao. Every check-out is one audit line with the vault's request id and a correlation id sent to the vault, never the secret; a monitor writes at most one line an hour. A login can **require a reason** (ticket number or a few words) from a person; monitors and other jobs cannot use such a login. **Try it** in Settings → Credentials checks a login without showing it. A refused login appears under "needs attention" and in the answers and reports. See `PAM.md`. CyberArk, Delinea and BeyondTrust follow on the same framework.
 
+### Fixed
+- Testing a monitor with a PAM login that the vault refused now says what the vault said, instead of "the login was refused".
+
 ### Changed
 - A PAM login is fetched off the event loop, so a slow vault cannot hold up the other monitors. Monitor lists and device pages never ask the vault.
 

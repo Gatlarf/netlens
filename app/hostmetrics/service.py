@@ -334,27 +334,30 @@ def resolve_secret(conn, method: str, secret: dict[str, Any], fetch: bool = True
     return {**secret, "username": user, **{k: stored[k] for k in ("password", "private_key", "passphrase") if stored.get(k)}}
 
 
-async def load_secret_async(conn, row) -> dict[str, Any]:
-    """`load_secret` for code that runs on the event loop: a login in the PAM is a network call, which must not hold up everything else. Only a login that lives in the PAM
-    leaves the loop (with a connection of its own); everything else is read as before."""
-    stored = raw_secret(conn, row)
-    cred = stored.get("credential_id")
+async def resolve_secret_async(conn, method: str, secret: dict[str, Any], device: str = "") -> dict[str, Any]:
+    """`resolve_secret` for code that runs on the event loop: a login in the PAM is a network call, which must not hold up everything else. Only a login that lives in the
+    PAM leaves the loop (with a connection of its own); everything else is read as before."""
+    cred = secret.get("credential_id")
     if not cred:
-        return load_secret(conn, row)
+        return secret
     from app import credstore
 
     entry = credstore.peek_bound(conn, cred)
     path = dbengine.database_path(conn)
     if entry is None or entry.get("kind") != "pam" or not path:
-        return load_secret(conn, row)
+        return resolve_secret(conn, method, secret, True, device)
 
     def work() -> dict[str, Any]:
         own = connect(path)
         try:
-            return load_secret(own, row)
+            return resolve_secret(own, method, secret, True, device)
         finally:
             own.close()
     return await asyncio.to_thread(work)
+
+
+async def load_secret_async(conn, row) -> dict[str, Any]:
+    return await resolve_secret_async(conn, row["method"], raw_secret(conn, row), f"device {row['device_id']}")
 
 
 def unreadable_text(conn, row, default: str) -> str:

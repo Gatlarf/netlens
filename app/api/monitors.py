@@ -92,9 +92,13 @@ async def test_monitor(device_id: int, body: MonitorBody, request: Request, conn
         d = hm.validate(data, current)
     except hm.MonitorError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    d["secret"] = hm.resolve_secret(conn, d["method"], d["secret"])
-    if d["secret"].get("credential_id") and not d["secret"].get("username"):
-        raise HTTPException(status_code=422, detail="the stored login is gone: pick another one")
+    cred_id = d["secret"].get("credential_id")
+    d["secret"] = await hm.resolve_secret_async(conn, d["method"], d["secret"], f"device {device_id}")
+    if cred_id and not d["secret"].get("username"):
+        from app import pam
+
+        asked = pam.last_status(cred_id)
+        raise HTTPException(status_code=422, detail=f"the PAM system did not hand out the login: {asked['message']}" if asked and not asked["ok"] else "the stored login is gone: pick another one")
     known = None
     if d["method"] == "ssh":
         from app.terminal.hostkeys import get_fingerprint
