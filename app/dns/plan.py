@@ -43,6 +43,7 @@ class DnsDevice:
     windows: bool = False
     auto_name: str | None = None         # a generated name kept from an earlier run, so names stay stable
     first_missing: str | None = None     # since when the device has had no record
+    nic_of: int | None = None            # another network card of that host: the host's own name is the one that is registered
 
 
 @dataclass
@@ -174,6 +175,9 @@ def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, 
             continue          # not in a network that has a zone: not this plugin's business, and not listed
         if d.dns_mode == "never":
             skip("set to never register in DNS", zone)
+            continue
+        if d.nic_of and d.dns_mode != "always" and not d.dns_name:
+            skip("another network card of a host (the host's own name is registered)", zone)
             continue
         if settings.only_known and not d.trusted and d.dns_mode != "always":
             skip("not marked as known yet (only known devices are registered)", zone)

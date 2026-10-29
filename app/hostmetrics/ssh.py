@@ -27,6 +27,8 @@ SCRIPT = (
     'echo "##uptime"; cat /proc/uptime 2>/dev/null; '
     'echo "##df"; df -PkT 2>/dev/null; '
     'echo "##net"; cat /proc/net/dev 2>/dev/null; '
+    # whether the cable of an interface has a link (carrier): unreadable for an interface that is switched off, which is then not reported
+    'echo "##link"; for n in /sys/class/net/*; do c=$(cat "$n/carrier" 2>/dev/null) && echo "${n##*/} $c"; done 2>/dev/null; '
     # a container (LXC, Docker) shares the kernel of its host: the sensors it can see are the HOST's, so they are not read there
     'echo "##container"; if [ -r /run/systemd/container ]; then head -n1 /run/systemd/container; elif [ -e /.dockerenv ] || [ -e /run/.containerenv ]; then echo container; '
     'elif command -v systemd-detect-virt >/dev/null 2>&1; then systemd-detect-virt -c 2>/dev/null | head -n1; fi; '
@@ -322,6 +324,13 @@ def parse(text: str, state: dict, now: float | None = None) -> tuple[list[tuple]
         add("network", traffic)
     elif seen_if and "network" not in found:
         found.append("network")
+
+    links = []
+    for item in sec.get("link", []):
+        name, _, carrier = item.strip().rpartition(" ")
+        if name and carrier in ("0", "1") and not SKIP_IFACES.match(name):
+            links.append(("if_up", name[:40], float(carrier), "state"))
+    add("network", links[:MAX_INTERFACES])
 
     temps = []
     inside = [x.strip().lower() for x in sec.get("container", []) if x.strip()]

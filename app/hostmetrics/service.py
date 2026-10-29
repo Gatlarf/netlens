@@ -45,7 +45,12 @@ DEFAULT_RULES: dict[str, dict[str, Any]] = {
     "on_battery": {"title": "UPS on battery power", "unit": "", "warn": 1, "crit": None, "confirm": 1},
     "storage_status": {"title": "Storage problem", "unit": "", "warn": 1, "crit": 2, "confirm": 1},
     "service_stopped": {"title": "Service stopped", "unit": "", "warn": 1, "crit": None, "confirm": 2},
+    # a link that goes down (a cable out of a bond, a lost uplink). Off until it is switched on, because a switch has ports with nothing plugged in; `only` names the interfaces to watch
+    "if_up": {"title": "Link down", "unit": "", "warn": 0, "crit": None, "confirm": 2, "low": True, "enabled": False, "only": []},
 }
+
+
+MAX_ONLY = 20          # interfaces one link rule may name
 
 
 class MonitorError(ValueError):
@@ -74,6 +79,8 @@ def _apply(base: dict[str, dict[str, Any]], saved: Any) -> None:
                 base[metric][k] = mine[k]
         if isinstance(mine.get("enabled"), bool):
             base[metric]["enabled"] = mine["enabled"]
+        if isinstance(mine.get("only"), list):
+            base[metric]["only"] = [x for x in mine["only"] if isinstance(x, str)][:MAX_ONLY]
 
 
 def _saved(conn, key: str) -> Any:
@@ -86,7 +93,7 @@ def _saved(conn, key: str) -> Any:
 def rules(conn, device_id: int | None = None) -> dict[str, dict[str, Any]]:
     """The default rules with the user's changes applied: {metric: {title, unit, warn, crit, confirm, low, enabled}}.
     With a device id the limits that were set for that device alone are applied on top."""
-    out = {metric: {**base, "enabled": True} for metric, base in DEFAULT_RULES.items()}
+    out = {metric: {**base, "enabled": base.get("enabled", True)} for metric, base in DEFAULT_RULES.items()}
     _apply(out, _saved(conn, THRESHOLDS_KEY))
     if device_id is not None:
         mine = _saved(conn, DEVICE_LIMITS_KEY)
@@ -123,6 +130,16 @@ def _clean_rules(data: dict) -> dict[str, dict]:
                 item[k] = v
         if "enabled" in mine:
             item["enabled"] = bool(mine["enabled"])
+        if "only" in mine:
+            if metric != "if_up":
+                raise MonitorError("only the link rule can be limited to some interfaces")
+            names = mine["only"]
+            if not isinstance(names, list) or any(not isinstance(x, str) for x in names):
+                raise MonitorError("the interfaces must be a list of names")
+            clean_names = [" ".join(x.split())[:40] for x in names if x.strip()]
+            if len(clean_names) > MAX_ONLY:
+                raise MonitorError(f"at most {MAX_ONLY} interfaces")
+            item["only"] = clean_names
         warn, crit = item.get("warn", DEFAULT_RULES[metric]["warn"]), item.get("crit", DEFAULT_RULES[metric]["crit"])
         if warn is not None and crit is not None:
             low = DEFAULT_RULES[metric].get("low")
@@ -630,6 +647,8 @@ def _describe(rule: dict[str, Any], metric: str, label: str, value: float, level
         if level == "ok":
             return f"{device}: {what} is fine again"
         return f"{device}: {what} {'has stopped (a fan is not turning)' if level == 'critical' else 'reports a failure (a fan or power supply)'}"
+    if metric == "if_up":
+        return f"{device}: the link of {label or 'an interface'} is up again" if level == "ok" else f"{device}: the link of {label or 'an interface'} is down"
     if metric == "service_stopped":
         what = f"the service {label}" if label else "a service"
         return f"{device}: {what} is running again" if level == "ok" else f"{device}: {what} has stopped with an error"
@@ -647,6 +666,8 @@ def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: li
     for metric, label, value, _unit in points:
         rule = the_rules.get(metric)
         if rule is None or not rule["enabled"]:
+            continue
+        if rule.get("only") and label.lower() not in {x.lower() for x in rule["only"]}:          # the owner named the interfaces that matter
             continue
         level = level_of(rule, value)
         row = conn.execute("SELECT * FROM metric_state WHERE monitor_id = ? AND metric = ? AND label = ?", (monitor_id, metric, label)).fetchone()
@@ -709,7 +730,7 @@ def problems(conn, include_snoozed: bool = True) -> list[dict[str, Any]]:
         if the_rules is None:
             the_rules = per_device[r["device_id"]] = rules(conn, r["device_id"]) if device_overrides(conn, r["device_id"]) else general
         rule = the_rules.get(r["metric"])
-        if rule:
+        if rule and rule.get("enabled", True):
             key = f"metric:{r['device_id']}:{r['metric']}:{r['label']}"
             sleeping = asleep.get(key)
             if sleeping and not include_snoozed:

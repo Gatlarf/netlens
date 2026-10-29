@@ -651,3 +651,65 @@ def test_other_vendors_get_no_vendor_readings():
     other.set(snmp.SYS_OBJECT_ID, (1, 3, 6, 1, 4, 1, 9, 1, 1))
     pts, found = snmp.collect(Direct(other), groups=["vendor"], state={}, now=1)
     assert pts == [] and found == []
+
+
+# ------------------------------------------------------------------ a link that goes down (a cable out of a bond)
+LINKS = "##link\nbond0 1\neno1 1\neno2 0\nlo 1\ndocker0 1\nwlan0 \n"
+
+
+def test_the_link_of_each_interface_is_read_from_a_linux_host():
+    pts, found = ssh.parse(proc().replace("##temp", LINKS + "##temp"), {}, now=100)
+    got = {k: v for k, v in points(pts).items() if k[0] == "if_up"}
+    assert got == {("if_up", "bond0"): 1.0, ("if_up", "eno1"): 1.0, ("if_up", "eno2"): 0.0}        # loopback and docker bridges are left out; an unreadable carrier is not guessed
+    assert "network" in found
+    pts, _ = ssh.parse(proc(), {}, now=100)                                                         # a host whose output has no link section still parses
+    assert not [p for p in pts if p[0] == "if_up"]
+
+
+def test_the_script_reads_the_carrier_in_valid_shell():
+    import subprocess
+
+    assert subprocess.run(["sh", "-n", "-c", ssh.SCRIPT], capture_output=True).returncode == 0
+    out = subprocess.run(["sh", "-c", ssh.SCRIPT], capture_output=True, text=True).stdout
+    assert out.index("##net") < out.index("##link") < out.index("##container")
+
+
+def test_a_lost_link_is_an_alert_only_when_it_was_switched_on(conn):
+    monitor(conn)
+    mid = hm.get_monitor(conn, 1)["id"]
+    down = [("if_up", "eno2", 0.0, "state"), ("if_up", "eno1", 1.0, "state")]
+    assert hm.rules(conn)["if_up"]["enabled"] is False
+    assert hm.evaluate(conn, mid, 1, "nas", down, NOW) == []                              # off by default: a switch has empty ports
+    hm.save_rules(conn, {"if_up": {"enabled": True}})
+    assert hm.evaluate(conn, mid, 1, "nas", down, "2026-03-10T12:01:00Z") == ["metric_warning"]      # the first look at a down link is reported
+    text = conn.execute("SELECT detail FROM events WHERE kind = 'metric_warning'").fetchone()["detail"]
+    assert text == "nas: the link of eno2 is down"
+    assert hm.evaluate(conn, mid, 1, "nas", [("if_up", "eno2", 0.0, "state")], "2026-03-10T12:02:00Z") == []     # still down: no repeat
+    assert [p["label"] for p in hm.problems(conn)] == ["eno2"]
+    assert hm.evaluate(conn, mid, 1, "nas", [("if_up", "eno2", 1.0, "state")], "2026-03-10T12:03:00Z") == []     # back: needs the confirmation rounds
+    assert hm.evaluate(conn, mid, 1, "nas", [("if_up", "eno2", 1.0, "state")], "2026-03-10T12:04:00Z") == ["metric_ok"]
+    assert conn.execute("SELECT detail FROM events WHERE kind = 'metric_ok'").fetchone()["detail"] == "nas: the link of eno2 is up again"
+
+
+def test_a_link_rule_can_name_the_interfaces_to_watch(conn):
+    monitor(conn)
+    mid = hm.get_monitor(conn, 1)["id"]
+    hm.save_device_limits(conn, 1, {"if_up": {"enabled": True, "only": ["eno1", "ENO2"]}})
+    both_down = [("if_up", "eno1", 0.0, "state"), ("if_up", "eno2", 0.0, "state"), ("if_up", "eno3", 0.0, "state")]
+    raised = hm.evaluate(conn, mid, 1, "nas", both_down, NOW)
+    assert raised == ["metric_warning", "metric_warning"]                                  # eno3 is not one of the named interfaces (names match in any case)
+    assert hm.rules(conn, 1)["if_up"]["only"] == ["eno1", "ENO2"] and hm.rules(conn)["if_up"]["enabled"] is False
+    with pytest.raises(hm.MonitorError):
+        hm.save_rules(conn, {"cpu_pct": {"only": ["x"]}})
+    with pytest.raises(hm.MonitorError):
+        hm.save_rules(conn, {"if_up": {"only": "eno1"}})
+
+
+def test_a_switched_off_rule_does_not_leave_a_problem_behind(conn):
+    monitor(conn)
+    mid = hm.get_monitor(conn, 1)["id"]
+    hm.save_rules(conn, {"if_up": {"enabled": True}})
+    hm.evaluate(conn, mid, 1, "nas", [("if_up", "eno2", 0.0, "state")], NOW)
+    assert hm.problems(conn)
+    hm.save_rules(conn, {"if_up": {"enabled": False}})
+    assert hm.problems(conn) == []

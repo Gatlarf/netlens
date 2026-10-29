@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.325 — 2026-10-29
+
+### Added
+- ★ **Alert when a link goes down on a monitored host.** A new limit, **Link down** (Monitoring → Health → When to warn), warns when the network cable of an interface loses its link. It is off by default, because a switch has ports with nothing plugged in; switch it on in general, or for one host (the host's **Health monitoring** card, *Limits for this device*) and name the interfaces to watch, for example `eno1, eno2` for the cards of a bond. SSH monitors of Linux hosts now read the carrier of every interface (SNMP monitors already did). The alert is a normal health warning ("nas: the link of eno2 is down") and goes through your alert channels; a switched-off limit no longer leaves an old problem on the dashboard.
+- **Network cards: two MAC addresses, one host.** A host with two network cards shows up as two devices. On either device's page, **Network cards** links them: the main device lists its cards (with their state and "2 of 2 network cards answering"), the card says whose it is, and DNS registers the host's own name only (a card with a DNS name of its own, or set to *Always register*, is still registered). Each card is still monitored by itself, so a card that stops answering is still reported.
+
 ## 0.4.324 — 2026-10-29
 
 ### Changed

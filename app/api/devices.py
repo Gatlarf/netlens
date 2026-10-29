@@ -49,6 +49,7 @@ class DevicePatch(BaseModel):
     pos_y: float | None = None
     multi_ip: bool | None = None            # True = the device has several addresses on purpose (app/multiip.py)
     pinned_ip: str | None = Field(default=None, max_length=45)   # the address Netlens (and DNS) uses while it answers; "" = automatic
+    nic_of: int | None = None               # this device is another network card (MAC address) of that host; null = it is a host of its own
 
 
 def _parse_tags(value: str | None) -> list[str]:
@@ -211,6 +212,15 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
     ]
     from app import multiip
 
+    names = {r["id"]: r for r in conn.execute("SELECT id, custom_name, hostname, primary_ip, mac, online, last_seen, same_host_id FROM devices WHERE id = ? OR same_host_id = ?", (device_id, device_id))}
+    mine = names.get(device_id)
+    result["nics"] = [{"id": r["id"], "name": r["custom_name"] or r["hostname"] or r["primary_ip"], "mac": r["mac"], "ip": r["primary_ip"], "online": bool(r["online"]), "last_seen": r["last_seen"]}
+                      for r in sorted(names.values(), key=lambda r: r["id"]) if r["id"] != device_id]
+    result["nic_of"] = None
+    if mine is not None and mine["same_host_id"]:
+        host = conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices WHERE id = ?", (mine["same_host_id"],)).fetchone()
+        if host is not None:
+            result["nic_of"] = {"id": host["id"], "name": host["custom_name"] or host["hostname"] or host["primary_ip"]}
     own = conn.execute("SELECT multi_ip, pinned_ip, multi_score FROM devices WHERE id = ?", (device_id,)).fetchone()
     result.update({"multi_ip": bool(own["multi_ip"]), "pinned_ip": own["pinned_ip"], "multi_auto": multiip.state(own)["auto"]})
 
@@ -450,6 +460,22 @@ def get_device(
     return _build_device_detail(conn, device_id, row)
 
 
+def _check_nic_of(conn: sqlite3.Connection, device_id: int, host_id: int | None) -> int | None:
+    """The host this device is another network card of. A host is never a card of another one: cards that hang on this device move to the new host."""
+    if host_id is None or host_id == 0:
+        return None
+    if host_id == device_id:
+        raise HTTPException(status_code=422, detail="a device cannot be a network card of itself")
+    host = conn.execute("SELECT id, same_host_id FROM devices WHERE id = ?", (host_id,)).fetchone()
+    if host is None:
+        raise HTTPException(status_code=422, detail="that host does not exist")
+    root = host["same_host_id"] or host["id"]              # a card of a card is a card of the main host
+    if root == device_id:
+        raise HTTPException(status_code=422, detail="that device is a network card of this one: unlink it first")
+    conn.execute("UPDATE devices SET same_host_id = ? WHERE same_host_id = ?", (root, device_id))
+    return root
+
+
 @router.patch("/devices/{device_id}")
 def patch_device(
     device_id: int,
@@ -600,6 +626,9 @@ def patch_device(
         else:
             updates["parent_mode"] = mode
             updates["parent_device_id"] = None
+
+    if "nic_of" in fields_set:
+        updates["same_host_id"] = _check_nic_of(conn, device_id, body.nic_of)
 
     if "multi_ip" in fields_set and body.multi_ip is not None:
         updates["multi_ip"] = 1 if body.multi_ip else 0

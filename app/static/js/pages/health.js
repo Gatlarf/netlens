@@ -4,8 +4,8 @@ import { h, clear, patch, toast, statusDot, shortName, timeAgo, isAdmin } from "
 import { pageHead, emptyState, tile } from "../ui.js";
 
 const REFRESH_MS = 30000;
-const METRIC_ORDER = ["cpu_pct", "mem_pct", "disk_pct", "temp_c", "battery_pct", "supply_pct", "on_battery", "storage_status", "sensor_fault", "service_stopped"];
-const EVENT_ONLY = ["on_battery", "storage_status", "sensor_fault", "service_stopped"];       // no numbers to set: it is a problem as soon as it happens
+const METRIC_ORDER = ["cpu_pct", "mem_pct", "disk_pct", "temp_c", "battery_pct", "supply_pct", "on_battery", "storage_status", "sensor_fault", "service_stopped", "if_up"];
+const EVENT_ONLY = ["on_battery", "storage_status", "sensor_fault", "service_stopped", "if_up"];       // no numbers to set: it is a problem as soon as it happens
 
 const fmtRate = (bps) => (bps === null || bps === undefined ? "–" : bps >= 1e9 ? `${(bps / 1e9).toFixed(1)} Gbit/s` : bps >= 1e6 ? `${(bps / 1e6).toFixed(1)} Mbit/s` : `${Math.round(bps / 1e3)} kbit/s`);
 const fmtUptime = (s) => (s === null || s === undefined ? "–" : s >= 86400 ? `${Math.floor(s / 86400)} d` : s >= 3600 ? `${Math.floor(s / 3600)} h` : `${Math.floor(s / 60)} min`);
@@ -106,8 +106,9 @@ export async function render(container) {
       const crit = h("input", { type: "number", step: "any", value: r.crit === null ? "" : String(r.crit), "aria-label": `${r.title} critical limit`, disabled: !isAdmin() || EVENT_ONLY.includes(metric) });
       const on = h("input", { type: "checkbox", disabled: !isAdmin() });
       on.checked = r.enabled;
-      inputs[metric] = { warn, crit, on };
-      body.appendChild(h("tr", {}, h("td", {}, r.title, r.low ? h("span", { class: "hint" }, " (warns when it falls below the limit)") : null),
+      const only = metric === "if_up" ? h("input", { type: "text", value: (r.only || []).join(", "), placeholder: "all interfaces", maxlength: "400", "aria-label": "Interfaces to watch", disabled: !isAdmin() }) : null;
+      inputs[metric] = { warn, crit, on, only };
+      body.appendChild(h("tr", {}, h("td", {}, r.title, metric === "if_up" ? h("div", { class: "hint" }, "A link that goes down (a cable out of a bond). Off by default: a switch has ports with nothing plugged in. Name the interfaces to watch, separated by commas, or leave it empty for all of them. A single host can set its own on its page.") : r.low ? h("span", { class: "hint" }, " (warns when it falls below the limit)") : null, only),
         h("td", {}, EVENT_ONLY.includes(metric) ? h("span", { class: "hint" }, "as soon as it happens") : warn, r.unit ? ` ${r.unit}` : ""), h("td", {}, EVENT_ONLY.includes(metric) ? "" : crit, r.unit && !EVENT_ONLY.includes(metric) ? ` ${r.unit}` : ""), h("td", {}, on)));
     }
     table.appendChild(body);
@@ -117,6 +118,7 @@ export async function render(container) {
       for (const [metric, f] of Object.entries(inputs)) {
         const num = (el) => (el.value === "" ? null : Number(el.value));
         payload[metric] = { enabled: f.on.checked };
+        if (f.only) payload[metric].only = f.only.value.split(",").map((x) => x.trim()).filter(Boolean);
         if (!EVENT_ONLY.includes(metric)) { payload[metric].warn = num(f.warn); payload[metric].crit = num(f.crit); }
       }
       save.disabled = true;

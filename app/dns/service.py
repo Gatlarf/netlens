@@ -98,7 +98,7 @@ def load_devices(conn: sqlite3.Connection) -> list[DnsDevice]:
     states = {r["device_id"]: r for r in conn.execute("SELECT device_id, auto_name, first_missing FROM dns_state")}
     out = []
     for r in conn.execute(
-        "SELECT id, primary_ip, mac, vendor, device_type, type_override, hostname, custom_name, dns_name, dns_mode, trusted, last_seen, os_name, hints FROM devices"
+        "SELECT id, primary_ip, mac, vendor, device_type, type_override, hostname, custom_name, dns_name, dns_mode, trusted, last_seen, os_name, hints, same_host_id FROM devices"
     ):
         try:
             hints = json.loads(r["hints"] or "[]")
@@ -108,7 +108,7 @@ def load_devices(conn: sqlite3.Connection) -> list[DnsDevice]:
         out.append(DnsDevice(
             id=r["id"], ip=r["primary_ip"], mac=r["mac"], vendor=r["vendor"], type=r["type_override"] or r["device_type"], hostname=r["hostname"],
             custom_name=r["custom_name"], dns_name=r["dns_name"], dns_mode=r["dns_mode"] or "auto", trusted=bool(r["trusted"]), last_seen=r["last_seen"],
-            windows=looks_like_windows(r["os_name"], hints), auto_name=st["auto_name"] if st else None, first_missing=st["first_missing"] if st else None,
+            windows=looks_like_windows(r["os_name"], hints), auto_name=st["auto_name"] if st else None, first_missing=st["first_missing"] if st else None, nic_of=r["same_host_id"],
         ))
     return out
 

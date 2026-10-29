@@ -122,6 +122,12 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
         inputs[metric] = { warn, crit };
         table.append(h("span", {}, title), warn, crit);
       }
+      // the link rule: alert when a link of this host goes down (a cable out of a bond), for all or some interfaces
+      const mineLink = data.overrides.if_up || {};
+      const linkMode = h("select", { "aria-label": "Alert when a link goes down" },
+        h("option", { value: "" }, `As in the general limits (${(data.general.if_up || {}).enabled ? "on" : "off"})`), h("option", { value: "on" }, "Alert"), h("option", { value: "off" }, "Do not alert"));
+      linkMode.value = typeof mineLink.enabled === "boolean" ? (mineLink.enabled ? "on" : "off") : "";
+      const linkOnly = h("input", { type: "text", maxlength: "400", placeholder: ((data.general.if_up || {}).only || []).join(", ") || "all interfaces", value: (mineLink.only || []).join(", "), "aria-label": "Interfaces to watch" });
       const save = h("button", { class: "btn primary", type: "button" }, "Save");
       save.addEventListener("click", async () => {
         const rules = {};
@@ -131,6 +137,11 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
           if (f.crit.value !== "") item.crit = Number(f.crit.value);
           if (Object.keys(item).length) rules[metric] = item;
         }
+        const link = {};
+        if (linkMode.value) link.enabled = linkMode.value === "on";
+        const only = linkOnly.value.split(",").map((x) => x.trim()).filter(Boolean);
+        if (only.length) link.only = only;
+        if (Object.keys(link).length) rules.if_up = link;
         try {
           await put(`/api/devices/${device.id}/limits`, { rules });
           toast(Object.keys(rules).length ? "Limits for this device saved" : "This device follows the general limits", "success");
@@ -139,7 +150,9 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
           toast(err.message || "Could not save the limits", "error");
         }
       });
-      box.append(h("p", { class: "hint" }, "Leave a box empty to use the general limit shown in grey. Changes apply to the warnings and to the lines in the graphs."), table, h("div", { class: "form-actions" }, save));
+      box.append(h("p", { class: "hint" }, "Leave a box empty to use the general limit shown in grey. Changes apply to the warnings and to the lines in the graphs."), table,
+        h("div", { class: "edit-grid" }, h("label", {}, "Alert when a link goes down", linkMode), h("label", {}, "Interfaces to watch (separated by commas)", linkOnly)),
+        h("p", { class: "hint" }, "For a host with a bond: name the interfaces of its network cards (for example eno1, eno2). The link of each is read from the host itself."), h("div", { class: "form-actions" }, save));
     });
     return box;
   }
