@@ -130,12 +130,13 @@ export async function buildPortMapCard(device) {
       const plate = h("div", { class: `faceplate${numeric && data.ports.length >= 8 ? " two-rows" : ""}` });
       for (const p of data.ports) {
         const first = p.devices[0];
-        const text = !first ? "" : p.devices.length > 1 ? `${p.devices.length} devices` : first.name;
+        const bond = (p.bonds || [])[0];
+        const text = !first ? (bond ? `${bond.host || "bond"} (bond)` : "") : p.devices.length > 1 ? `${p.devices.length} devices` : first.name;
         const hasNode = p.devices.some((d) => d.behind && d.behind.length);
         const block = h("button", {
           type: "button",
           class: `fp-port st-${state(p)}${selected === p.port ? " sel" : ""}${hasNode ? " node" : ""}`,
-          title: [`Port ${p.port}${p.name ? ` (${p.name})` : ""}`, speedText(p), ...p.devices.map((d) => d.name)].filter(Boolean).join(" · "),
+          title: [`Port ${p.port}${p.name ? ` (${p.name})` : ""}`, speedText(p), ...p.devices.map((d) => d.name), ...(p.bonds || []).map((b) => `bond ${b.name} of ${b.host}`)].filter(Boolean).join(" · "),
           onclick: () => { selected = selected === p.port ? null : p.port; SELECTED.set(device.id, selected); draw(); },
         },
         h("span", { class: "fp-num" }, p.port),
@@ -155,6 +156,9 @@ export async function buildPortMapCard(device) {
       box.appendChild(h("h3", {}, `Port ${port.port}${port.name ? ` (${port.name})` : ""}`));
       const facts = [speedText(port) && (port.up ? `link ${speedText(port)}${port.duplex ? ` ${port.duplex}` : ""}` : speedText(port))].filter(Boolean);
       if (facts.length) box.appendChild(h("p", { class: "hint" }, facts.join(" · ")));
+      for (const b of port.bonds || []) {
+        box.appendChild(h("p", { class: "hint" }, "Part of the bond ", h("strong", {}, b.name), " of ", h("a", { href: `#/device/${b.host_device_id}` }, b.host || "a host"), "."));
+      }
       if (port.devices.length) {
         const list = h("ul", { class: "pm-devices" });
         for (const d of port.devices) list.appendChild(deviceLine(d, remove));

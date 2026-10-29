@@ -156,3 +156,18 @@ def test_api(tmp_path):
         assert client.delete(f"/api/link-groups/{group['id']}").status_code == 200
         assert client.delete(f"/api/link-groups/{group['id']}").status_code == 404
         assert client.patch("/api/link-groups/999", json={"name": "x"}).status_code == 404
+
+
+def test_the_switch_shows_which_ports_belong_to_a_bond(env):
+    from app import portmap
+
+    conn, nas, switch = env
+    sync(conn, {1: True, 2: True, 3: True, 4: True}, 1)
+    linkgroups.create(conn, "bond0", nas, switch, [3, 4])
+    ports = {p["port"]: p for p in portmap.for_switch(conn, switch)["ports"]}
+    assert ports["1"]["bonds"] == [] and ports["2"]["bonds"] == []
+    for number in ("3", "4"):
+        assert [(b["name"], b["host_device_id"]) for b in ports[number]["bonds"]] == [("bond0", nas)]
+        assert ports[number]["bonds"][0]["host"]
+    linkgroups.delete(conn, 1)
+    assert all(p["bonds"] == [] for p in portmap.for_switch(conn, switch)["ports"])

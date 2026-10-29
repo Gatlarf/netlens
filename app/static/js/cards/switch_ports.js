@@ -15,10 +15,12 @@ export async function buildSwitchPortsCard(deviceId) {
   const data = await get(`/api/devices/${deviceId}/switch-ports?hours=24`);
   if (!data.ports.length) return null;
   let connected = {};
+  let bonds = {};
   try {
-    for (const p of (await get(`/api/devices/${deviceId}/port-map`)).ports) connected[p.port] = p.devices;
+    for (const p of (await get(`/api/devices/${deviceId}/port-map`)).ports) { connected[p.port] = p.devices; bonds[p.port] = p.bonds || []; }
   } catch (err) {
     connected = {};
+    bonds = {};
   }
   const card = h("div", { class: "card switch-ports-card" });
   const up = data.ports.filter((p) => p.up).length;
@@ -33,7 +35,8 @@ export async function buildSwitchPortsCard(deviceId) {
     const row = h("tr", { title: p.enabled ? "" : "Disabled on the switch" },
       h("td", {}, p.enabled ? label : `${label} (disabled)`),
       h("td", { class: p.up ? "" : "muted" }, speed(p)),
-      h("td", {}, ...(connected[String(p.port)] || []).flatMap((d, i) => [i ? ", " : "", h("a", { href: `#/device/${d.id}` }, d.name), d.behind_total ? ` (+${d.behind_total} behind)` : ""])),
+      h("td", {}, ...(connected[String(p.port)] || []).flatMap((d, i) => [i ? ", " : "", h("a", { href: `#/device/${d.id}` }, d.name), d.behind_total ? ` (+${d.behind_total} behind)` : ""]),
+        ...(bonds[String(p.port)] || []).flatMap((b, i) => [(connected[String(p.port)] || []).length || i ? " · " : "", h("a", { href: `#/device/${b.host_device_id}` }, b.host || "a host"), h("span", { class: "hint" }, ` bond ${b.name}`)])),
       h("td", { class: errors ? "bad" : "" }, errors ? `${fmtNumber(errors)} (${fmtNumber(p.tx_errors_window || 0)} out, ${fmtNumber(p.rx_errors_window || 0)} in)` : "0"),
       h("td", { class: p.flaps > 2 ? "bad" : "" }, String(p.flaps)));
     body.appendChild(row);

@@ -9,6 +9,7 @@ this one is listed under the port that leads there.
 from __future__ import annotations
 
 import re
+import json
 import sqlite3
 from typing import Any
 
@@ -79,11 +80,22 @@ def for_switch(conn: sqlite3.Connection, switch_id: int) -> dict[str, Any]:
         label = port if port in known else name_to_label.get(port.lower(), port)      # a port may be given by its number or by the name the switch gives it
         (by_port.setdefault(label, []) if label else no_port).append(entry)
 
+    bonds: dict[str, list[dict]] = {}               # port label -> the bonds (link groups, app/linkgroups.py) that use it
+    for g in conn.execute("SELECT id, name, host_device_id, ports FROM link_groups WHERE switch_device_id = ? ORDER BY id", (switch_id,)):
+        try:
+            numbers = [str(int(n)) for n in json.loads(g["ports"] or "[]")]
+        except (ValueError, TypeError):
+            numbers = []
+        for number in numbers:
+            bonds.setdefault(number, []).append({"id": g["id"], "name": g["name"], "host_device_id": g["host_device_id"],
+                                                 "host": device_name(devs[g["host_device_id"]]) if g["host_device_id"] in devs else None})
+
     labels = sorted(set(known) | set(by_port), key=natural)
     ports = []
     for label in labels:
         k = known.get(label)
         ports.append({
+            "bonds": bonds.get(label, []),
             "port": label,
             "name": (k or {}).get("name") or "",
             "known": k is not None,
