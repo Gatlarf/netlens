@@ -38,22 +38,35 @@ export async function buildCredentialsCard() {
       f_user: text(pm.username_field, { placeholder: "username" }), f_pass: text(pm.password_field, { placeholder: "password" }), f_key: text(pm.key_field, { placeholder: "private_key" }),
       f_phrase: text(pm.passphrase_field, { placeholder: "passphrase" }), f_domain: text(pm.domain_field, { placeholder: "domain" }),
       reason: h("input", { type: "checkbox", checked: pm.reason_required }),
+      appid: text(pm.appid, { placeholder: "Netlens" }), safe: text(pm.safe), folder: text(pm.folder, { placeholder: "Root" }), object: text(pm.object), account_user: text(pm.account_user),
+      account_address: text(pm.account_address), content_as: h("select", {}, [["password", "a password"], ["private_key", "an SSH private key"]].map(([v, t]) => h("option", { value: v, selected: v === (pm.content_as || "password") }, t))),
+      client_cert: h("textarea", { rows: 3, class: "mono", placeholder: pm.has_client_cert ? "(set; paste to replace)" : "-----BEGIN CERTIFICATE-----" }),
+      client_key: h("textarea", { rows: 3, class: "mono", placeholder: pm.has_client_cert ? "(set; paste to replace)" : "-----BEGIN PRIVATE KEY-----" }),
     };
     const pamRows = h("div", {});
     const drawPam = () => {
       clear(pamRows);
       const f = (label, el, hint) => h("div", { class: "field" }, h("label", {}, label), el, hint ? h("p", { class: "hint" }, hint) : null);
-      pamRows.append(f("PAM system", pamF.provider, "Netlens asks it for the password each time it is needed and keeps no copy. If it cannot be reached, the login is not used."),
-        f("Address", pamF.url), f("Namespace", pamF.namespace), f("Secrets engine", pamF.mount), f("Secret path", pamF.path), f("Version", pamF.kv),
-        f("Netlens signs in with", pamF.auth, "Give Netlens its own identity with a policy that may only read the secrets that hold monitoring and access accounts."));
-      if (pamF.auth.value === "approle") pamRows.append(f("AppRole mount", pamF.approle_mount), f("Role id", pamF.role), f("Secret id", pamF.secret_id));
-      else pamRows.append(f("Token", pamF.token));
-      pamRows.append(f("CA certificate", pamF.ca), h("details", { class: "collapsible" }, h("summary", {}, "Field names in the secret (only if they differ)"),
-        f("User name", pamF.f_user), f("Password", pamF.f_pass), f("Private key", pamF.f_key), f("Passphrase", pamF.f_phrase), f("Domain", pamF.f_domain)),
-        h("div", { class: "field" }, h("label", { class: "check-row" }, pamF.reason, " Ask for a reason every time"),
+      pamRows.append(f("PAM system", pamF.provider, "Netlens asks it for the password each time it is needed and keeps no copy. If it cannot be reached, the login is not used."));
+      if (pamF.provider.value === "cyberark_ccp") {
+        pamRows.append(h("p", { class: "hint" }, "Not tested on a real CyberArk yet: it follows CyberArk's documentation. Please check it on a test account first."),
+          f("Address", pamF.url, "The Central Credential Provider web service, for example https://cyberark.example.com"), f("Application id (AppID)", pamF.appid),
+          f("Safe", pamF.safe), f("Folder", pamF.folder), f("Account object name", pamF.object), f("or account user name", pamF.account_user), f("and address", pamF.account_address),
+          f("The secret is", pamF.content_as), f("Client certificate", pamF.client_cert, "Strongly recommended: the certificate the application is bound to in CyberArk (mutual TLS)."), f("Client certificate key", pamF.client_key));
+      } else {
+        pamRows.append(f("Address", pamF.url), f("Namespace", pamF.namespace), f("Secrets engine", pamF.mount), f("Secret path", pamF.path), f("Version", pamF.kv),
+          f("Netlens signs in with", pamF.auth, "Give Netlens its own identity with a policy that may only read the secrets that hold monitoring and access accounts."));
+        if (pamF.auth.value === "approle") pamRows.append(f("AppRole mount", pamF.approle_mount), f("Role id", pamF.role), f("Secret id", pamF.secret_id));
+        else pamRows.append(f("Token", pamF.token));
+      }
+      pamRows.append(f("CA certificate", pamF.ca));
+      if (pamF.provider.value !== "cyberark_ccp") pamRows.append(h("details", { class: "collapsible" }, h("summary", {}, "Field names in the secret (only if they differ)"),
+        f("User name", pamF.f_user), f("Password", pamF.f_pass), f("Private key", pamF.f_key), f("Passphrase", pamF.f_phrase), f("Domain", pamF.f_domain)));
+      pamRows.append(h("div", { class: "field" }, h("label", { class: "check-row" }, pamF.reason, " Ask for a reason every time"),
           h("p", { class: "hint" }, "A person gives a ticket number or a few words; it goes to the audit log. Monitors and other background jobs cannot use such a login.")));
     };
     pamF.auth.addEventListener("change", drawPam);
+    pamF.provider.addEventListener("change", drawPam);
     const fill = () => {
       clear(secretRows);
       if (kind.value === "pam") { drawPam(); secretRows.append(pamRows); return; }
@@ -67,10 +80,15 @@ export async function buildCredentialsCard() {
       const body = { name: name.value, kind: kind.value, username: user.value, shared: shared.checked };
       if (kind.value === "login") Object.assign(body, { password: pass.value, domain: domain.value });
       else if (kind.value === "pam") {
-        Object.assign(body, { provider: pamF.provider.value, url: pamF.url.value.trim(), namespace: pamF.namespace.value.trim(), mount: pamF.mount.value.trim(), path: pamF.path.value.trim(), kv_version: pamF.kv.value,
+        Object.assign(body, { provider: pamF.provider.value, url: pamF.url.value.trim(), reason_required: pamF.reason.checked });
+        if (pamF.provider.value !== "cyberark_ccp") Object.assign(body, { namespace: pamF.namespace.value.trim(), mount: pamF.mount.value.trim(), path: pamF.path.value.trim(), kv_version: pamF.kv.value,
           approle_mount: pamF.approle_mount.value.trim(), role_id: pamF.auth.value === "approle" ? pamF.role.value.trim() : "", secret_id: pamF.auth.value === "approle" ? pamF.secret_id.value : "",
           token: pamF.auth.value === "token" ? pamF.token.value : "", username_field: pamF.f_user.value.trim(), password_field: pamF.f_pass.value.trim(), key_field: pamF.f_key.value.trim(),
-          passphrase_field: pamF.f_phrase.value.trim(), domain_field: pamF.f_domain.value.trim(), reason_required: pamF.reason.checked });
+          passphrase_field: pamF.f_phrase.value.trim(), domain_field: pamF.f_domain.value.trim() });
+        if (pamF.provider.value === "cyberark_ccp") Object.assign(body, { appid: pamF.appid.value.trim(), safe: pamF.safe.value.trim(), folder: pamF.folder.value.trim(), object: pamF.object.value.trim(),
+          account_user: pamF.account_user.value.trim(), account_address: pamF.account_address.value.trim(), content_as: pamF.content_as.value });
+        if (pamF.client_cert.value.trim()) body.client_cert = pamF.client_cert.value.trim();
+        if (pamF.client_key.value.trim()) body.client_key = pamF.client_key.value.trim();
         if (pamF.ca.value.trim()) body.ca_cert = pamF.ca.value.trim();
       } else Object.assign(body, { private_key: key.value, passphrase: phrase.value });
       try {

@@ -136,4 +136,4 @@ def audit_line(entry: dict, ctx: Context, lease: str, ok: bool, error: str = "")
     return f"{head}; purpose: {ctx.purpose[:60]}{reason}{tail}" + ("" if ok else f"; {error[:140]}")
 
 
-from app.pam import vaultkv  # noqa: E402,F401  (registers itself)
+from app.pam import cyberark, vaultkv  # noqa: E402,F401  (each registers itself)

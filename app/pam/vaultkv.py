@@ -22,7 +22,7 @@ _FIELD_KEYS = {"username_field": "username", "password_field": "password", "key_
 
 def _path(value: Any, what: str) -> str:
     text = str(value or "").strip().strip("/")
-    if not text or not _PATH_RE.match(text) or any(part in ("", ".", "..") for part in text.split("/")):
+    if not text or not _PATH_RE.fullmatch(text) or any(part in ("", ".", "..") for part in text.split("/")):
         raise PamError(f"{what} is not valid: use letters, digits and / only, for example netlens/linux-admin")
     return text
 
@@ -45,6 +45,17 @@ class VaultKV:
         if not (entry.get("role_id") and entry.get("secret_id")):
             raise PamError("give Netlens a way to sign in: an AppRole (role id and secret id), or a token")
         _path(entry.get("approle_mount") or "approle", "the AppRole mount")
+
+    @staticmethod
+    def where(entry: dict) -> str:
+        return "/".join(x for x in (entry.get("mount") or DEFAULT_MOUNT, entry.get("path") or "") if x)
+
+    @staticmethod
+    def public(entry: dict) -> dict:
+        return {"namespace": entry.get("namespace", ""), "kv_version": entry.get("kv_version") or "2", "auth": "token" if entry.get("token") else "approle",
+                "approle_mount": entry.get("approle_mount", ""), "role_id": entry.get("role_id", ""), "has_ca": bool(entry.get("ca_cert")),
+                "username_field": entry.get("username_field", ""), "password_field": entry.get("password_field", ""), "key_field": entry.get("key_field", ""),
+                "passphrase_field": entry.get("passphrase_field", ""), "domain_field": entry.get("domain_field", "")}
 
     @staticmethod
     def fetch(entry: dict, ctx: "pam.Context") -> "pam.Fetched":

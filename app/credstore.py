@@ -22,13 +22,15 @@ KINDS = {
     "ssh_key": ("username", "private_key", "passphrase"),                # a private key
     # Enterprise: the login lives in the customer's PAM; only where it is, and how Netlens signs in to the PAM, is stored here (app/pam)
     "pam": ("provider", "url", "namespace", "mount", "kv_version", "path", "approle_mount", "role_id", "secret_id", "token", "ca_cert", "username", "domain",
-            "username_field", "password_field", "key_field", "passphrase_field", "domain_field", "reason_required"),
+            "username_field", "password_field", "key_field", "passphrase_field", "domain_field", "reason_required",
+            "appid", "safe", "folder", "object", "account_user", "account_address", "content_as", "client_cert", "client_key"),
 }
-SECRET_FIELDS = ("password", "private_key", "passphrase", "token", "secret_id")
+SECRET_FIELDS = ("password", "private_key", "passphrase", "token", "secret_id", "client_key")
 BOOL_FIELDS = ("reason_required",)
 LIMITS = {"name": 80, "username": 256, "domain": 256, "password": 1024, "private_key": 16384, "passphrase": 1024, "provider": 40, "url": 512, "namespace": 200, "mount": 200,
           "kv_version": 2, "path": 512, "approle_mount": 100, "role_id": 200, "secret_id": 512, "token": 4096, "ca_cert": 16384, "username_field": 100, "password_field": 100,
-          "key_field": 100, "passphrase_field": 100, "domain_field": 100}
+          "key_field": 100, "passphrase_field": 100, "domain_field": 100,
+          "appid": 200, "safe": 200, "folder": 200, "object": 200, "account_user": 256, "account_address": 256, "content_as": 20, "client_cert": 16384, "client_key": 16384}
 
 
 class CredentialError(ValueError):
@@ -65,13 +67,10 @@ def _pam_public(entry: dict[str, Any]) -> dict[str, Any]:
         return {}
     from app import pam
 
-    where = "/".join(x for x in (entry.get("mount") or "secret", entry.get("path") or "") if x)
-    return {"pam": {"provider": entry.get("provider", ""), "provider_name": pam.providers().get(entry.get("provider", ""), entry.get("provider", "")), "url": entry.get("url", ""),
-                    "where": where, "namespace": entry.get("namespace", ""), "kv_version": entry.get("kv_version") or "2", "auth": "token" if entry.get("token") else "approle",
-                    "approle_mount": entry.get("approle_mount", ""), "role_id": entry.get("role_id", ""), "has_ca": bool(entry.get("ca_cert")),
-                    "username_field": entry.get("username_field", ""), "password_field": entry.get("password_field", ""), "key_field": entry.get("key_field", ""),
-                    "passphrase_field": entry.get("passphrase_field", ""), "domain_field": entry.get("domain_field", ""),
-                    "reason_required": bool(entry.get("reason_required")), "last": pam.last_status(entry["id"])}}
+    provider = pam.PROVIDERS.get(entry.get("provider", ""))
+    base = {"provider": entry.get("provider", ""), "provider_name": pam.providers().get(entry.get("provider", ""), entry.get("provider", "")), "url": entry.get("url", ""),
+            "where": provider.where(entry) if provider else "", "reason_required": bool(entry.get("reason_required")), "last": pam.last_status(entry["id"])}
+    return {"pam": {**base, **(provider.public(entry) if provider else {})}}
 
 
 def listing(conn: sqlite3.Connection, user: str) -> list[dict[str, Any]]:

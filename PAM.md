@@ -11,6 +11,7 @@ drops it.
 * [What Netlens does and does not do](#what-netlens-does-and-does-not-do)
 * [HashiCorp Vault and OpenBao](#hashicorp-vault-and-openbao)
 * [Add the login in Netlens](#add-the-login-in-netlens)
+* [CyberArk](#cyberark)
 * [Reasons](#reasons)
 * [What is logged](#what-is-logged)
 * [When the PAM is down](#when-the-pam-is-down)
@@ -84,6 +85,25 @@ remote desktop, host monitors, host probes and host set-up.
 Creating and changing PAM logins needs the Enterprise edition (or the trial) and, when step-up is on, a fresh confirmation. If the licence ends, existing PAM logins
 keep working: holding a secret in your vault is the safer way, so a lapsing licence never pushes anyone back to stored passwords.
 
+## CyberArk
+
+The **Central Credential Provider (CCP)** web service (`/AIMWebService/api/Accounts`). **Not tested on a real CyberArk yet:** it follows CyberArk's documentation and is tested
+against a stand-in server that does the same. Try it on a test account first, and tell us what you find.
+
+**In CyberArk:**
+1. Create an **application** (for example `Netlens`) under Applications. Under *Authentication* add a **client certificate** (serial number, issuer or DN) and the **allowed
+   address** of Netlens. A certificate is strongly recommended; an application id alone is only as safe as the network.
+2. Add the application as a member of the **safe** that holds the monitoring and access accounts with the permission **Retrieve accounts** and nothing else.
+3. If the account needs dual control or exclusive use, a monitor cannot get it (nobody is there to approve); use a separate account for monitoring.
+
+**In Netlens** (Settings → Credentials → *In your PAM system* → CyberArk): the address of the CCP web service (`https://cyberark.example.com`), the application id, the safe,
+the account **object name** (or its user name and address), whether the secret is a password or an SSH private key, the client certificate and its key, and the CA
+certificate if your CyberArk uses a private CA. The client key is stored encrypted like every other secret and is never shown again.
+
+Netlens sends the application id, safe, folder and object, `FailRequestOnPasswordChange=true` (a password that is being changed is refused, not handed out half-way), and a
+**reason** that names Netlens, the person, the purpose and the correlation id, so the CyberArk audit shows who the password was really for. The client certificate is
+loaded from a private temporary file in memory (`/dev/shm`) that is removed straight away.
+
 ## Reasons
 
 Tick **Ask for a reason every time** and a person must give a ticket number or a few words before the login is used. The reason is written to the audit log and sent
@@ -113,8 +133,8 @@ use works; nothing has to be reset. Monitors ask the vault at every poll, so a l
 
 ## Other PAM systems
 
-CyberArk (Central Credential Provider), Delinea Secret Server and BeyondTrust Password Safe, and routing through a bastion, are planned. They use the same framework.
-They will be marked *not tested on a real system* until a customer or partner has confirmed them.
+Delinea Secret Server and BeyondTrust Password Safe, and routing through a bastion, are planned on the same framework. They will be marked *not tested on a real system*
+until a customer or partner has confirmed them.
 
 ## Troubleshooting
 
@@ -126,6 +146,8 @@ They will be marked *not tested on a real system* until a customer or partner ha
 | the secret does not hold a user name and a password or key | the keys have other names: set them under *Field names* |
 | the certificate of the PAM system is not trusted | add the vault's CA certificate to the login |
 | cannot reach the PAM system | network, firewall, or the address is blocked by the outbound guard |
+| the PAM system did not accept the connection: it wants a client certificate | CyberArk requires mutual TLS: add the client certificate and key |
+| CyberArk refused the application | application id, certificate binding, allowed address or safe permission |
 | needs a reason … only be used by a person | the login asks for reasons: use it from a terminal or remote session, or use another login for monitoring |
 
 ## What was tested

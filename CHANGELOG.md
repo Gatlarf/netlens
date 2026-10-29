@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.313 — 2026-10-29
+
+### Added
+- ★ **CyberArk as a PAM provider (Enterprise and the trial).** Netlens retrieves a login from the **Central Credential Provider** with an application id, a client certificate (mutual TLS) and a reason that names Netlens, the person, the purpose and the correlation id, so the CyberArk audit shows who the password was for. A password that is being changed is refused, not handed out half-way. The client key is stored encrypted and never shown. **Not tested on a real CyberArk yet:** it follows CyberArk's documentation and a stand-in server; the interface and `PAM.md` say so.
+
+### Fixed
+- A missing or refused client certificate is reported as that, not as an untrusted server certificate.
+- A path or account name with a trailing line break could pass the character check; the check now covers the whole text.
+
 ## 0.4.308 — 2026-10-29
 
 ### Added
