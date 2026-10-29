@@ -113,7 +113,8 @@ tr.svc-sep:hover { background: var(--bg); }
 .settings-content .field > .hint { max-width: 72ch; }
 /* Button rows: the one button that saves comes first, then cancel/reset, a destructive button last. */
 .row-actions { display: flex; gap: 6px; flex-wrap: nowrap; }
-.row-actions .btn { white-space: nowrap; }
+.row-actions .btn { white-space: nowrap; padding: 4px 9px; font-size: .9rem; }
+.row-actions { flex-wrap: wrap; justify-content: flex-end; }
 .form-actions, .btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
 .form-actions > .btn.primary, .btn-row > .btn.primary { order: -1; }
 .form-actions > .btn.danger, .btn-row > .btn.danger { order: 2; margin-left: auto; }
