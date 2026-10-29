@@ -212,6 +212,9 @@ async def lifespan(app: FastAPI):
         if getattr(app.state, "ingest", None) is not None:
             app.state.ingest.stop()
         app.state.iperf.stop()
+        from app import pam
+
+        await asyncio.to_thread(pam.release_all)            # passwords checked out of a PAM are checked in before Netlens stops
         for task in tasks:
             task.cancel()
             try:

@@ -111,3 +111,47 @@ def form_call(method: str, url: str, *, fields: dict[str, str], headers: dict[st
 
 def quote_path(path: str) -> str:
     return "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
+
+
+class Session:
+    """A few calls that share cookies (BeyondTrust Password Safe keeps its sign-in in a session cookie). Same rules as `call`: guarded address, verified TLS, size cap;
+    redirects go through the same guard."""
+
+    def __init__(self, ca_cert: str = "", timeout: float = TIMEOUT_S) -> None:
+        import http.cookiejar
+
+        self.jar = http.cookiejar.CookieJar()
+        self.ca_cert, self.timeout = ca_cert, timeout
+        self._openers: dict[bool, urllib.request.OpenerDirector] = {}
+
+    def call(self, method: str, url: str, *, headers: dict[str, str] | None = None, body: Any = None) -> tuple[int, Any]:
+        try:
+            safenet.check_url(url, what="the address of the PAM system")
+        except safenet.BlockedAddress as exc:
+            raise PamError(str(exc)) from None
+        handlers: list[Any] = [urllib.request.HTTPCookieProcessor(self.jar), safenet._RedirectGuard()]
+        ctx = context(url, self.ca_cert)
+        if ctx is not None:
+            handlers.append(urllib.request.HTTPSHandler(context=ctx))
+        opener = urllib.request.build_opener(*handlers)
+        data = json.dumps(body).encode() if body is not None else None
+        request = urllib.request.Request(url, data=data, method=method, headers={"Accept": "application/json", **({"Content-Type": "application/json"} if data else {}), **(headers or {})})
+        try:
+            with opener.open(request, timeout=self.timeout) as response:           # noqa: S310 - scheme and address were checked above
+                raw, status = response.read(MAX_BYTES + 1), response.status
+        except urllib.error.HTTPError as exc:
+            status, raw = exc.code, exc.read(MAX_BYTES + 1)
+        except ssl.SSLError as exc:
+            raise PamError(_tls_message(exc)) from None
+        except urllib.error.URLError as exc:
+            if isinstance(exc.reason, ssl.SSLError):
+                raise PamError(_tls_message(exc.reason)) from None
+            raise PamError(f"cannot reach the PAM system: {exc.reason}") from None
+        except (OSError, ValueError) as exc:
+            raise PamError(f"cannot reach the PAM system: {exc}") from None
+        if len(raw) > MAX_BYTES:
+            raise PamError("the PAM system sent a larger answer than expected")
+        try:
+            return status, (json.loads(raw.decode() or "null") if raw else None)
+        except ValueError:
+            return status, None

@@ -23,14 +23,16 @@ KINDS = {
     # Enterprise: the login lives in the customer's PAM; only where it is, and how Netlens signs in to the PAM, is stored here (app/pam)
     "pam": ("provider", "url", "namespace", "mount", "kv_version", "path", "approle_mount", "role_id", "secret_id", "token", "ca_cert", "username", "domain",
             "username_field", "password_field", "key_field", "passphrase_field", "domain_field", "reason_required",
-            "appid", "safe", "folder", "object", "account_user", "account_address", "content_as", "client_cert", "client_key"),
+            "appid", "safe", "folder", "object", "account_user", "account_address", "content_as", "client_cert", "client_key",
+            "secret_id_ref", "app_user", "app_password", "app_domain", "api_key", "run_as", "run_as_password", "ps_system", "ps_account"),
 }
-SECRET_FIELDS = ("password", "private_key", "passphrase", "token", "secret_id", "client_key")
+SECRET_FIELDS = ("password", "private_key", "passphrase", "token", "secret_id", "client_key", "app_password", "api_key", "run_as_password")
 BOOL_FIELDS = ("reason_required",)
 LIMITS = {"name": 80, "username": 256, "domain": 256, "password": 1024, "private_key": 16384, "passphrase": 1024, "provider": 40, "url": 512, "namespace": 200, "mount": 200,
           "kv_version": 2, "path": 512, "approle_mount": 100, "role_id": 200, "secret_id": 512, "token": 4096, "ca_cert": 16384, "username_field": 100, "password_field": 100,
           "key_field": 100, "passphrase_field": 100, "domain_field": 100,
-          "appid": 200, "safe": 200, "folder": 200, "object": 200, "account_user": 256, "account_address": 256, "content_as": 20, "client_cert": 16384, "client_key": 16384}
+          "appid": 200, "safe": 200, "folder": 200, "object": 200, "account_user": 256, "account_address": 256, "content_as": 20, "client_cert": 16384, "client_key": 16384,
+          "secret_id_ref": 12, "app_user": 256, "app_password": 1024, "app_domain": 100, "api_key": 512, "run_as": 256, "run_as_password": 1024, "ps_system": 256, "ps_account": 256}
 
 
 class CredentialError(ValueError):
@@ -177,9 +179,10 @@ def _login_from_pam(conn: sqlite3.Connection, entry: dict[str, Any], user: str, 
     except pam.PamError as exc:
         audit.record(conn, user or "netlens", "", "", "PAM", "/pam/checkout", 403, pam.audit_line(entry, ctx, "", False, str(exc)))
         raise CredentialError(str(exc)) from None
-    try:
-        values = dict(fetched.values)
-    finally:
+    values = dict(fetched.values)
+    if getattr(pam.PROVIDERS.get(entry.get("provider", "")), "holds", False):
+        pam.release_later(fetched)                  # checked out: checked in after the login attempt, not before
+    else:
         fetched.done()
     if interactive or _due(entry["id"], purpose):
         audit.record(conn, user or "netlens", "", "", "PAM", "/pam/checkout", 200, pam.audit_line(entry, ctx, fetched.lease, True))

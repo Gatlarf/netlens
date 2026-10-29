@@ -12,6 +12,8 @@ drops it.
 * [HashiCorp Vault and OpenBao](#hashicorp-vault-and-openbao)
 * [Add the login in Netlens](#add-the-login-in-netlens)
 * [CyberArk](#cyberark)
+* [Delinea Secret Server](#delinea-secret-server)
+* [BeyondTrust Password Safe](#beyondtrust-password-safe)
 * [Reasons](#reasons)
 * [What is logged](#what-is-logged)
 * [When the PAM is down](#when-the-pam-is-down)
@@ -104,6 +106,31 @@ Netlens sends the application id, safe, folder and object, `FailRequestOnPasswor
 **reason** that names Netlens, the person, the purpose and the correlation id, so the CyberArk audit shows who the password was really for. The client certificate is
 loaded from a private temporary file in memory (`/dev/shm`) that is removed straight away.
 
+## Delinea Secret Server
+
+On premises or Secret Server Cloud. **Not tested on a real Secret Server yet:** written from Delinea's REST documentation and tested against a stand-in. The details most
+likely to differ on a real server (how a secret that requires check-out or a comment is read) are the first thing to check on a test secret.
+
+**In Secret Server:** make a user for Netlens (a long random password, no interactive use, allowed from Netlens' address), give it **View** on the folder that holds the
+monitoring and access accounts and nothing else. Note the **secret id** (the number in `…/secrets/1234`).
+
+**In Netlens:** the address, the secret id, the application user and its password (and its domain, if any). Netlens signs in with the OAuth2 password grant, reads the
+secret, takes `username` and `password` (or `private-key`) from its fields, sends a comment that names Netlens, the person, the purpose and the correlation id, and, if
+Secret Server checked the secret out for it, **checks it in again 90 seconds later** (when the login attempt is over; checking in at once could start a password change
+while the login is still under way).
+
+## BeyondTrust Password Safe
+
+**Not tested on a real Password Safe yet:** written from BeyondTrust's API guide (v3) and tested against a stand-in. Most likely to differ: the check-in call, how a request
+that needs approval answers, and the sign-in variants.
+
+**In Password Safe:** an **API registration** for Netlens (a key, limited to Netlens' address, with the role that may only request passwords) and a **run-as user**. The
+managed account must allow a *view password* request without approval for the Netlens user (an approval cannot be given to a monitor).
+
+**In Netlens:** the address, the API key, the run-as user (and password if it needs one), the managed system name and the managed account name. Per use Netlens signs in,
+looks the account up, makes a **five-minute request** for the password with a reason that carries the person, purpose and correlation id, reads it, and **checks the request in
+and signs out 90 seconds later**. A conflicting open request is reused.
+
 ## Reasons
 
 Tick **Ask for a reason every time** and a person must give a ticket number or a few words before the login is used. The reason is written to the audit log and sent
@@ -133,8 +160,7 @@ use works; nothing has to be reset. Monitors ask the vault at every poll, so a l
 
 ## Other PAM systems
 
-Delinea Secret Server and BeyondTrust Password Safe, and routing through a bastion, are planned on the same framework. They will be marked *not tested on a real system*
-until a customer or partner has confirmed them.
+Routing through a bastion or a PAM session proxy is planned on the same framework. A cloud secret manager (Azure Key Vault, AWS Secrets Manager) can be added if asked.
 
 ## Troubleshooting
 
@@ -147,6 +173,7 @@ until a customer or partner has confirmed them.
 | the certificate of the PAM system is not trusted | add the vault's CA certificate to the login |
 | cannot reach the PAM system | network, firewall, or the address is blocked by the outbound guard |
 | the PAM system did not accept the connection: it wants a client certificate | CyberArk requires mutual TLS: add the client certificate and key |
+| Secret Server refused the application user / BeyondTrust refused the API registration | user, password, key, run-as user, or the allowed address |
 | CyberArk refused the application | application id, certificate binding, allowed address or safe permission |
 | needs a reason … only be used by a person | the login asks for reasons: use it from a terminal or remote session, or use another login for monitoring |
 

@@ -40,6 +40,8 @@ export async function buildCredentialsCard() {
       reason: h("input", { type: "checkbox", checked: pm.reason_required }),
       appid: text(pm.appid, { placeholder: "Netlens" }), safe: text(pm.safe), folder: text(pm.folder, { placeholder: "Root" }), object: text(pm.object), account_user: text(pm.account_user),
       account_address: text(pm.account_address), content_as: h("select", {}, [["password", "a password"], ["private_key", "an SSH private key"]].map(([v, t]) => h("option", { value: v, selected: v === (pm.content_as || "password") }, t))),
+      secret_id_ref: text(pm.secret_id_ref, { placeholder: "1234" }), app_user: text(pm.app_user), app_password: secret(), app_domain: text(pm.app_domain, { placeholder: "optional" }),
+      api_key: secret(), run_as: text(pm.run_as), run_as_password: secret("only if the run-as user needs one"), ps_system: text(pm.ps_system), ps_account: text(pm.ps_account),
       client_cert: h("textarea", { rows: 3, class: "mono", placeholder: pm.has_client_cert ? "(set; paste to replace)" : "-----BEGIN CERTIFICATE-----" }),
       client_key: h("textarea", { rows: 3, class: "mono", placeholder: pm.has_client_cert ? "(set; paste to replace)" : "-----BEGIN PRIVATE KEY-----" }),
     };
@@ -53,6 +55,15 @@ export async function buildCredentialsCard() {
           f("Address", pamF.url, "The Central Credential Provider web service, for example https://cyberark.example.com"), f("Application id (AppID)", pamF.appid),
           f("Safe", pamF.safe), f("Folder", pamF.folder), f("Account object name", pamF.object), f("or account user name", pamF.account_user), f("and address", pamF.account_address),
           f("The secret is", pamF.content_as), f("Client certificate", pamF.client_cert, "Strongly recommended: the certificate the application is bound to in CyberArk (mutual TLS)."), f("Client certificate key", pamF.client_key));
+      } else if (pamF.provider.value === "delinea_ss") {
+        pamRows.append(h("p", { class: "hint" }, "Not tested on a real Secret Server yet: it follows Delinea's documentation. Please check it on a test secret first."),
+          f("Address", pamF.url, "For example https://company.secretservercloud.com or https://secrets.example.com/SecretServer"), f("Secret id", pamF.secret_id_ref, "The number in the secret's address (…/secrets/1234)."),
+          f("Application user", pamF.app_user, "A Secret Server user made for Netlens, with View on the folder that holds the monitoring and access accounts and nothing else."),
+          f("Application user's password", pamF.app_password), f("Domain of that user", pamF.app_domain));
+      } else if (pamF.provider.value === "beyondtrust_ps") {
+        pamRows.append(h("p", { class: "hint" }, "Not tested on a real Password Safe yet: it follows BeyondTrust's documentation. Please check it on a test account first."),
+          f("Address", pamF.url, "For example https://passwordsafe.example.com (the /BeyondTrust/api/public/v3 part is added)"), f("API key", pamF.api_key, "The key of an API registration limited to Netlens' address."),
+          f("Run as user", pamF.run_as), f("Run-as password", pamF.run_as_password), f("Managed system", pamF.ps_system), f("Managed account", pamF.ps_account));
       } else {
         pamRows.append(f("Address", pamF.url), f("Namespace", pamF.namespace), f("Secrets engine", pamF.mount), f("Secret path", pamF.path), f("Version", pamF.kv),
           f("Netlens signs in with", pamF.auth, "Give Netlens its own identity with a policy that may only read the secrets that hold monitoring and access accounts."));
@@ -60,7 +71,7 @@ export async function buildCredentialsCard() {
         else pamRows.append(f("Token", pamF.token));
       }
       pamRows.append(f("CA certificate", pamF.ca));
-      if (pamF.provider.value !== "cyberark_ccp") pamRows.append(h("details", { class: "collapsible" }, h("summary", {}, "Field names in the secret (only if they differ)"),
+      if (pamF.provider.value === "vault_kv") pamRows.append(h("details", { class: "collapsible" }, h("summary", {}, "Field names in the secret (only if they differ)"),
         f("User name", pamF.f_user), f("Password", pamF.f_pass), f("Private key", pamF.f_key), f("Passphrase", pamF.f_phrase), f("Domain", pamF.f_domain)));
       pamRows.append(h("div", { class: "field" }, h("label", { class: "check-row" }, pamF.reason, " Ask for a reason every time"),
           h("p", { class: "hint" }, "A person gives a ticket number or a few words; it goes to the audit log. Monitors and other background jobs cannot use such a login.")));
@@ -81,7 +92,9 @@ export async function buildCredentialsCard() {
       if (kind.value === "login") Object.assign(body, { password: pass.value, domain: domain.value });
       else if (kind.value === "pam") {
         Object.assign(body, { provider: pamF.provider.value, url: pamF.url.value.trim(), reason_required: pamF.reason.checked });
-        if (pamF.provider.value !== "cyberark_ccp") Object.assign(body, { namespace: pamF.namespace.value.trim(), mount: pamF.mount.value.trim(), path: pamF.path.value.trim(), kv_version: pamF.kv.value,
+        if (pamF.provider.value === "delinea_ss") Object.assign(body, { secret_id_ref: pamF.secret_id_ref.value.trim(), app_user: pamF.app_user.value.trim(), app_password: pamF.app_password.value, app_domain: pamF.app_domain.value.trim() });
+        if (pamF.provider.value === "beyondtrust_ps") Object.assign(body, { api_key: pamF.api_key.value, run_as: pamF.run_as.value.trim(), run_as_password: pamF.run_as_password.value, ps_system: pamF.ps_system.value.trim(), ps_account: pamF.ps_account.value.trim() });
+        if (pamF.provider.value === "vault_kv") Object.assign(body, { namespace: pamF.namespace.value.trim(), mount: pamF.mount.value.trim(), path: pamF.path.value.trim(), kv_version: pamF.kv.value,
           approle_mount: pamF.approle_mount.value.trim(), role_id: pamF.auth.value === "approle" ? pamF.role.value.trim() : "", secret_id: pamF.auth.value === "approle" ? pamF.secret_id.value : "",
           token: pamF.auth.value === "token" ? pamF.token.value : "", username_field: pamF.f_user.value.trim(), password_field: pamF.f_pass.value.trim(), key_field: pamF.f_key.value.trim(),
           passphrase_field: pamF.f_phrase.value.trim(), domain_field: pamF.f_domain.value.trim() });

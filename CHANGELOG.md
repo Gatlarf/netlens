@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.314 — 2026-10-29
+
+### Added
+- ★ **Delinea Secret Server and BeyondTrust Password Safe as PAM providers (Enterprise and the trial), not tested on a real system.** Both check passwords out, so a password that Netlens fetched is **held for 90 seconds** (the login attempt) and then checked in, and checked in when Netlens stops. Secret Server: application user, a comment that carries the person, purpose and correlation id, check-in when it was checked out. Password Safe: API key and run-as user, a five-minute request with the same reason, reuse of a conflicting request, check-in and sign-out. Both follow the vendors' documentation and stand-in servers; the interface and `PAM.md` say so, and list what is most likely to differ.
+
+### Changed
+- A PAM login is validated again each time it is used, so an entry changed behind Netlens' back is treated like a new one.
+
 ## 0.4.313 — 2026-10-29
 
 ### Added

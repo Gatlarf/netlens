@@ -61,6 +61,28 @@ _status: dict[str, dict] = {}
 _lock = threading.Lock()
 
 
+HOLD_S = 90                    # a checked-out password is checked in this long after it was read: long enough for the login attempt, short enough not to block rotation
+_timers: set = set()
+
+
+def release_later(fetched: Fetched, seconds: float = HOLD_S) -> None:
+    """Check a login in after `seconds` (or when Netlens stops). Providers that check passwords out (Delinea, BeyondTrust) use this: checking in at once could
+    start a password change while the login attempt is still under way. A provider with nothing to release returns a Fetched without a release function."""
+    if fetched.release is None:
+        return
+    timer = threading.Timer(seconds, lambda: (_timers.discard(timer), fetched.done()))
+    timer.daemon = True
+    _timers.add(timer)
+    timer.start()
+
+
+def release_all() -> None:
+    """For shutdown and tests: stop the timers and check everything in now."""
+    for timer in list(_timers):
+        timer.cancel()
+        timer.function()
+
+
 def register(name: str, provider: Any, title: str = "") -> None:
     PROVIDERS[name] = provider
     PROVIDER_NAMES[name] = title or name
@@ -116,6 +138,7 @@ def checkout(entry: dict, ctx: Context, interactive: bool) -> Fetched:
         provider = PROVIDERS.get(str(entry.get("provider") or ""))
         if provider is None:
             raise PamError("the PAM system of this login is not available in this version")
+        provider.validate(entry)                  # again, at use: an entry edited in the database or restored from an old backup is checked like a new one
         fetched = provider.fetch(entry, ctx)
     except PamError as exc:
         _remember(cred_id, False, str(exc))
@@ -136,4 +159,4 @@ def audit_line(entry: dict, ctx: Context, lease: str, ok: bool, error: str = "")
     return f"{head}; purpose: {ctx.purpose[:60]}{reason}{tail}" + ("" if ok else f"; {error[:140]}")
 
 
-from app.pam import cyberark, vaultkv  # noqa: E402,F401  (each registers itself)
+from app.pam import beyondtrust, cyberark, delinea, vaultkv  # noqa: E402,F401  (each registers itself)
