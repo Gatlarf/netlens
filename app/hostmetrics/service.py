@@ -320,18 +320,18 @@ def resolve_secret(conn, method: str, secret: dict[str, Any], fetch: bool = True
     stored = credstore.peek_bound(conn, secret["credential_id"])
     if stored is None:
         return {}
-    if stored.get("kind") == "pam":
-        if not fetch:
-            return {**secret, "username": stored.get("username", ""), "via_pam": True}
+    if stored.get("kind") == "pam" and not fetch:
+        return {**secret, "username": stored.get("username", ""), "via_pam": True}
+    if fetch and (stored.get("kind") == "pam" or stored.get("route_mode")):
         try:
             stored = credstore.use_bound(conn, secret["credential_id"], f"monitoring {method.upper()}", device) or {}
         except credstore.CredentialError as exc:
-            log.warning("PAM login for a monitor refused: %s", exc)
+            log.warning("login for a monitor refused: %s", exc)
             return {}
     user = stored.get("username", "")
     if method == "winrm" and stored.get("domain") and "\\" not in user and "@" not in user:
         user = f"{stored['domain']}\\{user}"
-    return {**secret, "username": user, **{k: stored[k] for k in ("password", "private_key", "passphrase") if stored.get(k)}}
+    return {**secret, "username": user, **{k: stored[k] for k in ("password", "private_key", "passphrase", "route") if stored.get(k)}}
 
 
 async def resolve_secret_async(conn, method: str, secret: dict[str, Any], device: str = "") -> dict[str, Any]:
@@ -344,7 +344,7 @@ async def resolve_secret_async(conn, method: str, secret: dict[str, Any], device
 
     entry = credstore.peek_bound(conn, cred)
     path = dbengine.database_path(conn)
-    if entry is None or entry.get("kind") != "pam" or not path:
+    if entry is None or not (entry.get("kind") == "pam" or entry.get("route_mode")) or not path:
         return resolve_secret(conn, method, secret, True, device)
 
     def work() -> dict[str, Any]:
@@ -517,7 +517,7 @@ async def read(method: str, address: str, port: int, secret: dict[str, Any], gro
         if platform in ("auto", "linux"):
             try:
                 out, fingerprint = await ssh.run(address, port, secret.get("username", ""), secret.get("password"), secret.get("private_key"),
-                                                 secret.get("passphrase"), known_fingerprint)
+                                                 secret.get("passphrase"), known_fingerprint, route=secret.get("route"))
                 points, found = ssh.parse(out, state, now)
                 if found:
                     state["platform"] = "linux"
@@ -526,7 +526,7 @@ async def read(method: str, address: str, port: int, secret: dict[str, Any], gro
                     raise
         if not found and platform in ("auto", "windows"):          # not a /proc system: try it as Windows (OpenSSH + PowerShell)
             out, _status, fingerprint = await ssh.run_command(address, port, secret.get("username", ""), secret.get("password"), secret.get("private_key"),
-                                                              secret.get("passphrase"), ssh.WIN_COMMAND, known_fingerprint, timeout=30.0)
+                                                              secret.get("passphrase"), ssh.WIN_COMMAND, known_fingerprint, timeout=30.0, route=secret.get("route"))
             points, found = ssh.parse_windows(out, state, now)
             if found:
                 state["platform"] = "windows"
@@ -605,7 +605,7 @@ async def check_process(db_path: str, device_id: int | None, name: str, timeout:
             else:
                 command = f"sh -c 'pgrep -x {quoted} >/dev/null 2>&1 || systemctl is-active --quiet {quoted} >/dev/null 2>&1'"
             _out, status, _fp = await ssh.run_command(row["address"], row["port"], secret.get("username", ""), secret.get("password"),
-                                                      secret.get("private_key"), secret.get("passphrase"), command, known, timeout)
+                                                      secret.get("private_key"), secret.get("passphrase"), command, known, timeout, route=secret.get("route"))
             running = status == 0
             detail = "running" if running else "not running"
     except (snmp.SnmpError, ssh.SshError, winrm.WinrmError) as exc:

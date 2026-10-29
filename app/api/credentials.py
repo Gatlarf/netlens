@@ -31,9 +31,9 @@ def list_credentials(request: Request, conn=Depends(get_conn)) -> dict[str, Any]
             "pam": {"allowed": licence.allows(conn, "privileged"), "providers": pam.providers()}}
 
 
-def _need_pam(conn) -> None:
+def _need_pam(conn, what: str = "using your privileged-access system (PAM) for logins") -> None:
     if not licence.allows(conn, "privileged"):
-        raise HTTPException(status_code=402, detail="using your privileged-access system (PAM) for logins is part of the Enterprise edition (or the free trial)")
+        raise HTTPException(status_code=402, detail=f"{what} is part of the Enterprise edition (or the free trial)")
 
 
 @router.post("/credentials", dependencies=[Depends(ensure_allowed)])
@@ -41,6 +41,8 @@ def create_credential(body: dict, request: Request, conn=Depends(get_conn)) -> d
     require_admin(request)
     if str(body.get("kind") or "login") == "pam":
         _need_pam(conn)
+    if body.get("route_mode"):
+        _need_pam(conn, "routing a login through a bastion or a PAM session proxy")
     try:
         made = credstore.create(conn, _user(request), body.get("name", ""), str(body.get("kind") or "login"), body, shared=bool(body.get("shared")))
     except credstore.CredentialError as exc:
@@ -55,6 +57,8 @@ def update_credential(cred_id: str, body: dict, request: Request, conn=Depends(g
     current = credstore.peek(conn, _user(request), cred_id)
     if current and current.get("kind") == "pam":
         _need_pam(conn)
+    if body.get("route_mode"):
+        _need_pam(conn, "routing a login through a bastion or a PAM session proxy")
     try:
         made = credstore.update(conn, _user(request), cred_id, body, True)
     except credstore.CredentialError as exc:

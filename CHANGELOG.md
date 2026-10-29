@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.315 — 2026-10-29
+
+### Added
+- ★ **SSH through a bastion or a PAM session proxy (Enterprise and the trial).** A stored login can carry a route (Settings → Credentials → Reach the host). **Jump host:** Netlens signs in to the bastion with a stored login (which can live in your PAM), then to the host through it; the host's own key is still checked, and the bastion's key can be pinned. **PAM session proxy:** Netlens connects to the proxy with a user name made from a template such as `{user}@{target}`. It applies to the web terminal, SSH monitors and remediation; the audit line of a terminal session names the bastion or proxy. Tested against real SSH servers (a bastion, a proxy and a target).
+
 ## 0.4.314 — 2026-10-29
 
 ### Added

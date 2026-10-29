@@ -432,11 +432,11 @@ def test_ssh_reading_falls_back_to_windows(monkeypatch):
 
     calls = []
 
-    async def run(host, port, user, pw, key, phrase, known=None, timeout=15.0):
+    async def run(host, port, user, pw, key, phrase, known=None, timeout=15.0, route=None):
         calls.append("linux")
         return "'sh' is not recognized as an internal or external command", "AA:BB"
 
-    async def run_command(host, port, user, pw, key, phrase, command, known=None, timeout=15.0):
+    async def run_command(host, port, user, pw, key, phrase, command, known=None, timeout=15.0, route=None):
         calls.append("windows")
         return win_output(), 0, "AA:BB"
 

@@ -1,5 +1,6 @@
 import asyncio
 import asyncssh
+from app import sshroute
 from app.terminal.base import TerminalBackend, AuthFailed, ConnectFailed, HostKeyMismatch
 
 
@@ -16,7 +17,9 @@ class SSHBackend(TerminalBackend):
         rows: int = 24,
         known_fingerprint: str | None = None,
         connect_timeout: float = 10.0,
+        route: dict | None = None,
     ) -> None:
+        self.route = route
         self.host = host
         self.port = port
         self.username = username
@@ -30,6 +33,7 @@ class SSHBackend(TerminalBackend):
         self.fingerprint: str | None = None
         self.new_key = False
         self._conn: asyncssh.SSHClientConnection | None = None
+        self._hops: list = []
         self._process: asyncssh.SSHClientProcess | None = None
 
     def _create_client_factory(self):
@@ -59,21 +63,20 @@ class SSHBackend(TerminalBackend):
                 raise ConnectFailed("invalid private key")
 
         try:
-            self._conn = await asyncio.wait_for(
-                asyncssh.connect(
+            self._conn, self._hops = await asyncio.wait_for(
+                sshroute.connect(
                     self.host,
-                    port=self.port,
-                    client_factory=client_factory,
+                    self.port,
                     username=self.username,
-                    password=self.password,
-                    client_keys=client_keys,
-                    known_hosts=(),
-                    agent_path=None,
-                    config=None,
-                    login_timeout=self.connect_timeout,
+                    route=self.route,
+                    timeout=self.connect_timeout,
+                    connect_args=dict(client_factory=client_factory, password=self.password, client_keys=client_keys, known_hosts=(), agent_path=None, config=None,
+                                      login_timeout=self.connect_timeout),
                 ),
-                timeout=self.connect_timeout,
+                timeout=self.connect_timeout * 2 if self.route else self.connect_timeout,
             )
+        except sshroute.RouteError as e:
+            raise ConnectFailed(str(e))
         except asyncssh.PermissionDenied:
             raise AuthFailed("authentication failed")
         except asyncssh.HostKeyNotVerifiable as e:
@@ -129,3 +132,10 @@ class SSHBackend(TerminalBackend):
             except Exception:
                 pass
             self._conn = None
+
+        for hop in self._hops:
+            try:
+                hop.close()
+            except Exception:
+                pass
+        self._hops = []

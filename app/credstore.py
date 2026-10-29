@@ -26,12 +26,14 @@ KINDS = {
             "appid", "safe", "folder", "object", "account_user", "account_address", "content_as", "client_cert", "client_key",
             "secret_id_ref", "app_user", "app_password", "app_domain", "api_key", "run_as", "run_as_password", "ps_system", "ps_account"),
 }
+ROUTE_FIELDS = ("route_mode", "route_host", "route_port", "route_login", "route_template", "route_fingerprint")      # any kind: reach the host through a bastion or a PAM session proxy
 SECRET_FIELDS = ("password", "private_key", "passphrase", "token", "secret_id", "client_key", "app_password", "api_key", "run_as_password")
 BOOL_FIELDS = ("reason_required",)
 LIMITS = {"name": 80, "username": 256, "domain": 256, "password": 1024, "private_key": 16384, "passphrase": 1024, "provider": 40, "url": 512, "namespace": 200, "mount": 200,
           "kv_version": 2, "path": 512, "approle_mount": 100, "role_id": 200, "secret_id": 512, "token": 4096, "ca_cert": 16384, "username_field": 100, "password_field": 100,
           "key_field": 100, "passphrase_field": 100, "domain_field": 100,
           "appid": 200, "safe": 200, "folder": 200, "object": 200, "account_user": 256, "account_address": 256, "content_as": 20, "client_cert": 16384, "client_key": 16384,
+          "route_mode": 10, "route_host": 253, "route_port": 6, "route_login": 40, "route_template": 200, "route_fingerprint": 60,
           "secret_id_ref": 12, "app_user": 256, "app_password": 1024, "app_domain": 100, "api_key": 512, "run_as": 256, "run_as_password": 1024, "ps_system": 256, "ps_account": 256}
 
 
@@ -60,7 +62,30 @@ def public(entry: dict[str, Any], user: str) -> dict[str, Any]:
     """What the API may show: never a secret, only whether one is set."""
     return {"id": entry["id"], "name": entry["name"], "kind": entry["kind"], "owner": entry["owner"], "shared": bool(entry.get("shared")), "mine": entry["owner"] == user,
             "username": entry.get("username", ""), "domain": entry.get("domain", ""), "has_secret": any(entry.get(f) for f in SECRET_FIELDS),
-            "created": entry.get("created"), "updated": entry.get("updated"), "last_used": entry.get("last_used"), "used_for": entry.get("used_for", "")} | _pam_public(entry)
+            "created": entry.get("created"), "updated": entry.get("updated"), "last_used": entry.get("last_used"), "used_for": entry.get("used_for", "")} | _pam_public(entry) | _route_public(entry)
+
+
+def _route_public(entry: dict[str, Any]) -> dict[str, Any]:
+    if not entry.get("route_mode"):
+        return {}
+    return {"route": {"mode": entry["route_mode"], "host": entry.get("route_host", ""), "port": entry.get("route_port") or "22", "template": entry.get("route_template", ""),
+                      "login": entry.get("route_login", ""), "pinned": bool(entry.get("route_fingerprint")), "fingerprint": entry.get("route_fingerprint", "")}}
+
+
+def _attach_route(conn: sqlite3.Connection, entry: dict[str, Any], out: dict[str, Any], user: str, purpose: str, reason: str, interactive: bool, device: str) -> dict[str, Any]:
+    """If the login carries a route, put it into the result for the code that connects: `route` = {mode, host, port, template, fingerprint, login}. For a jump host the
+    login for the bastion is fetched now (from the PAM too, if it lives there)."""
+    if not entry.get("route_mode"):
+        return out
+    route: dict[str, Any] = {"mode": entry["route_mode"], "host": entry.get("route_host", ""), "port": int(entry.get("route_port") or 22), "template": entry.get("route_template", ""),
+                             "fingerprint": entry.get("route_fingerprint", "")}
+    if entry["route_mode"] == "jump":
+        hop = _load(conn).get(str(entry.get("route_login")))
+        if hop is None or (user and not _visible(hop, user)):
+            raise CredentialError("the login chosen for the bastion no longer exists")
+        found = _login_from_pam(conn, hop, user, f"bastion for {purpose}"[:60], reason, interactive, device) if hop.get("kind") == "pam" else hop
+        route["login"] = {k: found.get(k) for k in ("username", "password", "private_key", "passphrase") if found.get(k)}
+    return {**out, "route": route}
 
 
 def _pam_public(entry: dict[str, Any]) -> dict[str, Any]:
@@ -81,7 +106,7 @@ def listing(conn: sqlite3.Connection, user: str) -> list[dict[str, Any]]:
 
 def _clean(kind: str, fields: dict[str, Any]) -> dict[str, str]:
     out: dict[str, str] = {}
-    for name in KINDS[kind]:
+    for name in (*KINDS[kind], *ROUTE_FIELDS):
         if name in BOOL_FIELDS and name in fields:
             out[name] = bool(fields[name])
         elif name in fields and fields[name] is not None:
@@ -101,6 +126,21 @@ def _check_pam(values: dict[str, Any]) -> None:
         raise CredentialError(str(exc)) from None
 
 
+def _check_route(data: dict[str, dict[str, Any]], values: dict[str, Any], user: str, own_id: str = "") -> None:
+    from app import sshroute
+
+    try:
+        sshroute.validate(values)
+    except sshroute.RouteError as exc:
+        raise CredentialError(str(exc)) from None
+    if values.get("route_mode") == "jump":
+        target = data.get(str(values.get("route_login")))
+        if target is None or not _visible(target, user) or target["id"] == own_id:
+            raise CredentialError("the login chosen for the bastion does not exist, is not yours to use, or is this same login")
+        if target.get("route_mode"):
+            raise CredentialError("the login for the bastion cannot itself use a route")
+
+
 def create(conn: sqlite3.Connection, user: str, name: str, kind: str, fields: dict[str, Any], shared: bool = False, owner: str | None = None) -> dict[str, Any]:
     name = (name or "").strip()
     if not name or len(name) > LIMITS["name"]:
@@ -118,6 +158,7 @@ def create(conn: sqlite3.Connection, user: str, name: str, kind: str, fields: di
         _check_pam(values)
     elif not any(values.get(f) for f in SECRET_FIELDS):
         raise CredentialError("a password or a key is needed")
+    _check_route(data, values, user)
     entry = {"id": secrets.token_hex(6), "name": name, "kind": kind, "owner": owner, "shared": bool(shared), "created": utcnow(), "updated": utcnow(), **values}
     data[entry["id"]] = entry
     _save(conn, data)
@@ -146,6 +187,7 @@ def update(conn: sqlite3.Connection, user: str, cred_id: str, fields: dict[str, 
         if (fields.get("role_id") or fields.get("secret_id")) and not fields.get("token"):
             entry.pop("token", None)
         _check_pam({**entry, **changes})
+    _check_route(data, {**entry, **changes}, user, cred_id)
     for key, value in changes.items():
         entry[key] = value
     if "shared" in fields:
@@ -213,12 +255,13 @@ def resolve(conn: sqlite3.Connection, user: str, cred_id: str, used_for: str = "
         raise CredentialError("no such login")
     if entry.get("kind") == "pam":
         found = _login_from_pam(conn, entry, user, used_for or "use", reason, True, device)
+        found = _attach_route(conn, entry, found, user, used_for or "use", reason, True, device)
         entry["last_used"], entry["used_for"] = utcnow(), used_for[:120]
         _save(conn, data)
         return found
     entry["last_used"], entry["used_for"] = utcnow(), used_for[:120]
     _save(conn, data)
-    return dict(entry)
+    return _attach_route(conn, entry, dict(entry), user, used_for or "use", reason, True, device)
 
 
 def pam_problems(conn: sqlite3.Connection) -> list[dict[str, str]]:
@@ -272,8 +315,8 @@ def use_bound(conn: sqlite3.Connection, cred_id: str, purpose: str, device: str 
     if entry is None:
         return None
     if entry.get("kind") == "pam":
-        return _login_from_pam(conn, entry, "", purpose, "", False, device)
-    return dict(entry)
+        return _attach_route(conn, entry, _login_from_pam(conn, entry, "", purpose, "", False, device), "", purpose, "", False, device)
+    return _attach_route(conn, entry, dict(entry), "", purpose, "", False, device)
 
 
 def find(conn: sqlite3.Connection, user: str, name: str) -> dict[str, Any] | None:

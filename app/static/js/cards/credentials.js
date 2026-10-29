@@ -25,6 +25,28 @@ export async function buildCredentialsCard() {
     const phrase = h("input", { type: "password", autocomplete: "new-password", placeholder: "only if the key has one" });
     const shared = h("input", { type: "checkbox", checked: cur.shared });
     const secretRows = h("div", {});
+    const rt = cur.route || { mode: "", host: "", port: "22", template: "", login: "", fingerprint: "" };
+    const routeF = {
+      mode: h("select", {}, [["", "Directly"], ["jump", "Through a jump host (bastion)"], ["proxy", "Through a PAM session proxy"]].map(([v, t]) => h("option", { value: v, selected: v === rt.mode }, t))),
+      host: h("input", { type: "text", value: rt.host, autocomplete: "off", spellcheck: "false", placeholder: "bastion.example.com" }),
+      port: h("input", { type: "text", value: rt.port, inputmode: "numeric", autocomplete: "off" }),
+      login: h("select", {}, [h("option", { value: "" }, "Choose a stored login"), ...data.credentials.filter((c) => c.id !== editing && !c.route).map((c) => h("option", { value: c.id, selected: c.id === rt.login }, c.name))]),
+      template: h("input", { type: "text", value: rt.template, autocomplete: "off", spellcheck: "false", placeholder: "{user}@{target}" }),
+      fingerprint: h("input", { type: "text", value: rt.fingerprint, autocomplete: "off", spellcheck: "false", placeholder: "SHA256:… (the host key of the bastion; recommended)" }),
+    };
+    const routeRows = h("div", {});
+    const drawRoute = () => {
+      clear(routeRows);
+      const f = (label, el, hint) => h("div", { class: "field" }, h("label", {}, label), el, hint ? h("p", { class: "hint" }, hint) : null);
+      routeRows.append(f("Reach the host", routeF.mode, "Only SSH (terminal and SSH monitors) uses this. Remote desktop connects directly."));
+      if (!routeF.mode.value) return;
+      routeRows.append(f("Address", routeF.host), f("Port", routeF.port));
+      if (routeF.mode.value === "jump") routeRows.append(f("Login for the bastion", routeF.login, "Netlens signs in to the bastion with this login (it can live in your PAM), then to the host through it. The host's own key is still checked."));
+      else routeRows.append(f("User name for the proxy", routeF.template, "The proxy opens the session to the host. Use {user}, {target} and {port}, for example {user}@{target} or {user}@account@{target}."));
+      routeRows.append(f("Host key of the bastion or proxy", routeF.fingerprint, "Pin it so nobody can stand in for it: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub"));
+    };
+    routeF.mode.addEventListener("change", drawRoute);
+    drawRoute();
     const text = (value, extra = {}) => h("input", { type: "text", value: value || "", autocomplete: "off", spellcheck: "false", ...extra });
     const secret = (hint) => h("input", { type: "password", autocomplete: "new-password", placeholder: editing ? "(set; type to replace)" : hint || "" });
     const pamF = {
@@ -88,7 +110,9 @@ export async function buildCredentialsCard() {
     fill();
     const save = h("button", { class: "btn primary", type: "button" }, editing ? "Save" : "Add");
     save.addEventListener("click", async () => {
-      const body = { name: name.value, kind: kind.value, username: user.value, shared: shared.checked };
+      const body = { name: name.value, kind: kind.value, username: user.value, shared: shared.checked,
+        route_mode: routeF.mode.value, route_host: routeF.host.value.trim(), route_port: routeF.port.value.trim(), route_login: routeF.mode.value === "jump" ? routeF.login.value : "",
+        route_template: routeF.mode.value === "proxy" ? routeF.template.value.trim() : "", route_fingerprint: routeF.fingerprint.value.trim() };
       if (kind.value === "login") Object.assign(body, { password: pass.value, domain: domain.value });
       else if (kind.value === "pam") {
         Object.assign(body, { provider: pamF.provider.value, url: pamF.url.value.trim(), reason_required: pamF.reason.checked });
@@ -116,6 +140,7 @@ export async function buildCredentialsCard() {
     return h("section", { class: "probe-section" }, h("h3", {}, editing ? `Change “${cur.name}”` : "Add a login"),
       h("div", { class: "field" }, h("label", {}, "Name"), name), h("div", { class: "field" }, h("label", {}, "Kind"), kind),
       h("div", { class: "field" }, h("label", {}, "User name"), user), secretRows,
+      h("div", {}, routeRows),
       h("div", { class: "field" }, h("label", { class: "check-row" }, shared, " Let other administrators use it"),
         h("p", { class: "hint" }, "Off: only you can use it. On: other administrators can pick it (for remote access and for setting up monitoring), but nobody can read it.")),
       h("div", { class: "form-actions" }, save, " ", cancel));
@@ -138,7 +163,7 @@ export async function buildCredentialsCard() {
     card.appendChild(h("p", { class: "hint" }, "The logins Netlens uses to reach your hosts: remote desktop, SSH, health monitoring and host probes. Each is stored once, encrypted, and picked by name wherever it is needed. " +
       "A password or key can be replaced but is never shown again. Every use is in the audit log."));
     const rows = data.credentials.map((c) => h("tr", {},
-      h("td", {}, c.name, c.username ? h("div", { class: "hint" }, c.username) : null), h("td", {}, c.kind === "pam" ? h("span", {}, `PAM · ${c.pam.provider_name.split(" (")[0]}`, h("br"), h("span", { class: "hint mono" }, c.pam.where)) : c.kind === "ssh_key" ? "SSH key" : "Password"),
+      h("td", {}, c.name, c.username ? h("div", { class: "hint" }, c.username) : null), h("td", {}, c.kind === "pam" ? h("span", {}, `PAM · ${c.pam.provider_name.split(" (")[0]}`, h("br"), h("span", { class: "hint mono" }, c.pam.where)) : c.kind === "ssh_key" ? "SSH key" : "Password", c.route ? h("div", { class: "hint" }, c.route.mode === "jump" ? `via jump host ${c.route.host}` : `via PAM proxy ${c.route.host}`) : null),
       h("td", {}, c.shared ? (c.mine ? "shared by you" : `shared by ${c.owner}`) : "only you"),
       h("td", { class: "hint" }, c.last_used ? `${c.used_for || "used"} · ${timeAgo(c.last_used)}` : "not used yet", c.pam && c.pam.last ? h("div", { class: c.pam.last.ok ? "hint" : "error" }, c.pam.last.ok ? "PAM: last check-out worked" : `PAM: ${c.pam.last.message}`) : null),
       h("td", {}, h("div", { class: "row-actions" }, c.kind === "pam" ? h("button", { class: "btn", type: "button", onclick: () => tryPam(c) }, "Try it") : null,

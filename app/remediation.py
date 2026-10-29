@@ -262,7 +262,7 @@ def run_ssh(conn: sqlite3.Connection, rule: dict, run: dict) -> str:
     if not secret:
         raise RuntimeError(hm.unreadable_text(conn, monitor, "the login of the host monitor cannot be read"))
     out, status, _fp = asyncio.run(ssh.run_command(monitor["address"], monitor["port"], secret.get("username", ""), secret.get("password"), secret.get("private_key"), secret.get("passphrase"),
-                                                   rule["action"]["command"], get_fingerprint(conn, device_id), timeout=60.0))
+                                                   rule["action"]["command"], get_fingerprint(conn, device_id), timeout=60.0, route=secret.get("route")))
     text = " ".join(out.split())[:300]
     if status not in (0, None):
         raise RuntimeError(f"the command ended with status {status}" + (f": {text}" if text else ""))

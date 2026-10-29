@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 
 import asyncssh
 
+from app import sshroute
+
 from app.hostmetrics.snmp import MAX_INTERFACES, SKIP_MOUNTS, _delta
 
 # One round trip. Plain sh syntax only (the login shell may be anything); the command ends with a marker so a cut-off is noticed.
@@ -353,15 +355,16 @@ def interpret_error(exc: Exception) -> str:
 
 
 async def run(host: str, port: int, username: str, password: str | None, private_key: str | None, passphrase: str | None,
-              known_fingerprint: str | None = None, timeout: float = 15.0) -> tuple[str, str | None]:
+              known_fingerprint: str | None = None, timeout: float = 15.0, route: dict | None = None) -> tuple[str, str | None]:
     """Run the readings command. Returns (output, host key fingerprint)."""
-    out, _status, fingerprint = await run_command(host, port, username, password, private_key, passphrase, COMMAND, known_fingerprint, timeout)
+    out, _status, fingerprint = await run_command(host, port, username, password, private_key, passphrase, COMMAND, known_fingerprint, timeout, route=route)
     return out, fingerprint
 
 
 async def run_command(host: str, port: int, username: str, password: str | None, private_key: str | None, passphrase: str | None,
-                      command: str, known_fingerprint: str | None = None, timeout: float = 15.0, certificate: str | None = None, input: str | None = None) -> tuple[str, int | None, str | None]:
-    """Run one command. Returns (output, exit status, host key fingerprint). `certificate` is an OpenSSH user certificate for `private_key` (a short-lived login)."""
+                      command: str, known_fingerprint: str | None = None, timeout: float = 15.0, certificate: str | None = None, input: str | None = None, route: dict | None = None) -> tuple[str, int | None, str | None]:
+    """Run one command. Returns (output, exit status, host key fingerprint). `certificate` is an OpenSSH user certificate for `private_key` (a short-lived login).
+    `route` sends the connection through a bastion or a PAM session proxy (app/sshroute.py)."""
     seen: dict[str, str] = {}
 
     class Client(asyncssh.SSHClient):
@@ -377,10 +380,12 @@ async def run_command(host: str, port: int, username: str, password: str | None,
         except (asyncssh.Error, ValueError) as exc:
             raise SshError(f"the private key cannot be read: {exc}") from None
     try:
-        conn = await asyncio.wait_for(
-            asyncssh.connect(host, port=port, client_factory=Client, username=username, password=password or None, client_keys=keys,
-                             known_hosts=(), agent_path=None, config=None, login_timeout=timeout),
+        conn, extra = await asyncio.wait_for(
+            sshroute.connect(host, port, username=username, route=route, timeout=timeout,
+                             connect_args=dict(client_factory=Client, password=password or None, client_keys=keys, known_hosts=(), agent_path=None, config=None, login_timeout=timeout)),
             timeout + 2)
+    except sshroute.RouteError as exc:
+        raise SshError(str(exc)) from None
     except Exception as exc:  # noqa: BLE001 - turned into a sentence for the user
         raise SshError(interpret_error(exc)) from None
     try:
@@ -389,4 +394,6 @@ async def run_command(host: str, port: int, username: str, password: str | None,
         raise SshError(interpret_error(exc)) from None
     finally:
         conn.close()
+        for hop in extra:
+            hop.close()
     return str(result.stdout or ""), result.exit_status, seen.get("fp")

@@ -363,3 +363,16 @@ def test_testing_a_monitor_with_a_refused_pam_login_says_why(api, bao):
     made = c.post("/api/credentials", json=body(bao, path="netlens/missing"), headers=ADMIN).json()
     r = c.post("/api/devices/1/monitor/test", json={"method": "ssh", "credential_id": made["id"]}, headers=ADMIN)
     assert r.status_code == 422 and "PAM system did not hand out the login" in r.json()["detail"] and "no secret at that path" in r.json()["detail"]
+
+
+def test_routing_a_login_through_a_bastion_is_enterprise_only_to_set(api, bao):
+    c, state, path = api
+    plain = {"name": "Web", "kind": "login", "username": "svc", "password": "x"}
+    routed = {**plain, "name": "Web routed", "route_mode": "proxy", "route_host": "psm.example.com", "route_template": "{user}@{target}"}
+    state["privileged"] = False
+    assert c.post("/api/credentials", json=plain, headers=ADMIN).status_code == 200
+    assert c.post("/api/credentials", json=routed, headers=ADMIN).status_code == 402
+    state["privileged"] = True
+    made = c.post("/api/credentials", json=routed, headers=ADMIN)
+    assert made.status_code == 200 and made.json()["route"]["mode"] == "proxy"
+    assert c.post("/api/credentials", json={**routed, "name": "bad", "route_template": "{secret}"}, headers=ADMIN).status_code == 422

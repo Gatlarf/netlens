@@ -139,6 +139,7 @@ async def terminal_ws(
         password = data.get("password")
         private_key = data.get("private_key")
         passphrase = data.get("passphrase")
+        route = None
         cols = data.get("cols", 80)
         rows = data.get("rows", 24)
         if proto == "ssh" and data.get("credential_id"):
@@ -153,7 +154,8 @@ async def terminal_ws(
             password = stored.get("password")
             private_key = stored.get("private_key")
             passphrase = stored.get("passphrase")
-            audit.record_by(conn, principal, client_ip(websocket), "WS", f"/api/terminal/{device_id}/ws", 200, f"Opened SSH to {primary_ip} with the stored login \"{stored['name']}\"")
+            route = stored.get("route")
+            audit.record_by(conn, principal, client_ip(websocket), "WS", f"/api/terminal/{device_id}/ws", 200, f"Opened SSH to {primary_ip} with the stored login \"{stored['name']}\"" + (f" {'through the jump host' if route['mode'] == 'jump' else 'through the PAM session proxy'} {route['host']}" if route else ""))
 
         if proto == "ssh":
             if not username or len(username) > 128:
@@ -184,6 +186,8 @@ async def terminal_ws(
             kwargs["private_key"] = private_key
             kwargs["passphrase"] = passphrase
             kwargs["known_fingerprint"] = get_fingerprint(conn, device_id)
+            if route:
+                kwargs["route"] = route
 
         backend = websocket.app.state.terminal_backends[proto](**kwargs)
 

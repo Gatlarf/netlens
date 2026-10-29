@@ -14,6 +14,7 @@ drops it.
 * [CyberArk](#cyberark)
 * [Delinea Secret Server](#delinea-secret-server)
 * [BeyondTrust Password Safe](#beyondtrust-password-safe)
+* [Routing through a bastion or a session proxy](#routing-through-a-bastion-or-a-session-proxy)
 * [Reasons](#reasons)
 * [What is logged](#what-is-logged)
 * [When the PAM is down](#when-the-pam-is-down)
@@ -131,6 +132,22 @@ managed account must allow a *view password* request without approval for the Ne
 looks the account up, makes a **five-minute request** for the password with a reason that carries the person, purpose and correlation id, reads it, and **checks the request in
 and signs out 90 seconds later**. A conflicting open request is reused.
 
+## Routing through a bastion or a session proxy
+
+Many companies allow SSH to servers only through a **bastion**, or only through a **PAM session proxy** that records the session (CyberArk PSM for SSH, BeyondTrust, Delinea
+and others). Any stored login (a password, a key or a PAM login) can carry a **route** (Settings → Credentials → *Reach the host*). It applies to the web terminal and to
+SSH monitors and remediation. Remote desktop connects directly.
+
+| Kind | What Netlens does |
+|---|---|
+| **Jump host (bastion)** | signs in to the bastion with a stored login of your choice (which can live in your PAM), opens a channel to the host through it, and signs in to the host there. **The host's own key is still checked**: a bastion cannot swap the machine behind it unnoticed. |
+| **PAM session proxy** | connects to the proxy only, with a user name that names the target, made from a template: `{user}@{target}`, `{user}@account@{target}`, with `{user}`, `{target}` and `{port}` available. The proxy opens and records the session to the host. |
+
+**Pin the host key of the bastion or proxy** (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` gives `SHA256:…`); without a pin the key is trusted when first seen. A route
+is checked when it is saved (address, port, template characters, the bastion login must be one you may use and must not use a route itself) and again when it is used. A user
+name or address with a space or control character cannot be put into a proxy user name. The audit line of a terminal session names the bastion or proxy that was used, and the
+login for a vaulted bastion is a PAM check-out like any other ("bastion for SSH terminal").
+
 ## Reasons
 
 Tick **Ask for a reason every time** and a person must give a ticket number or a few words before the login is used. The reason is written to the audit log and sent
@@ -160,7 +177,7 @@ use works; nothing has to be reset. Monitors ask the vault at every poll, so a l
 
 ## Other PAM systems
 
-Routing through a bastion or a PAM session proxy is planned on the same framework. A cloud secret manager (Azure Key Vault, AWS Secrets Manager) can be added if asked.
+A cloud secret manager (Azure Key Vault, AWS Secrets Manager) can be added if asked.
 
 ## Troubleshooting
 
