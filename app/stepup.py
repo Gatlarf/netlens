@@ -73,6 +73,8 @@ def enabled(request: HTTPConnection) -> dict | None:
 def method_for(principal) -> str:
     if principal.auth_method == "oidc":
         return "oidc"
+    if principal.mfa and principal.mfa.get("webauthn"):
+        return "webauthn"
     return "totp" if principal.mfa and principal.mfa.get("enrolled") else "password"
 
 

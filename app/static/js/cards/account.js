@@ -1,5 +1,6 @@
 import { get, put, post } from "../api.js";
 import { h, toast, sessionInfo, timeAgo } from "../util.js";
+import * as webauthn from "../webauthn.js";
 
 
 // ---- a second factor (authenticator app) ------------------------------------------------------------------------------------------------
@@ -111,6 +112,58 @@ function buildTotpSection(wrap) {
 }
 
 
+// ---- security keys and passkeys (WebAuthn) -------------------------------------------------------------------------------------------
+let pendingCodes = null;          // recovery codes made with the first key: shown until the person says they are saved (a redraw of the page must not lose them)
+
+function buildKeysSection(wrap) {
+  async function draw() {
+    wrap.replaceChildren(h("h3", {}, "Security keys and passkeys"));
+    let st;
+    try { st = await get("/api/me/webauthn"); } catch { return; }
+    if (pendingCodes) {
+      const saved = h("button", { class: "btn", type: "button" }, "I have saved them");
+      saved.addEventListener("click", () => { pendingCodes = null; draw(); });
+      const box = recoveryBox(pendingCodes);
+      box.appendChild(h("div", { class: "btn-row" }, saved));
+      wrap.appendChild(box);
+    }
+    wrap.appendChild(h("p", { class: "hint" }, "A hardware key (YubiKey and similar) or a passkey on your phone or laptop, used after the password. It cannot be typed into a look-alike site, so it protects against phishing in a way a code cannot."));
+    const pass = passwordField();
+    if (st.keys.length) {
+      const rows = st.keys.map((k) => {
+        const remove = h("button", { class: "btn danger", type: "button" }, "Remove");
+        remove.addEventListener("click", async () => {
+          if (!pass.value) { toast("Enter your password below to remove a key", "error"); pass.focus(); return; }
+          if (!confirm(`Remove “${k.name}”?`)) return;
+          try { await post("/api/me/webauthn/remove", { id: k.id, password: pass.value }); toast("Key removed", "success"); document.dispatchEvent(new CustomEvent("netlens:session-changed")); await draw(); } catch (err) { toast(err.message || "Failed", "error"); }
+        });
+        return h("tr", {}, h("td", {}, k.name), h("td", {}, timeAgo(k.created)), h("td", {}, k.last_used ? timeAgo(k.last_used) : "not used yet"), h("td", {}, remove));
+      });
+      wrap.appendChild(h("div", { class: "table-wrap" }, h("table", { class: "table" }, h("thead", {}, h("tr", {}, ...["Key", "Added", "Last used", ""].map((x) => h("th", {}, x)))), h("tbody", {}, rows))));
+    }
+    if (!st.allowed) { wrap.appendChild(h("p", { class: "hint" }, "Adding keys is part of the Enterprise edition (or the free trial). Keys that are already set up keep working.")); if (st.keys.length) wrap.appendChild(h("div", { class: "btn-row" }, pass)); return; }
+    if (!webauthn.supported()) { wrap.appendChild(h("p", { class: "hint" }, webauthn.whyNot())); if (st.keys.length) wrap.appendChild(h("div", { class: "btn-row" }, pass)); return; }
+    if (st.keys.length >= st.max) { wrap.appendChild(h("div", { class: "btn-row" }, pass)); return; }
+    const name = h("input", { type: "text", maxlength: "60", placeholder: "Name, for example YubiKey", "aria-label": "Name of the key", style: "max-width:14rem" });
+    const add = h("button", { class: "btn", type: "button" }, "Add a security key or passkey");
+    add.addEventListener("click", async () => {
+      add.disabled = true;
+      try {
+        const options = await post("/api/me/webauthn/begin", { password: pass.value });
+        const credential = await webauthn.create(options);
+        const done = await post("/api/me/webauthn/finish", { credential, name: name.value });
+        toast("Key added", "success");
+        if (done.recovery_codes && done.recovery_codes.length) pendingCodes = done.recovery_codes;
+        await draw();
+        document.dispatchEvent(new CustomEvent("netlens:session-changed"));
+      } catch (err) { toast(err.message || "Could not add the key", "error"); add.disabled = false; }
+    });
+    wrap.appendChild(h("div", { class: "btn-row" }, pass, name, add));
+  }
+  draw();
+}
+
+
 // ---- the sessions of this user -------------------------------------------------------------------------------------------------------
 function buildSessionsSection(wrap) {
   const phone = (ua) => {
@@ -171,6 +224,9 @@ export function buildAccountCard() {
     const totpWrap = h("div", { class: "totp-section" });
     card.appendChild(totpWrap);
     buildTotpSection(totpWrap);
+    const keysWrap = h("div", { class: "keys-section" });
+    card.appendChild(keysWrap);
+    buildKeysSection(keysWrap);
     const sessWrap = h("div", { class: "sessions-section" });
     card.appendChild(sessWrap);
     buildSessionsSection(sessWrap);

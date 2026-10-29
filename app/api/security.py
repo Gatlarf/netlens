@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app import audit, licence, secpolicy, stepup, totp, users
+from app import audit, licence, secpolicy, stepup, totp, users, webauthn
 from app.api.devices import get_conn
 from app.auth import client_ip, identify, require_admin
 from app.db import add_event
@@ -24,6 +24,7 @@ class SessionRef(BaseModel):
 class ProofBody(BaseModel):
     password: str | None = None
     code: str | None = None
+    credential: dict | None = None          # what a security key signed (app/webauthn.py)
 
 
 def _principal(request: Request):
@@ -39,7 +40,7 @@ def _principal(request: Request):
 def _doc(conn) -> dict[str, Any]:
     pol = secpolicy.get(conn)
     total = conn.execute("SELECT COUNT(*) FROM users WHERE disabled = 0").fetchone()[0]
-    with_totp = conn.execute("SELECT COUNT(*) FROM users WHERE disabled = 0 AND totp_enabled = 1").fetchone()[0]
+    with_totp = conn.execute("SELECT COUNT(*) FROM users WHERE disabled = 0 AND (totp_enabled = 1 OR webauthn_enabled = 1)").fetchone()[0]
     return {"policy": pol, "token_configured": False, "allowed": {"mfa_policy": licence.allows(conn, "mfa_policy"), "privileged": licence.allows(conn, "privileged")},
             "users": {"total": total, "with_second_factor": with_totp}, "without_second_factor": secpolicy.users_without_factor(conn)}
 
@@ -141,15 +142,25 @@ def reset_user_totp(user_id: int, body: ProofBody, request: Request, conn=Depend
     if not limiter.allowed(key):
         raise HTTPException(status_code=429, detail="too many attempts")
     me = users.get_user(conn, principal.user_id)
-    if me["totp_enabled"]:
+    has_factor = bool(me["totp_enabled"] or me["webauthn_enabled"])
+    if body.credential is not None:
+        from app.api import webauthn as webauthn_api
+
+        try:
+            webauthn_api.prove(request, conn, principal.user_id, body.credential, "step", f"step:{principal.user_id}")
+            ok = True
+        except HTTPException:
+            ok = False
+    elif has_factor:
         ok = totp.check_second_factor(conn, principal.user_id, body.code or "") is not None
     else:
         ok = users.verify_password(body.password or "", me["password_hash"])
     if not ok:
         limiter.record_failure(key)
-        raise HTTPException(status_code=403, detail="the code is wrong" if me["totp_enabled"] else "the password is wrong")
+        raise HTTPException(status_code=403, detail="the code is wrong" if has_factor else "the password is wrong")
     target = _target(conn, user_id)
     totp.remove(conn, user_id)
+    webauthn.remove_all(conn, user_id)
     users.end_sessions(conn, user_id)
     add_event(conn, "totp_reset", f"The second factor of {target['username']} was reset by {principal.username}")
     audit.record_by(conn, principal, client_ip(request), "POST", request.url.path, 200, f"Reset the second factor of {target['username']}")
@@ -158,7 +169,7 @@ def reset_user_totp(user_id: int, body: ProofBody, request: Request, conn=Depend
 
 # ----------------------------------------------------------------------------- step-up: confirm who is acting before a privileged action
 @router.get("/me/stepup")
-def stepup_status(request: Request) -> dict[str, Any]:
+def stepup_status(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     """Whether a privileged action would be accepted now, and how this user confirms (the interface asks before opening a terminal, which cannot be retried after a refusal)."""
     principal = identify(request)
     if principal is None:
@@ -168,7 +179,19 @@ def stepup_status(request: Request) -> dict[str, Any]:
         return {"enabled": False, "fresh": True}
     if principal.user_id is None or principal.auth_method is None:
         return {"enabled": True, "fresh": False, "available": False, "minutes": pol["step_up_minutes"]}
-    return {"enabled": True, "fresh": stepup.fresh(principal, pol["step_up_minutes"]), "available": True, "method": stepup.method_for(principal), "minutes": pol["step_up_minutes"]}
+    answer = {"enabled": True, "fresh": stepup.fresh(principal, pol["step_up_minutes"]), "available": True, "method": stepup.method_for(principal), "minutes": pol["step_up_minutes"]}
+    if answer["method"] == "webauthn":
+        from app.api import webauthn as webauthn_api
+
+        options = webauthn_api.step_up_options(request, conn, principal.user_id)
+        if options:
+            answer["webauthn"] = options
+        elif principal.mfa.get("totp"):
+            answer["method"] = "totp"              # a page that cannot use keys (not https) falls back to the code
+        else:
+            answer["available"] = False
+    answer["alternatives"] = [m for m in ("totp",) if principal.mfa and principal.mfa.get(m) and answer["method"] != m]
+    return answer
 
 
 @router.post("/me/stepup")
@@ -187,15 +210,27 @@ def stepup_confirm(body: ProofBody, request: Request, conn=Depends(get_conn)) ->
     if not limiter.allowed(host) or not user_limiter.allowed(key):
         raise HTTPException(status_code=429, detail="too many attempts")
     row = users.get_user(conn, principal.user_id)
-    if how == "totp":
-        ok = totp.check_second_factor(conn, principal.user_id, body.code or "") is not None
+    enrolled = bool(principal.mfa and principal.mfa.get("enrolled"))
+    if body.credential is not None:
+        from app.api import webauthn as webauthn_api
+
+        try:
+            webauthn_api.prove(request, conn, principal.user_id, body.credential, "step", f"step:{principal.user_id}")
+            ok, how = True, "security key"
+        except HTTPException as exc:
+            limiter.record_failure(host)
+            user_limiter.record_failure(key)
+            audit.record_by(conn, principal, host, "POST", request.url.path, 403, "Failed confirmation of a privileged action")
+            raise exc
+    elif enrolled:
+        ok, how = totp.check_second_factor(conn, principal.user_id, body.code or "") is not None, "code"
     else:
-        ok = users.verify_password(body.password or "", row["password_hash"])
+        ok, how = users.verify_password(body.password or "", row["password_hash"]), "password"
     if not ok:
         limiter.record_failure(host)
         user_limiter.record_failure(key)
         audit.record_by(conn, principal, host, "POST", request.url.path, 403, "Failed confirmation of a privileged action")
-        raise HTTPException(status_code=403, detail="the code is wrong" if how == "totp" else "the password is wrong")
+        raise HTTPException(status_code=403, detail="the code is wrong" if how == "code" else "the password is wrong")
     limiter.reset(host)
     user_limiter.reset(key)
     users.mark_auth(conn, request.cookies.get("netlens_session"))

@@ -79,7 +79,7 @@ def password_step(app, name="alice", password="longenough1"):
 def test_enrolment_confirms_with_a_code_and_the_secret_is_encrypted(env):
     app, path = env
     c = user_client(app)
-    assert c.get("/api/me/totp").json() == {"enabled": False, "since": None, "recovery_left": 0, "pending": False}
+    assert c.get("/api/me/totp").json() == {"enabled": False, "since": None, "recovery_left": 0, "pending": False, "webauthn": False}
     assert c.post("/api/me/totp/begin", json={"password": "wrong"}).status_code == 403
     r = c.post("/api/me/totp/begin", json={"password": "longenough1"}).json()
     assert r["uri"].startswith("otpauth://totp/") and c.get("/api/me/totp").json()["pending"] is True and not c.get("/api/me/totp").json()["enabled"]

@@ -129,7 +129,7 @@ class Principal:
     restricted: bool = False  # a second factor is required of this user, the grace period is over and none is set up: only the set-up pages work (app/secpolicy.py)
     mfa: Optional[dict] = None  # {"required", "enrolled", "deadline", "restricted"} for a signed-in user session
     auth_at: Optional[str] = None  # when this session last proved the user's identity (sign-in, or step-up)
-    auth_method: Optional[str] = None  # password | totp | recovery | oidc
+    auth_method: Optional[str] = None  # password | totp | recovery | webauthn | oidc
 
     @property
     def is_admin(self) -> bool:
@@ -142,9 +142,9 @@ BUILTIN = Principal(username="access token", role="admin", builtin=True)
 VIEWER_READABLE = re.compile(
     r"^/(metrics"
     r"|api/(session|update|changelog|map|map-settings|hierarchy|relations|events|uptime|uptime/core|scans|scans/current|service-checks|service-checks/\d+/results|monitors|agent-status|monitoring/limits|forecast|snoozes|changes|reports/availability|reports/availability\.csv|reports/weekly|probes|probes/\d+|probes/\d+/availability(\.csv)?|timeseries/(device|service|probe)/\d+|timeseries/(device|service|probe)/\d+/[A-Za-z0-9_.-]+"
-    r"|me/totp|me/sessions|me/stepup|stats|stats/summary|dashboard|dashboard/layout|dashboard/default|dashboard/shared|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
+    r"|me/totp|me/webauthn|me/sessions|me/stepup|stats|stats/summary|dashboard|dashboard/layout|dashboard/default|dashboard/shared|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
 )
-VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery", "/api/me/sessions/end", "/api/me/sessions/revoke-others", "/api/me/stepup", "/api/speedtest/up", "/api/speedtest/browser")  # a viewer may test the line from their own device
+VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery", "/api/me/webauthn/begin", "/api/me/webauthn/finish", "/api/me/webauthn/remove", "/api/me/sessions/end", "/api/me/sessions/revoke-others", "/api/me/stepup", "/api/speedtest/up", "/api/speedtest/browser")  # a viewer may test the line from their own device
 
 # An operator looks like a viewer and may also act on what happens: scan, test, wake, acknowledge, snooze, plan maintenance, approve fixes, edit a device's
 # name and group. Settings, users, credentials, backups, plugins, remote access and deleting things stay with the administrator.
@@ -159,9 +159,9 @@ OPERATOR_WRITABLE = (
 )
 # A viewer limited to some groups (a customer view) reads only the devices of those groups: the device list, a device and its history, the uptime page and the events.
 SCOPED_READABLE = re.compile(
-    r"^/api/(session|me/totp|me/sessions|me/stepup|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)|events|uptime|timeseries/device/\d+|timeseries/device/\d+/[A-Za-z0-9_.-]+)$"
+    r"^/api/(session|me/totp|me/webauthn|me/sessions|me/stepup|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)|events|uptime|timeseries/device/\d+|timeseries/device/\d+/[A-Za-z0-9_.-]+)$"
 )
-SCOPED_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery", "/api/me/sessions/end", "/api/me/sessions/revoke-others", "/api/me/stepup")
+SCOPED_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery", "/api/me/webauthn/begin", "/api/me/webauthn/finish", "/api/me/webauthn/remove", "/api/me/sessions/end", "/api/me/sessions/revoke-others", "/api/me/stepup")
 SCOPED_SITE_READABLE = re.compile(r"^/api/(probes|probes/\d+|probes/\d+/availability(\.csv)?|timeseries/(remote|remote_service)/\d+(/[A-Za-z0-9_.-]+)?)$")
 _SITE_IN_PATH = re.compile(r"^/api/probes/(\d+)")
 _REMOTE_IN_PATH = re.compile(r"^/api/timeseries/(remote|remote_service)/(\d+)")
@@ -236,7 +236,7 @@ def identify(conn: HTTPConnection) -> Optional[Principal]:
 
                 db = connect(conn.app.state.db_path)
                 try:
-                    mfa = secpolicy.mfa_state(db, {"role": row["role"], "created": row["user_created"], "oidc_sub": row["oidc_sub"], "totp_enabled": row["totp_enabled"]})
+                    mfa = secpolicy.mfa_state(db, {"role": row["role"], "created": row["user_created"], "oidc_sub": row["oidc_sub"], "totp_enabled": row["totp_enabled"], "webauthn_enabled": row["webauthn_enabled"]})
                 finally:
                     db.close()
             return Principal(username=row["username"], role=role, user_id=row["id"], scope=groups if groups is not None else (() if sites is not None else None), sites=sites,

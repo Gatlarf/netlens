@@ -109,7 +109,7 @@ def normalise_recovery(code: str) -> str | None:
 
 # ----------------------------------------------------------------------------- per user state (database)
 def _row(conn: sqlite3.Connection, user_id: int):
-    return conn.execute("SELECT id, username, totp_secret, totp_enabled, totp_counter, totp_since FROM users WHERE id = ?", (user_id,)).fetchone()
+    return conn.execute("SELECT id, username, totp_secret, totp_enabled, webauthn_enabled, totp_counter, totp_since FROM users WHERE id = ?", (user_id,)).fetchone()
 
 
 def enabled(row) -> bool:
@@ -124,7 +124,8 @@ def status(conn: sqlite3.Connection, user_id: int) -> dict:
     if row is None:
         raise TotpError("no such user")
     left = conn.execute("SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = ? AND used = 0", (user_id,)).fetchone()[0]
-    return {"enabled": bool(row["totp_enabled"]), "since": row["totp_since"], "recovery_left": left if row["totp_enabled"] else 0, "pending": bool(row["totp_secret"] and not row["totp_enabled"])}
+    return {"enabled": bool(row["totp_enabled"]), "since": row["totp_since"], "recovery_left": left if (row["totp_enabled"] or row["webauthn_enabled"]) else 0,
+            "pending": bool(row["totp_secret"] and not row["totp_enabled"]), "webauthn": bool(row["webauthn_enabled"])}
 
 
 def begin(conn: sqlite3.Connection, user_id: int) -> tuple[str, str]:
@@ -183,9 +184,9 @@ def check_second_factor(conn: sqlite3.Connection, user_id: int, code: str, now: 
     """Verify a code or a recovery code for a user whose factor is on. Returns "totp", "recovery" or None. Each code works once; the claim on a time step or a
     recovery code is a single conditional UPDATE, so two requests at the same moment cannot both use it."""
     row = _row(conn, user_id)
-    if row is None or not row["totp_enabled"]:
+    if row is None or not (row["totp_enabled"] or row["webauthn_enabled"]):
         return None
-    secret = _secret_of(conn, row)
+    secret = _secret_of(conn, row) if row["totp_enabled"] else None          # a user with only security keys still has recovery codes
     if secret:
         counter = verify(secret, code, row["totp_counter"], now)
         if counter is not None:

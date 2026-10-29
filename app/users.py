@@ -248,9 +248,9 @@ def delete_user(conn: sqlite3.Connection, user_id: int) -> None:
 
 def list_users(conn: sqlite3.Connection) -> list[dict]:
     users = []
-    for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope, site_scope, totp_enabled, break_glass FROM users ORDER BY LOWER(username)"):
+    for u in conn.execute("SELECT id, username, role, disabled, created, last_login, scope, site_scope, totp_enabled, webauthn_enabled, break_glass FROM users ORDER BY LOWER(username)"):
         tokens = conn.execute("SELECT id, name, created, last_used, readonly, assistant, expires, allowed_ips FROM api_tokens WHERE user_id = ? ORDER BY id", (u["id"],)).fetchall()
-        users.append({**{k: v for k, v in dict(u).items() if k not in ("scope", "site_scope", "totp_enabled", "break_glass")}, "scope": parse_scope(u["scope"]), "sites": parse_scope(u["site_scope"]), "disabled": bool(u["disabled"]), "totp": bool(u["totp_enabled"]), "break_glass": bool(u["break_glass"]), "last_admin": u["role"] == "admin" and not u["disabled"] and _other_admins(conn, u["id"]) == 0, "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
+        users.append({**{k: v for k, v in dict(u).items() if k not in ("scope", "site_scope", "totp_enabled", "webauthn_enabled", "break_glass")}, "scope": parse_scope(u["scope"]), "sites": parse_scope(u["site_scope"]), "disabled": bool(u["disabled"]), "totp": bool(u["totp_enabled"]), "webauthn": bool(u["webauthn_enabled"]), "second_factor": bool(u["totp_enabled"] or u["webauthn_enabled"]), "break_glass": bool(u["break_glass"]), "last_admin": u["role"] == "admin" and not u["disabled"] and _other_admins(conn, u["id"]) == 0, "tokens": [{**dict(t), "readonly": bool(t["readonly"])} for t in tokens]})
     return users
 
 
@@ -268,7 +268,7 @@ def login(conn: sqlite3.Connection, username: str, password: str) -> str | None:
     """Check a password; returns a new session cookie value, or None. A user with a second factor never gets a session from here: the login goes through
     `authenticate`, the challenge and the code (so no caller can skip the second factor by accident)."""
     row = authenticate(conn, username, password)
-    if row is None or row["totp_enabled"]:
+    if row is None or row["totp_enabled"] or row["webauthn_enabled"]:
         return None
     return start_session(conn, row["id"])
 
@@ -304,7 +304,7 @@ def user_for_session(conn: sqlite3.Connection, cookie: str):
         return None
     digest = _digest(cookie[len(SESSION_PREFIX):])
     row = conn.execute(
-        "SELECT u.id, u.username, u.role, u.scope, u.site_scope, u.created AS user_created, u.oidc_sub, u.totp_enabled, s.created AS session_created, s.last_seen, s.auth_at, s.auth_method "
+        "SELECT u.id, u.username, u.role, u.scope, u.site_scope, u.created AS user_created, u.oidc_sub, u.totp_enabled, u.webauthn_enabled, s.created AS session_created, s.last_seen, s.auth_at, s.auth_method "
         "FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires > ? AND u.disabled = 0",
         (digest, _iso(_now())),
     ).fetchone()

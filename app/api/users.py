@@ -94,7 +94,7 @@ def edit_user(request: Request, user_id: int, body: UserPatch) -> dict:
             if body.break_glass and (target["role"] != "admin" or target["oidc_sub"]):
                 raise HTTPException(status_code=422, detail="a break-glass account is a local administrator account (not a single-sign-on user)")
             if not body.break_glass and target["break_glass"] and secpolicy.get(db)["local_login"] == "break_glass_only" and db.execute(
-                    "SELECT COUNT(*) FROM users WHERE disabled = 0 AND role = 'admin' AND break_glass = 1 AND totp_enabled = 1 AND id != ?", (user_id,)).fetchone()[0] < 1:
+                    "SELECT COUNT(*) FROM users WHERE disabled = 0 AND role = 'admin' AND break_glass = 1 AND (totp_enabled = 1 OR webauthn_enabled = 1) AND id != ?", (user_id,)).fetchone()[0] < 1:
                 raise HTTPException(status_code=409, detail="this is the last break-glass account while password sign-in is limited to them: allow password sign-in again first")
             db.execute("UPDATE users SET break_glass = ? WHERE id = ?", (1 if body.break_glass else 0, user_id))
             db.commit()

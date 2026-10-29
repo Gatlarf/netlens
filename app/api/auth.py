@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app import secpolicy, totp, users
+from app.api import webauthn as webauthn_api
 from app.auth import COOKIE_NAME, BUILTIN, LoginLimiter, client_ip, identify, session_value
 from app.db import add_event, connect
 
@@ -85,15 +86,18 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
         db = connect(request.app.state.db_path)
         try:
             row = users.authenticate(db, body.username, body.password or "")
-            cookie = challenge = refusal = None
+            cookie = challenge = refusal = key_options = None
+            factors = {}
             if row is not None:
                 pol = secpolicy.get(db)
                 if pol["local_login"] == "break_glass_only" and not row["break_glass"]:
                     refusal = "password sign-in is switched off: use single sign-on (Settings → Sign-in security)"
-                elif row["break_glass"] and not row["totp_enabled"]:
+                elif row["break_glass"] and not (row["totp_enabled"] or row["webauthn_enabled"]):
                     refusal = "a break-glass account must have a second factor before it can sign in"
-                elif row["totp_enabled"]:
-                    challenge = _challenges(request).issue(row["id"], row["username"])      # no session yet: only the code can make one
+                elif row["totp_enabled"] or row["webauthn_enabled"]:
+                    challenge = _challenges(request).issue(row["id"], row["username"])      # no session yet: only the code (or the key) can make one
+                    factors = {"totp": bool(row["totp_enabled"]), "webauthn": bool(row["webauthn_enabled"])}
+                    key_options = webauthn_api.login_options(request, db, row["id"], challenge) if row["webauthn_enabled"] else None
                 else:
                     cookie = users.start_session(db, row["id"], host, request.headers.get("user-agent", ""), "password")
         finally:
@@ -113,7 +117,7 @@ async def login(request: Request, body: LoginBody) -> JSONResponse:
         if challenge is not None:
             # the failures stay counted until the code is right too: a correct password must not give an unlimited number of tries at the code
             _audit(request, body.username.strip(), "", "Password accepted; waiting for the second factor", 200)
-            return JSONResponse({"totp_required": True, "challenge": challenge})
+            return JSONResponse({"totp_required": True, "challenge": challenge, "methods": factors, **({"webauthn": key_options} if key_options else {})})
         limiter.reset(host)
         user_limiter.reset(user_key)
         _audit(request, body.username.strip(), "", "Signed in", 200)
@@ -191,6 +195,17 @@ async def login_totp(request: Request, body: TotpLoginBody) -> JSONResponse:
     response = JSONResponse({"ok": True})
     _session_cookie(response, request, cookie)
     return response
+
+
+@router.post("/login/webauthn")
+async def login_webauthn(request: Request, body: webauthn_api.LoginKeyBody) -> JSONResponse:
+    """The second step of a sign-in with a security key (app/api/webauthn.py)."""
+    return await webauthn_api.login_webauthn(request, body)
+
+
+@router.post("/login/webauthn/options")
+async def login_webauthn_options(request: Request, body: webauthn_api.LoginOptionsBody) -> dict:
+    return await webauthn_api.login_options_again(request, body)
 
 
 def _alarm_kind(request: Request, kind: str, text: str) -> None:

@@ -157,7 +157,10 @@
         <input id="login-password" type="password" autocomplete="current-password">
       </div>
       <div id="login-totp-fields" hidden>
-        <p>Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
+        <div id="login-key-fields" hidden>
+          <button id="login-key" class="btn" type="button">Use my security key</button>
+        </div>
+        <p id="login-totp-text">Enter the 6-digit code from your authenticator app, or one of your recovery codes.</p>
         <label for="login-code">Code</label>
         <input id="login-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="24" spellcheck="false">
       </div>

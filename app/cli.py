@@ -58,12 +58,13 @@ def run(argv: list[str]) -> int:
             if args.command == "reset-totp":
                 if row is None:
                     sys.exit(f"No user named {args.username!r}. Use list-users.")
-                from app import totp
+                from app import totp, webauthn
 
                 totp.remove(conn, row["id"])
+                webauthn.remove_all(conn, row["id"])
                 conn.execute("DELETE FROM sessions WHERE user_id = ?", (row["id"],))
                 conn.commit()
-                print(f"The second factor of {args.username} is off and its logins ended; it can set one up again after signing in.")
+                print(f"The second factor of {args.username} (authenticator app and security keys) is off and its logins ended; it can set one up again after signing in.")
             elif args.command == "reset-password":
                 if row is None:
                     sys.exit(f"No user named {args.username!r}. Use list-users, or create-admin to add one.")

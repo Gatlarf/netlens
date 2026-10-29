@@ -30,7 +30,7 @@ RANGES = {"grace_days": (0, 365), "idle_minutes": (0, 1440), "absolute_hours": (
 ENUMS = {"static_token": ("allowed", "lan", "off"), "local_login": ("allowed", "break_glass_only")}
 ENTERPRISE_FIELDS = ("idle_minutes", "absolute_hours", "max_sessions", "step_up", "step_up_minutes", "static_token", "local_login", "api_token_max_days", "min_password")
 # a restricted session (no second factor after the grace period) may use only these
-ENROL_PATHS = ("/api/session", "/api/logout", "/api/me/totp", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/password", "/api/me/sessions", "/api/me/stepup")
+ENROL_PATHS = ("/api/session", "/api/logout", "/api/me/totp", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/webauthn", "/api/me/webauthn/begin", "/api/me/webauthn/finish", "/api/me/webauthn/remove", "/api/me/password", "/api/me/sessions", "/api/me/stepup")
 
 _cache: dict[str, tuple[float, dict[str, Any]]] = {}
 CACHE_SECONDS = 30.0           # only this process writes the policy (and `save` and a restore forget it at once), so a long time is safe and keeps the per-request check free
@@ -152,7 +152,7 @@ def _check_safe(conn, new: dict[str, Any], cur: dict[str, Any]) -> None:
 
         if not oidc.settings(conn)["enabled"] or not licence.allows(conn, "sso"):
             raise PolicyError("password sign-in can only be limited when single sign-on is set up and on")
-        if conn.execute("SELECT COUNT(*) FROM users WHERE disabled = 0 AND role = 'admin' AND break_glass = 1 AND totp_enabled = 1").fetchone()[0] < 1:
+        if conn.execute("SELECT COUNT(*) FROM users WHERE disabled = 0 AND role = 'admin' AND break_glass = 1 AND (totp_enabled = 1 OR webauthn_enabled = 1)").fetchone()[0] < 1:
             raise PolicyError("make at least one administrator a break-glass account with a second factor first (Users & tokens): it is the way in when single sign-on fails")
 
 
@@ -161,10 +161,18 @@ def _in_scope(role: str, mode: str) -> bool:
     return (mode == "everyone") or (mode == "operators" and role in ("admin", "operator")) or (mode == "admins" and role == "admin")
 
 
+def _get(row, key):
+    try:
+        return row[key]
+    except (KeyError, IndexError):
+        return 0
+
+
 def mfa_state(conn, row, now: datetime | None = None) -> dict[str, Any]:
     """{"required", "enrolled", "deadline", "restricted"} for a user row (needs role, created, oidc_sub, totp_enabled)."""
     pol = get(conn)
-    enrolled = bool(row["totp_enabled"])
+    totp_on, key_on = bool(row["totp_enabled"]), bool(_get(row, "webauthn_enabled"))
+    enrolled = totp_on or key_on
     sso = bool(row["oidc_sub"])
     required = pol["require_totp"] != "off" and not sso and _in_scope(row["role"], pol["require_totp"])
     deadline = None
@@ -174,13 +182,13 @@ def mfa_state(conn, row, now: datetime | None = None) -> dict[str, Any]:
         end = start + timedelta(days=pol["grace_days"])
         deadline = end.strftime(STAMP)
         restricted = (now or datetime.now(timezone.utc)) >= end
-    return {"required": required, "enrolled": enrolled, "deadline": deadline, "restricted": restricted}
+    return {"required": required, "enrolled": enrolled, "deadline": deadline, "restricted": restricted, "totp": totp_on, "webauthn": key_on}
 
 
 def users_without_factor(conn) -> list[str]:
     """The users the policy applies to who have not set a second factor up yet (for the settings page)."""
     out = []
-    for r in conn.execute("SELECT username, role, created, oidc_sub, totp_enabled, disabled FROM users WHERE disabled = 0 ORDER BY LOWER(username)"):
+    for r in conn.execute("SELECT username, role, created, oidc_sub, totp_enabled, webauthn_enabled, disabled FROM users WHERE disabled = 0 ORDER BY LOWER(username)"):
         st = mfa_state(conn, r)
         if st["required"] and not st["enrolled"]:
             out.append(r["username"])

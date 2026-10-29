@@ -10,6 +10,7 @@ import { maybeShowWhatsNew } from "./changelog.js";
 import { renderSetup } from "./setup.js";
 import { applyInterface } from "./interface.js";
 import { get, post, ApiError } from "./api.js";
+import * as webauthn from "./webauthn.js";
 import { initSiteBar } from "./sitebar.js";
 import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
 
@@ -410,12 +411,37 @@ function goToStartPage(session) {
   }
 }
 
+let loginKeyOptions = null;
 let loginChallenge = null;              // set between the password and the code of a second factor: no session exists yet
 
 let loginStash = [];                    // what the first step showed, to put it back when the second step ends
 
-function showTotpStep() {
+// the security key step: the browser asks for the key; a failed try needs a new challenge from the server (the first one is used up)
+async function useSecurityKey(first) {
+  let options = first;
+  const button = el("#login-key");
+  button.disabled = true;
+  try {
+    if (!options) options = await post("/api/login/webauthn/options", { challenge: loginChallenge });
+    const credential = await webauthn.get(options);
+    await post("/api/login/webauthn", { challenge: loginChallenge, credential });
+    await finishLogin();
+  } catch (err) {
+    const detail = err instanceof ApiError ? err.detail : err.message;
+    showLoginError(detail);
+    if (/expired|ended/.test(detail || "")) resetLoginSteps();
+  }
+  button.disabled = false;
+}
+
+function showTotpStep(result) {
   loginStash = [];
+  const keys = Boolean(result && result.webauthn) && webauthn.supported();
+  el("#login-key-fields").hidden = !keys;
+  el("#login-totp-text").textContent = result && result.methods && !result.methods.totp
+    ? "Use your security key. If you lost it, enter one of your recovery codes below."
+    : "Enter the 6-digit code from your authenticator app, or one of your recovery codes.";
+  loginKeyOptions = keys ? result.webauthn : null;
   for (const id of ["#login-user-fields", "#login-token-fields", "#login-sso", "#login-switch", "#login-demo"]) {
     const node = el(id);
     if (node) {
@@ -425,12 +451,13 @@ function showTotpStep() {
   }
   el("#login-totp-fields").hidden = false;
   el("#login-code").value = "";
-  el("#login-code").focus();
+  if (keys) useSecurityKey(loginKeyOptions); else el("#login-code").focus();
 }
 
 function resetLoginSteps() {
   loginChallenge = null;
   el("#login-totp-fields").hidden = true;
+  el("#login-key-fields").hidden = true;
   el("#login-code").value = "";
   for (const [node, was] of loginStash) node.hidden = was;
   loginStash = [];
@@ -475,7 +502,7 @@ async function handleLogin(e) {
       loginChallenge = result.challenge;
       el("#login-password").value = "";                                  // the password is not needed again
       clearLoginError();
-      showTotpStep();
+      showTotpStep(result);
       return;
     }
     await finishLogin();
@@ -526,6 +553,7 @@ function startSetup() {
 // Without NETLENS_TOKEN only a user name and password sign in: show just that form.
 function hideTokenLogin() {
   setLoginMode(true);
+  el("#login-key").addEventListener("click", () => useSecurityKey(null));
   const switchBtn = el("#login-switch");
   if (switchBtn) switchBtn.hidden = true;
 }

@@ -779,6 +779,17 @@ How it is kept safe: the secret is stored **encrypted** with the same key as the
 
 If the authenticator **and** the recovery codes are lost: `docker exec -it netlens python -m app.cli reset-totp <user>` (needs access to the container, like a password reset; there is deliberately no reset by e-mail). People who sign in through **single sign-on** use their identity provider's own second factor. The access token and API tokens are not interactive and have no second factor.
 
+### Security keys and passkeys (Enterprise)
+
+**Settings → Account → Security keys and passkeys.** A hardware key (YubiKey and similar) or a **passkey** on a phone or laptop can be the second factor after the password, next to or instead of an authenticator app. Unlike a typed code, a key signs a message that names the website it was asked by, so a look-alike page gets nothing it can use: this is the **phishing resistance** that codes cannot give. Netlens keeps only the public key; a stolen database holds nothing that can sign in.
+
+- **Adding a key** needs the password again and the Enterprise edition (or the free trial). Up to ten keys per account. The first factor you set up also gives you **ten recovery codes** (shown once), the way back in if the key is lost; they work at the sign-in code step like the codes of an authenticator app. **Keys that exist keep working when a licence ends**, and removing one is always allowed (with the password).
+- **Signing in:** after the password the browser asks for the key. A failed try gets a new request; five wrong answers end the sign-in. The signature counter is checked: a key whose counter goes backwards (a possible copy) is refused.
+- **Step-up confirmation** of privileged actions (see above) uses the key too, with "use a code instead" when you also have an authenticator app. Resetting someone's second factor (an administrator, or `python -m app.cli reset-totp <user>`) removes their keys as well.
+- **The policy** "require a second factor" counts a key like an authenticator app, and a break-glass account may use a key.
+- **It needs https.** Browsers offer security keys only on pages served over https (and on localhost); a plain `http://192.168…` address cannot use them and the page says so. Netlens takes the web site's name from the `Host` header and compares it with the page's origin, so a reverse proxy must pass the original `Host` (`proxy_set_header Host $host;`). No attestation is requested, so any key or passkey works and nothing about its make is stored.
+- Supported: ES256, RS256 and Ed25519 keys (what YubiKeys, Windows Hello, Touch ID and phones use).
+
 ### Sign-in security: requiring a second factor, session limits, step-up
 
 **Settings → Sign-in security** (administrators). A second factor itself is free for every user (see above); the policy around it is for organisations.

@@ -1196,6 +1196,11 @@ def init_db(conn: sqlite3.Connection) -> None:
     for col in ("last_seen", "ip", "user_agent", "auth_at", "auth_method"):
         _add_column_if_missing(conn, "sessions", col, "TEXT")
     _add_column_if_missing(conn, "sessions", "seq", "INTEGER")          # a running number: "the newest sessions" without relying on a clock that has seconds only
+    # --- security keys and passkeys as a second factor (app/webauthn.py): only public keys are kept --------------------------------------------------
+    _add_column_if_missing(conn, "users", "webauthn_enabled", "INTEGER NOT NULL DEFAULT 0")
+    conn.execute("CREATE TABLE IF NOT EXISTS user_webauthn (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, name TEXT NOT NULL, "
+                 "credential_id TEXT NOT NULL UNIQUE, public_key TEXT NOT NULL, sign_count INTEGER NOT NULL DEFAULT 0, aaguid TEXT, transports TEXT, created TEXT NOT NULL, last_used TEXT)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_user_webauthn_user ON user_webauthn(user_id)")
     conn.execute("CREATE TABLE IF NOT EXISTS user_recovery_codes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, code_hash TEXT NOT NULL, "
                  "created TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (user_id, code_hash))")
     _add_column_if_missing(conn, "ingest_agents", "cert_ca", "TEXT")          # fingerprint of the CA that issued the current certificate (CA rotation)

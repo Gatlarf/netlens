@@ -127,7 +127,7 @@ def test_a_privileged_action_needs_a_fresh_proof_and_the_password_gives_one(env)
     r = a.post("/api/credentials", json={"name": "x", "kind": "login"})
     assert needs_step_up(r) and r.json()["detail"] == "step_up_required:password"
     s = a.get("/api/me/stepup").json()
-    assert s == {"enabled": True, "fresh": False, "available": True, "method": "password", "minutes": 10}
+    assert s == {"enabled": True, "fresh": False, "available": True, "method": "password", "minutes": 10, "alternatives": []}
     assert a.get("/api/devices").status_code == 200 and a.get("/api/session").json()["authenticated"] is True            # nothing else is affected, and it is not a sign-out
     assert a.post("/api/me/stepup", json={"password": "wrong"}).status_code == 403
     assert a.post("/api/me/stepup", json={"password": "longenough1"}).json()["fresh"] is True

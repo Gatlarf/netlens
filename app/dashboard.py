@@ -192,7 +192,7 @@ def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
     from app.ingest import core as ingest
 
     try:        # the access token signs in as administrator with no second factor: say so once somebody has one
-        if conn.execute("SELECT 1 FROM users WHERE disabled = 0 AND role = 'admin' AND totp_enabled = 1 LIMIT 1").fetchone() and secpolicy.get(conn)["static_token"] == "allowed":
+        if conn.execute("SELECT 1 FROM users WHERE disabled = 0 AND role = 'admin' AND (totp_enabled = 1 OR webauthn_enabled = 1) LIMIT 1").fetchone() and secpolicy.get(conn)["static_token"] == "allowed":
             import os
 
             if os.environ.get("NETLENS_TOKEN", "").strip():

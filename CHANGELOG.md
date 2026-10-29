@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.317 — 2026-10-29
+
+### Added
+- ★ **Security keys and passkeys as a second factor (Enterprise and the trial).** A hardware key or a passkey (WebAuthn) works after the password, next to or instead of an authenticator app, and is **phishing-resistant**: it signs a message that names the website, so a look-alike page gets nothing it can use. Settings → Account lists the keys and adds or removes them; sign-in and the step-up confirmation of privileged actions use the key; the policy "require a second factor" counts it; a break-glass account may use one. Only public keys are stored; the signature counter is checked; ES256, RS256 and Ed25519. The first factor also gives ten recovery codes, which work at the code step. Keys that exist keep working when a licence ends. Needs https (browsers allow keys only there and on localhost). Tested with a software authenticator and in a real Chromium with a virtual CTAP2 authenticator (registration, sign-in and step-up).
+
+### Changed
+- The step-up status answer lists the other ways to confirm (`alternatives`), and the second-factor status says whether keys are set up.
+
 ## 0.4.316 — 2026-10-29
 
 ### Added
