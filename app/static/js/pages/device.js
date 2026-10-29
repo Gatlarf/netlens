@@ -343,6 +343,15 @@ function buildEditCard(device, onSaved) {
     checkRow(gentleInput, "Gentle scanning (don't probe its services)",
       "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself. It is on by default for printers, smart devices, cameras, TVs, speakers, consoles and appliances (some print the probe, hang or ask for permission); untick it to scan this device normally, or change the list under Settings → Scan performance.")));
 
+  const multiInput = h("input", { type: "checkbox", name: "multi_ip", checked: device.multi_ip === true });
+  const pinSelect = h("select", { name: "pinned_ip" }, h("option", { value: "" }, "Automatic"),
+    ...(device.ips || []).map((a) => h("option", { value: a.ip }, a.ip)));
+  pinSelect.value = device.pinned_ip || "";
+  form.appendChild(section("Addresses",
+    checkRow(multiInput, "Several addresses on purpose",
+      "Tick it for a device that is meant to answer on more than one address (a virtual or failover address, a second service address). Netlens then keeps one address for monitoring and DNS and does not report the others as address changes. A device that really moves to a new address is still reported."),
+    labelled("Address to use", pinSelect, "Choose the address Netlens (and DNS) should use while it answers. Automatic keeps the address the device has now. If the chosen address stops answering, Netlens follows the device and says so on this page.")));
+
   const dnsMode = h("select", { name: "dns_mode" },
     h("option", { value: "auto" }, "Automatic"), h("option", { value: "always" }, "Always register"), h("option", { value: "never" }, "Never register"));
   dnsMode.value = device.dns_mode || "auto";
@@ -359,7 +368,7 @@ function buildEditCard(device, onSaved) {
   let focused = false;
   const extraForms = [];
 
-  const fields = [tierSelect, nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, alwaysInput, excludeInput, trustInput, dnsMode, dnsName];
+  const fields = [tierSelect, nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, alwaysInput, excludeInput, trustInput, multiInput, pinSelect, dnsMode, dnsName];
   for (const f of fields) {
     f.addEventListener("input", () => { dirty = true; });
     f.addEventListener("change", () => { dirty = true; });
@@ -381,6 +390,8 @@ function buildEditCard(device, onSaved) {
       report_exclude: excludeInput.checked,
       trusted: trustInput.checked,
       gentle: gentleInput.checked,
+      multi_ip: multiInput.checked,
+      pinned_ip: pinSelect.value,
       dns_mode: dnsMode.value,
       dns_name: dnsName.value,
     };

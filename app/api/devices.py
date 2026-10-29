@@ -47,6 +47,8 @@ class DevicePatch(BaseModel):
     parent_device_id: int | None = None
     pos_x: float | None = None
     pos_y: float | None = None
+    multi_ip: bool | None = None            # True = the device has several addresses on purpose (app/multiip.py)
+    pinned_ip: str | None = Field(default=None, max_length=45)   # the address Netlens (and DNS) uses while it answers; "" = automatic
 
 
 def _parse_tags(value: str | None) -> list[str]:
@@ -207,6 +209,10 @@ def _build_device_detail(conn: sqlite3.Connection, device_id: int, row: sqlite3.
         {"ip": r["ip"], "first_seen": r["first_seen"], "last_seen": r["last_seen"]}
         for r in ips
     ]
+    from app import multiip
+
+    own = conn.execute("SELECT multi_ip, pinned_ip, multi_score FROM devices WHERE id = ?", (device_id,)).fetchone()
+    result.update({"multi_ip": bool(own["multi_ip"]), "pinned_ip": own["pinned_ip"], "multi_auto": multiip.state(own)["auto"]})
 
     from app.scanner import ipv6
 
@@ -594,6 +600,15 @@ def patch_device(
         else:
             updates["parent_mode"] = mode
             updates["parent_device_id"] = None
+
+    if "multi_ip" in fields_set and body.multi_ip is not None:
+        updates["multi_ip"] = 1 if body.multi_ip else 0
+
+    if "pinned_ip" in fields_set:
+        wanted = (body.pinned_ip or "").strip()
+        if wanted and conn.execute("SELECT 1 FROM device_ips WHERE device_id = ? AND ip = ?", (device_id, wanted)).fetchone() is None:
+            raise HTTPException(status_code=422, detail="that address has not been seen on this device")
+        updates["pinned_ip"] = wanted or None
 
     if "pos_x" in fields_set:
         updates["pos_x"] = body.pos_x

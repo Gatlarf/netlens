@@ -524,6 +524,10 @@ def init_db(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "devices", "baseline_at", "TEXT")
     _add_column_if_missing(conn, "devices", "gentle", "INTEGER NOT NULL DEFAULT 0")  # v14: scans never probe this device's services
     _add_column_if_missing(conn, "devices", "gentle_off", "INTEGER NOT NULL DEFAULT 0")  # 1 = the owner turned gentle scanning off although its type would have it on
+    # --- several addresses on one network card (app/multiip.py): the owner's flag, an address chosen as primary, and the detected score ---------
+    _add_column_if_missing(conn, "devices", "multi_ip", "INTEGER NOT NULL DEFAULT 0")
+    _add_column_if_missing(conn, "devices", "pinned_ip", "TEXT")
+    _add_column_if_missing(conn, "devices", "multi_score", "INTEGER NOT NULL DEFAULT 0")
     # --- schema v9: users, login sessions and API tokens ---------------------------------------
     cur.execute(
         """

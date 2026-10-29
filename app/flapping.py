@@ -22,7 +22,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app import actions
+from app import actions, multiip
 from app.hierarchy import descendants, load_hierarchy
 from app.scanner.nmap_parser import parse_nmap_xml
 from app.scanner.nmap_runner import build_args
@@ -136,6 +136,25 @@ def _guest_hint(conn: sqlite3.Connection, device_id: int, device) -> str:
     return " ".join(parts)
 
 
+def _several_addresses(conn: sqlite3.Connection, device_id: int, device: sqlite3.Row, mode: dict[str, Any], addresses: list[str], since: str) -> list[dict[str, str]]:
+    """The device answers on several addresses and Netlens keeps one of them as the primary one (app/multiip.py)."""
+    names = ", ".join(sorted(addresses)) or device["primary_ip"] or "?"
+    primary = device["primary_ip"] or "?"
+    found = []
+    if mode["flag"]:
+        found.append(_finding("info", "Several addresses on purpose", f"This device is marked as having several addresses ({names}). Netlens uses {primary} for monitoring and DNS and does not report the others as changes."))
+    else:
+        found.append(_finding(
+            "warn", "It answers on several addresses at the same time",
+            f"{names} answer with the same MAC address ({device['mac'] or '?'}), so this is one network card (or one virtual one) with more than one address. Netlens keeps {primary} as its address and no longer reports the others as changes. "
+            "If it is meant to be like this (a virtual or failover address, a second service address), tick \u201cSeveral addresses on purpose\u201d on this device. "
+            "If not, run `ip -4 addr` (Linux) or `ipconfig /all` (Windows) on the device and remove the one you do not want: switch off DHCP on that interface, or delete its lease or reservation in the router. " + _guest_hint(conn, device_id, device)))
+    if mode["pinned"] and mode["pinned"] != device["primary_ip"]:
+        found.append(_finding("warn", "The address you chose is not answering",
+                              f"You chose {mode['pinned']} as this device's address, but it has not answered for a while, so Netlens uses {primary} instead. DNS follows the address Netlens uses. Check the device, or choose another address."))
+    return found
+
+
 def address_findings(conn: sqlite3.Connection, device_id: int, since: str) -> tuple[list[dict[str, str]], dict[str, Any]]:
     """Does the device keep changing its address, or answer on two addresses at once?
 
@@ -143,10 +162,14 @@ def address_findings(conn: sqlite3.Connection, device_id: int, since: str) -> tu
     container that copies its host's MAC, ...) answers on both in every scan, so its entry's address "changes" back and forth
     and the history fills up with address changes. That is not an outage, but it explains odd uptime, names and DNS records.
     """
-    device = conn.execute("SELECT mac, vendor, primary_ip, device_type, type_override FROM devices WHERE id = ?", (device_id,)).fetchone()
+    device = conn.execute("SELECT mac, vendor, primary_ip, device_type, type_override, multi_ip, pinned_ip, multi_score FROM devices WHERE id = ?", (device_id,)).fetchone()
     changes = conn.execute("SELECT ts, detail FROM events WHERE device_id = ? AND kind = 'ip_changed' AND ts >= ? ORDER BY ts", (device_id, since)).fetchall()
     seen = conn.execute("SELECT ip, last_seen FROM device_ips WHERE device_id = ? AND last_seen >= ? ORDER BY last_seen DESC, ip", (device_id, since)).fetchall()
     info: dict[str, Any] = {"changes": len(changes), "addresses": [{"ip": r["ip"], "last_seen": r["last_seen"]} for r in seen], "at_once": False}
+    mode = multiip.state(device)
+    info.update({"several_addresses": mode["multi"], "pinned": mode["pinned"]})
+    if mode["multi"]:
+        return _several_addresses(conn, device_id, device, mode, [r["ip"] for r in seen], since), info
     if not changes:
         return [], info
 

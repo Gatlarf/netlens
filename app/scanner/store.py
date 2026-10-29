@@ -2,6 +2,7 @@ import json
 from dataclasses import replace
 from typing import Any, Optional
 
+from app import multiip
 from app.baselines import baseline_ports
 from app.db import BatchedCommits, add_event, get_or_create_device, utcnow
 from app.plugins.enrich import refresh_hostname
@@ -66,6 +67,13 @@ def save_scan_results(
     device_ids: list[int] = []
     rtts: dict[int, float] = {}
 
+    # the addresses each MAC answers on in this scan: a device with two live addresses is told apart from one that was given a new address
+    answering: dict[str, list[str]] = {}
+    for host in processed_hosts:
+        if host.mac is not None and host.ip not in answering.setdefault(host.mac.lower(), []):
+            answering[host.mac.lower()].append(host.ip)
+    scored: set[int] = set()
+
     for host in processed_hosts:
         mac = host.mac.lower() if host.mac is not None else None
 
@@ -106,6 +114,14 @@ def save_scan_results(
 
         # Create or update device
         device_id = get_or_create_device(conn, host.mac, host.ip, now)
+        primary = host.ip
+        if mac is not None:
+            if device_id not in scored and device_id <= prev_max:       # a new device has nothing to compare with
+                scored.add(device_id)
+                multiip.score_scan(conn, device_id, len(answering[mac]))
+            primary = multiip.choose_primary(conn, device_id, old_primary_ip, host.ip, answering[mac], now)
+            if primary != host.ip:
+                conn.execute("UPDATE devices SET primary_ip = ? WHERE id = ?", (primary, device_id))
         if holder is not None and holder["mac"] != mac:
             detail = f"{host.ip} is now used by {mac or 'a device without MAC'}; it was {holder['custom_name'] or holder['hostname'] or holder['mac'] or 'another device'} ({holder['mac'] or 'no MAC'})"
             if conn.execute("SELECT 1 FROM events WHERE kind = 'ip_reused' AND device_id = ? AND detail = ?", (device_id, detail)).fetchone() is None:
@@ -123,8 +139,8 @@ def save_scan_results(
             # Events for existing devices
             if old_online == 0:
                 add_event(conn, "device_online", None, device_id=device_id, now=now)
-            if old_primary_ip is not None and old_primary_ip != host.ip:
-                add_event(conn, "ip_changed", f"{old_primary_ip} -> {host.ip}", device_id=device_id, now=now)
+            if old_primary_ip is not None and old_primary_ip != primary:
+                add_event(conn, "ip_changed", f"{old_primary_ip} -> {primary}", device_id=device_id, now=now)
             if old_os_name is not None and host.os_name is not None and old_os_name != host.os_name:
                 add_event(conn, "os_changed", f"{old_os_name} -> {host.os_name}", device_id=device_id, now=now)
 

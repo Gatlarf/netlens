@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.322 — 2026-10-29
+
+### Added
+- ★ **Devices with several addresses.** A device that answers on two addresses with the same MAC at once (a fixed address next to a DHCP lease, a virtual or failover address) no longer makes its entry switch addresses at every scan, which filled the history with address changes and could move its DNS record back and forth. Netlens counts the addresses a MAC answers on; after three scans in a row with two or more it keeps the primary address where it is while that address still answers, and reports an address change only when the primary address really stops answering. A lease that is handed over (old and new address answering together for a scan or two) and a device that really alternates between addresses are reported exactly as before. On the device page, **Addresses** has a box "Several addresses on purpose" and a choice of the address Netlens and DNS should use; if the chosen address stops answering, Netlens follows the device and the Investigate result says so.
+
 ## 0.4.320 — 2026-10-29
 
 ### Added
