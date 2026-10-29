@@ -609,6 +609,7 @@ def route(conn, q: str, names: list[str]) -> tuple[str, dict] | None:
         ("reliability", r"mttr|reliability (report|figures?|numbers?|kpis?|score)|how reliable (was|is|has been) (my|the|our) (network|setup|infrastructure|environment)|time to (recover|repair|restore|fix)|recover(y)? time|(meet|meets|meeting|miss|missed) (the |my |our )?(target|slo|sla)|availability target|alert quality|noisy alerts?|false (alarms?|positives?)|how (fast|quickly) .* (notice|detect)"),
         ("coverage", r"coverage|not (being )?monitored|unmonitored|blind spots?|what am i missing|gaps? in (my |the )?monitoring|no service check|without (a )?(service )?check"),
         ("flapping", r"flapping|unstable|going up and down|keeps? (going|dropping) (offline|down)|up and down"),
+        ("bonds", r"\bbond(s|ed|ing)?\b|teaming|\blacp\b|link aggregation|redundant links?|lost a link"),
         ("storage", r"\bstorage\b|\bpools?\b|\braid\b|\bzfs\b|\bceph\b|iscsi|\bluns?\b|disk (failed|failure|health|degraded)|failed disks?|\bsmart (status|errors?)\b|volume"),
         ("backups", r"backup|back-up"), ("certificates", r"certificat|\bcerts?\b|\bssl\b|\btls\b|expir"), ("speedtest", r"speed ?test|internet speed|bandwidth|mbit|mbps|download speed|upload speed|how fast is (my|the) internet"),
         ("remote_sites", r"remote sites?|branch|other (site|location)|probe"), ("wifi", r"wi-?fi|wireless|\bsignal\b|rssi"), ("maintenance", r"maintenance|snooze|planned (downtime|work)|scheduled downtime"),
@@ -740,6 +741,26 @@ def t_storage(conn, args, now=None) -> dict:
             "fullest_pools": pools[:6], "disks_needing_attention": bad_disks[:LIMIT], "open_alerts": [a["text"][:160] for a in o["alerts"][:6]]}
 
 
+def t_bonds(conn, args, now=None) -> dict:
+    from app import linkgroups
+
+    groups = linkgroups.listing(conn)
+    if not groups:
+        return {"configured": False}
+    return {"configured": True, "groups": [{"name": g["name"], "host": g["host"], "switch": g["switch"], "status": g["status"], "links_up": g["up"], "links": g["total"],
+                                            "ports_without_link": [m["port"] for m in g["ports"] if not m["up"]]} for g in groups[:LIMIT]]}
+
+
+def r_bonds(r: dict) -> str:
+    if not r.get("configured"):
+        return "No bonded connections are set up. On a host's page, \u201cBonded connection\u201d lets you say which switch ports carry its bond, so a lost link is reported."
+    lines = []
+    for g in r["groups"]:
+        state = {"ok": "all links up", "degraded": "LOST A LINK", "down": "ALL LINKS DOWN", "unknown": "state unknown (the switch has not reported)"}[g["status"]]
+        lines.append(f"{g['name']} ({g['host']} on {g['switch']}): {g['links_up']} of {g['links']} links up, {state}" + (f"; no link on port {', '.join(str(p) for p in g['ports_without_link'])}" if g["ports_without_link"] and g["status"] != "unknown" else ""))
+    return " ".join(lines)
+
+
 def r_storage(r: dict) -> str:
     if not r.get("configured"):
         return "No storage system is connected (install a storage plugin, for example TrueNAS, Synology, NetApp or Ceph)."
@@ -824,7 +845,7 @@ def r_flapping(r: dict) -> str:
     return "Going up and down (last 24 hours): " + ", ".join(f"{d['name']} ({d['changes_24h']} changes{', always-on' if d['always_on'] else ''})" for d in r["devices"][:8]) + "."
 
 
-RENDERERS = {"storage": r_storage, "reliability": r_reliability, "coverage": r_coverage, "flapping": r_flapping, "site": r_site, "search_devices": r_search_devices, "counts": r_counts, "ports": r_ports, "guests": r_guests, "backups": r_backups, "certificates": r_certificates, "speedtest": r_speedtest,
+RENDERERS = {"bonds": r_bonds, "storage": r_storage, "reliability": r_reliability, "coverage": r_coverage, "flapping": r_flapping, "site": r_site, "search_devices": r_search_devices, "counts": r_counts, "ports": r_ports, "guests": r_guests, "backups": r_backups, "certificates": r_certificates, "speedtest": r_speedtest,
              "network_services": r_network_services, "remote_sites": r_remote_sites, "smart_home": r_smart_home, "security": r_security, "audit": r_audit, "connections": r_connections,
              "wifi": r_wifi, "maintenance": r_maintenance, "system": r_system, "updates": r_updates, "changes": r_changes, "ipv6": r_ipv6}
 
@@ -849,6 +870,7 @@ TOOLS = {
     "changes": (t_changes, "what changed on the network and in the settings in a period, by category. args: days (1, 7 or 30)"),
     "site": (t_site, "a website or service by its domain or name: its checks and whether the site is enabled or DISABLED on the reverse proxy (nginx proxy manager), and where it forwards to. Use it for 'why is <domain> down/offline'. args: name (a domain such as example.com, or a service name)"),
     "ipv6": (t_ipv6, "devices that have IPv6 addresses. args: none"),
+    "bonds": (t_bonds, "bonded connections (NIC teaming, LACP) that the owner linked to switch ports: per bond how many links are up and which ports have no link. args: none"),
     "storage": (t_storage, "storage systems (NAS, SAN, Ceph ...) from the storage plugins: health, the fullest pools, failed disks and open alerts. args: none"),
     "reliability": (t_reliability, "reliability of the devices and services that matter: outages, average time to recover (MTTR), availability against the target, how fast a problem is noticed and how noisy the alerts were. args: days (7, 30 or 90)"),
     "coverage": (t_coverage, "monitoring gaps: devices marked always-on or critical that have no service check, health monitor, backup or alerts. args: none"),

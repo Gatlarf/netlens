@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.323 — 2026-10-29
+
+### Added
+- ★ **Bonded connections: a lost link in a bond (NIC teaming, LACP) is reported.** A bond shows up as one network card, so a scan cannot see that one of its cables went down. On the host's page (Network tab), **Bonded connection** lets you tick the ports of a switch (one that a switch plugin reads) that carry the bond. When a member loses its link Netlens raises `link_degraded` ("TrueNAS bond: 1 of 2 links up; no link on port 4") and `link_recovered` when all are up again; the dashboard lists a bond that lost a link (a warning) or all links (a problem), the AI assistant can answer "did a bond lose a link?", and the event can be sent to an alert channel. A switch that has not reported for half an hour makes the state *unknown*: nothing is claimed.
+
 ## 0.4.322 — 2026-10-29
 
 ### Added

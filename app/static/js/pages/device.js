@@ -11,6 +11,7 @@ import { buildHealthGlance } from "../cards/health_glance.js";
 import { buildDevicePortsCard, PORT_METRICS } from "../cards/device_ports.js";
 import { buildDeviceWifiCard } from "../cards/device_wifi.js";
 import { buildSwitchPortsCard } from "../cards/switch_ports.js";
+import { buildLinkGroupsCard } from "../cards/link_groups.js";
 import { buildDeviceApplicationsCard } from "../cards/device_apps.js";
 import { buildPortMapCard, isPortMapBusy } from "../cards/port_map.js";
 import { buildFirewallCard } from "../cards/firewall.js";
@@ -914,6 +915,10 @@ export async function render(container, params) {
     const switchPortsSlot = slot("switchports", "Switch ports", true, "table");
     flow.appendChild(switchPortsSlot);
     buildSwitchPortsCard(device.id).then((c) => { if (c && !disposed) switchPortsSlot.appendChild(c); }).catch(() => {});
+    const linkGroupsSlot = slot("linkgroups", "Bonded connection", false, "list");
+    flow.appendChild(linkGroupsSlot);
+    const drawLinkGroups = () => buildLinkGroupsCard(device, () => { linkGroupsSlot.replaceChildren(); drawLinkGroups(); }).then((c) => { if (c && !disposed) linkGroupsSlot.appendChild(c); }).catch(() => {});
+    drawLinkGroups();
     const firewallSlot = slot("firewall", "Firewall");
     flow.appendChild(firewallSlot);
     buildFirewallCard(device.id).then((c) => { if (c && !disposed) firewallSlot.appendChild(c); }).catch(() => {});

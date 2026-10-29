@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from app import containers, imageupdates, usagecfg
+from app import containers, imageupdates, linkgroups, usagecfg
 from app.db import Error as db_Error, add_event, connect, delete_setting, get_setting, set_setting, utcnow
 from app.plugins.contract import ContractError, clean_config, default_config, migrate_servers, missing_required, validate_output
 from app.plugins import enrich, runs
@@ -440,6 +440,7 @@ class PluginService:
                     record_client_links(conn, plugin.id, data)
                     summary.update(record_wifi(conn, data))
                     record_switch_ports(conn, plugin.id, data)
+                    linkgroups.evaluate(conn)
                     record_node_health(conn, plugin.id, data)
                     record_firewall(conn, plugin.id, data)
                     if usagecfg.enabled(conn):

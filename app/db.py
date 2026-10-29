@@ -528,6 +528,9 @@ def init_db(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "devices", "multi_ip", "INTEGER NOT NULL DEFAULT 0")
     _add_column_if_missing(conn, "devices", "pinned_ip", "TEXT")
     _add_column_if_missing(conn, "devices", "multi_score", "INTEGER NOT NULL DEFAULT 0")
+    # --- link groups: the switch ports of a host's bond (app/linkgroups.py) ---------------------------------------------------------------------
+    conn.execute("CREATE TABLE IF NOT EXISTS link_groups (id INTEGER PRIMARY KEY, name TEXT NOT NULL, host_device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE, "
+                 "switch_device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE, ports TEXT NOT NULL, status TEXT, status_since TEXT, created TEXT NOT NULL)")
     # --- schema v9: users, login sessions and API tokens ---------------------------------------
     cur.execute(
         """
