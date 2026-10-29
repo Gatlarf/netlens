@@ -182,7 +182,11 @@ def purge(conn: sqlite3.Connection, dry_run: bool = False, now: datetime | None 
         cutoff = _cutoff(n_days, now)
         extra = " AND status != 'running'" if table == "scans" else ""
         try:
-            if dry_run:
+            if table == "audit_log":          # the audit log keeps its chain across a prune (app/auditchain.py)
+                from app import auditchain
+
+                out[name] = auditchain.prune(conn, cutoff, None, dry_run)
+            elif dry_run:
                 out[name] = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE {column} < ?{extra}", (cutoff,)).fetchone()[0]
             else:
                 out[name] = conn.execute(f"DELETE FROM {table} WHERE {column} < ?{extra}", (cutoff,)).rowcount

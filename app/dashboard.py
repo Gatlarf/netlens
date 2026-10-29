@@ -203,8 +203,11 @@ def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
     if licence.allows(conn, "agents"):
         for p in ingest.problems(conn):          # a collector that stopped sending, a certificate that is about to end
             out.append({"level": "warn", "text": p["text"], "href": "#/settings/ingest", "snooze": f"agent:{p['agent_id']}"})
-    from app import credstore
+    from app import auditchain, credstore
 
+    verified = auditchain.last_result(conn)
+    if verified and not verified.get("ok"):       # the latest integrity check of the audit log failed
+        out.append({"level": "bad", "text": f"The audit log failed its integrity check at line {verified['problem']['id']}: {verified['problem']['text']}", "href": "#/settings/audit"})
     for p in credstore.pam_problems(conn):       # the customer's PAM refused a login (nothing can use it until that is fixed)
         out.append({"level": "warn", "text": p["text"], "href": "#/settings/credentials", "snooze": f"pam:{p['id']}"})
     for row in conn.execute("SELECT * FROM probes WHERE enabled = 1 ORDER BY LOWER(name)"):

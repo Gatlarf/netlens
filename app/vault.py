@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 import logging
 import os
 import re
@@ -125,6 +126,11 @@ def _key(conn: sqlite3.Connection) -> bytes:
             key = _keys.setdefault("memory", secrets.token_bytes(32))
         _keys[cache_id] = key
         return key
+
+
+def derive_key(conn: sqlite3.Connection, purpose: str) -> bytes:
+    """A key for another purpose, derived from the master key (so it needs no storage of its own and is lost or replaced together with it)."""
+    return hmac.new(_key(conn), b"netlens-derived-key:" + purpose.encode(), hashlib.sha256).digest()
 
 
 def forget_cached_key(conn: sqlite3.Connection) -> None:

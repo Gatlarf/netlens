@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { h, clear, fmtTime } from "../util.js";
+import { h, clear, fmtTime, isAdmin, toast } from "../util.js";
 
 // Settings → Audit log: who changed what, and when (kept for a year; request bodies, passwords and tokens are never stored).
 export async function buildAuditCard() {
@@ -38,8 +38,27 @@ export async function buildAuditCard() {
   let timer = null;
   search.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => load(false), 300); });
   more.addEventListener("click", () => load(true));
+  const integrity = h("p", { class: "hint", role: "status" });
+  const checkNow = h("button", { class: "btn", type: "button" }, "Check now");
+  const showIntegrity = (r) => {
+    if (!r) { integrity.textContent = "The integrity of the log has not been checked yet (it is checked every six hours)."; return; }
+    const when = fmtTime(r.at);
+    integrity.className = r.ok ? "hint" : "error";
+    integrity.textContent = r.ok
+      ? `Integrity: intact when checked ${when} (${r.checked} lines linked${r.unchained ? `, ${r.unchained} older lines from before the chain existed` : ""}${r.anchors_checked ? `, ${r.anchors_checked} anchors` : ""}).`
+      : `Integrity: FAILED when checked ${when}, at line ${r.problem.id}: ${r.problem.text}`;
+  };
+  if (isAdmin()) {
+    get("/api/audit/integrity").then((d) => showIntegrity(d.result)).catch(() => {});
+    checkNow.addEventListener("click", async () => {
+      checkNow.disabled = true;
+      try { showIntegrity((await get("/api/audit/integrity?run=true")).result); } catch (err) { toast(err.message || "Could not check", "error"); }
+      checkNow.disabled = false;
+    });
+  }
   card.append(h("h2", {}, "Audit log"),
     h("p", { class: "hint" }, "Who changed what, and when: settings, devices, users, monitors, backups and sign-ins. Kept for a year. Passwords and request contents are never stored."),
+    isAdmin() ? h("div", { class: "rep-tools" }, integrity, checkNow) : null,
     h("div", { class: "rep-tools" }, userSelect, search, h("a", { class: "btn", href: "/api/audit.csv", download: "" }, "Download as CSV")),
     h("div", { class: "rep-scroll" }, h("table", { class: "rep-table" }, h("thead", {}, h("tr", {}, ...["When", "Who", "What", "From"].map((t) => h("th", {}, t)))), body)),
     note, more);

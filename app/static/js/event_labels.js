@@ -57,6 +57,7 @@ export const EVENT_LABELS = {
   totp_recovery_used: "Recovery code used",
   totp_reset: "Second factor reset",
   break_glass_login: "Break-glass sign-in",
+  audit_tampered: "Audit log tampered",
   login_failed: "Failed logins",
   cert_expiring: "Certificate expiring",
   vuln_critical: "New vulnerability",

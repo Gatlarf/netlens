@@ -1231,6 +1231,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts)")
+    _add_column_if_missing(conn, "audit_log", "chain", "TEXT")          # the tamper-evident link (app/auditchain.py); NULL on rows from before it existed
 
     # Indexes
     cur.execute("CREATE INDEX IF NOT EXISTS idx_device_ips_ip ON device_ips(ip)")

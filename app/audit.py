@@ -115,9 +115,9 @@ def describe(conn: sqlite3.Connection, method: str, path: str) -> str:
 
 
 def record(conn: sqlite3.Connection, user: str, role: str, ip: str, method: str, path: str, status: int, action: str) -> None:
-    conn.execute("INSERT INTO audit_log (ts, user, role, ip, method, path, status, action) VALUES (?,?,?,?,?,?,?,?)",
-                 (utcnow(), (user or "")[:60], (role or "")[:20], (ip or "")[:60], method[:10], path[:200], int(status), action[:300]))
-    conn.commit()
+    from app import auditchain
+
+    auditchain.append(conn, utcnow(), (user or "")[:60], (role or "")[:20], (ip or "")[:60], method[:10], path[:200], int(status), action[:300])
 
 
 def record_system(conn: sqlite3.Connection, action: str, path: str, status: int = 200) -> None:
@@ -150,9 +150,9 @@ def log_request(conn: sqlite3.Connection, principal, ip: str, method: str, path:
 def prune(conn: sqlite3.Connection) -> None:
     from app import dbmaint
 
-    conn.execute("DELETE FROM audit_log WHERE ts < ?", (ago(days=dbmaint.days(conn, "audit_days")),))
-    conn.execute("DELETE FROM audit_log WHERE id <= (SELECT MAX(id) FROM audit_log) - ?", (MAX_ROWS,))
-    conn.commit()
+    from app import auditchain
+
+    auditchain.prune(conn, ago(days=dbmaint.days(conn, "audit_days")), MAX_ROWS)
 
 
 def entries(conn: sqlite3.Connection, limit: int = 100, before: int | None = None, user: str = "", q: str = "") -> list[dict]:

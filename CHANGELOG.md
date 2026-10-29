@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.316 — 2026-10-29
+
+### Added
+- ★ **A tamper-evident audit log (every edition).** Each audit line is linked to the one before it with a keyed hash (derived from the master key). Settings → Audit log shows whether the log is intact and can check it now; Netlens also checks every six hours and raises a **critical event** and a "needs attention" entry when a line was changed, inserted or removed. Once an hour an **anchor line** with the newest chain value is written; log forwarding sends it to your SIEM, which keeps a copy Netlens cannot change (this covers what a chain alone cannot: removing the newest lines, or rebuilding the chain by somebody who has the key). Retention keeps the chain valid. `GET /api/audit/integrity`.
+
 ## 0.4.315 — 2026-10-29
 
 ### Added
