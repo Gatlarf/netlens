@@ -145,3 +145,39 @@ def test_the_setting_is_validated_and_kept():
     assert hm.validate({"method": "ssh", "address": "10.0.0.1", "username": "u", "password": "p", "arp_mode": "on"})["arp_mode"] == "auto"      # only SNMP has it
     with pytest.raises(hm.MonitorError):
         hm.validate({"method": "snmp", "address": "10.0.0.1", "community": "c", "arp_mode": "sometimes"})
+
+
+# ------------------------------------------------------------------ the client list of a router or DHCP plugin
+def test_dhcp_leases_and_router_clients_give_hosts_their_mac(db):
+    from app.plugins.enrich import record_client_macs
+
+    data = {"clients": [{"mac": "02:00:00:00:00:31", "ip": "10.0.30.31", "name": "printer"}, {"mac": "02:00:00:00:00:32", "ip": None}, {"mac": "bad", "ip": "10.0.30.33"}]}
+    assert record_client_macs(db, "kea", data, at(1)) == 1
+    assert arpcache.fresh(db, at(1)) == {"10.0.30.31": "02:00:00:00:00:31"}
+    assert db.execute("SELECT source, device_id FROM arp_cache").fetchone()["source"] == "plugin:kea"
+    save_scan_results(db, [host("10.0.30.31")], "quick", now=at(2))
+    assert db.execute("SELECT mac FROM devices WHERE primary_ip = '10.0.30.31'").fetchone()["mac"] == "02:00:00:00:00:31"
+    assert record_client_macs(db, "kea", {"clients": []}, at(3)) == 0
+
+
+def test_clients_the_scan_did_not_find_are_listed_not_added(db):
+    import json
+
+    from app import networks
+    from app.db import set_setting
+
+    save_scan_results(db, [host("10.0.40.5", "02:00:00:00:00:05")], "quick", now=at(1))
+    networks.add(db, "10.0.40.0/24")
+    clients = [{"mac": "02:00:00:00:00:05", "ip": "10.0.40.5", "name": "known"},            # found by the scan
+               {"mac": "02:00:00:00:00:41", "ip": "10.0.40.41", "name": "asleep phone", "medium": "wifi"},
+               {"mac": "02:00:00:00:00:42", "ip": "10.0.40.7", "name": "known by address only"},
+               {"mac": "02:00:00:00:00:43", "ip": "172.20.0.9", "name": "outside the scanned networks"}]
+    set_setting(db, "plugin.kea.data", json.dumps({"nodes": [], "clients": clients}))
+    set_setting(db, "plugin.kea", json.dumps({"enabled": True}))
+    db.execute("INSERT INTO device_ips (device_id, ip, first_seen, last_seen) VALUES (2, '10.0.40.7', ?, ?)", (at(0), at(0)))
+    save_scan_results(db, [host("10.0.40.7", "02:00:00:00:00:99")], "quick", now=at(2))
+    got = networks.unseen_clients(db)
+    assert got["count"] == 1 and got["clients"][0]["ip"] == "10.0.40.41" and got["clients"][0]["source"] == "kea" and got["clients"][0]["medium"] == "wifi"
+    assert db.execute("SELECT COUNT(*) FROM devices WHERE primary_ip = '10.0.40.41'").fetchone()[0] == 0          # listed only
+    set_setting(db, "plugin.kea", json.dumps({"enabled": False}))
+    assert networks.unseen_clients(db)["count"] == 0                                                              # a plugin that is off says nothing

@@ -85,6 +85,17 @@ export async function buildNetworksCard() {
       card.appendChild(h("p", {}, "No network was found yet. Add one below, for example 192.168.1.0/24."));
     }
     const names = [];
+    const result = h("div", { class: "network-test" });
+    const showTest = (r) => {
+      const tone = { ok: "", info: "muted", warn: "bad", bad: "bad" };
+      const route = r.route.found
+        ? `Route to ${r.route.to}: ${r.route.gateway ? `through ${r.route.gateway}${r.route.gateway_answers === null ? "" : r.route.gateway_answers ? " (answers)" : " (does not answer)"}` : "directly connected"}${r.route.dev ? ` on ${r.route.dev}` : ""}.`
+        : "No route found.";
+      result.replaceChildren(
+        h("h3", {}, `Test of ${r.network.label}`), h("p", { class: "hint" }, route),
+        h("ul", {}, r.findings.map((f) => h("li", { class: tone[f.level] || "" }, h("strong", {}, f.title), " ", f.text))),
+        r.probes.length ? h("p", { class: "hint" }, "Asked: ", r.probes.map((p) => `${p.name} ${p.answered ? "✓" : "✗"}`).join(", ")) : null);
+    };
     if (data.networks.length) {
       const table = h("table", { class: "table" });
       table.appendChild(h("thead", {}, h("tr", {}, ...["Scan", "Name", "Range", "State", "Devices", "Hosts in the last scan", "Without MAC", ""].map((t) => h("th", {}, t)))));
@@ -106,16 +117,28 @@ export async function buildNetworksCard() {
             }
           });
         }
+        const test = h("button", { type: "button", class: "btn", title: "Ask the devices that used to be here, and look at the route and the gateway" }, "Test");
+        test.addEventListener("click", async () => {
+          test.disabled = true;
+          result.replaceChildren(h("p", { class: "hint" }, `Testing ${n.cidr}…`));
+          try {
+            showTest(await post(`/api/networks/${n.id}/test`, {}));
+          } catch (err) {
+            result.replaceChildren(h("p", { class: "error" }, err.message || "The test failed"));
+          }
+          test.disabled = false;
+        });
         body.appendChild(h("tr", {},
           h("td", {}, scan), h("td", {}, input), h("td", {}, h("span", { class: "mono" }, n.cidr), h("div", { class: "hint" }, SOURCE_TEXT[n.source] || "")),
           h("td", { class: tone }, text, n.status === "quiet" && n.since ? h("span", { class: "hint" }, ` since ${fmtTime(n.since)}`) : null),
           h("td", {}, `${n.devices} (${n.online} online)`),
           h("td", {}, !n.scan || n.last_hosts == null ? "–" : n.usual_hosts ? `${n.last_hosts} (usually ${n.usual_hosts})` : String(n.last_hosts)),
           h("td", { title: n.no_mac ? "Devices behind a router have no visible MAC address. A health monitor (SNMP) on the router or layer-3 switch can learn them from its ARP table." : "" }, String(n.no_mac)),
-          h("td", {}, remove)));
+          h("td", {}, h("div", { class: "btn-row" }, test, remove))));
       }
       table.appendChild(body);
       card.appendChild(h("div", { class: "table-wrap" }, table));
+      card.appendChild(result);
       const save = h("button", { type: "button", class: "btn primary admin-only" }, "Save");
       save.addEventListener("click", async () => {
         save.disabled = true;
@@ -135,6 +158,14 @@ export async function buildNetworksCard() {
         }
       });
       card.appendChild(save);
+    }
+    if (data.unseen && data.unseen.count) {
+      const list = h("table", { class: "table" }, h("thead", {}, h("tr", {}, ...["Address", "MAC", "Name", "Reported by"].map((t) => h("th", {}, t)))),
+        h("tbody", {}, data.unseen.clients.map((c) => h("tr", {}, h("td", { class: "mono" }, c.ip), h("td", { class: "mono" }, c.mac), h("td", {}, c.name || "–"), h("td", {}, c.source)))));
+      card.appendChild(h("details", { class: "unseen-clients" }, h("summary", {}, `Known to a router or DHCP server, not found by the scan (${data.unseen.count})`),
+        h("p", { class: "hint" }, "Clients a router, controller or DHCP server reports (a lease, a connected client) in a scanned network, that no scan found. They are asleep or switched off, or they ignore every probe " +
+          "(a firewall on the device, a phone that sleeps its Wi-Fi). They are only listed: devices still come from the scans."),
+        h("div", { class: "table-wrap" }, list)));
     }
     if (isAdmin()) {
       const range = h("input", { type: "text", placeholder: "e.g. 10.0.20.0/24", autocomplete: "off", "aria-label": "Range to add" });

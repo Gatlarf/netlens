@@ -768,7 +768,8 @@ def t_networks(conn, args, now=None) -> dict:
     rows = networks.listing(conn)
     if not rows:
         return {"configured": False}
-    return {"configured": True, "networks": [{"name": n["label"], "range": n["cidr"], "status": n["status"], "devices": n["devices"], "online": n["online"], "hosts_in_last_scan": n["last_hosts"],
+    unseen = networks.unseen_clients(conn)
+    return {"configured": True, "known_to_router_not_found_by_scan": unseen["count"], "networks": [{"name": n["label"], "range": n["cidr"], "status": n["status"], "devices": n["devices"], "online": n["online"], "hosts_in_last_scan": n["last_hosts"],
                                               "usual_hosts": n["usual_hosts"], "without_mac": n["no_mac"], "quiet_since": n["since"]} for n in rows[:LIMIT]]}
 
 
@@ -780,6 +781,8 @@ def r_networks(r: dict) -> str:
         state = {"ok": "answering", "quiet": "QUIET since " + str(n["quiet_since"]), "empty": "no hosts found"}.get(n["status"], n["status"])
         extra = f"; {n['without_mac']} without MAC address" if n["without_mac"] else ""
         lines.append(f"{n['name']} ({n['range']}): {state}, {n['devices']} devices ({n['online']} online), {n['hosts_in_last_scan']} hosts in the last scan (usually {n['usual_hosts']}){extra}.")
+    if r.get("known_to_router_not_found_by_scan"):
+        lines.append(f"{r['known_to_router_not_found_by_scan']} clients are known to a router or DHCP server but were not found by the scan (asleep, off, or they ignore probes).")
     return " ".join(lines)
 
 

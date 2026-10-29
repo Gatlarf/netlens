@@ -84,6 +84,15 @@ def record_router_names(conn: sqlite3.Connection, data: dict, now: str | None = 
     return count
 
 
+def record_client_macs(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None) -> int:
+    """The address and MAC of every client a router, controller or DHCP server reports (leases, connected clients): a scan that finds the address from another
+    network gets the MAC from here (app/arpcache.py). Returns how many entries were kept."""
+    from app import arpcache
+
+    entries = [(c["ip"], c["mac"], None) for c in data.get("clients", []) if c.get("ip") and c.get("mac")]
+    return arpcache.learn(conn, None, entries, now, source=f"plugin:{plugin_id}") if entries else 0
+
+
 def record_client_hints(conn: sqlite3.Connection, data: dict) -> int:
     """What the router / controller worked out about its clients (manufacturer, OS, model, type) becomes evidence for the classifier.
 

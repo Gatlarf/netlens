@@ -184,6 +184,8 @@ tool("get_speedtests", "system", "Speed test history and schedule.", "GET", "/ap
 tool("start_scan", "scans", "Start a network scan now.", "POST", "/api/scans", {"kind": s("quick looks for devices, deep also reads ports and services", ["quick", "deep"])})
 tool("cancel_scan", "scans", "Cancel the running scan.", "POST", "/api/scans/cancel")
 tool("scan_device", "scans", "Run a full scan of one device (ports, services, operating system).", "POST", "/api/devices/{device_id}/scan", DEV, ("device_id",))
+tool("test_network", "scans", "Find out why a network does not answer: whether this host has a route to it, whether its gateway answers, and whether the devices that used to be there answer ping and TCP probes. Nothing is changed. Ids come from get_networks.", "POST", "/api/networks/{network_id}/test",
+     {"network_id": i("The network's id")}, ("network_id",))
 tool("ping_device", "scans", "Ping one device now.", "POST", "/api/devices/{device_id}/ping", DEV, ("device_id",))
 tool("trace_device", "scans", "Trace the route to one device.", "POST", "/api/devices/{device_id}/trace", DEV, ("device_id",))
 tool("wake_device", "scans", "Send a Wake-on-LAN packet to one device.", "POST", "/api/devices/{device_id}/wake", DEV, ("device_id",))

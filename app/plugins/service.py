@@ -437,6 +437,7 @@ class PluginService:
                 try:  # what the router tells us besides the links; a failure here must not fail the sync
                     record_router_names(conn, data)
                     record_client_hints(conn, data)
+                    enrich.record_client_macs(conn, plugin.id, data)
                     record_client_links(conn, plugin.id, data)
                     summary.update(record_wifi(conn, data))
                     record_switch_ports(conn, plugin.id, data)

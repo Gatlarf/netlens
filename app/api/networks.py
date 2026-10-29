@@ -45,7 +45,7 @@ async def _look_around(request: Request) -> None:
 def _answer(request: Request) -> dict:
     db = _db(request)
     try:
-        return {"networks": networks.listing(db)}
+        return {"networks": networks.listing(db), "unseen": networks.unseen_clients(db)}
     finally:
         db.close()
 
@@ -53,7 +53,7 @@ def _answer(request: Request) -> dict:
 @router.get("/networks")
 async def list_networks(request: Request) -> dict:
     if scope_of(request) is not None:           # a viewer limited to some groups or sites does not see the layout of the network
-        return {"networks": []}
+        return {"networks": [], "unseen": {"count": 0, "clients": []}}
     await _look_around(request)
     return _answer(request)
 
@@ -89,6 +89,21 @@ async def edit_network(request: Request, network_id: int, body: NetworkPatch) ->
         db.close()
     apply_ranges(request.app)
     return _answer(request)
+
+
+@router.post("/networks/{network_id}/test")
+async def test_network(request: Request, network_id: int) -> dict:
+    """Why does this network (not) answer? Asks the devices that used to be there (ping, TCP) and looks at the route and the gateway. Nothing is changed."""
+    from app import netdiag
+
+    db = _db(request)
+    try:
+        try:
+            return await netdiag.diagnose(db, network_id, getattr(request.app.state, "action_runner", None))
+        except KeyError:
+            raise HTTPException(status_code=404, detail="no such network") from None
+    finally:
+        db.close()
 
 
 @router.delete("/networks/{network_id}")

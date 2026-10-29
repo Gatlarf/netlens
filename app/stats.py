@@ -62,14 +62,16 @@ def _top(counter: Counter, n: int = TOP) -> list[dict]:
 
 # ----------------------------------------------------------------------------- groups
 def _overview(conn, now: str) -> dict:
-    row = conn.execute("SELECT COUNT(*) AS n, COALESCE(SUM(online), 0) AS up FROM devices").fetchone()
+    # a network card that the owner linked to its host is not another device (Network cards on the device page): it is counted in "network_cards" only
+    row = conn.execute("SELECT COUNT(*) AS n, COALESCE(SUM(online), 0) AS up FROM devices WHERE same_host_id IS NULL").fetchone()
     total, online = row["n"], row["up"]
 
     def count(where: str, *args) -> int:
-        return conn.execute(f"SELECT COUNT(*) FROM devices WHERE {where}", args).fetchone()[0]
+        return conn.execute(f"SELECT COUNT(*) FROM devices WHERE same_host_id IS NULL AND {where}", args).fetchone()[0]
 
     return {
         "total": total,
+        "network_cards": conn.execute("SELECT COUNT(*) FROM devices WHERE same_host_id IS NOT NULL").fetchone()[0],
         "online": online,
         "offline": total - online,
         "online_pct": _pct(online, total),
@@ -777,7 +779,7 @@ def record_daily_snapshot(conn: sqlite3.Connection, now: str | None = None) -> N
         """,
         (
             day, overview["total"], overview["online"],
-            conn.execute("SELECT COUNT(*) FROM devices WHERE substr(first_seen, 1, 10) = ?", (day,)).fetchone()[0],
+            conn.execute("SELECT COUNT(*) FROM devices WHERE same_host_id IS NULL AND substr(first_seen, 1, 10) = ?", (day,)).fetchone()[0],
             conn.execute("SELECT COUNT(*) FROM ports WHERE state = 'open'").fetchone()[0],
             conn.execute("SELECT COUNT(*) FROM events WHERE substr(ts, 1, 10) = ?", (day,)).fetchone()[0],
             conn.execute("SELECT COUNT(*) FROM scans WHERE substr(started, 1, 10) = ?", (day,)).fetchone()[0],

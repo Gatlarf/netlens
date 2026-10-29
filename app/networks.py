@@ -282,3 +282,37 @@ def absorb_legacy(conn: sqlite3.Connection, env_ranges=()) -> None:
     if raw is not None:
         delete_setting(conn, LEGACY_KEY)
     conn.commit()
+
+
+# ----------------------------------------------------------------------------- known to the router or DHCP server, not found by the scan
+MAX_UNSEEN = 100
+
+
+def unseen_clients(conn: sqlite3.Connection) -> dict[str, Any]:
+    """The clients a router, controller or DHCP server reports (a lease, a connected client) in a scanned network that the scan did not find: no device has
+    that MAC address or that IP address. They are asleep, switched off, or they ignore every probe. Only listed, never added: the scan stays the source of devices."""
+    import json
+
+    scanned = parse([r["cidr"] for r in conn.execute("SELECT cidr FROM networks WHERE scan = 1 AND (source != 'detected' OR present = 1)")], 32)
+    if not scanned:
+        return {"count": 0, "clients": []}
+    macs = {r["mac"].lower() for r in conn.execute("SELECT mac FROM devices WHERE mac IS NOT NULL")}
+    ips = {r["primary_ip"] for r in conn.execute("SELECT primary_ip FROM devices WHERE primary_ip IS NOT NULL")} | {r["ip"] for r in conn.execute("SELECT ip FROM device_ips")}
+    found: dict[str, dict[str, Any]] = {}
+    for row in conn.execute("SELECT key, value FROM settings WHERE key LIKE 'plugin.%.data'"):
+        plugin_id = row["key"][len("plugin."):-len(".data")]
+        try:
+            if not json.loads(get_setting(conn, f"plugin.{plugin_id}") or "{}").get("enabled"):
+                continue
+            data = json.loads(row["value"])
+        except ValueError:
+            continue
+        if not isinstance(data, dict) or "clients" not in data:
+            continue
+        for c in data.get("clients") or []:
+            mac, ip = (c.get("mac") or "").lower(), c.get("ip")
+            if not mac or not ip or mac in macs or ip in ips or mac in found or _containing(scanned, ip) is None:
+                continue
+            found[mac] = {"ip": ip, "mac": mac, "name": c.get("name") or "", "medium": c.get("medium") or "unknown", "source": plugin_id}
+    ordered = sorted(found.values(), key=lambda c: ipaddress.ip_address(c["ip"]))
+    return {"count": len(ordered), "clients": ordered[:MAX_UNSEEN]}

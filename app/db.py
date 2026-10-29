@@ -531,6 +531,7 @@ def init_db(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "devices", "same_host_id", "INTEGER REFERENCES devices(id) ON DELETE SET NULL")      # this device is another network card of that host (set by the owner)
     # --- the ARP table of a router (app/arpcache.py): MAC addresses for hosts behind it; a monitor chooses whether to read it ------------------------
     conn.execute("CREATE TABLE IF NOT EXISTS arp_cache (ip TEXT PRIMARY KEY, mac TEXT NOT NULL, device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE, iface INTEGER, seen TEXT NOT NULL)")
+    _add_column_if_missing(conn, "arp_cache", "source", "TEXT")          # where the entry came from: NULL = the ARP table of device_id, "plugin:<id>" = the client list of a router or DHCP plugin
     # --- networks: the scanned ranges and whether they keep answering (app/networks.py) -----------------------------------------------------------
     conn.execute("CREATE TABLE IF NOT EXISTS networks (id INTEGER PRIMARY KEY, cidr TEXT NOT NULL UNIQUE, name TEXT, active INTEGER NOT NULL DEFAULT 1, status TEXT, quiet_since TEXT, "
                  "first_seen TEXT NOT NULL, last_scan TEXT, last_hosts INTEGER, baseline REAL, low_scans INTEGER NOT NULL DEFAULT 0)")

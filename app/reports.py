@@ -323,8 +323,8 @@ def weekly(conn, now: datetime | None = None, options: dict[str, Any] | None = N
                       ignore_maintenance=opts["ignore_maintenance"])
     a = _fmt(start)
     counts = {r["kind"]: r["n"] for r in conn.execute("SELECT kind, COUNT(*) AS n FROM events WHERE ts >= ? GROUP BY kind", (a,))}
-    total = conn.execute(f"SELECT COUNT(*) FROM devices WHERE 1 = 1{only}").fetchone()[0]
-    online = conn.execute(f"SELECT COUNT(*) FROM devices WHERE online = 1{only}").fetchone()[0]
+    total = conn.execute(f"SELECT COUNT(*) FROM devices WHERE same_host_id IS NULL{only}").fetchone()[0]          # a linked network card is not another device
+    online = conn.execute(f"SELECT COUNT(*) FROM devices WHERE same_host_id IS NULL AND online = 1{only}").fetchone()[0]
     new = [r["n"] for r in conn.execute(
         "SELECT COALESCE(custom_name, hostname, primary_ip) AS n FROM devices WHERE first_seen >= ? AND report_exclude = 0 ORDER BY first_seen", (a,))] if opts["new_devices"] else []
     core_ids = {r["id"] for r in conn.execute("SELECT id FROM devices WHERE report_exclude = 0" + (" AND always_on = 1" if core else ""))}

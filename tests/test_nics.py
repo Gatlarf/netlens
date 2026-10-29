@@ -86,3 +86,22 @@ def test_dns_registers_the_hosts_own_name_only():
     assert items(main, own)[2]["state"] == "add"                                               # a name of its own is honoured
     always = DnsDevice(id=2, ip="10.0.0.21", hostname=f"nas2.{ZONE}", nic_of=1, dns_mode="always")
     assert items(main, always)[2]["state"] == "add"
+
+
+def test_a_linked_card_is_not_counted_as_another_device(tmp_path):
+    from app import stats
+
+    path = tmp_path / "c.db"
+    conn = connect(path)
+    init_db(conn)
+    save_scan_results(conn, [host("10.0.0.20", "aa:00:00:00:00:02"), host("10.0.0.21", "aa:00:00:00:00:03"), host("10.0.0.22", "aa:00:00:00:00:04")], "quick", now=NOW)
+    before = stats._overview(conn, NOW)
+    assert (before["total"], before["online"], before["network_cards"], before["unknown"]) == (3, 3, 0, 3)
+    conn.execute("UPDATE devices SET same_host_id = 1 WHERE id = 2")
+    conn.commit()
+    after = stats._overview(conn, NOW)
+    assert (after["total"], after["online"], after["offline"], after["network_cards"], after["unknown"], after["new_24h"]) == (2, 2, 0, 1, 2, 2)
+    stats.record_daily_snapshot(conn, NOW)
+    row = conn.execute("SELECT devices, online, new_devices FROM stats_daily").fetchone()
+    assert (row["devices"], row["online"], row["new_devices"]) == (2, 2, 2)
+    conn.close()

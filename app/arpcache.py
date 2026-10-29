@@ -3,8 +3,8 @@
 nmap sees a MAC address only for hosts on its own network segment (ARP). A host on a routed network (another VLAN, a network reached over a VPN) is
 found by IP address alone; it has no MAC, so Netlens has to treat its address as its identity: a DHCP lease that changes looks like a new device, and
 there is no manufacturer. The router or layer-3 switch that the host is attached to knows the MAC: it is in its ARP table. A health monitor over
-SNMP on such a device reads that table (app/hostmetrics/service.py) and keeps it here for an hour; a scan then gives a MAC-less host the MAC that
-the router reports for its address.
+SNMP on such a device reads that table (app/hostmetrics/service.py) and keeps it here for an hour; so does the client list of a router or DHCP plugin
+(leases and connected clients, app/plugins/enrich.py). A scan then gives a MAC-less host the MAC that they report for its address.
 
 This only fills a gap: a MAC that the scan itself saw is never replaced, and a MAC that would stand for many addresses is not used (a router that
 answers ARP for networks behind it, or NAT, shows one MAC for many addresses: that is the router, not the hosts).
@@ -38,17 +38,17 @@ def usable_mac(mac: str) -> bool:
     return len(raw) == 6 and any(raw) and raw != b"\xff" * 6 and not raw[0] & 1
 
 
-def learn(conn: sqlite3.Connection, device_id: int, entries: list[tuple[str, str, int]], now: str | None = None) -> int:
-    """Keep what a router's ARP table says. Returns the number of entries kept."""
+def learn(conn: sqlite3.Connection, device_id: int | None, entries: list[tuple[str, str, int | None]], now: str | None = None, source: str | None = None) -> int:
+    """Keep what a router's ARP table (or the client list of a router or DHCP plugin, `source`) says. Returns the number of entries kept."""
     now = now or utcnow()
     kept = 0
     for ip, mac, iface in entries:
         if not usable_mac(mac):
             continue
         conn.execute(
-            "INSERT INTO arp_cache (ip, mac, device_id, iface, seen) VALUES (?, ?, ?, ?, ?) "
-            "ON CONFLICT(ip) DO UPDATE SET mac = excluded.mac, device_id = excluded.device_id, iface = excluded.iface, seen = excluded.seen",
-            (ip, mac.lower(), device_id, iface, now))
+            "INSERT INTO arp_cache (ip, mac, device_id, iface, seen, source) VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(ip) DO UPDATE SET mac = excluded.mac, device_id = excluded.device_id, iface = excluded.iface, seen = excluded.seen, source = excluded.source",
+            (ip, mac.lower(), device_id, iface, now, source))
         kept += 1
     conn.execute("DELETE FROM arp_cache WHERE seen < ?", ((_ts(now) - 2 * TTL).strftime("%Y-%m-%dT%H:%M:%SZ"),))
     conn.commit()
