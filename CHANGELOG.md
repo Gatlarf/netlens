@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.330 — 2026-10-30
+
+### Added
+- **Dashboard: "Add all cards".** While customizing, one button puts every available card on the dashboard so you can see everything and remove what you do not want.
+
 ## 0.4.329 — 2026-10-29
 
 ### Changed

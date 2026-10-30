@@ -546,6 +546,7 @@ export async function render(container) {
         onToggle: (on) => { order = on ? [...order.filter((x) => x !== c.id), c.id] : order.filter((x) => x !== c.id); persist(); draw(); } };
     });
     const head = [h("p", { class: "hint bd-pick" }, "Drag the grip on a card to move it, use ↔ for its width and ✕ to remove it. Tick a card here to put it on the dashboard."),
+      h("button", { class: "btn bd-pick", type: "button", title: "Put every card there is on the dashboard, then remove what you do not want", onclick: () => { order = [...order, ...known.map((c) => c.id).filter((id) => !order.includes(id))]; persist(); draw(); } }, "Add all cards"),
       h("button", { class: "btn bd-pick", type: "button", onclick: () => edit(null) }, "Create a card of your own")];
     if (!drawerApi) {
       const foot = [h("button", { class: "btn", type: "button", onclick: resetMine }, shared ? "Back to the default" : "Reset to default"),
