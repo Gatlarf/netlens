@@ -92,6 +92,17 @@ const CARDS = [
     build: ({ summary: s }) => { const g = s.storage;
       const notes = [g.unhealthy ? `${g.unhealthy} not healthy` : null, g.failed_disks ? `${g.failed_disks} failed disk${g.failed_disks === 1 ? "" : "s"}` : null, g.pools_filling ? `${g.pools_filling} pool${g.pools_filling === 1 ? "" : "s"} filling up` : null, g.alerts ? `${g.alerts} alert${g.alerts === 1 ? "" : "s"}` : null].filter(Boolean);
       return big(`${g.systems - g.unhealthy} / ${g.systems}`, `storage system${g.systems === 1 ? "" : "s"} healthy`, { extra: [h("div", { class: `d-mini${notes.length ? " d-warn" : ""}` }, notes.length ? notes.join(" · ") : `${g.pools} pools · ${g.disks} disks · all fine`)] }); } },
+  { id: "networks", title: "Networks", href: "#/settings/networks", size: "s", about: "The networks Netlens scans, and which of them have gone quiet (a VPN, a VLAN or a router that no longer answers).",
+    show: (d) => !!d.summary.networks && d.summary.networks.tracked > 0,
+    tone: (d) => (d.summary.networks.quiet ? "warn" : "ok"),
+    build: ({ summary: s }) => { const n = s.networks;
+      return big(`${n.tracked - n.quiet} / ${n.tracked}`, `network${n.tracked === 1 ? "" : "s"} answering`, { extra: [h("div", { class: `d-mini${n.quiet ? " d-warn" : ""}` }, n.quiet ? `quiet: ${n.quiet_names.join(", ")}` : "all networks have hosts")] }); } },
+  { id: "bonds", title: "Bonded connections", href: "#/devices", size: "s", about: "Hosts with a bond or NIC team over several switch ports: how many have a link that is down.",
+    show: (d) => !!d.summary.link_groups && d.summary.link_groups.groups > 0,
+    tone: (d) => { const g = d.summary.link_groups; return g.down ? "bad" : g.degraded ? "warn" : "ok"; },
+    build: ({ summary: s }) => { const g = s.link_groups, bad = g.degraded + g.down;
+      return big(`${g.groups - bad} / ${g.groups}`, `bond${g.groups === 1 ? "" : "s"} fully up`, { extra: [h("div", { class: `d-mini${bad ? " d-warn" : ""}` },
+        bad ? [g.degraded ? `${g.degraded} degraded` : null, g.down ? `${g.down} down` : null].filter(Boolean).join(" · ") : "all links up")] }); } },
   { id: "sites", title: "Sites & certificates", href: "#/stats", size: "s", about: "Reverse-proxy sites and when their certificates end.",
     show: (d) => d.summary.sites.total > 0,
     tone: (d) => (d.summary.sites.down || d.summary.sites.certificates_expired ? "bad" : d.summary.sites.certificates_expiring ? "warn" : "ok"),
