@@ -1,6 +1,6 @@
 import { buildMaintenanceCard } from "../cards/maintenance.js";
 import { del, get, patch, post, put } from "../api.js";
-import { groupButtons } from "../ui.js";
+import { groupButtons, compactHelp } from "../ui.js";
 import { h, clear, toast, isAdmin, can, fmtTime } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
 import { buildScheduleCard, buildTerminalCard } from "../cards/general.js";
@@ -495,7 +495,8 @@ export async function render(container, params) {
     if (destroyed) return;
     clear(content);
     content.appendChild(card);
-    const watch = new MutationObserver(() => { watch.disconnect(); groupButtons(content); watch.observe(content, { childList: true, subtree: true }); });
+    const watch = new MutationObserver(() => { watch.disconnect(); compactHelp(content); groupButtons(content); watch.observe(content, { childList: true, subtree: true }); });
+    compactHelp(content);
     groupButtons(content);
     watch.observe(content, { childList: true, subtree: true });
     setTimeout(() => revealFound(content), 150);    // a setting that was searched for is scrolled to and highlighted

@@ -135,3 +135,21 @@ input.inline-number { width: 5.5em; }
 /* narrow screens: the heartbeat strips shrink so the table keeps its last columns in view */
 @media (max-width: 1100px) { .hb { min-width: 1px; } .hb-bar { min-width: 90px; } }
 .plugin-status { min-width: 14rem; overflow-wrap: anywhere; }
+
+/* ---------- Settings, compact (contrib/UI-RULES.md): explanations behind a "?", tighter rhythm ---------- */
+.help-tip { position: relative; display: inline-block; margin-left: 8px; vertical-align: middle; font-weight: 400; text-transform: none; letter-spacing: normal; }
+.help-btn { width: 1.35rem; height: 1.35rem; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--muted); font: 600 .78rem/1 inherit; cursor: pointer; }
+.help-btn:hover, .help-tip.open .help-btn { color: var(--text); border-color: currentColor; }
+.help-body { display: none; position: absolute; z-index: 30; left: 0; top: calc(100% + 6px); width: max-content; max-width: min(440px, 80vw); padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: 0 6px 18px rgba(0,0,0,.28); font-size: .85rem; font-weight: 400; line-height: 1.45; text-align: left; white-space: normal; }
+.help-tip.open .help-body, .help-tip:hover .help-body { display: block; }
+.settings-content .card { padding: 10px 14px; }
+.settings-content .card > h2:first-child { margin-bottom: 8px; }
+.settings-content .card h3 { margin: 10px 0 4px; font-size: .92rem; }
+.settings-content .edit-form, .settings-content form { gap: 8px; }
+.settings-content .field label { margin-bottom: 2px; }
+.settings-content .field > .hint, .settings-content .check-field > .hint { margin-top: 1px; font-size: .8rem; line-height: 1.35; }
+.settings-content :where(form, .card, div):has(> .field + .field) { gap: 6px 18px; }
+.settings-content .form-actions, .settings-content .btn-row { margin-top: 8px; }
+.settings-content .table th, .settings-content .table td { padding-top: 5px; padding-bottom: 5px; }
+.preset-row { margin: 4px 0 6px; } .preset-row .hint { margin: 0; }
+.gap-list { margin: 4px 0; } .gap-list summary { cursor: pointer; color: var(--muted); font-size: .85rem; } .gap-list ul { margin: 4px 0 0; padding-left: 1.2rem; }

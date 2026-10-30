@@ -186,8 +186,8 @@ export async function buildChannelsCard() {
         }
         load();
       });
-      card.appendChild(h("div", { class: "card warning", role: "alert" }, h("strong", {}, first ? "You would not be told about:" : "No channel is switched on, so nobody is told about anything."),
-        h("ul", {}, gaps.map((g) => h("li", {}, g.label, h("span", { class: "hint" }, ` (${g.why})`)))), fix));
+      card.appendChild(h("div", { class: "card warning", role: "alert" }, h("strong", {}, first ? `You would not be told about ${gaps.length} event${gaps.length === 1 ? "" : "s"}` : "No channel is on: nobody is told about anything"),
+        h("details", { class: "gap-list" }, h("summary", {}, "Show which"), h("ul", {}, gaps.map((g) => h("li", {}, g.label, h("span", { class: "hint" }, ` (${g.why})`))))), fix));
     }
     const slot = h("div", {});
     const add = h("button", { class: "btn", type: "button" }, "Add channel");

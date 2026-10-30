@@ -67,14 +67,14 @@ export async function buildScanOptionsCard() {
     }
 
     // Preset buttons
-    const presetContainer = h("div", {});
+    const presetContainer = h("div", { class: "btn-row preset-row" }, h("span", { class: "hint" }, "Presets"));
     const presetButtons = {};
     const presetHints = {};
 
     for (const key of ["default", "fast", "fastest"]) {
       const label = PRESET_LABELS[key];
       const isActive = JSON.stringify(options) === JSON.stringify(presets[key]);
-      const btn = h("button", { type: "button", class: "btn" }, isActive ? `${label} (active)` : label);
+      const btn = h("button", { type: "button", class: "btn", title: PRESET_HINTS[key] }, isActive ? `${label} (active)` : label);
       btn.addEventListener("click", () => {
         fillForm(presets[key]);
         toast("Preset loaded. Press Save to apply.", "info");
@@ -82,8 +82,6 @@ export async function buildScanOptionsCard() {
       presetContainer.appendChild(btn);
       presetButtons[key] = btn;
 
-      const hint = h("p", { class: "hint" }, PRESET_HINTS[key]);
-      presetContainer.appendChild(hint);
     }
     card.appendChild(presetContainer);
 

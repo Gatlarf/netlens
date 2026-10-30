@@ -140,3 +140,53 @@ export function savedLoginButton(label, onConnect, onForget) {
     h("button", { type: "button", class: "btn", onclick: onConnect }, label),
     h("button", { type: "button", class: "btn btn-split-x", title: "Forget this saved login", "aria-label": "Forget this saved login", onclick: onForget }, "×"));
 }
+
+// Settings pages: long explanations sit behind a "?" next to the heading or the field they belong to, so a page shows its controls first.
+// A short hint (a unit, "0 = never") stays where it is. Run on every redraw; a hint that was moved is not looked at again.
+const HELP_LONG = 70, HELP_FIELD = 48;
+function helpTip(hint) {
+  const body = h("div", { class: "help-body", role: "note" });
+  body.append(...hint.childNodes);
+  const tip = h("span", { class: "help-tip", "data-help": "1" },
+    h("button", { type: "button", class: "help-btn", "aria-label": "Explanation", "aria-expanded": "false" }, "?"), body);
+  return tip;
+}
+export function compactHelp(root) {
+  const text = (el) => (el.textContent || "").trim();
+  for (const hint of root.querySelectorAll("p.hint, .field > .hint, .check-field > .hint, .inline-setting > .hint")) {
+    if (hint.closest(".help-body") || hint.querySelector("input, select, textarea, button")) continue;
+    const len = text(hint).length;
+    const inField = hint.matches(".field > .hint, .check-field > .hint, .inline-setting > .hint");
+    if (len < (inField ? HELP_FIELD : HELP_LONG)) continue;
+    let anchor = null;
+    if (inField) {
+      anchor = hint.parentElement.querySelector(":scope > label, :scope > .check-label, :scope > h4");
+    } else {
+      let prev = hint.previousElementSibling;
+      while (prev && prev.matches(".help-tip, .hint")) prev = prev.previousElementSibling;
+      if (prev && prev.matches("h1, h2, h3, h4, legend, .card-title, .card-head")) anchor = prev.matches(".card-head") ? (prev.querySelector("h2, h3") || prev) : prev;
+      else if (prev && prev.matches(".field, .check-field, label, .inline-setting")) anchor = prev.matches("label") ? prev : prev.querySelector("label");
+      else if (!prev && hint.parentElement) anchor = hint.parentElement.querySelector(":scope > h2, :scope > h3, :scope > legend");
+    }
+    if (!anchor) continue;
+    let tip = anchor.querySelector(":scope > .help-tip");
+    if (tip) { tip.querySelector(".help-body").append(h("br"), ...hint.childNodes); }
+    else { tip = helpTip(hint); anchor.appendChild(tip); }
+    hint.remove();
+  }
+}
+document.addEventListener("click", (event) => {
+  const btn = event.target.closest && event.target.closest(".help-btn");
+  for (const open of document.querySelectorAll(".help-tip.open")) {
+    if (!btn || open !== btn.parentElement) { open.classList.remove("open"); open.firstChild.setAttribute("aria-expanded", "false"); }
+  }
+  if (btn) {
+    event.preventDefault();
+    const tip = btn.parentElement, on = !tip.classList.contains("open");
+    tip.classList.toggle("open", on);
+    btn.setAttribute("aria-expanded", String(on));
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") for (const open of document.querySelectorAll(".help-tip.open")) open.classList.remove("open");
+});

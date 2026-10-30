@@ -20,6 +20,8 @@ The rules every page follows, so a new page does not need a review round. Most a
 - Single-line inputs and selects are at most 36rem wide.
 - Settings live under Settings. A feature page (DNS, Vulnerabilities, Backups) holds results and actions and links to its settings ("Settings -> DNS registration"); it does not embed a settings form. Exception: a one-line schedule that belongs to the page (Speed tests).
 
+- **Explanations behind a "?":** on Settings pages a hint longer than about 70 characters (48 under a field) is moved behind a "?" by `compactHelp` in `js/ui.js`; keep hints short or let them be moved. Do not put controls inside a hint.
+
 ## Lists and pages
 - A list that can grow shows the newest few (6-10) with a "show all" button; logs page by 50.
 - Several summary tiles use `.up-tiles` (auto-fit, 190 px minimum). A tile that signals a problem is clickable and leads to the page or row that explains it (`tile(..., target)`).
