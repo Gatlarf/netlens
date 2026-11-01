@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.333 — 2026-11-01
+
+### Fixed
+- ★ **The program watches itself.** On 1 November a Netlens container ran out of open files (the limit was 1024), after which every request and every background task failed with "unable to open database file" while the health check still said "healthy", so nothing restarted it. Now the limit is raised at start, the health check reports "unwell" (HTTP 503) when the database cannot be opened or 90% of the open files are in use, and after two minutes of that the process ends so the container restarts by itself. From half full onward the log says what the open files are, to find a leak.
+
 ## 0.4.332 — 2026-10-30
 
 ### Changed

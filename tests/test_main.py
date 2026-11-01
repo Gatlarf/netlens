@@ -6,9 +6,12 @@ from app.main import create_app, VERSION
 from app.config import Settings, load_settings
 
 
-def test_health_endpoint():
+def test_health_endpoint(tmp_path):
     settings = load_settings({"NETLENS_TOKEN": "t"})
-    app = create_app(settings)
+    from app.db import connect, init_db
+
+    init_db(connect(tmp_path / "t.db"))
+    app = create_app(settings, db_path=str(tmp_path / "t.db"))          # the health check opens the database
     client = TestClient(app)
 
     response = client.get("/api/health")

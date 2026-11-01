@@ -141,6 +141,9 @@ async def lifespan(app: FastAPI):
             )
         ))
         tasks.append(asyncio.create_task(service_loop(app.state.db_path)))
+        from app import watchdog
+
+        tasks.append(asyncio.create_task(watchdog.loop(app.state.db_path)))          # unwell for two minutes (no file descriptors left, no database): end, so the container restarts
         from app import beats
 
         async def beat_ranges() -> list[str]:                  # the ranges the scans use: the configured ones, else the ones detected
@@ -389,8 +392,16 @@ def create_app(
     app.include_router(terminal_router, dependencies=[Depends(require_terminal_enabled)])
 
     @app.get("/api/health")
-    async def health(request: Request) -> dict[str, str]:
-        if identify(request) is None:       # the version tells a stranger which known flaws to try
+    async def health(request: Request):
+        from fastapi.responses import JSONResponse
+
+        from app import watchdog
+
+        who = identify(request)
+        found = await asyncio.to_thread(watchdog.problem, app.state.db_path)
+        if found:                           # the container's health check then turns unhealthy; the reason is for people who are signed in only
+            return JSONResponse({"status": "unwell", **({"problem": found} if who is not None else {})}, status_code=503)
+        if who is None:       # the version tells a stranger which known flaws to try
             return {"status": "ok"}
         return {"status": "ok", "version": VERSION}
 
@@ -414,6 +425,9 @@ def main() -> None:
     from app import syslog
 
     syslog.setup(settings.data_dir)
+    from app import watchdog
+
+    watchdog.raise_file_limit()
     app = create_app(settings, scheduler=True)
     logging.getLogger("netlens").info("Netlens %s started", VERSION)
     if STALE_ENV:
