@@ -713,3 +713,16 @@ def test_a_switched_off_rule_does_not_leave_a_problem_behind(conn):
     assert hm.problems(conn)
     hm.save_rules(conn, {"if_up": {"enabled": False}})
     assert hm.problems(conn) == []
+
+
+def test_a_disk_that_is_gone_stops_being_a_problem(conn):
+    monitor(conn)
+    mid = hm.get_monitor(conn, 1)["id"]
+    both = [("disk_pct", "/", 40.0, "%"), ("disk_pct", "/mnt/ct104-root", 96.0, "%")]
+    assert hm.evaluate(conn, mid, 1, "nuc", both, NOW) == ["metric_critical"]
+    assert [p["label"] for p in hm.problems(conn)] == ["/mnt/ct104-root"]
+    hm.evaluate(conn, mid, 1, "nuc", [("cpu_pct", "", 5.0, "%")], "2026-03-10T12:01:00Z")                    # no disk read at all: the state is kept
+    assert [p["label"] for p in hm.problems(conn)] == ["/mnt/ct104-root"]
+    hm.evaluate(conn, mid, 1, "nuc", [("disk_pct", "/", 40.0, "%")], "2026-03-10T12:02:00Z")                 # the container was stopped: its mount is no longer reported
+    assert hm.problems(conn) == []
+    assert hm.evaluate(conn, mid, 1, "nuc", both, "2026-03-10T12:03:00Z") == ["metric_critical"]              # and when it comes back full, that is a problem again

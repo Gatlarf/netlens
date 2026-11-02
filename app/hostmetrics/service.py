@@ -710,6 +710,15 @@ def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: li
             add_event(conn, "metric_ok", _describe(rule, "service_stopped", row["label"], 0.0, "ok", device_name), device_id=device_id, now=now,
                       subject=f"metric:{device_id}:service_stopped:{row['label']}")
             raised.append("metric_ok")
+    # a disk or an interface that is no longer there (a container stopped, a mount removed) cannot stay a problem: its last reading would be shown for ever.
+    # Only for a kind of reading the round did take for something else, so a failed read does not wipe the state.
+    for kind in ("disk_pct", "if_up"):
+        seen = {lbl for m, lbl, _v, _u in points if m == kind}
+        if not seen:
+            continue
+        for row in conn.execute("SELECT label FROM metric_state WHERE monitor_id = ? AND metric = ?", (monitor_id, kind)).fetchall():
+            if row["label"] not in seen:
+                conn.execute("DELETE FROM metric_state WHERE monitor_id = ? AND metric = ? AND label = ?", (monitor_id, kind, row["label"]))
     # a reading that is no longer taken cannot stay a problem: a container used to report the temperature of its host and no longer does, so the old warning would
     # never clear. Only when the rest of the read worked (processor or memory present), so a failed read does not wipe the state.
     if points and not any(m == "temp_c" for m, _l, _v, _u in points) and any(m in ("cpu_pct", "mem_pct") for m, _l, _v, _u in points):
