@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.335 — 2026-11-03
+
+### Fixed
+- **Looking at a remote site no longer clogs up when the site answers slowly.** A page that gave up waiting (after 30 seconds) stayed in the queue, so the site still worked on it later while the pages that mattered timed out too, and a page that polls (the scan status) queued a copy of the same question every few seconds. Now the same question that is still being answered is asked once and shared, a question nobody waits for any more is dropped before the site sees it, and the remote site's relay has its own threads so the application's other work cannot hold its answers back. An answer that could not be handed over is tried twice, and the log says why. While the site is slow the banner says so, instead of leaving blank pages without a word.
+
 ## 0.4.334 — 2026-11-02
 
 ### Fixed

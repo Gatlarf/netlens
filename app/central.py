@@ -9,6 +9,7 @@ always goes out from here; nothing at this site has to be reachable from outside
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import gzip
 import hashlib
 import http.client
@@ -392,6 +393,9 @@ def _relay_request(link: dict[str, Any], path: str, body: dict[str, Any] | None,
         raise LinkError(f"cannot reach the central Netlens: {getattr(exc, 'reason', exc)}") from None
 
 
+RELAY_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="relay")
+
+
 def relay_poll(link: dict[str, Any]) -> list[dict[str, Any]]:
     """Wait (up to about 25 seconds) for requests the central Netlens wants answered."""
     reply = _relay_request(link, f"/api/probe/relay?wait={int(relay.POLL_WAIT)}", None, relay.POLL_WAIT + 15)
@@ -416,15 +420,19 @@ async def relay_loop(app) -> None:
                 continue
 
             def answer(request_id: str, payload: dict[str, Any], link=link) -> None:
-                try:
-                    _relay_request(link, f"/api/probe/relay/{request_id}", payload, 20)
-                except LinkError:
-                    log.warning("could not hand an answer to the central Netlens")
+                for attempt in (1, 2):                      # one more try: a slow line often answers the second time
+                    try:
+                        _relay_request(link, f"/api/probe/relay/{request_id}", payload, 20)
+                        return
+                    except LinkError as exc:
+                        if attempt == 2:
+                            log.warning("could not hand an answer to the central Netlens: %s", exc)
 
-            items = await asyncio.to_thread(relay_poll, link)
+            loop = asyncio.get_running_loop()
+            items = await loop.run_in_executor(RELAY_POOL, relay_poll, link)          # the relay's own threads: the application's other work cannot hold its answers back
             failures = 0
             for item in items:
-                asyncio.create_task(relay.serve(app, answer, item))
+                asyncio.create_task(relay.serve(app, answer, item, RELAY_POOL))
         except asyncio.CancelledError:
             raise
         except LinkError:

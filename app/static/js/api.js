@@ -50,8 +50,10 @@ export async function api(path, { method = "GET", body, _retried = false } = {})
         document.dispatchEvent(new CustomEvent("netlens:unauth"));
       }
 
+      if (res.status === 504 && String(path).startsWith("/api/site-view/")) document.dispatchEvent(new CustomEvent("netlens:site-slow"));       // the remote site did not answer in time
       throw new ApiError(res.status, detail);
     }
+    if (res.ok && String(path).startsWith("/api/site-view/")) document.dispatchEvent(new CustomEvent("netlens:site-ok"));
 
     return parsed;
   } catch (err) {

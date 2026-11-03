@@ -16,7 +16,10 @@ export async function initSiteBar(session) {
     text.append("You are looking at ", Object.assign(document.createElement("b"), { textContent: site.name }), ": the pages of that site, live and read only, through this Netlens. ");
     const back = Object.assign(document.createElement("button"), { type: "button", className: "btn", textContent: "Back to this site" });
     back.addEventListener("click", leaveSite);
-    banner.append(text, back);
+    const slow = Object.assign(document.createElement("span"), { className: "site-slow", hidden: true, textContent: " The site is slow to answer right now; pages may stay empty until it does." });
+    document.addEventListener("netlens:site-slow", () => { slow.hidden = false; });
+    document.addEventListener("netlens:site-ok", () => { slow.hidden = true; });
+    banner.append(text, slow, back);
     const header = document.getElementById("topbar");
     header.parentNode.insertBefore(banner, header.nextSibling);
   }

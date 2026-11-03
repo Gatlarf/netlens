@@ -164,3 +164,39 @@ def test_the_view_setting_is_saved_and_reported_to_the_central_netlens(tmp_path,
     monkeypatch.setattr(central, "send", lambda url, token, payload, **kw: sent.update(payload) or {"events": 0})
     central.push_once(str(path), force=True)
     assert sent["accepts_view"] is True and sent["accepts_config"] is False
+
+
+def test_the_same_question_is_asked_once_and_shared():
+    async def go():
+        hub = relay.Hub()
+        hub.last_poll[1] = relay.time.monotonic()                      # the site is connected
+        first = asyncio.create_task(hub.ask(1, "/api/scans/current"))
+        await asyncio.sleep(0.01)
+        second = asyncio.create_task(hub.ask(1, "/api/scans/current"))      # a page that polls: no second copy for the site to answer
+        await asyncio.sleep(0.01)
+        other = asyncio.create_task(hub.ask(1, "/api/features"))
+        await asyncio.sleep(0.01)
+        items = await hub.poll(1, wait=1)
+        assert sorted(i["path"] for i in items) == ["/api/features", "/api/scans/current"]
+        for i in items:
+            hub.answer(1, i["id"], {"status": 200, "content_type": "application/json", "body": base64.b64encode(i["path"].encode()).decode()})
+        assert (await first)["status"] == 200 and (await second) == (await first) and (await other)["status"] == 200
+
+    asyncio.run(go())
+
+
+def test_a_question_nobody_waits_for_is_not_sent_to_the_site():
+    async def go():
+        hub = relay.Hub()
+        hub.last_poll[1] = relay.time.monotonic()
+        with pytest.raises(relay.SiteOffline):
+            await hub.ask(1, "/api/old", timeout=0.05)                 # the page gave up
+        live = asyncio.create_task(hub.ask(1, "/api/live"))
+        await asyncio.sleep(0.01)
+        items = await hub.poll(1, wait=1)
+        assert [i["path"] for i in items] == ["/api/live"]             # the stale one is gone, the live one is not delayed behind it
+        hub.answer(1, items[0]["id"], {"status": 200, "content_type": "application/json", "body": ""})
+        await live
+        assert not hub.inflight
+
+    asyncio.run(go())

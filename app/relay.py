@@ -48,6 +48,7 @@ class Hub:
         self.waiting: dict[str, tuple[int, asyncio.Future]] = {}
         self.polling: dict[int, int] = {}
         self.last_poll: dict[int, float] = {}
+        self.inflight: dict[tuple[int, str], asyncio.Future] = {}
 
     def connected(self, probe_id: int) -> bool:
         return self.polling.get(probe_id, 0) > 0 or time.monotonic() - self.last_poll.get(probe_id, -1e9) < CONNECTED_FOR
@@ -56,13 +57,24 @@ class Hub:
         return self.queues.setdefault(probe_id, asyncio.Queue())
 
     async def poll(self, probe_id: int, wait: float = POLL_WAIT) -> list[dict]:
-        """What the site should answer now (empty after `wait` seconds when nothing came)."""
+        """What the site should answer now (empty after `wait` seconds when nothing came). A request that nobody waits for any more (the page gave up on it)
+        is dropped here: answering it late would only keep the site busy while the pages it matters for time out as well."""
         queue = self._queue(probe_id)
         self.polling[probe_id] = self.polling.get(probe_id, 0) + 1
         try:
-            items = [await asyncio.wait_for(queue.get(), wait)]
+            deadline = time.monotonic() + wait
+            items: list[dict] = []
+            while not items:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    return []
+                item = await asyncio.wait_for(queue.get(), left)
+                if item["id"] in self.waiting:
+                    items.append(item)
             while not queue.empty() and len(items) < 20:
-                items.append(queue.get_nowait())
+                item = queue.get_nowait()
+                if item["id"] in self.waiting:
+                    items.append(item)
             return items
         except asyncio.TimeoutError:
             return []
@@ -71,18 +83,38 @@ class Hub:
             self.last_poll[probe_id] = time.monotonic()
 
     async def ask(self, probe_id: int, path: str, timeout: float = ANSWER_TIMEOUT) -> dict:
+        """Ask the site for one page of its API. The same question asked while it is still being answered (a page that polls, several tabs) shares that one answer
+        instead of queueing a copy for every call."""
         if not self.connected(probe_id):
             raise SiteOffline("this site is not connected right now (it opens the connection itself; check that it is running and that it allows viewing)")
+        key = (probe_id, path)
+        shared = self.inflight.get(key)
+        if shared is not None and not shared.done():
+            return await self._wait(shared, timeout)
         request_id = secrets.token_hex(8)
         future: asyncio.Future = asyncio.get_running_loop().create_future()
         self.waiting[request_id] = (probe_id, future)
+        self.inflight[key] = future
         try:
             await self._queue(probe_id).put({"id": request_id, "method": "GET", "path": path})
-            return await asyncio.wait_for(future, timeout)
-        except asyncio.TimeoutError:
-            raise SiteOffline("the site did not answer in time") from None
+            return await self._wait(future, timeout)
         finally:
             self.waiting.pop(request_id, None)
+            if self.inflight.get(key) is future:
+                del self.inflight[key]
+            if not future.done():
+                future.cancel()          # whoever shared it stops waiting too
+
+    @staticmethod
+    async def _wait(future: asyncio.Future, timeout: float) -> dict:
+        try:
+            return await asyncio.wait_for(asyncio.shield(future), timeout)
+        except asyncio.TimeoutError:
+            raise SiteOffline("the site did not answer in time") from None
+        except asyncio.CancelledError:
+            if future.cancelled():          # the question was given up by the one who asked it first
+                raise SiteOffline("the site did not answer in time") from None
+            raise                           # this caller itself was cancelled (the browser went away)
 
     def answer(self, probe_id: int, request_id: str, response: dict) -> bool:
         entry = self.waiting.get(request_id)
@@ -152,7 +184,7 @@ def is_relay(request) -> bool:
     return bool(client and client.host == "relay" and header and secrets.compare_digest(header, secret_for(request.app)))
 
 
-async def serve(app, send_answer, item: dict[str, Any]) -> None:
+async def serve(app, send_answer, item: dict[str, Any], executor=None) -> None:
     """Answer one queued request and hand the answer back with `send_answer(request_id, payload)` (a blocking call, run in a thread)."""
     path = item.get("path")
     if item.get("method") != "GET" or not allowed_path(path):
@@ -164,4 +196,4 @@ async def serve(app, send_answer, item: dict[str, Any]) -> None:
             log.exception("relayed request failed")
             status, ctype, body = 500, "application/json", json.dumps({"detail": "the site could not answer"}).encode()
     payload = {"status": status, "content_type": ctype, "body": base64.b64encode(body).decode()}
-    await asyncio.to_thread(send_answer, str(item.get("id")), payload)
+    await asyncio.get_running_loop().run_in_executor(executor, send_answer, str(item.get("id")), payload)

@@ -153,3 +153,4 @@ input.inline-number { width: 5.5em; }
 .settings-content .table th, .settings-content .table td { padding-top: 5px; padding-bottom: 5px; }
 .preset-row { margin: 4px 0 6px; } .preset-row .hint { margin: 0; }
 .gap-list { margin: 4px 0; } .gap-list summary { cursor: pointer; color: var(--muted); font-size: .85rem; } .gap-list ul { margin: 4px 0 0; padding-left: 1.2rem; }
+.site-banner .site-slow { color: var(--warn, #b26a00); font-weight: 600; }
