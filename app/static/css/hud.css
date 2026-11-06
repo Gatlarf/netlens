@@ -110,8 +110,13 @@
 .hud-panel-head h3 { margin: 0; font-size: 0.72em; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); }
 .hud-views { margin: 0; }
 .hud-cap { margin: 4px 0 0; font-size: 0.68em; letter-spacing: 0.08em; color: var(--muted); }
-.hud-radar .blip.off { animation: hud-pulse 1.1s ease-in-out infinite; }
 @keyframes hud-pulse { 50% { opacity: 0.25; } }
+/* a blip glows once when a check of its device has run (offline ones too); a device that is down no longer blinks all the time */
+.hud-radar .blip.ping { animation: hud-ping 1.1s ease-out 1; }
+@keyframes hud-ping {
+  0% { filter: drop-shadow(0 0 16px var(--blip)) brightness(2); stroke: var(--blip); stroke-width: 7; stroke-opacity: 0.85; }
+  100% { filter: drop-shadow(0 0 5px var(--blip)) brightness(1); stroke: var(--blip); stroke-width: 0; stroke-opacity: 0; }
+}
 .hud-radar .blip.crit { stroke: #fff; stroke-width: 1.2; }
 .hud-stats { display: flex; gap: 18px; flex-wrap: wrap; justify-content: space-around; font-size: 0.8em; }
 .hud-stats b { display: block; font-size: 1.7em; color: var(--accent); text-shadow: 0 0 10px rgba(0, 229, 255, 0.6); }

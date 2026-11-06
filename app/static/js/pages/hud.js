@@ -199,6 +199,7 @@ function radar() {
         dot.setAttribute("r", d.tier === "critical" ? 6 : 4);
         dot.setAttribute("fill", d.online ? COLOUR.ok : COLOUR.bad);
         dot.style.filter = `drop-shadow(0 0 5px ${d.online ? COLOUR.ok : COLOUR.bad})`;
+        dot.style.setProperty("--blip", d.online ? COLOUR.ok : COLOUR.bad);       // the glow of a check takes the colour of the state
       }
       const move = `translate(${pos.x.toFixed(1)}px, ${pos.y.toFixed(1)}px)`;
       if (dot.style.transform !== move) dot.style.transform = move;
@@ -208,6 +209,13 @@ function radar() {
       dot.firstChild.textContent = `${d.custom_name || d.hostname || d.primary_ip}${d.online ? "" : " (offline)"}${mode === "response" && r && r.rtt_ms != null ? ` · ${r.rtt_ms} ms` : ""}`;
     }
     for (const [id, dot] of dots) if (!seen.has(id)) { dot.remove(); dots.delete(id); }
+  };
+  // a check of these devices just ran: their blips glow once (online and offline alike)
+  s.flash = (ids) => {
+    const lit = ids.map((id) => dots.get(id)).filter(Boolean);
+    for (const dot of lit) dot.classList.remove("ping");
+    if (lit.length) void s.getBoundingClientRect();                       // restart the animation of a blip that is still glowing
+    for (const dot of lit) dot.classList.add("ping");
   };
   return s;
 }
@@ -397,7 +405,9 @@ export async function render(container) {
     try {
       const rows = await get("/api/uptime/latest");
       if (disposed) return;
+      const before = rtt;
       rtt = new Map(rows.map((r) => [r.id, r]));
+      if (before.size) radarSvg.flash(rows.filter((r) => { const b = before.get(r.id); return b && b.ts !== r.ts; }).map((r) => r.id));       // a new check since the last look
       if (view === "response" && lastList) drawRadar();
     } catch (err) { /* the next round tries again */ }
   }

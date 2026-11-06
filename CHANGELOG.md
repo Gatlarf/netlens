@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.338 — 2026-11-06
+
+### Changed
+- **HUD radar: a blip glows when its device is checked.** Each time a check of a device has run (the ping of a scan or of the fast beat), its blip flashes once with a ring in its own colour, green for online and red for offline. Devices that are down no longer blink all the time; they glow on every check like the others, so a steady red blip means "checked and still down". Reduced-motion settings still switch the animation off.
+
 ## 0.4.337 — 2026-11-06
 
 ### Fixed
