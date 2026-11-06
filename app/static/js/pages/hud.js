@@ -138,7 +138,7 @@ function layoutGroup(devices, all) {
 }
 
 function radar() {
-  const s = svg("svg", { viewBox: "-80 0 660 500", role: "img", "aria-label": "Radar of all devices; red blips are offline" });
+  const s = svg("svg", { viewBox: "8 8 484 484", role: "img", "aria-label": "Radar of all devices; red blips are offline" });
   const defs = svg("defs");
   const grad = svg("linearGradient", { id: "hudsweep", x1: 0, y1: 0, x2: 1, y2: 0 });
   grad.append(svg("stop", { offset: "0", "stop-color": COLOUR.cyan, "stop-opacity": 0 }), svg("stop", { offset: "1", "stop-color": COLOUR.cyan, "stop-opacity": 0.55 }));
@@ -181,6 +181,7 @@ function radar() {
   // devices: those to show; ctx: { mode, all (every device, so a view keeps its layout when the filter changes), tree (the hierarchy), rtt (Map id -> latest response) }
   s.update = (devices, ctx) => {
     const mode = ctx.mode;
+    s.setAttribute("viewBox", mode === "group" ? "-80 0 660 500" : "8 8 484 484");       // only the group view writes names beside the circle; the others use all the room for the radar itself
     const { at, legend: items } = mode === "depth" ? layoutDepth(devices, ctx.tree) : mode === "group" ? layoutGroup(devices, ctx.all) : mode === "response" ? layoutResponse(devices, ctx.rtt) : layoutHash(devices);
     drawLegend(items, mode);
     const seen = new Set();
