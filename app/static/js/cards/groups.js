@@ -9,7 +9,7 @@ function fill(card, groups) {
   card.appendChild(h("p", { class: "hint" },
     "Put devices in groups such as rooms, floors or owners. A device is in one group. The map can colour devices by group and show one group at a time, " +
     "the Devices page can filter and set groups for many devices at once, and Home Assistant uses the group as the area of a device. " +
-    "Set a device's group on its page, or from the Devices page."));
+    "Set a device's group on its page or from the Devices page, or add many devices at once with \"Add devices to a group\" below."));
 
   if (groups.length) {
     const table = h("table", { class: "table groups" });
@@ -57,6 +57,73 @@ function fill(card, groups) {
     }
   });
   card.appendChild(form);
+  if (groups.length) card.appendChild(bulkSection(card, groups));
+}
+
+// Several devices into one group at once: pick the group, filter the list, tick the devices.
+function bulkSection(card, groups) {
+  const box = h("div", { class: "edit-form", id: "bulk-group" });
+  box.appendChild(h("h3", {}, "Add devices to a group"));
+  const target = h("select", { "aria-label": "Group to put the devices in" },
+    ...groups.map((g) => h("option", { value: String(g.id) }, g.name)),
+    h("option", { value: "" }, "(no group: take them out of their group)"));
+  const search = h("input", { type: "search", placeholder: "Filter by name, address or group", "aria-label": "Filter the devices" });
+  const onlyFree = h("input", { type: "checkbox", checked: true });
+  const list = h("div", { class: "bulk-list", style: "max-height:22rem;overflow:auto;border:1px solid var(--border, #8884);border-radius:var(--radius-sm);padding:6px" }, h("p", { class: "hint" }, "Loading devices…"));
+  const count = h("span", { class: "hint" });
+  const apply = h("button", { type: "button", class: "btn primary", disabled: true }, "Add to group");
+  const selectShown = h("button", { type: "button", class: "btn" }, "Select all shown");
+  const clearAll = h("button", { type: "button", class: "btn" }, "Clear selection");
+
+  let devices = [];
+  const chosen = new Set();
+  const shown = () => {
+    const q = search.value.trim().toLowerCase();
+    return devices.filter((d) => (!onlyFree.checked || d.group_id == null)
+      && (!q || [d.name, d.primary_ip, d.group].some((v) => (v || "").toLowerCase().includes(q))));
+  };
+  const refreshCount = () => {
+    count.textContent = `${chosen.size} selected`;
+    apply.disabled = chosen.size === 0;
+  };
+  const draw = () => {
+    clear(list);
+    const rows = shown();
+    if (!rows.length) list.appendChild(h("p", { class: "hint" }, devices.length ? "No device matches." : "No devices."));
+    for (const d of rows) {
+      const tick = h("input", { type: "checkbox", checked: chosen.has(d.id) });
+      tick.addEventListener("change", () => { tick.checked ? chosen.add(d.id) : chosen.delete(d.id); refreshCount(); });
+      list.appendChild(h("label", { style: "display:flex;gap:8px;align-items:center;padding:2px 4px" }, tick,
+        h("span", {}, d.name || d.primary_ip || `#${d.id}`), h("span", { class: "hint" }, [d.primary_ip, d.group ? `in ${d.group}` : "no group"].filter(Boolean).join(" · "))));
+    }
+    refreshCount();
+  };
+  search.addEventListener("input", draw);
+  onlyFree.addEventListener("change", draw);
+  selectShown.addEventListener("click", () => { shown().forEach((d) => chosen.add(d.id)); draw(); });
+  clearAll.addEventListener("click", () => { chosen.clear(); draw(); });
+  apply.addEventListener("click", async () => {
+    const group_id = target.value === "" ? null : Number(target.value);
+    const name = target.selectedOptions[0].textContent;
+    try {
+      const res = await api("/api/devices/group", { method: "POST", body: { ids: [...chosen], group_id } });
+      toast(`${res.changed} device${res.changed === 1 ? "" : "s"} ${group_id === null ? "taken out of their group" : `put in ${name}`}`, "success");
+      fill(card, (await get("/api/groups")).groups);
+    } catch (err) {
+      toast(err.message || "Could not change the groups", "error");
+    }
+  });
+
+  box.appendChild(h("div", { class: "field" }, h("label", {}, "Group"), target));
+  box.appendChild(h("div", { class: "field" }, h("label", {}, "Devices"), search));
+  box.appendChild(h("label", { style: "display:flex;gap:8px;align-items:center" }, onlyFree, "Only devices without a group"));
+  box.appendChild(list);
+  box.appendChild(h("div", { class: "btn-row" }, apply, selectShown, clearAll, count));
+  get("/api/devices").then((all) => {
+    devices = all.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    draw();
+  }).catch((err) => { clear(list); list.appendChild(h("p", { class: "hint" }, err.message || "Could not load the devices")); });
+  return box;
 }
 
 export async function buildGroupsCard() {

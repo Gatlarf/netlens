@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.336 — 2026-11-06
+
+### Added
+- **Add many devices to a group at once.** Settings → Groups has a new "Add devices to a group" section: pick the group, filter the device list (by name, address or group, by default only devices without a group), tick devices or press "Select all shown", and add them in one step. The same section can take devices out of their group.
+
 ## 0.4.335 — 2026-11-03
 
 ### Fixed
