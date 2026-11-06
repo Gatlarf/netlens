@@ -165,7 +165,10 @@ function radar() {
     legendKey = key;
     frame.classList.toggle("quiet", mode === "depth" || mode === "group");               // the fixed rings give way to the ones of the view
     clear(legend);
+    let lastSpoke = null;
     for (const it of items) {
+      if (it.kind === "spoke") lastSpoke = it.ang;
+      if (it.kind === "slice-label" && lastSpoke != null) it.span = 2 * (it.ang - lastSpoke);        // the width of the slice, from its first spoke to the middle
       if (it.kind === "ring") legend.appendChild(svg("circle", { class: "lring", cx: C, cy: C, r: it.r }));
       else if (it.kind === "ring-label") legend.appendChild(Object.assign(svg("text", { class: "lbl", x: C + 4, y: C - it.r - 3 }), { textContent: it.text }));
       else if (it.kind === "spoke") legend.appendChild(svg("line", { class: "axis spoke", x1: C, y1: C, x2: C + Math.cos(it.ang) * 240, y2: C + Math.sin(it.ang) * 240 }));
@@ -173,39 +176,21 @@ function radar() {
     drawSliceNames(items.filter((it) => it.kind === "slice-label"));
   }
 
-  // The names of the groups sit in the four corners of the square (the circle leaves them free) and a thin line in the group's colour joins each name to its slice.
-  // A corner holds three names; the ones that do not fit are written inside their slice, near the rim.
+  // The name of a group is written along the rim, just outside the circle, in the middle of its slice and in its colour: no lines, and a name never gets more room than its
+  // own slice, so two names cannot run into each other. The text is turned to follow the circle and never stands on its head.
   function drawSliceNames(labels) {
-    const slots = { tl: [], tr: [], bl: [], br: [] }, inside = [];
+    const FONT = 13, CHAR = FONT * 0.62;
     for (const it of labels) {
-      const a = Math.atan2(Math.sin(it.ang), Math.cos(it.ang));                       // -PI..PI, 0 = right, PI/2 = down
-      const quad = `${Math.sin(a) < 0 ? "t" : "b"}${Math.cos(a) < 0 ? "l" : "r"}`;
-      slots[quad].push({ it, a, away: Math.abs(Math.abs(Math.sin(a)) - 1) });          // how far from the top or bottom of the circle
-    }
-    const FONT = 14, STEP = 19, CHAR = FONT * 0.6;
-    for (const [quad, list] of Object.entries(slots)) {
-      list.sort((p, q) => p.away - q.away);
-      list.forEach((e, row) => {
-        if (row >= 3) { inside.push(e); return; }
-        const top = quad[0] === "t", left = quad[1] === "l";
-        const y = top ? 26 + row * STEP : 474 - row * STEP;
-        const name = e.it.text.length > 12 ? `${e.it.text.slice(0, 11)}…` : e.it.text;
-        const x = left ? 14 : 486, width = name.length * CHAR;
-        const rim = { x: C + Math.cos(e.a) * 240, y: C + Math.sin(e.a) * 240 };
-        const inner = { x: left ? x + width + 4 : x - width - 4, y: y - FONT * 0.35 };
-        legend.appendChild(svg("line", { class: "slice-link", x1: rim.x, y1: rim.y, x2: inner.x, y2: inner.y, stroke: e.it.colour }));
-        legend.appendChild(svg("circle", { class: "slice-dot", cx: rim.x, cy: rim.y, r: 2.5, fill: e.it.colour }));
-        const t = svg("text", { class: "lbl slice", x, y, "text-anchor": left ? "start" : "end", fill: e.it.colour });
-        t.style.fontSize = `${FONT}px`; t.style.fill = e.it.colour;
-        t.textContent = name;
-        if (name !== e.it.text) t.appendChild(Object.assign(svg("title"), { textContent: e.it.text }));
-        legend.appendChild(t);
-      });
-    }
-    for (const e of inside) {
-      const t = svg("text", { class: "lbl slice", x: C + Math.cos(e.a) * 205, y: C + Math.sin(e.a) * 205 + 4, "text-anchor": "middle", fill: e.it.colour });
-      t.style.fontSize = "12px"; t.style.fill = e.it.colour;
-      t.textContent = e.it.text.length > 12 ? `${e.it.text.slice(0, 11)}…` : e.it.text;
+      const a = Math.atan2(Math.sin(it.ang), Math.cos(it.ang));                        // -PI..PI, 0 = right, PI/2 = down
+      const bottom = Math.sin(a) > 0.0001;
+      const room = (it.span || Math.PI / 4) * 246 * 0.92;                              // the arc of its slice, in drawing units
+      const fit = Math.max(3, Math.min(18, Math.floor(room / CHAR)));
+      const name = it.text.length > fit ? `${it.text.slice(0, fit - 1)}…` : it.text;
+      const r = bottom ? 258 : 247;                                                    // the text grows away from its baseline: outward on top, inward (towards the circle) below
+      const t = svg("text", { class: "lbl slice", "text-anchor": "middle", transform: `translate(${(C + Math.cos(a) * r).toFixed(1)} ${(C + Math.sin(a) * r).toFixed(1)}) rotate(${(a * 180 / Math.PI + 90 + (bottom ? 180 : 0)).toFixed(1)})` });
+      t.style.fontSize = `${FONT}px`; t.style.fill = it.colour;
+      t.textContent = name;
+      if (name !== it.text) t.appendChild(Object.assign(svg("title"), { textContent: it.text }));
       legend.appendChild(t);
     }
   }
@@ -213,6 +198,7 @@ function radar() {
   // devices: those to show; ctx: { mode, all (every device, so a view keeps its layout when the filter changes), tree (the hierarchy), rtt (Map id -> latest response) }
   s.update = (devices, ctx) => {
     const mode = ctx.mode;
+    s.setAttribute("viewBox", mode === "group" ? "-8 -8 516 516" : "8 8 484 484");       // the group names are written round the circle, so that view needs a little more room
     const { at, legend: items } = mode === "depth" ? layoutDepth(devices, ctx.tree) : mode === "group" ? layoutGroup(devices, ctx.all) : mode === "response" ? layoutResponse(devices, ctx.rtt) : layoutHash(devices);
     drawLegend(items, mode);
     const seen = new Set();

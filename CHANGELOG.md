@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.347 — 2026-11-06
+
+### Changed
+- **HUD radar, Group view: tidier names.** The names in the corners with lines to the slices looked messy with many groups (long lines crossing each other and the radar). Each group name is now written along the rim, outside the circle, in the middle of its own slice and in its colour. There are no lines, a name only gets the width of its slice (longer names are cut with "…", hover shows the whole name), and the text follows the circle without standing on its head. The radar is a little smaller in this view only, to leave room for the names.
+
 ## 0.4.346 — 2026-11-06
 
 ### Changed
