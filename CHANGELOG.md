@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.341 — 2026-11-06
+
+### Fixed
+- **The HUD page is readable in the light theme.** The page was drawn for dark backgrounds, so in the light theme the panels came out grey with unreadable text and neon colours. In the light theme the panels are now light with dark text, and the radar, the gauges and the traffic graph are dark instrument screens so their colours stay clear; the event and attention lists use darker red and amber. The dark theme and the HUD look are unchanged.
+
 ## 0.4.340 — 2026-11-06
 
 ### Added

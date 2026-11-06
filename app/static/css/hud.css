@@ -236,3 +236,48 @@
 .hud-revents { min-height: 0; }
 .hud-radar-panel.is-full .hud-revents { font-size: 0.85em; }
 .hud-radar-panel:fullscreen, .hud-radar-panel.is-full { --text: #cfeeff; --muted: #6d9db6; --accent: #00e5ff; --border: #0b4a63; }
+
+/* ---- the HUD page in the light theme: light panels, dark instrument screens (the dark theme and the HUD look are untouched; the rules below are written twice,
+   once for a light theme that was chosen and once for a light theme that follows the system) ---- */
+:where(:root[data-theme="light"]) .hud-title, :where(:root[data-theme="light"]) .hud-clock, :where(:root[data-theme="light"]) .hud-stats b { text-shadow: none; }
+:where(:root[data-theme="light"]) .hud-stats b { color: #0b6fa4; }
+:where(:root[data-theme="light"]) .hud-panel { background: linear-gradient(135deg, #ffffff, #eef5fa); border-color: #b6cfdd; box-shadow: 0 1px 6px rgba(15, 60, 90, 0.12); }
+:where(:root[data-theme="light"]) .hud-gauge:hover, :where(:root[data-theme="light"]) .hud-gauge:focus-visible, :where(:root[data-theme="light"]) .hud-stats a:hover, :where(:root[data-theme="light"]) .hud-stats a:focus-visible { box-shadow: none; background: rgba(11, 111, 164, 0.08); }
+:where(:root[data-theme="light"]) .hud-feed li:hover { background: rgba(11, 111, 164, 0.07); }
+:where(:root[data-theme="light"]) .hud-attn a { text-decoration-color: rgba(11, 111, 164, 0.5); }
+:where(:root[data-theme="light"]) .hud-feed li.bad { color: #b4233c; }
+:where(:root[data-theme="light"]) .hud-feed li.warn { color: #8a5200; }
+:where(:root[data-theme="light"]) .hud-ticker b { color: #0f7a4d; }
+:where(:root[data-theme="light"]) .hud-ticker b.bad { color: #b4233c; }
+:where(:root[data-theme="light"]) .hud-scope button[aria-pressed="true"], :where(:root[data-theme="light"]) .hud-toggle[aria-pressed="true"] { background: rgba(11, 111, 164, 0.14); color: #0b5f8f; box-shadow: none; }
+:where(:root[data-theme="light"]) .hud-toggle[aria-pressed="true"] { border-color: #0b6fa4; }
+/* the instruments stay dark screens: the neon colours of the radar, the rings and the graph need a dark background to be readable */
+:where(:root[data-theme="light"]) .hud-radar, :where(:root[data-theme="light"]) .hud-gauges, :where(:root[data-theme="light"]) .hud-tchart, :where(:root[data-theme="light"]) .hud-rstrip { background: radial-gradient(circle at 50% 45%, #06293c, #020f19 80%); border: 1px solid #0b4a63; border-radius: var(--radius-sm); }
+:where(:root[data-theme="light"]) .hud-gauges { padding: 8px 6px 4px; }
+:where(:root[data-theme="light"]) .hud-tchart { padding: 2px; }
+:where(:root[data-theme="light"]) .hud-gauge .cap, :where(:root[data-theme="light"]) .hud-radar .lbl, :where(:root[data-theme="light"]) .hud-tchart span, :where(:root[data-theme="light"]) .hud-const-note { color: #8fb9cf; fill: #8fb9cf; }
+:where(:root[data-theme="light"]) .hud-gauge .cap, :where(:root[data-theme="light"]) .hud-const-note, :where(:root[data-theme="light"]) .hud-tchart span { fill: none; }
+:where(:root[data-theme="light"]) .hud-const-tip { color: #cfeeff; }
+:where(:root[data-theme="light"]) .hud-rstrip { height: 44px; }
+@media (prefers-color-scheme: light) {
+  :where(:root:not([data-theme])) .hud-title, :where(:root:not([data-theme])) .hud-clock, :where(:root:not([data-theme])) .hud-stats b { text-shadow: none; }
+  :where(:root:not([data-theme])) .hud-stats b { color: #0b6fa4; }
+  :where(:root:not([data-theme])) .hud-panel { background: linear-gradient(135deg, #ffffff, #eef5fa); border-color: #b6cfdd; box-shadow: 0 1px 6px rgba(15, 60, 90, 0.12); }
+  :where(:root:not([data-theme])) .hud-gauge:hover, :where(:root:not([data-theme])) .hud-gauge:focus-visible, :where(:root:not([data-theme])) .hud-stats a:hover, :where(:root:not([data-theme])) .hud-stats a:focus-visible { box-shadow: none; background: rgba(11, 111, 164, 0.08); }
+  :where(:root:not([data-theme])) .hud-feed li:hover { background: rgba(11, 111, 164, 0.07); }
+  :where(:root:not([data-theme])) .hud-attn a { text-decoration-color: rgba(11, 111, 164, 0.5); }
+  :where(:root:not([data-theme])) .hud-feed li.bad { color: #b4233c; }
+  :where(:root:not([data-theme])) .hud-feed li.warn { color: #8a5200; }
+  :where(:root:not([data-theme])) .hud-ticker b { color: #0f7a4d; }
+  :where(:root:not([data-theme])) .hud-ticker b.bad { color: #b4233c; }
+  :where(:root:not([data-theme])) .hud-scope button[aria-pressed="true"], :where(:root:not([data-theme])) .hud-toggle[aria-pressed="true"] { background: rgba(11, 111, 164, 0.14); color: #0b5f8f; box-shadow: none; }
+  :where(:root:not([data-theme])) .hud-toggle[aria-pressed="true"] { border-color: #0b6fa4; }
+  /* the instruments stay dark screens: the neon colours of the radar, the rings and the graph need a dark background to be readable */
+  :where(:root:not([data-theme])) .hud-radar, :where(:root:not([data-theme])) .hud-gauges, :where(:root:not([data-theme])) .hud-tchart, :where(:root:not([data-theme])) .hud-rstrip { background: radial-gradient(circle at 50% 45%, #06293c, #020f19 80%); border: 1px solid #0b4a63; border-radius: var(--radius-sm); }
+  :where(:root:not([data-theme])) .hud-gauges { padding: 8px 6px 4px; }
+  :where(:root:not([data-theme])) .hud-tchart { padding: 2px; }
+  :where(:root:not([data-theme])) .hud-gauge .cap, :where(:root:not([data-theme])) .hud-radar .lbl, :where(:root:not([data-theme])) .hud-tchart span, :where(:root:not([data-theme])) .hud-const-note { color: #8fb9cf; fill: #8fb9cf; }
+  :where(:root:not([data-theme])) .hud-gauge .cap, :where(:root:not([data-theme])) .hud-const-note, :where(:root:not([data-theme])) .hud-tchart span { fill: none; }
+  :where(:root:not([data-theme])) .hud-const-tip { color: #cfeeff; }
+  :where(:root:not([data-theme])) .hud-rstrip { height: 44px; }
+}
