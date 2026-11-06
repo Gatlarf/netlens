@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.339 — 2026-11-06
+
+### Changed
+- **HUD radar: the glow comes when the sweep arm passes the blip.** A blip whose device was checked no longer lights up at once; it waits and glows at the moment the turning arm of the radar reaches it, so the radar looks like it is doing the checking. Devices checked since the last turn glow as the arm sweeps by, one after the other, instead of all together.
+
 ## 0.4.338 — 2026-11-06
 
 ### Changed

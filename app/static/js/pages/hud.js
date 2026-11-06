@@ -56,6 +56,7 @@ const CAPTION = {
   response: "Distance: response time now (log scale) · offline on the rim",
 };
 const R = 230, C = 250;
+const SWEEP_MS = 6000;       // one turn of the sweep arm (hud-spin in hud.css)
 const RESPONSE_RINGS = [[5, 60], [20, 120], [80, 180], [300, 235]];       // the ms written on each ring
 const rttRadius = (ms) => Math.min(0.98, Math.log10(Math.max(1, ms)) / Math.log10(300) * 0.98);
 const polar = (ang, frac) => ({ x: C + Math.cos(ang) * R * frac, y: C + Math.sin(ang) * R * frac });
@@ -203,6 +204,7 @@ function radar() {
       }
       const move = `translate(${pos.x.toFixed(1)}px, ${pos.y.toFixed(1)}px)`;
       if (dot.style.transform !== move) dot.style.transform = move;
+      dot.__at = pos;                                                    // where the blip is going (the sweep is timed on this)
       if (born) requestAnimationFrame(() => requestAnimationFrame(() => { dot.style.transition = ""; }));      // a new blip appears in place; only later moves glide
       const r = ctx.rtt && ctx.rtt.get(d.id);
       dot.setAttribute("aria-label", `Open ${d.custom_name || d.hostname || d.primary_ip}`);
@@ -210,10 +212,23 @@ function radar() {
     }
     for (const [id, dot] of dots) if (!seen.has(id)) { dot.remove(); dots.delete(id); }
   };
-  // a check of these devices just ran: their blips glow once (online and offline alike)
+  // a check of these devices just ran: each blip glows once when the arm of the sweep passes over it (online and offline alike).
+  // The arm turns clockwise once every SWEEP_MS and its bright edge points straight up at phase 0; the glow is an animation with a delay of exactly the time the edge needs to get there.
   s.flash = (ids) => {
-    const lit = ids.map((id) => dots.get(id)).filter(Boolean);
-    for (const dot of lit) dot.classList.remove("ping");
+    const spin = sweep.getAnimations().find((a) => a.animationName === "hud-spin") || sweep.getAnimations()[0];
+    const phase = spin && spin.currentTime != null ? Number(spin.currentTime) % SWEEP_MS : null;
+    const now = performance.now();
+    const lit = [];
+    for (const id of ids) {
+      const dot = dots.get(id);
+      if (!dot || !dot.__at || (dot.__start && now < dot.__start)) continue;        // unknown, or already waiting for the arm
+      const toBlip = (Math.atan2(dot.__at.y - C, dot.__at.x - C) + Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI);       // clockwise from "up"
+      const wait = phase == null ? 0 : ((toBlip / (2 * Math.PI)) * SWEEP_MS - phase + SWEEP_MS) % SWEEP_MS;
+      dot.classList.remove("ping");
+      dot.style.animationDelay = `${Math.round(wait)}ms`;
+      dot.__start = now + wait;
+      lit.push(dot);
+    }
     if (lit.length) void s.getBoundingClientRect();                       // restart the animation of a blip that is still glowing
     for (const dot of lit) dot.classList.add("ping");
   };
