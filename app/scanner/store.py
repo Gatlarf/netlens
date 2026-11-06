@@ -20,6 +20,25 @@ def _hours_before(ts: str, hours: int) -> str:
     return (datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc) - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+MACLESS_HOLDER_DAYS = 7  # a device with a MAC that was seen this recently still owns its address
+
+
+def _with_known_mac(conn: Any, host: ScanHost, now: str) -> ScanHost:
+    """An answer without a MAC (a scan that could not read the ARP table) says nothing about who answered, so it is not a new device.
+
+    If the address belongs to a device that has a MAC and was seen in the last days, and no MAC-less device was ever stored for the address,
+    the answer is attributed to that device. A different MAC on the address is still an address takeover (event `ip_reused`)."""
+    if host.mac is not None:
+        return host
+    if conn.execute("SELECT 1 FROM devices WHERE mac IS NULL AND primary_ip = ?", (host.ip,)).fetchone():
+        return host                      # a device that is only known by its address (behind a router): keep it as it is
+    owners = conn.execute("SELECT mac FROM devices WHERE mac IS NOT NULL AND primary_ip = ? AND last_seen >= ?",
+                          (host.ip, _hours_before(now, 24 * MACLESS_HOLDER_DAYS))).fetchall()
+    if len(owners) != 1:
+        return host                      # nobody, or more than one candidate: not clear who answered
+    return replace(host, mac=owners[0]["mac"])
+
+
 def save_scan_results(
     conn: Any,
     hosts: list[ScanHost],
@@ -64,6 +83,8 @@ def save_scan_results(
                 processed_hosts.append(host)
         else:
             processed_hosts.append(host)
+
+    processed_hosts = [_with_known_mac(conn, host, now) for host in processed_hosts]
 
     new_count = 0
     updated_count = 0

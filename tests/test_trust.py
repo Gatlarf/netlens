@@ -82,3 +82,26 @@ def test_an_ip_taken_over_by_another_device_is_noted_once(tmp_path):
     save_scan_results(conn, [host("10.0.0.7", "aa:00:00:00:00:03")], "quick", "2026-03-01T12:00:00Z")
     save_scan_results(conn, [host("10.0.0.7", "aa:00:00:00:00:04")], "quick", NOW)
     assert conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'ip_reused'").fetchone()[0] == 1
+
+
+def test_an_answer_without_a_mac_is_the_device_that_holds_the_address(tmp_path):
+    """A scan that could not read the MAC (for example no ARP table) must not create a second device for a known address."""
+    conn = connect(tmp_path / "t.db")
+    init_db(conn)
+    save_scan_results(conn, [host("10.0.0.5", "aa:00:00:00:00:01")], "quick", NOW)
+    save_scan_results(conn, [host("10.0.0.5", None)], "quick", "2026-03-10T12:15:00Z")
+    assert conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM events WHERE kind IN ('ip_reused', 'device_new')").fetchone()[0] == 1   # only the first sighting
+    # a long-gone device does not claim the address: that is a new device
+    save_scan_results(conn, [host("10.0.0.9", "aa:00:00:00:00:09")], "quick", "2026-02-01T12:00:00Z")
+    save_scan_results(conn, [host("10.0.0.9", None)], "quick", NOW)
+    assert conn.execute("SELECT COUNT(*) FROM devices WHERE primary_ip = '10.0.0.9'").fetchone()[0] == 2
+
+
+def test_a_device_known_only_by_its_address_stays_separate(tmp_path):
+    conn = connect(tmp_path / "t.db")
+    init_db(conn)
+    save_scan_results(conn, [host("10.0.0.5", None)], "quick", NOW)
+    save_scan_results(conn, [host("10.0.0.5", "aa:00:00:00:00:01")], "quick", "2026-03-10T12:15:00Z")
+    save_scan_results(conn, [host("10.0.0.5", None)], "quick", "2026-03-10T12:30:00Z")
+    assert conn.execute("SELECT COUNT(*) FROM devices WHERE mac IS NULL").fetchone()[0] == 1
