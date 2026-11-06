@@ -34,6 +34,28 @@ def get_uptime_latest(request: Request, conn=Depends(get_conn)) -> list[dict]:
     return out
 
 
+@router.get("/uptime/replay")
+def get_uptime_replay(request: Request, hours: int = Query(24, ge=1, le=168), conn=Depends(get_conn)) -> dict:
+    """What the HUD time machine replays: for every device with checks in the last `hours`, its state at the start of the window (`initial`) and every
+    change after that. Only changes are returned, not the checks, so a week of a big network stays small. {from, to, changes: [{id, ts, up, initial}]}"""
+    from app.db import ago, utcnow
+
+    since = ago(hours=hours)
+    scope = scope_of(request)
+    allowed = devices_in_scope(conn, scope) if scope is not None else None
+    changes = []
+    for r in conn.execute(
+        "WITH s AS (SELECT device_id, ts, up, LAG(up) OVER (PARTITION BY device_id ORDER BY ts, id) AS prev FROM checks WHERE ts >= ?) "
+        "SELECT device_id, ts, up, prev FROM s WHERE prev IS NULL OR prev != up ORDER BY ts",
+        (since,),
+    ):
+        if allowed is not None and r["device_id"] not in allowed:
+            continue
+        first = r["prev"] is None
+        changes.append({"id": r["device_id"], "ts": since if first else r["ts"], "up": bool(r["up"]), "initial": first})
+    return {"from": since, "to": utcnow(), "changes": changes}
+
+
 @router.get("/uptime")
 def get_uptime_overview(request: Request, bars: int = Query(60, ge=1, le=240), range: Literal["6h", "24h", "7d", "30d"] | None = None) -> list[dict]:
     """Per-device heartbeat bars and 24h/7d/30d uptime, like Uptime Kuma's dashboard. With `range` each bar is a slice of that period with its

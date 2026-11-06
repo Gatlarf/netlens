@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.340 — 2026-11-06
+
+### Added
+- ★ **HUD: constellation and time machine.** The radar panel has two new views next to Hash, Depth, Group and Response. **Constellation** draws every device as a star and the network links as lines; each check sends a pulse of light from the top of the network down to the device, a device that does not answer flashes red, and everything behind a broken device turns grey. **Time machine** replays the last 6 hours, 24 hours or 7 days on the radar: drag the slider or press play, blips turn red as devices fail and a ring spreads from every change, and a strip shows how many devices were online with the incidents marked. It uses the stored checks (new `GET /api/uptime/replay`, which returns only the changes), so nothing new is collected. "Unreachable" is worked out from today's network layout, and containers have no checks, so they are not part of the replay.
+- ★ **HUD: full screen for the radar panel.** A "Full screen" button on the radar panel shows only that panel on the whole screen (Esc to leave), in every view.
+- **HUD: show containers.** A "Containers" switch adds the containers and apps that plugins report (Docker, LXC and so on) to the radar and the constellation, as small blips that circle their host. A click opens the host. The choice is remembered.
+
 ## 0.4.339 — 2026-11-06
 
 ### Changed

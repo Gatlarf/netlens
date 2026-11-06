@@ -1,12 +1,16 @@
 import { get } from "../api.js";
 import { h, clear, patch } from "../util.js";
+import { constellation } from "./hud_constellation.js";
+import { replay } from "./hud_replay.js";
 
 // EXPERIMENT: a full-screen command-centre view. It looks "streamed": the event list takes new events the moment the poll sees them (every 4 s), the gauges
 // and radar refresh every 15 s, and the ticker runs along the bottom. Nothing is stored; it is read-only and uses the same API as the other pages.
 const NS = "http://www.w3.org/2000/svg";
 const svg = (tag, attrs = {}) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v)); return n; };
 const COLOUR = { ok: "#00ffa3", warn: "#ffb020", bad: "#ff3b5c", cyan: "#00e5ff" };
-const hash = (n) => { let x = (Number(n) * 2654435761) >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; return (x ^ (x >>> 13)) >>> 0; };
+const num = (n) => { if (typeof n === "number") return n; let v = 7; for (const ch of String(n)) v = (Math.imul(v, 31) + ch.charCodeAt(0)) >>> 0; return v; };       // containers have text ids
+const cmp = (a, b) => (typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b)));
+const hash = (n) => { let x = (num(n) * 2654435761) >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; return (x ^ (x >>> 13)) >>> 0; };
 const pad = (n) => String(n).padStart(2, "0");
 const BAD = new Set(["device_offline", "service_down", "metric_critical", "probe_offline", "remote_service_down", "capacity_critical", "dhcp_rogue", "gateway_changed"]);
 const WARN = new Set(["metric_warning", "device_new", "container_restarting", "capacity_warning"]);
@@ -48,12 +52,14 @@ function gauge(label, href) {
 //   depth     the network as a tree: the top device in the middle, every level a ring further out, a branch keeps its own slice
 //   group     one slice per device group, the distance follows the importance
 //   response  the distance is the response time right now (log scale), the direction is arbitrary; offline devices sit on the rim
-const VIEWS = [["hash", "Hash"], ["depth", "Depth"], ["group", "Group"], ["response", "Response"]];
+const VIEWS = [["hash", "Hash"], ["depth", "Depth"], ["group", "Group"], ["response", "Response"], ["constellation", "Constellation"], ["replay", "Time machine"]];
 const CAPTION = {
   hash: "Distance: importance (critical in the middle) · direction: arbitrary but steady",
   depth: "Distance: levels below the top device · each branch has its own slice",
   group: "One slice per device group · distance: importance",
   response: "Distance: response time now (log scale) · offline on the rim",
+  constellation: "Stars are devices, lines are the network · a pulse of light is a check, red means it was not answered · grey: unreachable behind a broken device",
+  replay: "The radar as it was at the chosen moment, from the stored checks · \"unreachable\" is worked out from today's network layout · containers have no checks",
 };
 const R = 230, C = 250;
 const SWEEP_MS = 6000;       // one turn of the sweep arm (hud-spin in hud.css)
@@ -88,7 +94,7 @@ function layoutDepth(devices, tree) {
   for (const n of nodes.values()) { const p = nodes.has(n.parent_id) ? n.parent_id : null; if (!kids.has(p)) kids.set(p, []); kids.get(p).push(n.id); }
   const leaves = new Map();
   const count = (id) => { const k = kids.get(id) || []; const v = k.length ? k.reduce((a, c) => a + count(c), 0) : 1; leaves.set(id, v); return v; };
-  const roots = (kids.get(null) || []).slice().sort((a, b) => a - b);
+  const roots = (kids.get(null) || []).slice().sort(cmp);
   roots.forEach(count);
   const maxDepth = Math.max(1, ...[...nodes.values()].map((n) => n.depth || 0));
   const ring = (depth) => (depth === 0 ? 0.03 : 0.1 + 0.85 * depth / maxDepth);
@@ -99,7 +105,7 @@ function layoutDepth(devices, tree) {
     for (const id of ids) {
       const span = (a1 - a0) * leaves.get(id) / total;
       place.set(id, { ang: from + span / 2, depth });
-      walk((kids.get(id) || []).slice().sort((a, b) => a - b), from, from + span, depth + 1);
+      walk((kids.get(id) || []).slice().sort(cmp), from, from + span, depth + 1);
       from += span;
     }
   };
@@ -127,7 +133,7 @@ function layoutGroup(devices, all) {
   let from = -Math.PI / 2;
   for (const g of list) {
     const span = Math.PI * 2 * weight(g) / total;
-    const members = g.members.slice().sort((a, b) => (a.tier === "critical" ? 0 : 1) - (b.tier === "critical" ? 0 : 1) || a.id - b.id);
+    const members = g.members.slice().sort((a, b) => (a.tier === "critical" ? 0 : 1) - (b.tier === "critical" ? 0 : 1) || cmp(a.id, b.id));
     members.forEach((d, i) => { at.set(d.id, polar(from + span * (i + 0.5) / members.length, importance(d, hash(d.id)))); });
     legend.push({ kind: "spoke", ang: from }, { kind: "slice-label", ang: from + span / 2, text: g.name, colour: g.colour });
     from += span;
@@ -184,20 +190,24 @@ function radar() {
     const seen = new Set();
     for (const d of devices) {
       seen.add(d.id);
-      const pos = at.get(d.id) || polar(hashAngle(d.id), 0.9);
+      let pos = at.get(d.id) || polar(hashAngle(d.id), 0.9);
+      if (d.virtual && mode !== "depth") {                                  // a container circles its host
+        const host = at.get(d.host_id);
+        if (host) { const a = hashAngle(d.id); const rr = 9 + (hash(d.id) % 3) * 4; pos = { x: host.x + Math.cos(a) * rr, y: host.y + Math.sin(a) * rr, dim: host.dim }; }
+      }
       let dot = dots.get(d.id);
       const born = !dot;
       if (born) {
         dot = svg("circle", { cx: 0, cy: 0, tabindex: 0, role: "link" });
-        const open = () => { location.hash = `#/device/${d.id}`; };
+        const open = () => { location.hash = `#/device/${d.virtual ? d.host_id : d.id}`; };       // a container has no page of its own: its host's
         dot.addEventListener("click", open);
         dot.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
         dot.style.transition = "none"; dot.appendChild(svg("title")); dots.set(d.id, dot); blips.appendChild(dot);
       }
-      const cls = `blip ${d.online ? "on" : "off"}${d.tier === "critical" ? " crit" : ""}${pos.dim ? " dim" : ""}`;
+      const cls = `blip ${d.online ? "on" : "off"}${d.tier === "critical" ? " crit" : ""}${pos.dim ? " dim" : ""}${d.virtual ? " virt" : ""}`;
       if (dot.getAttribute("class") !== cls) {
         dot.setAttribute("class", cls);
-        dot.setAttribute("r", d.tier === "critical" ? 6 : 4);
+        dot.setAttribute("r", d.virtual ? 2.4 : d.tier === "critical" ? 6 : 4);
         dot.setAttribute("fill", d.online ? COLOUR.ok : COLOUR.bad);
         dot.style.filter = `drop-shadow(0 0 5px ${d.online ? COLOUR.ok : COLOUR.bad})`;
         dot.style.setProperty("--blip", d.online ? COLOUR.ok : COLOUR.bad);       // the glow of a check takes the colour of the state
@@ -207,10 +217,19 @@ function radar() {
       dot.__at = pos;                                                    // where the blip is going (the sweep is timed on this)
       if (born) requestAnimationFrame(() => requestAnimationFrame(() => { dot.style.transition = ""; }));      // a new blip appears in place; only later moves glide
       const r = ctx.rtt && ctx.rtt.get(d.id);
-      dot.setAttribute("aria-label", `Open ${d.custom_name || d.hostname || d.primary_ip}`);
-      dot.firstChild.textContent = `${d.custom_name || d.hostname || d.primary_ip}${d.online ? "" : " (offline)"}${mode === "response" && r && r.rtt_ms != null ? ` · ${r.rtt_ms} ms` : ""}`;
+      dot.setAttribute("aria-label", `Open ${d.custom_name || d.name || d.hostname || d.primary_ip}`);
+      dot.firstChild.textContent = `${d.custom_name || d.name || d.hostname || d.primary_ip}${d.virtual ? " (container)" : ""}${d.online ? "" : " (offline)"}${mode === "response" && r && r.rtt_ms != null ? ` · ${r.rtt_ms} ms` : ""}`;
     }
     for (const [id, dot] of dots) if (!seen.has(id)) { dot.remove(); dots.delete(id); }
+  };
+  // a ring spreads from a blip (the time machine shows every change this way)
+  s.ring = (id, up) => {
+    const dot = dots.get(id), at = dot && dot.__at;
+    if (!at) return;
+    const ring = svg("circle", { class: "ripple", cx: at.x, cy: at.y, r: 6, fill: "none", stroke: up ? COLOUR.ok : COLOUR.bad });
+    blips.appendChild(ring);
+    ring.addEventListener("animationend", () => ring.remove());
+    setTimeout(() => ring.remove(), 1500);
   };
   // a check of these devices just ran: each blip glows once when the arm of the sweep passes over it (online and offline alike).
   // The arm turns clockwise once every SWEEP_MS and its bright edge points straight up at phase 0; the glow is an animation with a delay of exactly the time the edge needs to get there.
@@ -281,9 +300,21 @@ export async function render(container) {
       view = key;
       try { localStorage.setItem("netlens.hud.radar", key); } catch (e) { /* only this page remembers it */ }
       for (const [k, b] of Object.entries(viewBtns)) b.setAttribute("aria-pressed", String(k === view));
-      caption.textContent = CAPTION[view];
-      if (lastList) drawRadar();
+      applyView();
     } }, label))));
+  // the container switch: containers and apps that plugins report (they are no devices) circle their host
+  let showContainers = false;
+  try { showContainers = localStorage.getItem("netlens.hud.containers") === "1"; } catch (e) { /* not remembered */ }
+  const containerBtn = h("button", { type: "button", class: "hud-toggle", "aria-pressed": String(showContainers), title: "Also show containers and apps that plugins report (Docker, LXC ...). They circle their host.", onclick: async () => {
+    showContainers = !showContainers;
+    containerBtn.setAttribute("aria-pressed", String(showContainers));
+    try { localStorage.setItem("netlens.hud.containers", showContainers ? "1" : "0"); } catch (e) { /* only this page remembers it */ }
+    await loadTree();
+    if (lastList) drawRadar();
+  } }, "Containers");
+  const radarFs = h("button", { type: "button", class: "hud-fs", title: "Show only this panel on the whole screen (Esc to leave)", "aria-label": "Full screen for the radar", onclick: () => {
+    if (document.fullscreenElement) document.exitFullscreen(); else if (radarPanel.requestFullscreen) radarPanel.requestFullscreen().catch(() => {});
+  } }, "Full screen");
   const clock = h("span", { class: "hud-clock" });
   const fsButton = h("button", { type: "button", class: "hud-fs", title: "Show the HUD on the whole screen (Esc to leave)", "aria-label": "Full screen", onclick: () => {
     if (document.fullscreenElement) document.exitFullscreen(); else if (root.requestFullscreen) root.requestFullscreen().catch(() => {});
@@ -325,6 +356,12 @@ export async function render(container) {
   const radarBox = h("div", { class: "hud-radar" });
   const radarSvg = radar();
   radarBox.appendChild(radarSvg);
+  const stars = constellation({ onOpen: (n) => { location.hash = `#/device/${n.virtual ? n.host : n.id}`; } });
+  radarBox.appendChild(stars.el);
+  const timeMachine = replay({
+    getTree: () => tree, getDevices: () => lastList,
+    onChange: (moved) => { if (view !== "replay" || !lastList) return; drawRadar(); for (const m of moved.slice(0, 30)) radarSvg.ring(m.id, m.up); },
+  });
   const gDevices = gauge("Devices online", "#/devices"), gServices = gauge("Services up", "#/services"), gAvail = gauge("Availability 30d", "#/uptime");
   gauges.append(gDevices, gServices, gAvail);
   let tickerText = "";
@@ -332,10 +369,21 @@ export async function render(container) {
   const feed = h("ol", {});
   const ticker = h("div", { class: "hud-ticker" });
 
+  const radarPanel = h("section", { class: "hud-panel hud-radar-panel", style: "flex:1;display:flex;flex-direction:column" }, h("div", { class: "hud-panel-head" }, h("h3", {}, "Network scope"), viewSwitch, containerBtn, radarFs), caption, radarBox, timeMachine.el);
+  radarPanel.addEventListener("fullscreenchange", () => { const on = document.fullscreenElement === radarPanel; radarFs.textContent = on ? "Exit full screen" : "Full screen"; radarPanel.classList.toggle("is-full", on); if (view === "replay") timeMachine.activate(true); });
+  if (!document.fullscreenEnabled) radarFs.hidden = true;
+  function applyView() {
+    caption.textContent = CAPTION[view];
+    radarSvg.style.display = view === "constellation" ? "none" : "";
+    stars.show(view === "constellation");
+    timeMachine.activate(view === "replay");
+    if (lastList) drawRadar();
+  }
+
   const root = h("div", { class: "hud" },
     h("div", { class: "hud-top" }, h("span", { class: "hud-title" }, h("i", { class: "hud-live" }), "Netlens // situation"), scopeSwitch, h("span", { class: "hud-top-right" }, clock, fsButton)),
     h("div", { class: "hud-left" }, h("section", { class: "hud-panel" }, h("h3", {}, "Vitals"), gauges), h("section", { class: "hud-panel", style: "flex:1" }, h("h3", {}, "Needs attention"), attn)),
-    h("div", { class: "hud-mid" }, h("section", { class: "hud-panel hud-radar-panel", style: "flex:1;display:flex;flex-direction:column" }, h("div", { class: "hud-panel-head" }, h("h3", {}, "Network scope"), viewSwitch), caption, radarBox), h("section", { class: "hud-panel" }, stats)),
+    h("div", { class: "hud-mid" }, radarPanel, h("section", { class: "hud-panel" }, stats)),
     h("div", { class: "hud-right" }, h("section", { class: "hud-panel hud-feed", style: "flex:1" }, h("h3", {}, "Live event stream"), feed), trafficPanel),
     h("div", { class: "hud-bottom" }, ticker));
   clear(container);
@@ -398,12 +446,30 @@ export async function render(container) {
     } catch (err) { /* the next round tries again */ }
   }
 
+  async function loadTree() {
+    try { tree = (await get(showContainers ? "/api/hierarchy?guests=true" : "/api/hierarchy")).nodes || []; } catch (e) { /* the views keep the last tree */ }
+  }
+
+  // containers as devices without an address: the group and importance of their host, the state of the container
+  function withContainers(list) {
+    if (!showContainers) return list;
+    const byId = new Map(list.map((d) => [d.id, d]));
+    const extra = [];
+    for (const n of tree) {
+      if (!n.virtual) continue;
+      const host = byId.get(n.parent_id);
+      if (!host) continue;                                              // its host is not on the screen (the core scope, for example)
+      extra.push({ id: n.id, name: n.name, online: !!n.online, tier: "normal", always_on: false, group_id: host.group_id, group: host.group, group_color: host.group_color, virtual: true, host_id: n.parent_id });
+    }
+    return list.concat(extra);
+  }
+
   async function overview() {
     try {
       const [dash, devices, rel] = await Promise.all([get("/api/dashboard"), get("/api/devices?limit=1000"), get("/api/reliability").catch(() => null)]);
       if (disposed) return;
       lastList = Array.isArray(devices) ? devices : devices.devices || [];
-      try { tree = (await get("/api/hierarchy")).nodes || []; } catch (e) { /* the depth view keeps the last tree */ }
+      await loadTree();
       lastDash = dash;
       lastRel = rel;
       paint();
@@ -411,8 +477,10 @@ export async function render(container) {
   }
 
   function drawRadar() {
-    const shown = scope === "core" ? lastList.filter((d) => d.always_on) : lastList;
-    radarSvg.update(shown, { mode: view, all: lastList, tree, rtt });
+    const base = scope === "core" ? lastList.filter((d) => d.always_on) : lastList;
+    if (view === "constellation") { stars.update(withContainers(base), tree); return; }
+    if (view === "replay") { radarSvg.update(timeMachine.apply(base), { mode: "hash", all: lastList, tree, rtt }); return; }      // containers have no history
+    radarSvg.update(withContainers(base), { mode: view, all: lastList, tree, rtt });
   }
 
   // the response times move often: look every few seconds, and let the blips glide when that is the view
@@ -422,7 +490,11 @@ export async function render(container) {
       if (disposed) return;
       const before = rtt;
       rtt = new Map(rows.map((r) => [r.id, r]));
-      if (before.size) radarSvg.flash(rows.filter((r) => { const b = before.get(r.id); return b && b.ts !== r.ts; }).map((r) => r.id));       // a new check since the last look
+      if (before.size && view !== "replay") {
+        const checked = rows.filter((r) => { const b = before.get(r.id); return b && b.ts !== r.ts; }).map((r) => r.id);       // a new check since the last look
+        radarSvg.flash(checked);
+        stars.flash(checked);
+      }
       if (view === "response" && lastList) drawRadar();
     } catch (err) { /* the next round tries again */ }
   }
@@ -472,11 +544,11 @@ export async function render(container) {
 
   size();
   await Promise.all([events(true), overview(), responses(), traffic()]);
-  if (lastList) drawRadar();
+  applyView();
   size();
   const evTimer = setInterval(() => events(false), 4000);
   const ovTimer = setInterval(overview, 15000);
   const rtTimer = setInterval(responses, 5000);
   const trTimer = setInterval(traffic, 15000);
-  return () => { disposed = true; window.removeEventListener("resize", size); clearInterval(clockTimer); clearInterval(evTimer); clearInterval(ovTimer); clearInterval(rtTimer); clearInterval(trTimer); };
+  return () => { disposed = true; window.removeEventListener("resize", size); clearInterval(clockTimer); clearInterval(evTimer); clearInterval(ovTimer); clearInterval(rtTimer); clearInterval(trTimer); stars.dispose(); timeMachine.dispose(); };
 }
