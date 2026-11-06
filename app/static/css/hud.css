@@ -319,3 +319,6 @@
 @media (max-height: 820px) { .hud-radar-panel:not(.is-full) .hud-revents { display: none; } }
 @media (max-height: 820px) { .hud-radar-panel:not(.is-full) .hud-rstrip { display: none; } }
 .hud-scope button[hidden] { display: none; }
+.hud-radar .slice-link { stroke-width: 1; opacity: 0.55; fill: none; }
+.hud-radar .slice-dot { opacity: 0.9; }
+.hud-radar .lbl.slice { letter-spacing: 0.02em; opacity: 1; }

@@ -169,19 +169,50 @@ function radar() {
       if (it.kind === "ring") legend.appendChild(svg("circle", { class: "lring", cx: C, cy: C, r: it.r }));
       else if (it.kind === "ring-label") legend.appendChild(Object.assign(svg("text", { class: "lbl", x: C + 4, y: C - it.r - 3 }), { textContent: it.text }));
       else if (it.kind === "spoke") legend.appendChild(svg("line", { class: "axis spoke", x1: C, y1: C, x2: C + Math.cos(it.ang) * 240, y2: C + Math.sin(it.ang) * 240 }));
-      else if (it.kind === "slice-label") {
-        const x = C + Math.cos(it.ang) * 246, y = C + Math.sin(it.ang) * 246 + 3;
-        const t = svg("text", { class: "lbl slice", x, y, "text-anchor": Math.cos(it.ang) < -0.2 ? "end" : Math.cos(it.ang) > 0.2 ? "start" : "middle", fill: it.colour });
-        t.textContent = it.text.length > 16 ? `${it.text.slice(0, 15)}…` : it.text;
+    }
+    drawSliceNames(items.filter((it) => it.kind === "slice-label"));
+  }
+
+  // The names of the groups sit in the four corners of the square (the circle leaves them free) and a thin line in the group's colour joins each name to its slice.
+  // A corner holds three names; the ones that do not fit are written inside their slice, near the rim.
+  function drawSliceNames(labels) {
+    const slots = { tl: [], tr: [], bl: [], br: [] }, inside = [];
+    for (const it of labels) {
+      const a = Math.atan2(Math.sin(it.ang), Math.cos(it.ang));                       // -PI..PI, 0 = right, PI/2 = down
+      const quad = `${Math.sin(a) < 0 ? "t" : "b"}${Math.cos(a) < 0 ? "l" : "r"}`;
+      slots[quad].push({ it, a, away: Math.abs(Math.abs(Math.sin(a)) - 1) });          // how far from the top or bottom of the circle
+    }
+    const FONT = 14, STEP = 19, CHAR = FONT * 0.6;
+    for (const [quad, list] of Object.entries(slots)) {
+      list.sort((p, q) => p.away - q.away);
+      list.forEach((e, row) => {
+        if (row >= 3) { inside.push(e); return; }
+        const top = quad[0] === "t", left = quad[1] === "l";
+        const y = top ? 26 + row * STEP : 474 - row * STEP;
+        const name = e.it.text.length > 12 ? `${e.it.text.slice(0, 11)}…` : e.it.text;
+        const x = left ? 14 : 486, width = name.length * CHAR;
+        const rim = { x: C + Math.cos(e.a) * 240, y: C + Math.sin(e.a) * 240 };
+        const inner = { x: left ? x + width + 4 : x - width - 4, y: y - FONT * 0.35 };
+        legend.appendChild(svg("line", { class: "slice-link", x1: rim.x, y1: rim.y, x2: inner.x, y2: inner.y, stroke: e.it.colour }));
+        legend.appendChild(svg("circle", { class: "slice-dot", cx: rim.x, cy: rim.y, r: 2.5, fill: e.it.colour }));
+        const t = svg("text", { class: "lbl slice", x, y, "text-anchor": left ? "start" : "end", fill: e.it.colour });
+        t.style.fontSize = `${FONT}px`; t.style.fill = e.it.colour;
+        t.textContent = name;
+        if (name !== e.it.text) t.appendChild(Object.assign(svg("title"), { textContent: e.it.text }));
         legend.appendChild(t);
-      }
+      });
+    }
+    for (const e of inside) {
+      const t = svg("text", { class: "lbl slice", x: C + Math.cos(e.a) * 205, y: C + Math.sin(e.a) * 205 + 4, "text-anchor": "middle", fill: e.it.colour });
+      t.style.fontSize = "12px"; t.style.fill = e.it.colour;
+      t.textContent = e.it.text.length > 12 ? `${e.it.text.slice(0, 11)}…` : e.it.text;
+      legend.appendChild(t);
     }
   }
 
   // devices: those to show; ctx: { mode, all (every device, so a view keeps its layout when the filter changes), tree (the hierarchy), rtt (Map id -> latest response) }
   s.update = (devices, ctx) => {
     const mode = ctx.mode;
-    s.setAttribute("viewBox", mode === "group" ? "-80 0 660 500" : "8 8 484 484");       // only the group view writes names beside the circle; the others use all the room for the radar itself
     const { at, legend: items } = mode === "depth" ? layoutDepth(devices, ctx.tree) : mode === "group" ? layoutGroup(devices, ctx.all) : mode === "response" ? layoutResponse(devices, ctx.rtt) : layoutHash(devices);
     drawLegend(items, mode);
     const seen = new Set();
