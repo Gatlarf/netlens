@@ -322,3 +322,4 @@
 .hud-radar .slice-link { stroke-width: 1; opacity: 0.55; fill: none; }
 .hud-radar .slice-dot { opacity: 0.9; }
 .hud-radar .lbl.slice { letter-spacing: 0.02em; opacity: 1; }
+.hud-radar-panel .hud-t { margin: 0; flex: none; font-weight: 700; padding: 1px 9px; letter-spacing: 0; }

@@ -159,8 +159,8 @@ function radar() {
   const dots = new Map();
   let legendKey = "";
 
-  function drawLegend(items, mode) {
-    const key = mode + JSON.stringify(items);
+  function drawLegend(items, mode, text) {
+    const key = `${mode}${text ? "t" : "n"}${JSON.stringify(items)}`;
     if (key === legendKey) return;
     legendKey = key;
     frame.classList.toggle("quiet", mode === "depth" || mode === "group");               // the fixed rings give way to the ones of the view
@@ -170,10 +170,10 @@ function radar() {
       if (it.kind === "spoke") lastSpoke = it.ang;
       if (it.kind === "slice-label" && lastSpoke != null) it.span = 2 * (it.ang - lastSpoke);        // the width of the slice, from its first spoke to the middle
       if (it.kind === "ring") legend.appendChild(svg("circle", { class: "lring", cx: C, cy: C, r: it.r }));
-      else if (it.kind === "ring-label") legend.appendChild(Object.assign(svg("text", { class: "lbl", x: C + 4, y: C - it.r - 3 }), { textContent: it.text }));
+      else if (it.kind === "ring-label") { if (text) legend.appendChild(Object.assign(svg("text", { class: "lbl", x: C + 4, y: C - it.r - 3 }), { textContent: it.text })); }
       else if (it.kind === "spoke") legend.appendChild(svg("line", { class: "axis spoke", x1: C, y1: C, x2: C + Math.cos(it.ang) * 240, y2: C + Math.sin(it.ang) * 240 }));
     }
-    drawSliceNames(items.filter((it) => it.kind === "slice-label"));
+    if (text) drawSliceNames(items.filter((it) => it.kind === "slice-label"));
   }
 
   // The name of a group is written along the rim, just outside the circle, in the middle of its slice and in its colour: no lines, and a name never gets more room than its
@@ -198,9 +198,10 @@ function radar() {
   // devices: those to show; ctx: { mode, all (every device, so a view keeps its layout when the filter changes), tree (the hierarchy), rtt (Map id -> latest response) }
   s.update = (devices, ctx) => {
     const mode = ctx.mode;
-    s.setAttribute("viewBox", mode === "group" ? "-8 -8 516 516" : "8 8 484 484");       // the group names are written round the circle, so that view needs a little more room
+    const text = ctx.text !== false;
+    s.setAttribute("viewBox", mode === "group" && text ? "-8 -8 516 516" : "8 8 484 484");       // the group names are written round the circle, so that view needs a little more room
     const { at, legend: items } = mode === "depth" ? layoutDepth(devices, ctx.tree) : mode === "group" ? layoutGroup(devices, ctx.all) : mode === "response" ? layoutResponse(devices, ctx.rtt) : layoutHash(devices);
-    drawLegend(items, mode);
+    drawLegend(items, mode, text);
     const seen = new Set();
     for (const d of devices) {
       seen.add(d.id);
@@ -321,6 +322,16 @@ export async function render(container) {
     for (const [k, b] of Object.entries(viewBtns)) b.setAttribute("aria-pressed", String(k === layout()));
     viewBtns.response.hidden = mode === "replay";
   }
+  // the T button: all the text on the radar and the constellation on or off (off gives the radar the whole box)
+  let showText = true;
+  try { showText = localStorage.getItem("netlens.hud.text") !== "0"; } catch (e) { /* not remembered */ }
+  const textBtn = h("button", { type: "button", class: "hud-toggle hud-t", "aria-pressed": String(showText), "aria-label": "Show the text", title: "Text on or off (off: the radar gets the whole box)", onclick: () => {
+    showText = !showText;
+    textBtn.setAttribute("aria-pressed", String(showText));
+    try { localStorage.setItem("netlens.hud.text", showText ? "1" : "0"); } catch (e) { /* only this page remembers it */ }
+    stars.setText(showText);
+    if (lastList) drawRadar();
+  } }, "T");
   // the container switch: containers and apps that plugins report (they are no devices) circle their host
   let showContainers = false;
   try { showContainers = localStorage.getItem("netlens.hud.containers") === "1"; } catch (e) { /* not remembered */ }
@@ -395,6 +406,7 @@ export async function render(container) {
   radarBox.appendChild(radarSvg);
   const stars = constellation({ onOpen: (n) => { location.hash = `#/device/${n.virtual ? n.host : n.id}`; } });
   radarBox.appendChild(stars.el);
+  stars.setText(showText);
   const timeMachine = replay({
     getTree: () => tree, getDevices: () => lastList,
     onChange: (moved) => { if (mode !== "replay" || !lastList) return; drawRadar(); for (const m of moved.slice(0, 30)) radarSvg.ring(m.id, m.up); },
@@ -407,7 +419,7 @@ export async function render(container) {
   const ticker = h("div", { class: "hud-ticker" });
 
   const panelTitle = h("h3", {}, MODE_TITLE.radar);
-  const radarPanel = h("section", { class: "hud-panel hud-radar-panel", style: "flex:1;display:flex;flex-direction:column" }, h("div", { class: "hud-panel-head" }, modeWrap, panelTitle, h("span", { class: "hud-spacer" }), viewSwitch, containerBtn, radarFs), radarBox, timeMachine.el);
+  const radarPanel = h("section", { class: "hud-panel hud-radar-panel", style: "flex:1;display:flex;flex-direction:column" }, h("div", { class: "hud-panel-head" }, textBtn, modeWrap, panelTitle, h("span", { class: "hud-spacer" }), viewSwitch, containerBtn, radarFs), radarBox, timeMachine.el);
   radarPanel.addEventListener("fullscreenchange", () => { const on = document.fullscreenElement === radarPanel; radarFs.replaceChildren(fsIcon(on)); radarFs.title = on ? "Leave full screen (Esc)" : "Show only this panel on the whole screen (Esc to leave)"; radarPanel.classList.toggle("is-full", on); if (mode === "replay") timeMachine.activate(true); });
   if (!document.fullscreenEnabled) radarFs.hidden = true;
   function applyMode() {
@@ -521,8 +533,8 @@ export async function render(container) {
   function drawRadar() {
     const base = scope === "core" ? lastList.filter((d) => d.always_on) : lastList;
     if (mode === "constellation") { stars.update(withContainers(base), tree); return; }
-    if (mode === "replay") { radarSvg.update(timeMachine.apply(base), { mode: layout(), all: lastList, tree, rtt }); return; }      // containers have no history
-    radarSvg.update(base, { mode: view, all: lastList, tree, rtt });
+    if (mode === "replay") { radarSvg.update(timeMachine.apply(base), { mode: layout(), all: lastList, tree, rtt, text: showText }); return; }      // containers have no history
+    radarSvg.update(base, { mode: view, all: lastList, tree, rtt, text: showText });
   }
 
   // the response times move often: look every few seconds, and let the blips glide when that is the view

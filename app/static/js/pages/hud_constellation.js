@@ -17,6 +17,7 @@ export function constellation({ onOpen }) {
 
   const nodes = new Map();            // id -> star
   const pulses = [], queue = [];
+  let names = true;
   let w = 300, h2 = 300, dpr = 1, raf = 0, visible = false, alpha = 1, hover = null, last = 0, signature = "";
   const ctx = canvas.getContext("2d");
 
@@ -164,6 +165,7 @@ export function constellation({ onOpen }) {
 
   // names: only for stars that have others below them, the busiest first; a name that would overlap one already written is left out, and none runs off the edge
   function drawLabels() {
+    if (!names) return;
     ctx.font = "11px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "left";
     const want = [...nodes.values()].filter((n) => n.kids >= 1);                 // only a device that has others connected below it carries a name (hover shows any other)
     want.sort((a, b) => b.kids - a.kids);
@@ -206,6 +208,7 @@ export function constellation({ onOpen }) {
     el,
     update,
     flash,
+    setText(on) { names = !!on; request(); },
     show(on) { visible = on; el.hidden = !on; if (on) { resize(); last = 0; request(); } else if (raf) { cancelAnimationFrame(raf); raf = 0; } },
     dispose() { visible = false; if (raf) cancelAnimationFrame(raf); if (observer) observer.disconnect(); },
   };
