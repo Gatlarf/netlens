@@ -52,15 +52,11 @@ function gauge(label, href) {
 //   depth     the network as a tree: the top device in the middle, every level a ring further out, a branch keeps its own slice
 //   group     one slice per device group, the distance follows the importance
 //   response  the distance is the response time right now (log scale), the direction is arbitrary; offline devices sit on the rim
-const VIEWS = [["hash", "Hash"], ["depth", "Depth"], ["group", "Group"], ["response", "Response"], ["constellation", "Constellation"], ["replay", "Time machine"]];
-const CAPTION = {
-  hash: "Distance: importance (critical in the middle) · direction: arbitrary but steady",
-  depth: "Distance: levels below the top device · each branch has its own slice",
-  group: "One slice per device group · distance: importance",
-  response: "Distance: response time now (log scale) · offline on the rim",
-  constellation: "Stars are devices, lines are the network · a pulse of light is a check, red means it was not answered · grey: unreachable behind a broken device",
-  replay: "The radar as it was at the chosen moment, from the stored checks · \"unreachable\" is worked out from today's network layout · containers have no checks",
-};
+const VIEWS = [["hash", "Hash"], ["depth", "Depth"], ["group", "Group"], ["response", "Response"]];
+// what the panel shows (the menu next to its title): the radar with the four views above, the constellation, or the time machine
+const MODES = [["radar", "Radar", "Every device as a blip on the radar"], ["constellation", "Constellation", "Devices as stars joined by the network; every check is a pulse of light"],
+  ["replay", "Time machine", "The radar as it was at an earlier moment, from the stored checks (unreachable is worked out from today's network layout; containers have no checks)"]];
+const MODE_TITLE = { radar: "Network scope", constellation: "Constellation", replay: "Time machine" };
 const R = 230, C = 250;
 const SWEEP_MS = 6000;       // one turn of the sweep arm (hud-spin in hud.css)
 const RESPONSE_RINGS = [[5, 60], [20, 120], [80, 180], [300, 235]];       // the ms written on each ring
@@ -294,27 +290,44 @@ export async function render(container) {
   let view = "hash";
   try { const v = localStorage.getItem("netlens.hud.radar"); if (VIEWS.some(([k]) => k === v)) view = v; } catch (e) { /* not remembered */ }
   const viewBtns = {};
-  const caption = h("p", { class: "hud-cap" }, CAPTION[view]);
   const viewSwitch = h("div", { class: "hud-scope hud-views", role: "group", "aria-label": "How the radar places the devices" },
     ...VIEWS.map(([key, label]) => (viewBtns[key] = h("button", { type: "button", "aria-pressed": String(key === view), onclick: () => {
       view = key;
       try { localStorage.setItem("netlens.hud.radar", key); } catch (e) { /* only this page remembers it */ }
       for (const [k, b] of Object.entries(viewBtns)) b.setAttribute("aria-pressed", String(k === view));
-      applyView();
+      if (lastList) drawRadar();
     } }, label))));
   // the container switch: containers and apps that plugins report (they are no devices) circle their host
   let showContainers = false;
   try { showContainers = localStorage.getItem("netlens.hud.containers") === "1"; } catch (e) { /* not remembered */ }
-  const containerBtn = h("button", { type: "button", class: "hud-toggle", "aria-pressed": String(showContainers), title: "Also show containers and apps that plugins report (Docker, LXC ...). They circle their host.", onclick: async () => {
+  const containerBtn = h("button", { type: "button", class: "hud-toggle", "aria-pressed": String(showContainers), title: "Also show containers and apps that plugins report (Docker, LXC ...) around their host", onclick: async () => {
     showContainers = !showContainers;
     containerBtn.setAttribute("aria-pressed", String(showContainers));
     try { localStorage.setItem("netlens.hud.containers", showContainers ? "1" : "0"); } catch (e) { /* only this page remembers it */ }
     await loadTree();
     if (lastList) drawRadar();
   } }, "Containers");
-  const radarFs = h("button", { type: "button", class: "hud-fs", title: "Show only this panel on the whole screen (Esc to leave)", "aria-label": "Full screen for the radar", onclick: () => {
+  const fsIcon = (on) => { const i = svg("svg", { viewBox: "0 0 20 20", width: 14, height: 14, fill: "none", stroke: "currentColor", "stroke-width": 1.8 }); i.appendChild(svg("path", { d: on ? "M8 3v5H3 M12 3v5h5 M8 17v-5H3 M12 17v-5h5" : "M3 8V3h5 M12 3h5v5 M17 12v5h-5 M8 17H3v-5" })); return i; };
+  const radarFs = h("button", { type: "button", class: "hud-fs hud-fs-icon", title: "Show only this panel on the whole screen (Esc to leave)", "aria-label": "Full screen for this panel", onclick: () => {
     if (document.fullscreenElement) document.exitFullscreen(); else if (radarPanel.requestFullscreen) radarPanel.requestFullscreen().catch(() => {});
-  } }, "Full screen");
+  } }, fsIcon(false));
+  // the menu next to the title: what the panel shows (the radar is the default and is not remembered)
+  let mode = "radar";
+  const modeItems = {};
+  const modeMenu = h("div", { class: "hud-menu", role: "menu", hidden: true }, ...MODES.map(([key, label, hint]) => (modeItems[key] = h("button", { type: "button", role: "menuitemradio", "aria-checked": String(key === mode), title: hint, onclick: () => { closeMenu(); setMode(key); } }, label))));
+  const modeBtn = h("button", { type: "button", class: "hud-menu-btn", "aria-haspopup": "true", "aria-expanded": "false", "aria-label": "Choose what the panel shows", title: "Radar, constellation or time machine", onclick: (e) => { e.stopPropagation(); modeMenu.hidden ? openMenu() : closeMenu(); } }, "☰");
+  const modeWrap = h("div", { class: "hud-menu-wrap" }, modeBtn, modeMenu);
+  const outside = (e) => { if (!modeWrap.contains(e.target)) closeMenu(); };
+  const escape = (e) => { if (e.key === "Escape") closeMenu(); };
+  function openMenu() { modeMenu.hidden = false; modeBtn.setAttribute("aria-expanded", "true"); document.addEventListener("click", outside); document.addEventListener("keydown", escape); }
+  function closeMenu() { modeMenu.hidden = true; modeBtn.setAttribute("aria-expanded", "false"); document.removeEventListener("click", outside); document.removeEventListener("keydown", escape); }
+  async function setMode(key) {
+    const hadGuests = wantGuests();
+    mode = key;
+    if (wantGuests() !== hadGuests) await loadTree();          // the container nodes are only fetched for the constellation
+    for (const [k, b] of Object.entries(modeItems)) b.setAttribute("aria-checked", String(k === mode));
+    applyMode();
+  }
   const clock = h("span", { class: "hud-clock" });
   const fsButton = h("button", { type: "button", class: "hud-fs", title: "Show the HUD on the whole screen (Esc to leave)", "aria-label": "Full screen", onclick: () => {
     if (document.fullscreenElement) document.exitFullscreen(); else if (root.requestFullscreen) root.requestFullscreen().catch(() => {});
@@ -360,7 +373,7 @@ export async function render(container) {
   radarBox.appendChild(stars.el);
   const timeMachine = replay({
     getTree: () => tree, getDevices: () => lastList,
-    onChange: (moved) => { if (view !== "replay" || !lastList) return; drawRadar(); for (const m of moved.slice(0, 30)) radarSvg.ring(m.id, m.up); },
+    onChange: (moved) => { if (mode !== "replay" || !lastList) return; drawRadar(); for (const m of moved.slice(0, 30)) radarSvg.ring(m.id, m.up); },
   });
   const gDevices = gauge("Devices online", "#/devices"), gServices = gauge("Services up", "#/services"), gAvail = gauge("Availability 30d", "#/uptime");
   gauges.append(gDevices, gServices, gAvail);
@@ -369,14 +382,17 @@ export async function render(container) {
   const feed = h("ol", {});
   const ticker = h("div", { class: "hud-ticker" });
 
-  const radarPanel = h("section", { class: "hud-panel hud-radar-panel", style: "flex:1;display:flex;flex-direction:column" }, h("div", { class: "hud-panel-head" }, h("h3", {}, "Network scope"), viewSwitch, containerBtn, radarFs), caption, radarBox, timeMachine.el);
-  radarPanel.addEventListener("fullscreenchange", () => { const on = document.fullscreenElement === radarPanel; radarFs.textContent = on ? "Exit full screen" : "Full screen"; radarPanel.classList.toggle("is-full", on); if (view === "replay") timeMachine.activate(true); });
+  const panelTitle = h("h3", {}, MODE_TITLE.radar);
+  const radarPanel = h("section", { class: "hud-panel hud-radar-panel", style: "flex:1;display:flex;flex-direction:column" }, h("div", { class: "hud-panel-head" }, modeWrap, panelTitle, h("span", { class: "hud-spacer" }), viewSwitch, containerBtn, radarFs), radarBox, timeMachine.el);
+  radarPanel.addEventListener("fullscreenchange", () => { const on = document.fullscreenElement === radarPanel; radarFs.replaceChildren(fsIcon(on)); radarFs.title = on ? "Leave full screen (Esc)" : "Show only this panel on the whole screen (Esc to leave)"; radarPanel.classList.toggle("is-full", on); if (mode === "replay") timeMachine.activate(true); });
   if (!document.fullscreenEnabled) radarFs.hidden = true;
-  function applyView() {
-    caption.textContent = CAPTION[view];
-    radarSvg.style.display = view === "constellation" ? "none" : "";
-    stars.show(view === "constellation");
-    timeMachine.activate(view === "replay");
+  function applyMode() {
+    panelTitle.textContent = MODE_TITLE[mode];
+    viewSwitch.hidden = mode !== "radar";                      // the four views belong to the radar
+    containerBtn.hidden = mode !== "constellation";            // containers are drawn in the constellation only
+    radarSvg.style.display = mode === "constellation" ? "none" : "";
+    stars.show(mode === "constellation");
+    timeMachine.activate(mode === "replay");
     if (lastList) drawRadar();
   }
 
@@ -446,13 +462,14 @@ export async function render(container) {
     } catch (err) { /* the next round tries again */ }
   }
 
+  const wantGuests = () => showContainers && mode === "constellation";
   async function loadTree() {
-    try { tree = (await get(showContainers ? "/api/hierarchy?guests=true" : "/api/hierarchy")).nodes || []; } catch (e) { /* the views keep the last tree */ }
+    try { tree = (await get(wantGuests() ? "/api/hierarchy?guests=true" : "/api/hierarchy")).nodes || []; } catch (e) { /* the views keep the last tree */ }
   }
 
   // containers as devices without an address: the group and importance of their host, the state of the container
   function withContainers(list) {
-    if (!showContainers) return list;
+    if (!wantGuests()) return list;
     const byId = new Map(list.map((d) => [d.id, d]));
     const extra = [];
     for (const n of tree) {
@@ -478,9 +495,9 @@ export async function render(container) {
 
   function drawRadar() {
     const base = scope === "core" ? lastList.filter((d) => d.always_on) : lastList;
-    if (view === "constellation") { stars.update(withContainers(base), tree); return; }
-    if (view === "replay") { radarSvg.update(timeMachine.apply(base), { mode: "hash", all: lastList, tree, rtt }); return; }      // containers have no history
-    radarSvg.update(withContainers(base), { mode: view, all: lastList, tree, rtt });
+    if (mode === "constellation") { stars.update(withContainers(base), tree); return; }
+    if (mode === "replay") { radarSvg.update(timeMachine.apply(base), { mode: "hash", all: lastList, tree, rtt }); return; }      // containers have no history
+    radarSvg.update(base, { mode: view, all: lastList, tree, rtt });
   }
 
   // the response times move often: look every few seconds, and let the blips glide when that is the view
@@ -490,12 +507,12 @@ export async function render(container) {
       if (disposed) return;
       const before = rtt;
       rtt = new Map(rows.map((r) => [r.id, r]));
-      if (before.size && view !== "replay") {
+      if (before.size && mode !== "replay") {
         const checked = rows.filter((r) => { const b = before.get(r.id); return b && b.ts !== r.ts; }).map((r) => r.id);       // a new check since the last look
         radarSvg.flash(checked);
         stars.flash(checked);
       }
-      if (view === "response" && lastList) drawRadar();
+      if (mode === "radar" && view === "response" && lastList) drawRadar();
     } catch (err) { /* the next round tries again */ }
   }
 
@@ -544,11 +561,11 @@ export async function render(container) {
 
   size();
   await Promise.all([events(true), overview(), responses(), traffic()]);
-  applyView();
+  applyMode();
   size();
   const evTimer = setInterval(() => events(false), 4000);
   const ovTimer = setInterval(overview, 15000);
   const rtTimer = setInterval(responses, 5000);
   const trTimer = setInterval(traffic, 15000);
-  return () => { disposed = true; window.removeEventListener("resize", size); clearInterval(clockTimer); clearInterval(evTimer); clearInterval(ovTimer); clearInterval(rtTimer); clearInterval(trTimer); stars.dispose(); timeMachine.dispose(); };
+  return () => { disposed = true; window.removeEventListener("resize", size); clearInterval(clockTimer); clearInterval(evTimer); clearInterval(ovTimer); clearInterval(rtTimer); clearInterval(trTimer); stars.dispose(); timeMachine.dispose(); closeMenu(); };
 }

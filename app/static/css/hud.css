@@ -281,3 +281,40 @@
   :where(:root:not([data-theme])) .hud-const-tip { color: #cfeeff; }
   :where(:root:not([data-theme])) .hud-rstrip { height: 44px; }
 }
+
+/* the head of the radar panel: one compact row (menu, title, the four views, containers, full screen) */
+.hud-radar-panel .hud-panel-head { flex-wrap: nowrap; justify-content: flex-start; align-items: center; gap: 8px; margin-bottom: 6px; }
+.hud-radar-panel .hud-panel-head h3 { white-space: nowrap; }
+.hud-spacer { flex: 1 1 auto; }
+.hud-radar-panel .hud-scope { margin: 0; flex: none; }
+.hud-radar-panel .hud-scope button, .hud-radar-panel .hud-toggle, .hud-radar-panel .hud-fs, .hud-menu-btn {
+  padding: 1px 8px; min-height: 0; height: auto; line-height: 1.3; white-space: nowrap; font-size: 0.72rem; letter-spacing: 0.1em; }
+.hud-radar-panel .hud-toggle { margin: 0; flex: none; }
+.hud-radar-panel .hud-fs { flex: none; }
+.hud-scope[hidden], .hud-toggle[hidden], .hud-fs[hidden] { display: none; }
+.hud-menu-btn { background: transparent; color: var(--accent); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-size: 0.95rem; padding: 0 8px; line-height: 1.2; }
+.hud-menu-btn:hover, .hud-menu-btn[aria-expanded="true"] { border-color: var(--accent); box-shadow: var(--hud-glow); }
+.hud-menu-wrap { position: relative; flex: none; }
+.hud-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 30; min-width: 11rem; display: flex; flex-direction: column; background: #031a29; border: 1px solid #00e5ff; box-shadow: 0 0 12px rgba(0, 229, 255, 0.35); }
+.hud-menu[hidden] { display: none; }
+.hud-menu button { text-align: left; background: transparent; color: #cfeeff; border: 0; padding: 6px 12px; font: inherit; font-size: 0.74rem; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+.hud-menu button:hover { background: rgba(0, 229, 255, 0.1); }
+.hud-menu button[aria-checked="true"] { color: #00e5ff; background: rgba(0, 229, 255, 0.16); }
+.hud-radar-panel { padding-top: 8px; }
+/* narrow panels (a tablet): the title makes room, the menu button and the views are what matter */
+.hud-radar-panel { container-type: inline-size; container-name: scope; }
+@container scope (max-width: 470px) { .hud-radar-panel .hud-panel-head > h3 { display: none; } }
+.hud-radar-panel .hud-panel-head { flex-wrap: wrap; row-gap: 4px; }
+.hud-radar-panel .hud-scope button { padding: 1px 6px; letter-spacing: 0.05em; }
+.hud-radar-panel .hud-panel-head h3 { letter-spacing: 0.16em; }
+.hud-fs-icon { display: inline-flex; align-items: center; justify-content: center; padding: 3px 6px !important; }
+.hud-radar-panel .hud-radar { min-height: 110px; }
+.hud-rstrip { height: 36px; }
+.hud-replay { margin-top: 4px; padding-top: 6px; }
+.hud-rbar { margin-bottom: 4px; }
+/* the time machine controls: one small row */
+.hud-rbar { flex-wrap: nowrap; gap: 6px; }
+.hud-rbar select, .hud-rbar .hud-rbtn { padding: 1px 6px; min-height: 0; height: auto; line-height: 1.3; font-size: 0.72rem; width: auto; flex: none; }
+.hud-rclock { font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+@media (max-height: 820px) { .hud-radar-panel:not(.is-full) .hud-revents { display: none; } }
+@media (max-height: 820px) { .hud-radar-panel:not(.is-full) .hud-rstrip { display: none; } }

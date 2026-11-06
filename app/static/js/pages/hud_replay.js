@@ -5,7 +5,7 @@ import { h, clear } from "../util.js";
 // (GET /api/uptime/replay returns only the changes), so nothing new is collected. Containers have no checks, so they are not part of the replay.
 // Caveat shown to the user: "unreachable" is worked out from today's hierarchy, Netlens does not store how the network was wired in the past.
 const RANGES = [["6h", 6, 60], ["24h", 24, 360], ["7d", 168, 1800]];            // label, hours, default speed (times real time)
-const SPEEDS = [[60, "1 min per second"], [360, "6 min per second"], [1800, "30 min per second"], [7200, "2 h per second"]];
+const SPEEDS = [[60, "1 min/s"], [360, "6 min/s"], [1800, "30 min/s"], [7200, "2 h/s"]];
 
 export function replay({ onChange, getTree, getDevices }) {
   const el = h("div", { class: "hud-replay", hidden: true });
@@ -14,7 +14,7 @@ export function replay({ onChange, getTree, getDevices }) {
   const speedSel = h("select", { "aria-label": "Replay speed" }, ...SPEEDS.map(([v, l]) => h("option", { value: String(v) }, l)));
   const nowBtn = h("button", { type: "button", class: "hud-rbtn" }, "Back to now");
   const clock = h("span", { class: "hud-rclock" });
-  const strip = h("canvas", { class: "hud-rstrip", height: 44, "aria-hidden": "true" });
+  const strip = h("canvas", { class: "hud-rstrip", height: 36, "aria-hidden": "true" });
   const slider = h("input", { type: "range", min: 0, max: 1, step: 1, value: 1, "aria-label": "Moment to show" });
   const list = h("div", { class: "hud-revents" });
   const note = h("div", { class: "hud-rnote" });
@@ -71,7 +71,7 @@ export function replay({ onChange, getTree, getDevices }) {
   }
   function drawList() {
     clear(list);
-    const shown = data ? data.changes.filter((c) => c.t <= t).slice(-5).reverse() : [];
+    const shown = data ? data.changes.filter((c) => c.t <= t).slice(-3).reverse() : [];
     if (!shown.length) { list.appendChild(h("div", { class: "hud-rev" }, "No changes yet in this period.")); return; }
     for (const c of shown) {
       const cause = !c.up ? behind(c.id, c.t) : null;
@@ -84,9 +84,9 @@ export function replay({ onChange, getTree, getDevices }) {
   function drawStrip() {
     const r = strip.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
     if (!r.width) return;
-    strip.width = Math.round(r.width * dpr); strip.height = Math.round(44 * dpr);
+    strip.width = Math.round(r.width * dpr); strip.height = Math.round(36 * dpr);
     const c = strip.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const w = r.width, hh = 44; c.clearRect(0, 0, w, hh);
+    const w = r.width, hh = 36; c.clearRect(0, 0, w, hh);
     if (!data) return;
     const bins = data.counts.length, max = Math.max(1, ...data.total), min = Math.min(...data.counts.map((v, i) => (data.total[i] ? v / data.total[i] : 1)));
     c.beginPath();

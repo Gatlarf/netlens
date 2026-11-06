@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.342 — 2026-11-06
+
+### Changed
+- **HUD radar panel: one compact row.** The four layout buttons (Hash, Depth, Group, Response) are back as they were, and what the panel shows is chosen with a ☰ menu next to the title: Radar (the default), Constellation or Time machine. The explanatory text under the buttons is gone, the buttons are much smaller, "Full screen" is a small icon, and on a narrow panel the title makes room. The Containers switch only appears in the constellation, which is the only place that draws containers now. In the time machine the controls are one small row, the speed reads "6 min/s", and on a short screen the incident strip and the event list are left out so the radar keeps its room. The constellation writes the names of the busiest devices only, without overlap and never over the edge.
+
 ## 0.4.341 — 2026-11-06
 
 ### Fixed
