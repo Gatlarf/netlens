@@ -162,19 +162,19 @@ export function constellation({ onOpen }) {
     drawLabels();
   }
 
-  // names: the busiest stars first, a name that would overlap one already written is left out, and none runs off the edge
+  // names: only for stars that have others below them, the busiest first; a name that would overlap one already written is left out, and none runs off the edge
   function drawLabels() {
     ctx.font = "11px ui-monospace, Menlo, Consolas, monospace"; ctx.textAlign = "left";
-    const want = [...nodes.values()].filter((n) => n === hover || (!n.virtual && (n.important || n.kids >= 3)));
-    want.sort((a, b) => (b === hover) - (a === hover) || b.kids - a.kids || (b.important === true) - (a.important === true));
+    const want = [...nodes.values()].filter((n) => n.kids >= 1);                 // only a device that has others connected below it carries a name (hover shows any other)
+    want.sort((a, b) => b.kids - a.kids);
     const placed = [];
     for (const n of want) {
       const text = n.name.length > 18 ? `${n.name.slice(0, 17)}…` : n.name;
       const tw = ctx.measureText(text).width, x = Math.max(4, Math.min(w - tw - 4, n.x - tw / 2)), y = n.y - n.radius - 7;
       const box = { x0: x - 2, x1: x + tw + 2, y0: y - 10, y1: y + 3 };
-      if (n !== hover && placed.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0)) continue;
+      if (placed.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0)) continue;
       placed.push(box);
-      ctx.fillStyle = n === hover ? "#ffffff" : "rgba(170, 220, 242, 0.85)"; ctx.fillText(text, x, y);
+      ctx.fillStyle = "rgba(170, 220, 242, 0.85)"; ctx.fillText(text, x, y);
     }
   }
 
