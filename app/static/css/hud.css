@@ -318,3 +318,4 @@
 .hud-rclock { font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 @media (max-height: 820px) { .hud-radar-panel:not(.is-full) .hud-revents { display: none; } }
 @media (max-height: 820px) { .hud-radar-panel:not(.is-full) .hud-rstrip { display: none; } }
+.hud-scope button[hidden] { display: none; }

@@ -294,9 +294,15 @@ export async function render(container) {
     ...VIEWS.map(([key, label]) => (viewBtns[key] = h("button", { type: "button", "aria-pressed": String(key === view), onclick: () => {
       view = key;
       try { localStorage.setItem("netlens.hud.radar", key); } catch (e) { /* only this page remembers it */ }
-      for (const [k, b] of Object.entries(viewBtns)) b.setAttribute("aria-pressed", String(k === view));
+      markViews();
       if (lastList) drawRadar();
     } }, label))));
+  // the layout in use: the time machine has no past response times, so it shows Response as Hash
+  const layout = () => (mode === "replay" && view === "response" ? "hash" : view);
+  function markViews() {
+    for (const [k, b] of Object.entries(viewBtns)) b.setAttribute("aria-pressed", String(k === layout()));
+    viewBtns.response.hidden = mode === "replay";
+  }
   // the container switch: containers and apps that plugins report (they are no devices) circle their host
   let showContainers = false;
   try { showContainers = localStorage.getItem("netlens.hud.containers") === "1"; } catch (e) { /* not remembered */ }
@@ -388,7 +394,8 @@ export async function render(container) {
   if (!document.fullscreenEnabled) radarFs.hidden = true;
   function applyMode() {
     panelTitle.textContent = MODE_TITLE[mode];
-    viewSwitch.hidden = mode !== "radar";                      // the four views belong to the radar
+    viewSwitch.hidden = mode === "constellation";              // the layouts belong to the radar and the time machine
+    markViews();
     containerBtn.hidden = mode !== "constellation";            // containers are drawn in the constellation only
     radarSvg.style.display = mode === "constellation" ? "none" : "";
     stars.show(mode === "constellation");
@@ -496,7 +503,7 @@ export async function render(container) {
   function drawRadar() {
     const base = scope === "core" ? lastList.filter((d) => d.always_on) : lastList;
     if (mode === "constellation") { stars.update(withContainers(base), tree); return; }
-    if (mode === "replay") { radarSvg.update(timeMachine.apply(base), { mode: "hash", all: lastList, tree, rtt }); return; }      // containers have no history
+    if (mode === "replay") { radarSvg.update(timeMachine.apply(base), { mode: layout(), all: lastList, tree, rtt }); return; }      // containers have no history
     radarSvg.update(base, { mode: view, all: lastList, tree, rtt });
   }
 
