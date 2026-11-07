@@ -68,8 +68,8 @@
       "key": "verify_tls",
       "type": "bool",
       "label": "Verify TLS certificate",
-      "default": false,
-      "help": "Leave this off while the host uses a self-signed certificate (what the setup lines create)."
+      "default": true,
+      "help": "Checks that the certificate is signed by an authority this machine trusts. Turn this off only when the device uses its own self-signed certificate (many do until you install one)."
     },
     {
       "key": "allow_plain_http",
