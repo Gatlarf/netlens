@@ -1,4 +1,5 @@
 import { get, put, post } from "../api.js";
+import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
 const fmtSize = (b) => (b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(0, Math.round(b / 1024))} KB`);
@@ -87,7 +88,8 @@ export async function buildDatabaseCard() {
     return form;
   }
 
-  function draw() {
+  function draw() { return keepDrafts(card, drawNow); }
+  function drawNow() {
     clear(card);
     const m = info.main, g = info.metrics;
     const last = info.last && info.last.tidy;

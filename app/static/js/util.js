@@ -53,7 +53,8 @@ export function patch(parent, ...nodes) {
   }
   // what an element looks like, leaving out what fills in later by itself (marked data-live: a graph that loads when a row is opened)
   // (and what the page adds to tables by itself afterwards: the grips to resize a column and the widths that go with them)
-  const DECO = [[/<span class="col-grip"[^>]*><\/span>/g, ""], [/<(table|th)\b[^>]*>/g, (tag) => tag.replace(/ style="[^"]*"/, "").replace(/ resizable/, "")]];
+  const DECO = [[/<span class="col-grip"[^>]*><\/span>/g, ""], [/<details\b[^>]*>/g, (tag) => tag.replace(/ open(="[^"]*")?/, "")],      // a section the user opened is not a difference
+     [/<(table|th)\b[^>]*>/g, (tag) => tag.replace(/ style="[^"]*"/, "").replace(/ resizable/, "")]];
   const plain = (html) => DECO.reduce((t, [re, to]) => t.replace(re, to), html);
   const sig = (el) => {
     if (!el.querySelector || !el.querySelector("[data-live]")) return plain(el.outerHTML);
@@ -61,7 +62,7 @@ export function patch(parent, ...nodes) {
     for (const live of copy.querySelectorAll("[data-live]")) live.textContent = "";
     return plain(copy.outerHTML);
   };
-  const KEEP = (el, name) => name === "data-action-checked" || ((el.tagName === "TABLE" || el.tagName === "TH") && (name === "style" || name === "class"));
+  const KEEP = (el, name) => name === "data-action-checked" || (el.tagName === "DETAILS" && name === "open") || ((el.tagName === "TABLE" || el.tagName === "TH") && (name === "style" || name === "class"));
   // inside an element marked data-morph (a table of readings, for instance) a change is made in place: the same rows and cells stay, only the text or attribute that differs changes
   const morph = (a, b) => {
     for (const at of [...a.attributes]) if (!b.hasAttribute(at.name) && !KEEP(a, at.name)) a.removeAttribute(at.name);
@@ -82,7 +83,7 @@ export function patch(parent, ...nodes) {
     const cur = parent.childNodes[i];
     if (cur === node) return;
     if (cur && node.parentNode !== parent && alike(cur, node)) return;      // the same picture: keep the element that is on screen
-    if (cur && node.parentNode !== parent && cur.nodeType === 1 && node.nodeType === 1 && cur.nodeName === node.nodeName && cur.hasAttribute("data-morph")) return morph(cur, node);
+    if (cur && node.parentNode !== parent && cur.nodeType === 1 && node.nodeType === 1 && cur.nodeName === node.nodeName && (cur.hasAttribute("data-morph") || cur.contains(document.activeElement))) return morph(cur, node);     // text being typed in it stays
     if (cur) parent.replaceChild(node, cur); else parent.appendChild(node);
   });
   while (parent.childNodes.length > incoming.length) parent.removeChild(parent.lastChild);

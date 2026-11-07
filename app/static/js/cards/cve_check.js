@@ -1,5 +1,6 @@
 // The version-based CVE check: switch, minimum severity, optional NVD key, run now, and what the last run did.
 import { get, put, post } from "../api.js";
+import { keepDrafts } from "../editguard.js";
 import { h, toast, timeAgo } from "../util.js";
 
 const SEVERITIES = [["critical", "Critical only"], ["high", "High and critical"], ["medium", "Medium and above"], ["low", "Everything, also low"]];
@@ -52,14 +53,16 @@ export function buildCveCheckCard(onChange = () => {}) {
 
   const schedule = () => {
     clearTimeout(timer);
-    if (state && state.running) timer = setTimeout(refresh, 5000);
+    if (state && state.running && !left) timer = setTimeout(refresh, 5000);
   };
 
+  let seen = false, left = false;           // the card was on the page and is not any more: stop asking
   async function refresh() {
+    if (card.isConnected) seen = true; else if (seen) { left = true; return; }
     try {
       const before = state && state.running;
       state = await get("/api/cve-check");
-      if (card.isConnected || !timer) draw();
+      if (card.isConnected || !timer) keepDrafts(card, draw);          // the key being typed stays
       if (before && !state.running) onChange();
       schedule();
     } catch (err) {

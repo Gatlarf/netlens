@@ -7,6 +7,7 @@ export class ApiError extends Error {
 }
 
 import { currentSite, routed } from "./site.js";
+import { settled } from "./editguard.js";
 
 export async function api(path, { method = "GET", body, _retried = false } = {}) {
   if (method !== "GET" && currentSite() && routed(path) !== path) throw new ApiError(0, "A remote site is shown read-only through this Netlens. Go back to this site to change things.");
@@ -55,6 +56,7 @@ export async function api(path, { method = "GET", body, _retried = false } = {})
     }
     if (res.ok && String(path).startsWith("/api/site-view/")) document.dispatchEvent(new CustomEvent("netlens:site-ok"));
 
+    if (method !== "GET") settled();           // what was typed next to the button that was pressed is saved now (editguard.js)
     return parsed;
   } catch (err) {
     if (err instanceof ApiError) {

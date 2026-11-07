@@ -1,4 +1,5 @@
 import { get, put, post, api } from "../api.js";
+import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
 // Settings → Host agents: hosts that cannot be reached from Netlens push their readings through a standard collector (OpenTelemetry Collector or Telegraf).
@@ -55,7 +56,8 @@ export async function buildIngestCard() {
     try { const r = await fn(); if (ok) toast(ok, "success"); return r; } catch (err) { toast(err.message || "Failed", "error"); return null; }
   }
 
-  function draw() {
+  function draw() { return keepDrafts(card, drawNow); }
+  function drawNow() {
     clear(card);
     const p = info.policy;
     card.appendChild(h("h2", {}, "Host agents (locked-down hosts)"));

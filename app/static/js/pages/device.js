@@ -1,4 +1,5 @@
 import { get, patch, post, del, ApiError } from "../api.js";
+import { editing } from "../editguard.js";
 import { applyLayout, loadLayout, startBoard } from "../layout_cards.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { eventLabel } from "../event_labels.js";
@@ -371,7 +372,7 @@ function buildEditCard(device, onSaved) {
   let focused = false;
   const extraForms = [];
 
-  const fields = [tierSelect, nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, alwaysInput, excludeInput, trustInput, multiInput, pinSelect, dnsMode, dnsName];
+  const fields = [tierSelect, nameInput, typeSelect, groupSelect, tagsInput, notesTextarea, notifyInput, alwaysInput, excludeInput, trustInput, multiInput, pinSelect, dnsMode, dnsName, gentleInput];
   for (const f of fields) {
     f.addEventListener("input", () => { dirty = true; });
     f.addEventListener("change", () => { dirty = true; });
@@ -1052,8 +1053,10 @@ export async function render(container, params) {
 
   let lastSig = "", lastDraw = 0;
   // `quiet`: the timer asks; nothing is redrawn when the device is the same as a moment ago (the page is rebuilt at most every three minutes then, so its graphs still catch up)
+  let reloadAfter = false;
   async function load(quiet = false) {
-    if (loading || disposed) return;
+    if (disposed) return;
+    if (loading) { if (!quiet) reloadAfter = true; return; }      // a reload after a save is not dropped: it runs as soon as the one in flight is done (that one may have started before the save)
     loading = true;
     try {
       const device = await get(`/api/devices/${params.id}`);
@@ -1082,6 +1085,7 @@ export async function render(container, params) {
       failing = true;
     } finally {
       loading = false;
+      if (reloadAfter && !disposed) { reloadAfter = false; load(); }
     }
   }
 
@@ -1092,7 +1096,7 @@ export async function render(container, params) {
     if (terminalSlot && isTerminalActive(terminalSlot)) return;
     if (isStabilityOpen() || customizing) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
-    if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isProbeBusy()) return;     // never wipe a form someone is filling in
+    if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isProbeBusy() || editing(container)) return;     // never wipe a form someone is filling in
     load(true);
   }, 20000);
 
@@ -1101,6 +1105,7 @@ export async function render(container, params) {
     if (customizing) return;
     if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isProbeBusy() || isStabilityOpen() || (terminalSlot && isTerminalActive(terminalSlot))) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
+    if (editing(container)) return;
     load();
   };
   document.addEventListener("netlens:scan-finished", onScanFinished);

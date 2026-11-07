@@ -1,4 +1,5 @@
 import { get, put } from "../api.js";
+import { livePoll } from "../editguard.js";
 import { snoozeMenu, wakeButton, untilText } from "../snooze.js";
 import { h, clear, patch, toast, statusDot, shortName, timeAgo, isAdmin } from "../util.js";
 import { pageHead, emptyState, tile } from "../ui.js";
@@ -161,6 +162,6 @@ export async function render(container) {
   tiles, problems, list, limitsSlot);
   list.append(h("p", { class: "hint" }, "Loading…"));
   await load();
-  timer = setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);   // a tab nobody looks at does not poll
-  return () => { disposed = true; if (timer) clearInterval(timer); document.removeEventListener("netlens:snoozed", onSnoozed); };
+  timer = livePoll(() => load(), REFRESH_MS);   // a tab nobody looks at does not poll, and nothing is redrawn while somebody is choosing something
+  return () => { disposed = true; if (timer) timer.stop(); document.removeEventListener("netlens:snoozed", onSnoozed); };
 }

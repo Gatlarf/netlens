@@ -1,4 +1,5 @@
 import { api, get } from "../api.js";
+import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, fmtTime } from "../util.js";
 
 const ROLE_TEXT = { admin: "Administrator (everything)", operator: "Operator (looks and acts, no settings) - business feature", viewer: "Viewer (read-only)" };
@@ -210,7 +211,9 @@ function userRow(user, data, refresh, shown) {
   return rows;
 }
 
-function fill(card, data, shown) {
+function fill(card, data, shown) { return keepDrafts(card, () => fillNow(card, data, shown)); }
+
+function fillNow(card, data, shown) {
   clear(card);
   card.appendChild(h("h2", {}, "Users & tokens"));
   card.appendChild(h("p", { class: "hint" },

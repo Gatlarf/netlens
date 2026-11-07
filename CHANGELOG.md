@@ -2,6 +2,19 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.350 — 2026-11-07
+
+### Fixed
+- ★ **The page no longer refreshes or rebuilds while you are editing.** Netlens now notices by itself when a field has the focus or holds something you typed that is not saved yet, and then:
+  - the pages that refresh on a timer (the device page, Remote sites, Health) skip that round and catch up as soon as you are done;
+  - a card that is rebuilt after a save or an action (Users, Groups, DNS, Escalation, Host agents, Database, the CVE check, the speed test) keeps what you typed in its other fields;
+  - signing in again after the session ran out, or switching on a second factor, no longer rebuilds a page that holds unsaved text;
+  - leaving a page with unsaved changes (menu, link, back button, closing the tab) asks first.
+- **The recovery codes of an authenticator app stay on the screen** until you press "I have saved them"; the page was rebuilt right after the second factor was switched on and they could disappear.
+- **Menus and sections you opened stay open** when a page refreshes (the "⋯" menu on Services, the folds on Health and others), and a field you are typing in is no longer replaced.
+- **Device page:** ticking only "Gentle scanning" counts as a change, and a reload after a save is no longer dropped when a timed reload was already running (the page looked as if the save was undone).
+- **The CVE check** stops polling when you leave the settings page.
+
 ## 0.4.349 — 2026-11-07
 
 ### Fixed

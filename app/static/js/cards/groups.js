@@ -1,9 +1,12 @@
 import { api, get } from "../api.js";
+import { keepDrafts } from "../editguard.js";
 import { h, clear, toast } from "../util.js";
 
 const PALETTE = ["#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2", "#be185d", "#65a30d", "#7c3aed", "#ea580c"];
 
-function fill(card, groups) {
+function fill(card, groups) { return keepDrafts(card, () => fillNow(card, groups)); }
+
+function fillNow(card, groups) {
   clear(card);
   card.appendChild(h("h2", {}, "Groups"));
   card.appendChild(h("p", { class: "hint" },

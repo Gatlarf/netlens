@@ -1,4 +1,5 @@
 import { get, post, patch, put, del } from "../api.js";
+import { editing } from "../editguard.js";
 import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin, fmtTime } from "../util.js";
 import { pageHead, emptyState, previewHtml } from "../ui.js";
 import { buildPerformanceCard } from "../cards/performance.js";
@@ -531,9 +532,9 @@ export async function render(container) {
     }
   }
 
-  const onSnoozed = () => { if (!disposed && queryId()) showDetail(queryId()); };
+  const onSnoozed = () => { if (!disposed && queryId() && !editing()) showDetail(queryId()); };
   document.addEventListener("netlens:snoozed", onSnoozed);
   await showList();
-  timer = setInterval(() => { if (!disposed && !board.editing && !form.firstChild && !managedDirty && !body.querySelector(".rs-add :focus") && !body.querySelector("tr.rs-graph:not([hidden])")) refresh(); }, REFRESH_MS);
+  timer = setInterval(() => { if (!disposed && !board.editing && !form.firstChild && !managedDirty && !editing() && !body.querySelector(".rs-add :focus") && !body.querySelector("tr.rs-graph:not([hidden])")) refresh(); }, REFRESH_MS);
   return () => { disposed = true; board.close(); if (timer) clearInterval(timer); document.removeEventListener("netlens:snoozed", onSnoozed); };
 }

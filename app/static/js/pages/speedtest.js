@@ -1,5 +1,6 @@
 // Speed tests: the internet (Cloudflare), iperf3 (a server inside Netlens and a client) and a test from this browser.
 import { get, post, put, del, ApiError } from "../api.js";
+import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, timeAgo, isAdmin } from "../util.js";
 import { pageHead, tabbed } from "../ui.js";
 import { emptyNote, lineChart, tile } from "../charts.js";
@@ -286,7 +287,7 @@ export async function render(container) {
     fill();
   }
 
-  function draw() { drawInternet(); drawIperf(); drawHistory(); if (!browserRunning && !sections.browser.firstChild) drawBrowser(); }
+  function draw() { keepDrafts(page, () => { drawInternet(); drawIperf(); drawHistory(); if (!browserRunning && !sections.browser.firstChild) drawBrowser(); }); }      // a host or port being typed survives the redraw
 
   sections.internet.append(h("p", { class: "hint" }, "Loading…"));
   await load();

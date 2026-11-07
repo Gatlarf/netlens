@@ -12,6 +12,7 @@ import { applyInterface } from "./interface.js";
 import { get, post, ApiError } from "./api.js";
 import * as webauthn from "./webauthn.js";
 import { initSiteBar } from "./sitebar.js";
+import { stopPageTimers, unsaved } from "./editguard.js";
 import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
 
 const ROUTES = {
@@ -95,6 +96,7 @@ async function renderPage() {
 
   const gen = ++renderGen;
 
+  stopPageTimers();                       // the polls a page started with livePoll() stop with the page
   if (currentCleanup) {
     try {
       currentCleanup();
@@ -475,7 +477,8 @@ async function finishLogin() {
   goToStartPage(session);
   displayLoaded = false;
   startPoll();
-  renderPage();
+  if (unsaved(el("#view"))) toast("Signed in again. What you typed is still on the page: save it now.", "info");     // rebuilding the page would throw it away
+  else renderPage();
 }
 
 async function handleLogin(e) {
@@ -653,14 +656,25 @@ async function init() {
     scanDeep.addEventListener("click", () => handleScan("deep"));
   }
 
-  document.addEventListener("netlens:session-changed", () => { applySession().then(() => renderPage()).catch(() => {}); });
+  document.addEventListener("netlens:session-changed", () => { applySession().then(() => { if (!unsaved(el("#view"))) renderPage(); }).catch(() => {}); });
   document.addEventListener("netlens:unauth", () => {
     if (setupMode) return; // a background request before the first account exists must not cover the wizard
     stopPoll();
     openLoginDialog();
   });
 
-  window.addEventListener("hashchange", () => { if (document.body.dataset.scoped) restrictToOwnDevices(); renderPage(); });
+  // leaving a page with changes that are not saved asks first (a redraw of the same address, such as a view switch on the map, does not)
+  let shownHash = location.hash;
+  window.addEventListener("hashchange", () => {
+    if (location.hash !== shownHash && unsaved(el("#view")) && !window.confirm("You have changes that are not saved. Leave this page?")) {
+      history.replaceState(null, "", shownHash || location.pathname + location.search);
+      return;
+    }
+    shownHash = location.hash;
+    if (document.body.dataset.scoped) restrictToOwnDevices();
+    renderPage();
+  });
+  window.addEventListener("beforeunload", (e) => { if (unsaved(el("#view"))) { e.preventDefault(); e.returnValue = ""; } });
 }
 
 init().finally(hideBoot);       // never leave the spinner on the screen, also when something went wrong

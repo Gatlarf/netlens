@@ -53,11 +53,20 @@ function recoveryBox(codes) {
     h("pre", { class: "code-block", style: "columns:2;column-gap:2em" }, text), h("div", { class: "btn-row" }, copy, save));
 }
 
+let pendingTotpCodes = null;      // recovery codes of the authenticator: shown until the person says they are saved (the page is rebuilt after the second factor is switched on)
+
 function buildTotpSection(wrap) {
   async function draw() {
     wrap.replaceChildren(h("h3", {}, "Second factor"));
     let st;
     try { st = await get("/api/me/totp"); } catch { return; }
+    if (pendingTotpCodes) {
+      const saved = h("button", { class: "btn", type: "button" }, "I have saved them");
+      saved.addEventListener("click", () => { pendingTotpCodes = null; draw(); });
+      const box = recoveryBox(pendingTotpCodes);
+      box.appendChild(h("div", { class: "btn-row" }, saved));
+      wrap.appendChild(box);
+    }
     wrap.appendChild(h("p", { class: "hint" },
       "Ask for a code from your authenticator app after the password. Netlens does not make the codes: use the authenticator you already have (Google or Microsoft Authenticator, Authy, 1Password, a hardware token ...)."));
     if (!st.enabled) {
@@ -76,9 +85,9 @@ function buildTotpSection(wrap) {
             try {
               const done = await post("/api/me/totp/confirm", { code: code.value.trim() });
               toast("Second factor switched on", "success");
-              document.dispatchEvent(new CustomEvent("netlens:session-changed"));
+              pendingTotpCodes = done.recovery_codes;
               await draw();
-              wrap.appendChild(recoveryBox(done.recovery_codes));
+              document.dispatchEvent(new CustomEvent("netlens:session-changed"));
             } catch (err) { toast(err.message || "That code is not right", "error"); }
           });
           area.replaceChildren(h("p", {}, "Scan this code with your authenticator, or type the key by hand:"), canvas,
@@ -98,8 +107,8 @@ function buildTotpSection(wrap) {
     fresh.addEventListener("click", async () => {
       try {
         const r = await post("/api/me/totp/recovery", { password: pass.value, code: code.value.trim() });
+        pendingTotpCodes = r.recovery_codes;
         await draw();
-        wrap.appendChild(recoveryBox(r.recovery_codes));
       } catch (err) { toast(err.message || "Failed", "error"); }
     });
     off.addEventListener("click", async () => {

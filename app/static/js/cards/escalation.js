@@ -1,10 +1,12 @@
 import { get, put, post } from "../api.js";
+import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
 // Settings page: escalate alerts that nobody acknowledges.
 export async function buildEscalationCard() {
   const card = h("div", { class: "card" });
-  function draw(info) {
+  function draw(...args) { return keepDrafts(card, () => drawNow(...args)); }       // an action on one item keeps what was typed elsewhere in the card
+  function drawNow(info) {
     clear(card);
     card.appendChild(h("h2", {}, "Escalation"));
     card.appendChild(h("p", { class: "hint" },

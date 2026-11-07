@@ -1,4 +1,5 @@
 import { get, post, put } from "../api.js";
+import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
 const STATE_LABEL = {
@@ -42,7 +43,9 @@ export async function buildDnsCard(mode = "page") {
   return card;
 }
 
-function render(card, state, mode = "page") {
+function render(card, state, mode = "page") { return keepDrafts(card, () => renderNow(card, state, mode)); }
+
+function renderNow(card, state, mode) {
   clear(card);
   if (mode === "settings") card.appendChild(h("h2", {}, "DNS registration"));
   if (mode === "settings") {
