@@ -28,6 +28,15 @@ MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
 MAX_CLIENTS = 4000
 
 
+def _parse_xml(text):
+    """Parse an answer of a device. A document that declares a DOCTYPE or entities is refused: expanding them can use all the memory (stdlib ElementTree has no limit)."""
+    raw = text if isinstance(text, bytes) else str(text).encode("utf-8", "ignore")
+    low = raw[:65536].lower()
+    if b"<!doctype" in low or b"<!entity" in low:
+        raise ET.ParseError("the XML declares a DOCTYPE or entities, which is refused")
+    return ET.fromstring(text)
+
+
 class PanError(Exception):
     pass
 
@@ -91,7 +100,7 @@ class Firewall:
         except OSError as exc:
             raise PanError(f"cannot reach {self.id}: {exc}")
         try:
-            root = ET.fromstring(body)
+            root = _parse_xml(body)
         except ET.ParseError:
             raise PanError(f"{self.id} did not answer with XML (is this a Palo Alto firewall?)")
         if root.get("status") != "success":

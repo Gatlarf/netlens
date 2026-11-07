@@ -58,6 +58,15 @@ STATE_RUNNING = {"running": "running", "off": "stopped", "paused": "paused", "sa
 TIMEOUT_TOTAL = 90
 
 
+def _parse_xml(text):
+    """Parse an answer of a device. A document that declares a DOCTYPE or entities is refused: expanding them can use all the memory (stdlib ElementTree has no limit)."""
+    raw = text if isinstance(text, bytes) else str(text).encode("utf-8", "ignore")
+    low = raw[:65536].lower()
+    if b"<!doctype" in low or b"<!entity" in low:
+        raise ET.ParseError("the XML declares a DOCTYPE or entities, which is refused")
+    return ET.fromstring(text)
+
+
 class HyperVError(Exception):
     pass
 
@@ -243,7 +252,7 @@ class Session:
                 raise AuthRefused(f"{self.id} refused the login: wrong user name or password, or this account may not use remote management (it must be a member of Remote Management Users)")
             if status in (200, 500) and text.lstrip().startswith("<"):
                 try:
-                    root = ET.fromstring(text)
+                    root = _parse_xml(text)
                 except ET.ParseError:
                     raise HyperVError(f"{self.id} sent an answer that is not XML")
                 fault = _fault_text(root)

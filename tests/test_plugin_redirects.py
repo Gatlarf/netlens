@@ -42,3 +42,21 @@ def test_the_worker_keeps_the_login_on_the_same_host_and_refuses_dangerous_redir
     assert out["other"] == ["followed", None]                    # another host name: followed, but without the login
     assert out["meta"][0] == "refused"                           # the cloud metadata address
     assert out["file"][0] == "refused"
+
+
+def test_plugins_that_read_xml_from_a_device_refuse_a_document_with_entities():
+    import importlib.util
+    import xml.etree.ElementTree as ET
+
+    bomb = b'<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;">]><x>&b;</x>'
+    for name in ("hyperv", "paloalto", "qnap", "vsphere"):
+        path = Path(__file__).resolve().parents[1] / "plugins" / name / "plugin.py"
+        spec = importlib.util.spec_from_file_location(f"xml_{name}", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        try:
+            module._parse_xml(bomb)
+            raise AssertionError(f"{name} parsed a document with entities")
+        except ET.ParseError:
+            pass
+        assert module._parse_xml(b"<a><b>1</b></a>").tag == "a"

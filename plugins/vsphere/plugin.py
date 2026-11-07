@@ -31,6 +31,15 @@ VM_PROPS = ["name", "runtime.powerState", "runtime.host", "config.template", "co
             "config.hardware.device", "guest.net", "guest.toolsRunningStatus"]
 
 
+def _parse_xml(text):
+    """Parse an answer of a device. A document that declares a DOCTYPE or entities is refused: expanding them can use all the memory (stdlib ElementTree has no limit)."""
+    raw = text if isinstance(text, bytes) else str(text).encode("utf-8", "ignore")
+    low = raw[:65536].lower()
+    if b"<!doctype" in low or b"<!entity" in low:
+        raise ET.ParseError("the XML declares a DOCTYPE or entities, which is refused")
+    return ET.fromstring(text)
+
+
 class VsphereError(Exception):
     pass
 
@@ -103,7 +112,7 @@ class Session:
         if cookie and "vmware_soap_session" in cookie:
             self.cookie = cookie.split(";", 1)[0]
         try:
-            root = ET.fromstring(raw)
+            root = _parse_xml(raw)
         except ET.ParseError:
             raise VsphereError(f"{self.id} did not return XML (is this ESXi or vCenter on /sdk?)")
         fault = find(root, "Fault")

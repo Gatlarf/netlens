@@ -31,6 +31,15 @@ STATES = {"running": "running", "up": "running", "exited": "stopped", "stopped":
           "restarting": "restarting", "dead": "failed"}
 
 
+def _parse_xml(text):
+    """Parse an answer of a device. A document that declares a DOCTYPE or entities is refused: expanding them can use all the memory (stdlib ElementTree has no limit)."""
+    raw = text if isinstance(text, bytes) else str(text).encode("utf-8", "ignore")
+    low = raw[:65536].lower()
+    if b"<!doctype" in low or b"<!entity" in low:
+        raise ET.ParseError("the XML declares a DOCTYPE or entities, which is refused")
+    return ET.fromstring(text)
+
+
 class QnapError(Exception):
     pass
 
@@ -159,7 +168,7 @@ class Qnap:
 
 def _xml_text(raw, tag):
     try:
-        root = ET.fromstring(raw.decode("utf-8", "replace").strip())
+        root = _parse_xml(raw.decode("utf-8", "replace").strip())
     except ET.ParseError:
         return ""
     node = next((n for n in root.iter() if n.tag.lower() == tag.lower()), None)
@@ -259,7 +268,7 @@ def _pick(fields, *words):
 
 def _iter_xml(raw):
     try:
-        return list(ET.fromstring((raw or b"").decode("utf-8", "replace").strip()).iter())
+        return list(_parse_xml((raw or b"").decode("utf-8", "replace").strip()).iter())
     except ET.ParseError:
         return []
 
@@ -267,7 +276,7 @@ def _iter_xml(raw):
 def _xml_records(raw, wanted):
     """Every element whose own children (text only) contain all the wanted words in some tag name: a record with its fields. Tolerant of QTS versions."""
     try:
-        root = ET.fromstring((raw or b"").decode("utf-8", "replace").strip())
+        root = _parse_xml((raw or b"").decode("utf-8", "replace").strip())
     except ET.ParseError:
         return []
     out = []

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.358 — 2026-11-07
+
+### Fixed
+- **Plugins that read XML from a device (Hyper-V, Palo Alto, QNAP, vSphere) refuse a document with a DOCTYPE or entities.** A device, or someone in between, could otherwise send a small document that expands to gigabytes and exhausts the memory of the plugin process.
+
 ## 0.4.357 — 2026-11-07
 
 ### Fixed
