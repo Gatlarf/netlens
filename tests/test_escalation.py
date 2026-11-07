@@ -144,3 +144,13 @@ def test_timing_is_validated_and_saved(conn):
         with pytest.raises(escalation.PolicyError):
             policy(conn, timing=bad)
     assert policy(conn, timing={"normal": None})["timing"]["normal"] is None
+
+
+def test_the_recovery_of_another_service_on_the_same_device_does_not_end_it(conn):
+    policy(conn)
+    a = add_event(conn, "service_down", "web down", device_id=1, now=stamp(30), subject="service:1")
+    add_event(conn, "service_down", "ssh down", device_id=1, now=stamp(29), subject="service:2")
+    add_event(conn, "service_up", "ssh up", device_id=1, now=stamp(10), subject="service:2")
+    assert [i["id"] for i, _, _ in escalation.due(conn, NOW)] == [a]          # web is still down
+    add_event(conn, "service_up", "web up", device_id=1, now=stamp(5), subject="service:1")
+    assert escalation.due(conn, NOW) == []

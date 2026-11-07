@@ -66,3 +66,12 @@ def test_the_model_only_rewords_and_a_failure_keeps_the_plain_text(conn):
         raise RuntimeError("down")
 
     assert incidents.narrate(conn, item, ask=broken) is None
+
+
+def test_a_recovery_closes_only_the_problem_of_its_own_subject(conn):
+    add_event(conn, "service_down", "web", device_id=4, now="2026-11-01T10:00:00Z", subject="service:1")
+    add_event(conn, "service_down", "ssh", device_id=4, now="2026-11-01T10:01:00Z", subject="service:2")
+    add_event(conn, "service_up", "ssh back", device_id=4, now="2026-11-01T10:05:00Z", subject="service:2")
+    assert incidents.incidents(conn, 7, NOW)[0]["ongoing"] is True
+    add_event(conn, "service_up", "web back", device_id=4, now="2026-11-01T10:06:00Z", subject="service:1")
+    assert incidents.incidents(conn, 7, NOW)[0]["ongoing"] is False

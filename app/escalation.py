@@ -100,6 +100,8 @@ def _resolved(conn: sqlite3.Connection, event: sqlite3.Row) -> bool:
     good = RECOVERY.get(event["kind"])
     if not good or event["device_id"] is None:
         return False
+    if event["subject"]:      # one device can have several things that fail (services, disks): another one's recovery does not end this
+        return bool(conn.execute("SELECT 1 FROM events WHERE kind = ? AND device_id = ? AND id > ? AND (subject = ? OR subject IS NULL) LIMIT 1", (good, event["device_id"], event["id"], event["subject"])).fetchone())
     return bool(conn.execute("SELECT 1 FROM events WHERE kind = ? AND device_id = ? AND id > ? LIMIT 1", (good, event["device_id"], event["id"])).fetchone())
 
 

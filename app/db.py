@@ -764,6 +764,7 @@ def init_db(conn: sqlite3.Connection) -> None:
 
     # --- schema v18: events held back by a maintenance window carry the window's name ----------------------
     _add_column_if_missing(conn, "events", "maintenance", "TEXT")
+    _add_column_if_missing(conn, "events", "subject", "TEXT")          # what the event is about (service:7, device:3): a recovery ends the problem of the same subject
 
     # --- schema v19: sites published by a reverse proxy plugin (Nginx Proxy Manager ...) -----------------------
     cur.execute(
@@ -1408,10 +1409,10 @@ def add_event(
     new_id = insert_id(
         conn,
         """
-        INSERT INTO events (ts, device_id, kind, detail, maintenance, tier)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO events (ts, device_id, kind, detail, maintenance, tier, subject)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (now, device_id, kind, detail, window, tier),
+        (now, device_id, kind, detail, window, tier, subject),
     )
     conn.commit()
     return new_id

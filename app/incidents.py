@@ -59,13 +59,13 @@ def incidents(conn: sqlite3.Connection, days: int = 7, now: datetime | None = No
     now = now or datetime.now(timezone.utc)
     cutoff = (now - timedelta(days=days)).strftime(STAMP)
     kinds = PROBLEMS | set(RECOVERS) | REMEDIATION
-    rows = [dict(r) for r in conn.execute("SELECT id, ts, device_id, kind, detail FROM events WHERE ts >= ? AND maintenance IS NULL ORDER BY id", (cutoff,)) if r["kind"] in kinds and (only is None or r["device_id"] is None or r["device_id"] in only)]
+    rows = [dict(r) for r in conn.execute("SELECT id, ts, device_id, kind, detail, subject FROM events WHERE ts >= ? AND maintenance IS NULL ORDER BY id", (cutoff,)) if r["kind"] in kinds and (only is None or r["device_id"] is None or r["device_id"] in only)]
     clusters: list[dict] = []
     open_by_key: dict[tuple, dict] = {}
     for e in rows:
         when = _ts(e["ts"])
         if e["kind"] in PROBLEMS:
-            key = (e["device_id"], e["kind"])
+            key = (e["device_id"], e["kind"], e["subject"])
             c = open_by_key.get(key)
             if c is None:
                 c = clusters[-1] if clusters and when - clusters[-1]["_last"] <= GAP else None
@@ -79,7 +79,9 @@ def incidents(conn: sqlite3.Connection, days: int = 7, now: datetime | None = No
                 open_by_key[key] = c
                 c["_open"].add(key)
         elif e["kind"] in RECOVERS:
-            key = (e["device_id"], RECOVERS[e["kind"]])
+            key = (e["device_id"], RECOVERS[e["kind"]], e["subject"])
+            if key not in open_by_key and e["subject"] is None:          # a recovery that names no subject ends the first open problem of that kind on the device
+                key = next((k for k in open_by_key if k[:2] == key[:2]), key)
             c = open_by_key.pop(key, None)
             if c is not None:
                 c["events"].append(e)
