@@ -175,6 +175,15 @@ def test_the_whole_flow(tmp_path, idp):
         q3 = {k: v[0] for k, v in parse_qs(urlsplit(start.headers["location"]).query).items()}
         idp["nonce"] = q3["nonce"]
         assert anon.get("/api/auth/oidc/callback", params={"code": "wrong", "state": q3["state"]}).status_code == 401
+        # login CSRF: a sign-in started in one browser cannot be completed in another (a link with somebody else's code)
+        mine = TestClient(client.app, headers={})
+        q4 = {k: v[0] for k, v in parse_qs(urlsplit(mine.get("/api/auth/oidc/login", follow_redirects=False).headers["location"]).query).items()}
+        idp["nonce"] = q4["nonce"]
+        stranger = TestClient(client.app, headers={})
+        refused = stranger.get("/api/auth/oidc/callback", params={"code": "good-code", "state": q4["state"]})
+        assert refused.status_code == 401 and "not started in this browser" in refused.text
+        assert not stranger.get("/api/session").json()["authenticated"]
+        assert mine.get("/api/auth/oidc/callback", params={"code": "good-code", "state": q4["state"]}).status_code == 200      # the browser that asked can finish it
     tsdb.forget_all()
 
 

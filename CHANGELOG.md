@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.357 — 2026-11-07
+
+### Fixed
+- ★ **Single sign-on: the sign-in is only accepted in the browser that started it.** A link that carried somebody else's sign-in answer could sign the person who opened it in as that other person. Netlens now remembers in the browser which sign-in it started (a cookie that lives ten minutes) and refuses an answer that comes from another browser.
+- **Single sign-on: the audit log names the right person.** The line "Signed in with single sign-on" took the person of the newest session of anybody; with two sign-ins at about the same time it could name the wrong one.
+
 ## 0.4.355 — 2026-11-07
 
 ### Changed

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import html
 import re
+import urllib.parse
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -31,6 +32,18 @@ def _page(message: str, status: int = 400) -> HTMLResponse:
                         f"<h1>Sign-in failed</h1><p>{html.escape(message)}</p><p><a href='/'>Back to Netlens</a></p>", status_code=status)
 
 
+BIND_COOKIE = "netlens_oidc"
+
+
+def _go(url: str, request: Request) -> RedirectResponse:
+    """Send the browser to the identity provider and remember in THIS browser which sign-in was started: the answer is only accepted from the browser that asked. Without it a
+    link with somebody else's code (login CSRF) would sign the victim in as the attacker."""
+    state = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query).get("state", [""])[0]
+    response = RedirectResponse(url, status_code=302)
+    response.set_cookie(BIND_COOKIE, state, httponly=True, samesite="lax", path="/api/auth/oidc", max_age=600, secure=_is_https(request))
+    return response
+
+
 @public_router.get("/login")
 async def login(request: Request):
     db = connect(request.app.state.db_path)
@@ -40,7 +53,7 @@ async def login(request: Request):
         return _page(str(exc))
     finally:
         db.close()
-    return RedirectResponse(url, status_code=302)
+    return _go(url, request)
 
 
 @public_router.get("/stepup")
@@ -61,17 +74,23 @@ async def stepup(request: Request, back: str = ""):
         return _page(str(exc))
     finally:
         db.close()
-    return RedirectResponse(url, status_code=302)
+    return _go(url, request)
 
 
 @public_router.get("/callback")
 async def callback(request: Request, code: str = "", state: str = "", error: str = "", error_description: str = ""):
     if error:
         return _page(f"The identity provider refused the sign-in: {error_description or error}")
+    if not state or request.cookies.get(BIND_COOKIE) != state:
+        return _page("this sign-in has expired or was not started in this browser; try again", 401)
     db = connect(request.app.state.db_path)
     try:
         cookie = await asyncio.to_thread(oidc.finish, db, state, code, client_ip(request), request.headers.get("user-agent", ""))
-        user = db.execute("SELECT u.username, u.role FROM sessions s JOIN users u ON u.id = s.user_id ORDER BY s.created DESC LIMIT 1").fetchone()
+        user = None
+        if isinstance(cookie, str):                       # the person of THIS session (not the newest session of anybody)
+            from app import users
+
+            user = db.execute("SELECT u.username, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?", (users._digest(cookie[len(users.SESSION_PREFIX):]),)).fetchone()
     except oidc.OidcError as exc:
         _audit(request, "", "", "Failed single sign-on", 401)
         return _page(str(exc), 401)
@@ -91,6 +110,7 @@ async def callback(request: Request, code: str = "", state: str = "", error: str
     # the browser arrives from another site; a page that moves on by itself makes the next request a same-site one, so the strict session cookie is sent
     response = HTMLResponse("<!doctype html><meta charset=utf-8><meta http-equiv='refresh' content='0;url=/'><title>Signing in…</title><body style='font:16px system-ui;padding:2em'>Signing in… <a href='/'>continue</a>")
     _session_cookie(response, request, cookie)
+    response.delete_cookie(BIND_COOKIE, path="/api/auth/oidc")
     if user:
         _audit(request, user["username"], user["role"], "Signed in with single sign-on", 200)
     return response
