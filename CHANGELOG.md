@@ -7,6 +7,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ### Changed
 - **Settings, On-call schedule:** the choices "Reached through" and "Who" are tick boxes now (they were list boxes that looked like grey bars), the days of a shift sit in one row, and the Remove buttons are outlines instead of large red blocks.
 - **Settings, Network checks:** Save and Check now sit side by side in the usual button row.
+- **Settings, Users & tokens:** a user's row shows Disable and Delete; the rarely used actions (New password, New API token, Reset 2FA, Break-glass, Certificate, Sessions, Limit to groups or sites) are behind a "⋯" menu instead of seven buttons that wrapped over three lines.
 
 ## 0.4.351 — 2026-11-07
 

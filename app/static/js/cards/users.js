@@ -1,4 +1,5 @@
 import { api, get } from "../api.js";
+import { rowMenu } from "../ui.js";
 import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, fmtTime } from "../util.js";
 
@@ -124,7 +125,8 @@ function userRow(user, data, refresh, shown) {
     call(() => api(`/api/users/${user.id}/tokens`, { method: "POST", body }), null);
   });
   if (user.last_admin) for (const b of [toggle, del]) { b.disabled = true; b.title = "This is the last administrator: make another user an administrator first"; }
-  const parts = [pw, " ", toggle, " ", tok, " "];
+  const parts = [toggle, " "];
+  const more = [pw, tok];                 // the rarely used actions sit behind a "⋯" menu, so a row has Disable and Delete and not seven buttons
   if (user.totp) {
     const reset = h("button", { type: "button", class: "btn", title: "For a user who lost the authenticator and the recovery codes" }, "Reset 2FA");
     reset.addEventListener("click", async () => {
@@ -134,12 +136,12 @@ function userRow(user, data, refresh, shown) {
       if (!proof) return;
       call(() => api(`/api/users/${user.id}/totp/reset`, { method: "POST", body: mine.enabled ? { code: proof } : { password: proof } }), "Second factor reset: their sessions ended");
     });
-    parts.push(reset, " ");
+    more.push(reset);
   }
   if (user.role === "admin" && data.privileged_allowed !== false) {
     const bg = h("button", { type: "button", class: "btn", title: "A local administrator who may still sign in with a password when password sign-in is limited to break-glass accounts. Needs a second factor; every use raises a critical event." }, user.break_glass ? "Not break-glass" : "Make break-glass");
     bg.addEventListener("click", () => call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { break_glass: !user.break_glass } }), user.break_glass ? "No longer a break-glass account" : "Marked as a break-glass account"));
-    parts.push(bg, " ");
+    more.push(bg);
   }
   if (data.privileged_allowed !== false) {
     const cert = h("button", { type: "button", class: "btn", title: user.cert_identity ? `Linked to: ${user.cert_identity}` : "Link a client certificate (Enterprise): what the reverse proxy reports for it, for example the subject" }, user.cert_identity ? "Certificate ✓" : "Certificate");
@@ -148,7 +150,7 @@ function userRow(user, data, refresh, shown) {
       if (id === null) return;
       call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { cert_identity: id.trim() } }), id.trim() ? "Certificate linked" : "Certificate unlinked");
     });
-    parts.push(cert, " ");
+    more.push(cert);
   }
   const sess = h("button", { type: "button", class: "btn", title: "Enterprise: see and end the sessions of this user" }, "Sessions");
   sess.addEventListener("click", async () => {
@@ -159,7 +161,7 @@ function userRow(user, data, refresh, shown) {
       else if (!r.sessions.length) window.alert(list);
     } catch (err) { toast(err.message || "Failed", "error"); }
   });
-  parts.push(sess, " ");
+  more.push(sess);
   if (user.role === "viewer") {
     const lim = h("button", { type: "button", class: "btn" }, user.scope ? "Change groups" : "Limit to groups");
     lim.addEventListener("click", () => {
@@ -169,7 +171,7 @@ function userRow(user, data, refresh, shown) {
       actions.append(h("div", { class: "scope-edit" }, h("p", { class: "hint" }, "Tick the groups this viewer may see. None ticked: everything."), picker.box, save));
       lim.disabled = true;
     });
-    parts.push(lim, " ");
+    more.push(lim);
     if ((data.sites || []).length) {
       const limSites = h("button", { type: "button", class: "btn" }, user.sites ? "Change sites" : "Limit to sites");
       limSites.addEventListener("click", () => {
@@ -179,10 +181,10 @@ function userRow(user, data, refresh, shown) {
         actions.append(h("div", { class: "scope-edit" }, h("p", { class: "hint" }, "Tick the remote sites this viewer may see (a customer view). None ticked: no site limit."), picker.box, save));
         limSites.disabled = true;
       });
-      parts.push(limSites, " ");
+      more.push(limSites);
     }
   }
-  parts.push(del);
+  parts.push(rowMenu(more.map((b) => ({ label: b.textContent, onclick: () => b.click() })), { label: "More actions for " + user.username }), " ", del);
   actions.append(...parts);
 
   row.appendChild(h("td", {}, h("strong", {}, user.username), user.disabled ? h("span", { class: "tag" }, "disabled") : null, user.totp ? h("span", { class: "tag ok", title: "Signs in with a code from an authenticator app" }, "2FA") : null, user.break_glass ? h("span", { class: "tag warn", title: "Break-glass account: may sign in with a password when that is limited; each use raises a critical event" }, "break-glass") : null));
