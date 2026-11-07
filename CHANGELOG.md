@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.359 — 2026-11-07
+
+### Fixed
+- **A device or item number that is far too large** (more than 63 bits, for example `/api/devices/99999999999999999999`) now answers "not found" instead of a server error (73 addresses were affected).
+
 ## 0.4.358 — 2026-11-07
 
 ### Fixed

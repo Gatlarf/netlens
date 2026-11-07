@@ -47,3 +47,9 @@ def test_a_viewer_can_load_what_the_hud_reads_but_a_customer_view_not_the_whole_
         for path in ("/api/uptime/latest", "/api/uptime/replay?hours=6", "/api/reliability", "/api/traffic?range=1h"):
             assert viewer.get(path).status_code == 200, path
         assert viewer.post("/api/scans", json={"kind": "quick"}).status_code == 403          # reading is all a viewer gets
+
+
+def test_an_id_too_large_for_the_database_is_not_found_not_a_server_error(tmp_path):
+    client, _ = _client(tmp_path)
+    for path in ("/api/devices/99999999999999999999", "/api/devices/99999999999999999999/applications"):
+        assert client.get(path).status_code == 404, path

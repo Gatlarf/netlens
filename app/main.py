@@ -244,6 +244,13 @@ def create_app(
     app.add_middleware(BodyLimitMiddleware)             # a request body is capped before the framework reads it (app/security.py)
     app.add_middleware(SecurityHeadersMiddleware)
 
+    @app.exception_handler(OverflowError)
+    async def _number_too_large(request, exc):
+        """An id or a number that does not fit in the database (more than 63 bits) names nothing: the same answer as for an id that does not exist, not a server error."""
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse({"detail": "not found"}, status_code=404)
+
     @app.middleware("http")
     async def audit_requests(request, call_next):
         """Write down who changed what (see app/audit.py). It never changes the answer, and a failure to write is only logged."""
