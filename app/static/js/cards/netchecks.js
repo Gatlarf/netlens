@@ -40,8 +40,7 @@ function fill(card, data) {
   card.appendChild(h("div", { class: "field" }, h("label", {}, "How often"), every));
   card.appendChild(h("p", { class: "hint" },
     "Netlens sends one DHCP discover to the network (like a device that has just been plugged in) and lists every server that answers. The servers found the first time are taken as normal; later ones are reported until you trust them."));
-  card.appendChild(save);
-  card.appendChild(run);
+  card.appendChild(h("div", { class: "form-actions" }, save, run));
   const last = data.last;
   if (last) {
     card.appendChild(h("p", { class: last.ok ? "hint" : "error", id: "dhcp-last" },

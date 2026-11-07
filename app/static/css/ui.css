@@ -154,3 +154,12 @@ input.inline-number { width: 5.5em; }
 .preset-row { margin: 4px 0 6px; } .preset-row .hint { margin: 0; }
 .gap-list { margin: 4px 0; } .gap-list summary { cursor: pointer; color: var(--muted); font-size: .85rem; } .gap-list ul { margin: 4px 0 0; padding-left: 1.2rem; }
 .site-banner .site-slow { color: var(--warn, #b26a00); font-weight: 600; }
+
+/* a group of tick boxes in a row that wraps (on-call: who is reached through which channel) */
+.check-group { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
+.check-group .check { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+.oncall-shift .event-boxes { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0; }
+.oncall-shift .event-boxes .check-row { display: inline-flex; gap: 4px; align-items: center; margin: 0; }
+/* repeated remove buttons (on-call people, shifts, overrides): an outline, like the delete buttons in a table row */
+.oncall-row .btn.danger, .oncall-shift .btn.danger, #oncall-card .field > .btn.danger { background: transparent; color: #c62828; }
+.oncall-row .btn.danger:hover, .oncall-shift .btn.danger:hover, #oncall-card .field > .btn.danger:hover { background: color-mix(in srgb, #c62828 12%, transparent); }

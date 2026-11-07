@@ -3,10 +3,17 @@ import { h, clear, toast, fmtTime } from "../util.js";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+// a group of tick boxes (a list box with several choices is hard to use, and looks like a grey bar)
 function multi(options, chosen) {
-  return h("select", { multiple: true, size: String(Math.min(4, Math.max(2, options.length))) }, ...options.map((o) => h("option", { value: o.id, selected: chosen.includes(o.id) }, o.name)));
+  const group = h("div", { class: "check-group" });
+  if (!options.length) group.appendChild(h("span", { class: "hint" }, "Nothing to choose from yet."));
+  for (const o of options) {
+    const box = h("input", { type: "checkbox", value: o.id, checked: chosen.includes(o.id) });
+    group.appendChild(h("label", { class: "check" }, box, ` ${o.name}`));
+  }
+  return group;
 }
-const picked = (select) => [...select.selectedOptions].map((o) => o.value);
+const picked = (group) => [...group.querySelectorAll("input:checked")].map((i) => i.value);
 
 // Settings page: who is on call, by day and hour. Escalation can tell "whoever is on call" (see app/oncall.py).
 export async function buildOncallCard() {
