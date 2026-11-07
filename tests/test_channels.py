@@ -554,3 +554,19 @@ async def test_a_critical_alert_breaks_through_quiet_hours_even_behind_500_older
     p = Poster()
     r = await process_channels(str(path), now=utc(23, 30), poster=p)
     assert r["sent"] == 1 and "1 service down" in json.loads(p.calls[0][1])["content"]          # held without the fix: the critical event is the 521st
+
+
+def test_a_send_pass_keeps_an_edit_made_meanwhile(tmp_path):
+    from app.notify.channels import _save_progress, load_channels, save_channels
+    conn = connect(str(tmp_path / "n.db"))
+    init_db(conn)
+    base = {"id": "a", "name": "old", "enabled": True, "type": "webhook", "events": [], "settings": {}, "last_event_id": 1}
+    save_channels(conn, [base, {**base, "id": "gone", "name": "will be deleted"}])
+    worked = load_channels(conn)                                   # what the send pass read at its start
+    save_channels(conn, [{**base, "name": "renamed"}])             # meanwhile: an edit and a deletion
+    for ch in worked:
+        ch["last_event_id"] = 9
+        ch["status"] = {"ok": True}
+    _save_progress(conn, worked)
+    after = load_channels(conn)
+    assert [(c["id"], c["name"], c["last_event_id"]) for c in after] == [("a", "renamed", 9)]

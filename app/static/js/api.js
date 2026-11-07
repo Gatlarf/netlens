@@ -67,7 +67,7 @@ export async function api(path, { method = "GET", body, _retried = false } = {})
 }
 
 // Send a file as the raw request body (used for plugin zip uploads).
-export async function upload(path, file, contentType = "application/zip") {
+export async function upload(path, file, contentType = "application/zip", _retried = false) {
   let res;
   try {
     res = await fetch(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": contentType }, body: file });
@@ -81,10 +81,16 @@ export async function upload(path, file, contentType = "application/zip") {
     parsed = null;
   }
   if (!res.ok) {
-    if (res.status === 401) document.dispatchEvent(new CustomEvent("netlens:unauth"));
     const detail = parsed && typeof parsed.detail === "string" ? parsed.detail : res.statusText;
+    if (res.status === 401 && detail.startsWith("step_up_required")) {      // same as api(): confirm once, then send the file again
+      const { prompt } = await import("./stepup.js");
+      if (!_retried && (await prompt(detail.split(":")[1] || "password"))) return upload(path, file, contentType, true);
+      throw new ApiError(401, "Confirmation cancelled");
+    }
+    if (res.status === 401) document.dispatchEvent(new CustomEvent("netlens:unauth"));
     throw new ApiError(res.status, detail);
   }
+  settled();
   return parsed;
 }
 

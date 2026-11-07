@@ -312,12 +312,17 @@ class ScanManager:
                     logging.getLogger(__name__).exception("recording the networks failed")
             if kind in ("quick", "deep") and self.options.recheck_missing:
                 hosts += await self._recheck_missing(conn, result, targets, kwargs)
-            mark_offline(
-                conn,
-                result["device_ids"],
-                targets,
-                now=utcnow(),
-            )
+            if hosts or kind not in ("quick", "deep"):
+                mark_offline(
+                    conn,
+                    result["device_ids"],
+                    targets,
+                    now=utcnow(),
+                )
+            else:
+                # a sweep that finds nothing at all is far more likely a broken network card, a cable or a firewall on this machine than
+                # every device going dark at once: leave the states alone, the next sweep (and the checks) will tell
+                logging.getLogger(__name__).warning("the sweep of %s found no device at all: nobody is marked offline from it", ", ".join(targets))
             try:
                 from app.maintenance import announce_still_down
 

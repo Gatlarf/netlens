@@ -1,5 +1,6 @@
 import { get, post, put, del } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
+import { keepDrafts } from "../editguard.js";
 
 function statusText(c) {
   if (!c.status) return h("span", { class: "hint" }, c.enabled ? "nothing sent yet" : "off");
@@ -169,6 +170,9 @@ export async function buildChannelsCard() {
   const wrap = h("div", {});
   async function load() {
     const overview = await get("/api/notify-channels");
+    keepDrafts(wrap, () => paint(overview));
+  }
+  function paint(overview) {
     clear(wrap);
     const card = h("div", { class: "card" }, h("h2", {}, "Notification channels"));
     card.appendChild(h("p", { class: "hint" },

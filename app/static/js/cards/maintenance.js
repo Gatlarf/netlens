@@ -1,5 +1,6 @@
 import { get, post, put, del } from "../api.js";
 import { h, clear, toast, fmtTime } from "../util.js";
+import { keepDrafts } from "../editguard.js";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -123,7 +124,8 @@ export async function buildMaintenanceCard() {
   const groups = groupData.groups || [];
   const devices = [...deviceList].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
-  function draw(data, editing) {
+  function draw(data, editing) { return keepDrafts(card, () => drawNow(data, editing)); }      // a rebuild after one action keeps what was typed in an open form
+  function drawNow(data, editing) {
     clear(card);
     card.appendChild(h("h2", {}, "Maintenance windows"));
     card.appendChild(h("p", { class: "hint" },

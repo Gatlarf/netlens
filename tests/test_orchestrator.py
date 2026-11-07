@@ -294,6 +294,23 @@ async def test_offline_marking(db_path: Path, settings: Any, fake_runner: tuple[
 
 
 @pytest.mark.asyncio
+async def test_a_sweep_that_finds_nothing_does_not_mark_everybody_offline(db_path: Path, settings: Any, fake_names: Any, fake_ranges: Any) -> None:
+    async def silent(kind: str, targets: list[str], *, nmap_path: str = "nmap") -> str:
+        return '<?xml version="1.0"?><nmaprun scanner="nmap"><runstats><finished time="1" exit="success"/><hosts up="0" down="0" total="0"/></runstats></nmaprun>'
+
+    conn = connect(db_path)
+    get_or_create_device(conn, None, "192.168.1.77", utcnow())
+    conn.close()
+    manager = ScanManager(db_path, settings, runner=silent, names_provider=fake_names, ranges_provider=fake_ranges)
+    await manager.start("quick")
+    await manager.wait()
+    conn = connect(db_path)
+    assert [d["online"] for d in _get_devices(conn) if d["primary_ip"] == "192.168.1.77"] == [1]
+    assert not [e for e in _get_events(conn) if e["kind"] == "device_offline"]
+    conn.close()
+
+
+@pytest.mark.asyncio
 async def test_recover_marks_running_scan_failed(db_path: Path, settings: Any, fake_runner: tuple[dict[str, Any], Any], fake_names: Any, fake_ranges: Any) -> None:
     calls, runner = fake_runner
     conn = connect(db_path)

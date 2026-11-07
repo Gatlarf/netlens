@@ -2,6 +2,7 @@ import { get } from "./api.js";
 import { currentSite, enterSite, leaveSite } from "./site.js";
 
 // The site switcher in the top bar and the banner while a remote site is shown. Only for administrators, and only when remote sites exist.
+let slowNote = null;
 export async function initSiteBar(session) {
   const site = currentSite();
   document.body.classList.toggle("site-view", !!site);
@@ -17,8 +18,10 @@ export async function initSiteBar(session) {
     const back = Object.assign(document.createElement("button"), { type: "button", className: "btn", textContent: "Back to this site" });
     back.addEventListener("click", leaveSite);
     const slow = Object.assign(document.createElement("span"), { className: "site-slow", hidden: true, textContent: " The site is slow to answer right now; pages may stay empty until it does." });
-    document.addEventListener("netlens:site-slow", () => { slow.hidden = false; });
-    document.addEventListener("netlens:site-ok", () => { slow.hidden = true; });
+    if (slowNote) { document.removeEventListener("netlens:site-slow", slowNote.on); document.removeEventListener("netlens:site-ok", slowNote.off); }      // the bar is built again on every session refresh
+    slowNote = { on: () => { slow.hidden = false; }, off: () => { slow.hidden = true; } };
+    document.addEventListener("netlens:site-slow", slowNote.on);
+    document.addEventListener("netlens:site-ok", slowNote.off);
     banner.append(text, slow, back);
     const header = document.getElementById("topbar");
     header.parentNode.insertBefore(banner, header.nextSibling);

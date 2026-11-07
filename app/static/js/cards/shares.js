@@ -1,5 +1,6 @@
 import { api, get } from "../api.js";
 import { h, clear, toast, fmtTime } from "../util.js";
+import { keepDrafts } from "../editguard.js";
 
 const PRESETS = {
   view: ["summary", "services", "map", "devices"],
@@ -134,7 +135,9 @@ function buildForm(card, state, existing) {
   return form;
 }
 
-function fill(card, state, editing = null) {
+function fill(card, state, editing = null) { return keepDrafts(card, () => fillNow(card, state, editing)); }
+
+function fillNow(card, state, editing) {
   clear(card);
   const links = state.links;
   card.appendChild(h("h2", {}, "Share links"));

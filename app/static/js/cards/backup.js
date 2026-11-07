@@ -1,4 +1,4 @@
-import { api } from "../api.js";
+import { api, upload } from "../api.js";
 import { h, clear, toast, fmtTime } from "../util.js";
 import { ask as askApproval, isApprovalRequired, parse as parseApproval } from "../approval.js";
 
@@ -255,35 +255,20 @@ export function buildBackupCard() {
     restoreBtn.textContent = "Restoring...";
 
     try {
-      const res = await fetch("/api/restore", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/octet-stream" },
-        body: file,
-      });
-
       let data = null;
       try {
-        data = await res.json();
-      } catch (e) {
-        data = null;
-      }
-
-      if (!res.ok) {
-        const msg = data && data.detail
-          ? data.detail
-          : `Restore failed (HTTP ${res.status})`;
+        data = await upload("/api/restore", file, "application/octet-stream");      // asks for the step-up confirmation by itself when it is switched on
+      } catch (err) {
+        const msg = err.message || `Restore failed (HTTP ${err.status})`;
+        restoreBtn.disabled = false;
+        restoreBtn.textContent = "Restore from file";
         if (isApprovalRequired(msg)) {
-          restoreBtn.disabled = false;
-          restoreBtn.textContent = "Restore from file";
           const ok = await askApproval("restore", "upload", "an uploaded backup");
           errorEl.textContent = ok ? "Approved. Choose Restore again now: the approval is good for one use, for a few minutes." : "No approval: nothing was restored.";
           return;
         }
         errorEl.textContent = msg;
         toast(msg, "error");
-        restoreBtn.disabled = false;
-        restoreBtn.textContent = "Restore from file";
         return;
       }
 

@@ -229,3 +229,75 @@ def test_metrics_and_summary_endpoints_carry_the_speed(env):
     assert "netlens_speedtest_download_bits_per_second 4.5e+08" in text and "netlens_speedtest_latency_seconds 0.011" in text and "netlens_speedtest_last_ok 1" in text
     assert c.get("/api/stats/summary").json()["speed"]["internet"]["down_mbps"] == 450
     assert c.get("/api/stats?range=7d").json()["speed"]["tests"] == 1
+
+
+# ---- the measuring code against a local stand-in for the test server (no internet needed)
+@pytest.fixture
+def stand_in(monkeypatch):
+    import http.client
+    import http.server
+    import threading
+
+    from app import speedtest
+
+    class H(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+        def log_message(self, *a): pass
+        def do_GET(self):
+            if self.path.startswith("/meta"):
+                body = b'{"colo": {"city": "Brussels", "iata": "BRU"}, "asOrganization": "Example ISP", "country": "BE"}'
+            elif self.path.startswith("/__down?bytes=0"):
+                body = b""
+            else:
+                body = b"x" * 5_000_000
+            self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers()
+            try: self.wfile.write(body)
+            except OSError: pass
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            self.send_response(200); self.send_header("Content-Length", "0"); self.end_headers()
+
+    class Server(http.server.ThreadingHTTPServer):
+        daemon_threads = True
+
+    srv = Server(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setattr(speedtest, "_connect", lambda timeout=10.0: http.client.HTTPConnection("127.0.0.1", srv.server_port, timeout=timeout))
+    yield speedtest
+    srv.shutdown()
+
+
+def test_latency_download_and_upload_are_measured(stand_in):
+    latency, jitter = stand_in.measure_latency(samples=6)
+    assert latency is not None and latency >= 0 and jitter is not None
+    p = stand_in.Progress()
+    assert p.start("internet") and not p.start("internet")                    # one test at a time
+    assert stand_in.measure_download(p, seconds=3, streams=2) > 0
+    assert stand_in.measure_upload(p, seconds=3, streams=1) > 0
+    assert p.snapshot()["phase"] == "upload"
+    p.finish()
+    assert p.snapshot() is None
+
+
+def test_an_unreachable_server_gives_no_latency_and_a_failed_row(tmp_path, monkeypatch):
+    import http.client
+
+    from app import speedtest
+    from app.db import connect, init_db
+
+    monkeypatch.setattr(speedtest, "_connect", lambda timeout=10.0: http.client.HTTPConnection("127.0.0.1", 1, timeout=1))
+    assert speedtest.measure_latency(samples=4) == (None, None)
+    assert speedtest._get_json("/meta") == {}
+    conn = connect(tmp_path / "s.db"); init_db(conn); conn.close()
+    p = speedtest.Progress(); p.start("internet")
+    speedtest.run_and_record(str(tmp_path / "s.db"), p)
+    conn = connect(tmp_path / "s.db")
+    row = speedtest.history(conn, "internet")[0]
+    assert row["ok"] == 0 and "internet" in row["error"].lower() and p.snapshot() is None
+
+
+def test_the_whole_internet_test_reads_the_server_details(stand_in, monkeypatch):
+    monkeypatch.setattr(stand_in, "measure_download", lambda progress, seconds=8, streams=4: 123.4)
+    monkeypatch.setattr(stand_in, "measure_upload", lambda progress, seconds=8, streams=3: 45.6)
+    r = stand_in.run_internet_test(stand_in.Progress(), seconds=1)
+    assert (r["down"], r["up"]) == (123.4, 45.6) and r["detail"] == {"server": "Brussels", "server_code": "BRU", "isp": "Example ISP", "country": "BE"}

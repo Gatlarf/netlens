@@ -260,3 +260,39 @@ def test_the_copy_with_plain_text_passwords_made_before_the_first_encryption_goe
     os.utime(copy, (old, old))
     assert vault.remove_plaintext_copy(c) and not copy.exists()
     assert not vault.remove_plaintext_copy(c)                                         # nothing left to remove
+
+
+def test_a_huge_answer_is_refused_and_exit_calls_are_reported(tmp_path):
+    big = plugin(tmp_path, """
+        def test(config):
+            return {"blob": "x" * (9 * 1024 * 1024)}
+        def fetch(config):
+            return {}
+    """)
+    with pytest.raises(PluginRunError, match="too much data"):
+        run_subprocess(big, "test", {})
+
+    (tmp_path / "b").mkdir()
+    quitter = plugin(tmp_path / "b", """
+        import sys
+        def test(config):
+            sys.exit("bye")
+        def fetch(config):
+            return {}
+    """)
+    with pytest.raises(PluginRunError, match="bye"):                 # SystemExit is reported like any other error, not a silent crash
+        run_subprocess(quitter, "test", {})
+
+
+def test_a_payload_reaches_the_second_argument_and_an_empty_error_gets_its_class_name(tmp_path):
+    p = plugin(tmp_path, """
+        def test(config):
+            raise KeyError()
+        def fetch(config, payload=None):
+            return {"got": payload}
+        def act(config, payload):
+            return {"got": payload["x"]}
+    """)
+    assert run_subprocess(p, "act", {}, payload={"x": 7}) == {"got": 7}
+    with pytest.raises(PluginRunError, match="KeyError"):
+        run_subprocess(p, "test", {})

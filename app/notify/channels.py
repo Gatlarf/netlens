@@ -215,6 +215,23 @@ def save_channels(conn: sqlite3.Connection, channels: list[dict]) -> None:
     set_setting(conn, CHANNELS_KEY, json.dumps(channels))
 
 
+def _save_progress(conn: sqlite3.Connection, worked: list[dict]) -> None:
+    """Store only what a send pass changed (how far each channel got, how the last send went).
+
+    A pass can take a while (a slow webhook); an administrator may edit or delete a channel meanwhile. Writing back the whole list that was
+    read at the start would undo that edit, so the list is read again and only the progress is copied onto it."""
+    by_id = {c.get("id"): c for c in worked}
+    fresh = load_channels(conn)
+    for ch in fresh:
+        mine = by_id.get(ch.get("id"))
+        if mine is None:
+            continue
+        for key in ("last_event_id", "status"):
+            if key in mine:
+                ch[key] = mine[key]
+    save_channels(conn, fresh)
+
+
 def current_max_event_id(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()[0]
 
@@ -717,7 +734,7 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
                     ch["last_event_id"] = resume
                 changed = True
             if changed:
-                save_channels(conn, channels)
+                _save_progress(conn, channels)
         finally:
             conn.close()
     return result

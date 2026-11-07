@@ -2,6 +2,17 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.360 — 2026-11-07
+
+### Fixed
+- **Restore from file and plugin upload work with the extra confirmation switched on.** They did not ask for the password or code and failed with "step up required".
+- **Editing a notification channel while a send round is running is no longer undone.** The round wrote back the list it had read at its start; now it stores only how far each channel got.
+- **Maintenance, Notification channels, Share links and Credentials keep what you typed** when the card redraws after another action (a password is never kept).
+- **The remote-site banner no longer adds a new "site is slow" listener on every session refresh.**
+
+### Changed
+- **A scan that finds no device at all no longer marks everybody offline.** That is far more likely a problem on the scanning machine (network card, cable, firewall) than every device going dark; a warning is written to the log and the next scan decides.
+
 ## 0.4.359 — 2026-11-07
 
 ### Fixed

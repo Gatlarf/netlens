@@ -1,5 +1,6 @@
 import { get, post, put, del } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
+import { keepDrafts } from "../editguard.js";
 import { reasonFor } from "../reason.js";
 
 const KINDS = [["login", "User name and password"], ["ssh_key", "SSH key"], ["pam", "In your PAM system (Enterprise)"]];
@@ -157,7 +158,9 @@ export async function buildCredentialsCard() {
     draw();
   }
 
-  function draw() {
+  function draw() { return keepDrafts(card, drawNow); }
+
+  function drawNow() {
     clear(card);
     card.appendChild(h("h2", {}, "Credentials"));
     card.appendChild(h("p", { class: "hint" }, "The logins Netlens uses to reach your hosts: remote desktop, SSH, health monitoring and host probes. Each is stored once, encrypted, and picked by name wherever it is needed. " +
