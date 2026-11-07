@@ -83,6 +83,15 @@ async def test_a_command_goes_through_the_bastion_and_the_target_key_is_still_ch
         await ssh.run_command("127.0.0.1", lab["tport"], "svc", "target-pw", None, None, "uptime", "SHA256:" + "A" * 43, route=jump(lab))
 
 
+def _closed_port() -> int:
+    """A port nothing listens on (asked from the system, so the refusal is immediate on every host; port 1 can time out behind some firewalls)."""
+    import socket
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
 @pytest.mark.asyncio
 async def test_the_bastion_key_can_be_pinned_and_its_login_must_work(lab):
     with pytest.raises(ssh.SshError, match="not the one that was pinned"):
@@ -90,7 +99,7 @@ async def test_the_bastion_key_can_be_pinned_and_its_login_must_work(lab):
     with pytest.raises(ssh.SshError, match="bastion refused"):
         await ssh.run_command("127.0.0.1", lab["tport"], "svc", "target-pw", None, None, "x", None, route=jump(lab, login={"username": "jumper", "password": "wrong"}))
     with pytest.raises(ssh.SshError, match="cannot reach the bastion"):
-        await ssh.run_command("127.0.0.1", lab["tport"], "svc", "target-pw", None, None, "x", None, route=jump(lab, port=1), timeout=3)
+        await ssh.run_command("127.0.0.1", lab["tport"], "svc", "target-pw", None, None, "x", None, route=jump(lab, port=_closed_port()), timeout=3)
 
 
 @pytest.mark.asyncio

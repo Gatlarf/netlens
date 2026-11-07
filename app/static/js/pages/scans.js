@@ -277,7 +277,7 @@ export async function render(container, params) {
   const onScanFinished = () => {
     refresh();
   };
-  window.addEventListener("netlens:scan-finished", onScanFinished);
+  document.addEventListener("netlens:scan-finished", onScanFinished);
   listenerAttached = true;
 
   return () => {
@@ -286,7 +286,7 @@ export async function render(container, params) {
       intervalId = null;
     }
     if (listenerAttached) {
-      window.removeEventListener("netlens:scan-finished", onScanFinished);
+      document.removeEventListener("netlens:scan-finished", onScanFinished);
       listenerAttached = false;
     }
   };

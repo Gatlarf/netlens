@@ -33,3 +33,17 @@ def test_replay_returns_the_start_state_and_only_the_changes(tmp_path):
     assert [c for c in body["changes"] if c["id"] == b] == [{"id": b, "ts": body["from"], "up": True, "initial": True}]
     assert client.get("/api/uptime/replay?hours=0").status_code == 422
     assert client.get("/api/uptime/replay?hours=500").status_code == 422
+
+
+def test_a_viewer_can_load_what_the_hud_reads_but_a_customer_view_not_the_whole_network(tmp_path):
+    from app.config import load_settings as ls
+    db = tmp_path / "v.db"
+    app = create_app(ls({"NETLENS_TOKEN": "secret"}), db_path=db)
+    admin = {"Authorization": "Bearer secret"}
+    with TestClient(app) as c:
+        assert c.post("/api/users", json={"username": "vera", "password": "longenough1", "role": "viewer"}, headers=admin).status_code == 201
+        viewer = TestClient(app)
+        assert viewer.post("/api/login", json={"username": "vera", "password": "longenough1"}).status_code == 200
+        for path in ("/api/uptime/latest", "/api/uptime/replay?hours=6", "/api/reliability", "/api/traffic?range=1h"):
+            assert viewer.get(path).status_code == 200, path
+        assert viewer.post("/api/scans", json={"kind": "quick"}).status_code == 403          # reading is all a viewer gets

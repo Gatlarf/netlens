@@ -212,6 +212,16 @@ class _PinnedConnection(http.client.HTTPSConnection):
             raise ssl.SSLError("the certificate is not the one you trusted")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """The link to the central Netlens sends a token: a redirect (to another host, or from https to http) must not carry it along, so none is followed."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_PLAIN_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _opener(pin: str):
     context = ssl.create_default_context()
     context.check_hostname = False
@@ -221,7 +231,7 @@ def _opener(pin: str):
         def https_open(self, req):
             return self.do_open(lambda host, **kw: _PinnedConnection(host, pin=pin, context=context, **{k: v for k, v in kw.items() if k != "context"}), req)
 
-    return urllib.request.build_opener(Handler)
+    return urllib.request.build_opener(Handler, _NoRedirect)
 
 
 # ----------------------------------------------------------------------------- sending
@@ -234,7 +244,7 @@ def send(url: str, token: str, payload: dict[str, Any], timeout: float = TIMEOUT
         url + "/api/probe/push", data=body, method="POST",
         headers={"Content-Type": "application/json", "Content-Encoding": "gzip", "Authorization": f"Bearer {token}", "User-Agent": f"Netlens/{VERSION}"})
     try:
-        opener = _opener(pin).open if pin and url.startswith("https://") else urllib.request.urlopen
+        opener = _opener(pin).open if pin and url.startswith("https://") else _PLAIN_OPENER.open
         with opener(request, timeout=timeout) as resp:  # noqa: S310 - scheme checked when the link was saved
             return json.loads(resp.read(2 * 1024 * 1024).decode("utf-8", "replace") or "{}")
     except urllib.error.HTTPError as exc:
@@ -384,7 +394,7 @@ def _relay_request(link: dict[str, Any], path: str, body: dict[str, Any] | None,
     request = urllib.request.Request(link["url"] + path, data=data, method="POST" if data is not None else "GET", headers=headers)
     pin = link["pin"]
     try:
-        opener = _opener(pin).open if pin and link["url"].startswith("https://") else urllib.request.urlopen
+        opener = _opener(pin).open if pin and link["url"].startswith("https://") else _PLAIN_OPENER.open
         with opener(request, timeout=timeout) as resp:  # noqa: S310 - scheme checked when the link was saved
             return json.loads(resp.read(1024 * 1024).decode("utf-8", "replace") or "{}")
     except urllib.error.HTTPError as exc:

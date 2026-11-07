@@ -117,7 +117,7 @@ export function openEditor({ def, data, onSave }) {
     const s = h("select", { "aria-label": label }, h("option", { value: "" }, `Choose…`), options.map(([v, t]) => h("option", { value: String(v) }, t)));
     if (value !== undefined && value !== null) s.value = String(value);
     s.addEventListener("change", update);
-    body.append(field(label, s), options.length ? null : h("p", { class: "hint" }, "There is nothing to choose from yet."));
+    body.append(field(label, s), ...(options.length ? [] : [h("p", { class: "hint" }, "There is nothing to choose from yet.")]));
     return () => ({ [key]: s.value === "" ? null : key === "group" ? s.value : Number(s.value) });
   }
 

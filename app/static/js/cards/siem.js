@@ -37,7 +37,7 @@ export async function buildSiemCard() {
     card.append(h("label", { class: "check" }, enabled, " Forward to a syslog server"),
       h("div", { class: "field" }, h("label", {}, "Server"), host), h("div", { class: "field" }, h("label", {}, "Port"), port), h("div", { class: "field" }, h("label", {}, "Protocol"), proto),
       h("div", { class: "field" }, h("label", {}, "Facility"), facility), h("label", { class: "check" }, events, " Events (alerts, devices, services ...)"), h("label", { class: "check" }, audit, " Audit log (who changed what)"),
-      st.ts ? h("p", { class: st.ok ? "hint" : "error" }, st.ok ? `Last delivery ${timeAgo(st.ts)}: ${st.sent} message${st.sent === 1 ? "" : "s"}.` : `Last attempt ${timeAgo(st.ts)} failed: ${st.error}`) : null,
+      ...(st.ts ? [h("p", { class: st.ok ? "hint" : "error" }, st.ok ? `Last delivery ${timeAgo(st.ts)}: ${st.sent} message${st.sent === 1 ? "" : "s"}.` : `Last attempt ${timeAgo(st.ts)} failed: ${st.error}`)] : []),
       h("div", { class: "form-actions" }, save, test));
   }
   draw(await get("/api/siem"));

@@ -764,3 +764,38 @@ def test_a_central_netlens_that_stays_unreachable_is_reported_here(conn):
     assert "timed out" in conn.execute("SELECT detail FROM events WHERE kind = 'central_unreachable'").fetchone()[0]
     central._watch_link(conn, fail, 5000)                                                 # a short break that mends itself says nothing
     assert central._watch_link(conn, {"ok": True}, 5100) is None and kinds(conn) == ["central_unreachable", "central_reachable"]
+
+
+def test_the_link_to_the_central_netlens_does_not_follow_a_redirect_with_the_token(tmp_path):
+    import http.server
+    import threading
+
+    from app import central
+
+    got = {}
+
+    class Other(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a): pass
+        def do_POST(self):
+            got["auth"] = self.headers.get("Authorization"); self.send_response(200); self.end_headers(); self.wfile.write(b"{}")
+
+    other = http.server.HTTPServer(("127.0.0.1", 0), Other)
+
+    class Redirect(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a): pass
+        def do_POST(self):
+            self.send_response(307); self.send_header("Location", f"http://127.0.0.1:{other.server_port}/x"); self.end_headers()
+
+    first = http.server.HTTPServer(("127.0.0.1", 0), Redirect)
+    for srv in (other, first):
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        try:
+            central.send(f"http://127.0.0.1:{first.server_port}", "tok-secret", {"a": 1}, timeout=5)
+            raised = None
+        except central.LinkError as exc:
+            raised = str(exc)
+    finally:
+        first.shutdown(); other.shutdown()
+    assert raised and "307" in raised
+    assert "auth" not in got                                          # the token never reached the address the redirect named

@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.349 — 2026-11-07
+
+### Fixed
+- **Scans page: it now reacts when a scan finishes.** It listened for the "scan finished" signal in the wrong place and so only changed at its 10-second refresh.
+- **Log forwarding no longer shows the word "null"** below the options when nothing has been sent yet (the same slip is fixed in the dashboard editor's choice lists).
+- **HUD for viewers.** The scan glow, the time machine, the reliability figures and the traffic panel were refused for accounts that may only look (viewer role); they now load. A customer view (limited to some groups) gets the response times and the time machine of its own devices only.
+- **Plugins no longer pass login details on in a redirect.** A redirect to another host drops the Authorization header, cookies and API keys, and a redirect to a file, to the cloud metadata address or from https back to http is refused. The link to a central Netlens follows no redirect at all, so its token cannot be sent anywhere else.
+
 ## 0.4.348 — 2026-11-06
 
 ### Added

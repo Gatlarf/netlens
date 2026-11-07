@@ -152,8 +152,13 @@ def test_addresses_are_understood_and_unreachable_hosts_reported():
         plugin.parse_servers({"servers": []})
     with pytest.raises(plugin.AuthRefused):
         plugin.parse_servers({"servers": [{"host": "h", "username": "", "password": ""}]})
+    import socket
+
+    with socket.socket() as sock:                                  # a port nothing listens on: refused at once on every host (port 1 can time out behind a firewall)
+        sock.bind(("127.0.0.1", 0))
+        closed = sock.getsockname()[1]
     with pytest.raises(plugin.HyperVError, match="cannot reach"):
-        plugin.fetch({"servers": [{"host": "https://127.0.0.1:1", "username": "u", "password": "p"}], "timeout": 3})
+        plugin.fetch({"servers": [{"host": f"https://127.0.0.1:{closed}", "username": "u", "password": "p"}], "timeout": 3})
 
 
 @needs_openssl
