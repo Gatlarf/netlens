@@ -34,6 +34,17 @@ def _is_single_private_host(target: str) -> bool:
     return addr.version == 4 and _is_valid_target(target)
 
 
+
+def _release(conn):
+    """Undo and close the connection of a scan that failed, so its open transaction cannot block the connection that records the failure."""
+    if conn is not None:
+        try:
+            conn.rollback()
+            conn.close()
+        except Exception:  # noqa: BLE001 - the scan has failed already; what matters is that the lock is let go
+            pass
+    return None
+
 class ScanBusy(RuntimeError):
     pass
 
@@ -379,6 +390,7 @@ class ScanManager:
         except asyncio.CancelledError:
             # Cancelled by the user before anything was saved: record it and end quietly.
             logging.getLogger(__name__).info("scan %s cancelled", scan_id)
+            conn = _release(conn)                # the connection of the scan may still hold the write lock: without this the new one waits for it and the scan stays "running"
             conn = connect(self.db_path)
             try:
                 row = conn.execute("SELECT status FROM scans WHERE id = ?", (scan_id,)).fetchone()
@@ -399,6 +411,7 @@ class ScanManager:
                     scan_id, "; ".join(found["findings"]), found["cause"] or "none of the usual settings is wrong; see Troubleshooting in the README.", exc)
             else:
                 logging.getLogger(__name__).warning("scan %s failed: %r", scan_id, exc)
+            conn = _release(conn)                # the connection of the scan may still hold the write lock: without this the new one waits for it and the scan stays "running"
             conn = connect(self.db_path)
             try:
                 finish_scan(

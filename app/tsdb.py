@@ -102,6 +102,9 @@ class Store:
                         CREATE TABLE IF NOT EXISTS m5 (series INTEGER NOT NULL, ts INTEGER NOT NULL, n INTEGER NOT NULL, s REAL NOT NULL, lo REAL NOT NULL, hi REAL NOT NULL, PRIMARY KEY (series, ts)) WITHOUT ROWID;
                         CREATE TABLE IF NOT EXISTS h1 (series INTEGER NOT NULL, ts INTEGER NOT NULL, n INTEGER NOT NULL, s REAL NOT NULL, lo REAL NOT NULL, hi REAL NOT NULL, PRIMARY KEY (series, ts)) WITHOUT ROWID;
                         CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v INTEGER NOT NULL);
+                        CREATE INDEX IF NOT EXISTS raw_ts ON raw(ts);     -- the roll-ups and the pruning ask for a time window of all series: without these they read every row each time
+                        CREATE INDEX IF NOT EXISTS m5_ts ON m5(ts);
+                        CREATE INDEX IF NOT EXISTS h1_ts ON h1(ts);
                         """
                     )
                     conn.commit()

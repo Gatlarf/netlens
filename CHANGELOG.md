@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.351 — 2026-11-07
+
+### Fixed
+- ★ **Uptime history is no longer wiped.** The hourly availability figures (kept 400 days) were deleted completely when the device with the newest checks was deleted, or when the old checks had been pruned until none were left. They now stay, and the checks that follow are counted as usual.
+- **A failed scan can no longer leave itself at "running".** The scan's database connection is now released before the failure is recorded; before, it could keep the write lock, so the scan stayed "running" and the regular device checks stopped until a restart.
+- **A critical alert is no longer held back in quiet hours** when more than 500 ordinary events were waiting before it.
+- **The passive listener no longer stops by itself** on a busy network: the list of devices it has heard was changed from two threads at once.
+- **Faster performance graphs:** the roll-up and clean-up of the stored measurements no longer read every row each time (an index on the time).
+
 ## 0.4.350 — 2026-11-07
 
 ### Fixed

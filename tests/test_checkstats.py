@@ -85,11 +85,27 @@ def test_a_big_gap_falls_back_to_the_raw_rows_and_backfill_catches_up(conn, monk
     assert conn.execute("SELECT SUM(n) FROM checks_hourly").fetchone()[0] == conn.execute("SELECT COUNT(*) FROM checks").fetchone()[0]
 
 
-def test_a_table_that_was_emptied_starts_over(conn):
+def test_a_table_that_was_emptied_keeps_the_history_and_counts_what_comes_next(conn):
+    checkstats.backfill(conn)
+    kept = conn.execute("SELECT SUM(n) FROM checks_hourly").fetchone()[0]
     conn.execute("DELETE FROM checks")
     conn.commit()
     assert checkstats.current(conn) is True
-    assert conn.execute("SELECT COUNT(*) FROM checks_hourly").fetchone()[0] == 0
+    assert conn.execute("SELECT SUM(n) FROM checks_hourly").fetchone()[0] == kept         # the raw rows are pruned after 90 days, the roll-up is the only record of the rest
+    conn.execute("INSERT INTO checks (device_id, ts, up, rtt_ms) VALUES (1, ?, 1, 4.0)", (stamp(NOW + timedelta(minutes=1)),))      # the id starts at 1 again
+    conn.commit()
+    assert checkstats.fold(conn) == 1
+    assert conn.execute("SELECT SUM(n) FROM checks_hourly").fetchone()[0] == kept + 1
+
+
+def test_deleting_the_device_with_the_newest_checks_does_not_wipe_the_history_of_the_others(conn):
+    checkstats.backfill(conn)
+    last = conn.execute("SELECT device_id FROM checks ORDER BY id DESC LIMIT 1").fetchone()[0]
+    others = conn.execute("SELECT SUM(n) FROM checks_hourly WHERE device_id != ?", (last,)).fetchone()[0]
+    conn.execute("DELETE FROM devices WHERE id = ?", (last,))
+    conn.commit()
+    checkstats.fold(conn)
+    assert conn.execute("SELECT SUM(n) FROM checks_hourly").fetchone()[0] == others
 
 
 def test_deleting_a_device_removes_its_roll_up(conn):

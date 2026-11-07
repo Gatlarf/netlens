@@ -42,9 +42,13 @@ def fold(conn: sqlite3.Connection, limit: int | None = None) -> int:
     with _lock:
         done = _rolled(conn)
         top = _max_id(conn)
-        if done > top:                                             # the checks table was emptied or replaced: start over
-            conn.execute("DELETE FROM checks_hourly")
-            done = 0
+        if done > top:
+            # The newest checks are gone (the device they belonged to was deleted, or the old rows were pruned until none were left) and the next ids start lower again.
+            # What was counted stays counted: the roll-up keeps 400 days, the raw rows only 90, so wiping it here would throw away history that cannot be rebuilt.
+            # New checks always get an id above `top`, so following from there counts every one of them.
+            set_setting(conn, KEY, str(top))
+            conn.commit()
+            done = top
         if done == top:
             return 0
         upto = top if limit is None else min(top, done + limit)

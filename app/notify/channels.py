@@ -576,15 +576,15 @@ def send_channel(channel: dict, title: str, body: str, events: list[dict], *, po
 
 
 # ----------------------------------------------------------------------------- processing
-def _pending_events(conn: sqlite3.Connection, after_id: int) -> list[dict]:
+def _pending_events(conn: sqlite3.Connection, after_id: int, limit: int = 500) -> list[dict]:
     rows = conn.execute(
         """
         SELECT e.id, e.ts, e.kind, e.device_id, e.detail, e.maintenance, e.tier,
                COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.primary_ip AS ip, d.mac, d.vendor, d.trusted, d.notify_offline, d.always_on, d.group_id, g.name AS group_name
         FROM events e LEFT JOIN devices d ON d.id = e.device_id LEFT JOIN device_groups g ON g.id = d.group_id
-        WHERE e.id > ? ORDER BY e.id LIMIT 500
+        WHERE e.id > ? ORDER BY e.id LIMIT ?
         """,
-        (after_id,),
+        (after_id, limit),
     ).fetchall()
     out = []
     for r in rows:
@@ -640,8 +640,11 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
                 if not pending:
                     continue
                 top = pending[-1]["id"]
-                wanted = [e for e in pending if e["kind"] in ch["events"] and not e["maintenance"] and not (e["kind"] == "device_offline" and e["device_id"] is not None and e["notify_offline"] == 0)
-                          and passes_filters(e, ch.get("filters"))]
+                def pick(events, ch=ch):
+                    return [e for e in events if e["kind"] in ch["events"] and not e["maintenance"] and not (e["kind"] == "device_offline" and e["device_id"] is not None and e["notify_offline"] == 0)
+                            and passes_filters(e, ch.get("filters"))]
+
+                wanted = pick(pending)
                 if not wanted:
                     ch["last_event_id"] = top
                     changed = True
@@ -671,6 +674,11 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
                     continue
                 own = ch.get("quiet")                       # this channel's own quiet hours (a person's sleep) replace the general ones
                 hold, bypass = (in_quiet_hours(now, own), own["bypass_critical"]) if own and own.get("enabled") else (quiet_now, quiet["bypass_critical"])
+                if hold and bypass and len(pending) >= 500 and not any(e["kind"] in CRITICAL for e in wanted):
+                    # a long night of older events must not hide a critical one behind the first 500: look further before deciding to hold
+                    pending = _pending_events(conn, ch["last_event_id"], limit=5000)
+                    top = pending[-1]["id"]
+                    wanted = pick(pending)
                 if hold and not (bypass and any(e["kind"] in CRITICAL for e in wanted)):
                     continue  # held back until the quiet hours end
                 if quiet.get("group_by_cause", True):

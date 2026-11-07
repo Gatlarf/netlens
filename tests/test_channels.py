@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.config import load_settings
-from app.db import add_event, connect, init_db
+from app.db import set_setting, add_event, connect, init_db
 from app.main import create_app
 from app.notify import channels as ch
 from app.notify.channels import ChannelError, build_digest, clean_quiet, clean_settings, in_quiet_hours, process_channels, send_channel
@@ -540,3 +540,17 @@ def test_a_channel_can_be_limited_to_always_on_devices():
     assert ch.passes_filters({"kind": "metric_critical", "device_id": 1, "always_on": 0}, f)          # a full disk on any host is still told
     assert not ch.passes_filters(phone, f) and ch.passes_filters(server, f) and ch.passes_filters(service, f)
     assert ch.passes_filters(phone, ch.clean_filters({}))
+
+
+async def test_a_critical_alert_breaks_through_quiet_hours_even_behind_500_older_events(db):
+    path, conn = db
+    add_channels(conn, chan("a", events=["device_new", "service_down"]))
+    for i in range(520):
+        add_event(conn, "device_new", f"10.1.{i // 250}.{i % 250}", device_id=1)           # a long night of ordinary news
+    add_event(conn, "service_down", "web is down", device_id=1)
+    conn.commit()
+    set_setting(conn, ch.QUIET_KEY, json.dumps({"enabled": True, "start": "22:00", "end": "07:00", "tz": "UTC", "offset_min": 0, "bypass_critical": True}))
+    conn.commit()
+    p = Poster()
+    r = await process_channels(str(path), now=utc(23, 30), poster=p)
+    assert r["sent"] == 1 and "1 service down" in json.loads(p.calls[0][1])["content"]          # held without the fix: the critical event is the 521st

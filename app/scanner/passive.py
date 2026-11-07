@@ -16,6 +16,7 @@ import os
 import socket
 import struct
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -299,6 +300,7 @@ class Listener:
     def __init__(self, db_path: str) -> None:
         self.db_path = db_path
         self.pending: dict[str, Observation] = {}
+        self._lock = threading.Lock()                 # feed() runs on the event loop, flush() in a worker thread: both change `pending`
         self.stats = {"running": False, "frames": 0, "applied": 0, "error": None}
 
     def feed(self, frame: bytes) -> None:
@@ -306,14 +308,15 @@ class Listener:
         if obs is None:
             return
         self.stats["frames"] += 1
-        known = self.pending.get(obs.mac)
-        if known is None:
-            if len(self.pending) >= MAX_PENDING:
-                oldest = min(self.pending, key=lambda m: self.pending[m].seen)
-                del self.pending[oldest]
-            self.pending[obs.mac] = obs
-        else:
-            known.merge(obs)
+        with self._lock:
+            known = self.pending.get(obs.mac)
+            if known is None:
+                if len(self.pending) >= MAX_PENDING:
+                    oldest = min(self.pending, key=lambda m: self.pending[m].seen)
+                    self.pending.pop(oldest, None)
+                self.pending[obs.mac] = obs
+            else:
+                known.merge(obs)
 
     def flush(self) -> int:
         """Write pending observations; keep those whose device is not known yet for a while."""
@@ -325,14 +328,17 @@ class Listener:
         done = 0
         try:
             now = time.time()
-            for mac, obs in list(self.pending.items()):
+            with self._lock:
+                snapshot = list(self.pending.items())
+            for mac, obs in snapshot:
                 try:
                     applied = apply(conn, obs)
                 except Exception:
                     log.exception("could not store a passive observation")
                     applied = True
                 if applied or now - obs.seen > PENDING_TTL:
-                    del self.pending[mac]
+                    with self._lock:
+                        self.pending.pop(mac, None)
                     done += 1 if applied else 0
         finally:
             conn.close()
@@ -370,7 +376,10 @@ class Listener:
     async def _flush_loop(self) -> None:
         while True:
             await asyncio.sleep(FLUSH_EVERY)
-            await asyncio.to_thread(self.flush)
+            try:
+                await asyncio.to_thread(self.flush)
+            except Exception:  # noqa: BLE001 - one failed round must not end the listener for good
+                log.exception("flushing the passive observations failed")
 
 
 SETTING = "passive.enabled"
