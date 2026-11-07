@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.363 — 2026-11-07
+
+### Fixed
+- **A double click or double Enter no longer saves twice** (two tokens, two groups, two shares): an identical change that is still on its way shares its request.
+- **Saving the results of a big scan no longer makes the pages and background loops wait.** It runs in its own thread now.
+
 ## 0.4.362 — 2026-11-07
 
 ### Fixed

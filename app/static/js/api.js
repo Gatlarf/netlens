@@ -9,7 +9,19 @@ export class ApiError extends Error {
 import { currentSite, routed } from "./site.js";
 import { settled } from "./editguard.js";
 
-export async function api(path, { method = "GET", body, _retried = false } = {}) {
+// A double click or a double Enter sends the same change twice (two tokens, two groups). An identical write that is still on its way shares its request.
+const inFlight = new Map();
+export function api(path, opts = {}) {
+  const { method = "GET", body, _retried = false } = opts;
+  if (method === "GET" || _retried) return call(path, opts);
+  const key = `${method} ${path} ${body === undefined ? "" : JSON.stringify(body)}`;
+  if (inFlight.has(key)) return inFlight.get(key);
+  const p = call(path, opts).finally(() => inFlight.delete(key));
+  inFlight.set(key, p);
+  return p;
+}
+
+async function call(path, { method = "GET", body, _retried = false } = {}) {
   if (method !== "GET" && currentSite() && routed(path) !== path) throw new ApiError(0, "A remote site is shown read-only through this Netlens. Go back to this site to change things.");
   try {
     const res = await fetch(routed(path), {
@@ -44,7 +56,7 @@ export async function api(path, { method = "GET", body, _retried = false } = {})
       if (res.status === 401 && typeof detail === "string" && detail.startsWith("step_up_required")) {
         // a privileged action: ask the person to confirm once and repeat it; this is not a sign-out
         const { prompt } = await import("./stepup.js");
-        if (!_retried && (await prompt(detail.split(":")[1] || "password"))) return api(path, { method, body, _retried: true });
+        if (!_retried && (await prompt(detail.split(":")[1] || "password"))) return call(path, { method, body, _retried: true });
         throw new ApiError(401, "Confirmation cancelled");
       }
       if (res.status === 401) {

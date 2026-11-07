@@ -297,7 +297,9 @@ class ScanManager:
             self._set_progress(phase="saving")
 
             conn = connect(self.db_path)
-            result = save_scan_results(
+            # on a big network this takes seconds of database work: in a thread, so the page, the beats and the other loops keep answering
+            result = await asyncio.to_thread(
+                save_scan_results,
                 conn,
                 hosts,
                 # a full scan reports the complete port list of its host: store it like a deep scan
