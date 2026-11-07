@@ -1,6 +1,6 @@
 // Vulnerability findings, shared by the Vulnerabilities page and the device page.
 import { get } from "../api.js";
-import { h } from "../util.js";
+import { h, webUrl } from "../util.js";
 
 export const SEV_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low", info: "Info" };
 
@@ -18,7 +18,7 @@ export function findingsTable(findings, { showDevice = true } = {}) {
         h("div", { class: "vuln-body" },
           f.cve.length ? h("p", {}, "CVE: ", f.cve.flatMap((c, i) => (i ? [", ", cveLink(c)] : [cveLink(c)]))) : null,
           f.solution ? h("p", {}, h("strong", {}, "What to do: "), f.solution) : h("p", { class: "hint" }, "The scanner gave no advice for this one."),
-          f.url ? h("p", {}, h("a", { href: f.url, target: "_blank", rel: "noopener noreferrer" }, "More from the scanner")) : null,
+          webUrl(f.url) ? h("p", {}, h("a", { href: webUrl(f.url), target: "_blank", rel: "noopener noreferrer" }, "More from the scanner")) : null,
           f.last_seen ? h("p", { class: "hint" }, `Last seen ${f.last_seen.replace("T", " ").replace("Z", " UTC")}`) : null))),
       showDevice ? h("td", {}, f.device_id ? h("a", { href: `#/device/${f.device_id}` }, f.device) : f.device || "") : null,
       h("td", { class: "mono" }, f.port ? `${f.port}/${f.proto}` : "")))));

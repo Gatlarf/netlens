@@ -335,16 +335,23 @@ function renderRows() {
   count.textContent = sorted.length + (sorted.length === 1 ? " device" : " devices");
 }
 
+let loadTicket = 0;                  // a slow answer for an older filter must not replace the answer for the newer one
 async function load() {
   const params = new URLSearchParams();
   if (state.q) params.set("q", state.q);
   if (state.online) params.set("online", state.online);
   if (state.trusted) params.set("trusted", state.trusted);
 
+  const mine = ++loadTicket;
   try {
-    devices = await get("/api/devices?" + params.toString());
+    const got = await get("/api/devices?" + params.toString());
+    if (mine !== loadTicket) return;
+    devices = got;
   } catch (e) {
-    devices = [];
+    if (mine !== loadTicket) return;
+    if (!Array.isArray(devices)) devices = [];        // a failed refresh keeps the list that is on screen
+    else if (!devices.length) devices = [];
+    else return;
   }
 
   if (state.type) {

@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { h, clear, timeAgo } from "../util.js";
+import { h, clear, timeAgo, webUrl } from "../util.js";
 import { pageHead, tile as uiTile, tileRow, emptyState } from "../ui.js";
 
 function battery(d) {
@@ -53,7 +53,7 @@ export async function render(container) {
       const rows = data.devices.filter((d) => (!q || `${d.name} ${d.manufacturer || ""} ${d.model || ""} ${d.area || ""}`.toLowerCase().includes(q)) && (!area || d.area === area)
         && (only === "" || (only === "unavailable" && !d.available) || (only === "battery" && d.battery_low) || (only === "network" && d.device_id) || (only === "update" && d.update)));
       for (const d of rows.sort((a, b) => (a.available - b.available) || a.name.localeCompare(b.name))) {
-        tbody.appendChild(h("tr", {}, h("td", {}, d.url ? h("a", { href: d.url, target: "_blank", rel: "noopener" }, d.name) : d.name),
+        tbody.appendChild(h("tr", {}, h("td", {}, webUrl(d.url) ? h("a", { href: webUrl(d.url), target: "_blank", rel: "noopener" }, d.name) : d.name),
           h("td", {}, [d.manufacturer, d.model].filter(Boolean).join(" ")), h("td", {}, d.area || ""), h("td", {}, d.protocol || ""),
           h("td", { title: d.unavailable_since || "" }, d.available ? h("span", { class: "run-ok" }, "available") : h("span", { class: "error" }, `unavailable${d.unavailable_since ? ` · ${timeAgo(d.unavailable_since)}` : ""}`), d.update ? h("span", { class: "warn-text" }, " · update") : ""),
           h("td", {}, battery(d)), h("td", {}, d.via || ""), h("td", {}, d.device_id ? h("a", { href: `#/device/${d.device_id}` }, d.device || "device") : "")));

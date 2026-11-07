@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.354 — 2026-11-07
+
+### Fixed
+- **Devices page:** a slow answer for an older search or filter can no longer replace the newer list, and a failed refresh keeps the list on screen instead of showing "No devices yet".
+- **Links from scanners and plugins** (Smart home, Vulnerabilities) are only made clickable when they are web addresses (http or https).
+
 ## 0.4.352 — 2026-11-07
 
 ### Changed

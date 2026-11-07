@@ -1,5 +1,8 @@
 import { decorate } from "./actions.js";
 
+// An address that came from a device, a scanner or a plugin is only a link when it is a web address (never javascript: or data:).
+export const webUrl = (url) => (/^https?:\/\//i.test(String(url || "").trim()) ? String(url).trim() : null);
+
 export function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
 
