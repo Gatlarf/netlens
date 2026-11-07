@@ -155,7 +155,7 @@ Every enabled plugin gets a plain *status* card on the dashboard (is it working,
       "key": "verify_tls",
       "type": "bool",
       "label": "Verify TLS certificate",
-      "default": false
+      "default": true
     }
   ]
 }
