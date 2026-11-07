@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app import ask, hierarchy, licence, tsdb
+from app import ask, ask_more, hierarchy, licence, tsdb
 from app.db import add_event, connect, init_db
 
 NOW = datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc)
@@ -209,3 +209,49 @@ def test_ask_knows_how_the_plugins_are_doing(conn):
     runs.record(conn, "proxmox", True, 300.0)
     a = ask.answer(conn, "how are the plugins doing?", mode="rules")
     assert a["tools"] == ["plugins"] and "home-assistant: 1 of 2 syncs failed" in a["answer"] and "timed out" in a["answer"]
+
+
+# ---- every filter of the device search, and every tool with its sentence (smoke: none may crash on a normal database or on odd arguments)
+def names(r):
+    return sorted(d["name"] for d in r["devices"])
+
+
+@pytest.mark.parametrize("args,expected", [
+    ({"vendor": "apple"}, ["iphone-bert", "macbook"]),
+    ({"os": "windows"}, ["desktop-1"]),
+    ({"online": "false"}, ["hp-laserjet", "iphone-bert"]),
+    ({"port": 3389}, ["desktop-1"]),
+    ({"service": "ssh"}, ["macbook", "nas"]),
+    ({"untrusted": True}, ["desktop-1"]),
+    ({"text": "voor"}, ["voordeur"]),
+    ({"text": "192.168.1.6"}, ["desktop-1"]),
+    ({"type": "printer"}, ["hp-laserjet"]),
+    ({"type": "raspberry"}, []),                       # not a kind: looked for in the names instead
+    ({"missing": "os", "vendor": "tp-link"}, ["sw-garden"]),
+    ({"not_seen_days": 3}, []),
+    ({"new_days": 30, "limit": 2}, None),
+])
+def test_device_search_filters(conn, args, expected):
+    r = ask_more.t_search_devices(conn, args, NOW)
+    if expected is None:
+        assert len(r["devices"]) == 2 and r["count"] >= 2 and r["shown"] == "1-2"
+    else:
+        assert [n for n in names(r)] == [n for n in expected] or {d["name"] for d in r["devices"]} == set(expected)
+
+
+def test_device_search_survives_nonsense_arguments(conn):
+    r = ask_more.t_search_devices(conn, {"port": "abc", "limit": "x", "offset": "y", "not_seen_days": "z", "sort": "bogus", "missing": "nothing", "online": "maybe", "group": "x'; DROP TABLE devices;--"}, NOW)
+    assert r["count"] == 0 and "devices" in r
+    assert conn.execute("SELECT COUNT(*) FROM devices").fetchone()[0] == 7
+    assert ask_more.t_search_devices(conn, {"sort": "oldest", "limit": 1}, NOW)["devices"][0]["first_seen"]
+    assert ask_more.t_search_devices(conn, {"offset": 5}, NOW)["shown"] == "6-7"
+
+
+@pytest.mark.parametrize("tool", sorted(ask_more.TOOLS))
+@pytest.mark.parametrize("args", [{}, {"days": 7}, {"days": "x"}, {"device": "nas"}, {"device": "nobody"}, {"status": "stopped"}, {"by": "vendor"}, {"by": "bogus"}])
+def test_every_tool_answers_and_its_sentence_renders(conn, tool, args):
+    fn = ask_more.TOOLS[tool][0]
+    result = fn(conn, args, NOW)
+    assert isinstance(result, dict)
+    text = ask_more.RENDERERS[tool](result)
+    assert isinstance(text, str) and text.strip()

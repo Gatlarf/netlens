@@ -66,11 +66,13 @@ def t_search_devices(conn, args, now=None) -> dict:
         shown["online"] = online
     if args.get("port"):
         try:
-            where.append("EXISTS (SELECT 1 FROM ports p WHERE p.device_id = d.id AND p.port = ? AND p.state LIKE 'open%')")
-            params.append(int(args["port"]))
-            shown["port"] = int(args["port"])
+            port = int(args["port"])                   # converted first: a clause without its value would break the whole query
         except (TypeError, ValueError):
-            pass
+            port = None
+        if port is not None:
+            where.append("EXISTS (SELECT 1 FROM ports p WHERE p.device_id = d.id AND p.port = ? AND p.state LIKE 'open%')")
+            params.append(port)
+            shown["port"] = port
     if args.get("service"):
         where.append("EXISTS (SELECT 1 FROM ports p WHERE p.device_id = d.id AND LOWER(COALESCE(p.service, '')) LIKE ? ESCAPE '\\' AND p.state LIKE 'open%')")
         params.append(_like(args["service"]))

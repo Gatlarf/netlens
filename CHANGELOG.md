@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.364 — 2026-11-07
+
+### Fixed
+- **Host probe settings are saved all or nothing.** A wrong value for the analysis summary style or the address of this Netlens now refuses the whole change instead of saving the other fields first.
+- **Ask no longer fails when a port is given as text** (for example "port abc") in the device search.
+
 ## 0.4.363 — 2026-11-07
 
 ### Fixed

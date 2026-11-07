@@ -40,6 +40,10 @@ def get_settings(request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
 def put_settings(body: dict, request: Request, conn=Depends(get_conn)) -> dict[str, Any]:
     _admin(request)
     try:
+        if "analysis_words" in body and str(body["analysis_words"]) not in analysis.WORDS_MODES:      # refuse before anything is saved: a 422 must not leave half of the change behind
+            raise ValueError("the summary is written by 'rules', 'auto' or 'model'")
+        if "base_url" in body and str(body["base_url"] or "").strip() and not str(body["base_url"]).strip().startswith(("http://", "https://")):
+            raise ValueError("the address of this Netlens must start with http:// or https://")
         out = service.save_settings(conn, body)
         if "analysis_auto" in body:
             analysis.set_auto(conn, bool(body["analysis_auto"]))
