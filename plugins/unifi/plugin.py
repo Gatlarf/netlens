@@ -76,7 +76,7 @@ class Controller:
             raise ValueError("the type of controller must be auto, unifi_os or classic")
         self.site_filter = str(config.get("site") or "").strip().lower()
         context = ssl.create_default_context()
-        if not config.get("verify_tls"):
+        if not config.get("verify_tls", True):
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
         self.jar = http.cookiejar.CookieJar()

@@ -47,8 +47,8 @@
       "key": "verify_tls",
       "type": "bool",
       "label": "Verify the server's certificate",
-      "default": false,
-      "help": "Incus makes its own self-signed server certificate; leave this off unless you installed a trusted one."
+      "default": true,
+      "help": "Checks that the certificate is signed by an authority this machine trusts. Turn this off only when the device uses its own self-signed certificate (many do until you install one)."
     },
     {
       "key": "timeout",

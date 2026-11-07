@@ -178,7 +178,7 @@ class TrueNAS:
         self.key = str(config.get("api_key") or "").strip()
         if not self.key:
             raise ValueError("enter the API key")
-        self.verify = bool(config.get("verify_tls"))
+        self.verify = bool(config.get("verify_tls", True))
         self.ws = None
         self.counter = 0
 

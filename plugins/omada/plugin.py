@@ -89,7 +89,7 @@ class Controller:
             raise ValueError("enter the username and password")
         self.site_filter = str(config.get("site") or "").strip().lower()
         context = ssl.create_default_context()
-        if not config.get("verify_tls"):
+        if not config.get("verify_tls", True):
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
         self.client_id = str(config.get("client_id") or "").strip()

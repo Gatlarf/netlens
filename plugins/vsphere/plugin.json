@@ -44,8 +44,8 @@
       "key": "verify_tls",
       "type": "bool",
       "label": "Verify TLS certificate",
-      "default": false,
-      "help": "ESXi and vCenter use a self-signed certificate until you install your own."
+      "default": true,
+      "help": "Checks that the certificate is signed by an authority this machine trusts. Turn this off only when the device uses its own self-signed certificate (many do until you install one)."
     },
     {
       "key": "timeout",

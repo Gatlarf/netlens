@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.355 — 2026-11-07
+
+### Changed
+- ★ **Plugins check the certificate of the device by default.** For 25 plugins (ASUS, Ceph, Greenbone, Hyper-V, Incus, InsightVM, Kubernetes, MikroTik, Nessus, NetApp, Omada, OpenMediaVault, OpenWrt, OPNsense, Portainer, QNAP, Redfish, Rockstor, Synology, TrueNAS, UGREEN, UniFi, Unraid, vSphere, VyOS) "Verify TLS certificate" was off when you set the plugin up; it is now on, like in the other plugins. **Plugins you have already set up keep the choice you saved.** For a new set-up with a device that has its own self-signed certificate, turn the box off (the help text says so), or give Greenbone, InsightVM and Nessus the fingerprint, which pins the exact certificate.
+- **The help texts** of the box now say what it does instead of telling you to leave it off.
+
 ## 0.4.354 — 2026-11-07
 
 ### Fixed

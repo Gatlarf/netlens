@@ -54,7 +54,7 @@ def _stamp(text):
 
 
 class Gmp:
-    def __init__(self, host, username, password, fingerprint="", verify_tls=False, timeout=60):
+    def __init__(self, host, username, password, fingerprint="", verify_tls=True, timeout=60):
         text = host.strip()
         text = re.sub(r"^[a-z]+://", "", text).rstrip("/")
         if not text:

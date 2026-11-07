@@ -79,7 +79,7 @@ class Unraid:
     def __init__(self, config):
         self.base, self.host = normalize(config.get("url") or config.get("host"))
         self.key = str(config.get("api_key") or "").strip()
-        self.verify = bool(config.get("verify_tls"))
+        self.verify = bool(config.get("verify_tls", True))
         self.timeout = int(config.get("timeout") or 30)
         if not self.key:
             raise ValueError("enter the API key (Unraid: Settings > Management Access > API Keys)")

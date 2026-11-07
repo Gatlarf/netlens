@@ -39,8 +39,8 @@
       "key": "verify_tls",
       "type": "bool",
       "label": "Verify TLS certificate",
-      "default": false,
-      "help": "Leave this off while the server uses a self-signed certificate or is reached by IP address."
+      "default": true,
+      "help": "Checks that the certificate is signed by an authority this machine trusts. Turn this off only when the device uses its own self-signed certificate (many do until you install one)."
     },
     {
       "key": "timeout",

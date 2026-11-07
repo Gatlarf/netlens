@@ -66,7 +66,7 @@ def _number(value):
 
 
 class Router:
-    def __init__(self, url, username, password, role="", uplink="", verify_tls=False, timeout=20, extras=True):
+    def __init__(self, url, username, password, role="", uplink="", verify_tls=True, timeout=20, extras=True):
         url = url.strip().rstrip("/")
         if "://" not in url:
             url = "https://" + url

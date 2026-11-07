@@ -64,7 +64,7 @@ class Qnap:
         self.user, self.password = str(config.get("username") or ""), str(config.get("password") or "")
         if not self.user or not self.password:
             raise ValueError("enter the user name and the password")
-        self.verify = bool(config.get("verify_tls"))
+        self.verify = bool(config.get("verify_tls", True))
         self.timeout = int(config.get("timeout") or 30)
         context = ssl.create_default_context()
         if not self.verify:

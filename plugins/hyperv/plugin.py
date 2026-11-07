@@ -176,7 +176,7 @@ def _fault_text(root):
 
 
 class Session:
-    def __init__(self, host, port, https, username, password, auth="ntlm", verify_tls=False, timeout=30):
+    def __init__(self, host, port, https, username, password, auth="ntlm", verify_tls=True, timeout=30):
         self.host, self.port, self.https = host, port, https
         user, domain = username, ""
         if "\\" in username:

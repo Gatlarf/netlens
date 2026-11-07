@@ -51,7 +51,7 @@ def _mac(value):
 
 
 class Router:
-    def __init__(self, url, username, password, role="", uplink="", verify_tls=False, timeout=15, extras=True):
+    def __init__(self, url, username, password, role="", uplink="", verify_tls=True, timeout=15, extras=True):
         url = url.strip().rstrip("/")
         if "://" not in url:
             url = "http://" + url

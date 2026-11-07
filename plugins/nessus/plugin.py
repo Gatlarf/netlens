@@ -41,7 +41,7 @@ def _stamp(seconds):
 
 
 class Server:
-    def __init__(self, url, access_key, secret_key, fingerprint="", verify_tls=False, timeout=30):
+    def __init__(self, url, access_key, secret_key, fingerprint="", verify_tls=True, timeout=30):
         url = url.strip().rstrip("/")
         if "://" not in url:
             url = "https://" + url

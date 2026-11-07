@@ -41,7 +41,7 @@ def _ipv4(value):
 
 
 class Cluster:
-    def __init__(self, url, token, namespaces="", verify_tls=False, timeout=20):
+    def __init__(self, url, token, namespaces="", verify_tls=True, timeout=20):
         url = url.strip().rstrip("/")
         if "://" not in url:
             url = "https://" + url

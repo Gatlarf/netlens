@@ -62,7 +62,7 @@ class Rockstor:
         if not user or not password:
             raise ValueError("enter the user name and the password")
         self.auth = "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()
-        self.verify = bool(config.get("verify_tls"))
+        self.verify = bool(config.get("verify_tls", True))
         self.timeout = int(config.get("timeout") or 30)
         context = ssl.create_default_context()
         if not self.verify:

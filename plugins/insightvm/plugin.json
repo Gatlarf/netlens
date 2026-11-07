@@ -58,8 +58,8 @@
       "key": "verify_tls",
       "type": "bool",
       "label": "Verify TLS certificate",
-      "default": false,
-      "help": "Only used for a console without a fingerprint. The console uses a self-signed certificate by default."
+      "default": true,
+      "help": "Only used for a server without a fingerprint: checks the certificate against the authorities this machine trusts. Better: enter the fingerprint, which pins the exact certificate."
     },
     {
       "key": "timeout",

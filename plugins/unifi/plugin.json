@@ -61,8 +61,8 @@
       "key": "verify_tls",
       "type": "bool",
       "label": "Verify TLS certificate",
-      "default": false,
-      "help": "UniFi consoles use a self-signed certificate unless you installed your own. Leave this off in that case."
+      "default": true,
+      "help": "Checks that the certificate is signed by an authority this machine trusts. Turn this off only when the device uses its own self-signed certificate (many do until you install one)."
     }
   ],
   "homepage": "https://github.com/Gatlarf/netlens/tree/main/plugins/unifi"

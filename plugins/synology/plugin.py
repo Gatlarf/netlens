@@ -87,7 +87,7 @@ class DSM:
         self.base, self.host = normalize(config.get("url") or config.get("host"))
         self.user = str(config.get("username") or "")
         self.password = str(config.get("password") or "")
-        self.verify = bool(config.get("verify_tls"))
+        self.verify = bool(config.get("verify_tls", True))
         self.timeout = int(config.get("timeout") or 30)
         if not self.user or not self.password:
             raise ValueError("enter the user name and the password")

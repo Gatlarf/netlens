@@ -79,7 +79,7 @@ def make_step(report: dict) -> Callable[[str, Callable[[], Any]], Any]:
 class AsusConfig:
     enabled: bool = False
     url: str = ""
-    verify_tls: bool = False  # ASUS routers ship a self-signed certificate
+    verify_tls: bool = True  # ASUS routers ship a self-signed certificate
     username: str = ""
     password: str = ""
     traffic: bool = True      # also read the Traffic Analyzer statistics (applications and devices)

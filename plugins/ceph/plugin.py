@@ -66,7 +66,7 @@ class Ceph:
             raise ValueError("enter the user name and the password")
         self.timeout = int(config.get("timeout") or 30)
         context = ssl.create_default_context()
-        if not config.get("verify_tls"):
+        if not config.get("verify_tls", True):
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
         self.opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context))

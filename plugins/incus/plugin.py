@@ -80,7 +80,7 @@ def make_context(cert, key, verify_tls):
 
 
 class Server:
-    def __init__(self, url, cert, key, verify_tls=False, timeout=20):
+    def __init__(self, url, cert, key, verify_tls=True, timeout=20):
         url = url.strip().rstrip("/")
         if "://" not in url:
             url = "https://" + url
