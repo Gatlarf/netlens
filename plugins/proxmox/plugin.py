@@ -7,14 +7,11 @@ from datetime import datetime, timezone
 import ipaddress
 import json
 import re
-import socket
-import ssl
 import time
 from typing import Any, Callable
-import urllib.error
 from urllib.parse import urlparse
 import urllib.parse
-import urllib.request
+import netlens_http
 
 
 # ----------------------------------------------------------------------------- diagnostic helpers
@@ -164,30 +161,18 @@ class ProxmoxClient:
 
     # -- transport ---------------------------------------------------------
     def _urllib_transport(self, method: str, url: str, headers: dict, data: bytes | None) -> tuple[int, bytes]:
-        ctx = ssl.create_default_context()
-        if not self.cfg.verify_tls:
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-        req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as resp:
-                return resp.status, resp.read()
-        except urllib.error.HTTPError as exc:
-            return exc.code, exc.read()
-        except urllib.error.URLError as exc:
-            reason = exc.reason
-            if isinstance(reason, ssl.SSLCertVerificationError):
-                raise ProxmoxError(
-                    "the TLS certificate could not be verified; Proxmox uses a self-signed "
+            resp = netlens_http.request(method, url, headers=headers, data=data, timeout=self.timeout, verify_tls=self.cfg.verify_tls)
+        except netlens_http.CertificateError as exc:
+            raise ProxmoxError(
+                "the TLS certificate could not be verified; Proxmox uses a self-signed "
                     "certificate by default, so turn off 'Verify TLS certificate' to continue"
-                ) from exc
-            if isinstance(reason, (socket.timeout, TimeoutError)):
-                raise ProxmoxError(f"connection to {self.cfg.url} timed out") from exc
-            raise ProxmoxError(f"cannot reach {self.cfg.url}: {reason}") from exc
-        except (socket.timeout, TimeoutError) as exc:
+            ) from exc
+        except netlens_http.NetTimeout as exc:
             raise ProxmoxError(f"connection to {self.cfg.url} timed out") from exc
-        except OSError as exc:
+        except netlens_http.NetError as exc:
             raise ProxmoxError(f"cannot reach {self.cfg.url}: {exc}") from exc
+        return resp.status, resp.body
 
     # -- auth + requests ---------------------------------------------------
     def _auth_headers(self) -> dict:

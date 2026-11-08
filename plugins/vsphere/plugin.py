@@ -16,12 +16,10 @@ Works against a standalone ESXi and a vCenter alike. Templates are left out. Sta
 
 import ipaddress
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
 from xml.sax.saxutils import escape
+import netlens_http
 
 MAX_OBJECTS = 6000
 NS = 'xmlns="urn:vim25" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
@@ -84,11 +82,7 @@ class Session:
         self.endpoint, self.id, self.host, self.timeout = f"{parts.scheme}://{parts.netloc}/sdk", parts.netloc, parts.hostname, float(timeout)
         self.username, self.password = username, password
         self.cookie, self.content = None, {}
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def call(self, method, inner):
         body = (f'<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" '
@@ -96,19 +90,14 @@ class Session:
         headers = {"Content-Type": "text/xml; charset=utf-8", "SOAPAction": '"urn:vim25/8.0.0.0"'}
         if self.cookie:
             headers["Cookie"] = self.cookie
-        request = urllib.request.Request(self.endpoint, data=body, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                raw = response.read()
-                cookie = response.headers.get("Set-Cookie")
-        except urllib.error.HTTPError as exc:
-            raw, cookie = exc.read(), None
-            if not raw.lstrip().startswith(b"<"):
-                raise VsphereError(f"{self.id} answered HTTP {exc.code} (is this ESXi or vCenter?)")
-        except urllib.error.URLError as exc:
-            raise VsphereError(f"cannot reach {self.id}: {exc.reason}")
-        except OSError as exc:
-            raise VsphereError(f"{self.id} did not answer properly: {exc}")
+            response = netlens_http.request("POST", self.endpoint, headers=headers, data=body, timeout=self.timeout, verify_tls=self.verify_tls)
+        except netlens_http.NetError as exc:
+            raise VsphereError(f"cannot reach {self.id}: {exc}")
+        raw = response.body
+        cookie = response.header("Set-Cookie") if response.ok else None
+        if not response.ok and not raw.lstrip().startswith(b"<"):
+            raise VsphereError(f"{self.id} answered HTTP {response.status} (is this ESXi or vCenter?)")
         if cookie and "vmware_soap_session" in cookie:
             self.cookie = cookie.split(";", 1)[0]
         try:

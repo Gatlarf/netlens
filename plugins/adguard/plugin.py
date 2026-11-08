@@ -18,9 +18,7 @@ import base64
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
-import urllib.request
+import netlens_http
 
 
 class AdguardError(Exception):
@@ -57,30 +55,23 @@ class Server:
         self.url, self.timeout = url, float(timeout)
         self.auth = "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()
         self.version = None
-        self.context = None
-        if url.startswith("https://") and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def call(self, method, path, body=None):
         data = json.dumps(body).encode() if body is not None else None
         headers = {"Accept": "application/json", "Authorization": self.auth}
         if data is not None:
             headers["Content-Type"] = "application/json"
-        request = urllib.request.Request(f"{self.url}{path}", data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                raw = response.read().decode("utf-8", "replace")
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.url} refused the login (wrong user name or password)")
-            detail = exc.read().decode("utf-8", "replace").strip()[:200]
-            raise AdguardError(f"{self.url} answered HTTP {exc.code}" + (f": {detail}" if detail else ""))
-        except urllib.error.URLError as exc:
-            raise AdguardError(f"cannot reach {self.url}: {exc.reason}")
-        except OSError as exc:
-            raise AdguardError(f"{self.url} did not answer properly: {exc}")
+            response = netlens_http.request(method, f"{self.url}{path}", headers=headers, data=data, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.url} refused the login (wrong user name or password)")
+                detail = response.text().strip()[:200]
+                raise AdguardError(f"{self.url} answered HTTP {response.status}" + (f": {detail}" if detail else ""))
+            raw = response.text()
+        except netlens_http.NetError as exc:
+            raise AdguardError(f"cannot reach {self.url}: {exc}")
         try:
             return json.loads(raw) if raw.strip() else {}
         except ValueError:

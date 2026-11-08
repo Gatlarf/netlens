@@ -169,7 +169,23 @@ Netlens calls two **top-level, normal (not `async`)** functions. `config` is a d
 - `test(config)` runs when the user presses **Test connection**. Return `{"message": "text to show"}` (the message is optional) or raise an exception. It must not change anything on your device and Netlens saves nothing.
 - `fetch(config)` runs after every scan and when the user presses **Sync now**. Return a dict in the format of your plugin's kind (see below).
 
-Your code runs in a separate Python process (`python -I`) with only the plugin folder importable, a stripped environment (no `NETLENS_*` variables) and no database path. **Use only the Python standard library** (`urllib`, `json`, `ssl`, `socket`, `re`, ...); packages cannot be installed. Anything printed is ignored.
+Your code runs in a separate Python process (`python -I`) with only the plugin folder importable, a stripped environment (no `NETLENS_*` variables) and no database path. **Use only the Python standard library** (`json`, `re`, `socket`, ...); packages cannot be installed. Anything printed is ignored.
+
+**Talk to your device through `netlens_http`** (Netlens puts it on the import path; it needs Netlens 0.4.366 or newer, so set `min_netlens` in your index entry). It is the one place that decides how Netlens plugins use the network, so every plugin behaves the same and a fix reaches all of them:
+
+```python
+import netlens_http
+
+resp = netlens_http.request("GET", url, headers={"Authorization": "Bearer " + token}, verify_tls=cfg["verify_tls"], timeout=10)
+resp.status, resp.text(), resp.json()                       # an HTTP error such as 401 is an answer, not an exception
+
+session = netlens_http.Session(verify_tls=True, cookies=True, fingerprint="")      # cookies of a login; fingerprint= pins a self-signed certificate (SHA-256)
+session.request("POST", url, form={"user": u, "password": p})        # also json=..., data=..., headers=...
+
+netlens_http.connect(host, port, tls=True, verify_tls=True)          # a TLS socket for a protocol that is not HTTP
+```
+
+What it does for you: the certificate **and hostname** are checked unless the admin turned `verify_tls` off, or pinned a fingerprint (checked before a byte of the request is sent); every call has a timeout and a size limit (50 MB); the proxy variables of the environment are ignored; only http and https; at most 3 redirects, never from https back to http, never to a cloud metadata address, and Authorization, cookies and API keys are not sent to another host. Only network trouble raises (`NetError`: `CertificateError`, `NetTimeout`, `Unreachable`, `TooLarge`, `BadUrl`, `ClientCertError`); catch it and raise your own error with your wording. Do **not** switch certificate checking off yourself, open your own HTTP connection (`urlopen`, `HTTPSConnection`) or read an answer without a limit: `plugin-index/tools/static_scan.py` flags `tls-off`, `own-http` and `unbounded-read`, and the plugins in this repository must have none of them.
 
 ```python
 """Example Netlens plugin (kind "topology").
@@ -193,7 +209,7 @@ class LoginRefused(Exception):
 def _connect(config):
     if not config.get("host"):
         raise ValueError("enter the router address")
-    # Replace this with a real request to your device, for example with urllib.request.
+    # Replace this with a real request to your device, for example with netlens_http.request(...).
     # if the password is wrong:  raise LoginRefused("login refused (check the username and password)")
     return {"host": config["host"]}
 

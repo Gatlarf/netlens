@@ -17,10 +17,9 @@ import base64
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+
+import netlens_http
 
 MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
 MAX_CLIENTS = 4000
@@ -62,28 +61,23 @@ class Firewall:
         self.base, self.id, self.host, self.timeout = f"{parts.scheme}://{parts.netloc}", parts.netloc, parts.hostname, float(timeout)
         self.extras = bool(extras)            # health, firmware and ports (switched off in the plugin settings)
         self.auth = "Basic " + base64.b64encode(f"{key}:{secret}".encode()).decode()
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path):
-        request = urllib.request.Request(f"{self.base}/api/{path}", headers={"Authorization": self.auth, "Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code == 401:
-                raise AuthRefused(f"{self.id} refused the API key or secret")
-            if exc.code == 403:
-                raise AuthRefused(f"{self.id} says this API user may not read {path}: add the privilege listed in the box at the top of this page")
-            if exc.code == 404:
-                raise Missing(f"{self.id} has no {path}")
-            raise OpnsenseError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise OpnsenseError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.base}/api/{path}", headers={"Authorization": self.auth, "Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status == 401:
+                    raise AuthRefused(f"{self.id} refused the API key or secret")
+                if response.status == 403:
+                    raise AuthRefused(f"{self.id} says this API user may not read {path}: add the privilege listed in the box at the top of this page")
+                if response.status == 404:
+                    raise Missing(f"{self.id} has no {path}")
+                raise OpnsenseError(f"{self.id} answered HTTP {response.status} for {path}")
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise OpnsenseError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise OpnsenseError(f"{self.id} did not answer properly (is this OPNsense?): {exc}")
 
     def search(self, path):
@@ -91,12 +85,12 @@ class Firewall:
         data = self.get(path)
         rows = _rows(data)
         if isinstance(data, dict) and isinstance(data.get("total"), int) and data["total"] > len(rows):
-            request = urllib.request.Request(f"{self.base}/api/{path}", data=json.dumps({"current": 1, "rowCount": data["total"]}).encode(), method="POST",
-                                             headers={"Authorization": self.auth, "Accept": "application/json", "Content-Type": "application/json"})
             try:
-                with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                    rows = _rows(json.loads(response.read().decode("utf-8", "replace")))
-            except (OSError, ValueError):
+                response = netlens_http.request("POST", f"{self.base}/api/{path}", json={"current": 1, "rowCount": data["total"]},
+                                                headers={"Authorization": self.auth, "Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+                if response.ok:
+                    rows = _rows(response.json())
+            except (netlens_http.NetError, ValueError):
                 pass       # keep what the first answer had
         return rows
 

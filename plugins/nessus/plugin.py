@@ -14,12 +14,11 @@ once (the most serious first, up to the configured number). Standard library onl
 """
 
 import hashlib
-import http.client
 import json
 import re
-import ssl
 import urllib.parse
 from datetime import datetime, timedelta, timezone
+import netlens_http
 
 LEVELS = {4: "critical", 3: "high", 2: "medium", 1: "low", 0: "info"}
 MAX_FINDINGS = 20000
@@ -50,32 +49,24 @@ class Server:
             raise NessusError(f"{url!r} is not an address like https://192.168.0.50:8834")
         self.host, self.port = parts.hostname, parts.port or 8834
         self.id = f"{self.host}:{self.port}"
+        self.base = netlens_http.origin("https", self.host, self.port)
         self.auth = f"accessKey={access_key.strip()}; secretKey={secret_key.strip()}"
         self.timeout = float(timeout)
         self.fingerprint = re.sub(r"[^0-9a-f]", "", fingerprint.lower()) if fingerprint else ""
         if fingerprint and len(self.fingerprint) != 64:
             raise NessusError("the fingerprint must be 64 hexadecimal digits (SHA-256 of the certificate)")
-        self.context = ssl.create_default_context()
-        if self.fingerprint or not verify_tls:
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.http = netlens_http.Session(verify_tls=verify_tls, timeout=self.timeout, fingerprint=self.fingerprint, max_bytes=100_000_000)
 
     def get(self, path):
-        conn = http.client.HTTPSConnection(self.host, self.port, timeout=self.timeout, context=self.context)
         try:
-            conn.connect()
-            if self.fingerprint and hashlib.sha256(conn.sock.getpeercert(binary_form=True)).hexdigest() != self.fingerprint:
+            response = self.http.request("GET", f"{self.base}{path}", headers={"X-ApiKeys": self.auth, "Accept": "application/json"})
+        except netlens_http.CertificateError as exc:
+            if exc.detail == "fingerprint":
                 raise NessusError(f"the certificate of {self.id} does not match the fingerprint; nothing was sent")
-            conn.request("GET", path, headers={"X-ApiKeys": self.auth, "Accept": "application/json"})
-            response = conn.getresponse()
-            raw = response.read(100_000_000).decode("utf-8", "replace")
-            status = response.status
-        except ssl.SSLError as exc:
-            raise NessusError(f"cannot make a secure connection to {self.id}: {exc.reason or exc}. For a self-signed certificate fill in the fingerprint")
-        except (OSError, http.client.HTTPException) as exc:
+            raise NessusError(f"cannot make a secure connection to {self.id}: {exc}. For a self-signed certificate fill in the fingerprint")
+        except netlens_http.NetError as exc:
             raise NessusError(f"cannot reach {self.id}: {exc}")
-        finally:
-            conn.close()
+        status, raw = response.status, response.text()
         if status in (401, 403):
             raise AuthRefused(f"{self.id} refused the API keys (wrong keys, or the user may not read this)")
         if status != 200:

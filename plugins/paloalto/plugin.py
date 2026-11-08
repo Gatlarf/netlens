@@ -17,12 +17,10 @@ tags a firewall really answers with, so a tester can send them without addresses
 
 import ipaddress
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime
+import netlens_http
 
 MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
 MAX_CLIENTS = 4000
@@ -77,27 +75,20 @@ class Firewall:
         self.role = (role or "auto").strip().lower()
         if self.role not in ("auto", "gateway", "node"):
             raise PanError(f"{self.id}: the role must be auto, gateway or node")
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def op(self, cmd):
         """The <result> element of an operational command, or None when the command answers with an empty result."""
-        request = urllib.request.Request(self.base + "?" + urllib.parse.urlencode({"type": "op", "cmd": cmd}), headers={"X-PAN-KEY": self.key}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                body = response.read()
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the API key (wrong, expired, or the administrator's role may not use the XML API)")
-            raise PanError(f"{self.id} answered HTTP {exc.code}")
-        except urllib.error.URLError as exc:
-            if isinstance(exc.reason, ssl.SSLCertVerificationError):
-                raise PanError(f"{self.id}: the certificate is not trusted ({exc.reason.verify_message}); install your own certificate or untick Verify TLS certificate")
-            raise PanError(f"cannot reach {self.id}: {exc.reason}")
-        except OSError as exc:
+            response = netlens_http.request("GET", self.base + "?" + urllib.parse.urlencode({"type": "op", "cmd": cmd}), headers={"X-PAN-KEY": self.key}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the API key (wrong, expired, or the administrator's role may not use the XML API)")
+                raise PanError(f"{self.id} answered HTTP {response.status}")
+            body = response.body
+        except netlens_http.NetError as exc:
+            if isinstance(exc, netlens_http.CertificateError):
+                raise PanError(f"{self.id}: the certificate is not trusted ({exc.detail}); install your own certificate or untick Verify TLS certificate")
             raise PanError(f"cannot reach {self.id}: {exc}")
         try:
             root = _parse_xml(body)

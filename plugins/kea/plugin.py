@@ -14,11 +14,9 @@ import base64
 import ipaddress
 import json
 import re
-import ssl
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
 MAX_LEASES = 50000
@@ -55,11 +53,7 @@ class Server:
             raise KeaError(f"{url!r} is not an address like http://192.168.0.2:8000")
         self.url, self.timeout, self.id = f"{parts.scheme}://{parts.netloc}/", float(timeout), parts.netloc
         self.auth = "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode() if user else None
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def command(self, name, service="dhcp4"):
         """Run one command; returns the `arguments` of the answer ({} when there are none)."""
@@ -67,17 +61,16 @@ class Server:
         if self.auth:
             headers["Authorization"] = self.auth
         body = json.dumps({"command": name, "service": [service]}).encode()
-        request = urllib.request.Request(self.url, data=body, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                answer = json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the user name or password")
-            raise KeaError(f"{self.id} answered HTTP {exc.code}")
-        except urllib.error.URLError as exc:
-            raise KeaError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("POST", self.url, headers=headers, data=body, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the user name or password")
+                raise KeaError(f"{self.id} answered HTTP {response.status}")
+            answer = json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise KeaError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise KeaError(f"{self.id} did not answer properly (is this the Kea Control Agent?): {exc}")
         item = answer[0] if isinstance(answer, list) and answer else answer
         if not isinstance(item, dict):

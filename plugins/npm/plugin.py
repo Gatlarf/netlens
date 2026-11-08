@@ -18,11 +18,9 @@ import ipaddress
 import json
 import re
 import socket
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
+import netlens_http
 
 LOCAL_NAMES = ("localhost", "host.docker.internal", "gateway.docker.internal")
 MAX_NAMES = 200
@@ -62,11 +60,7 @@ class Server:
         self.lan_ip = _ipv4(lan) if str(lan or "").strip() else None
         if str(lan or "").strip() and not self.lan_ip:
             raise NpmError(f"{lan!r} (the proxy's own address) is not an IPv4 address")
-        self.context = None
-        if self.url.startswith("https://") and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
         self.id = urllib.parse.urlsplit(self.url).netloc
         self.address = urllib.parse.urlsplit(self.url).hostname
         self.token = None
@@ -79,24 +73,23 @@ class Server:
             headers["Content-Type"] = "application/json"
         if auth and self.token:
             headers["Authorization"] = "Bearer " + self.token
-        request = urllib.request.Request(self.url + path, data=data, headers=headers, method="POST" if body is not None else "GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace") or "null")
-        except urllib.error.HTTPError as exc:
-            message = ""
-            try:
-                message = (json.loads(exc.read().decode("utf-8", "replace")).get("error") or {}).get("message") or ""
-            except (ValueError, AttributeError):
-                pass
-            if path == "/api/tokens" and (exc.code == 401 or exc.code == 400 and "invalid" in message.lower()):     # 2.15 answers a wrong password with 400
-                raise AuthRefused(f"{self.id} refused the login ({message or 'wrong e-mail address or password'})")
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused {path} ({message or 'HTTP %d' % exc.code}): check what this user may see")
-            raise NpmError(f"{self.id} answered HTTP {exc.code} for {path}" + (f": {message}" if message else ""))
-        except urllib.error.URLError as exc:
-            raise NpmError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("POST" if body is not None else "GET", self.url + path, headers=headers, data=data, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                message = ""
+                try:
+                    message = (json.loads(response.text()).get("error") or {}).get("message") or ""
+                except (ValueError, AttributeError):
+                    pass
+                if path == "/api/tokens" and (response.status == 401 or response.status == 400 and "invalid" in message.lower()):     # 2.15 answers a wrong password with 400
+                    raise AuthRefused(f"{self.id} refused the login ({message or 'wrong e-mail address or password'})")
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused {path} ({message or 'HTTP %d' % response.status}): check what this user may see")
+                raise NpmError(f"{self.id} answered HTTP {response.status} for {path}" + (f": {message}" if message else ""))
+            return json.loads(response.text() or "null")
+        except netlens_http.NetError as exc:
+            raise NpmError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise NpmError(f"{self.id} did not answer properly: {exc}")
 
     def login(self):

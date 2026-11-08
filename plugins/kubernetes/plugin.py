@@ -15,10 +15,8 @@ never for pods on the host network, whose address is the node's). Standard libra
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 PAGE = 500
 MAX_PODS = 3000
@@ -53,27 +51,22 @@ class Cluster:
         for n in self.namespaces:
             if not re.fullmatch(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?", n):
                 raise KubernetesError(f"{n!r} is not a namespace name")
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path, **params):
         query = urllib.parse.urlencode({k: v for k, v in params.items() if v})
-        request = urllib.request.Request(f"{self.url}{path}" + (f"?{query}" if query else ""), headers={"Authorization": f"Bearer {self.token}", "Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code == 401:
-                raise AuthRefused(f"{self.id} refused the token (wrong, expired or revoked)")
-            if exc.code == 403:
-                raise AuthRefused(f"{self.id} says the token may not read {path}: give the service account the rights from the box at the top of this page")
-            raise KubernetesError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise KubernetesError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.url}{path}" + (f"?{query}" if query else ""), headers={"Authorization": f"Bearer {self.token}", "Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status == 401:
+                    raise AuthRefused(f"{self.id} refused the token (wrong, expired or revoked)")
+                if response.status == 403:
+                    raise AuthRefused(f"{self.id} says the token may not read {path}: give the service account the rights from the box at the top of this page")
+                raise KubernetesError(f"{self.id} answered HTTP {response.status} for {path}")
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise KubernetesError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise KubernetesError(f"{self.id} did not answer properly (is this the Kubernetes API?): {exc}")
 
     def items(self, path):

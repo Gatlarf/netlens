@@ -9,7 +9,7 @@ into the form (the keys come from "config" in plugin.json):
 
 Raise an exception with a clear message when something goes wrong; Netlens shows it to the user. If the
 login was refused, set `auth_failed = True` on the exception so Netlens stops retrying until the user acts
-(this protects the account from being locked). Use only the Python standard library.
+(this protects the account from being locked). Use only the Python standard library and netlens_http.
 """
 
 
@@ -20,7 +20,7 @@ class LoginRefused(Exception):
 def _connect(config):
     if not config.get("host"):
         raise ValueError("enter the router address")
-    # Replace this with a real request to your device, for example with urllib.request.
+    # Replace this with a real request to your device, for example with netlens_http.request(...) (see PLUGINS.md).
     # if the password is wrong:  raise LoginRefused("login refused (check the username and password)")
     return {"host": config["host"]}
 

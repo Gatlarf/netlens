@@ -12,19 +12,18 @@ unless the traffic is sealed, which this client does not do.
 import base64
 import hashlib
 import hmac
-import http.client
 import ipaddress
 import json
 import os
 import re
 import socket
-import ssl
 import struct
 import time
 import urllib.parse
 import uuid
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
+import netlens_http
 
 SCRIPT = r"""$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$ns='root\virtualization\v2'
 $st=@{2='Running';3='Off';6='Saved';9='Paused';32768='Paused';32769='Saved';32770='Starting';32773='Saving';32774='Stopping';32776='Pausing';32777='Resuming'}
@@ -193,12 +192,7 @@ class Session:
         self.user, self.domain, self.password = user, domain, password
         self.auth = auth
         self.timeout = float(timeout)
-        self.context = None
-        if https:
-            self.context = ssl.create_default_context()
-            if not verify_tls:
-                self.context.check_hostname = False
-                self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
         self.url = f"{'https' if https else 'http'}://{host}:{port}/wsman"
         self.conn = None
         self.negotiated = False
@@ -208,9 +202,7 @@ class Session:
     def _connect(self):
         self.close()
         self.negotiated = False
-        cls = http.client.HTTPSConnection if self.https else http.client.HTTPConnection
-        kwargs = {"context": self.context} if self.https else {}
-        self.conn = cls(self.host, self.port, timeout=self.timeout, **kwargs)
+        self.conn = netlens_http.Connection(self.host, self.port, https=self.https, verify_tls=self.verify_tls, timeout=self.timeout)
 
     def close(self):
         if self.conn is not None:
@@ -222,9 +214,8 @@ class Session:
 
     def _send(self, body, extra=None):
         headers = {"Content-Type": "application/soap+xml;charset=UTF-8", "User-Agent": "Netlens", "Connection": "keep-alive", **(extra or {})}
-        self.conn.request("POST", "/wsman", body=body, headers=headers)
-        response = self.conn.getresponse()
-        return response.status, response.read().decode("utf-8", "replace"), response
+        response = self.conn.request("POST", "/wsman", data=body, headers=headers)
+        return response.status, response.text(), response
 
     def post(self, envelope):
         """Send one SOAP message and return the parsed reply; raises on a refused login or a SOAP fault."""
@@ -234,17 +225,15 @@ class Session:
                 self._connect()
             try:
                 status, text, response = self._post_once(data)
-            except (http.client.HTTPException, ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as exc:
+            except netlens_http.CertificateError as exc:
+                raise HyperVError(f"cannot make a secure connection to {self.id}: {exc}. Check that the HTTPS listener exists (port 5986); a self-signed certificate is fine when 'Verify TLS certificate' is off")
+            except netlens_http.NetTimeout:
+                raise HyperVError(f"{self.id} did not answer within {self.timeout:g} seconds")
+            except netlens_http.NetError as exc:
                 self.close()
                 if attempt == 2:
-                    raise HyperVError(f"{self.id} closed the connection: {exc}")
+                    raise HyperVError(f"cannot reach {self.id}: {exc}")
                 continue
-            except ssl.SSLError as exc:
-                raise HyperVError(f"cannot make a secure connection to {self.id}: {exc.reason or exc}. Check that the HTTPS listener exists (port 5986); a self-signed certificate is fine when 'Verify TLS certificate' is off")
-            except socket.timeout:
-                raise HyperVError(f"{self.id} did not answer within {self.timeout:g} seconds")
-            except OSError as exc:
-                raise HyperVError(f"cannot reach {self.id}: {exc.strerror or exc}")
             if status == 401:
                 if attempt == 1 and self.negotiated:        # the connection lost its login: log in again once
                     self.close()
@@ -277,7 +266,7 @@ class Session:
             if scheme == "NTLM":
                 self._connect()
             status, _, response = self._send(b"", {"Authorization": f"{scheme} " + base64.b64encode(ntlm_negotiate()).decode(), "Content-Length": "0"})
-            match = re.search(r"(?:Negotiate|NTLM)\s+([A-Za-z0-9+/=]+)", response.getheader("WWW-Authenticate") or "")
+            match = re.search(r"(?:Negotiate|NTLM)\s+([A-Za-z0-9+/=]+)", response.header("WWW-Authenticate") or "")
             if status == 401 and match:
                 break
         if status != 401 or not match:

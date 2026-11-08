@@ -19,10 +19,8 @@ records as made by Netlens). Standard library only.
 
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 DEFAULT_MARKER = "managed by Netlens"
 TYPES = ("A", "AAAA", "PTR", "CNAME")
@@ -47,25 +45,20 @@ class Server:
         if not re.match(r"^https?://[^/\s]+$", url):
             raise TechnitiumError(f"{url!r} is not an address like http://192.168.0.2:5380")
         self.url, self.token, self.timeout = url, token, float(timeout)
-        self.context = None
-        if url.startswith("https://") and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
         self.zones = {}       # name -> Technitium zone type
         self.cluster = None   # None, or the node type of this server ("Primary" / "Secondary")
 
     def call(self, path, **params):
         query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
-        request = urllib.request.Request(f"{self.url}{path}?{query}", headers={"Authorization": f"Bearer {self.token}", "Accept": "application/json"})
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                data = json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            raise TechnitiumError(f"{self.url} answered HTTP {exc.code}")
-        except urllib.error.URLError as exc:
-            raise TechnitiumError(f"cannot reach {self.url}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.url}{path}?{query}", headers={"Authorization": f"Bearer {self.token}", "Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                raise TechnitiumError(f"{self.url} answered HTTP {response.status}")
+            data = json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise TechnitiumError(f"cannot reach {self.url}: {exc}")
+        except ValueError as exc:
             raise TechnitiumError(f"{self.url} did not answer properly: {exc}")
         status = data.get("status") if isinstance(data, dict) else None
         if status == "invalid-token":

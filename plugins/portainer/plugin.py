@@ -16,10 +16,8 @@ the same as in the Docker plugin. Standard library only.
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_CONTAINERS = 1000
 DOCKER_TYPES = (1, 2, 4)
@@ -57,44 +55,36 @@ class Server:
         if lan and not self.lan_ip:
             raise PortainerError(f"{lan!r} is not an IPv4 address")
         self.address = _ipv4(parts.hostname)
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path, **params):
         query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
-        request = urllib.request.Request(f"{self.url}{path}" + (f"?{query}" if query else ""), headers={"X-API-Key": self.api_key, "Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403) and path == "/api/endpoints":
-                raise AuthRefused(f"{self.id} refused the access token (wrong, revoked, or the user may not list environments)")
-            raise PortainerError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise PortainerError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.url}{path}" + (f"?{query}" if query else ""), headers={"X-API-Key": self.api_key, "Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403) and path == "/api/endpoints":
+                    raise AuthRefused(f"{self.id} refused the access token (wrong, revoked, or the user may not list environments)")
+                raise PortainerError(f"{self.id} answered HTTP {response.status} for {path}")
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise PortainerError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise PortainerError(f"{self.id} did not answer properly: {exc}")
 
     def post(self, path):
-        request = urllib.request.Request(f"{self.url}{path}", data=b"", headers={"X-API-Key": self.api_key}, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return response.status
-        except urllib.error.HTTPError as exc:
-            if exc.code == 304:
-                return 304
-            if exc.code in (401, 403):
-                raise PortainerError(f"{self.id} refused the action: the token's user may not start or stop containers in that environment")
-            if exc.code == 404:
-                raise PortainerError(f"{self.id} has no such container")
-            raise PortainerError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise PortainerError(f"cannot reach {self.id}: {exc.reason}")
-        except OSError as exc:
-            raise PortainerError(f"{self.id} did not answer properly: {exc}")
+            response = netlens_http.request("POST", f"{self.url}{path}", headers={"X-API-Key": self.api_key}, data=b"", timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status == 304:
+                    return 304
+                if response.status in (401, 403):
+                    raise PortainerError(f"{self.id} refused the action: the token's user may not start or stop containers in that environment")
+                if response.status == 404:
+                    raise PortainerError(f"{self.id} has no such container")
+                raise PortainerError(f"{self.id} answered HTTP {response.status} for {path}")
+            return response.status
+        except netlens_http.NetError as exc:
+            raise PortainerError(f"cannot reach {self.id}: {exc}")
 
     def environments(self):
         rows = self.get("/api/endpoints")

@@ -2,7 +2,7 @@
 
 Reads {"config": {...}} as JSON on stdin and prints one JSON line {"ok": true, "result": ...} or
 {"ok": false, "error": "...", "auth_failed": bool}. The process gets no database path and a stripped
-environment, and only the plugin's own folder (plus the Netlens code for built-in plugins) is importable.
+environment, and only the plugin's own folder and `lib/` (netlens_http) are importable.
 """
 
 import importlib
@@ -12,44 +12,16 @@ import sys
 from pathlib import Path
 
 
+LIB = Path(__file__).resolve().parent / "lib"      # netlens_http and friends: what a plugin may import from Netlens
+
+
 def _guard_redirects() -> None:
-    """A plugin talks to a device it was given and to nothing else: a redirect to a file, to the cloud metadata service or from https back to http is refused, and the
-    login details (Authorization, cookies, API keys) are not sent along to another host. Stdlib only: this process cannot import Netlens code (see app/safenet.py)."""
-    import ipaddress
-    import urllib.error
-    import urllib.parse
-    import urllib.request
+    """Plugin code that still calls urllib itself gets the same redirect rules as netlens_http (see lib/netlens_http.py)."""
+    if str(LIB) not in sys.path:
+        sys.path.insert(0, str(LIB))
+    import netlens_http
 
-    original = urllib.request.HTTPRedirectHandler.redirect_request
-    secret_headers = {"authorization", "cookie", "x-api-key", "x-auth-token", "x-api-token", "csrftoken", "x-csrf-token", "private-token"}
-
-    def refused(req, fp, code, headers, why):
-        return urllib.error.HTTPError(req.full_url, code, f"redirect refused: {why}", headers, fp)
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        target = urllib.parse.urlsplit(urllib.parse.urljoin(req.full_url, newurl))
-        source = urllib.parse.urlsplit(req.full_url)
-        if target.scheme.lower() not in ("http", "https"):
-            raise refused(req, fp, code, headers, "not a web address")
-        if source.scheme.lower() == "https" and target.scheme.lower() == "http":
-            raise refused(req, fp, code, headers, "from https back to http")
-        host = (target.hostname or "").lower()
-        if host in ("metadata.google.internal", "metadata", "instance-data", "instance-data.ec2.internal", "metadata.azure.internal"):
-            raise refused(req, fp, code, headers, "the metadata service of a cloud provider")
-        try:
-            ip = ipaddress.ip_address(host)
-        except ValueError:
-            ip = None
-        if ip is not None and (ip.is_link_local or ip.is_unspecified or ip.is_multicast or ip.is_reserved):
-            raise refused(req, fp, code, headers, "that address is not allowed")
-        new = original(self, req, fp, code, msg, headers, newurl)
-        if new is not None and (target.hostname or "").lower() != (source.hostname or "").lower():
-            for store in (new.headers, new.unredirected_hdrs):
-                for name in [k for k in store if k.lower() in secret_headers]:
-                    del store[name]
-        return new
-
-    urllib.request.HTTPRedirectHandler.redirect_request = redirect_request
+    netlens_http.guard_urllib()
 
 
 def _load(plugin_dir: Path, builtin: bool):

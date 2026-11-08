@@ -15,9 +15,8 @@ certificate information is reported. Standard library only.
 import ipaddress
 import json
 import re
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_SITES = 2000
 
@@ -49,15 +48,14 @@ class Server:
         self.ip = self.lan_ip or _ipv4(parts.hostname)
 
     def get(self, path):
-        request = urllib.request.Request(f"{self.url}{path}", headers={"Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            raise CaddyError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise CaddyError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.url}{path}", headers={"Accept": "application/json"}, timeout=self.timeout)
+            if not response.ok:
+                raise CaddyError(f"{self.id} answered HTTP {response.status} for {path}")
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise CaddyError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise CaddyError(f"{self.id} did not answer properly (is this Caddy's admin API?): {exc}")
 
 

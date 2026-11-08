@@ -175,13 +175,13 @@ def test_test_message_counts(unraid):
     assert "Tower" in message and "Unraid 7.2.0" in message and "2 container(s)" in message and "2 virtual machine(s)" in message
 
 
-def test_an_http_redirect_is_followed_for_the_post():
-    fake = FakeUnraid(redirect=True)
+def test_a_redirect_to_another_host_is_not_followed_so_the_api_key_stays_home():
+    fake = FakeUnraid(redirect=True)         # answers 307 to http://localhost:<port>/graphql, another host name than the one that was configured
     try:
-        cfg = fake.config()
-        out = plugin.fetch(cfg)
-        assert out["guests"]
-        assert any(path == "/graphql" for path, _, _ in fake.seen)
+        with pytest.raises(plugin.ConnectError) as err:
+            plugin.fetch(fake.config())
+        assert "HTTP 307" in str(err.value)
+        assert [path for path, _, _ in fake.seen] == ["/graphql"]            # the second request, with the key, was never made
     finally:
         fake.close()
 

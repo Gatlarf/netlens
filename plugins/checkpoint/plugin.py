@@ -14,10 +14,8 @@ use the SNMP plugin on the gateways for the devices behind them. Objects are kno
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 PAGE = 100
 MAX_NODES = 500
@@ -52,33 +50,29 @@ class Server:
         if not self.api_key and not (self.username and password):
             raise CheckpointError(f"{self.id}: enter an API key, or a user name and password")
         self.sid = None
-        self.context = ssl.create_default_context()
-        if not verify_tls:
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def call(self, command, body=None):
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self.sid:
             headers["X-chkp-sid"] = self.sid
-        request = urllib.request.Request(f"{self.base}/{command}", data=json.dumps(body or {}).encode(), headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            try:
-                detail = json.loads(exc.read().decode("utf-8", "replace"))
-                message = str(detail.get("message") or detail.get("code") or "")[:200]
-            except (ValueError, AttributeError):
-                message = ""
-            if exc.code in (401, 403) or "authentication" in message.lower() or "wrong" in message.lower() and "password" in message.lower():
-                raise AuthRefused(f"{self.id} refused the login ({message or 'wrong API key, user name or password, or this machine may not call the API'})")
-            raise CheckpointError(f"{self.id} answered HTTP {exc.code} for {command}" + (f" ({message})" if message else ""))
-        except urllib.error.URLError as exc:
-            if isinstance(exc.reason, ssl.SSLCertVerificationError):
-                raise CheckpointError(f"{self.id}: the certificate is not trusted ({exc.reason.verify_message}); install your own certificate or untick Verify TLS certificate")
-            raise CheckpointError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("POST", f"{self.base}/{command}", headers=headers, data=json.dumps(body or {}).encode(), timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                try:
+                    detail = json.loads(response.text())
+                    message = str(detail.get("message") or detail.get("code") or "")[:200]
+                except (ValueError, AttributeError):
+                    message = ""
+                if response.status in (401, 403) or "authentication" in message.lower() or "wrong" in message.lower() and "password" in message.lower():
+                    raise AuthRefused(f"{self.id} refused the login ({message or 'wrong API key, user name or password, or this machine may not call the API'})")
+                raise CheckpointError(f"{self.id} answered HTTP {response.status} for {command}" + (f" ({message})" if message else ""))
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            if isinstance(exc, netlens_http.CertificateError):
+                raise CheckpointError(f"{self.id}: the certificate is not trusted ({exc.detail}); install your own certificate or untick Verify TLS certificate")
+            raise CheckpointError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise CheckpointError(f"{self.id} did not answer properly (is the Management API on?): {exc}")
 
     def login(self):

@@ -15,10 +15,8 @@ cluster and are not reported. Standard library only.
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_TASKS = 3000
 LIVE = ("new", "pending", "assigned", "accepted", "ready", "preparing", "starting", "running", "failed", "rejected", "orphaned")
@@ -45,26 +43,21 @@ class Manager:
         if parts.scheme not in ("http", "https") or not parts.hostname:
             raise SwarmError(f"{url!r} is not an address like http://192.168.0.189:2375")
         self.url, self.timeout, self.id = f"{parts.scheme}://{parts.netloc}", float(timeout), parts.netloc
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path):
-        request = urllib.request.Request(f"{self.url}{path}", headers={"Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code == 403:
-                raise SwarmError(f"{self.id} refused {path}: the socket proxy does not allow it (set INFO=1, NODES=1, SERVICES=1 and TASKS=1 on the proxy)")
-            if exc.code == 503:
-                raise SwarmError(f"{self.id} is not a swarm manager (HTTP 503): point the plugin at a manager node")
-            raise SwarmError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise SwarmError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.url}{path}", headers={"Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status == 403:
+                    raise SwarmError(f"{self.id} refused {path}: the socket proxy does not allow it (set INFO=1, NODES=1, SERVICES=1 and TASKS=1 on the proxy)")
+                if response.status == 503:
+                    raise SwarmError(f"{self.id} is not a swarm manager (HTTP 503): point the plugin at a manager node")
+                raise SwarmError(f"{self.id} answered HTTP {response.status} for {path}")
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise SwarmError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise SwarmError(f"{self.id} did not answer properly: {exc}")
 
 

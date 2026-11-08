@@ -122,4 +122,4 @@ def test_pem_handling():
     with pytest.raises(plugin.IncusError):
         plugin.normalize_pem("just text", "client key")
     with pytest.raises(plugin.IncusError):
-        plugin.make_context("-----BEGIN CERTIFICATE-----\nQUJD\n-----END CERTIFICATE-----\n", "-----BEGIN PRIVATE KEY-----\nQUJD\n-----END PRIVATE KEY-----\n", False)
+        plugin.Server("https://10.0.0.1:8443", "-----BEGIN CERTIFICATE-----\nQUJD\n-----END CERTIFICATE-----\n", "-----BEGIN PRIVATE KEY-----\nQUJD\n-----END PRIVATE KEY-----\n", False)

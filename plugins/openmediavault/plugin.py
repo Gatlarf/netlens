@@ -16,14 +16,10 @@ Standard library only. A refused login is reported with `auth_failed` so Netlens
 plugin parts are optional: a NAS without them reports no containers or machines, with a note.
 """
 
-import http.cookiejar
 import json
 import re
-import socket
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_BODY = 16 * 1024 * 1024
 MAX_VM_NICS = 60
@@ -72,12 +68,8 @@ class Omv:
             raise ValueError("enter the user name and the password")
         self.verify = bool(config.get("verify_tls", True))
         self.timeout = int(config.get("timeout") or 30)
-        context = ssl.create_default_context()
-        if not self.verify:
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-        self.jar = http.cookiejar.CookieJar()
-        self.opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context), urllib.request.HTTPCookieProcessor(self.jar))
+        verify_tls = bool(self.verify)
+        self.http = netlens_http.Session(verify_tls=verify_tls, cookies=True)
         self.session = None
 
     def _rpc(self, service, method, params=None):
@@ -85,14 +77,11 @@ class Omv:
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self.session:
             headers["X-OPENMEDIAVAULT-SESSIONID"] = self.session
-        request = urllib.request.Request(self.base + "/rpc.php", data=body, headers=headers)
         try:
-            with self.opener.open(request, timeout=self.timeout) as response:
-                code, raw = response.status, response.read(MAX_BODY)
-        except urllib.error.HTTPError as exc:
-            code, raw = exc.code, exc.read(MAX_BODY)
-        except (urllib.error.URLError, socket.timeout, ssl.SSLError, OSError) as exc:
-            raise ConnectError(f"cannot reach the OpenMediaVault at {self.host}: {getattr(exc, 'reason', exc)}") from None
+            response = self.http.request("POST", self.base + "/rpc.php", headers=headers, data=body, timeout=self.timeout)
+        except netlens_http.NetError as exc:
+            raise ConnectError(f"cannot reach the OpenMediaVault at {self.host}: {exc}") from None
+        code, raw = response.status, response.body[:MAX_BODY]
         try:
             answer = json.loads(raw.decode("utf-8", "replace"))
         except ValueError:
@@ -122,7 +111,7 @@ class Omv:
         self.session = str(answer.get("sessionid") or "") or None
 
     def close(self):
-        if self.session is not None or len(self.jar):
+        if self.session is not None or len(self.http.jar):
             try:
                 self._rpc("Session", "logout")
             except OmvError:

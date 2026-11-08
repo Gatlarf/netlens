@@ -15,11 +15,8 @@ optional: a server whose key may not read VMs, or that has the VM manager switch
 
 import json
 import re
-import socket
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_BODY = 8 * 1024 * 1024
 VM_STATES = {"RUNNING": "running", "IDLE": "running", "PAUSED": "paused", "PMSUSPENDED": "paused", "SHUTOFF": "stopped", "SHUTDOWN": "stopped",
@@ -70,11 +67,6 @@ def normalize(url):
     return f"{parts.scheme}://{shown}" + (f":{parts.port}" if parts.port else ""), host
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args, **kwargs):
-        return None
-
-
 class Unraid:
     def __init__(self, config):
         self.base, self.host = normalize(config.get("url") or config.get("host"))
@@ -83,37 +75,34 @@ class Unraid:
         self.timeout = int(config.get("timeout") or 30)
         if not self.key:
             raise ValueError("enter the API key (Unraid: Settings > Management Access > API Keys)")
-        context = ssl.create_default_context()
-        if not self.verify:
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
         # redirects are followed by hand: Unraid sends http:// to https:// and a POST would not survive urllib's own redirect
-        self.opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context), _NoRedirect)
+        self.session = netlens_http.Session(verify_tls=self.verify, follow_redirects=False)
 
     def _post(self, query):
         body = json.dumps({"query": query}).encode()
         for _ in range(3):
-            request = urllib.request.Request(self.base + "/graphql", data=body, headers={"Content-Type": "application/json", "Accept": "application/json", "x-api-key": self.key})
             try:
-                with self.opener.open(request, timeout=self.timeout) as response:
-                    raw = response.read(MAX_BODY)
+                response = self.session.request("POST", self.base + "/graphql", data=body, timeout=self.timeout, max_bytes=MAX_BODY,
+                                                headers={"Content-Type": "application/json", "Accept": "application/json", "x-api-key": self.key})
+            except netlens_http.NetError as exc:
+                raise ConnectError(f"cannot reach the Unraid server at {self.host}: {exc}") from None
+            if response.ok:
                 break
-            except urllib.error.HTTPError as exc:
-                where = exc.headers.get("Location") if exc.code in (301, 302, 307, 308) else None
-                if where:
-                    origin = urllib.parse.urlsplit(urllib.parse.urljoin(self.base + "/graphql", where))
-                    if origin.hostname and origin.scheme in ("http", "https"):
-                        self.base = f"{origin.scheme}://{origin.netloc}"
-                        continue
-                if exc.code in (401, 403):
-                    raise KeyRefused("the key was refused: check the API key and that it has the Viewer role") from None
-                raise ConnectError(f"the server answered with HTTP {exc.code} (is this an Unraid server with the API, version 7.2 or newer?)") from None
-            except (urllib.error.URLError, socket.timeout, ssl.SSLError, OSError) as exc:
-                raise ConnectError(f"cannot reach the Unraid server at {self.host}: {getattr(exc, 'reason', exc)}") from None
+            where = response.header("Location") if response.status in (301, 302, 307, 308) else None
+            if where:
+                origin = urllib.parse.urlsplit(urllib.parse.urljoin(self.base + "/graphql", where))
+                same_host = (origin.hostname or "").lower() == (urllib.parse.urlsplit(self.base).hostname or "").lower()
+                upgrade = self.base.startswith("http:") and origin.scheme == "https"          # Unraid sends http:// to its https:// (name) address
+                if origin.hostname and (same_host or upgrade) and not (self.base.startswith("https:") and origin.scheme == "http"):      # the API key never goes to another host over a weaker link
+                    self.base = f"{origin.scheme}://{origin.netloc}"
+                    continue
+            if response.status in (401, 403):
+                raise KeyRefused("the key was refused: check the API key and that it has the Viewer role") from None
+            raise ConnectError(f"the server answered with HTTP {response.status} (is this an Unraid server with the API, version 7.2 or newer?)") from None
         else:
             raise ConnectError("too many redirects")
         try:
-            answer = json.loads(raw.decode("utf-8", "replace"))
+            answer = json.loads(response.text())
         except ValueError:
             raise ConnectError("this does not look like the Unraid API (the answer is not JSON)") from None
         if not isinstance(answer, dict):

@@ -16,9 +16,7 @@ import base64
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
-import urllib.request
+import netlens_http
 
 MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
 TYPES = {"device_audio": "speaker", "device_camera": "camera", "device_gameconsole": "console", "device_laptop": "pc", "device_nas": "nas", "device_pc": "pc",
@@ -57,24 +55,19 @@ class Server:
         self.url, self.timeout = url, float(timeout)
         self.id = url.split("://", 1)[1]
         self.auth = "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()
-        self.context = None
-        if url.startswith("https://") and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path):
-        request = urllib.request.Request(f"{self.url}{path}", headers={"Authorization": self.auth, "Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace") or "{}")
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the user name or password")
-            raise AdguardError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise AdguardError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.url}{path}", headers={"Authorization": self.auth, "Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the user name or password")
+                raise AdguardError(f"{self.id} answered HTTP {response.status} for {path}")
+            return json.loads(response.text() or "{}")
+        except netlens_http.NetError as exc:
+            raise AdguardError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise AdguardError(f"{self.id} did not answer properly (is this AdGuard Home?): {exc}")
 
 

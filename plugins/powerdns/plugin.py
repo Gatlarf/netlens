@@ -14,11 +14,9 @@ are found by themselves. Names are dotted at the end in PowerDNS and without the
 
 import json
 import re
-import ssl
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 DEFAULT_MARKER = "managed by Netlens"
 TYPES = ("A", "AAAA", "PTR", "CNAME")
@@ -56,33 +54,26 @@ class Server:
         self.id = url.split("//", 1)[-1]
         self.version = None
         self.zones = {}        # name (no dot) -> {"id", "kind"}
-        self.context = None
-        if url.startswith("https://") and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def call(self, method, path, body=None):
         data = json.dumps(body).encode() if body is not None else None
         headers = {"X-API-Key": self.key, "Accept": "application/json"}
         if data is not None:
             headers["Content-Type"] = "application/json"
-        request = urllib.request.Request(f"{self.url}{self.base}{path}", data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                raw = response.read().decode("utf-8", "replace")
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the API key")
-            try:
-                detail = json.loads(exc.read().decode("utf-8", "replace")).get("error")
-            except (ValueError, AttributeError):
-                detail = None
-            raise PowerdnsError(f"{self.id} answered HTTP {exc.code}" + (f": {str(detail)[:200]}" if detail else ""))
-        except urllib.error.URLError as exc:
-            raise PowerdnsError(f"cannot reach {self.id}: {exc.reason}")
-        except OSError as exc:
-            raise PowerdnsError(f"{self.id} did not answer properly: {exc}")
+            response = netlens_http.request(method, f"{self.url}{self.base}{path}", headers=headers, data=data, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the API key")
+                try:
+                    detail = json.loads(response.text()).get("error")
+                except (ValueError, AttributeError):
+                    detail = None
+                raise PowerdnsError(f"{self.id} answered HTTP {response.status}" + (f": {str(detail)[:200]}" if detail else ""))
+            raw = response.text()
+        except netlens_http.NetError as exc:
+            raise PowerdnsError(f"cannot reach {self.id}: {exc}")
         try:
             return json.loads(raw) if raw.strip() else {}
         except ValueError:

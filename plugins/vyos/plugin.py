@@ -15,11 +15,9 @@ when a column is added in a newer release. Neighbours in state FAILED or INCOMPL
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
 import uuid
+import netlens_http
 
 MAC = re.compile(r"\b([0-9a-f]{2}(?::[0-9a-f]{2}){5})\b", re.I)
 IPV4 = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b")
@@ -60,43 +58,37 @@ class Router:
         self.role = (role or "auto").strip().lower()
         if self.role not in ("auto", "gateway", "node"):
             raise VyosError(f"{self.id}: the role must be auto, gateway or node")
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
-    def _open(self, request):
+    def _open(self, method, url, headers, data=None):
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
+            response = netlens_http.request(method, url, headers=headers, data=data, timeout=self.timeout, verify_tls=self.verify_tls)
+            if response.ok:
+                return response.json()
             try:
-                body = json.loads(exc.read().decode("utf-8", "replace"))
+                body = response.json()
             except ValueError:
                 body = {}
             error = str(body.get("error", "")).lower() if isinstance(body, dict) else ""
-            if exc.code in (401, 403) or ("key" in error and "required" in error):
+            if response.status in (401, 403) or ("key" in error and "required" in error):
                 raise AuthRefused(f"{self.id} refused the API key")
             if isinstance(body, dict) and "success" in body:
                 return body
-            raise VyosError(f"{self.id} answered HTTP {exc.code}")
-        except urllib.error.URLError as exc:
-            raise VyosError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            raise VyosError(f"{self.id} answered HTTP {response.status}")
+        except netlens_http.NetError as exc:
+            raise VyosError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise VyosError(f"{self.id} did not answer properly (is this VyOS's HTTPS API?): {exc}")
 
     def info(self):
-        answer = self._open(urllib.request.Request(f"{self.base}/info", headers={"Accept": "application/json"}, method="GET"))
+        answer = self._open("GET", f"{self.base}/info", {"Accept": "application/json"})
         return answer.get("data") or {} if isinstance(answer, dict) else {}
 
     def call(self, endpoint, payload, optional=False):
         boundary = uuid.uuid4().hex
         fields = {"data": json.dumps(payload), "key": self.key}
         body = "".join(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n' for k, v in fields.items()) + f"--{boundary}--\r\n"
-        request = urllib.request.Request(f"{self.base}/{endpoint}", data=body.encode(), method="POST",
-                                         headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json"})
-        answer = self._open(request)
+        answer = self._open("POST", f"{self.base}/{endpoint}", {"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json"}, body.encode())
         if not isinstance(answer, dict) or not answer.get("success"):
             error = str((answer or {}).get("error") or "unknown error").strip()
             if "api key" in error.lower():

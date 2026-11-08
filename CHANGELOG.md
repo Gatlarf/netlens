@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.366 — 2026-11-08
+
+### Changed
+- ★ **All plugins talk to their device through one shared HTTP client** (`netlens_http`, built into Netlens). The certificate and host name are checked in the same way everywhere (unless you switched "Verify TLS certificate" off, or pinned a fingerprint, which is checked before anything is sent), every call has a timeout and a size limit, proxy settings of the host are ignored, and login details are never sent on to another host in a redirect. Before, each of the 55 plugins carried its own copy of this code. The plugins have a new patch version that needs this Netlens; the plugin store offers them as updates.
+- Unraid: a redirect to another host name is no longer followed with the API key (only to the https address of the same server).
+- Plugin authors: `plugin-index/tools/static_scan.py` flags plugins that switch certificate checking off themselves, open their own HTTP connection or read an answer without a limit, and `app/plugins/PLUGINS.md` describes the client.
+
 ## 0.4.365 — 2026-11-08
 
 ### Changed

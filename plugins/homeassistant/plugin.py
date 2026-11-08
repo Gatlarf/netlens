@@ -11,12 +11,11 @@ Uses the REST API of Home Assistant (read only):
 The template endpoint is how the registry can be read over REST (the registry itself is only on the websocket API). Standard library only.
 """
 
-import http.client
 import ipaddress
 import json
 import re
-import ssl
 import urllib.parse
+import netlens_http
 
 TEMPLATE = (
     "{% set ns = namespace(out=[]) %}"
@@ -81,31 +80,22 @@ class Server:
         self.password = str(config.get("password") or "")
         if not self.token and not (self.username and self.password):
             raise HaError("enter a long-lived access token, or a user name and a password")
-        self.context = ssl.create_default_context()
-        if not config.get("verify_tls", True):
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.http = netlens_http.Session(verify_tls=bool(config.get("verify_tls", True)), timeout=self.timeout, max_bytes=50_000_000)
         self.ip = _ipv4(self.host)
 
     def _request(self, method, path, body=None, headers=None, form=False):
-        conn = (http.client.HTTPSConnection(self.host, self.port, timeout=self.timeout, context=self.context) if self.scheme == "https"
-                else http.client.HTTPConnection(self.host, self.port, timeout=self.timeout))
         head = {"Accept": "application/json", **(headers or {})}
         data = None
         if body is not None:
             data = urllib.parse.urlencode(body) if form else json.dumps(body)
             head["Content-Type"] = "application/x-www-form-urlencoded" if form else "application/json"
         try:
-            conn.request(method, path, body=data, headers=head)
-            response = conn.getresponse()
-            raw = response.read(50_000_000).decode("utf-8", "replace")
-            return response.status, raw
-        except ssl.SSLError as exc:
-            raise HaError(f"cannot make a secure connection to {self.id}: {exc.reason or exc}")
-        except (OSError, http.client.HTTPException) as exc:
+            response = self.http.request(method, f"{self.base}{path}", headers=head, data=data)
+        except netlens_http.CertificateError as exc:
+            raise HaError(f"cannot make a secure connection to {self.id}: {exc}")
+        except netlens_http.NetError as exc:
             raise HaError(f"cannot reach {self.id}: {exc}")
-        finally:
-            conn.close()
+        return response.status, response.text()
 
     def login(self):
         """An access token from a user name and password (the normal sign-in flow of Home Assistant)."""

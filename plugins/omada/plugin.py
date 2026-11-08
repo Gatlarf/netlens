@@ -22,15 +22,12 @@ Standard library only. A refused login is reported with `auth_failed`, so Netlen
 (this protects the account from being locked).
 """
 
-import http.cookiejar
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
 import time
-import urllib.request
 from datetime import datetime
+import netlens_http
 
 PAGE_SIZE = 100
 MAX_PAGES = 200
@@ -88,48 +85,38 @@ class Controller:
         if not self.username or not self.password:
             raise ValueError("enter the username and password")
         self.site_filter = str(config.get("site") or "").strip().lower()
-        context = ssl.create_default_context()
-        if not config.get("verify_tls", True):
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(config.get("verify_tls", True))
         self.client_id = str(config.get("client_id") or "").strip()
         self.client_secret = str(config.get("client_secret") or "").strip()
         self.allowed = bool(config.get("collect_usage", True))      # Netlens' own switch (Settings > Statistics) has the last word
-        self.context = context
         self.targets = []       # (site, client as the controller wrote it) for the application statistics
-        self.opener = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
-            urllib.request.HTTPSHandler(context=context),
-        )
+        self.session = netlens_http.Session(verify_tls=self.verify_tls, cookies=True)
         self.controller_id = None
         self.version = ""
         self.csrf = None
 
     # ---- plumbing ------------------------------------------------------------------------------------------
-    def _call(self, method, url, body=None, params=None, headers=None, opener=None):
+    def _call(self, method, url, body=None, params=None, headers=None, session=None):
         if params:
             url += "?" + urllib.parse.urlencode(params)
         data = json.dumps(body).encode() if body is not None else None
         headers = {"Accept": "application/json", **(headers or {})}
         if data is not None:
             headers["Content-Type"] = "application/json"
-        if self.csrf and opener is None:
+        if self.csrf and session is None:
             headers["Csrf-Token"] = self.csrf
-        request = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            with (opener or self.opener).open(request, timeout=20) as response:
-                raw = response.read(8_000_000)
-        except urllib.error.HTTPError as exc:
-            payload = _json_or_none(exc.read(200_000))
-            if exc.code >= 500:
-                raise ConnectError(f"the controller has a problem (HTTP {exc.code})") from None
+            response = (session or self.session).request(method, url, data=data, headers=headers, timeout=20, max_bytes=8_000_000)
+        except netlens_http.NetError as exc:
+            raise ConnectError(f"cannot reach the controller: {exc}") from None
+        if not response.ok:
+            payload = _json_or_none(response.body)
+            if response.status >= 500:
+                raise ConnectError(f"the controller has a problem (HTTP {response.status})") from None
             if isinstance(payload, dict) and payload.get("msg"):
                 raise OmadaError(f"{payload['msg']} (error {payload.get('errorCode')})") from None
-            raise OmadaError(f"the controller answered HTTP {exc.code}") from None
-        except urllib.error.URLError as exc:
-            raise ConnectError(f"cannot reach the controller: {exc.reason}") from None
-        except (TimeoutError, OSError) as exc:
-            raise ConnectError(f"cannot reach the controller: {exc}") from None
+            raise OmadaError(f"the controller answered HTTP {response.status}") from None
+        raw = response.body
         payload = _json_or_none(raw)
         if payload is None:
             # a lost session answers with the HTML login page and a 200
@@ -287,10 +274,10 @@ class Controller:
 
     def open_login(self):
         """The Open API access token (a separate login from the web session: OAuth client credentials)."""
-        self.plain = urllib.request.build_opener(urllib.request.HTTPSHandler(context=self.context))
+        self.plain = netlens_http.Session(verify_tls=self.verify_tls)
         try:
             result = self._call("POST", f"{self.base}/openapi/authorize/token", {"omadacId": self.controller_id, "client_id": self.client_id, "client_secret": self.client_secret},
-                                params={"grant_type": "client_credentials"}, opener=self.plain)
+                                params={"grant_type": "client_credentials"}, session=self.plain)
         except ConnectError:
             raise
         except OmadaError as exc:
@@ -301,7 +288,7 @@ class Controller:
         self.access = f"AccessToken={token}"
 
     def _open(self, path, params=None):
-        return self._call("GET", f"{self.base}/openapi/v1/{self.controller_id}/{path}", params=params, headers={"Authorization": self.access}, opener=self.plain)
+        return self._call("GET", f"{self.base}/openapi/v1/{self.controller_id}/{path}", params=params, headers={"Authorization": self.access}, session=self.plain)
 
     def open_sites(self):
         """{site key in the web API: site id in the Open API}. The two are normally the same value; a name match is the fallback."""

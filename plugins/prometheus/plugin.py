@@ -8,17 +8,14 @@ which is checked character by character). Read-only: only GET requests to /api/v
 from __future__ import annotations
 
 import base64
-import hashlib
-import http.client
 import ipaddress
 import json
 import math
 import re
-import socket
-import ssl
 import time
 import urllib.parse
 from typing import Any, Callable
+import netlens_http
 
 
 # ----------------------------------------------------------------------------- diagnostic helpers
@@ -111,33 +108,20 @@ def make_transport(verify_tls: bool, timeout: float, label: str, fingerprint: st
     pin = re.sub(r"[^0-9a-f]", "", (fingerprint or "").lower())
     if fingerprint and len(pin) != 64:
         raise ValueError("the certificate fingerprint must be 64 hexadecimal digits (SHA-256)")
-    ctx = ssl.create_default_context()
-    if pin or not verify_tls:
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+    session = netlens_http.Session(verify_tls=verify_tls, timeout=timeout, fingerprint=pin, max_bytes=MAX_RESPONSE)
 
     def send(method: str, url: str, headers: dict, data: bytes | None) -> tuple[int, bytes]:
-        parts = urllib.parse.urlsplit(url)
-        secure = parts.scheme == "https"
-        conn = (http.client.HTTPSConnection(parts.hostname, parts.port or 443, timeout=timeout, context=ctx) if secure
-                else http.client.HTTPConnection(parts.hostname, parts.port or 80, timeout=timeout))
         try:
-            conn.connect()
-            if pin and secure and hashlib.sha256(conn.sock.getpeercert(binary_form=True)).hexdigest() != pin:
-                raise PromError(f"the certificate of {label} does not match the fingerprint; nothing was sent")
-            conn.request(method, parts.path + (f"?{parts.query}" if parts.query else ""), body=data, headers=headers)
-            resp = conn.getresponse()
-            return resp.status, resp.read(MAX_RESPONSE)
-        except ssl.SSLCertVerificationError as exc:
+            resp = session.request(method, url, headers=headers, data=data)
+        except netlens_http.CertificateError as exc:
+            if exc.detail == "fingerprint":
+                raise PromError(f"the certificate of {label} does not match the fingerprint; nothing was sent") from exc
             raise PromError("the TLS certificate could not be verified: fill in its fingerprint, or turn off 'Verify TLS certificate' for a self-signed one") from exc
-        except ssl.SSLError as exc:
-            raise PromError(f"cannot make a secure connection to {label}: {exc.reason or exc}") from exc
-        except (socket.timeout, TimeoutError) as exc:
+        except netlens_http.NetTimeout as exc:
             raise PromError(f"connection to {label} timed out") from exc
-        except (OSError, http.client.HTTPException) as exc:
+        except netlens_http.NetError as exc:
             raise PromError(f"cannot reach {label}: {exc}") from exc
-        finally:
-            conn.close()
+        return resp.status, resp.body
 
     return send
 

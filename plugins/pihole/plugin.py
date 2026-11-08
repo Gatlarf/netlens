@@ -14,14 +14,11 @@ the list of records it remembers writing, so a record you typed in Pi-hole yours
 answer for a Local DNS record is made by Pi-hole itself, so no reverse zone is reported. Standard library only.
 """
 
-import http.client
 import json
 import re
-import ssl
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 TYPES = ("A", "CNAME")
 
@@ -48,11 +45,7 @@ class Server:
         self.url, self.password, self.timeout = url, password, float(timeout)
         self.sid = None
         self.version = None
-        self.context = None
-        if url.startswith("https://") and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.http = netlens_http.Session(verify_tls=verify_tls, timeout=self.timeout)
 
     def call(self, method, path, body=None, ok=(200, 201, 204)):
         data = json.dumps(body).encode() if body is not None else None
@@ -61,24 +54,16 @@ class Server:
             headers["Content-Type"] = "application/json"
         if self.sid:
             headers["sid"] = self.sid
-        request = urllib.request.Request(f"{self.url}{path}", data=data, headers=headers, method=method)
         for attempt in (1, 2, 3):
             try:
-                with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                    raw = response.read().decode("utf-8", "replace")
-                    status = response.status
+                response = self.http.request(method, f"{self.url}{path}", headers=headers, data=data)
+                raw, status = response.text(), response.status
                 break
-            except urllib.error.HTTPError as exc:
-                raw, status = exc.read().decode("utf-8", "replace"), exc.code
-                break
-            except (http.client.RemoteDisconnected, ConnectionResetError, urllib.error.URLError) as exc:
+            except netlens_http.NetError as exc:
                 # Pi-hole restarts its web server for a moment after a settings change; reading is safe to repeat, a write is not
-                reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
                 if attempt == 3 or method not in ("GET", "POST"):
-                    raise PiholeError(f"cannot reach {self.url}: {reason}")
+                    raise PiholeError(f"cannot reach {self.url}: {exc}")
                 time.sleep(1.5)
-            except OSError as exc:
-                raise PiholeError(f"{self.url} did not answer properly: {exc}")
         try:
             parsed = json.loads(raw) if raw.strip() else {}
         except ValueError:

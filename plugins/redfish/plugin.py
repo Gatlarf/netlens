@@ -17,11 +17,8 @@ import base64
 import ipaddress
 import json
 import re
-import socket
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_BODY = 8 * 1024 * 1024
 MAX_REQUESTS = 400
@@ -65,11 +62,8 @@ class Redfish:
         if not self.user or not self.password:
             raise ValueError("enter the user name and the password")
         self.timeout = int(config.get("timeout") or 30)
-        context = ssl.create_default_context()
-        if not config.get("verify_tls", True):
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-        self.opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context))
+        verify_tls = bool(config.get("verify_tls", True))
+        self.session = netlens_http.Session(verify_tls=verify_tls)
         self.auth = "Basic " + base64.b64encode(f"{self.user}:{self.password}".encode()).decode()
         self.requests = 0
         self.notes = []
@@ -81,14 +75,11 @@ class Redfish:
         self.requests += 1
         if self.requests > MAX_REQUESTS:
             raise RedfishError("too many requests (this BMC has more parts than Netlens reads)")
-        request = urllib.request.Request(self.base + path, headers={"Authorization": self.auth, "Accept": "application/json", "OData-Version": "4.0"})
         try:
-            with self.opener.open(request, timeout=self.timeout) as response:
-                code, raw = response.status, response.read(MAX_BODY)
-        except urllib.error.HTTPError as exc:
-            code, raw = exc.code, exc.read(MAX_BODY)
-        except (urllib.error.URLError, socket.timeout, ssl.SSLError, OSError) as exc:
-            raise ConnectError(f"cannot reach the BMC at {self.host}: {getattr(exc, 'reason', exc)}") from None
+            response = self.session.request("GET", self.base + path, headers={"Authorization": self.auth, "Accept": "application/json", "OData-Version": "4.0"}, timeout=self.timeout)
+        except netlens_http.NetError as exc:
+            raise ConnectError(f"cannot reach the BMC at {self.host}: {exc}") from None
+        code, raw = response.status, response.body[:MAX_BODY]
         if code in (401, 403):
             raise LoginRefused(f"login refused (HTTP {code}): check the user name and password, and that the user has at least the ReadOnly role")
         if code == 404:

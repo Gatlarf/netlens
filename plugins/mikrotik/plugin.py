@@ -22,10 +22,8 @@ import base64
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
 MAX_CLIENTS = 4000
@@ -82,29 +80,24 @@ class Router:
         self.uplink = _ipv4(uplink) if uplink else None
         if uplink and not self.uplink:
             raise RouterosError(f"{self.id}: the uplink must be an IPv4 address")
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path):
-        request = urllib.request.Request(f"{self.base}/{path}", headers={"Authorization": self.auth, "Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            body = exc.read().decode("utf-8", "replace")[:300]
-            if exc.code == 401:
-                raise AuthRefused(f"{self.id} refused the login (wrong user name or password, or this user may not use the REST API)")
-            if exc.code == 403:
-                raise AuthRefused(f"{self.id} says this user may not read {path} (give the user's group the read and rest-api policies)")
-            if exc.code in (400, 404) and "no such command" in body:
-                raise Missing(f"{self.id} has no {path}")
-            raise RouterosError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise RouterosError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.base}/{path}", headers={"Authorization": self.auth, "Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                body = response.text()[:300]
+                if response.status == 401:
+                    raise AuthRefused(f"{self.id} refused the login (wrong user name or password, or this user may not use the REST API)")
+                if response.status == 403:
+                    raise AuthRefused(f"{self.id} says this user may not read {path} (give the user's group the read and rest-api policies)")
+                if response.status in (400, 404) and "no such command" in body:
+                    raise Missing(f"{self.id} has no {path}")
+                raise RouterosError(f"{self.id} answered HTTP {response.status} for {path}")
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise RouterosError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise RouterosError(f"{self.id} did not answer properly (is the REST API on, RouterOS 7.1+?): {exc}")
 
     def rows(self, path, optional=False):

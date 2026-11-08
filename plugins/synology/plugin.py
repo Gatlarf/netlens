@@ -23,10 +23,8 @@ simply reports no machines, with a note.
 import json
 import re
 import socket
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_INSPECT = 60                  # containers whose details are read (one request each)
 APIS = ("SYNO.DSM.Info", "SYNO.Core.Network", "SYNO.Core.Network.Interface", "SYNO.Docker.Container", "SYNO.Virtualization.API.Guest", "SYNO.Core.Package", "SYNO.Storage.CGI.Storage", "SYNO.Core.Share", "SYNO.Core.ISCSI.LUN", "SYNO.Core.ISCSI.Target")
@@ -93,27 +91,20 @@ class DSM:
             raise ValueError("enter the user name and the password")
         self.sid = None
         self.paths = {}
-        context = ssl.create_default_context()
-        if not self.verify:
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-        self.opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context))
+        self.session = netlens_http.Session(verify_tls=self.verify)
 
     # ------------------------------------------------------------------ transport
     def _fetch(self, path, params, post=False):
         data = urllib.parse.urlencode(params).encode()
         url = f"{self.base}/webapi/{path}"
-        request = urllib.request.Request(url, data=data) if post else urllib.request.Request(url + "?" + data.decode())
         try:
-            with self.opener.open(request, timeout=self.timeout) as response:
-                raw = response.read(8 * 1024 * 1024)
-        except urllib.error.HTTPError as exc:
-            raise ConnectError(f"the Synology answered with HTTP {exc.code} (is this the DSM address and port, 5001 for https?)") from None
-        except (urllib.error.URLError, socket.timeout, ssl.SSLError, OSError) as exc:
-            reason = getattr(exc, "reason", exc)
-            raise ConnectError(f"cannot reach the Synology at {self.host}: {reason}") from None
+            response = self.session.request("POST" if post else "GET", url if post else url + "?" + data.decode(), data=data if post else None, timeout=self.timeout, max_bytes=8 * 1024 * 1024)
+        except netlens_http.NetError as exc:
+            raise ConnectError(f"cannot reach the Synology at {self.host}: {exc}") from None
+        if not response.ok:
+            raise ConnectError(f"the Synology answered with HTTP {response.status} (is this the DSM address and port, 5001 for https?)") from None
         try:
-            answer = json.loads(raw.decode("utf-8", "replace"))
+            answer = json.loads(response.text())
         except ValueError:
             raise ConnectError("this does not look like a Synology DSM (the answer is not JSON)") from None
         if not isinstance(answer, dict):

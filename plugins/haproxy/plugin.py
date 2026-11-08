@@ -14,10 +14,8 @@ import csv
 import io
 import ipaddress
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_BACKENDS = 1000
 
@@ -54,28 +52,21 @@ class Stats:
         if lan and not self.lan_ip:
             raise HaproxyError(f"{lan!r} is not an IPv4 address")
         self.ip = self.lan_ip or _ipv4(parts.hostname)
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def rows(self):
         headers = {"Accept": "text/csv"}
         if self.auth:
             headers["Authorization"] = self.auth
-        request = urllib.request.Request(self.csv_url, headers=headers, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                text = response.read().decode("utf-8", "replace")
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the login for the statistics page (wrong user name or password)")
-            raise HaproxyError(f"{self.id} answered HTTP {exc.code} (is the address the 'stats uri' of HAProxy?)")
-        except urllib.error.URLError as exc:
-            raise HaproxyError(f"cannot reach {self.id}: {exc.reason}")
-        except OSError as exc:
-            raise HaproxyError(f"{self.id} did not answer properly: {exc}")
+            response = netlens_http.request("GET", self.csv_url, headers=headers, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the login for the statistics page (wrong user name or password)")
+                raise HaproxyError(f"{self.id} answered HTTP {response.status} (is the address the 'stats uri' of HAProxy?)")
+            text = response.text()
+        except netlens_http.NetError as exc:
+            raise HaproxyError(f"cannot reach {self.id}: {exc}")
         if not text.lstrip().startswith("# pxname"):
             raise HaproxyError(f"{self.id} did not return HAProxy statistics as CSV (is the address the 'stats uri'?)")
         reader = csv.DictReader(io.StringIO(text.lstrip()[2:]))

@@ -15,15 +15,14 @@ snapshot). With a certificate fingerprint the server's certificate is compared w
 certificate check applies. Standard library only.
 """
 
-import http.client
 import ipaddress
 import json
 import re
-import ssl
 import statistics
 import time
 import urllib.parse
 from datetime import datetime, timezone
+import netlens_http
 
 MAX_SNAPSHOTS = 200000
 TASK_LIMIT = 1000
@@ -77,6 +76,7 @@ class Server:
             raise PbsError(f"{token_id.strip()!r} is not a token id like netlens@pbs!netlens")
         self.host, self.port = parts.hostname, parts.port or 8007
         self.id = f"{self.host}:{self.port}"
+        self.base = netlens_http.origin("https", self.host, self.port)
         self.auth = f"PBSAPIToken={token_id.strip()}:{secret.strip()}"
         self.timeout = float(timeout)
         self.fingerprint = re.sub(r"[^0-9a-f]", "", fingerprint.lower()) if fingerprint else ""
@@ -86,33 +86,20 @@ class Server:
         if lan and not self.lan_ip:
             raise PbsError(f"{lan!r} is not an IPv4 address")
         self.ip = self.lan_ip or _ipv4(self.host)
-        self.context = ssl.create_default_context()
-        if self.fingerprint or not verify_tls:
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.http = netlens_http.Session(verify_tls=verify_tls, timeout=self.timeout, fingerprint=self.fingerprint, max_bytes=50_000_000)
 
     def get(self, path, **params):
         query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
         target = f"/api2/json/{path}" + (f"?{query}" if query else "")
-        conn = http.client.HTTPSConnection(self.host, self.port, timeout=self.timeout, context=self.context)
         try:
-            conn.connect()
-            if self.fingerprint:
-                der = conn.sock.getpeercert(binary_form=True)
-                import hashlib
-
-                if hashlib.sha256(der).hexdigest() != self.fingerprint:
-                    raise PbsError(f"the certificate of {self.id} does not match the fingerprint; nothing was sent")
-            conn.request("GET", target, headers={"Authorization": self.auth, "Accept": "application/json"})
-            response = conn.getresponse()
-            raw = response.read(50_000_000).decode("utf-8", "replace")
-            status = response.status
-        except ssl.SSLError as exc:
-            raise PbsError(f"cannot make a secure connection to {self.id}: {exc.reason or exc}. For a self-signed certificate fill in the fingerprint")
-        except (OSError, http.client.HTTPException) as exc:
+            response = self.http.request("GET", f"{self.base}/api2/json/{path}" + (f"?{query}" if query else ""), headers={"Authorization": self.auth, "Accept": "application/json"})
+        except netlens_http.CertificateError as exc:
+            if exc.detail == "fingerprint":
+                raise PbsError(f"the certificate of {self.id} does not match the fingerprint; nothing was sent")
+            raise PbsError(f"cannot make a secure connection to {self.id}: {exc}. For a self-signed certificate fill in the fingerprint")
+        except netlens_http.NetError as exc:
             raise PbsError(f"cannot reach {self.id}: {exc}")
-        finally:
-            conn.close()
+        status, raw = response.status, response.text()
         if status in (401, 403):
             raise AuthRefused(f"{self.id} refused the API token (wrong token id or secret, or the token has no permission: give both the user and the token the Audit role on /)")
         if status != 200:

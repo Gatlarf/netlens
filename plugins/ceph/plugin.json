@@ -1,7 +1,7 @@
 {
   "id": "ceph",
   "name": "Ceph",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api_version": 1,
   "kind": "storage",
   "author": "Netlens",

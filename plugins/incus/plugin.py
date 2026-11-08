@@ -14,13 +14,9 @@ your LAN); one on a bridge, macvlan or physical NIC reports its LAN addresses. S
 
 import ipaddress
 import json
-import os
 import re
-import ssl
-import tempfile
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_INSTANCES = 3000
 PEM = re.compile(r"-----BEGIN ([A-Z0-9 ]+)-----(.*?)-----END \1-----", re.S)
@@ -54,31 +50,6 @@ def normalize_pem(text, what):
     return f"-----BEGIN {m.group(1)}-----\n" + "\n".join(lines) + f"\n-----END {m.group(1)}-----\n"
 
 
-def make_context(cert, key, verify_tls):
-    context = ssl.create_default_context()
-    if not verify_tls:
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-    paths = []
-    try:
-        for text in (cert, key):
-            handle, path = tempfile.mkstemp(prefix="netlens-incus-")
-            paths.append(path)
-            with os.fdopen(handle, "w") as f:
-                f.write(text)
-        try:
-            context.load_cert_chain(paths[0], paths[1])
-        except (ssl.SSLError, OSError) as exc:
-            raise IncusError(f"the client certificate and key do not fit together or are not valid ({exc.__class__.__name__})")
-    finally:
-        for path in paths:
-            try:
-                os.unlink(path)
-            except OSError:
-                pass
-    return context
-
-
 class Server:
     def __init__(self, url, cert, key, verify_tls=True, timeout=20):
         url = url.strip().rstrip("/")
@@ -89,40 +60,40 @@ class Server:
             raise IncusError(f"{url!r} is not an address like https://192.168.0.20:8443 (Incus needs https)")
         self.url, self.timeout, self.id = f"https://{parts.netloc}", float(timeout), parts.netloc
         self.address = _ipv4(parts.hostname)
-        self.context = make_context(normalize_pem(cert, "client certificate"), normalize_pem(key, "client key"), verify_tls)
+        try:
+            self.session = netlens_http.Session(verify_tls=verify_tls, timeout=self.timeout, client_cert=(normalize_pem(cert, "client certificate"), normalize_pem(key, "client key")))
+        except netlens_http.ClientCertError as exc:
+            raise IncusError(str(exc))
 
     def get(self, path, **params):
         query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
-        request = urllib.request.Request(f"{self.url}{path}" + (f"?{query}" if query else ""), headers={"Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                data = json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the client certificate for {path} (is it in the trust store, and not restricted away from this project?)")
-            raise IncusError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise IncusError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = self.session.request("GET", f"{self.url}{path}" + (f"?{query}" if query else ""), headers={"Accept": "application/json"})
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the client certificate for {path} (is it in the trust store, and not restricted away from this project?)")
+                raise IncusError(f"{self.id} answered HTTP {response.status} for {path}")
+            data = json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise IncusError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise IncusError(f"{self.id} did not answer properly (is this Incus on an https port?): {exc}")
         if isinstance(data, dict) and data.get("type") == "error":
             raise IncusError(f"{self.id} reported an error for {path}: {str(data.get('error'))[:200]}")
         return data.get("metadata") if isinstance(data, dict) else None
 
-
     def put(self, path, body, **params):
         query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
-        request = urllib.request.Request(f"{self.url}{path}" + (f"?{query}" if query else ""), data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}, method="PUT")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                data = json.loads(response.read().decode("utf-8", "replace") or "{}")
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the client certificate for this action (it must be a full, unrestricted client of the project)")
-            raise IncusError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise IncusError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = self.session.request("PUT", f"{self.url}{path}" + (f"?{query}" if query else ""), headers={"Content-Type": "application/json"}, data=json.dumps(body).encode())
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the client certificate for this action (it must be a full, unrestricted client of the project)")
+                raise IncusError(f"{self.id} answered HTTP {response.status} for {path}")
+            data = json.loads(response.text() or "{}")
+        except netlens_http.NetError as exc:
+            raise IncusError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise IncusError(f"{self.id} did not answer properly: {exc}")
         if isinstance(data, dict) and data.get("type") == "error":
             raise IncusError(f"{self.id} reported an error: {str(data.get('error'))[:200]}")

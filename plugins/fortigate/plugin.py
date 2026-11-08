@@ -19,11 +19,9 @@ The field names differ a little between FortiOS versions, so every reader accept
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
+import netlens_http
 
 MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
 MAX_CLIENTS = 4000
@@ -79,31 +77,26 @@ class Firewall:
         self.role = (role or "auto").strip().lower()
         if self.role not in ("auto", "gateway", "node"):
             raise FortiError(f"{self.id}: the role must be auto, gateway or node")
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def raw(self, path):
         query = ("&" if "?" in path else "?") + "vdom=" + urllib.parse.quote(self.vdom) if self.vdom else ""
-        request = urllib.request.Request(f"{self.base}/{path}{query}", headers={"Authorization": "Bearer " + self.token, "Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code == 401:
-                raise AuthRefused(f"{self.id} refused the token (wrong, expired, or this machine is not in the API user's trusted hosts)")
-            if exc.code == 403:
-                raise AuthRefused(f"{self.id} says this token may not read {path.split('?')[0]} (give the API user's profile read access to it)")
-            if exc.code in (404, 405, 424):
-                raise Missing(f"{self.id} has no {path.split('?')[0]}")
-            raise FortiError(f"{self.id} answered HTTP {exc.code} for {path.split('?')[0]}")
-        except urllib.error.URLError as exc:
-            if isinstance(exc.reason, ssl.SSLCertVerificationError):
-                raise FortiError(f"{self.id}: the certificate is not trusted ({exc.reason.verify_message}); install your own certificate or untick Verify TLS certificate")
-            raise FortiError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.base}/{path}{query}", headers={"Authorization": "Bearer " + self.token, "Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status == 401:
+                    raise AuthRefused(f"{self.id} refused the token (wrong, expired, or this machine is not in the API user's trusted hosts)")
+                if response.status == 403:
+                    raise AuthRefused(f"{self.id} says this token may not read {path.split('?')[0]} (give the API user's profile read access to it)")
+                if response.status in (404, 405, 424):
+                    raise Missing(f"{self.id} has no {path.split('?')[0]}")
+                raise FortiError(f"{self.id} answered HTTP {response.status} for {path.split('?')[0]}")
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            if isinstance(exc, netlens_http.CertificateError):
+                raise FortiError(f"{self.id}: the certificate is not trusted ({exc.detail}); install your own certificate or untick Verify TLS certificate")
+            raise FortiError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise FortiError(f"{self.id} did not answer properly (is this a FortiGate with the REST API on?): {exc}")
 
     def get(self, path, optional=False):

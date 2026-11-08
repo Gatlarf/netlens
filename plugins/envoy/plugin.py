@@ -15,10 +15,8 @@ that name it; one that is not referenced by any listener is still reported. Envo
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_SITES = 3000
 
@@ -48,23 +46,18 @@ class Admin:
         if lan and not self.lan_ip:
             raise EnvoyError(f"{lan!r} is not an IPv4 address")
         self.ip = self.lan_ip or _ipv4(parts.hostname)
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path, as_json=True):
-        request = urllib.request.Request(f"{self.url}{path}", headers={"Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                text = response.read().decode("utf-8", "replace")
+            response = netlens_http.request("GET", f"{self.url}{path}", headers={"Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                raise EnvoyError(f"{self.id} answered HTTP {response.status} for {path.split('?')[0]}")
+            text = response.text()
             return json.loads(text) if as_json else text
-        except urllib.error.HTTPError as exc:
-            raise EnvoyError(f"{self.id} answered HTTP {exc.code} for {path.split('?')[0]}")
-        except urllib.error.URLError as exc:
-            raise EnvoyError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+        except netlens_http.NetError as exc:
+            raise EnvoyError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise EnvoyError(f"{self.id} did not answer properly (is this Envoy's admin interface?): {exc}")
 
 

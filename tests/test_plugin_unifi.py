@@ -215,7 +215,7 @@ def test_an_expired_session_is_an_error(server):
     url, _ = server
     controller = plugin.Controller(cfg(url))
     controller.login()
-    controller.jar.clear()
+    controller.session.jar.clear()
     with pytest.raises(plugin.UnifiError, match="ended the session"):
         controller.sites()
 

@@ -14,12 +14,11 @@ knows exploits or malware kits for it. The asset ids are not kept: a finding id 
 
 import binascii
 import hashlib
-import http.client
 import json
 import re
-import ssl
 import urllib.parse
 from datetime import datetime, timedelta, timezone
+import netlens_http
 
 PAGE = 500
 MAX_FINDINGS = 20000
@@ -45,33 +44,25 @@ class Console:
             raise VmError(f"{url!r} is not an address like https://192.168.0.60:3780")
         self.host, self.port = parts.hostname, parts.port or 3780
         self.id = f"{self.host}:{self.port}"
+        self.base = netlens_http.origin("https", self.host, self.port)
         self.auth = "Basic " + binascii.b2a_base64(f"{username.strip()}:{password}".encode(), newline=False).decode()
         self.timeout = float(timeout)
         self.fingerprint = re.sub(r"[^0-9a-f]", "", fingerprint.lower()) if fingerprint else ""
         if fingerprint and len(self.fingerprint) != 64:
             raise VmError("the fingerprint must be 64 hexadecimal digits (SHA-256 of the certificate)")
-        self.context = ssl.create_default_context()
-        if self.fingerprint or not verify_tls:
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.http = netlens_http.Session(verify_tls=verify_tls, timeout=self.timeout, fingerprint=self.fingerprint, max_bytes=100_000_000)
 
     def get(self, path, **params):
         query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
-        conn = http.client.HTTPSConnection(self.host, self.port, timeout=self.timeout, context=self.context)
         try:
-            conn.connect()
-            if self.fingerprint and hashlib.sha256(conn.sock.getpeercert(binary_form=True)).hexdigest() != self.fingerprint:
+            response = self.http.request("GET", f"{self.base}/api/3{path}" + (f"?{query}" if query else ""), headers={"Authorization": self.auth, "Accept": "application/json;charset=UTF-8"})
+        except netlens_http.CertificateError as exc:
+            if exc.detail == "fingerprint":
                 raise VmError(f"the certificate of {self.id} does not match the fingerprint; nothing was sent")
-            conn.request("GET", f"/api/3{path}" + (f"?{query}" if query else ""), headers={"Authorization": self.auth, "Accept": "application/json;charset=UTF-8"})
-            response = conn.getresponse()
-            raw = response.read(100_000_000).decode("utf-8", "replace")
-            status = response.status
-        except ssl.SSLError as exc:
-            raise VmError(f"cannot make a secure connection to {self.id}: {exc.reason or exc}. For a self-signed certificate fill in the fingerprint")
-        except (OSError, http.client.HTTPException) as exc:
+            raise VmError(f"cannot make a secure connection to {self.id}: {exc}. For a self-signed certificate fill in the fingerprint")
+        except netlens_http.NetError as exc:
             raise VmError(f"cannot reach {self.id}: {exc}")
-        finally:
-            conn.close()
+        status, raw = response.status, response.text()
         if status in (401, 403):
             raise AuthRefused(f"{self.id} refused the user name or password (or the user may not read assets)")
         if status != 200:

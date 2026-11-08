@@ -19,11 +19,8 @@ Standard library only. A refused login is reported with `auth_failed`. Everythin
 import ipaddress
 import json
 import re
-import socket
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_BODY = 16 * 1024 * 1024
 MAX_ITEMS = 2000
@@ -65,11 +62,8 @@ class Ceph:
         if not self.user or not self.password:
             raise ValueError("enter the user name and the password")
         self.timeout = int(config.get("timeout") or 30)
-        context = ssl.create_default_context()
-        if not config.get("verify_tls", True):
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-        self.opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context))
+        verify_tls = bool(config.get("verify_tls", True))
+        self.session = netlens_http.Session(verify_tls=verify_tls)
         self.token = None
         self.notes = []
 
@@ -78,14 +72,11 @@ class Ceph:
         if self.token:
             headers["Authorization"] = "Bearer " + self.token
         data = json.dumps(body).encode() if body is not None else None
-        request = urllib.request.Request(self.base + path, data=data, headers=headers, method="POST" if body is not None else "GET")
         try:
-            with self.opener.open(request, timeout=self.timeout) as response:
-                code, raw = response.status, response.read(MAX_BODY)
-        except urllib.error.HTTPError as exc:
-            code, raw = exc.code, exc.read(MAX_BODY)
-        except (urllib.error.URLError, socket.timeout, ssl.SSLError, OSError) as exc:
-            raise ConnectError(f"cannot reach the Ceph dashboard at {self.host}: {getattr(exc, 'reason', exc)}") from None
+            response = self.session.request("POST" if body is not None else "GET", self.base + path, headers=headers, data=data, timeout=self.timeout)
+        except netlens_http.NetError as exc:
+            raise ConnectError(f"cannot reach the Ceph dashboard at {self.host}: {exc}") from None
+        code, raw = response.status, response.body[:MAX_BODY]
         try:
             answer = json.loads(raw.decode("utf-8", "replace") or "null")
         except ValueError:

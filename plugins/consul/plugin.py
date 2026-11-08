@@ -17,10 +17,8 @@ Standard library only.
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_GUESTS = 3000
 ORDER = {"passing": 0, "warning": 1, "critical": 2}
@@ -54,31 +52,26 @@ class Cluster:
         if parts.scheme not in ("http", "https") or not parts.hostname:
             raise ConsulError(f"{url!r} is not an address like http://192.168.0.4:8500")
         self.url, self.token, self.timeout, self.id = f"{parts.scheme}://{parts.netloc}", token, float(timeout), parts.netloc
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path):
         headers = {"Accept": "application/json"}
         if self.token:
             headers["X-Consul-Token"] = self.token
-        request = urllib.request.Request(f"{self.url}/v1/{path}", headers=headers, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code == 403:
-                err = AuthRefused(f"{self.id} refused the token for {path} (missing or not allowed: see the box at the top of this page)")
-                err.status = 403
+            response = netlens_http.request("GET", f"{self.url}/v1/{path}", headers=headers, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status == 403:
+                    err = AuthRefused(f"{self.id} refused the token for {path} (missing or not allowed: see the box at the top of this page)")
+                    err.status = 403
+                    raise err
+                err = ConsulError(f"{self.id} answered HTTP {response.status} for {path}")
+                err.status = response.status
                 raise err
-            err = ConsulError(f"{self.id} answered HTTP {exc.code} for {path}")
-            err.status = exc.code
-            raise err
-        except urllib.error.URLError as exc:
-            raise ConsulError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise ConsulError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise ConsulError(f"{self.id} did not answer properly (is this Consul?): {exc}")
 
 

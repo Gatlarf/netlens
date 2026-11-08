@@ -32,6 +32,7 @@ import ssl
 import struct
 import time
 import urllib.parse
+import netlens_http
 
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 MAX_MESSAGE = 32 * 1024 * 1024
@@ -56,16 +57,10 @@ class MethodMissing(TruenasError):
 
 # ----------------------------------------------------------------------------- a small WebSocket client (RFC 6455)
 class WebSocket:
-    def __init__(self, host, port, path="/api/current", tls=True, verify=False, timeout=20):
+    def __init__(self, host, port, path="/api/current", tls=True, verify=True, timeout=20):
         try:
-            raw = socket.create_connection((host, port), timeout=timeout)
-            if tls:
-                context = ssl.create_default_context()
-                if not verify:
-                    context.check_hostname = False
-                    context.verify_mode = ssl.CERT_NONE
-                raw = context.wrap_socket(raw, server_hostname=host)
-        except (OSError, ssl.SSLError) as exc:
+            raw = netlens_http.connect(host, port, timeout=timeout, tls=tls, verify_tls=verify)
+        except netlens_http.NetError as exc:
             raise ConnectError(f"cannot reach TrueNAS at {host}:{port}: {exc}") from None
         self.sock = raw
         self.buf = b""

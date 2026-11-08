@@ -16,11 +16,8 @@ Standard library only. A refused login is reported with `auth_failed` so Netlens
 import base64
 import json
 import re
-import socket
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_BODY = 8 * 1024 * 1024
 PAGE = 1000
@@ -64,24 +61,20 @@ class Rockstor:
         self.auth = "Basic " + base64.b64encode(f"{user}:{password}".encode()).decode()
         self.verify = bool(config.get("verify_tls", True))
         self.timeout = int(config.get("timeout") or 30)
-        context = ssl.create_default_context()
-        if not self.verify:
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-        self.opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context))
+        verify_tls = bool(self.verify)
+        self.session = netlens_http.Session(verify_tls=verify_tls)
 
     def get(self, path, paged=True):
         url = self.base + path + (("&" if "?" in path else "?") + f"page_size={PAGE}" if paged else "")
-        request = urllib.request.Request(url, headers={"Authorization": self.auth, "Accept": "application/json"})
         try:
-            with self.opener.open(request, timeout=self.timeout) as response:
-                raw = response.read(MAX_BODY)
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise LoginRefused("login refused: check the user name and password (the user needs to exist in Rockstor; an administrator account is the safe choice)") from None
-            raise ConnectError(f"the NAS answered with HTTP {exc.code} for {path.split('?')[0]} (is this a Rockstor NAS?)") from None
-        except (urllib.error.URLError, socket.timeout, ssl.SSLError, OSError) as exc:
-            raise ConnectError(f"cannot reach the Rockstor NAS at {self.host}: {getattr(exc, 'reason', exc)}") from None
+            response = self.session.request("GET", url, headers={"Authorization": self.auth, "Accept": "application/json"}, timeout=self.timeout)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise LoginRefused("login refused: check the user name and password (the user needs to exist in Rockstor; an administrator account is the safe choice)") from None
+                raise ConnectError(f"the NAS answered with HTTP {response.status} for {path.split('?')[0]} (is this a Rockstor NAS?)") from None
+            raw = response.body[:MAX_BODY]
+        except netlens_http.NetError as exc:
+            raise ConnectError(f"cannot reach the Rockstor NAS at {self.host}: {exc}") from None
         try:
             data = json.loads(raw.decode("utf-8", "replace"))
         except ValueError:

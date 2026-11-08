@@ -13,12 +13,11 @@ The page format was learned from the public projects check_tplink (MIT) and esss
 Standard library only.
 """
 
-import http.cookiejar
 import ipaddress
 import re
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
+import netlens_http
 
 MAC = re.compile(r"^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$")
 # link_status of the port statistics page. 0 = no link; 1 is what a port reports before it has negotiated; 2..6 are real links
@@ -55,18 +54,17 @@ class Switch:
         self.base = _base(server.get("host"))
         self.user = str(server.get("username") or "admin")
         self.password = str(server.get("password") or "")
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        self.session = netlens_http.Session(cookies=True, timeout=10)
         self.logged_in = False
 
     def _request(self, path, data=None, referer="/"):
-        request = urllib.request.Request(self.base + path, data, {"Referer": self.base + referer, "User-Agent": "Netlens"})
         try:
-            with self.opener.open(request, timeout=10) as response:
-                return response.read().decode("latin-1")
-        except urllib.error.URLError as exc:
-            raise SwitchError(f"cannot reach the switch at {self.base}: {getattr(exc, 'reason', exc)}")
-        except OSError as exc:
+            response = self.session.request("POST" if data is not None else "GET", self.base + path, data=data, headers={"Referer": self.base + referer, "User-Agent": "Netlens"})
+        except netlens_http.NetError as exc:
             raise SwitchError(f"cannot reach the switch at {self.base}: {exc}")
+        if not response.ok:
+            raise SwitchError(f"cannot reach the switch at {self.base}: HTTP {response.status}")
+        return response.body.decode("latin-1")
 
     def login(self):
         form = urllib.parse.urlencode({"logon": "Login", "username": self.user, "password": self.password}).encode()

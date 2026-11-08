@@ -15,10 +15,8 @@ NetBox says nothing about Wi-Fi, so clients are `wired`. Standard library only.
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 PAGE = 500
 MAX_ROWS = 50000
@@ -64,27 +62,22 @@ class Server:
         for s in self.sites:
             if not re.fullmatch(r"[A-Za-z0-9_-]+", s):
                 raise NetboxError(f"{s!r} is not a site slug")
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path, query=None):
         url = path if path.startswith("http") else f"{self.url}{path}" + (f"?{query}" if query else "")
         if not url.startswith(self.url):
             raise NetboxError(f"{self.id} sent a next page on another server; ignored")
-        request = urllib.request.Request(url, headers={"Authorization": self.auth, "Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the API token (wrong, expired, or it may not view this)")
-            raise NetboxError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise NetboxError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", url, headers={"Authorization": self.auth, "Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the API token (wrong, expired, or it may not view this)")
+                raise NetboxError(f"{self.id} answered HTTP {response.status} for {path}")
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise NetboxError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise NetboxError(f"{self.id} did not answer properly (is this NetBox?): {exc}")
 
     def results(self, path, **params):

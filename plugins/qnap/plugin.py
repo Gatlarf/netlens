@@ -15,15 +15,11 @@ is optional: without it the NAS is shown under the address Netlens connects to.
 """
 
 import base64
-import http.cookiejar
 import json
 import re
-import socket
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
+import netlens_http
 
 MAX_BODY = 8 * 1024 * 1024
 API = "/container-station/api/v1"
@@ -75,12 +71,8 @@ class Qnap:
             raise ValueError("enter the user name and the password")
         self.verify = bool(config.get("verify_tls", True))
         self.timeout = int(config.get("timeout") or 30)
-        context = ssl.create_default_context()
-        if not self.verify:
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-        self.jar = http.cookiejar.CookieJar()
-        self.opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context), urllib.request.HTTPCookieProcessor(self.jar))
+        verify_tls = bool(self.verify)
+        self.session = netlens_http.Session(verify_tls=verify_tls, cookies=True)
         self.logged_in = False
 
     def _send(self, method, path, body=None, form=None, accept="application/json"):
@@ -89,14 +81,13 @@ class Qnap:
             data, headers["Content-Type"] = json.dumps(body).encode(), "application/json"
         elif form is not None:
             data, headers["Content-Type"] = urllib.parse.urlencode(form).encode(), "application/x-www-form-urlencoded"
-        request = urllib.request.Request(self.base + path, data=data, headers=headers, method=method)
         try:
-            with self.opener.open(request, timeout=self.timeout) as response:
-                return response.status, response.read(MAX_BODY)
-        except urllib.error.HTTPError as exc:
-            return exc.code, b""
-        except (urllib.error.URLError, socket.timeout, ssl.SSLError, OSError) as exc:
-            raise ConnectError(f"cannot reach the QNAP at {self.host}: {getattr(exc, 'reason', exc)}") from None
+            response = self.session.request(method, self.base + path, headers=headers, data=data, timeout=self.timeout)
+            if not response.ok:
+                return response.status, b""
+            return response.status, response.body[:MAX_BODY]
+        except netlens_http.NetError as exc:
+            raise ConnectError(f"cannot reach the QNAP at {self.host}: {exc}") from None
 
     def _json(self, method, path, body=None):
         status, raw = self._send(method, API + path, body=body)

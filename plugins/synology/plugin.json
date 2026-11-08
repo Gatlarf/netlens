@@ -1,7 +1,7 @@
 {
   "id": "synology",
   "name": "Synology",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "api_version": 1,
   "kind": "hypervisor",
   "author": "Netlens",

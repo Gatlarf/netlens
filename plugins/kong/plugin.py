@@ -14,10 +14,8 @@ Admin API does not parse, so no certificate expiry is reported. Standard library
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_ROUTES = 3000
 
@@ -51,28 +49,23 @@ class Admin:
         if lan and not self.lan_ip:
             raise KongError(f"{lan!r} is not an IPv4 address")
         self.ip = self.lan_ip or _ipv4(parts.hostname)
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path, **params):
         query = urllib.parse.urlencode({k: v for k, v in params.items() if v})
         headers = {"Accept": "application/json"}
         if self.token:
             headers["Kong-Admin-Token"] = self.token
-        request = urllib.request.Request(f"{self.url}{path}" + (f"?{query}" if query else ""), headers=headers, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the admin token for {path}")
-            raise KongError(f"{self.id} answered HTTP {exc.code} for {path}")
-        except urllib.error.URLError as exc:
-            raise KongError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.url}{path}" + (f"?{query}" if query else ""), headers=headers, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the admin token for {path}")
+                raise KongError(f"{self.id} answered HTTP {response.status} for {path}")
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise KongError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise KongError(f"{self.id} did not answer properly (is this Kong's Admin API?): {exc}")
 
     def paged(self, path):

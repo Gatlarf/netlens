@@ -1,7 +1,7 @@
 {
   "id": "xobackup",
   "name": "Xen Orchestra backup",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api_version": 1,
   "kind": "backup",
   "author": "Netlens",

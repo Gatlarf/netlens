@@ -18,11 +18,9 @@ import fnmatch
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
 from datetime import datetime, timezone
+import netlens_http
 
 MAX_ROWS = 5000
 
@@ -93,28 +91,23 @@ class Admin:
         if lan and not self.lan_ip:
             raise ApisixError(f"{lan!r} is not an IPv4 address")
         self.ip = self.lan_ip or _ipv4(parts.hostname)
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, name, optional=False):
         """The `value` of every item of /apisix/admin/<name>, each with its `id`."""
-        request = urllib.request.Request(f"{self.url}/apisix/admin/{name}", headers={"X-API-KEY": self.key, "Accept": "application/json"}, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                self.version = self.version or (re.search(r"APISIX/([0-9][0-9.]*)", response.headers.get("Server", "")) or [None, None])[1]
-                data = json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the key (wrong, or the role may not read {name})")
-            if optional:
-                return []
-            raise ApisixError(f"{self.id} answered HTTP {exc.code} for {name}")
-        except urllib.error.URLError as exc:
-            raise ApisixError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.url}/apisix/admin/{name}", headers={"X-API-KEY": self.key, "Accept": "application/json"}, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the key (wrong, or the role may not read {name})")
+                if optional:
+                    return []
+                raise ApisixError(f"{self.id} answered HTTP {response.status} for {name}")
+            self.version = self.version or (re.search(r"APISIX/([0-9][0-9.]*)", response.headers.get("Server", "")) or [None, None])[1]
+            data = json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise ApisixError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise ApisixError(f"{self.id} did not answer properly (is this APISIX's Admin API?): {exc}")
         items = data.get("list") if isinstance(data, dict) else None
         if items is None:

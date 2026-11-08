@@ -11,15 +11,12 @@ whose last query is older than the `days` setting. The IPv4 address that was see
 Pi-hole resolved for one of its addresses. Pi-hole does not know where a device is connected, so clients have no `node_mac`. Standard library only.
 """
 
-import http.client
 import ipaddress
 import json
 import re
-import ssl
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
 MAX_DEVICES = 5000
@@ -57,11 +54,7 @@ class Server:
         self.id = url.split("://", 1)[1]
         self.sid = None
         self.version = None
-        self.context = None
-        if url.startswith("https://") and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.http = netlens_http.Session(verify_tls=verify_tls, timeout=self.timeout)
 
     def call(self, method, path, body=None):
         data = json.dumps(body).encode() if body is not None else None
@@ -70,22 +63,15 @@ class Server:
             headers["Content-Type"] = "application/json"
         if self.sid:
             headers["sid"] = self.sid
-        request = urllib.request.Request(f"{self.url}{path}", data=data, headers=headers, method=method)
         for attempt in (1, 2, 3):
             try:
-                with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                    raw, status = response.read().decode("utf-8", "replace"), response.status
+                response = self.http.request(method, f"{self.url}{path}", headers=headers, data=data)
+                raw, status = response.text(), response.status
                 break
-            except urllib.error.HTTPError as exc:
-                raw, status = exc.read().decode("utf-8", "replace"), exc.code
-                break
-            except (http.client.RemoteDisconnected, ConnectionResetError, urllib.error.URLError) as exc:
-                reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+            except netlens_http.NetError as exc:
                 if attempt == 3:
-                    raise PiholeError(f"cannot reach {self.id}: {reason}")
+                    raise PiholeError(f"cannot reach {self.id}: {exc}")
                 time.sleep(1.5)
-            except OSError as exc:
-                raise PiholeError(f"{self.id} did not answer properly: {exc}")
         try:
             parsed = json.loads(raw) if raw.strip() else {}
         except ValueError:

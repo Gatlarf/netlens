@@ -15,10 +15,10 @@ id (that changes with every scan), so the same finding keeps its id over many sc
 import hashlib
 import re
 import socket
-import ssl
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
+import netlens_http
 
 PAGE = 500
 MAX_FINDINGS = 20000
@@ -67,26 +67,20 @@ class Gmp:
         self.fingerprint = re.sub(r"[^0-9a-f]", "", fingerprint.lower()) if fingerprint else ""
         if fingerprint and len(self.fingerprint) != 64:
             raise GvmError("the fingerprint must be 64 hexadecimal digits (SHA-256 of the certificate)")
-        self.context = ssl.create_default_context()
-        if self.fingerprint or not verify_tls:
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
         self.sock = None
         self.authenticated = False
 
     # -- connection
     def open(self):
         try:
-            raw = socket.create_connection((self.host, self.port), timeout=self.timeout)
-            self.sock = self.context.wrap_socket(raw, server_hostname=self.host)
-        except ssl.SSLError as exc:
-            raise GvmError(f"cannot make a secure connection to {self.id}: {exc.reason or exc}. gvmd must listen with TLS (gvmd --listen --port 9390)")
-        except OSError as exc:
-            raise GvmError(f"cannot reach {self.id}: {exc}")
-        if self.fingerprint:
-            if hashlib.sha256(self.sock.getpeercert(binary_form=True)).hexdigest() != self.fingerprint:
-                self.close()
+            self.sock = netlens_http.connect(self.host, self.port, timeout=self.timeout, tls=True, verify_tls=self.verify_tls, fingerprint=self.fingerprint)
+        except netlens_http.CertificateError as exc:
+            if exc.detail == "fingerprint":
                 raise GvmError(f"the certificate of {self.id} does not match the fingerprint; nothing was sent")
+            raise GvmError(f"cannot make a secure connection to {self.id}: {exc}. gvmd must listen with TLS (gvmd --listen --port 9390)")
+        except netlens_http.NetError as exc:
+            raise GvmError(f"cannot reach {self.id}: {exc}")
         return self
 
     def close(self):

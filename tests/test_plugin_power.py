@@ -1,40 +1,26 @@
 """Power actions of the hypervisor plugins (restart / stop / start a guest) against fake transports."""
 
-import io
 import json
-import urllib.error
 
+import netlens_http
 import pytest
 
 from tests.plugin_modules import load
 
 
 class Fake:
-    """Replaces urllib.request.urlopen of a plugin: records the request, answers with a status (or raises an HTTP error)."""
+    """Replaces the HTTP call of netlens_http (what every plugin uses): records the request and answers with a status."""
 
     def __init__(self, status=204, body=b"{}"):
         self.status, self.body, self.requests = status, body, []
 
-    def __call__(self, request, timeout=None, context=None):
-        self.requests.append((request.get_method(), request.full_url, request.data, dict(request.header_items())))
-        if self.status >= 300:
-            raise urllib.error.HTTPError(request.full_url, self.status, "x", {}, io.BytesIO(b""))
-        outer = self
-
-        class Response(io.BytesIO):
-            status = outer.status
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *a):
-                return False
-
-        return Response(self.body)
+    def __call__(self, session, method, url, *, headers=None, data=None, **kwargs):
+        self.requests.append((method, url, data, dict(headers or {})))
+        return netlens_http.Response(self.status, b"" if self.status >= 300 else self.body, {})
 
 
 def patch(monkeypatch, module, fake):
-    monkeypatch.setattr(module.urllib.request, "urlopen", fake)
+    monkeypatch.setattr(netlens_http.Session, "request", lambda session, method, url, **kw: fake(session, method, url, **kw))
 
 
 def test_docker_reset_restarts_the_container_and_explains_a_refusing_proxy(monkeypatch):
@@ -65,7 +51,7 @@ def test_portainer_restarts_a_container_in_its_environment(monkeypatch):
     patch(monkeypatch, px, fake)
     assert px.power(cfg, {"guest_id": "10.0.0.6:9443/2/web", "action": "reboot"})["message"] == "restart sent to web"
     method, url, _, headers = fake.requests[0]
-    assert (method, url) == ("POST", "https://10.0.0.6:9443/api/endpoints/2/docker/containers/web/restart?t=10") and headers["X-api-key"] == "KEY"
+    assert (method, url) == ("POST", "https://10.0.0.6:9443/api/endpoints/2/docker/containers/web/restart?t=10") and headers["X-API-Key"] == "KEY"
     patch(monkeypatch, px, Fake(403))
     with pytest.raises(px.PortainerError, match="may not"):
         px.power(cfg, {"guest_id": "10.0.0.6:9443/2/web", "action": "reset"})
@@ -74,7 +60,7 @@ def test_portainer_restarts_a_container_in_its_environment(monkeypatch):
 def test_incus_reset_is_a_forced_restart_in_the_project(monkeypatch):
     incus = load("incus")
     server = incus.Server.__new__(incus.Server)
-    server.url, server.timeout, server.id, server.context = "https://10.0.0.7:8443", 5.0, "10.0.0.7:8443", None
+    server.url, server.timeout, server.id, server.session = "https://10.0.0.7:8443", 5.0, "10.0.0.7:8443", netlens_http.Session()
     monkeypatch.setattr(incus, "parse_servers", lambda config: [server])
     fake = Fake(202, json.dumps({"type": "async", "metadata": {}}).encode())
     patch(monkeypatch, incus, fake)

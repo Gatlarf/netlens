@@ -19,10 +19,8 @@ knows is `wired`. The router's own MAC addresses are never reported as clients. 
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 NO_SESSION = "00000000000000000000000000000000"
 MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
@@ -68,24 +66,19 @@ class Router:
             raise OpenwrtError(f"{self.id}: the uplink must be an IPv4 address")
         self.sid = None
         self.extras = bool(extras)            # the health, firmware and ports (switched off in the plugin settings)
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def rpc(self, obj, method, args=None, allow=()):
         """One ubus call; returns the result dict. `allow` lists ubus status codes that mean "nothing there" (returns None)."""
         body = {"jsonrpc": "2.0", "id": 1, "method": "call", "params": [self.sid or NO_SESSION, obj, method, args or {}]}
-        request = urllib.request.Request(self.endpoint, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}, method="POST")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                answer = json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            raise OpenwrtError(f"{self.id} answered HTTP {exc.code} (is uhttpd-mod-ubus installed?)")
-        except urllib.error.URLError as exc:
-            raise OpenwrtError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("POST", self.endpoint, headers={"Content-Type": "application/json"}, data=json.dumps(body).encode(), timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                raise OpenwrtError(f"{self.id} answered HTTP {response.status} (is uhttpd-mod-ubus installed?)")
+            answer = json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise OpenwrtError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise OpenwrtError(f"{self.id} did not answer properly (is this OpenWrt's /ubus?): {exc}")
         if isinstance(answer, dict) and answer.get("error"):
             code = answer["error"].get("code")

@@ -25,7 +25,12 @@ RULES = {
     "external-url": ("warn", "contains a URL to a host that is not a placeholder"),
     "obfuscation": ("warn", "decodes data at run time (base64/zlib/codecs), a common way to hide code"),
     "network-server": ("warn", "listens for incoming connections"),
+    "tls-off": ("warn", "switches certificate checking off itself (netlens_http does this, from the verify_tls setting)"),
+    "own-http": ("warn", "opens HTTP connections itself instead of using netlens_http (timeouts, size limit and redirect rules)"),
+    "unbounded-read": ("warn", "reads an answer without a size limit (netlens_http limits it)"),
 }
+NETWORK_RULES = ("tls-off", "own-http", "unbounded-read")      # Netlens' own plugins must be free of these (tests/test_plugin_network_rules.py)
+HTTP_OPENERS = {"urlopen", "build_opener", "HTTPSConnection", "HTTPConnection", "install_opener"}
 BAD_IMPORTS = {
     "subprocess": "subprocess", "pty": "subprocess", "ctypes": "native-code", "cffi": "native-code", "multiprocessing": "native-code",
     "sqlite3": "database", "pickle": "serialization", "cPickle": "serialization", "marshal": "serialization", "shelve": "serialization",
@@ -53,6 +58,15 @@ class Flag:
 
     def __str__(self) -> str:
         return f"{self.level.upper():5} {self.file}:{self.line} [{self.rule}] {RULES[self.rule][1]}{(': ' + self.detail) if self.detail else ''}"
+
+
+def _reads_an_answer(receiver: ast.AST) -> bool:
+    """`response.read()` / `conn.getresponse().read()` / `urlopen(...).read()`, not `Switch(...).read()` or `sys.stdin.read()`."""
+    if isinstance(receiver, ast.Name):
+        return receiver.id not in ("self", "cls", "stdin")
+    if isinstance(receiver, ast.Call) and isinstance(receiver.func, ast.Attribute):
+        return receiver.func.attr in ("urlopen", "getresponse", "open")
+    return False
 
 
 def _external(host: str) -> bool:
@@ -99,10 +113,18 @@ def scan_source(source: str, filename: str = "plugin.py") -> list[Flag]:
                     if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
                         mode = str(kw.value.value)
                 add("file-system", node, f"open(..., {mode!r})" if mode else "open()")
+            elif name in HTTP_OPENERS:
+                add("own-http", node, f"{name}()")
+            elif name == "_create_unverified_context":
+                add("tls-off", node, "_create_unverified_context()")
+            elif name == "read" and isinstance(func, ast.Attribute) and not node.args and not node.keywords and _reads_an_answer(func.value):
+                add("unbounded-read", node, ".read()")
             elif name in ("listen", "bind") and owner:
                 add("network-server", node, f"{owner}.{name}()")
             elif name in ("b64decode", "decompress", "decode") and owner in ("base64", "zlib", "codecs"):
                 add("obfuscation", node, f"{owner}.{name}()")
+        elif isinstance(node, ast.Assign) and any(isinstance(t, ast.Attribute) and t.attr in ("verify_mode", "check_hostname") for t in node.targets):
+            add("tls-off", node, "verify_mode / check_hostname")
         elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == "os" and node.attr == "environ":
             add("environment", node, "os.environ")
         elif isinstance(node, ast.Constant) and isinstance(node.value, str):

@@ -14,13 +14,10 @@ counters from the same device list:
 login is reported with `auth_failed`, so Netlens stops retrying until the user acts (this protects the account from lockout).
 """
 
-import http.cookiejar
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 ROLES = {"uap": "ap", "ubb": "ap", "usw": "switch", "ugw": "gateway", "udm": "gateway", "uxg": "gateway", "udr": "gateway"}
 BANDS = {"ng": "2.4 GHz", "na": "5 GHz", "6e": "6 GHz"}
@@ -75,15 +72,7 @@ class Controller:
         if self.mode not in ("auto", "unifi_os", "classic"):
             raise ValueError("the type of controller must be auto, unifi_os or classic")
         self.site_filter = str(config.get("site") or "").strip().lower()
-        context = ssl.create_default_context()
-        if not config.get("verify_tls", True):
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-        self.jar = http.cookiejar.CookieJar()
-        self.opener = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(self.jar),
-            urllib.request.HTTPSHandler(context=context),
-        )
+        self.session = netlens_http.Session(verify_tls=bool(config.get("verify_tls", True)), cookies=True)
         self.os = False
         self.csrf = None
 
@@ -100,17 +89,12 @@ class Controller:
             headers["Content-Type"] = "application/json"
         if self.csrf:
             headers["X-CSRF-Token"] = self.csrf
-        request = urllib.request.Request(self.base + path, data=data, headers=headers, method=method)
         try:
-            with self.opener.open(request, timeout=20) as response:
-                raw, status = response.read(16_000_000), response.status
-                token = response.headers.get("X-CSRF-Token") or response.headers.get("X-Updated-CSRF-Token")
-        except urllib.error.HTTPError as exc:
-            raw, status, token = exc.read(200_000), exc.code, None
-        except urllib.error.URLError as exc:
-            raise ConnectError(f"cannot reach the controller: {exc.reason}") from None
-        except (TimeoutError, OSError) as exc:
+            response = self.session.request(method, self.base + path, data=data, headers=headers, timeout=20, max_bytes=16_000_000)
+        except netlens_http.NetError as exc:
             raise ConnectError(f"cannot reach the controller: {exc}") from None
+        raw, status = response.body, response.status
+        token = (response.header("X-CSRF-Token") or response.header("X-Updated-CSRF-Token")) if response.ok else None
         if token:
             self.csrf = token
         return status, _json_or_none(raw)

@@ -19,10 +19,8 @@ import base64
 import ipaddress
 import json
 import re
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_SITES = 2000
 HOST_TERM = re.compile(r"Host(?:SNI)?\(([^)]*)\)")
@@ -59,29 +57,24 @@ class Server:
         if lan and not self.lan_ip:
             raise TraefikError(f"{lan!r} is not an IPv4 address")
         self.ip = self.lan_ip or _ipv4(parts.hostname)
-        self.context = None
-        if parts.scheme == "https" and not verify_tls:
-            self.context = ssl.create_default_context()
-            self.context.check_hostname = False
-            self.context.verify_mode = ssl.CERT_NONE
+        self.verify_tls = bool(verify_tls)
 
     def get(self, path):
         headers = {"Accept": "application/json"}
         if self.auth:
             headers["Authorization"] = self.auth
-        request = urllib.request.Request(f"{self.url}{path}", headers=headers, method="GET")
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout, context=self.context) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise AuthRefused(f"{self.id} refused the login (wrong user name or password)")
-            err = TraefikError(f"{self.id} answered HTTP {exc.code} for {path}")
-            err.status = exc.code
-            raise err
-        except urllib.error.URLError as exc:
-            raise TraefikError(f"cannot reach {self.id}: {exc.reason}")
-        except (OSError, ValueError) as exc:
+            response = netlens_http.request("GET", f"{self.url}{path}", headers=headers, timeout=self.timeout, verify_tls=self.verify_tls)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise AuthRefused(f"{self.id} refused the login (wrong user name or password)")
+                err = TraefikError(f"{self.id} answered HTTP {response.status} for {path}")
+                err.status = response.status
+                raise err
+            return json.loads(response.text())
+        except netlens_http.NetError as exc:
+            raise TraefikError(f"cannot reach {self.id}: {exc}")
+        except ValueError as exc:
             raise TraefikError(f"{self.id} did not answer properly (is this Traefik's API?): {exc}")
 
 

@@ -19,11 +19,8 @@ import base64
 import json
 import re
 import secrets
-import socket
-import ssl
-import urllib.error
 import urllib.parse
-import urllib.request
+import netlens_http
 
 MAX_BODY = 8 * 1024 * 1024
 APP_ID = "com.ugreen.nas"
@@ -114,27 +111,23 @@ class Ugreen:
             raise ValueError("enter the user name and the password")
         self.verify = bool(config.get("verify_tls", True))
         self.timeout = int(config.get("timeout") or 30)
-        context = ssl.create_default_context()
-        if not self.verify:
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-        self.opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=context))
+        verify_tls = bool(self.verify)
+        self.session = netlens_http.Session(verify_tls=verify_tls)
         self.token = None
 
     def _send(self, method, path, body=None, authed=True):
         headers = {"Accept": "application/json", "App-Id": APP_ID, "Content-Type": "application/json"}
         if authed and self.token:
             headers["Authorization"] = "Bearer " + self.token
-        request = urllib.request.Request(self.base + path, data=json.dumps(body).encode() if body is not None else None, headers=headers, method=method)
         try:
-            with self.opener.open(request, timeout=self.timeout) as response:
-                return response.headers, response.read(MAX_BODY)
-        except urllib.error.HTTPError as exc:
-            if exc.code in (401, 403):
-                raise LoginRefused("login refused: the NAS rejected the session") from None
-            raise ConnectError(f"the NAS answered with HTTP {exc.code} for {path.split('?')[0]} (is this a UGREEN NAS, and is the address the UGOS port 9443?)") from None
-        except (urllib.error.URLError, socket.timeout, ssl.SSLError, OSError) as exc:
-            raise ConnectError(f"cannot reach the UGREEN NAS at {self.host}: {getattr(exc, 'reason', exc)}") from None
+            response = self.session.request(method, self.base + path, headers=headers, data=json.dumps(body).encode() if body is not None else None, timeout=self.timeout)
+            if not response.ok:
+                if response.status in (401, 403):
+                    raise LoginRefused("login refused: the NAS rejected the session") from None
+                raise ConnectError(f"the NAS answered with HTTP {response.status} for {path.split('?')[0]} (is this a UGREEN NAS, and is the address the UGOS port 9443?)") from None
+            return response.headers, response.body[:MAX_BODY]
+        except netlens_http.NetError as exc:
+            raise ConnectError(f"cannot reach the UGREEN NAS at {self.host}: {exc}") from None
 
     def _json(self, method, path, body=None, authed=True):
         headers, raw = self._send(method, path, body, authed)
