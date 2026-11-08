@@ -991,6 +991,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_service_results ON service_results(check_id, ts)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_service_results_ts ON service_results(ts)")        # the hourly prune deletes by time only
     _add_column_if_missing(conn, "service_checks", "tier", "TEXT NOT NULL DEFAULT 'normal'")       # importance, see devices.tier
     # --- schema v19: checks made by a plugin, and checks that go through a reverse proxy
     _add_column_if_missing(conn, "service_checks", "source", "TEXT")      # who made the check (a plugin), NULL = the user

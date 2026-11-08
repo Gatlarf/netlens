@@ -14,7 +14,7 @@ export async function buildSiemCard() {
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = p.enabled;
     const host = h("input", { type: "text", value: p.host, placeholder: "logs.example.com or 192.168.0.9" });
-    const port = h("input", { type: "number", min: "1", max: "65535", value: String(p.port), style: "width:7em" });
+    const port = h("input", { type: "number", min: "1", max: "65535", value: String(p.port), class: "w-s" });
     const proto = h("select", {}, h("option", { value: "udp", selected: p.protocol === "udp" }, "UDP"), h("option", { value: "tcp", selected: p.protocol === "tcp" }, "TCP"));
     const facility = h("select", {}, ...info.facilities.map((f) => h("option", { value: f, selected: f === p.facility }, f)));
     const events = h("input", { type: "checkbox" });

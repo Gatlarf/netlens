@@ -20,12 +20,37 @@
       "required": true,
       "help": "One line per Xen Orchestra. A pool master (no Xen Orchestra) has no backups to read.",
       "columns": [
-        {"key": "host", "label": "Address", "placeholder": "https://xo.example.com", "required": true},
-        {"key": "token", "label": "Authentication token", "type": "password", "optional": true},
-        {"key": "username", "label": "Username", "placeholder": "netlens", "optional": true},
-        {"key": "password", "label": "Password", "type": "password", "optional": true},
-        {"key": "fingerprint", "label": "Certificate fingerprint", "placeholder": "B7:5B:65:5B:...", "optional": true,
-         "help": "SHA-256 fingerprint of the server's certificate. When filled in, exactly that certificate is trusted (also a self-signed one)."}
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://xo.example.com",
+          "required": true
+        },
+        {
+          "key": "token",
+          "label": "Authentication token",
+          "type": "password",
+          "optional": true
+        },
+        {
+          "key": "username",
+          "label": "Username",
+          "placeholder": "netlens",
+          "optional": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "optional": true
+        },
+        {
+          "key": "fingerprint",
+          "label": "Certificate fingerprint",
+          "placeholder": "B7:5B:65:5B:...",
+          "optional": true,
+          "help": "SHA-256 fingerprint of the server's certificate. When filled in, exactly that certificate is trusted (also a self-signed one)."
+        }
       ]
     },
     {
@@ -34,8 +59,7 @@
       "label": "Verify TLS certificate",
       "default": true,
       "help": "Turn off only for a self-signed certificate when you do not want to use the fingerprint."
-    }
-    ,
+    },
     {
       "key": "allow_http",
       "type": "bool",
@@ -43,5 +67,6 @@
       "default": false,
       "help": "Off: an address that starts with http:// is refused, because the password or token would cross the network unencrypted. Turn on only for a lab."
     }
-  ]
+  ],
+  "homepage": "https://xen-orchestra.com/"
 }

@@ -140,7 +140,7 @@ def make_transport(verify_tls: bool, timeout: float, label: str, fingerprint: st
         except (socket.timeout, TimeoutError) as exc:
             raise XenError(f"connection to {label} timed out") from exc
         except (OSError, http.client.HTTPException) as exc:
-            raise XenError(f"cannot connect to {label}: {exc}") from exc
+            raise XenError(f"cannot reach {label}: {exc}") from exc
         finally:
             conn.close()
 

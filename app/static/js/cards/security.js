@@ -16,7 +16,7 @@ export async function buildSecurityCard() {
     if (!info.allowed.mfa_policy) card.appendChild(h("p", { class: "warn-text" }, "Part of the Small business and Enterprise editions, and the free trial (Settings → Licence)."));
     const require = h("select", { "aria-label": "Who must use a second factor" },
       ...[["off", "Nobody (each user decides)"], ["admins", "Administrators"], ["operators", "Administrators and operators"], ["everyone", "Everyone"]].map(([v, t]) => h("option", { value: v, selected: v === p.require_totp }, t)));
-    const grace = h("input", { type: "number", min: "0", max: "365", value: String(p.grace_days), style: "width:6em", "aria-label": "Days to set it up" });
+    const grace = h("input", { type: "number", min: "0", max: "365", value: String(p.grace_days), class: "w-s", "aria-label": "Days to set it up" });
     card.append(h("div", { class: "field" }, h("label", {}, "Who"), require,
         h("div", { class: "hint" }, "Users who sign in through single sign-on are not asked: their identity provider does that. API tokens are not interactive and have no second factor.")),
       h("div", { class: "field" }, h("label", {}, "Days to set it up"), grace,
@@ -28,7 +28,7 @@ export async function buildSecurityCard() {
     // ---- sessions ------------------------------------------------------------------------------------------------------------------------
     card.appendChild(h("h3", {}, "Sessions"));
     if (!info.allowed.privileged) card.appendChild(h("p", { class: "warn-text" }, "Session limits are part of the Enterprise edition and the free trial (Settings → Licence)."));
-    const num = (value, max, label) => h("input", { type: "number", min: "0", max: String(max), value: String(value), style: "width:6em", "aria-label": label });
+    const num = (value, max, label) => h("input", { type: "number", min: "0", max: String(max), value: String(value), class: "w-s", "aria-label": label });
     const idle = num(p.idle_minutes, 1440, "Minutes without activity");
     const absolute = num(p.absolute_hours, 720, "Hours in all");
     const most = num(p.max_sessions, 50, "Most sessions per user");

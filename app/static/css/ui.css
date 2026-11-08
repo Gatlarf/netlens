@@ -163,3 +163,8 @@ input.inline-number { width: 5.5em; }
 /* repeated remove buttons (on-call people, shifts, overrides): an outline, like the delete buttons in a table row */
 .oncall-row .btn.danger, .oncall-shift .btn.danger, #oncall-card .field > .btn.danger { background: transparent; color: #c62828; }
 .oncall-row .btn.danger:hover, .oncall-shift .btn.danger:hover, #oncall-card .field > .btn.danger:hover { background: color-mix(in srgb, #c62828 12%, transparent); }
+
+/* three widths for fields (instead of a width written on each one): number or port, short text, wide text */
+input.w-s, select.w-s { width: 7em; }
+input.w-m, select.w-m { width: 12em; }
+input.w-l, select.w-l { width: 16em; max-width: 100%; }

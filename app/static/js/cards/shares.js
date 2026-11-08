@@ -1,4 +1,5 @@
 import { api, get } from "../api.js";
+import { rowMenu } from "../ui.js";
 import { h, clear, toast, fmtTime } from "../util.js";
 import { keepDrafts } from "../editguard.js";
 
@@ -198,7 +199,7 @@ function fillNow(card, state, editing) {
         h("td", {}, d.parts, d.extra ? h("span", { class: "hint" }, ` + ${d.extra}`) : null),
         h("td", {}, valid),
         h("td", {}, `${link.views}`, link.last_used ? h("span", { class: "hint" }, ` (last ${fmtTime(link.last_used)})`) : null),
-        h("td", {}, open, " ", copy, " ", edit, " ", fresh, " ", del)));
+        h("td", {}, copy, " ", rowMenu([{ label: "Open", onclick: () => open.click() }, { label: "Edit", onclick: () => edit.click() }, { label: "New address", onclick: () => fresh.click() }], { label: `More actions for ${link.name}` }), " ", del)));
     }
     table.appendChild(body);
     card.appendChild(table);

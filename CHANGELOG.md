@@ -2,6 +2,20 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.365 — 2026-11-08
+
+### Changed
+- **Alerts are sent from the background.** A webhook or mail server that hangs no longer holds up the service checks, the scans and the beats (it happened exactly during an outage). One send round runs at a time; requests made meanwhile are folded into one more round.
+- **Settings → Analysis reports** is a page of its own (it was at the bottom of Host probes, together with "Privacy and records").
+- **Share links:** "Copy link" and "Delete" stay in the row, the rest (Open, Edit, New address) is under "⋯".
+- **Uptime overview:** the little bars look at the last two days only, so the page stays fast on a big history (a device without checks for two days shows no bars).
+
+### Fixed
+- **One failing step of the hourly upkeep no longer skips the others** (before, a failing scheduled backup also skipped the CVE check and the speed test for an hour). The deletes of old results and audit lines run in a thread and have an index.
+- Plugins say "cannot reach …" in every error (five said "cannot connect"), and 15 plugins now carry their homepage in the manifest.
+- File and time formats in Backup, Database and Stability use the shared formatters, so sizes and durations read the same everywhere.
+- Field widths in the settings follow three sizes instead of a width written on each field.
+
 ## 0.4.364 — 2026-11-07
 
 ### Fixed

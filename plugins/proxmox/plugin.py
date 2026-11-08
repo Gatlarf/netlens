@@ -183,11 +183,11 @@ class ProxmoxClient:
                 ) from exc
             if isinstance(reason, (socket.timeout, TimeoutError)):
                 raise ProxmoxError(f"connection to {self.cfg.url} timed out") from exc
-            raise ProxmoxError(f"cannot connect to {self.cfg.url}: {reason}") from exc
+            raise ProxmoxError(f"cannot reach {self.cfg.url}: {reason}") from exc
         except (socket.timeout, TimeoutError) as exc:
             raise ProxmoxError(f"connection to {self.cfg.url} timed out") from exc
         except OSError as exc:
-            raise ProxmoxError(f"cannot connect to {self.cfg.url}: {exc}") from exc
+            raise ProxmoxError(f"cannot reach {self.cfg.url}: {exc}") from exc
 
     # -- auth + requests ---------------------------------------------------
     def _auth_headers(self) -> dict:

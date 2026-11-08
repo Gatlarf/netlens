@@ -152,7 +152,7 @@ async function buildManagedCard(probe, devices, state) {
     }
     const name = h("input", { type: "text", placeholder: "Name" }), kind = h("select", {}, Object.entries(KIND_TITLE).map(([k, t]) => h("option", { value: k }, t)));
     const host = h("input", { type: "text", placeholder: "Host or address" }), port = h("input", { type: "number", placeholder: "Port" }), path = h("input", { type: "text", placeholder: "Path or name (/ , example.com)" });
-    const every = h("input", { type: "number", min: "10", max: "86400", placeholder: "Every (s)", title: "Seconds between checks", style: "width:6.5rem" });
+    const every = h("input", { type: "number", min: "10", max: "86400", placeholder: "Every (s)", title: "Seconds between checks", class: "w-s" });
     const was = editSvc !== null ? draft.services[editSvc] : null;
     if (was) { name.value = was.name; kind.value = was.kind; host.value = was.host; port.value = was.port || ""; path.value = was.path || ""; every.value = was.interval_s || 60; } else every.value = 60;
     const addService = h("button", { class: "btn", type: "button" }, was ? "Update the check" : "Add the check");
@@ -178,7 +178,7 @@ async function buildManagedCard(probe, devices, state) {
     }
     if (editMon !== null) {
       const m = draft.monitors[editMon], dev = devices.find((d) => d.key === m.device_key);
-      const every = h("input", { type: "number", min: "15", max: "86400", value: String(m.interval_s), style: "width:6.5rem", "aria-label": "Seconds between readings" });
+      const every = h("input", { type: "number", min: "15", max: "86400", value: String(m.interval_s), class: "w-s", "aria-label": "Seconds between readings" });
       const alerts = h("input", { type: "checkbox" });
       alerts.checked = m.alerts !== false;
       const community = h("input", { type: "password", autocomplete: "off", placeholder: "New community (empty keeps the saved one)" });

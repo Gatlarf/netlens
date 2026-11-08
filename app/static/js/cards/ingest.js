@@ -69,9 +69,9 @@ export async function buildIngestCard() {
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = p.enabled;
     const names = h("input", { type: "text", value: (p.server_names || []).join(", "), placeholder: "netlens.example.com, 10.0.0.5", style: "max-width:36rem" });
-    const bind = h("input", { type: "text", value: p.bind, style: "width:12em" });
-    const port = h("input", { type: "number", min: "1024", max: "65535", value: String(p.port), style: "width:7em" });
-    const eport = h("input", { type: "number", min: "1024", max: "65535", value: String(p.enrol_port), style: "width:7em" });
+    const bind = h("input", { type: "text", value: p.bind, class: "w-m" });
+    const port = h("input", { type: "number", min: "1024", max: "65535", value: String(p.port), class: "w-s" });
+    const eport = h("input", { type: "number", min: "1024", max: "65535", value: String(p.enrol_port), class: "w-s" });
     const save = h("button", { class: "btn primary", type: "button" }, "Save");
     save.addEventListener("click", async () => {
       save.disabled = true;
@@ -146,7 +146,7 @@ export async function buildIngestCard() {
       close.addEventListener("click", async () => { const r = await act(() => api("/api/ingest/window", { method: "DELETE" })); if (r) info = r; draw(); });
       card.appendChild(h("p", {}, h("span", { class: "tag ok" }, "open"), ` until ${p.enrol_until.replace("T", " ").replace("Z", " UTC")} `, close));
     } else {
-      const minutes = h("input", { type: "number", min: "5", max: "240", value: "30", style: "width:5em" });
+      const minutes = h("input", { type: "number", min: "5", max: "240", value: "30", class: "w-s" });
       const open = h("button", { class: "btn", type: "button" }, "Open an enrolment window");
       open.disabled = !p.enabled || !info.allowed;
       open.addEventListener("click", async () => { const r = await act(() => post("/api/ingest/window", { minutes: Number(minutes.value) })); if (r) info = r; draw(); });
@@ -219,7 +219,7 @@ export async function buildIngestCard() {
     const pick = h("select", { multiple: "multiple", size: "6", style: "min-width:20rem" }, ...free.map((d) => h("option", { value: String(d.id) }, devName(d))));
     const hostNames = h("textarea", { rows: "3", placeholder: "only for a gateway (several hosts): one per line, device name = name used in the data\nweb01 = web01.example.com", style: "max-width:36rem" });
     const identity = h("input", { type: "text", placeholder: "dns:web01.example.com (only for certificates from your own CA)", style: "max-width:36rem" });
-    const interval = h("input", { type: "number", min: "10", max: "3600", value: "60", style: "width:6em" });
+    const interval = h("input", { type: "number", min: "10", max: "3600", value: "60", class: "w-s" });
     const add = h("button", { class: "btn", type: "button" }, "Add the agent");
     add.disabled = !info.allowed;
     add.addEventListener("click", async () => {

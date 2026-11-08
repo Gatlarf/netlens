@@ -31,7 +31,7 @@ function fill(card, info) {
 
   const enabled = h("input", { type: "checkbox", checked: info.enabled });
   const allow = h("input", { type: "checkbox", checked: info.allow_changes });
-  const rate = h("input", { type: "number", min: "0", max: "10000", value: String(info.rate_per_minute), style: "width:7em" });
+  const rate = h("input", { type: "number", min: "0", max: "10000", value: String(info.rate_per_minute), class: "w-s" });
   const off = new Set(info.disabled_groups);
 
   card.appendChild(h("label", { class: "check" }, enabled, h("strong", {}, "Switch the MCP server on"), h("span", { class: "hint" }, " (off by default; while off, /mcp answers that it is switched off)")));

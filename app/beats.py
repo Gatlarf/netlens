@@ -178,9 +178,9 @@ async def run_once(db_path: str, ranges: list[str], runner=None, now: str | None
     try:
         result = await asyncio.to_thread(record, conn, answered, ranges, stamp)
         if result["offline"] or result["online"]:
-            from app.notify.channels import process_channels
+            from app.notify.channels import notify_soon
 
-            await process_channels(db_path)
+            notify_soon(db_path)
         return result
     finally:
         conn.close()

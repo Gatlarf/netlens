@@ -18,11 +18,11 @@ export async function buildInboundCard() {
 
     const trapOn = h("input", { type: "checkbox" });
     trapOn.checked = p.traps.enabled;
-    const trapPort = h("input", { type: "number", min: "1", max: "65535", value: String(p.traps.port), style: "width:7em" });
+    const trapPort = h("input", { type: "number", min: "1", max: "65535", value: String(p.traps.port), class: "w-s" });
     const comm = h("input", { type: "text", value: p.traps.communities.join(", "), placeholder: "public" });
     const sysOn = h("input", { type: "checkbox" });
     sysOn.checked = p.syslog.enabled;
-    const sysPort = h("input", { type: "number", min: "1", max: "65535", value: String(p.syslog.port), style: "width:7em" });
+    const sysPort = h("input", { type: "number", min: "1", max: "65535", value: String(p.syslog.port), class: "w-s" });
     const sev = h("select", {}, ...info.severities.map((s) => h("option", { value: s, selected: s === p.syslog.min_severity }, s)));
 
     const body = () => ({

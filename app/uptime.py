@@ -13,6 +13,10 @@ def _format_ts(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# the little bars of the overview show the latest checks: only the last two days are looked at (the table can hold millions of rows); a device that has not been checked for longer shows no bars
+BARS_WINDOW_DAYS = 2
+
+
 def _cutoff(now: str, days: float) -> str:
     dt = _parse_ts(now)
     dt = dt - timedelta(days=days)
@@ -154,26 +158,15 @@ def device_uptime(
 
     # status_for_seconds
     status_for_seconds = None
-    all_checks = conn.execute(
-        "SELECT ts, up FROM checks WHERE device_id = ? ORDER BY ts ASC, id ASC",
-        (device_id,),
-    ).fetchall()
-    if all_checks:
-        latest = all_checks[-1]
-        latest_up = latest["up"]
-        # find most recent check whose up differs from latest.up
-        diff_idx = None
-        for i in range(len(all_checks) - 1, -1, -1):
-            if all_checks[i]["up"] != latest_up:
-                diff_idx = i
-                break
-        if diff_idx is not None:
-            # the check right after that one
-            next_check = all_checks[diff_idx + 1]
-            status_for_seconds = int((_parse_ts(now) - _parse_ts(next_check["ts"])).total_seconds())
+    latest = conn.execute("SELECT ts, up FROM checks WHERE device_id = ? ORDER BY ts DESC, id DESC LIMIT 1", (device_id,)).fetchone()
+    if latest:
+        # the newest check that differs from the latest state, then the first check after it (both use the (device_id, ts) index)
+        diff = conn.execute("SELECT ts, id FROM checks WHERE device_id = ? AND up != ? ORDER BY ts DESC, id DESC LIMIT 1", (device_id, latest["up"])).fetchone()
+        if diff is not None:
+            after = conn.execute("SELECT ts FROM checks WHERE device_id = ? AND (ts > ? OR (ts = ? AND id > ?)) ORDER BY ts ASC, id ASC LIMIT 1", (device_id, diff["ts"], diff["ts"], diff["id"])).fetchone()
+            status_for_seconds = int((_parse_ts(now) - _parse_ts(after["ts"])).total_seconds())
         else:
-            # no check differs, seconds between now and oldest
-            status_for_seconds = int((_parse_ts(now) - _parse_ts(all_checks[0]["ts"])).total_seconds())
+            status_for_seconds = int((_parse_ts(now) - _parse_ts(since)).total_seconds())      # nothing differs: since the oldest check
 
     return {
         "up_24h": up_24h,
@@ -214,9 +207,9 @@ def uptime_overview(
     for row in [] if days else conn.execute(
         "SELECT device_id, up FROM ("
         "SELECT device_id, up, ts, ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY ts DESC, id DESC) AS rn "
-        "FROM checks"
+        "FROM checks WHERE ts >= ?"
         ") WHERE rn <= ? ORDER BY device_id, rn DESC",
-        (bars,),
+        (_cutoff(now, BARS_WINDOW_DAYS), bars),
     ).fetchall():
         bars_map.setdefault(row["device_id"], []).append(int(row["up"]))
 

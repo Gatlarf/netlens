@@ -373,9 +373,9 @@ async def loop(db_path: str, scan_manager=None) -> None:
                 last = time.monotonic()
                 status = await asyncio.to_thread(push_once, db_path)
                 if status.get("event"):                       # the link broke or came back: send the alert now
-                    from app.notify.channels import process_channels
+                    from app.notify.channels import notify_soon
 
-                    await process_channels(db_path)
+                    notify_soon(db_path)
                 if scan_manager is not None and status.get("commands"):
                     await run_commands(status, scan_manager)
         except asyncio.CancelledError:

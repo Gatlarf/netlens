@@ -16,12 +16,37 @@
       "required": true,
       "help": "The address of a Xen Orchestra (it manages every pool it knows, one line is enough), or of the pool master of an XCP-ng / XenServer pool when you have no Xen Orchestra. Netlens finds out which one it is. HTTPS is assumed when you leave the scheme out.",
       "columns": [
-        {"key": "host", "label": "Address", "placeholder": "https://xo.example.com", "required": true},
-        {"key": "token", "label": "Xen Orchestra token", "type": "password", "optional": true},
-        {"key": "username", "label": "Username", "placeholder": "readonly@example.com or root", "optional": true},
-        {"key": "password", "label": "Password", "type": "password", "optional": true},
-        {"key": "fingerprint", "label": "Certificate fingerprint", "placeholder": "B7:5B:65:5B:...", "optional": true,
-         "help": "SHA-256 fingerprint of the server's certificate. When filled in, exactly that certificate is trusted (also a self-signed one)."}
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://xo.example.com",
+          "required": true
+        },
+        {
+          "key": "token",
+          "label": "Xen Orchestra token",
+          "type": "password",
+          "optional": true
+        },
+        {
+          "key": "username",
+          "label": "Username",
+          "placeholder": "readonly@example.com or root",
+          "optional": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "optional": true
+        },
+        {
+          "key": "fingerprint",
+          "label": "Certificate fingerprint",
+          "placeholder": "B7:5B:65:5B:...",
+          "optional": true,
+          "help": "SHA-256 fingerprint of the server's certificate. When filled in, exactly that certificate is trusted (also a self-signed one)."
+        }
       ]
     },
     {
@@ -46,11 +71,41 @@
       "about": "Virtual machines on your XCP-ng / XenServer hosts: running, stopped and how many in all.",
       "href": "#/hierarchy",
       "rows": [
-        {"label": "Running", "count": "guests", "where": {"status": "running"}},
-        {"label": "Stopped", "count": "guests", "where": {"status": ["stopped"]}, "tone_if_positive": "warn"},
-        {"label": "Paused", "count": "guests", "where": {"status": ["paused"]}, "tone_if_positive": "warn"}
+        {
+          "label": "Running",
+          "count": "guests",
+          "where": {
+            "status": "running"
+          }
+        },
+        {
+          "label": "Stopped",
+          "count": "guests",
+          "where": {
+            "status": [
+              "stopped"
+            ]
+          },
+          "tone_if_positive": "warn"
+        },
+        {
+          "label": "Paused",
+          "count": "guests",
+          "where": {
+            "status": [
+              "paused"
+            ]
+          },
+          "tone_if_positive": "warn"
+        }
       ]
     }
   ],
-  "power": ["reset", "reboot", "shutdown", "start"]
+  "power": [
+    "reset",
+    "reboot",
+    "shutdown",
+    "start"
+  ],
+  "homepage": "https://xcp-ng.org/"
 }

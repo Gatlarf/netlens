@@ -57,5 +57,6 @@
       "default": true,
       "help": "The nodes accept the main router's user name and password. Netlens asks each node at the address the router lists for it on every sync, so a node that gets another address is still found; nothing to set up per node. A node that refuses the login is skipped."
     }
-  ]
+  ],
+  "homepage": "https://www.asus.com/"
 }

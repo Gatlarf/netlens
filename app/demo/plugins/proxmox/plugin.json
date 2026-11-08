@@ -109,5 +109,6 @@
     "reboot",
     "shutdown",
     "start"
-  ]
+  ],
+  "homepage": "https://www.proxmox.com/"
 }

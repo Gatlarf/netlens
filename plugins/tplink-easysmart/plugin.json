@@ -20,11 +20,32 @@
       "required": true,
       "help": "One line per switch.",
       "columns": [
-        {"key": "host", "label": "Address", "placeholder": "192.168.0.250", "required": true},
-        {"key": "username", "label": "User name", "placeholder": "admin", "required": true},
-        {"key": "password", "label": "Password", "type": "password", "required": true},
-        {"key": "name", "label": "Name in Netlens", "placeholder": "Core switch", "optional": true}
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "192.168.0.250",
+          "required": true
+        },
+        {
+          "key": "username",
+          "label": "User name",
+          "placeholder": "admin",
+          "required": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "required": true
+        },
+        {
+          "key": "name",
+          "label": "Name in Netlens",
+          "placeholder": "Core switch",
+          "optional": true
+        }
       ]
     }
-  ]
+  ],
+  "homepage": "https://www.tp-link.com/"
 }

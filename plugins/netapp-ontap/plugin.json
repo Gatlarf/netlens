@@ -54,5 +54,6 @@
       "label": "Timeout per request (seconds)",
       "default": 30
     }
-  ]
+  ],
+  "homepage": "https://docs.netapp.com/us-en/ontap/"
 }

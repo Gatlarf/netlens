@@ -28,7 +28,7 @@ export async function buildOncallCard() {
 
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = p.enabled;
-    const tz = h("input", { type: "text", value: p.tz === "UTC" && !p.people.length ? Intl.DateTimeFormat().resolvedOptions().timeZone : p.tz, style: "width:16em", placeholder: "Europe/Brussels" });
+    const tz = h("input", { type: "text", value: p.tz === "UTC" && !p.people.length ? Intl.DateTimeFormat().resolvedOptions().timeZone : p.tz, class: "w-l", placeholder: "Europe/Brussels" });
     const now = info.now;
     const nowText = !p.enabled ? "The schedule is off." : now.people.length ? `On call now: ${now.people.map((x) => x.name).join(", ")}${now.until ? `, until ${fmtTime(now.until)}` : ""}${now.source && now.source !== "fallback" ? ` (${now.source})` : now.source === "fallback" ? " (fallback)" : ""}.` : "Nobody is on call now.";
 
@@ -36,7 +36,7 @@ export async function buildOncallCard() {
     const people = [];
     const peopleBox = h("div", {});
     const addPerson = (person) => {
-      const name = h("input", { type: "text", value: person.name, placeholder: "Name", style: "width:12em" });
+      const name = h("input", { type: "text", value: person.name, placeholder: "Name", class: "w-m" });
       const chans = multi(info.channels, person.channels);
       const row = h("div", { class: "field oncall-row" }, name, h("label", {}, "Reached through"), chans);
       const rm = h("button", { class: "btn danger", type: "button" }, "Remove");
@@ -58,7 +58,7 @@ export async function buildOncallCard() {
     const shifts = [];
     const shiftsBox = h("div", {});
     const addShift = (s) => {
-      const name = h("input", { type: "text", value: s.name, style: "width:10em" });
+      const name = h("input", { type: "text", value: s.name, class: "w-m" });
       const days = DAYS.map((d, i) => h("label", { class: "check-row" }, h("input", { type: "checkbox", checked: s.days.includes(i), "data-day": i }), ` ${d}`));
       const start = h("input", { type: "time", value: s.start });
       const end = h("input", { type: "time", value: s.end });
@@ -87,7 +87,7 @@ export async function buildOncallCard() {
       const who = h("select", {});
       const from = h("input", { type: "datetime-local", value: o.from });
       const to = h("input", { type: "datetime-local", value: o.to });
-      const note = h("input", { type: "text", value: o.note || "", placeholder: "Swap, holiday ...", style: "width:12em" });
+      const note = h("input", { type: "text", value: o.note || "", placeholder: "Swap, holiday ...", class: "w-m" });
       const entry = { who, from, to, note, chosen: o.person };
       const draw = () => { const keep = who.value || entry.chosen; clear(who); for (const x of peopleOptions()) who.appendChild(h("option", { value: x.id, selected: x.id === keep }, x.name)); };
       refreshers.push(draw);

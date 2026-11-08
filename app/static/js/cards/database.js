@@ -1,8 +1,9 @@
 import { get, put, post } from "../api.js";
+import { fmtBytes } from "../charts.js";
 import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
-const fmtSize = (b) => (b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(0, Math.round(b / 1024))} KB`);
+const fmtSize = fmtBytes;      // one formatter for sizes (charts.js)
 const num = (n) => Number(n).toLocaleString();
 const NAMES = { events: "events", scans: "finished scans", checks: "presence checks", service_results: "service check results", audit: "audit log lines", sessions: "expired sign-ins",
   metric_state: "health states", port_baselines: "port baselines", wifi_samples: "Wi-Fi samples", checks_hourly: "hourly roll-ups", remote_devices: "remote devices", remote_services: "remote checks",
@@ -66,7 +67,7 @@ export async function buildDatabaseCard() {
     const oldestKey = { events_days: "events", scans_days: "scans", checks_days: "checks", service_results_days: "service_results", audit_days: "audit" };
     const body = h("tbody");
     for (const [key, spec] of Object.entries(info.retention_info)) {
-      inputs[key] = h("input", { type: "number", min: spec.forever ? "0" : String(spec.min), max: String(spec.max), value: String(info.retention[key]), "aria-label": `${spec.label}: days to keep`, style: "width:5.5rem" });
+      inputs[key] = h("input", { type: "number", min: spec.forever ? "0" : String(spec.min), max: String(spec.max), value: String(info.retention[key]), "aria-label": `${spec.label}: days to keep`, class: "w-s" });
       const old = info.oldest[oldestKey[key]];
       body.appendChild(h("tr", {}, h("td", {}, spec.label), h("td", { style: "white-space:nowrap" }, inputs[key], " days"),
         h("td", { class: "hint" }, `${spec.forever ? "0 keeps everything. " : ""}Default ${spec.default}.${old ? ` Oldest now: ${old.slice(0, 10)}.` : ""}`)));

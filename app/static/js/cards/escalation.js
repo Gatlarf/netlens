@@ -17,7 +17,7 @@ export async function buildEscalationCard() {
     const levels = h("div", {});
     const rows = [];
     function addLevel(level) {
-      const after = h("input", { type: "number", min: "1", max: "1440", value: String(level.after_min), style: "width:6em" });
+      const after = h("input", { type: "number", min: "1", max: "1440", value: String(level.after_min), class: "w-s" });
       const chans = h("select", { multiple: true, size: String(Math.min(4, Math.max(2, info.channels.length))) }, ...info.channels.map((c) => h("option", { value: c.id, selected: level.channels.includes(c.id) }, c.name)));
       const row = h("div", { class: "field" }, h("label", {}, `After (minutes)`), after, h("label", {}, "Tell"), chans);
       rows.push({ after, chans, row });
@@ -30,7 +30,7 @@ export async function buildEscalationCard() {
     // how fast each importance escalates: a percentage of the level times above (50 = twice as fast), empty = never
     const timing = {};
     const timingRow = h("div", { class: "field" }, h("label", {}, "Speed by importance (%)"), ...[["critical", "Critical"], ["normal", "Normal"], ["low", "Low"]].map(([tier, label]) => {
-      const input = h("input", { type: "number", min: "10", max: "500", value: info.policy.timing[tier] == null ? "" : String(info.policy.timing[tier]), placeholder: "never", style: "width:5.5em", title: `${label}: 100 = the times above, 50 = twice as fast, empty = never escalates` });
+      const input = h("input", { type: "number", min: "10", max: "500", value: info.policy.timing[tier] == null ? "" : String(info.policy.timing[tier]), placeholder: "never", class: "w-s", title: `${label}: 100 = the times above, 50 = twice as fast, empty = never escalates` });
       timing[tier] = input;
       return h("span", { class: "inline-field" }, `${label} `, input);
     }), h("p", { class: "hint" }, "100 uses the times above, 50 escalates twice as fast, empty never escalates. A problem on something marked critical is always followed, whatever events you chose."));

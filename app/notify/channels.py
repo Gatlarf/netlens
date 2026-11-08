@@ -738,3 +738,39 @@ async def process_channels(db_path: str, *, now: datetime | None = None, poster:
         finally:
             conn.close()
     return result
+
+
+# ---- sending from the monitoring loops without waiting for the answer of a slow webhook
+_task: asyncio.Task | None = None
+_again = False
+
+
+async def _drain(db_path: str) -> None:
+    global _task, _again
+    try:
+        while True:
+            _again = False
+            try:
+                await process_channels(db_path)
+            except Exception:  # noqa: BLE001 - a failing send must never stop anything
+                logging.getLogger(__name__).exception("sending notifications failed")
+            if not _again:
+                return
+    finally:
+        _task = None
+
+
+def notify_soon(db_path: str) -> None:
+    """Start a send round in the background and return at once: a webhook that times out must not hold up the service checks and the beats
+    (it would happen exactly during an outage). One round runs at a time; a request made while it runs makes it go round once more."""
+    global _task, _again
+    if _task is not None and not _task.done():
+        _again = True
+        return
+    _task = asyncio.ensure_future(_drain(db_path))
+
+
+async def settle() -> None:
+    """Wait until the background round (if any) is finished: for tests and for a clean shutdown."""
+    while _task is not None and not _task.done():
+        await asyncio.shield(_task)

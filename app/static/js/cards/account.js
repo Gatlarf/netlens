@@ -79,7 +79,7 @@ function buildTotpSection(wrap) {
           const r = await post("/api/me/totp/begin", { password: pass.value });
           const canvas = h("canvas", { width: "10", height: "10", role: "img", "aria-label": "QR code for your authenticator", style: "max-width:14rem;height:auto;background:#fff" });
           await drawQr(canvas, r.uri).catch(() => canvas.remove());
-          const code = h("input", { type: "text", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "8", placeholder: "6-digit code", "aria-label": "Code from the authenticator", style: "width:9em" });
+          const code = h("input", { type: "text", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "8", placeholder: "6-digit code", "aria-label": "Code from the authenticator", class: "w-m" });
           const confirm = h("button", { class: "btn primary", type: "button" }, "Confirm and switch on");
           confirm.addEventListener("click", async () => {
             try {
@@ -101,7 +101,7 @@ function buildTotpSection(wrap) {
     }
     wrap.appendChild(h("p", {}, h("span", { class: "tag ok" }, "on"), ` since ${st.since ? timeAgo(st.since) : "—"} · ${st.recovery_left} recovery code${st.recovery_left === 1 ? "" : "s"} left`));
     const pass = passwordField();
-    const code = h("input", { type: "text", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "24", placeholder: "code or recovery code", "aria-label": "Code from the authenticator", style: "width:15em" });
+    const code = h("input", { type: "text", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "24", placeholder: "code or recovery code", "aria-label": "Code from the authenticator", class: "w-l" });
     const fresh = h("button", { class: "btn", type: "button" }, "New recovery codes");
     const off = h("button", { class: "btn danger", type: "button" }, "Switch off");
     fresh.addEventListener("click", async () => {

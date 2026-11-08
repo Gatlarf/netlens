@@ -1,13 +1,11 @@
 import { get, post } from "../api.js";
+import { fmtDuration } from "../charts.js";
 import { h, clear, toast, fmtTime } from "../util.js";
 
 const LEVEL_LABEL = { warn: "Look at this", info: "Note", ok: "Fine" };
 
 function duration(seconds) {
-  if (seconds == null) return "still down";
-  if (seconds < 90) return `${Math.round(seconds)} s`;
-  if (seconds < 5400) return `${Math.round(seconds / 60)} min`;
-  return `${(seconds / 3600).toFixed(1)} h`;
+  return seconds == null ? "still down" : fmtDuration(seconds);        // the shared formatter (charts.js)
 }
 
 function findingsList(findings) {

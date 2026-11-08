@@ -20,12 +20,36 @@
       "required": true,
       "help": "The address of a Prometheus, VictoriaMetrics, Mimir or Thanos Query (HTTPS is assumed when you leave the scheme out). A path prefix is allowed (https://example.com/prometheus).",
       "columns": [
-        {"key": "host", "label": "Address", "placeholder": "https://prometheus.example.com:9090", "required": true},
-        {"key": "token", "label": "Bearer token", "type": "password", "optional": true},
-        {"key": "username", "label": "User name (basic login)", "optional": true},
-        {"key": "password", "label": "Password", "type": "password", "optional": true},
-        {"key": "fingerprint", "label": "Certificate fingerprint", "placeholder": "B7:5B:65:5B:...", "optional": true,
-         "help": "SHA-256 fingerprint of the server's certificate. When filled in, exactly that certificate is trusted (also a self-signed one)."}
+        {
+          "key": "host",
+          "label": "Address",
+          "placeholder": "https://prometheus.example.com:9090",
+          "required": true
+        },
+        {
+          "key": "token",
+          "label": "Bearer token",
+          "type": "password",
+          "optional": true
+        },
+        {
+          "key": "username",
+          "label": "User name (basic login)",
+          "optional": true
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "optional": true
+        },
+        {
+          "key": "fingerprint",
+          "label": "Certificate fingerprint",
+          "placeholder": "B7:5B:65:5B:...",
+          "optional": true,
+          "help": "SHA-256 fingerprint of the server's certificate. When filled in, exactly that certificate is trusted (also a self-signed one)."
+        }
       ]
     },
     {
@@ -81,5 +105,6 @@
       "help": "Off: an address that starts with http:// is refused, because a token or password would cross the network unencrypted. Turn on only for a lab or a store on the same machine."
     }
   ],
-  "dashboard": []
+  "dashboard": [],
+  "homepage": "https://prometheus.io/"
 }

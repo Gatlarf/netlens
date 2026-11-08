@@ -1,12 +1,11 @@
 import { api, upload } from "../api.js";
+import { fmtBytes } from "../charts.js";
 import { h, clear, toast, fmtTime } from "../util.js";
 import { ask as askApproval, isApprovalRequired, parse as parseApproval } from "../approval.js";
 
 const INTERVAL_LABELS = { 6: "every 6 hours", 12: "every 12 hours", 24: "every day", 72: "every 3 days", 168: "every week" };
 
-function fmtSize(bytes) {
-  return bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
+const fmtSize = fmtBytes;      // one formatter for sizes (charts.js)
 
 function fillSchedule(box, data) {
   clear(box);

@@ -553,6 +553,103 @@ def _check_probes(db_path: str) -> bool:
         conn.close()
 
 
+async def _step(name: str, work) -> None:
+    """One step of the hourly upkeep. A step that fails is logged and the next one still runs (before, one failure skipped everything after it for an hour)."""
+    try:
+        result = work()
+        if asyncio.iscoroutine(result) or isinstance(result, asyncio.Future):
+            await result
+    except asyncio.CancelledError:
+        raise
+    except Exception:  # noqa: BLE001
+        log.exception("hourly upkeep: %s failed", name)
+
+
+async def _hourly(db_path: str) -> None:
+    """Prune, the weekly database upkeep, forecasts, reports, scheduled backup, vendor registry, DHCP check, CVE check, speed test."""
+    from app.notify.channels import notify_soon
+
+    conn = connect(db_path)
+    here = Path(db_path).resolve().parent
+    try:
+        def prune():
+            from app import audit
+
+            prune_results(conn)
+            audit.prune(conn)
+
+        await _step("pruning", lambda: asyncio.to_thread(prune))              # the deletes can take a while on a big history: not on the event loop
+
+        async def weekly():
+            from app import dbmaint
+
+            if dbmaint.due(conn):                    # retention, leftovers, optimize
+                await asyncio.to_thread(dbmaint.run_tidy, conn)
+
+        await _step("weekly database upkeep", weekly)
+
+        async def forecast_step():
+            from app import forecast
+
+            if await asyncio.to_thread(forecast.check, conn):          # a disk is on course to fill up
+                notify_soon(db_path)
+
+        await _step("capacity forecast", forecast_step)
+
+        async def reports_step():
+            from app import reports
+
+            await reports.send_weekly(db_path)                      # only when it is due
+            await reports.send_monthly(db_path)
+
+        await _step("weekly or monthly report", reports_step)
+
+        async def backup_step():
+            from app import backup_schedule
+
+            outcome = await asyncio.to_thread(backup_schedule.run_if_due, conn, db_path)
+            if outcome and not outcome["ok"]:
+                notify_soon(db_path)
+
+        await _step("scheduled backup", backup_step)
+
+        async def vendor_step():
+            from app.api import vendor_db as vendor_db_api
+
+            if vendor_db_api.due(conn):  # the IEEE vendor registry, once a month; offline is normal
+                await asyncio.to_thread(vendor_db_api.refresh_now, conn, here)
+
+        await _step("vendor registry", vendor_step)
+
+        async def dhcp_step():
+            from app import netchecks
+
+            if netchecks.dhcp_due(conn) and (await netchecks.check_dhcp(conn))["rogue"]:
+                notify_soon(db_path)
+
+        await _step("DHCP check", dhcp_step)
+        await _step("housekeeping checks", lambda: asyncio.to_thread(_housekeeping_checks, conn, here))
+
+        def cve_step():
+            from app import cvecheck, licence
+            from app.api import cvecheck as cvecheck_api
+
+            if cvecheck.due(conn) and licence.allows(conn, "vulnerabilities"):       # a day of cached answers; it runs in its own thread
+                cvecheck_api.run_in_background(db_path)
+
+        await _step("CVE check", cve_step)
+
+        def speed_step():
+            from app import speedtest
+
+            if speedtest.due(conn) and speedtest.PROGRESS.start("internet", "Cloudflare"):  # about 20 seconds: in its own thread, the checks go on
+                threading.Thread(target=speedtest.run_and_record, args=(db_path, speedtest.PROGRESS), daemon=True).start()
+
+        await _step("speed test", speed_step)
+    finally:
+        conn.close()
+
+
 async def service_loop(db_path: str, interval: float = 10.0) -> None:
     """Background task: run due checks every few seconds, prune old results hourly."""
     last_prune = 0.0
@@ -562,83 +659,23 @@ async def service_loop(db_path: str, interval: float = 10.0) -> None:
     while True:
         try:
             if await run_due_checks(db_path):
-                from app.notify.channels import process_channels  # a service going down should not wait for the next scan
+                from app.notify.channels import notify_soon  # a service going down should not wait for the next scan
 
-                await process_channels(db_path)
+                notify_soon(db_path)
             if time.monotonic() - last_rollup > 60:       # fold the new samples of the graphs into the coarser tiers
                 last_rollup = time.monotonic()
                 await asyncio.to_thread(_maintain_metrics, db_path, time.monotonic() - last_prune > 3600)
                 if await asyncio.to_thread(_expire_snoozes, db_path):      # a snooze ended and its problem is still there
-                    from app.notify.channels import process_channels
+                    from app.notify.channels import notify_soon
 
-                    await process_channels(db_path)
+                    notify_soon(db_path)
                 if await asyncio.to_thread(_check_probes, db_path):       # a remote site stopped reporting
-                    from app.notify.channels import process_channels
+                    from app.notify.channels import notify_soon
 
-                    await process_channels(db_path)
+                    notify_soon(db_path)
             if time.monotonic() - last_prune > 3600:
                 last_prune = time.monotonic()
-                conn = connect(db_path)
-                try:
-                    prune_results(conn)
-                    try:
-                        from app import audit, dbmaint
-
-                        audit.prune(conn)
-                        if dbmaint.due(conn):                 # the weekly upkeep: retention, leftovers, optimize
-                            await asyncio.to_thread(dbmaint.run_tidy, conn)
-                    except Exception:  # noqa: BLE001
-                        log.exception("pruning the audit log or the weekly database upkeep failed")
-                    try:
-                        from app import forecast
-
-                        if await asyncio.to_thread(forecast.check, conn):          # a disk is on course to fill up
-                            from app.notify.channels import process_channels
-
-                            await process_channels(db_path)
-                    except Exception:  # noqa: BLE001 - a forecast is a convenience
-                        log.exception("capacity forecast failed")
-                    try:
-                        from app import reports
-
-                        await reports.send_weekly(db_path)                      # only when it is due
-                        await reports.send_monthly(db_path)                     # likewise
-                    except Exception:  # noqa: BLE001
-                        log.exception("weekly or monthly report failed")
-                    from app import backup_schedule
-
-                    outcome = await asyncio.to_thread(backup_schedule.run_if_due, conn, db_path)
-                    if outcome and not outcome["ok"]:
-                        from app.notify.channels import process_channels
-
-                        await process_channels(db_path)
-                    from app import netchecks
-                    from app.api import vendor_db as vendor_db_api
-
-                    if vendor_db_api.due(conn):  # the IEEE vendor registry, once a month; offline is normal
-                        try:
-                            await asyncio.to_thread(vendor_db_api.refresh_now, conn, Path(db_path).resolve().parent)
-                        except Exception:  # noqa: BLE001
-                            log.debug("vendor registry refresh failed", exc_info=True)
-
-                    if netchecks.dhcp_due(conn):
-                        checked = await netchecks.check_dhcp(conn)
-                        if checked["rogue"]:
-                            from app.notify.channels import process_channels
-
-                            await process_channels(db_path)
-                    await asyncio.to_thread(_housekeeping_checks, conn, Path(db_path).resolve().parent)
-                    from app import cvecheck, licence
-                    from app.api import cvecheck as cvecheck_api
-
-                    if cvecheck.due(conn) and licence.allows(conn, "vulnerabilities"):       # a day of cached answers; it runs in its own thread
-                        cvecheck_api.run_in_background(db_path)
-                    from app import speedtest
-
-                    if speedtest.due(conn) and speedtest.PROGRESS.start("internet", "Cloudflare"):  # about 20 seconds: in its own thread, the checks go on
-                        threading.Thread(target=speedtest.run_and_record, args=(db_path, speedtest.PROGRESS), daemon=True).start()
-                finally:
-                    conn.close()
+                await _hourly(db_path)
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001

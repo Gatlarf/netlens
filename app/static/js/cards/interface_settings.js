@@ -15,7 +15,7 @@ export async function buildInterfaceCard() {
     return { el, field: h("div", { class: "field" }, h("label", {}, label), el, hint ? h("p", { class: "hint" }, hint) : null) };
   };
   const look = select("default_look", "Look for new users", [["system", "Follow the device (light or dark)"], ["light", "Light"], ["dark", "Dark"], ["hud", "HUD (futuristic)"]], s.default_look, "Applies to everybody who has not chosen a look themselves, including on the sign-in page.");
-  const seconds = h("input", { type: "number", name: "pulse_seconds", min: "0", max: "10", step: "0.5", value: String(s.pulse_seconds), style: "width:6em" });
+  const seconds = h("input", { type: "number", name: "pulse_seconds", min: "0", max: "10", step: "0.5", value: String(s.pulse_seconds), class: "w-s" });
   const scope = select("pulse_scope", "Show the flash on", [["hud", "The HUD page only"], ["all", "Every page (while the HUD look is on)"]], s.pulse_scope);
   const forWhom = select("pulse_for", "Flash for", [["all", "Every device"], ["always_on", "Always-on and critical devices"], ["critical", "Critical devices only"]], s.pulse_for, "Phones and tablets come and go all day; choose always-on to keep the flash for devices that matter.");
   let candidates = [];

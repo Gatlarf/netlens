@@ -238,11 +238,11 @@ class AsusClient:
                 raise AsusError("the TLS certificate could not be verified; turn off 'Verify TLS certificate' (routers use a self-signed one)") from exc
             if isinstance(reason, (socket.timeout, TimeoutError)):
                 raise AsusError(f"connection to {self.cfg.url} timed out") from exc
-            raise AsusError(f"cannot connect to {self.cfg.url}: {reason}") from exc
+            raise AsusError(f"cannot reach {self.cfg.url}: {reason}") from exc
         except (socket.timeout, TimeoutError) as exc:
             raise AsusError(f"connection to {self.cfg.url} timed out") from exc
         except OSError as exc:
-            raise AsusError(f"cannot connect to {self.cfg.url}: {exc}") from exc
+            raise AsusError(f"cannot reach {self.cfg.url}: {exc}") from exc
 
     def _send(self, path: str, data: str | None = None) -> tuple[int, str]:
         headers = {"User-Agent": USER_AGENT}
