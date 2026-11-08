@@ -2,6 +2,17 @@
   "id": "redfish",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "1345d6278071168fa3a4008b64730248464c6fa929aff5473869a255e8a39680",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "level": "verified",
+      "tested_on": [
+        "DMTF Redfish Mockup Server (official DMTF emulator) with the public-rackmount1 mockup, Redfish 1.22: service root, system, manager, chassis, network interfaces, SimpleStorage drives, power and thermal; the Storage/Volumes collections by a unit test only"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
+    },
+    {
       "version": "1.0.0",
       "sha256": "eb324005f7045b61ea60c1068ad38256d0038b4eb3f385699bcce41851430b2c",
       "reviewer": "Gatlarf",

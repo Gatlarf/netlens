@@ -2,6 +2,17 @@
   "id": "homeassistant",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "c88c3ee9ed58001207632005768334ef907d380766e70f8fe525488d1a1435f9",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "level": "verified",
+      "tested_on": [
+        "Home Assistant 2026.7.1 (the maintainer's installation, 129 registry entries): sign-in with a user name and password, the device registry through the template API, availability, battery, Zigbee devices and their coordinator, MAC addresses of Wi-Fi devices"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
+    },
+    {
       "version": "1.0.0",
       "sha256": "7fca69fde32e9316a1d6f0d9894f0f07af6a3f02b7f93e51f8feea28c15869ea",
       "level": "verified",

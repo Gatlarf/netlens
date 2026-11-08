@@ -2,6 +2,17 @@
   "id": "ceph",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "206a14ac47cfcabc7228f5d14cae0a2da5dcdc3ea1f053950b1143591283b0b9",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "level": "verified",
+      "tested_on": [
+        "Ceph 19.2.7 (cephadm, 3 OSDs, replicated/RBD/CephFS pools): login with right and wrong password and a read-only dashboard user, health checks, hosts, monitors, OSDs, pools, CephFS, RBD, diagnostic"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
+    },
+    {
       "version": "1.0.0",
       "sha256": "0b27b376bd7243e660b9237dafced283800322262060d714b40857dbcde59790",
       "reviewer": "Gatlarf",

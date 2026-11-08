@@ -2,6 +2,17 @@
   "id": "apisix",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "9cab17a2f81bb75930e7004318bb27d7c952d02503a63e226e77025293848e42",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "level": "verified",
+      "tested_on": [
+        "Apache APISIX 3.11.0 with etcd (Docker): routes with hosts, shared and inline upstreams, a service, a redirect, a disabled route, a wildcard TLS certificate (expiry read from the PEM), the viewer role, a wrong key"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
+    },
+    {
       "version": "1.0.0",
       "sha256": "5a9ed14762673c2f852f899cae0f649a908afda46d7cd8d4f446b905a3ce8fc9",
       "level": "verified",

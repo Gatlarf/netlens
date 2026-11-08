@@ -2,6 +2,17 @@
   "id": "envoy",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "d91ef295d842c6a9c76abe53bd4e932f566ae7601b94f956977d52a2278e3566",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "level": "verified",
+      "tested_on": [
+        "Envoy 1.32.13 (Docker, file configuration): two virtual hosts, a TCP proxy listener, clusters with several endpoints"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
+    },
+    {
       "version": "1.0.0",
       "sha256": "83d19f2daaf8eedb8d7d7b6a1662a0899f19f9f089a6704e868f325db0bc5239",
       "level": "verified",

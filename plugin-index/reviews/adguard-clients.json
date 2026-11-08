@@ -2,6 +2,17 @@
   "id": "adguard-clients",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "e928c6cf68797deb82dd118d351df76243ac415eb46b55261138f42734309227",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "level": "verified",
+      "tested_on": [
+        "AdGuard Home v0.107.79 (Docker): a named client with a MAC address, an IP address and a CIDR as identifiers, device tags, a static DHCP lease, a wrong password"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
+    },
+    {
       "version": "1.0.0",
       "sha256": "2f4f44447712c01470c1036d05f105f21c177e62dcad2c8b052a5412e7c41a7e",
       "level": "verified",

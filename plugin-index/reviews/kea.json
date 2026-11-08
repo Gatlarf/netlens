@@ -2,6 +2,17 @@
   "id": "kea",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "40eb1069cfc47c7da4ed8e9810ca8e005cd0853c894882acd6e34bb4f6c6d7f2",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "level": "verified",
+      "tested_on": [
+        "Kea 2.6.3 (Debian 13 packages): kea-dhcp4 with the lease_cmds hook, Control Agent with basic authentication; leases added through the API, a reservation in the configuration, a wrong password"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
+    },
+    {
       "version": "1.0.0",
       "sha256": "ebbee71f818af22b191f1b1d153125069a5455c101a3a2932453b8a5ee997d87",
       "level": "verified",

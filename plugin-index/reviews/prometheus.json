@@ -2,6 +2,17 @@
   "id": "prometheus",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "857940abfd0b92d89b299f023ae7cf5a859dde30ba206df0b800ede8b9f066b8",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "level": "verified",
+      "tested_on": [
+        "Prometheus 3.15.1 scraping a real node_exporter on Debian 13, read through a running Netlens (plugin test, enable, sync with history, readings on the device, the diagnostic with no names or addresses), HTTPS certificate pinning against a local server, bearer and basic login, the job filter with hostile input"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
+    },
+    {
       "version": "1.0.0",
       "sha256": "6d94daa7fc52f5415b64ffe1c723089e95c8996df65f3f1c6bdcc060e081ff48",
       "level": "verified",

@@ -2,6 +2,17 @@
   "id": "consul",
   "reviews": [
     {
+      "version": "1.0.1",
+      "sha256": "5ba61ad659c707cce77fdc8eb6c53bca0b83e7c4cf970d61cbdcb9e5d86b4f88",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "level": "verified",
+      "tested_on": [
+        "Consul 1.20.6 (Docker, dev mode): nodes and services registered through the catalog API with passing, warning and critical checks, agent/self"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
+    },
+    {
       "version": "1.0.0",
       "sha256": "92490e844f01fac06f4f3144ce98c6ebf1217bdaaece0b52981ae89b6f75b872",
       "level": "verified",

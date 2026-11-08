@@ -85,7 +85,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "AdGuard Home v0.107.79 (Docker): a named client with a MAC address, an IP address and a CIDR as identifiers, device tags, a static DHCP lease, a wrong password"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -129,7 +135,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Apache APISIX 3.11.0 with etcd (Docker): routes with hosts, shared and inline upstreams, a service, a redirect, a disabled route, a wildcard TLS certificate (expiry read from the PEM), the viewer role, a wrong key"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -384,7 +396,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Ceph 19.2.7 (cephadm, 3 OSDs, replicated/RBD/CephFS pools): login with right and wrong password and a read-only dashboard user, health checks, hosts, monitors, OSDs, pools, CephFS, RBD, diagnostic"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -467,7 +485,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Consul 1.20.6 (Docker, dev mode): nodes and services registered through the catalog API with passing, warning and critical checks, agent/self"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -640,7 +664,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Envoy 1.32.13 (Docker, file configuration): two virtual hosts, a TCP proxy listener, clusters with several endpoints"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -754,7 +784,14 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Greenbone Community Containers 22.7 (the maintainer's playground and docker host): GMP over TLS, login as an Observer user, a 'Full and fast' scan of one host, 5 real findings read (critical, medium, low) with port, score, solution and time; the filter syntax that gvmd accepts; paging and duplicate handling against a fake gvmd replaying the recorded answers",
+       "Greenbone Community 22.7 on the maintainer's docker host: an Observer user that is (and is not) an observer of the scan tasks; findings read through that user"
+      ],
+      "notes": "Carried over from 1.0.1 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -879,7 +916,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Home Assistant 2026.7.1 (the maintainer's installation, 129 registry entries): sign-in with a user name and password, the device registry through the template API, availability, battery, Zigbee devices and their coordinator, MAC addresses of Wi-Fi devices"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -1173,7 +1216,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Kea 2.6.3 (Debian 13 packages): kea-dhcp4 with the lease_cmds hook, Control Agent with basic authentication; leases added through the API, a reservation in the configuration, a wrong password"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -1772,7 +1821,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Omada controller with a gateway doing DPI: login, sites, devices, clients, switch ports, health, and the site-wide application statistics (stat/dpi/category/categoryCards)"
+      ],
+      "notes": "Carried over from 1.5.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -1975,7 +2030,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "OpenMediaVault 8.5.12 (Debian 13): the storage RPC calls answer (file systems, disks, S.M.A.R.T., shares), but the lab has no disks, so the field mapping is simulator-tested"
+      ],
+      "notes": "Carried over from 1.1.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -2238,7 +2299,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Proxmox Backup Server 4.2 (the maintainer's server, with a Proxmox VE node's backups): version, datastore usage, 113 snapshots in 11 groups, backup tasks, prune and garbage collection jobs, certificate pinning, a token without rights, a wrong token"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -2536,7 +2603,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Prometheus 3.15.1 scraping a real node_exporter on Debian 13, read through a running Netlens (plugin test, enable, sync with history, readings on the device, the diagnostic with no names or addresses), HTTPS certificate pinning against a local server, bearer and basic login, the job filter with hostile input"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -2580,7 +2653,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Proxmox VE (the maintainer's cluster): the reset of a frozen Windows VM through a remediation rule was run for real and the VM restarted (qmreset task OK)."
+      ],
+      "notes": "Carried over from 1.5.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -2694,7 +2773,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "DMTF Redfish Mockup Server (official DMTF emulator) with the public-rackmount1 mockup, Redfish 1.22: service root, system, manager, chassis, network interfaces, SimpleStorage drives, power and thermal; the Storage/Volumes collections by a unit test only"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -2911,7 +2996,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Virtual DSM 7.2.2 with SAN Manager: a real LUN, target and an iSCSI login from a second host; the contract-validated output was checked"
+      ],
+      "notes": "Carried over from 1.2.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -3136,7 +3227,14 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "A real TP-Link TL-SG1016PE (hardware 3.0, firmware 1.0.0 Build 20210825 Rel.52031) on the maintainer's network: login, logout, system information (model, MAC, IP) and the statistics of all 16 ports (link speeds 100 and 1000 Mbit full duplex, packet counters) were read and passed the plugin contract.",
+       "Not tested on hardware: a refused login or full session list on the real switch (simulated), a port going down or up (link events, simulated), half-duplex and 10 Mbit links, other Easy Smart models and firmware."
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
@@ -3818,7 +3916,13 @@
      "released": "2026-11-08",
      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-08",
+      "tested_on": [
+       "Xen Orchestra 6 (REST API 0.41) with a local backup repository, a nightly full-backup job, one failed run and one good run of a VM, also with a user that only has the built-in Read only role: repositories, per-VM backup overview, schedule interval, failed runs, wrong password, the diagnostic"
+      ],
+      "notes": "Carried over from 1.0.0 by the maintainer's decision (2026-11-08): the only change is that the plugin now talks to the device through Netlens' shared HTTP client (netlens_http); what it reads and writes is unchanged and the plugin's tests pass. Not re-tested on the hardware."
      }
     },
     {
