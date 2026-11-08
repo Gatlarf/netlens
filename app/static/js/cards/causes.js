@@ -1,5 +1,6 @@
 import { get } from "../api.js";
 import { h, clear, fmtTime } from "../util.js";
+import { calendarHeat } from "../flows.js";
 
 // Two sections at the bottom of the Uptime card of a device (administrators): what changed shortly before an outage, and what depends on the device.
 // Both load when opened and keep the device page from refreshing itself while open, like the Stability section.
@@ -114,6 +115,18 @@ export function buildImpactSection(device) {
   return section("impact-card", "If this goes down…", "What depends on this device: use it before you reboot or unplug it.", async (body) => {
     try {
       showImpact(body, await get(`/api/insights/devices/${device.id}/impact`));
+    } catch (err) {
+      problem(body, err);
+    }
+  });
+}
+
+// ----------------------------------------------------------------------------- the year of a device, one square per day (everybody)
+export function buildCalendarSection(device) {
+  return section("calendar-card", "A year of availability", "One square per day: green is a full day, red a bad one; a dot marks a firmware or system change.", async (body) => {
+    try {
+      const out = await get(`/api/devices/${device.id}/calendar?days=365`);
+      body.appendChild(out.days.length ? calendarHeat(out) : h("p", { class: "hint" }, "No history yet."));
     } catch (err) {
       problem(body, err);
     }

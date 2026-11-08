@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.375 — 2026-11-08
+
+### Added
+- ★ **Replay an incident** (Insights, button on every incident): the devices of the incident on the network tree turn red and green in the order they went wrong and came back; play it or drag the slider.
+- ★ **A year of availability** (device page, under Uptime): one square per day, from green (a full day) to red, with a dot on the days a firmware or system change was logged; hover a square for the day, the percentage and the outages.
+- **Traffic flow** (Statistics → Network, when a router plugin counts traffic): devices on the left, applications on the right, the width of a band is the amount of traffic. The router counts devices and applications separately, so a band never says which device used which application.
+- **Roaming** (Statistics → Network → Wi-Fi): the access points as dots and the moves of clients between them as arrows, thicker for more moves, for the range you chose.
+
 ## 0.4.374 — 2026-11-08
 
 ### Changed

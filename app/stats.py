@@ -7,6 +7,7 @@ uptime checks (which are pruned after 90 days).
 
 from __future__ import annotations
 
+import re
 import itertools
 
 import json
@@ -114,7 +115,17 @@ def _topology_clients(conn) -> tuple[list[dict], dict[str, str]]:
 WEAK_RSSI = -75
 
 
-def _wifi(conn, now: str) -> dict:
+def _roam_flows(conn, now: str, days: float) -> list[dict]:
+    """How many times clients moved from one access point to another in the window: [{from, to, count}], the most used first (the picture of the Wi-Fi section)."""
+    flows: Counter = Counter()
+    for r in conn.execute("SELECT detail FROM events WHERE kind = 'wifi_roamed' AND ts >= ? ORDER BY id DESC LIMIT 5000", (_ago(now, days=days),)):
+        m = re.match(r"^(.+?) -> (.+?)(?: \([^)]*\))?$", r["detail"] or "")
+        if m and m.group(1) != m.group(2):
+            flows[(m.group(1), m.group(2))] += 1
+    return [{"from": a, "to": b, "count": n} for (a, b), n in flows.most_common(24)]
+
+
+def _wifi(conn, now: str, days: float = 7) -> dict:
     """Signal picture from the newest Wi-Fi sample of every client seen in the last two hours."""
     rows = conn.execute(
         f"""
@@ -136,6 +147,7 @@ def _wifi(conn, now: str) -> dict:
         "quality": [{"label": k, "count": v} for k, v in sorted(buckets.items(), key=lambda kv: -kv[1])],
         "weakest": [{"id": r["id"], "name": r["n"], "rssi": r["rssi"], "node": r["node"], "band": r["band"]} for r in weakest],
         "roams_7d": conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'wifi_roamed' AND ts >= ?", (_ago(now, days=7),)).fetchone()[0],
+        "roam_flows": _roam_flows(conn, now, days),
     }
 
 
@@ -608,7 +620,7 @@ def compute_stats(conn: sqlite3.Connection, range_key: str = "7d", now: str | No
         "range": range_key,
         "overview": _overview(conn, now),
         "composition": _composition(conn, devs, hierarchy),
-        "wifi": _wifi(conn, now),
+        "wifi": _wifi(conn, now, days),
         "availability": _availability(conn, now),
         "history": _history(conn, now, days),
         "ports": _ports(conn, now),

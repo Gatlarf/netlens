@@ -260,3 +260,35 @@ i.impact-dot.down { background: #dc2626; }
 .impact-levels h4 { margin: 8px 0 4px; font-size: 0.9rem; }
 .impact-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .impact-list li { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+/* Pictures (flows.js, cards/cascade.js) */
+.flow-bands, .flow-roam, .flow-calendar { width: 100%; height: auto; display: block; }
+.cascade-tree { max-width: 100%; height: auto; display: block; }
+.flow-ribbon.alt { opacity: 0.38; }
+.flow-bar { fill: var(--accent); }
+.flow-ribbon { fill: var(--accent); opacity: 0.22; }
+.flow-ribbon:hover { opacity: 0.5; }
+.flow-label { fill: var(--text); font-size: 10.5px; }
+.flow-arc { fill: none; stroke: var(--accent); opacity: 0.55; stroke-linecap: round; }
+.flow-arc:hover { opacity: 1; }
+.flow-arrow { fill: var(--accent); }
+.flow-node { fill: var(--accent); opacity: 0.85; }
+.cal-day { fill: var(--border); }
+.cal-day.cal-4 { fill: #16a34a; }
+.cal-day.cal-3 { fill: #86c98f; }
+.cal-day.cal-2 { fill: #e5b53c; }
+.cal-day.cal-1 { fill: #e0782b; }
+.cal-day.cal-0 { fill: #dc2626; }
+.cal-day.cal-none { fill: var(--border); opacity: 0.35; }
+.cal-mark { fill: var(--text); stroke: var(--bg, #fff); stroke-width: 1; }
+.cascade-bar { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.cascade-bar input[type=range] { flex: 1; }
+.cascade-clock { min-width: 5em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cascade-edge { stroke: var(--border); stroke-width: 2; }
+.cascade-dot { fill: #16a34a; transition: fill 0.2s; }
+.cascade-dot.down { fill: #dc2626; }
+.cascade-dot.up { fill: #16a34a; }
+.cascade-dot:not(.down):not(.up) { fill: var(--muted); opacity: 0.55; }
+.cascade-dot.fresh { stroke: currentColor; stroke-width: 3; animation: cascade-pulse 0.9s ease-out; }
+@keyframes cascade-pulse { from { stroke-width: 12; stroke-opacity: 0.6; } to { stroke-width: 0; stroke-opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cascade-dot.fresh { animation: none; } }

@@ -75,3 +75,17 @@ def test_causes_and_impact_need_insights_and_answer(client, monkeypatch):
     assert c.get("/api/insights/devices/1/impact", headers=AUTH).json()["risk"] == "none"
     assert c.get("/api/insights/devices/99/impact", headers=AUTH).status_code == 404
     assert c.get("/api/insights", headers=AUTH).json()["incidents"] is not None
+
+
+def test_cascade_needs_insights_and_a_known_incident(client, monkeypatch):
+    c, _ = client
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: feature != "insights")
+    assert c.get("/api/insights/incidents/1/cascade", headers=AUTH).status_code == 402
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: True)
+    assert c.get("/api/insights/incidents/999999/cascade", headers=AUTH).status_code == 404
+    first = c.get("/api/insights", headers=AUTH).json()["incidents"]
+    if first:
+        assert c.get(f"/api/insights/incidents/{first[0]['id']}/cascade", headers=AUTH).json()["steps"]
+    assert c.get("/api/devices/1/calendar", headers=AUTH).json()["device_id"] == 1
+    assert c.get("/api/devices/99/calendar", headers=AUTH).status_code == 404
+    assert c.get("/api/devices/1/calendar?days=3", headers=AUTH).status_code == 422

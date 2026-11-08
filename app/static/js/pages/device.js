@@ -23,7 +23,7 @@ import { buildParentCard } from "../cards/device_parent.js";
 import { buildDeviceSitesCards } from "../cards/proxy_sites.js";
 import { buildDeviceVulnCard } from "../cards/vulns.js";
 import { buildStabilitySection, isStabilityOpen } from "../cards/stability.js";
-import { buildCausesSection, buildImpactSection, isInsightOpen } from "../cards/causes.js";
+import { buildCalendarSection, buildCausesSection, buildImpactSection, isInsightOpen } from "../cards/causes.js";
 
 const WEB_PORTS = new Set([80, 443, 8080, 8443, 8006, 5000, 5001, 9000]);
 
@@ -866,6 +866,7 @@ export async function render(container, params) {
     ovRight.appendChild(uptimeSlot);
     buildDeviceUptimeCard(device.id).then((c) => {
       if (disposed) return;
+      c.appendChild(buildCalendarSection(device));
       if (isAdmin()) {
         const section = buildStabilitySection(device);
         section.classList.add("admin-only");

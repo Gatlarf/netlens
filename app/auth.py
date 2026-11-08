@@ -144,7 +144,7 @@ BUILTIN = Principal(username="access token", role="admin", builtin=True)
 VIEWER_READABLE = re.compile(
     r"^/(metrics"
     r"|api/(session|update|changelog|map|map-settings|hierarchy|relations|events|uptime|uptime/core|uptime/latest|uptime/replay|scans|scans/current|service-checks|service-checks/\d+/results|monitors|agent-status|monitoring/limits|forecast|reliability|traffic|snoozes|changes|reports/availability|reports/availability\.csv|reports/weekly|probes|probes/\d+|probes/\d+/availability(\.csv)?|timeseries/(device|service|probe)/\d+|timeseries/(device|service|probe)/\d+/[A-Za-z0-9_.-]+"
-    r"|me/totp|me/webauthn|me/sessions|me/stepup|stats|stats/summary|dashboard|dashboard/layout|dashboard/default|dashboard/shared|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)))$"
+    r"|me/totp|me/webauthn|me/sessions|me/stepup|stats|stats/summary|dashboard|dashboard/layout|dashboard/default|dashboard/shared|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime|calendar)))$"
 )
 VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery", "/api/me/webauthn/begin", "/api/me/webauthn/finish", "/api/me/webauthn/remove", "/api/me/sessions/end", "/api/me/sessions/revoke-others", "/api/me/stepup", "/api/speedtest/up", "/api/speedtest/browser")  # a viewer may test the line from their own device
 
@@ -161,7 +161,7 @@ OPERATOR_WRITABLE = (
 )
 # A viewer limited to some groups (a customer view) reads only the devices of those groups: the device list, a device and its history, the uptime page and the events.
 SCOPED_READABLE = re.compile(
-    r"^/api/(session|me/totp|me/webauthn|me/sessions|me/stepup|groups|devices|devices/\d+|devices/\d+/(wifi|uptime)|events|uptime|uptime/latest|uptime/replay|timeseries/device/\d+|timeseries/device/\d+/[A-Za-z0-9_.-]+)$"
+    r"^/api/(session|me/totp|me/webauthn|me/sessions|me/stepup|groups|devices|devices/\d+|devices/\d+/(wifi|uptime|calendar)|events|uptime|uptime/latest|uptime/replay|timeseries/device/\d+|timeseries/device/\d+/[A-Za-z0-9_.-]+)$"
 )
 SCOPED_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery", "/api/me/webauthn/begin", "/api/me/webauthn/finish", "/api/me/webauthn/remove", "/api/me/sessions/end", "/api/me/sessions/revoke-others", "/api/me/stepup")
 SCOPED_SITE_READABLE = re.compile(r"^/api/(probes|probes/\d+|probes/\d+/availability(\.csv)?|timeseries/(remote|remote_service)/\d+(/[A-Za-z0-9_.-]+)?)$")

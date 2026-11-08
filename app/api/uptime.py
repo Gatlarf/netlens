@@ -34,6 +34,17 @@ def get_uptime_latest(request: Request, conn=Depends(get_conn)) -> list[dict]:
     return out
 
 
+@router.get("/devices/{device_id}/calendar")
+def get_device_calendar(device_id: int, days: int = Query(365, ge=7, le=400), conn=Depends(get_conn)) -> dict:
+    """Availability of a device per day (a calendar heatmap), with outages per day and its firmware and OS changes as marks. {from, to, days: [{d, pct, outages}], marks: [{d, kind, text}]}"""
+    from app import visuals
+
+    out = visuals.calendar(conn, device_id, days)
+    if out is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    return out
+
+
 @router.get("/uptime/replay")
 def get_uptime_replay(request: Request, hours: int = Query(24, ge=1, le=168), conn=Depends(get_conn)) -> dict:
     """What the HUD time machine replays: for every device with checks in the last `hours`, its state at the start of the window (`initial`) and every

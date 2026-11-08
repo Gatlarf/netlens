@@ -2,6 +2,7 @@ import { get } from "../api.js";
 import { h, clear, toast, timeAgo, fmtTime, TYPE_LABELS, isAdmin, latest } from "../util.js";
 import { eventLabel } from "../event_labels.js";
 import { pageHead } from "../ui.js";
+import { roamMap, trafficBands } from "../flows.js";
 import { applyLayout, loadLayout, startBoard } from "../layout_cards.js";
 import { barList, columnChart, donut, emptyNote, fmtBytes, fmtDuration, fmtNumber, fmtPct, lineChart, tile } from "../charts.js";
 
@@ -38,6 +39,8 @@ const TIPS = [
   ["Most common open ports", "The ports found open on the most devices."],
   ["Most common services", "The services (web, SSH, SMB and so on) found on the most devices."],
   ["Devices with the most open ports", "Devices exposing the most ports. More open ports means a bigger surface to keep secure."],
+  ["Traffic flow", "Devices on the left, applications on the right, the width of a band is the amount of traffic. The router counts devices and applications separately, so a band does not say which device used which application."],
+  ["Roaming", "How often Wi-Fi clients moved from one access point to another in the chosen range; a thicker arrow is more moves."],
   ["Top applications", "The applications that used the most traffic in the chosen range, as the router's traffic analyser (for example ASUS Traffic Analyzer) counts them. Down is traffic towards your devices, up is traffic from them."],
   ["Top devices by traffic", "The devices that used the most traffic in the chosen range, as the router counts it."],
   ["Traffic per day", "The total traffic the router counted on each day."],
@@ -127,6 +130,7 @@ function build(s) {
   if (w.clients) {
     root.appendChild(section("wifi", "Wi-Fi",
       h("div", { class: "tiles inline" }, tile(fmtNumber(w.clients), "Wi-Fi clients"), tile(w.avg_rssi === null ? "–" : `${w.avg_rssi} dBm`, "average signal"), tile(fmtNumber(w.weak), "weak (below -75 dBm)", { tone: w.weak ? "warn" : "" }), tile(fmtNumber(w.roams_7d), "moves between nodes, 7 days")),
+      w.roam_flows && w.roam_flows.length ? card("Roaming", roamMap(w.roam_flows)) : null,
       card("Signal quality", donut(w.quality)),
       card("Weakest clients", table(["Device", "Signal", "Node", "Band"], w.weakest.map((r) => [link(r), `${r.rssi} dBm`, r.node || "", r.band || ""])))));
   }
@@ -215,6 +219,10 @@ function build(s) {
     const bytesItem = (r, extra = {}) => ({ label: r.name, count: both(r), text: fmtBytes(both(r)), ...extra });
     root.appendChild(section("applications", "Applications",
       h("div", { class: "tiles inline" }, tile(fmtBytes(ap.rx), "downloaded"), tile(fmtBytes(ap.tx), "uploaded"), tile(fmtNumber(ap.applications_total), "applications seen"), tile(fmtNumber(ap.days), ap.days === 1 ? "day counted" : "days counted")),
+      ap.clients.length && ap.applications.length ? card("Traffic flow", trafficBands(ap.clients.slice(0, 8).map((r) => ({ label: r.name, value: both(r) })), (() => {
+        const shown = ap.applications.slice(0, 8).map((r) => ({ label: r.name, value: both(r) })), rest = ap.rx + ap.tx - shown.reduce((a, b) => a + b.value, 0);
+        return rest > 0 ? [...shown, { label: "others", value: rest }] : shown;
+      })(), fmtBytes)) : null,
       card("Top applications", barList(ap.applications.map((r) => bytesItem(r)))),
       card("Top devices by traffic", barList(ap.clients.map((r) => bytesItem(r, dev({ id: r.id, label: r.name }))))),
       ap.per_day.length > 1 ? card("Traffic per day", columnChart(ap.per_day.map((r) => ({ x: r.day, v: both(r) })))) : null));

@@ -10,7 +10,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app import aireport, anomaly, asklog, causes, relevance, ask, forecast, identify, incidents, insights, investigate, modelcheck, postmortem
+from app import aireport, anomaly, asklog, causes, visuals, relevance, ask, forecast, identify, incidents, insights, investigate, modelcheck, postmortem
 from app import engineer
 from app.api.devices import get_conn
 
@@ -130,6 +130,16 @@ async def device_impact(device_id: int, conn=Depends(get_conn)) -> dict:
     out = await asyncio.to_thread(causes.impact, conn, device_id)
     if out is None:
         raise HTTPException(status_code=404, detail="no such device")
+    return out
+
+
+@router.get("/insights/incidents/{incident_id}/cascade")
+async def incident_cascade(incident_id: int, conn=Depends(get_conn)) -> dict:
+    """An incident as a cascade through the network tree: who went wrong when and who came back when (seconds from the start), for the replay."""
+    _allowed(conn)
+    out = await asyncio.to_thread(visuals.cascade, conn, incident_id)
+    if out is None:
+        raise HTTPException(status_code=404, detail="that incident is no longer in the list")
     return out
 
 

@@ -3,6 +3,7 @@ import { h, clear, toast, timeAgo, fmtTime, isAdmin } from "../util.js";
 import { pageHead } from "../ui.js";
 import { boardPage } from "../layout_cards.js";
 import { showCauses } from "../cards/causes.js";
+import { cascade } from "../cards/cascade.js";
 
 const TYPES = ["router", "switch", "ap", "server", "pc", "phone", "tablet", "tv", "speaker", "console", "appliance", "printer", "iot", "camera", "nas", "vm"];
 
@@ -148,7 +149,14 @@ export async function render(container) {
         try { showCauses(beforeOut, await get(`/api/insights/devices/${target}/causes?at=${encodeURIComponent(i.start)}`)); } catch (err) { toast(err.message || "Failed", "error"); }
         before.disabled = false;
       });
-      row.append(dig, rep, ...(target != null ? [before] : []), why, repOut, beforeOut);
+      const replay = h("button", { class: "btn", type: "button", title: "Play the incident on the network tree: who went wrong when, and who came back" }, "Replay");
+      const replayOut = h("div", { class: "ins-text" });
+      replay.addEventListener("click", async () => {
+        replay.disabled = true;
+        try { cascade(replayOut, await get(`/api/insights/incidents/${i.id}/cascade`)); } catch (err) { toast(err.message || "Failed", "error"); }
+        replay.disabled = false;
+      });
+      row.append(dig, rep, ...(target != null ? [before, replay] : []), why, repOut, beforeOut, replayOut);
       if (data.status.llm_ready) {
         const words = h("button", { class: "btn ghost", type: "button" }, "Say it in the model's words");
         words.addEventListener("click", async () => {
