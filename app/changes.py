@@ -60,9 +60,15 @@ def timeline(conn: sqlite3.Connection, period: str = "24h", category: str = "", 
         for r in conn.execute("SELECT ts, user, action, path, status FROM audit_log WHERE ts >= ? AND status < 400 AND method != 'GET' AND path NOT LIKE '/api/login%' AND path NOT LIKE '/api/logout%' ORDER BY id DESC LIMIT ?", (since, 1000)):
             action = r["action"]
             items.append({"ts": r["ts"], "category": "settings", "kind": "change", "text": action, "device_id": None, "device": None, "who": r["user"] or None})
-    counts: dict[str, int] = {}
-    for it in items:
-        counts[it["category"]] = counts.get(it["category"], 0) + 1
+    counts: dict[str, int] = {}                  # real totals: the lists above are capped (2000 events, 1000 changes), a count must not stop at the cap
+    for r in conn.execute("SELECT kind, device_id, COUNT(*) AS n FROM events WHERE ts >= ? GROUP BY kind, device_id", (since,)):
+        if r["kind"] in QUIET or (only is not None and r["device_id"] is not None and r["device_id"] not in only):
+            continue
+        counts[category_of(r["kind"])] = counts.get(category_of(r["kind"]), 0) + r["n"]
+    if include_audit:
+        n = conn.execute("SELECT COUNT(*) FROM audit_log WHERE ts >= ? AND status < 400 AND method != 'GET' AND path NOT LIKE '/api/login%' AND path NOT LIKE '/api/logout%'", (since,)).fetchone()[0]
+        if n:
+            counts["settings"] = n
     if category in CATEGORIES:
         items = [it for it in items if it["category"] == category]
     items.sort(key=lambda it: it["ts"], reverse=True)

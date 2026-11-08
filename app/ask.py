@@ -182,8 +182,10 @@ def t_plugins(conn, args, now=None) -> dict:
     for r in conn.execute("SELECT plugin_id, COUNT(*) AS n, SUM(ok) AS good, ROUND(AVG(ms), 0) AS avg_ms, ROUND(MAX(ms), 0) AS max_ms, MAX(ts) AS last_ts FROM plugin_runs WHERE ts >= ? GROUP BY plugin_id ORDER BY (n - good) DESC, plugin_id LIMIT ?",
                           (_since(days, now), LIMIT)):
         err = conn.execute("SELECT ts, detail FROM plugin_runs WHERE plugin_id = ? AND ok = 0 AND ts >= ? ORDER BY id DESC LIMIT 1", (r["plugin_id"], _since(days, now))).fetchone()
+        latest = conn.execute("SELECT ok FROM plugin_runs WHERE plugin_id = ? ORDER BY id DESC LIMIT 1", (r["plugin_id"],)).fetchone()
         out.append({"plugin": r["plugin_id"], "syncs": r["n"], "failed": r["n"] - (r["good"] or 0), "avg_sync_ms": r["avg_ms"], "slowest_sync_ms": r["max_ms"], "last_sync": r["last_ts"],
-                    "last_error": (err["detail"] or "")[:160] if err else ""})
+                    "last_sync_ok": bool(latest and latest["ok"]),          # a failure that is days old must not read as a current problem
+                    "last_error": (err["detail"] or "")[:160] if err else "", "last_error_at": err["ts"] if err else ""})
     return {"days": days, "plugins": out}
 
 

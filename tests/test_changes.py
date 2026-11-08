@@ -69,3 +69,13 @@ def test_only_always_on_devices_leaves_out_the_others(conn):
     core = changes.timeline(conn, "24h", include_audit=True, now=NOW, only={1})
     assert any(i["device"] == "iphone" for i in everything["items"]) and not any(i["device"] == "iphone" for i in core["items"])
     assert any(i["kind"] == "change" for i in core["items"]) and any(i["device"] == "nas" for i in core["items"])      # changes made by people and the nas stay
+
+
+def test_the_counts_are_real_totals_not_the_size_of_the_capped_list(conn):
+    for i in range(2100):
+        conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES (?, 1, 'device_offline', 'x')", (stamp(1),))
+    for i in range(1100):
+        conn.execute("INSERT INTO audit_log (ts, user, role, ip, method, path, status, action) VALUES (?, 'bert', 'admin', '1.2.3.4', 'PUT', '/api/x', 200, 'Changed')", (stamp(1),))
+    conn.commit()
+    doc = changes.timeline(conn, "24h", include_audit=True, now=NOW)
+    assert doc["counts"]["settings"] == 1101 and doc["counts"]["availability"] >= 2100

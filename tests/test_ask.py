@@ -179,3 +179,11 @@ def test_what_is_wrong_also_names_a_full_disk(conn):
     conn.commit()
     a = ask.answer(conn, "What is wrong right now?", NOW)
     assert "Needs attention" in a["answer"] and "nas" in a["answer"] and "100%" in a["answer"]
+
+
+def test_the_plugin_answer_says_whether_the_last_sync_worked(conn):
+    for ts, ok, detail in (("2026-11-01T08:00:00Z", 0, "cannot reach x: timed out"), ("2026-11-01T09:00:00Z", 1, "")):
+        conn.execute("INSERT INTO plugin_runs (plugin_id, ts, ok, ms, detail) VALUES ('proxmox', ?, ?, 100, ?)", (ts, ok, detail))
+    conn.commit()
+    row = ask.TOOLS["plugins"][0](conn, {"days": 7}, now=datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc))["plugins"][0]
+    assert row["failed"] == 1 and row["last_sync_ok"] is True and row["last_error_at"] == "2026-11-01T08:00:00Z"
