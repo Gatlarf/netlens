@@ -14,7 +14,7 @@ export function replay({ onChange, getTree, getDevices }) {
   const speedSel = h("select", { "aria-label": "Replay speed" }, ...SPEEDS.map(([v, l]) => h("option", { value: String(v) }, l)));
   const nowBtn = h("button", { type: "button", class: "hud-rbtn" }, "Back to now");
   const clock = h("span", { class: "hud-rclock" });
-  const strip = h("canvas", { class: "hud-rstrip", height: 36, "aria-hidden": "true" });
+  const strip = h("canvas", { class: "hud-rstrip", height: 36, title: "Amber ticks: something changed (a port, an update, a container)", "aria-hidden": "true" });
   const slider = h("input", { type: "range", min: 0, max: 1, step: 1, value: 1, "aria-label": "Moment to show" });
   const list = h("div", { class: "hud-revents" });
   const note = h("div", { class: "hud-rnote" });
@@ -60,7 +60,7 @@ export function replay({ onChange, getTree, getDevices }) {
     data = { from, to, series, changes, counts, total, markers };
     slider.max = String(Math.round((to - from) / 60000));
     set(to, false);
-    note.textContent = changes.length ? (markers.length ? "Amber ticks at the top: something changed (a port, an update, a container)." : "") : "No device changed state in this period.";
+    note.textContent = changes.length ? "" : "No device changed state in this period.";
     if (!series.size) note.textContent = "There are no checks in this period yet.";
   }
 

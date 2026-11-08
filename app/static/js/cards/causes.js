@@ -10,7 +10,7 @@ export function isInsightOpen() {
 
 function section(id, title, hint, load) {
   const details = h("details", { class: "stability-details", id });
-  details.appendChild(h("summary", {}, h("strong", {}, title), h("span", { class: "hint" }, hint)));
+  details.appendChild(h("summary", { title: hint }, h("strong", {}, title)));
   const body = h("div", { class: "stability-body" });
   details.appendChild(body);
   let was = false, loaded = false;
@@ -32,19 +32,17 @@ const RELATION = { "this device": "this device", "above it": "the device it is p
 // ----------------------------------------------------------------------------- what changed before it broke
 export function showCauses(body, out, reload) {
   clear(body);
-  body.appendChild(h("p", { class: "hint" }, out.note));
   if (reload && out.outages.length) {
     const pick = h("select", { name: "outage", "aria-label": "Which outage" });
     for (const ts of out.outages) pick.appendChild(h("option", { value: ts, selected: ts === out.at }, `went offline ${fmtTime(ts)}`));
     pick.addEventListener("change", () => reload(pick.value));
     body.appendChild(h("div", { class: "btn-row" }, pick));
   }
-  body.appendChild(h("p", {}, `Looking at the ${out.window_hours} hours before ${fmtTime(out.at)} (${out.basis}).`));
   if (!out.suspects.length) {
     body.appendChild(h("p", { class: "hint" }, `Nothing that counts as a change was recorded around ${out.device} in that time. That is information too: the cause is probably outside what Netlens watches.`));
     return;
   }
-  const list = h("ul", { class: "findings" });
+  const list = h("ul", { class: "findings", title: out.note });
   const top = out.suspects[0].score;
   for (const s of out.suspects) {
     const strong = s.score >= top * 0.6;
@@ -57,8 +55,6 @@ export function showCauses(body, out, reload) {
 
 export function buildCausesSection(device) {
   const load = async (body, at) => {
-    clear(body);
-    body.appendChild(h("p", { class: "hint" }, "Looking…"));
     try {
       showCauses(body, await get(`/api/insights/devices/${device.id}/causes${at ? `?at=${encodeURIComponent(at)}` : ""}`), (ts) => load(body, ts));
     } catch (err) {
@@ -111,12 +107,11 @@ function showImpact(body, out) {
   }
   if (out.guests.length) body.appendChild(h("p", {}, h("strong", {}, "Containers and apps on it: "), out.guests.slice(0, 20).map((g) => g.name).join(", ") + (out.guests.length > 20 ? `, … (${out.guests.length})` : "")));
   if (out.services.length) body.appendChild(h("p", {}, h("strong", {}, "Service checks that would fail: "), out.services.slice(0, 20).map((s) => s.name).join(", ") + (out.services.length > 20 ? `, … (${out.services.length})` : "")));
-  body.appendChild(h("p", { class: "hint" }, out.note));
+  body.title = out.note;
 }
 
 export function buildImpactSection(device) {
   return section("impact-card", "If this goes down…", "What depends on this device: use it before you reboot or unplug it.", async (body) => {
-    body.appendChild(h("p", { class: "hint" }, "Looking…"));
     try {
       showImpact(body, await get(`/api/insights/devices/${device.id}/impact`));
     } catch (err) {
