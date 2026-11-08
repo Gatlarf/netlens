@@ -43,7 +43,7 @@ export async function buildRolesCard() {
           if (!window.confirm(`Remove the role “${r.name}”? ${r.users ? `${r.users} user(s) keep their base role (${r.base}).` : ""}`)) return;
           try { data = await del(`/api/roles/${r.id}`); draw(); } catch (err) { toast(err.message || "Could not remove", "error"); }
         } }, "Remove")))));
-    card.appendChild(rows.length ? h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("thead", {}, h("tr", {}, ["Role", "Based on", "May also read", "Users", ""].map((t) => h("th", {}, t)))), h("tbody", {}, rows))) : h("p", { class: "hint" }, "No custom roles yet."));
+    card.appendChild(rows.length ? h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("thead", {}, h("tr", {}, ["Role", "Based on", "May also read", "Users", ""].map((t) => h("th", {}, t)))), h("tbody", {}, rows))) : h("p", { class: "hint" }, data.allowed ? "No custom roles yet. Add one, for example an Auditor (a viewer who may also read the audit log and the reports), then give it to a user under Users & tokens." : "No custom roles yet."));
     if (editing === null) { if (data.allowed) card.appendChild(h("div", { class: "form-actions" }, h("button", { class: "btn primary", type: "button", onclick: () => { editing = ""; draw(); } }, "Add a role"))); }
     else card.appendChild(form());
   }

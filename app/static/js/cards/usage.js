@@ -1,4 +1,5 @@
 import { get, put } from "../api.js";
+import { longHint } from "../ui.js";
 import { h, clear, toast } from "../util.js";
 import { fmtNumber } from "../charts.js";
 
@@ -10,7 +11,7 @@ export async function buildUsageCard() {
     clear(card);
     card.appendChild(h("h2", {}, "Traffic statistics"));
     card.appendChild(h("p", {}, "Some routers can tell which application (YouTube, Netflix, a game...) each device used how much traffic for: the ASUS Traffic Analyzer, and the application statistics (DPI) of an Omada gateway. Netlens shows this in Statistics > Network > Applications and on the Network tab of each device."));
-    card.appendChild(h("p", { class: "hint" }, "This is data about what people do online. In some countries it may not be collected at all, or only with the knowledge or consent of the people concerned (a home, a company and a guest network are not the same). It is switched off until you turn it on, and switching it off again deletes everything stored. Only administrators can see it."));
+    card.appendChild(longHint("This is data about what people do online. In some countries it may not be collected at all, or only with the knowledge or consent of the people concerned (a home, a company and a guest network are not the same). It is switched off until you turn it on, and switching it off again deletes everything stored. Only administrators can see it."));
     const box = h("input", { type: "checkbox" });
     box.checked = state.enabled;
     card.appendChild(h("label", { class: "check-row" }, box, " Collect and keep application statistics"));

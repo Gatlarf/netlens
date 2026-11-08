@@ -1,4 +1,5 @@
 import { get, put, post } from "../api.js";
+import { longHint } from "../ui.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
 function field(label, input, hint) {
@@ -83,7 +84,7 @@ export async function buildCentralCard() {
       h("label", {}, accept, " Accept configuration and commands from the central Netlens"),
       h("p", { class: "hint" }, "When ticked, the central Netlens may set up service checks and health monitors here (they appear marked as managed from the central Netlens and cannot be changed here) and ask this Netlens to scan its network. Leave it off to keep all settings at this location. Logins it sends are stored encrypted."),
       h("label", {}, view, " Let the central Netlens show this site"),
-      h("p", { class: "hint" }, "When ticked, an administrator of the central Netlens can open this site there and see the same pages as here (devices, graphs, statistics, ports...), live and read only. Nothing is copied: the pages ask this Netlens, which keeps the connection open from here, so nothing has to be reachable from outside. Accounts, backups, the licence and other secrets are never shown. While it is off, the central Netlens only sees what this site reports."),
+      longHint("When ticked, an administrator of the central Netlens can open this site there and see the same pages as here (devices, graphs, statistics, ports...), live and read only. Nothing is copied: the pages ask this Netlens, which keeps the connection open from here, so nothing has to be reachable from outside. Accounts, backups, the licence and other secrets are never shown. While it is off, the central Netlens only sees what this site reports."),
       h("div", { class: "form-actions" }, save, send), result));
   }
 

@@ -2,6 +2,7 @@ import { api, get } from "../api.js";
 import { rowMenu } from "../ui.js";
 import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, fmtTime } from "../util.js";
+import { formDialog } from "../formdialog.js";
 
 const ROLE_TEXT = { admin: "Administrator (everything)", operator: "Operator (looks and acts, no settings) - business feature", viewer: "Viewer (read-only)" };
 
@@ -95,9 +96,10 @@ function userRow(user, data, refresh, shown) {
 
   const actions = h("td", {});
   const pw = h("button", { type: "button", class: "btn" }, "New password");
-  pw.addEventListener("click", () => {
-    const value = window.prompt(`New password for ${user.username} (at least ${data.min_password} characters). Their logins end.`);
-    if (value) call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { password: value } }), "Password changed");
+  pw.addEventListener("click", async () => {
+    const got = await formDialog({ title: `New password for ${user.username}`, text: "Their logins end.", ok: "Change password",
+      fields: [{ key: "password", label: "New password", type: "password", required: true, min: data.min_password, hint: `At least ${data.min_password} characters.` }] });
+    if (got) call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { password: got.password } }), "Password changed");
   });
   const toggle = h("button", { type: "button", class: "btn" }, user.disabled ? "Enable" : "Disable");
   toggle.addEventListener("click", () => call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { disabled: !user.disabled } }), user.disabled ? "User enabled" : "User disabled"));
@@ -106,22 +108,17 @@ function userRow(user, data, refresh, shown) {
     if (window.confirm(`Delete ${user.username}? Their logins and API tokens stop working.`)) call(() => api(`/api/users/${user.id}`, { method: "DELETE" }), "User deleted");
   });
   const tok = h("button", { type: "button", class: "btn" }, "New API token");
-  tok.addEventListener("click", () => {
-    const name = window.prompt("What is the token for? (for example Home Assistant)");
-    if (!name) return;
-    const readonly = window.confirm("Make it read-only?\n\nOK: the token can only read (right for Prometheus, Grafana and dashboards).\nCancel: it acts with the role of its user.");
-    const body = { name, readonly };
+  tok.addEventListener("click", async () => {
     const policy = data.token_policy || {};
-    if (policy.max_days || policy.may_restrict) {
-      const days = window.prompt(`How many days may the token be used?${policy.max_days ? ` (at most ${policy.max_days})` : " Leave empty for no end."}`, policy.max_days ? String(policy.max_days) : "");
-      if (days === null) return;
-      if (days.trim()) body.expires_days = Number(days);
-      if (policy.may_restrict) {
-        const where = window.prompt("Only from these addresses or networks (comma separated, for example 10.0.0.0/24). Leave empty for anywhere.", "");
-        if (where === null) return;
-        if (where.trim()) body.allowed_ips = where.split(",").map((x) => x.trim()).filter(Boolean);
-      }
-    }
+    const fields = [{ key: "name", label: "What is the token for?", placeholder: "for example Home Assistant", required: true },
+      { key: "readonly", label: "Read-only (right for Prometheus, Grafana and dashboards)", type: "checkbox", hint: "Not ticked: the token acts with the role of its user." }];
+    if (policy.max_days || policy.may_restrict) fields.push({ key: "days", label: "Days it may be used", type: "number", value: policy.max_days || "", hint: policy.max_days ? `At most ${policy.max_days}.` : "Leave empty for no end." });
+    if (policy.may_restrict) fields.push({ key: "where", label: "Only from these addresses or networks", placeholder: "10.0.0.0/24, comma separated", hint: "Leave empty for anywhere." });
+    const got = await formDialog({ title: `New API token for ${user.username}`, fields, ok: "Create token" });
+    if (!got) return;
+    const body = { name: got.name.trim(), readonly: got.readonly };
+    if (got.days && String(got.days).trim()) body.expires_days = Number(got.days);
+    if (got.where && got.where.trim()) body.allowed_ips = got.where.split(",").map((x) => x.trim()).filter(Boolean);
     call(() => api(`/api/users/${user.id}/tokens`, { method: "POST", body }), null);
   });
   if (user.last_admin) for (const b of [toggle, del]) { b.disabled = true; b.title = "This is the last administrator: make another user an administrator first"; }
@@ -132,9 +129,10 @@ function userRow(user, data, refresh, shown) {
     reset.addEventListener("click", async () => {
       let mine = { enabled: false };
       try { mine = await api("/api/me/totp"); } catch { /* the access token has no second factor: the server explains */ }
-      const proof = window.prompt(mine.enabled ? `Reset the second factor of ${user.username}? Enter a code from your own authenticator to confirm.` : `Reset the second factor of ${user.username}? Enter your own password to confirm.`);
-      if (!proof) return;
-      call(() => api(`/api/users/${user.id}/totp/reset`, { method: "POST", body: mine.enabled ? { code: proof } : { password: proof } }), "Second factor reset: their sessions ended");
+      const got = await formDialog({ title: `Reset the second factor of ${user.username}?`, text: "Their sessions end.", ok: "Reset",
+        fields: [mine.enabled ? { key: "proof", label: "A code from your own authenticator", required: true } : { key: "proof", label: "Your own password", type: "password", required: true }] });
+      if (!got) return;
+      call(() => api(`/api/users/${user.id}/totp/reset`, { method: "POST", body: mine.enabled ? { code: got.proof } : { password: got.proof } }), "Second factor reset: their sessions ended");
     });
     more.push(reset);
   }

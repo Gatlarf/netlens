@@ -2,6 +2,17 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.369 — 2026-11-08
+
+### Changed
+- **Passwords are no longer typed into a browser pop-up.** "New password", "New API token" (one form instead of four questions) and "Reset 2FA" in Users & tokens use a proper dialog: password fields are masked, every field has a label, Escape cancels.
+- **Every form label now points at its field** (click the label to focus it; screen readers read it), on every page.
+- **Long explanations are shortened** on 10 settings pages: the first sentences stay, the rest opens under "More". Export and Roles explain what they are for; about 25 widths and margins written on single fields became shared styles.
+
+### Fixed
+- **Slow answers no longer overwrite newer ones** on Audit log, What changed, Vulnerabilities, Statistics and Scans & events (typing in a search box or switching a filter quickly could show the result of an older request).
+- **The weekly clean-up of old data works in pieces of 10,000 rows**, so a long history no longer blocks other writes for minutes, and a clean-up that fails says so in the system log (before it silently did nothing).
+
 ## 0.4.366 — 2026-11-08
 
 ### Changed

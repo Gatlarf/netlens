@@ -1,6 +1,6 @@
 // Vulnerabilities: what the vulnerability scanners (Greenbone, Tenable, Rapid7 ...) found on your devices, worst first.
 import { get } from "../api.js";
-import { h, clear, timeAgo, isAdmin } from "../util.js";
+import { h, clear, timeAgo, isAdmin, latest } from "../util.js";
 import { pageHead, tile, tileRow, emptyState } from "../ui.js";
 import { boardPage, gatherCards } from "../layout_cards.js";
 import { findingsTable, sevBadge, SEV_LABEL } from "../cards/vulns.js";
@@ -53,17 +53,21 @@ export async function render(container) {
     board.apply({ main: gatherCards(body) });
   };
 
+  const fresh = latest();
   async function load() {
+    const current = fresh();
     const params = new URLSearchParams();
     if (sev) params.set("severity", sev);
     if (q.trim()) params.set("q", q.trim());
     try {
-      data = await get(`/api/vulns?${params.toString()}`);
+      const got = await get(`/api/vulns?${params.toString()}`);
+      if (!current()) return;
+      data = got;
       const keep = document.activeElement && document.activeElement.type === "search";
       draw();
       if (keep) { const input = body.querySelector("input[type=search]"); if (input) { input.focus(); input.setSelectionRange(q.length, q.length); } }
     } catch (err) {
-      body.replaceChildren(h("p", { class: "error" }, err.message || "Could not load the vulnerabilities"));
+      if (current()) body.replaceChildren(h("p", { class: "error" }, err.message || "Could not load the vulnerabilities"));
     }
   }
   await load();

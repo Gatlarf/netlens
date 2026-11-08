@@ -72,7 +72,7 @@ function bulkSection(card, groups) {
     h("option", { value: "" }, "(no group: take them out of their group)"));
   const search = h("input", { type: "search", placeholder: "Filter by name, address or group", "aria-label": "Filter the devices" });
   const onlyFree = h("input", { type: "checkbox", checked: true });
-  const list = h("div", { class: "bulk-list", style: "max-height:22rem;overflow:auto;border:1px solid var(--border, #8884);border-radius:var(--radius-sm);padding:6px" }, h("p", { class: "hint" }, "Loading devices…"));
+  const list = h("div", { class: "bulk-list scroll-list" }, h("p", { class: "hint" }, "Loading devices…"));
   const count = h("span", { class: "hint" });
   const apply = h("button", { type: "button", class: "btn primary", disabled: true }, "Add to group");
   const selectShown = h("button", { type: "button", class: "btn" }, "Select all shown");
@@ -96,7 +96,7 @@ function bulkSection(card, groups) {
     for (const d of rows) {
       const tick = h("input", { type: "checkbox", checked: chosen.has(d.id) });
       tick.addEventListener("change", () => { tick.checked ? chosen.add(d.id) : chosen.delete(d.id); refreshCount(); });
-      list.appendChild(h("label", { style: "display:flex;gap:8px;align-items:center;padding:2px 4px" }, tick,
+      list.appendChild(h("label", { class: "row-check padded" }, tick,
         h("span", {}, d.name || d.primary_ip || `#${d.id}`), h("span", { class: "hint" }, [d.primary_ip, d.group ? `in ${d.group}` : "no group"].filter(Boolean).join(" · "))));
     }
     refreshCount();
@@ -119,7 +119,7 @@ function bulkSection(card, groups) {
 
   box.appendChild(h("div", { class: "field" }, h("label", {}, "Group"), target));
   box.appendChild(h("div", { class: "field" }, h("label", {}, "Devices"), search));
-  box.appendChild(h("label", { style: "display:flex;gap:8px;align-items:center" }, onlyFree, "Only devices without a group"));
+  box.appendChild(h("label", { class: "row-check" }, onlyFree, "Only devices without a group"));
   box.appendChild(list);
   box.appendChild(h("div", { class: "btn-row" }, apply, selectShown, clearAll, count));
   get("/api/devices").then((all) => {

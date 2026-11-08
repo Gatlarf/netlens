@@ -3,6 +3,27 @@
 import { h } from "./util.js";
 
 // `hint` says what the page does; it sits behind a "?" next to the title so the content starts higher and every page begins the same way.
+let fieldCount = 0;
+// A labelled form field: the label points at the control (clicking it focuses the field, screen readers read it). `input` is a control or a wrapper that contains one.
+export function field(label, input, hint) {
+  const control = input && input.matches && input.matches("input, select, textarea") ? input : input && input.querySelector ? input.querySelector("input, select, textarea") : null;
+  const attrs = {};
+  if (control) {
+    if (!control.id) control.id = `f-${++fieldCount}`;
+    attrs.for = control.id;
+  }
+  return h("div", { class: "field" }, h("label", attrs, label), input, hint ? h("p", { class: "hint" }, hint) : null);
+}
+
+// A long explanation: the first sentences stay visible, the rest opens with "More".
+export function longHint(text, limit = 240) {
+  if (text.length <= limit + 60) return h("p", { class: "hint" }, text);
+  let cut = text.lastIndexOf(". ", limit);
+  if (cut < 80) cut = text.indexOf(". ", limit);
+  if (cut < 0) return h("p", { class: "hint" }, text);
+  return h("div", { class: "hint" }, h("p", {}, text.slice(0, cut + 1)), h("details", { class: "hint-more" }, h("summary", {}, "More"), h("p", {}, text.slice(cut + 2))));
+}
+
 export function pageHead(title, hint, ...actions) {
   return h("div", { class: "page-head up-head" },
     h("div", { class: "page-title" }, h("h1", {}, title, hint ? infoTip(hint) : null)),

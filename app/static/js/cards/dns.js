@@ -1,4 +1,5 @@
 import { get, post, put } from "../api.js";
+import { field } from "../ui.js";
 import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
@@ -19,10 +20,6 @@ const STATE_HELP = {
 };
 const ORDER = ["conflict", "add", "update", "delete", "wait", "orphan", "skip", "self", "ok"];
 const ACTIONABLE = new Set(["add", "update", "delete"]);
-
-function field(label, input, hint) {
-  return h("div", { class: "field" }, h("label", {}, label), input, hint ? h("p", { class: "hint" }, hint) : null);
-}
 
 function checkbox(name, checked, label, hint) {
   const input = h("input", { type: "checkbox", name, checked });

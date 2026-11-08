@@ -1,12 +1,12 @@
 // The window for making and changing a card of your own.
 import { h, clear } from "./util.js";
+import { field } from "./ui.js";
 import { FORMATS, TYPES, customCard, flatten, formatValue, guessFormat } from "./dashboard_cards.js";
 
 const PAGES = [["", "Nowhere"], ["#/dashboard", "Dashboard"], ["#/map", "Map"], ["#/devices", "Devices"], ["#/hierarchy", "Hierarchy"], ["#/speedtest", "Speed tests"], ["#/uptime", "Uptime"],
   ["#/services", "Services"], ["#/stats", "Statistics"], ["#/scans", "Scans & events"], ["#/settings", "Settings"]];
 const newId = () => `c-${Math.random().toString(36).slice(2, 8).replace(/[^a-z0-9]/g, "x")}`;
 const num = (input) => (input.value.trim() === "" ? null : Number(input.value));
-const field = (label, input, hint) => h("div", { class: "field" }, h("label", {}, label), input, hint ? h("p", { class: "hint" }, hint) : null);
 const select = (options, value) => { const s = h("select", {}, options.map(([v, t]) => h("option", { value: v }, t))); s.value = value; return s; };
 
 // def: an existing card to change, or null to make one. data: the dashboard data (what the pickers offer). onSave(def): the page stores it.

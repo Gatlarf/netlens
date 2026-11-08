@@ -1,4 +1,5 @@
 import { get, put, del } from "../api.js";
+import { longHint } from "../ui.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 import { humanDuration } from "../heartbeat.js";
 
@@ -252,13 +253,13 @@ export async function buildScanOptionsCard() {
 
     const fieldGentle = h("div", { class: "field" });
     fieldGentle.appendChild(h("label", {}, "Gentle scanning per kind of device"));
-    fieldGentle.appendChild(h("p", { class: "hint" }, "Deep scans only check which ports are open on the kinds ticked here. They get no service detection, scripts or OS detection, which can make a printer print rubbish, hang a camera or smart plug, or make a TV ask for permission. The cost: service names, versions and the OS of these devices are no longer refreshed. Quick scans never probe services, so they are not affected. A single device can be changed on its own page."));
+    fieldGentle.appendChild(longHint("Deep scans only check which ports are open on the kinds ticked here. They get no service detection, scripts or OS detection, which can make a printer print rubbish, hang a camera or smart plug, or make a TV ask for permission. The cost: service names, versions and the OS of these devices are no longer refreshed. Quick scans never probe services, so they are not affected. A single device can be changed on its own page."));
     const gentleBoxes = {};
     const gentleGrid = h("div", { class: "checks" });
     for (const [type, label] of GENTLE_KINDS) {
       const box = h("input", { type: "checkbox", name: "gentle_" + type, checked: gentleSet(options.gentle_types).has(type) });
       gentleBoxes[type] = box;
-      gentleGrid.appendChild(h("label", { style: "display:inline-block;margin-right:14px" }, box, " " + label));
+      gentleGrid.appendChild(h("label", { class: "inline-check" }, box, " " + label));
     }
     fieldGentle.appendChild(gentleGrid);
     const setGentle = (csv) => { const on = gentleSet(csv); for (const t in gentleBoxes) gentleBoxes[t].checked = on.has(t); };

@@ -1,12 +1,13 @@
 // The version-based CVE check: switch, minimum severity, optional NVD key, run now, and what the last run did.
 import { get, put, post } from "../api.js";
+import { longHint } from "../ui.js";
 import { keepDrafts } from "../editguard.js";
 import { h, toast, timeAgo } from "../util.js";
 
 const SEVERITIES = [["critical", "Critical only"], ["high", "High and critical"], ["medium", "Medium and above"], ["low", "Everything, also low"]];
 
 export function buildCveCheckCard(onChange = () => {}) {
-  const card = h("div", { class: "card cve-check", style: "margin-bottom:16px" });
+  const card = h("div", { class: "card cve-check spaced" });
   let state = null;
   let timer = null;
 
@@ -38,7 +39,7 @@ export function buildCveCheckCard(onChange = () => {}) {
     };
     card.replaceChildren(
       h("h2", {}, "Check versions against the CVE list"),
-      h("p", { class: "hint" }, "A light first look, no scan: Netlens takes the product and version of every service its deep scans found and asks the public NVD which known vulnerabilities (CVE) affect that version. Nothing is sent to your devices, and only the product name and version leave this machine. It sees only what a version number can tell: a distribution (Debian, Ubuntu, Red Hat) often fixes a hole without changing the number, so treat each finding as \"check this\", and a service that hides its version is not checked. For a real scan connect Greenbone or another scanner from the Plugin store."),
+      longHint("A light first look, no scan: Netlens takes the product and version of every service its deep scans found and asks the public NVD which known vulnerabilities (CVE) affect that version. Nothing is sent to your devices, and only the product name and version leave this machine. It sees only what a version number can tell: a distribution (Debian, Ubuntu, Red Hat) often fixes a hole without changing the number, so treat each finding as \"check this\", and a service that hides its version is not checked. For a real scan connect Greenbone or another scanner from the Plugin store."),
       h("div", { class: "form-row" }, h("label", { for: "cve-enabled" }, enabled, " Check the services found by the deep scans")),
       h("div", { class: "form-row" }, h("label", { for: "cve-sev" }, "Report "), severity),
       h("div", { class: "form-row" }, h("label", { for: "cve-key" }, "NVD API key "), key,

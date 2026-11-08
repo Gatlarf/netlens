@@ -69,7 +69,7 @@ export async function buildDatabaseCard() {
     for (const [key, spec] of Object.entries(info.retention_info)) {
       inputs[key] = h("input", { type: "number", min: spec.forever ? "0" : String(spec.min), max: String(spec.max), value: String(info.retention[key]), "aria-label": `${spec.label}: days to keep`, class: "w-s" });
       const old = info.oldest[oldestKey[key]];
-      body.appendChild(h("tr", {}, h("td", {}, spec.label), h("td", { style: "white-space:nowrap" }, inputs[key], " days"),
+      body.appendChild(h("tr", {}, h("td", {}, spec.label), h("td", { class: "nowrap" }, inputs[key], " days"),
         h("td", { class: "hint" }, `${spec.forever ? "0 keeps everything. " : ""}Default ${spec.default}.${old ? ` Oldest now: ${old.slice(0, 10)}.` : ""}`)));
     }
     const save = h("button", { class: "btn primary", type: "submit" }, "Save retention");

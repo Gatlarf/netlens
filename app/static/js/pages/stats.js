@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { h, clear, toast, timeAgo, fmtTime, TYPE_LABELS, isAdmin } from "../util.js";
+import { h, clear, toast, timeAgo, fmtTime, TYPE_LABELS, isAdmin, latest } from "../util.js";
 import { eventLabel } from "../event_labels.js";
 import { pageHead } from "../ui.js";
 import { applyLayout, loadLayout, startBoard } from "../layout_cards.js";
@@ -334,11 +334,13 @@ export async function render(container) {
   }
 
   let lastSig = "";
+  const fresh = latest();
   async function load() {
+    const current = fresh();
     for (const [key, btn] of Object.entries(buttons)) btn.classList.toggle("active", key === range);
     try {
       const data = await get(`/api/stats?range=${range}`);
-      if (destroyed) return;
+      if (destroyed || !current()) return;
       const sig = JSON.stringify(data, (k, v) => (k === "generated" ? undefined : v));
       if (sig === lastSig) return;                 // nothing changed: nothing is redrawn
       lastSig = sig;

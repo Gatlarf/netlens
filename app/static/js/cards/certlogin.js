@@ -1,4 +1,5 @@
 import { get, put } from "../api.js";
+import { field, longHint } from "../ui.js";
 import { h, clear, toast } from "../util.js";
 
 // Settings -> Client certificates: sign in with a certificate that a reverse proxy has checked. Netlens believes the two headers only from the proxies listed here.
@@ -10,7 +11,7 @@ export async function buildCertLoginCard() {
     clear(card);
     const s = data.settings;
     card.appendChild(h("h2", {}, "Client certificates"));
-    card.appendChild(h("p", { class: "hint" }, "Your reverse proxy (nginx, Traefik, Caddy, HAProxy, a load balancer) asks the browser for a certificate, checks it against your CA and tells Netlens who it was in two headers. Netlens believes those headers only from the proxies below, and only when the proxy says the certificate was good. The certificate replaces the password; a user with a second factor still gives it. Link a certificate to a user under Users & tokens (button “Certificate”)."));
+    card.appendChild(longHint("Your reverse proxy (nginx, Traefik, Caddy, HAProxy, a load balancer) asks the browser for a certificate, checks it against your CA and tells Netlens who it was in two headers. Netlens believes those headers only from the proxies below, and only when the proxy says the certificate was good. The certificate replaces the password; a user with a second factor still gives it. Link a certificate to a user under Users & tokens (button “Certificate”)."));
     if (!data.allowed) card.appendChild(h("p", { class: "warn-text" }, "Part of the Enterprise edition and the free trial (Settings → Licence)."));
     const enabled = h("input", { type: "checkbox", checked: s.enabled });
     const proxies = h("textarea", { rows: 3, class: "mono", placeholder: "10.0.0.5\n172.18.0.0/16  (one per line)", "aria-label": "Proxies" });
@@ -18,7 +19,6 @@ export async function buildCertLoginCard() {
     const verifyHeader = h("input", { type: "text", value: s.verify_header, "aria-label": "Verify header" });
     const verifyValue = h("input", { type: "text", value: s.verify_value, "aria-label": "Verify value" });
     const identityHeader = h("input", { type: "text", value: s.identity_header, "aria-label": "Identity header" });
-    const field = (label, el, hint) => h("div", { class: "field" }, h("label", {}, label), el, hint ? h("p", { class: "hint" }, hint) : null);
     const save = h("button", { class: "btn primary", type: "button" }, "Save");
     save.addEventListener("click", async () => {
       try {

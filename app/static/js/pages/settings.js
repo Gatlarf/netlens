@@ -1,6 +1,6 @@
 import { buildMaintenanceCard } from "../cards/maintenance.js";
 import { del, get, patch, post, put } from "../api.js";
-import { groupButtons, compactHelp } from "../ui.js";
+import { groupButtons, compactHelp, longHint } from "../ui.js";
 import { h, clear, toast, isAdmin, can, fmtTime } from "../util.js";
 import { buildScanOptionsCard } from "../cards/scan_options.js";
 import { buildScheduleCard, buildTerminalCard } from "../cards/general.js";
@@ -299,8 +299,8 @@ async function buildScanPage() {
 function buildExportCard() {
   const card = h("div", { class: "card" });
   card.appendChild(h("h2", {}, "Export"));
-  card.appendChild(downloadLink("/api/export/devices.csv", "Devices CSV"));
-  card.appendChild(downloadLink("/api/export/devices.json", "Devices JSON"));
+  card.appendChild(longHint("Download the list of devices to use it elsewhere: every device with its name, address, MAC address, vendor, type, operating system and when it was first and last seen. The CSV opens in a spreadsheet, the JSON suits scripts. Your own login is needed to download; nothing leaves Netlens by itself (for automatic forwarding see Log forwarding and Event forwarding)."));
+  card.appendChild(h("div", { class: "btn-row" }, downloadLink("/api/export/devices.csv", "Devices CSV"), downloadLink("/api/export/devices.json", "Devices JSON")));
   return card;
 }
 

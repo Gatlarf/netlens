@@ -125,6 +125,16 @@ export function timeAgo(iso, now = Date.now()) {
   return `${days} d ago`;
 }
 
+// A slow answer for an older request must not replace the answer for a newer one:
+//   const fresh = latest();  ...  async function load() { const current = fresh(); const data = await get(...); if (!current()) return; ... }
+export function latest() {
+  let n = 0;
+  return () => {
+    const mine = ++n;
+    return () => mine === n;
+  };
+}
+
 export function debounce(fn, ms) {
   let timer;
   return function (...args) {

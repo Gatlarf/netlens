@@ -168,6 +168,20 @@ def _cutoff(n_days: int, now: datetime) -> str:
     return (now - timedelta(days=n_days)).strftime(STAMP)
 
 
+PURGE_CHUNK = 10_000      # rows per DELETE: a long history is removed in pieces so that other writers get the database in between
+
+
+def _delete_old(conn: sqlite3.Connection, table: str, column: str, cutoff: str, extra: str = "") -> int:
+    """DELETE ... older than the cutoff in chunks, committing after each one (one huge DELETE would hold the write lock for minutes)."""
+    total = 0
+    while True:
+        n = conn.execute(f"DELETE FROM {table} WHERE id IN (SELECT id FROM {table} WHERE {column} < ?{extra} LIMIT {PURGE_CHUNK})", (cutoff,)).rowcount
+        conn.commit()
+        total += n
+        if n < PURGE_CHUNK:
+            return total
+
+
 def purge(conn: sqlite3.Connection, dry_run: bool = False, now: datetime | None = None) -> dict[str, int]:
     """Remove what is older than the retention. With dry_run only count it."""
     now = now or datetime.now(timezone.utc)
@@ -189,8 +203,9 @@ def purge(conn: sqlite3.Connection, dry_run: bool = False, now: datetime | None 
             elif dry_run:
                 out[name] = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE {column} < ?{extra}", (cutoff,)).fetchone()[0]
             else:
-                out[name] = conn.execute(f"DELETE FROM {table} WHERE {column} < ?{extra}", (cutoff,)).rowcount
-        except sqlite3.Error:
+                out[name] = _delete_old(conn, table, column, cutoff, extra)
+        except sqlite3.Error as exc:
+            log.warning("retention: could not remove old %s (%s); it is tried again at the next run", name, exc)
             out[name] = 0
     try:       # terminal recordings older than the policy says (the files go with them)
         from pathlib import Path
@@ -207,14 +222,15 @@ def purge(conn: sqlite3.Connection, dry_run: bool = False, now: datetime | None 
             out["sessions"] = conn.execute("SELECT COUNT(*) FROM sessions WHERE expires < ?", (now_s,)).fetchone()[0]
         else:
             out["sessions"] = conn.execute("DELETE FROM sessions WHERE expires < ?", (now_s,)).rowcount
-    except sqlite3.Error:
+    except sqlite3.Error as exc:
+        log.warning("retention: could not remove expired sessions (%s)", exc)
         out["sessions"] = 0
     try:      # the remote sites with a retention of their own
         from app import probes
 
         out.update(probes.trim_history(conn, now=now.timestamp(), dry_run=dry_run))
-    except sqlite3.Error:
-        pass
+    except sqlite3.Error as exc:
+        log.warning("retention: could not trim the history of remote sites (%s)", exc)
     if not dry_run:
         conn.commit()
     return out

@@ -16,7 +16,7 @@ export async function buildTlsCard() {
       card.appendChild(h("p", {}, h("span", { class: `tag ${st.running ? "ok" : ""}` }, st.running ? "serving https" : "configured, not running yet"), ` ${st.self_signed ? "self-signed" : "issued by " + st.issuer}`));
       card.appendChild(h("table", { class: "kv" }, h("tbody", {},
         [["Names", (st.names || []).join(", ") || "—"], ["Subject", st.subject], ["Expires", `${st.expires.slice(0, 10)} (${st.days_left} days)`], ["Fingerprint (SHA-256)", st.fingerprint], ["Set by", st.env_managed ? "NETLENS_TLS_CERT in the container's environment" : "this page"]]
-          .map(([k, v]) => h("tr", {}, h("th", {}, k), h("td", { class: "mono", style: "overflow-wrap:anywhere" }, v))))));
+          .map(([k, v]) => h("tr", {}, h("th", {}, k), h("td", { class: "mono wrap-any" }, v))))));
       if (st.days_left < 30) card.appendChild(h("p", { class: "warn-text" }, "This certificate ends soon: replace it."));
     }
     if (st.restart_needed) {

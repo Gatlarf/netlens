@@ -8,7 +8,7 @@ import { h, clear, toast, timeAgo } from "../util.js";
 const STATE = { active: ["ok", "enrolled"], pending: ["warn", "waiting for enrolment"], revoked: ["bad", "revoked"] };
 
 function copyBox(text, label) {
-  const pre = h("pre", { class: "code-block", style: "white-space:pre-wrap;word-break:break-all;margin:.3em 0" }, text);
+  const pre = h("pre", { class: "code-block code-wrap" }, text);
   const btn = h("button", { class: "btn", type: "button" }, "Copy");
   btn.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(text); toast("Copied", "success"); } catch { toast("Select the text and copy it", "error"); }
@@ -68,7 +68,7 @@ export async function buildIngestCard() {
     // ---------------------------------------------------------------- settings (the one Save of this page)
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = p.enabled;
-    const names = h("input", { type: "text", value: (p.server_names || []).join(", "), placeholder: "netlens.example.com, 10.0.0.5", style: "max-width:36rem" });
+    const names = h("input", { type: "text", value: (p.server_names || []).join(", "), placeholder: "netlens.example.com, 10.0.0.5", class: "w-xl" });
     const bind = h("input", { type: "text", value: p.bind, class: "w-m" });
     const port = h("input", { type: "number", min: "1024", max: "65535", value: String(p.port), class: "w-s" });
     const eport = h("input", { type: "number", min: "1024", max: "65535", value: String(p.enrol_port), class: "w-s" });
@@ -97,7 +97,7 @@ export async function buildIngestCard() {
       errors.length ? errors.join(" ") : listening.includes("ingest") ? `Listening on ${p.bind}:${p.port}${listening.includes("enrol") ? ` and ${p.bind}:${p.enrol_port} (enrolment window open)` : ""}.` : (p.enabled ? "Not listening yet (this can take a few seconds)." : "Switched off: nothing listens.")));
     const sc = info.server_certificate;
     if (sc) card.appendChild(h("p", { class: "hint" }, `Server certificate: ${sc.source === "uploaded" ? "uploaded by you" : "made by Netlens"} for ${(sc.names || []).join(", ") || "-"}, valid until ${sc.expires.slice(0, 10)}.`));
-    if (info.ca_fingerprint) card.appendChild(h("p", { class: "hint", style: "overflow-wrap:anywhere;word-break:break-all" }, `Netlens ingest CA (SHA-256): ${info.ca_fingerprint.match(/.{1,2}/g).join(":")}`));
+    if (info.ca_fingerprint) card.appendChild(h("p", { class: "hint wrap-any" }, `Netlens ingest CA (SHA-256): ${info.ca_fingerprint.match(/.{1,2}/g).join(":")}`));
     const caInfo = info.ca;
     if (caInfo) {
       card.appendChild(h("p", { class: "hint" }, `The Netlens ingest CA is valid until ${caInfo.expires.slice(0, 10)}.`));
@@ -113,7 +113,7 @@ export async function buildIngestCard() {
         });
         const cancel = h("button", { class: "btn", type: "button" }, "Cancel the rotation");
         cancel.addEventListener("click", async () => { const r = await act(() => post("/api/ingest/ca/cancel", {}), "Cancelled"); if (r) info = r; draw(); });
-        card.appendChild(h("div", { class: "card", style: "border:1px solid var(--warn, #c9a227)" },
+        card.appendChild(h("div", { class: "card card-warn" },
           h("h3", {}, "CA rotation running"),
           h("p", { class: "hint" }, `Started ${rot.since ? rot.since.slice(0, 16).replace("T", " ") + " UTC" : ""}. New and renewed certificates come from the new CA. The old CA stays trusted, and still signs the server certificate, until you finish: hosts get the new CA when they renew (the renewal scripts add it to ca.pem), so run the renewal on every host first (NETLENS_RENEW_DAYS=40 renews at once).`),
           stale.length ? h("p", { class: "warn-text" }, `Still on the old CA: ${stale.join(", ")}.`) : h("p", { class: "hint" }, "Every agent has a certificate from the new CA."),
@@ -155,7 +155,7 @@ export async function buildIngestCard() {
 
     // ---------------------------------------------------------------- the one-time token that was just made
     if (shown) {
-      const box = h("div", { class: "card", style: "border:1px solid var(--accent, #4a90d9)" },
+      const box = h("div", { class: "card card-accent" },
         h("h3", {}, shown.agent.identity ? "Agent added" : `Enrolment token for ${shown.agent.name}`));
       if (shown.token) {
         box.append(h("p", { class: "warn-text" }, `Shown once. It works one time and ends in ${shown.token_hours} hours. Open an enrolment window first. Run the commands on the host:`),
@@ -174,7 +174,7 @@ export async function buildIngestCard() {
     card.appendChild(h("h3", {}, "Agents"));
     if (!info.agents.length) card.appendChild(h("p", { class: "hint" }, "No agent yet."));
     for (const a of info.agents) {
-      const row = h("div", { class: "card", style: "margin:.4em 0" });
+      const row = h("div", { class: "card card-tight" });
       row.appendChild(h("div", {}, h("strong", {}, a.name), " ", pill(a), " ",
         h("span", { class: "hint" }, `${a.targets.map((t) => t.name).join(", ") || "-"} · ${a.mode === "own_ca" ? `your CA (${a.identity})` : "Netlens certificate"}`)));
       row.appendChild(h("div", { class: "hint" },
@@ -215,10 +215,10 @@ export async function buildIngestCard() {
 
     // ---------------------------------------------------------------- add an agent
     const free = devices.filter((d) => !info.agents.some((a) => a.targets.some((t) => t.device_id === d.id)));
-    const name = h("input", { type: "text", placeholder: "web01", style: "max-width:20rem" });
-    const pick = h("select", { multiple: "multiple", size: "6", style: "min-width:20rem" }, ...free.map((d) => h("option", { value: String(d.id) }, devName(d))));
-    const hostNames = h("textarea", { rows: "3", placeholder: "only for a gateway (several hosts): one per line, device name = name used in the data\nweb01 = web01.example.com", style: "max-width:36rem" });
-    const identity = h("input", { type: "text", placeholder: "dns:web01.example.com (only for certificates from your own CA)", style: "max-width:36rem" });
+    const name = h("input", { type: "text", placeholder: "web01", class: "w-l" });
+    const pick = h("select", { multiple: "multiple", size: "6", class: "w-l" }, ...free.map((d) => h("option", { value: String(d.id) }, devName(d))));
+    const hostNames = h("textarea", { rows: "3", placeholder: "only for a gateway (several hosts): one per line, device name = name used in the data\nweb01 = web01.example.com", class: "w-xl" });
+    const identity = h("input", { type: "text", placeholder: "dns:web01.example.com (only for certificates from your own CA)", class: "w-xl" });
     const interval = h("input", { type: "number", min: "10", max: "3600", value: "60", class: "w-s" });
     const add = h("button", { class: "btn", type: "button" }, "Add the agent");
     add.disabled = !info.allowed;
@@ -242,15 +242,15 @@ export async function buildIngestCard() {
     // ---------------------------------------------------------------- your own CA and server certificate
     card.appendChild(h("h3", {}, "Your own certificate authority"));
     card.appendChild(h("p", { class: "hint" }, `Instead of certificates made by Netlens, collectors can use certificates from your company CA: paste the CA certificate(s) here and give each agent its identity. ${info.own_ca ? `${info.own_ca} CA certificate${info.own_ca === 1 ? "" : "s"} trusted.` : "None yet."} A certificate from your CA is matched to an agent by its identity (a DNS name or URI in the certificate, or its CN); revoking an agent here stops it even though the certificate itself is still valid.`));
-    const ca = h("textarea", { rows: "4", placeholder: "-----BEGIN CERTIFICATE-----", style: "max-width:36rem;font-family:monospace" });
+    const ca = h("textarea", { rows: "4", placeholder: "-----BEGIN CERTIFICATE-----", class: "w-xl mono" });
     const caSave = h("button", { class: "btn", type: "button" }, "Trust these CA certificates");
     caSave.addEventListener("click", async () => { const r = await act(() => put("/api/ingest/own-ca", { pem: ca.value }), "Saved"); if (r) { info = r; draw(); } });
     card.append(h("div", { class: "field" }, ca), h("div", { class: "btn-row" }, caSave));
 
     card.appendChild(h("h3", {}, "Server certificate"));
     card.appendChild(h("p", { class: "hint" }, "Netlens makes its own server certificate from the names above. To use one from your company CA, paste the certificate (with its chain) and the private key (PEM, no password)."));
-    const sc1 = h("textarea", { rows: "3", placeholder: "certificate PEM", style: "max-width:36rem;font-family:monospace" });
-    const sc2 = h("textarea", { rows: "3", placeholder: "private key PEM", style: "max-width:36rem;font-family:monospace" });
+    const sc1 = h("textarea", { rows: "3", placeholder: "certificate PEM", class: "w-xl mono" });
+    const sc2 = h("textarea", { rows: "3", placeholder: "private key PEM", class: "w-xl mono" });
     const scSave = h("button", { class: "btn", type: "button" }, "Use this certificate");
     scSave.addEventListener("click", async () => { const r = await act(() => put("/api/ingest/server-certificate", { certificate: sc1.value, key: sc2.value }), "Saved"); if (r) { info = r; draw(); } });
     const scGen = h("button", { class: "btn", type: "button" }, "Use a certificate made by Netlens");

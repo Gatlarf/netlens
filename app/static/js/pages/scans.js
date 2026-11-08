@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { h, clear, fmtTime, timeAgo, isAdmin, patch } from "../util.js";
+import { h, clear, fmtTime, timeAgo, isAdmin, patch, latest } from "../util.js";
 import { makeResizable } from "../colresize.js";
 import { pageHead } from "../ui.js";
 import { EVENT_LABELS as KIND_LABELS, eventLabel } from "../event_labels.js";
@@ -106,13 +106,16 @@ export async function render(container, params) {
   const sysBody = h("div", { class: "card-body" });
   const sysLevel = h("select", { class: "kind-filter", "aria-label": "Level" }, h("option", { value: "error" }, "Errors"), h("option", { value: "warning" }, "Warnings and errors"), h("option", { value: "info" }, "Everything (information too)"));
   sysLevel.value = "warning";
-  const sysSearch = h("input", { type: "search", placeholder: "Search the log", "aria-label": "Search the log", style: "min-width:14rem" });
+  const sysSearch = h("input", { type: "search", placeholder: "Search the log", "aria-label": "Search the log", class: "w-search" });
   const sysDownload = h("a", { class: "btn", href: "/api/system-log/download", download: "netlens.log" }, "Download");
   sysCard.append(h("div", { class: "filter-row" }, sysLevel, sysSearch, sysDownload), sysBody);
 
+  const freshSystem = latest(), freshEvents = latest(), freshScans = latest();
   async function loadSystem() {
+    const current = freshSystem();
     try {
       const r = await get(`/api/system-log?level=${sysLevel.value}&q=${encodeURIComponent(sysSearch.value)}&limit=300`);
+      if (!current()) return;
       clear(sysBody);
       if (!r.entries.length) {
         sysBody.appendChild(h("div", { class: "empty" }, r.files ? "Nothing at this level" + (sysSearch.value ? " matches the search" : "") + "." : "No system log yet: it starts with the next start of Netlens."));
@@ -156,8 +159,10 @@ export async function render(container, params) {
 
   let scansSig = "";
   async function loadScans() {
+    const current = freshScans();
     try {
       const scans = await get("/api/scans?limit=50");
+      if (!current()) return;
       const sig = JSON.stringify(scans);
       if (sig === scansSig) return;                  // nothing new: the table stays as it is
       scansSig = sig;
@@ -223,10 +228,12 @@ export async function render(container, params) {
   }
 
   async function loadEvents() {
+    const current = freshEvents();
     try {
       const kind = select.value;
       const url = kind ? `/api/events?limit=200&kind=${encodeURIComponent(kind)}` : "/api/events?limit=200";
       const events = await get(url);
+      if (!current()) return;
       if (!events || !events.length) {
         clear(eventsBody);
         eventsBody.appendChild(h("div", { class: "empty" }, "No events."));

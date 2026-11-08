@@ -1,4 +1,5 @@
 import { get, put, post, del } from "../api.js";
+import { longHint } from "../ui.js";
 import { h, clear, toast, fmtTime } from "../util.js";
 
 // Settings -> Provisioning (SCIM 2.0): the identity provider makes, deactivates and removes accounts by itself.
@@ -10,11 +11,11 @@ export async function buildScimCard() {
   function draw() {
     clear(card);
     card.appendChild(h("h2", {}, "Provisioning (SCIM)"));
-    card.appendChild(h("p", { class: "hint" }, "Let your identity provider (Entra ID, Okta, Keycloak, Authentik ...) make an account when somebody joins and deactivate it when they leave, so nobody has to remember. People still sign in with single sign-on. The provider can only change accounts it made itself, can never make an administrator, and can never touch the last one."));
+    card.appendChild(longHint("Let your identity provider (Entra ID, Okta, Keycloak, Authentik ...) make an account when somebody joins and deactivate it when they leave, so nobody has to remember. People still sign in with single sign-on. The provider can only change accounts it made itself, can never make an administrator, and can never touch the last one."));
     if (!st.allowed) card.appendChild(h("p", { class: "warn-text" }, "Part of the Enterprise edition and the free trial (Settings → Licence). Without it the provider can still deactivate and remove accounts, but not make new ones."));
     card.appendChild(h("table", { class: "kv" }, h("tbody", {}, [["SCIM address (tenant URL)", st.address], ["Token", st.has_token ? `${st.token_name}, made ${fmtTime(st.token_created)}${st.last_used ? `, last used ${fmtTime(st.last_used)}` : ", not used yet"}` : "none yet"], ["Accounts made by the provider", String(st.users)]]
-      .map(([k, v]) => h("tr", {}, h("th", {}, k), h("td", { class: "mono", style: "overflow-wrap:anywhere" }, v))))));
-    if (shown) card.appendChild(h("div", { class: "card", style: "margin:.6em 0" }, h("p", { class: "warn-text" }, "Copy this token into your identity provider now. It is shown only once."), h("pre", { class: "code-block", style: "overflow-wrap:anywhere;white-space:pre-wrap" }, shown)));
+      .map(([k, v]) => h("tr", {}, h("th", {}, k), h("td", { class: "mono wrap-any" }, v))))));
+    if (shown) card.appendChild(h("div", { class: "card card-note" }, h("p", { class: "warn-text" }, "Copy this token into your identity provider now. It is shown only once."), h("pre", { class: "code-block", style: "overflow-wrap:anywhere;white-space:pre-wrap" }, shown)));
     const enabled = h("input", { type: "checkbox", checked: st.enabled, disabled: !st.has_token });
     const role = h("select", {}, [["viewer", "Viewer (can look, not change)"], ["operator", "Operator"]].map(([v, t]) => h("option", { value: v, selected: v === st.role }, t)));
     const nets = h("textarea", { rows: 2, class: "mono", placeholder: "20.50.0.0/16  (only from these addresses; empty = from anywhere)", "aria-label": "Networks" });

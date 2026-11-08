@@ -1,4 +1,5 @@
 import { get, put, post } from "../api.js";
+import { field } from "../ui.js";
 import { h, clear, toast } from "../util.js";
 
 // Settings page: single sign-on with an OpenID Connect identity provider.
@@ -10,7 +11,6 @@ export async function buildSsoCard() {
     card.appendChild(h("p", { class: "hint" },
       "Let people sign in with your company account (Microsoft Entra ID, Keycloak, Authentik, Google, Okta ...). Netlens becomes an application of your identity provider: create one there (type: web, authorization code), enter the redirect address below, and copy the client id and secret here. People are recognised by the provider's own id, never by their name, so nobody can take over a local account. The first sign-in makes the Netlens user; the role follows the provider's groups at every sign-in. Part of the Small business and Enterprise editions and the free trial."));
     if (!info.allowed) card.appendChild(h("p", { class: "warn-text" }, "Part of the Small business and Enterprise editions, and the free trial (Settings → Licence)."));
-    const field = (label, input, hint) => h("div", { class: "field" }, h("label", {}, label), input, hint ? h("p", { class: "hint" }, hint) : null);
     const enabled = h("input", { type: "checkbox" });
     enabled.checked = info.enabled;
     const issuer = h("input", { type: "url", value: info.issuer, placeholder: "https://login.example.com/realms/home" });

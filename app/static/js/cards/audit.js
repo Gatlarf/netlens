@@ -1,5 +1,5 @@
 import { get } from "../api.js";
-import { h, clear, fmtTime, can, toast } from "../util.js";
+import { h, clear, fmtTime, can, toast, latest } from "../util.js";
 
 // Settings → Audit log: who changed what, and when (kept for a year; request bodies, passwords and tokens are never stored).
 export async function buildAuditCard() {
@@ -11,7 +11,9 @@ export async function buildAuditCard() {
   const search = h("input", { type: "search", placeholder: "Search what was done", "aria-label": "Search" });
   let last = null;
 
+  const fresh = latest();
   async function load(append) {
+    const current = fresh();
     const params = new URLSearchParams({ limit: "100" });
     if (append && last) params.set("before", String(last));
     if (userSelect.value) params.set("user", userSelect.value);
@@ -19,7 +21,9 @@ export async function buildAuditCard() {
     let data;
     try {
       data = await get(`/api/audit?${params}`);
+      if (!current()) return;
     } catch (err) {
+      if (!current()) return;
       note.textContent = err.message || "The log could not be loaded";
       return;
     }

@@ -1,4 +1,5 @@
 import { get, put, post } from "../api.js";
+import { longHint } from "../ui.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 
 const GB = 1024 ** 3;
@@ -78,7 +79,7 @@ export async function buildDeviceProbeCard(device, mode = "health") {
 
   function diagnosisBox() {
     const box = h("div", { class: "field" });
-    const symptom = h("input", { type: "text", list: `symptoms-${device.id}`, placeholder: "What is wrong? (or leave empty)", style: "max-width: 28rem" });
+    const symptom = h("input", { type: "text", list: `symptoms-${device.id}`, placeholder: "What is wrong? (or leave empty)", class: "w-xl" });
     const list = h("datalist", { id: `symptoms-${device.id}` }, SYMPTOMS.map((t) => h("option", { value: t })));
     const out = h("div", {});
     async function ask(live) {
@@ -169,7 +170,7 @@ export async function buildDeviceProbeCard(device, mode = "health") {
     if (!setup) card.appendChild(h("p", { class: "hint" }, "Information only: the probes read and report. Netlens never changes anything on the host with them. What to do about a finding is for you, or for an automation system that has the right to change things and fetches the analysis by its id."));
     if (!info.monitor || !["ssh", "winrm"].includes(info.monitor)) {
       if (setup) card.appendChild(h("p", { class: "hint" }, "This device has no health monitoring over SSH or WinRM yet. Add it on the device page (Health): that supplies the address and the login."));
-      else card.appendChild(h("p", { class: "hint" }, "Read-only looks at this host (what uses the processor, memory, disk and network, which applications fail, what changed, what was scheduled, hardware and security) and an engineer that chains them into a cause. It needs health monitoring over SSH or WinRM first (the card above): that supplies the address and the login."));
+      else card.appendChild(longHint("Read-only looks at this host (what uses the processor, memory, disk and network, which applications fail, what changed, what was scheduled, hardware and security) and an engineer that chains them into a cause. It needs health monitoring over SSH or WinRM first (the card above): that supplies the address and the login."));
       return;
     }
     const cfg = info.config;

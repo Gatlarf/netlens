@@ -36,7 +36,7 @@ async function drawQr(canvas, text) {
 }
 
 function passwordField(label = "Your password") {
-  return h("input", { type: "password", autocomplete: "current-password", "aria-label": label, placeholder: label, style: "max-width:18rem" });
+  return h("input", { type: "password", autocomplete: "current-password", "aria-label": label, placeholder: label, class: "w-l" });
 }
 
 function recoveryBox(codes) {
@@ -48,9 +48,9 @@ function recoveryBox(codes) {
     const a = h("a", { href: URL.createObjectURL(new Blob([`Netlens recovery codes\n\n${text}\n`], { type: "text/plain" })), download: "netlens-recovery-codes.txt" });
     document.body.appendChild(a); a.click(); a.remove();
   });
-  return h("div", { class: "card", style: "margin:.6em 0" },
+  return h("div", { class: "card card-note" },
     h("p", { class: "warn-text" }, "Keep these recovery codes somewhere safe, apart from your phone. Each works once if you lose the authenticator. They are shown only now."),
-    h("pre", { class: "code-block", style: "columns:2;column-gap:2em" }, text), h("div", { class: "btn-row" }, copy, save));
+    h("pre", { class: "code-block code-cols" }, text), h("div", { class: "btn-row" }, copy, save));
 }
 
 let pendingTotpCodes = null;      // recovery codes of the authenticator: shown until the person says they are saved (the page is rebuilt after the second factor is switched on)
@@ -77,7 +77,7 @@ function buildTotpSection(wrap) {
         start.disabled = true;
         try {
           const r = await post("/api/me/totp/begin", { password: pass.value });
-          const canvas = h("canvas", { width: "10", height: "10", role: "img", "aria-label": "QR code for your authenticator", style: "max-width:14rem;height:auto;background:#fff" });
+          const canvas = h("canvas", { width: "10", height: "10", role: "img", "aria-label": "QR code for your authenticator", class: "qr" });
           await drawQr(canvas, r.uri).catch(() => canvas.remove());
           const code = h("input", { type: "text", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "8", placeholder: "6-digit code", "aria-label": "Code from the authenticator", class: "w-m" });
           const confirm = h("button", { class: "btn primary", type: "button" }, "Confirm and switch on");
@@ -91,7 +91,7 @@ function buildTotpSection(wrap) {
             } catch (err) { toast(err.message || "That code is not right", "error"); }
           });
           area.replaceChildren(h("p", {}, "Scan this code with your authenticator, or type the key by hand:"), canvas,
-            h("p", {}, h("code", { style: "overflow-wrap:anywhere" }, r.secret.match(/.{1,4}/g).join(" "))),
+            h("p", {}, h("code", { class: "wrap-any" }, r.secret.match(/.{1,4}/g).join(" "))),
             h("p", { class: "hint" }, "Then enter the code it shows now. Nothing is switched on until the code is right."), h("div", { class: "btn-row" }, code, confirm));
           start.hidden = true; pass.hidden = true;
         } catch (err) { toast(err.message || "Could not start", "error"); start.disabled = false; }
@@ -153,7 +153,7 @@ function buildKeysSection(wrap) {
     if (!st.allowed) { wrap.appendChild(h("p", { class: "hint" }, "Adding keys is part of the Enterprise edition (or the free trial). Keys that are already set up keep working.")); if (st.keys.length) wrap.appendChild(h("div", { class: "btn-row" }, pass)); return; }
     if (!webauthn.supported()) { wrap.appendChild(h("p", { class: "hint" }, webauthn.whyNot())); if (st.keys.length) wrap.appendChild(h("div", { class: "btn-row" }, pass)); return; }
     if (st.keys.length >= st.max) { wrap.appendChild(h("div", { class: "btn-row" }, pass)); return; }
-    const name = h("input", { type: "text", maxlength: "60", placeholder: "Name, for example YubiKey", "aria-label": "Name of the key", style: "max-width:14rem" });
+    const name = h("input", { type: "text", maxlength: "60", placeholder: "Name, for example YubiKey", "aria-label": "Name of the key", class: "w-m" });
     const add = h("button", { class: "btn", type: "button" }, "Add a security key or passkey");
     add.addEventListener("click", async () => {
       add.disabled = true;

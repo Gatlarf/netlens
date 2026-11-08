@@ -1,4 +1,5 @@
 import { get, post, patch } from "../api.js";
+import { field } from "../ui.js";
 import { h, toast } from "../util.js";
 
 const KIND_HELP = {
@@ -8,14 +9,6 @@ const KIND_HELP = {
   cert: { target: null, placeholder: "", expect: "Renewal", expectHint: "auto = renews itself (Let's Encrypt, Nginx Proxy Manager): goes down below 14 days left, which means the renewal is stuck. manual = you renew it: goes down below 30 days. Or a number of days. Empty picks auto for Let's Encrypt and similar, manual for other certificates.", port: "443" },
   process: { target: "Process or service name", placeholder: "nginx", expect: null, expectHint: "", port: null },
 };
-
-function field(label, input, hint) {
-  const wrap = h("div", { class: "field" });
-  wrap.appendChild(h("label", {}, label));
-  wrap.appendChild(input);
-  if (hint) wrap.appendChild(h("p", { class: "hint" }, hint));
-  return wrap;
-}
 
 // Form to add or edit a service check. `check` null = new; `defaults` pre-fills a new one (for example the device).
 export async function buildServiceForm({ check = null, defaults = {}, onDone }) {

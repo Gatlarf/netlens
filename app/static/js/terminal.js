@@ -166,7 +166,11 @@ export async function mountTerminal(slot, device, { onWideChange } = {}) {
 
       const passphraseInput = h("input", { type: "password", name: "passphrase", autocomplete: "off" });
       const connectBtn = h("button", { type: "submit", class: "btn primary" }, "Connect");
-      const field = (label, input, tip) => h("div", { class: "field" }, h("label", {}, label, tip ? infoTip(tip) : null), input);
+      let fieldCount = 0;
+      const field = (label, input, tip) => {
+        if (input && input.matches && input.matches("input, select, textarea") && !input.id) input.id = `term-f-${++fieldCount}`;
+        return h("div", { class: "field" }, h("label", input && input.id ? { for: input.id } : {}, label, tip ? infoTip(tip) : null), input);
+      };
 
       form.appendChild(field("Stored login", stored, "A typed login is sent to the Netlens server only to open this session, unless you save it. Stored logins are under Settings → Credentials."));
       form.appendChild(h("div", { class: "ssh-cols" }, field("User name", usernameInput), field("Password", passwordInput)));

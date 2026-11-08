@@ -1,9 +1,10 @@
 import { get, put, post } from "../api.js";
+import { field, longHint } from "../ui.js";
 import { h, clear, toast } from "../util.js";
 import { buildDeviceProbeCard } from "./device_probe.js";
 
 function copyBox(title, text) {
-  const area = h("textarea", { readonly: true, rows: Math.min(14, text.split("\n").length + 1), class: "mono", style: "width:100%" }, text);
+  const area = h("textarea", { readonly: true, rows: Math.min(14, text.split("\n").length + 1), class: "mono w-full" }, text);
   const copy = h("button", { class: "btn", type: "button" }, "Copy");
   copy.addEventListener("click", async () => { try { await navigator.clipboard.writeText(text); toast("Copied", "success"); } catch { area.select(); } });
   return h("div", { class: "field" }, h("label", {}, title), area, copy);
@@ -19,7 +20,7 @@ export async function buildHostProbeCard() {
   function draw() {
     clear(card);
     card.appendChild(h("h2", {}, "Host probes"));
-    card.appendChild(h("p", { class: "hint" }, "Host probes (device page) log in to a host and look at it: what uses its disks, processor, memory and network, which applications fail, what changed, what is scheduled, hardware and security. They only read, and the host can be locked down so that it can run nothing else. Logins can be short-lived: nothing secret is then kept on the host or reused."));
+    card.appendChild(longHint("Host probes (device page) log in to a host and look at it: what uses its disks, processor, memory and network, which applications fail, what changed, what is scheduled, hardware and security. They only read, and the host can be locked down so that it can run nothing else. Logins can be short-lived: nothing secret is then kept on the host or reused."));
 
     // 1. the Netlens certificate authority
     const ca = h("div", { class: "field" });
@@ -46,7 +47,6 @@ export async function buildHostProbeCard() {
       user: h("input", { type: "text", value: v.username }), token: h("input", { type: "password", autocomplete: "off", placeholder: v.has_token ? "(set; type to replace)" : "" }),
       roleId: h("input", { type: "text", autocomplete: "off" }), secretId: h("input", { type: "password", autocomplete: "off", placeholder: v.has_approle ? "(set; type to replace)" : "" }),
     };
-    const field = (label, input, hint) => h("div", { class: "field" }, h("label", {}, label), input, hint ? h("p", { class: "hint" }, hint) : null);
     const save = h("button", { class: "btn primary", type: "button" }, "Save");
     save.addEventListener("click", async () => {
       const vault = { url: f.url.value, mount: f.mount.value, role: f.role.value, namespace: f.ns.value, username: f.user.value };

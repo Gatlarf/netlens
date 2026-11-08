@@ -51,6 +51,28 @@ def test_purge_removes_only_what_is_old_and_can_preview(conn):
     assert dbmaint.purge(conn, now=NOW)["events"] == 0                      # 0 keeps everything
 
 
+def test_a_long_history_is_removed_in_chunks_with_a_commit_after_each(conn, monkeypatch):
+    monkeypatch.setattr(dbmaint, "PURGE_CHUNK", 7)
+    for i in range(30):
+        conn.execute("INSERT INTO events (ts, kind, detail) VALUES (?, 'x', 'y')", (ago(900 + i),))
+    for i in range(3):
+        conn.execute("INSERT INTO events (ts, kind, detail) VALUES (?, 'x', 'y')", (ago(1 + i),))
+    conn.commit()
+    out = dbmaint.purge(conn, now=NOW)
+    assert out["events"] == 30 and conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 3
+    assert dbmaint._delete_old(conn, "events", "ts", ago(0)) == 3                    # an exact multiple of the chunk size ends too
+
+
+def test_a_purge_that_fails_is_logged_and_the_rest_still_runs(conn, caplog):
+    conn.execute("INSERT INTO events (ts, kind, detail) VALUES (?, 'x', 'y')", (ago(900),))
+    conn.commit()
+    conn.execute("ALTER TABLE scans RENAME TO scans_gone")                            # the scans job fails; the others must not notice
+    with caplog.at_level("WARNING"):
+        out = dbmaint.purge(conn, now=NOW)
+    assert out["scans"] == 0 and out["events"] == 1
+    assert any("could not remove old scans" in r.message for r in caplog.records)
+
+
 def test_leftovers_of_a_removed_thing_are_found_and_removed(conn):
     store = tsdb.for_conn(conn)
     conn.execute("INSERT INTO probes (name, token_hash, created) VALUES ('s', 'h', 'x')")

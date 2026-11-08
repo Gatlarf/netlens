@@ -44,7 +44,12 @@ function buildForm(card, state, existing) {
   const form = h("form", { class: "edit-form", id: "new-share-form" });
   const paid = state.sharing_allowed;
   const text = (name, value, attrs = {}) => h("input", { type: "text", name, value: value || "", ...attrs });
-  const field = (label, ...inputs) => h("div", { class: "field" }, h("label", {}, label), ...inputs);
+  let fieldCount = 0;
+  const field = (label, ...inputs) => {
+    const control = inputs.find((i) => i && i.matches && i.matches("input, select, textarea"));
+    if (control && !control.id) control.id = `share-f-${++fieldCount}`;
+    return h("div", { class: "field" }, h("label", control ? { for: control.id } : {}, label), ...inputs);
+  };
 
   const name = text("name", existing?.name, { required: true, maxlength: "60", placeholder: "Family" });
   const preset = h("select", { name: "preset" }, h("option", { value: "" }, "Custom"), ...Object.entries(PRESET_TEXT).map(([k, t]) => h("option", { value: k }, t)));

@@ -12,6 +12,7 @@ import { applyInterface } from "./interface.js";
 import { get, post, ApiError } from "./api.js";
 import * as webauthn from "./webauthn.js";
 import { initSiteBar } from "./sitebar.js";
+import { watchLabels } from "./a11y.js";
 import { stopPageTimers, unsaved } from "./editguard.js";
 import { clear, toast, el, setDomainSuffix, setSessionUser, sessionInfo } from "./util.js";
 
@@ -92,6 +93,7 @@ let setupMode = false;
 async function renderPage() {
   const view = el("#view");
   if (!view || setupMode) return;
+  watchLabels(view);
   await loadDisplaySettings();
 
   const gen = ++renderGen;

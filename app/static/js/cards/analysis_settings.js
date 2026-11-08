@@ -1,4 +1,5 @@
 import { get, put } from "../api.js";
+import { longHint } from "../ui.js";
 import { h, clear, toast } from "../util.js";
 import { keepDrafts } from "../editguard.js";
 
@@ -30,7 +31,7 @@ export async function buildAnalysisSettingsCard() {
       h("h2", {}, "Analysis reports"),
       h("section", { class: "probe-section" },
         h("h3", {}, "Reports"),
-        h("p", { class: "hint" }, "Information only: the digital engineer reads and reports, it changes nothing on any host. Every incident gets an id (INC-…) and every analysis a report id (AR-…), so another system that is allowed to act (an automation platform, an AI agent) knows what is meant and fetches the report: GET /api/analysis/<id>, or the assistant tools get_analysis_report and get_incident_analysis. To have them pushed, include the event \"The digital engineer finished an analysis\" in an alert channel: e-mail gets a formatted report, a webhook gets the whole report as JSON."),
+        longHint("Information only: the digital engineer reads and reports, it changes nothing on any host. Every incident gets an id (INC-…) and every analysis a report id (AR-…), so another system that is allowed to act (an automation platform, an AI agent) knows what is meant and fetches the report: GET /api/analysis/<id>, or the assistant tools get_analysis_report and get_incident_analysis. To have them pushed, include the event \"The digital engineer finished an analysis\" in an alert channel: e-mail gets a formatted report, a webhook gets the whole report as JSON."),
         field("Write the short summary of a report with", f.words, "The findings, the cause and the chains always come from the built-in logic. A language model (Settings → AI) can only add a short plain-language summary on top, from the findings; names of files and folders are withheld from it unless you allow them below. The built-in text is always there, with or without it."),
         h("div", { class: "field" }, h("label", { class: "check-row" }, f.auto, " Analyse every incident automatically, about 10 minutes after it starts")),
         field("Address of this Netlens (for links in e-mails and messages)", f.base, "For example https://netlens.example.lan. Without it the links are paths on this Netlens.")),
