@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.1.2/npm.zip",
+      "sha256": "7a10f9b47b39d7768ddd61dde1d2a046d51479c02484725ddb70ca32fbe935df",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.1.1/npm.zip",
       "sha256": "cacd1035dae14a10797929b1a13451e875ae786ef18a4b80c2a595538ef7d720",

@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-qnap-v1.1.1/qnap.zip",
+      "sha256": "07a6c5d8e87e5eebea8d48588ca86a2516e53275e71d1e33676de7d44fc00e40",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-qnap-v1.1.0/qnap.zip",
       "sha256": "cb101644a56e87952ff60bd04479f74107d8b4932de0893deff237ab980c718b",

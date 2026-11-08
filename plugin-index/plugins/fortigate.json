@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-fortigate-v1.0.1/fortigate.zip",
+      "sha256": "e7c1ab1b6ca127e9c6ca292fd03d8a5f7cfd7075508fc15e9cc0874ea1b6d11f",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-fortigate-v1.0.0/fortigate.zip",
       "sha256": "26d5872f1bac5d53c5e986fcb1c8be3d35936b11fd0cf0257a1590a14a1f31a6",

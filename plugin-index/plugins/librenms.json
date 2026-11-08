@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-librenms-v1.0.1/librenms.zip",
+      "sha256": "e8e9e7f2c0f2ca8689eb411b3bec95fc309b5a29abc2ea14f5b1224020c59a3c",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-librenms-v1.0.0/librenms.zip",
       "sha256": "7165c888e9bddb198ffd8f0ddf60f9fa22923e6d484272954217f788e40a7c64",

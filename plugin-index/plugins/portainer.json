@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-portainer-v1.1.1/portainer.zip",
+      "sha256": "ac2cc6abf70371043bacd9b29578e9bb1eca3b2e0bbef799fe4f59f43448fdcc",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-portainer-v1.1.0/portainer.zip",
       "sha256": "fa21346afa65f92487321e047728235b1a440a5e251a33df37775ae513fa0edf",

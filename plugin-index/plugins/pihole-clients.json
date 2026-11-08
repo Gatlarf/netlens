@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-clients-v1.0.1/pihole-clients.zip",
+      "sha256": "6c1002d2e679c14fadddd026b38aac524b1cb3af90ca7d861eb61f4f3ab27e57",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-clients-v1.0.0/pihole-clients.zip",
       "sha256": "fd448cea19cbd24ce46a3b65e01bff30acb4f6ca12cf11af99ba4d577f0b20fc",

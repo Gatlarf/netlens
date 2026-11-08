@@ -14,6 +14,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openmediavault-v1.1.1/openmediavault.zip",
+      "sha256": "df2952ec2c071a60e154c519d2f204592dfeb298be5d679e27f5ad366f9906fe",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openmediavault-v1.1.0/openmediavault.zip",
       "sha256": "7a86e964ee4e9fcfedb732c3792489b96b4f422a6bd740c7593694f3256c4476",

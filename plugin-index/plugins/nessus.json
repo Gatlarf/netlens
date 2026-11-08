@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nessus-v1.0.1/nessus.zip",
+      "sha256": "e925990ccfd5523f2d487212a711300b683c84e5a505f6c17896b36d57e58049",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nessus-v1.0.0/nessus.zip",
       "sha256": "d8c922d38f8cf03b7a71e2a0a99576428f0d9b7d6494b822fab5aec87cb386aa",

@@ -269,7 +269,7 @@ def test_the_repository_index_sources_are_valid():
     assert problems == []
     # index.json itself is rebuilt by the CI after every merge (so a pull request does not have to), but what is on disk must be valid
     ids = {p["id"]: p for p in doc["plugins"]}
-    assert {"proxmox", "asus", "example-router"} <= set(ids) and not ids["proxmox"].get("builtin") and ids["proxmox"]["releases"][0]["review"]["level"] == "verified" and ids["asus"]["releases"]
+    assert {"proxmox", "asus", "example-router"} <= set(ids) and not ids["proxmox"].get("builtin") and any((r.get("review") or {}).get("level") == "verified" for r in ids["proxmox"]["releases"]) and ids["asus"]["releases"]      # (a new release is Community until it is reviewed again)
     assert ids["example-router"]["releases"][0]["review"]["level"] == "reviewed"
 
 

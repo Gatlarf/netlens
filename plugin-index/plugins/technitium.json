@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.2.2/technitium.zip",
+      "sha256": "f567790fbe0152a2d93a6fa68247af2da8aff41ce7547721f623ec59c50757e1",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.2.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.2.1/technitium.zip",
       "sha256": "d31eeb429ab52816ccbd7a218a093a90eaa4205ae70f5d287d6458f331c2d3be",

@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pbs-v1.0.1/pbs.zip",
+      "sha256": "3729bb95d4e0ec975d857a0e560c62ed129e0cfa5bfc608c306ab7f7e19c567f",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pbs-v1.0.0/pbs.zip",
       "sha256": "c2bbb79da498dd27ae9c6cfb3ff16e1ea935ab0550aed3168cb7749d7df8c1da",

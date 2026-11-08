@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-swarm-v1.0.2/swarm.zip",
+      "sha256": "c800175bfd3c82bf7bcad58f9e3b19d5711afb97cee8abca4ab39854a4eae8c4",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-swarm-v1.0.1/swarm.zip",
       "sha256": "f38e096d7cfb1d921ba8cfd8671c32d847e8e7f1f9f458d0d3f5fa72951bc410",

@@ -14,6 +14,15 @@
   "category": "monitoring",
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-prometheus-v1.0.1/prometheus.zip",
+      "sha256": "857940abfd0b92d89b299f023ae7cf5a859dde30ba206df0b800ede8b9f066b8",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-prometheus-v1.0.0/prometheus.zip",
       "sha256": "6d94daa7fc52f5415b64ffe1c723089e95c8996df65f3f1c6bdcc060e081ff48",

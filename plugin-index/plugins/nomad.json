@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nomad-v1.0.2/nomad.zip",
+      "sha256": "9bd3d6508cd3f6fee29073a6391315ce71b927f3a1f933f59703abd579406203",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nomad-v1.0.1/nomad.zip",
       "sha256": "8858448498162338c5a994360aa4068ffe1d1d01950fe4d799ec45797d1cd9c1",

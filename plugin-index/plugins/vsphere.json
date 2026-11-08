@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.1.1/vsphere.zip",
+      "sha256": "70ac6b4c35d7c1c9407a7278cde573827a519da39ace56a109c4378f027b76df",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.1.0/vsphere.zip",
       "sha256": "356047798bef7ad845976a122424397c4cfbaf65ac9227311d43661d380c911a",

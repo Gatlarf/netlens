@@ -14,6 +14,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.2.1/synology.zip",
+      "sha256": "1c3e945866cd7bda48866fb4afa3e51955d67afe6e1720f0c51564ac5a7216d9",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.2.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.2.0/synology.zip",
       "sha256": "3229354d33525622f46f0678f0fb920eee216cd9b42e6e6af9f5e56197cec678",

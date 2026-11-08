@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-envoy-v1.0.1/envoy.zip",
+      "sha256": "d91ef295d842c6a9c76abe53bd4e932f566ae7601b94f956977d52a2278e3566",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-envoy-v1.0.0/envoy.zip",
       "sha256": "83d19f2daaf8eedb8d7d7b6a1662a0899f19f9f089a6704e868f325db0bc5239",

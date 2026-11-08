@@ -14,6 +14,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-v1.0.2/adguard.zip",
+     "sha256": "0b8f77678bc7ce443d96d5bb732323c8fd1383f51fbb6d03cb2817b961404233",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-v1.0.1/adguard.zip",
      "sha256": "afd9cde98dbaa40aec88f4a4baadc0fa3c408e51a1e7dc3293f97a8b590ecf1e",
@@ -65,6 +77,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-clients-v1.0.1/adguard-clients.zip",
+     "sha256": "e928c6cf68797deb82dd118d351df76243ac415eb46b55261138f42734309227",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-clients-v1.0.0/adguard-clients.zip",
      "sha256": "2f4f44447712c01470c1036d05f105f21c177e62dcad2c8b052a5412e7c41a7e",
@@ -96,6 +120,18 @@
     "Apache APISIX 3.11 (tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-apisix-v1.0.1/apisix.zip",
+     "sha256": "9cab17a2f81bb75930e7004318bb27d7c952d02503a63e226e77025293848e42",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-apisix-v1.0.0/apisix.zip",
@@ -129,6 +165,18 @@
     "other stock ASUSWRT/AiMesh routers"
    ],
    "releases": [
+    {
+     "version": "1.5.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.5.1/asus.zip",
+     "sha256": "bef43655b979904dfda50c32785a598fabd75f587ef9df1ab708bb2f9a0ffa7f",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.5.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.5.0/asus.zip",
@@ -265,6 +313,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-caddy-v1.0.2/caddy.zip",
+     "sha256": "68510e34a0b07b085291ed55e0be9b6246417ebc087b138859c4ff68925ec175",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-caddy-v1.0.1/caddy.zip",
      "sha256": "920fcb07229b018d299c5f73d77566f1decd38bc44cf16b2cba52899a7887aad",
@@ -316,6 +376,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ceph-v1.0.1/ceph.zip",
+     "sha256": "206a14ac47cfcabc7228f5d14cae0a2da5dcdc3ea1f053950b1143591283b0b9",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ceph-v1.0.0/ceph.zip",
      "sha256": "0b27b376bd7243e660b9237dafced283800322262060d714b40857dbcde59790",
@@ -349,6 +421,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-checkpoint-v1.0.1/checkpoint.zip",
+     "sha256": "2e5227a9a9ed0ebc49523d7e21dd4a3b932a1c4d4bdabeb59eaa3feb7205c662",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-checkpoint-v1.0.0/checkpoint.zip",
      "sha256": "58b74a150efdf1df90994222b6719dc92db8e67dca5021e69298f0f2da18beba",
@@ -374,6 +458,18 @@
     "Consul 1.20 (tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-consul-v1.0.1/consul.zip",
+     "sha256": "5ba61ad659c707cce77fdc8eb6c53bca0b83e7c4cf970d61cbdcb9e5d86b4f88",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-consul-v1.0.0/consul.zip",
@@ -407,6 +503,18 @@
     "Containers on macvlan / ipvlan networks (not yet tested on a real host)"
    ],
    "releases": [
+    {
+     "version": "1.6.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.6.1/docker.zip",
+     "sha256": "9f53e0b56a4bee4acca99d3b5ddacb5aa6669f472b71ce2b5f9cf1793b2d7bf6",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.6.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.6.0/docker.zip",
@@ -524,6 +632,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-envoy-v1.0.1/envoy.zip",
+     "sha256": "d91ef295d842c6a9c76abe53bd4e932f566ae7601b94f956977d52a2278e3566",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-envoy-v1.0.0/envoy.zip",
      "sha256": "83d19f2daaf8eedb8d7d7b6a1662a0899f19f9f089a6704e868f325db0bc5239",
@@ -587,6 +707,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-fortigate-v1.0.1/fortigate.zip",
+     "sha256": "e7c1ab1b6ca127e9c6ca292fd03d8a5f7cfd7075508fc15e9cc0874ea1b6d11f",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-fortigate-v1.0.0/fortigate.zip",
      "sha256": "26d5872f1bac5d53c5e986fcb1c8be3d35936b11fd0cf0257a1590a14a1f31a6",
@@ -613,6 +745,18 @@
     "Greenbone Community Edition 22.7 (tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-greenbone-v1.0.2/greenbone.zip",
+     "sha256": "3792b0b8fd7e7e6c9d896730c82969b58b7d2bec9c3149edc3a09c8212ee57f0",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-greenbone-v1.0.1/greenbone.zip",
@@ -665,6 +809,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-haproxy-v1.0.2/haproxy.zip",
+     "sha256": "41d1e4ed3fbf0b0db40d107f3c4209d0978f34acd31f41b073d047f84850886b",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-haproxy-v1.0.1/haproxy.zip",
      "sha256": "0d4775ed900d18f5062c06358a583849d6bf38539ee9516a9c6436f8d484a29d",
@@ -715,6 +871,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-homeassistant-v1.0.1/homeassistant.zip",
+     "sha256": "c88c3ee9ed58001207632005768334ef907d380766e70f8fe525488d1a1435f9",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-homeassistant-v1.0.0/homeassistant.zip",
      "sha256": "7fca69fde32e9316a1d6f0d9894f0f07af6a3f02b7f93e51f8feea28c15869ea",
@@ -747,6 +915,18 @@
     "NTLM or Basic login; Kerberos is not supported"
    ],
    "releases": [
+    {
+     "version": "1.2.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.2.2/hyperv.zip",
+     "sha256": "a1748f8edc6b0f8cf3376ff3f512608d0b1b5d46de168505abb1e463f7b0ab78",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.2.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.2.1/hyperv.zip",
@@ -859,6 +1039,18 @@
    ],
    "releases": [
     {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-incus-v1.1.1/incus.zip",
+     "sha256": "598667959e2ab03fa829b82400de5d9f738a82e259ceeb42a6e347fe9792059a",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-incus-v1.1.0/incus.zip",
      "sha256": "b3a8eb2aeb0e871d9d4e1e11f540b210a2ffc7adaee98b117869203fd0e3a776",
@@ -928,6 +1120,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-insightvm-v1.0.1/insightvm.zip",
+     "sha256": "07734ffccee7fb83ab0a1f678bf45b84716c7e419d06af5276dcb7e1c27fd7c3",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-insightvm-v1.0.0/insightvm.zip",
      "sha256": "1a8cd4c0ad7a33f267e59a118681ea0f788bd72b8659dc837e98c0b74246d349",
@@ -961,6 +1165,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kea-v1.0.1/kea.zip",
+     "sha256": "40eb1069cfc47c7da4ed8e9810ca8e005cd0853c894882acd6e34bb4f6c6d7f2",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kea-v1.0.0/kea.zip",
      "sha256": "ebbee71f818af22b191f1b1d153125069a5455c101a3a2932453b8a5ee997d87",
@@ -993,6 +1209,18 @@
     "Kong with a database and Kong Enterprise (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kong-v1.0.2/kong.zip",
+     "sha256": "c670bd9668531d62c8a0c2173817a876f10e3a64effd870ef64dde4001beb5c4",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kong-v1.0.1/kong.zip",
@@ -1045,6 +1273,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kubernetes-v1.0.2/kubernetes.zip",
+     "sha256": "56598b027ad46a828acf8e519fdaf98a9d6ecd988f8253d95430b906908c1aaf",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kubernetes-v1.0.1/kubernetes.zip",
      "sha256": "9a09e846508349e0f6453798902286e218bcd5ee2730d4f6c9d842a00f8a3e2d",
@@ -1095,6 +1335,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-librenms-v1.0.1/librenms.zip",
+     "sha256": "e8e9e7f2c0f2ca8689eb411b3bec95fc309b5a29abc2ea14f5b1224020c59a3c",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-librenms-v1.0.0/librenms.zip",
      "sha256": "7165c888e9bddb198ffd8f0ddf60f9fa22923e6d484272954217f788e40a7c64",
@@ -1127,6 +1379,18 @@
     "Wi-Fi registration tables and MNDP neighbours (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.1.1/mikrotik.zip",
+     "sha256": "de62111862629aca68497083270cc9bcda954acaf56413298b0e2bae3d1828ee",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.1.0/mikrotik.zip",
@@ -1197,6 +1461,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nessus-v1.0.1/nessus.zip",
+     "sha256": "e925990ccfd5523f2d487212a711300b683c84e5a505f6c17896b36d57e58049",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nessus-v1.0.0/nessus.zip",
      "sha256": "d8c922d38f8cf03b7a71e2a0a99576428f0d9b7d6494b822fab5aec87cb386aa",
@@ -1229,6 +1505,18 @@
     "ONTAP 9.8 and newer (written from the published REST API reference; simulator only, not tested on a real cluster)"
    ],
    "releases": [
+    {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netapp-ontap-v1.1.1/netapp-ontap.zip",
+     "sha256": "6a8b02a236a842b716f03d11303e156b9a3e5645c5b79e85b59f793f64897d26",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netapp-ontap-v1.1.0/netapp-ontap.zip",
@@ -1281,6 +1569,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netbox-v1.0.2/netbox.zip",
+     "sha256": "e795f338c5c1e923567407cbc6857236ee7b2a0e10f51bfd6004dd082e437a3f",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-netbox-v1.0.1/netbox.zip",
      "sha256": "2738c831d3fda16ddfce50ceb4618fbf1a93b221944e993d02e7f84b35fc5419",
@@ -1332,6 +1632,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nomad-v1.0.2/nomad.zip",
+     "sha256": "9bd3d6508cd3f6fee29073a6391315ce71b927f3a1f933f59703abd579406203",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-nomad-v1.0.1/nomad.zip",
      "sha256": "8858448498162338c5a994360aa4068ffe1d1d01950fe4d799ec45797d1cd9c1",
@@ -1382,6 +1694,18 @@
     "Sites, certificates and access lists read with simulated data matching the 2.x API"
    ],
    "releases": [
+    {
+     "version": "1.1.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.1.2/npm.zip",
+     "sha256": "7a10f9b47b39d7768ddd61dde1d2a046d51479c02484725ddb70ca32fbe935df",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-npm-v1.1.1/npm.zip",
@@ -1439,6 +1763,18 @@
     "OC200 / OC300 hardware controllers (not yet tested)"
    ],
    "releases": [
+    {
+     "version": "1.5.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.5.1/omada.zip",
+     "sha256": "5dd8054cc20c8de9bb3e17c75ffb9d53b4307f36f6b04fa24b7aa7c97d1bce66",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.5.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.5.0/omada.zip",
@@ -1631,6 +1967,18 @@
    ],
    "releases": [
     {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openmediavault-v1.1.1/openmediavault.zip",
+     "sha256": "df2952ec2c071a60e154c519d2f204592dfeb298be5d679e27f5ad366f9906fe",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openmediavault-v1.1.0/openmediavault.zip",
      "sha256": "7a86e964ee4e9fcfedb732c3792489b96b4f422a6bd740c7593694f3256c4476",
@@ -1681,6 +2029,18 @@
     "Wi-Fi stations (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.1.1/openwrt.zip",
+     "sha256": "49f84207286c83265a8244e47e02e257df72efc578f785f050319ef519d1bb56",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.1.0/openwrt.zip",
@@ -1751,6 +2111,18 @@
    ],
    "releases": [
     {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.1.1/opnsense.zip",
+     "sha256": "4602e55bacb9451d5a1d9f96f773efd49398c56fa3f5623e7a3f24b5e3534bbb",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.1.0/opnsense.zip",
      "sha256": "dbf067c65b3af8eabebfecdc32933efcabc2dd259f25fc5ed92ca2cbc25dc292",
@@ -1820,6 +2192,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-paloalto-v1.0.1/paloalto.zip",
+     "sha256": "22fe1246c8cb9417402cc335def6937fae2f861e8f960588ae633175356ed02a",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-paloalto-v1.0.0/paloalto.zip",
      "sha256": "ce490e83958157a23e0784ab3a37a7dd9bf8ede496ab6fd6dc595d59a483c334",
@@ -1845,6 +2229,18 @@
     "Proxmox Backup Server 4.2 (tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pbs-v1.0.1/pbs.zip",
+     "sha256": "3729bb95d4e0ec975d857a0e560c62ed129e0cfa5bfc608c306ab7f7e19c567f",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pbs-v1.0.0/pbs.zip",
@@ -1878,6 +2274,18 @@
     "Pi-hole v5 and older (not supported: different API)"
    ],
    "releases": [
+    {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-v1.0.2/pihole.zip",
+     "sha256": "83d9992d4b994cbdadcc5b160dad61b44d4c281fa080ff6e55ac242d15cac42a",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-v1.0.1/pihole.zip",
@@ -1930,6 +2338,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-clients-v1.0.1/pihole-clients.zip",
+     "sha256": "6c1002d2e679c14fadddd026b38aac524b1cb3af90ca7d861eb61f4f3ab27e57",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-pihole-clients-v1.0.0/pihole-clients.zip",
      "sha256": "fd448cea19cbd24ce46a3b65e01bff30acb4f6ca12cf11af99ba4d577f0b20fc",
@@ -1962,6 +2382,18 @@
     "Portainer agent and Edge environments (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-portainer-v1.1.1/portainer.zip",
+     "sha256": "ac2cc6abf70371043bacd9b29578e9bb1eca3b2e0bbef799fe4f59f43448fdcc",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-portainer-v1.1.0/portainer.zip",
@@ -2031,6 +2463,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-powerdns-v1.0.2/powerdns.zip",
+     "sha256": "9e5b247ed3eed3dc37488065c2a95a9c10f8a326d319ef735b028d6f404ffc25",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-powerdns-v1.0.1/powerdns.zip",
      "sha256": "a77320509e131eb9134557ee25d6ff89d945c808ad6586f6442fd25131937dd2",
@@ -2084,6 +2528,18 @@
    "category": "monitoring",
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-prometheus-v1.0.1/prometheus.zip",
+     "sha256": "857940abfd0b92d89b299f023ae7cf5a859dde30ba206df0b800ede8b9f066b8",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-prometheus-v1.0.0/prometheus.zip",
      "sha256": "6d94daa7fc52f5415b64ffe1c723089e95c8996df65f3f1c6bdcc060e081ff48",
@@ -2115,6 +2571,18 @@
     "Proxmox VE 8 and 9 (in daily use)"
    ],
    "releases": [
+    {
+     "version": "1.5.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-proxmox-v1.5.1/proxmox.zip",
+     "sha256": "58dcb9fae372cc56333835833567793cae7b5d8ab5ad0af0a190e5725290faf7",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.5.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-proxmox-v1.5.0/proxmox.zip",
@@ -2167,6 +2635,18 @@
    ],
    "releases": [
     {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-qnap-v1.1.1/qnap.zip",
+     "sha256": "07a6c5d8e87e5eebea8d48588ca86a2516e53275e71d1e33676de7d44fc00e40",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-qnap-v1.1.0/qnap.zip",
      "sha256": "cb101644a56e87952ff60bd04479f74107d8b4932de0893deff237ab980c718b",
@@ -2206,6 +2686,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-redfish-v1.0.1/redfish.zip",
+     "sha256": "1345d6278071168fa3a4008b64730248464c6fa929aff5473869a255e8a39680",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-redfish-v1.0.0/redfish.zip",
      "sha256": "eb324005f7045b61ea60c1068ad38256d0038b4eb3f385699bcce41851430b2c",
@@ -2238,6 +2730,18 @@
     "Rockstor 5 (written from the source code; simulator only, not tested on a real Rockstor)"
    ],
    "releases": [
+    {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-rockstor-v1.1.1/rockstor.zip",
+     "sha256": "38dc1bf0e351a86592f6d7749d1d6d7c26f5cebf561d31c6e29a979a3d547028",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-rockstor-v1.1.0/rockstor.zip",
@@ -2334,6 +2838,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-swarm-v1.0.2/swarm.zip",
+     "sha256": "c800175bfd3c82bf7bcad58f9e3b19d5711afb97cee8abca4ab39854a4eae8c4",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-swarm-v1.0.1/swarm.zip",
      "sha256": "f38e096d7cfb1d921ba8cfd8671c32d847e8e7f1f9f458d0d3f5fa72951bc410",
@@ -2386,6 +2902,18 @@
     "Synology DSM 6.2 (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.2.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.2.1/synology.zip",
+     "sha256": "1c3e945866cd7bda48866fb4afa3e51955d67afe6e1720f0c51564ac5a7216d9",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.2.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-synology-v1.2.0/synology.zip",
@@ -2488,6 +3016,18 @@
    ],
    "releases": [
     {
+     "version": "1.2.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.2.2/technitium.zip",
+     "sha256": "f567790fbe0152a2d93a6fa68247af2da8aff41ce7547721f623ec59c50757e1",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.2.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-technitium-v1.2.1/technitium.zip",
      "sha256": "d31eeb429ab52816ccbd7a218a093a90eaa4205ae70f5d287d6458f331c2d3be",
@@ -2588,6 +3128,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-tplink-easysmart-v1.0.1/tplink-easysmart.zip",
+     "sha256": "5f7924f6cc77799e1603efb80beddcde4f785b4de0018e8e1f4e7fd1718a8150",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-tplink-easysmart-v1.0.0/tplink-easysmart.zip",
      "sha256": "daafcc815360c7f1b9c55bcdab6d8ca04678b4adb2aa835e7906c2e487b813e1",
@@ -2621,6 +3173,18 @@
     "Traefik 2.x (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-traefik-v1.0.2/traefik.zip",
+     "sha256": "68f1c8c4e028a457de2be1a44809897d4eed7d39a79f87f04f7573f7f71ed4bb",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-traefik-v1.0.1/traefik.zip",
@@ -2673,6 +3237,18 @@
     "TrueNAS 25.04 (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.6.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.6.2/truenas.zip",
+     "sha256": "ba3f77abd1f70369a16c0a7cc8e0575d5d35b2a49636eb9130e79b0c7265ba3b",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.6.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-truenas-v1.6.1/truenas.zip",
@@ -2863,6 +3439,18 @@
    ],
    "releases": [
     {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ugreen-v1.1.1/ugreen.zip",
+     "sha256": "ecad25fc232fd742d20f87911e7a4ee9682af8bf2ad7ee544e4201822d24a512",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ugreen-v1.1.0/ugreen.zip",
      "sha256": "eac23fe4a34722974aa7fa892ef49243a46175bc4be76d3b56cbc8bc732b2816",
@@ -2901,6 +3489,18 @@
     "UniFi OS consoles (Dream Machine, Cloud Gateway, Cloud Key Gen2+) and the classic self-hosted controller on port 8443 are both supported by the code"
    ],
    "releases": [
+    {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.1.1/unifi.zip",
+     "sha256": "3d87a43e3c378c1d62f3aaf9be3886e6646cf64fcbdccfe7323adc9609462f25",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.1.0/unifi.zip",
@@ -2972,6 +3572,18 @@
    ],
    "releases": [
     {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unraid-v1.1.1/unraid.zip",
+     "sha256": "ab7514812585d13093aeeeb116711b26b345ddc7af5e9ea7a7dfc8f21fb33650",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unraid-v1.1.0/unraid.zip",
      "sha256": "6957a304a9a05b6b210b9ef9504e5097157f2c83eaf60ceac2f35f9831419ddc",
@@ -3010,6 +3622,18 @@
     "VMware ESXi and vCenter (not tested on real systems)"
    ],
    "releases": [
+    {
+     "version": "1.1.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.1.1/vsphere.zip",
+     "sha256": "70ac6b4c35d7c1c9407a7278cde573827a519da39ace56a109c4378f027b76df",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vsphere-v1.1.0/vsphere.zip",
@@ -3078,6 +3702,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vyos-v1.0.2/vyos.zip",
+     "sha256": "db6ab2be95b1344c7e46b421fdce549e4d7b2c4efdf0a3051cc655927a7906f3",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vyos-v1.0.1/vyos.zip",
      "sha256": "b4ed79d9a916384229d9a6c5d758252335e87f84589d66436195381e044110f0",
@@ -3130,6 +3766,18 @@
    ],
    "releases": [
     {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-xcpng-v1.0.1/xcpng.zip",
+     "sha256": "6736fca310f6a57abadb488ff55fbed826ed210a4c5a4585680c3bbf328ec14f",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-xcpng-v1.0.0/xcpng.zip",
      "sha256": "9a36bbc9f966d1a4dbf0dad977b36493a72c6e91abf4a022a8b516676caa75d8",
@@ -3161,6 +3809,18 @@
     "Xen Orchestra 6 (tested, local backup repository)"
    ],
    "releases": [
+    {
+     "version": "1.0.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-xobackup-v1.0.1/xobackup.zip",
+     "sha256": "de2e3502265df865ccc6b94c1ddf03d5a4a92967d11731aac2f246ed9571a050",
+     "api_version": 1,
+     "min_netlens": "0.4.366",
+     "released": "2026-11-08",
+     "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.0.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-xobackup-v1.0.0/xobackup.zip",

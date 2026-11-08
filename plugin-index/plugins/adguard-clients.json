@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-clients-v1.0.1/adguard-clients.zip",
+      "sha256": "e928c6cf68797deb82dd118d351df76243ac415eb46b55261138f42734309227",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-adguard-clients-v1.0.0/adguard-clients.zip",
       "sha256": "2f4f44447712c01470c1036d05f105f21c177e62dcad2c8b052a5412e7c41a7e",

@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-caddy-v1.0.2/caddy.zip",
+      "sha256": "68510e34a0b07b085291ed55e0be9b6246417ebc087b138859c4ff68925ec175",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-caddy-v1.0.1/caddy.zip",
       "sha256": "920fcb07229b018d299c5f73d77566f1decd38bc44cf16b2cba52899a7887aad",

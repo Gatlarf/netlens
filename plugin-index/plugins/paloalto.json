@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-paloalto-v1.0.1/paloalto.zip",
+      "sha256": "22fe1246c8cb9417402cc335def6937fae2f861e8f960588ae633175356ed02a",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-paloalto-v1.0.0/paloalto.zip",
       "sha256": "ce490e83958157a23e0784ab3a37a7dd9bf8ede496ab6fd6dc595d59a483c334",

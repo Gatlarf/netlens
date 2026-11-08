@@ -13,6 +13,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-xcpng-v1.0.1/xcpng.zip",
+      "sha256": "6736fca310f6a57abadb488ff55fbed826ed210a4c5a4585680c3bbf328ec14f",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-xcpng-v1.0.0/xcpng.zip",
       "sha256": "9a36bbc9f966d1a4dbf0dad977b36493a72c6e91abf4a022a8b516676caa75d8",

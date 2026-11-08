@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ugreen-v1.1.1/ugreen.zip",
+      "sha256": "ecad25fc232fd742d20f87911e7a4ee9682af8bf2ad7ee544e4201822d24a512",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-ugreen-v1.1.0/ugreen.zip",
       "sha256": "eac23fe4a34722974aa7fa892ef49243a46175bc4be76d3b56cbc8bc732b2816",

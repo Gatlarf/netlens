@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-incus-v1.1.1/incus.zip",
+      "sha256": "598667959e2ab03fa829b82400de5d9f738a82e259ceeb42a6e347fe9792059a",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-incus-v1.1.0/incus.zip",
       "sha256": "b3a8eb2aeb0e871d9d4e1e11f540b210a2ffc7adaee98b117869203fd0e3a776",

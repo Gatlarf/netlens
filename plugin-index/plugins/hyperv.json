@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.2.2/hyperv.zip",
+      "sha256": "a1748f8edc6b0f8cf3376ff3f512608d0b1b5d46de168505abb1e463f7b0ab78",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.2.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-hyperv-v1.2.1/hyperv.zip",
       "sha256": "2d0d1a1a755b460814832397166704ba555bd7767ed96aa14c67fb69b308a075",

@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-redfish-v1.0.1/redfish.zip",
+      "sha256": "1345d6278071168fa3a4008b64730248464c6fa929aff5473869a255e8a39680",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-redfish-v1.0.0/redfish.zip",
       "sha256": "eb324005f7045b61ea60c1068ad38256d0038b4eb3f385699bcce41851430b2c",

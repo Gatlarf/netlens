@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.1.1/mikrotik.zip",
+      "sha256": "de62111862629aca68497083270cc9bcda954acaf56413298b0e2bae3d1828ee",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.1.0/mikrotik.zip",
       "sha256": "80bd00951826ce558e43b7c859b9efe19a9213e469b670b5d6e22d216221e4fe",

@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unraid-v1.1.1/unraid.zip",
+      "sha256": "ab7514812585d13093aeeeb116711b26b345ddc7af5e9ea7a7dfc8f21fb33650",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unraid-v1.1.0/unraid.zip",
       "sha256": "6957a304a9a05b6b210b9ef9504e5097157f2c83eaf60ceac2f35f9831419ddc",

@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-rockstor-v1.1.1/rockstor.zip",
+      "sha256": "38dc1bf0e351a86592f6d7749d1d6d7c26f5cebf561d31c6e29a979a3d547028",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-rockstor-v1.1.0/rockstor.zip",
       "sha256": "6a0b32a30dd8310cbc82d492fb80281bcf6571545997a04287df3618cb9cd08e",

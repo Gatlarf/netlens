@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.5.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-proxmox-v1.5.1/proxmox.zip",
+      "sha256": "58dcb9fae372cc56333835833567793cae7b5d8ab5ad0af0a190e5725290faf7",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.5.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-proxmox-v1.5.0/proxmox.zip",
       "sha256": "cb238c6c826d34e7c3e0fb5ce14576e16cfc33197ae2f470a67f8d523a13397f",

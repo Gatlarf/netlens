@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-haproxy-v1.0.2/haproxy.zip",
+      "sha256": "41d1e4ed3fbf0b0db40d107f3c4209d0978f34acd31f41b073d047f84850886b",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-haproxy-v1.0.1/haproxy.zip",
       "sha256": "0d4775ed900d18f5062c06358a583849d6bf38539ee9516a9c6436f8d484a29d",

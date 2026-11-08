@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vyos-v1.0.2/vyos.zip",
+      "sha256": "db6ab2be95b1344c7e46b421fdce549e4d7b2c4efdf0a3051cc655927a7906f3",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-vyos-v1.0.1/vyos.zip",
       "sha256": "b4ed79d9a916384229d9a6c5d758252335e87f84589d66436195381e044110f0",

@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.1.1/unifi.zip",
+      "sha256": "3d87a43e3c378c1d62f3aaf9be3886e6646cf64fcbdccfe7323adc9609462f25",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.1.0/unifi.zip",
       "sha256": "4a489650f57c5fd7f5e284b2f2837d4b5df5b55972b114ed72ec6035a529fa7e",

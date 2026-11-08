@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kubernetes-v1.0.2/kubernetes.zip",
+      "sha256": "56598b027ad46a828acf8e519fdaf98a9d6ecd988f8253d95430b906908c1aaf",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kubernetes-v1.0.1/kubernetes.zip",
       "sha256": "9a09e846508349e0f6453798902286e218bcd5ee2730d4f6c9d842a00f8a3e2d",

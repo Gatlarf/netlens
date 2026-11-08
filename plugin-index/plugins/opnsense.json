@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.1.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.1.1/opnsense.zip",
+      "sha256": "4602e55bacb9451d5a1d9f96f773efd49398c56fa3f5623e7a3f24b5e3534bbb",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.1.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-opnsense-v1.1.0/opnsense.zip",
       "sha256": "dbf067c65b3af8eabebfecdc32933efcabc2dd259f25fc5ed92ca2cbc25dc292",

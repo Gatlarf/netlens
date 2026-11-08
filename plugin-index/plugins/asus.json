@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.5.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.5.1/asus.zip",
+      "sha256": "bef43655b979904dfda50c32785a598fabd75f587ef9df1ab708bb2f9a0ffa7f",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.5.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.5.0/asus.zip",
       "sha256": "7f0c7b6df39d7f586689fae5c540a66c5cdf0d4a09cf6b4401ef0e2a70188ed1",

@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kong-v1.0.2/kong.zip",
+      "sha256": "c670bd9668531d62c8a0c2173817a876f10e3a64effd870ef64dde4001beb5c4",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-kong-v1.0.1/kong.zip",
       "sha256": "632f5243e5736ec6063aa81ccdd7e8f108254579195a814aeaa0f15b5c800524",

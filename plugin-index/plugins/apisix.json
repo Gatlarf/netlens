@@ -11,6 +11,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-apisix-v1.0.1/apisix.zip",
+      "sha256": "9cab17a2f81bb75930e7004318bb27d7c952d02503a63e226e77025293848e42",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-apisix-v1.0.0/apisix.zip",
       "sha256": "5a9ed14762673c2f852f899cae0f649a908afda46d7cd8d4f446b905a3ce8fc9",

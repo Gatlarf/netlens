@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.1",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-insightvm-v1.0.1/insightvm.zip",
+      "sha256": "07734ffccee7fb83ab0a1f678bf45b84716c7e419d06af5276dcb7e1c27fd7c3",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-08",
+      "changelog": "Talks to the device through Netlens' shared HTTP client (certificate and host name checks, timeouts, size limit and redirect rules are the same in every plugin). Needs Netlens 0.4.366 or newer. No change in what the plugin reads or writes."
+    },
+    {
       "version": "1.0.0",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-insightvm-v1.0.0/insightvm.zip",
       "sha256": "1a8cd4c0ad7a33f267e59a118681ea0f788bd72b8659dc837e98c0b74246d349",
