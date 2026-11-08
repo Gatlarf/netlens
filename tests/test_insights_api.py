@@ -57,3 +57,21 @@ def test_the_mode_of_a_question_is_chosen_by_the_caller(client, monkeypatch):
     assert c.post("/api/insights/ask", json={"question": "how many devices per type?", "mode": "rules"}, headers=AUTH).json()["source"] == "rules"
     assert "No language model" in c.post("/api/insights/ask", json={"question": "how many devices?", "mode": "model"}, headers=AUTH).json()["answer"]
     assert c.post("/api/insights/ask", json={"question": "x", "mode": "nonsense"}, headers=AUTH).status_code == 422
+
+
+def test_causes_and_impact_need_insights_and_answer(client, monkeypatch):
+    c, tmp_path = client
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: feature != "insights")
+    assert c.get("/api/insights/devices/1/causes", headers=AUTH).status_code == 402
+    assert c.get("/api/insights/devices/1/impact", headers=AUTH).status_code == 402
+    monkeypatch.setattr(licence, "allows", lambda conn, feature, now=None: True)
+    conn = connect(tmp_path / "netlens.db")
+    add_event(conn, "port_opened", "tcp/23 telnet", device_id=1)
+    conn.close()
+    body = c.get("/api/insights/devices/1/causes", headers=AUTH).json()
+    assert body["device"] == "nas" and body["suspects"] == [] or any(s["text"] == "tcp/23 telnet" for s in body["suspects"])
+    assert c.get("/api/insights/devices/1/causes?at=yesterday", headers=AUTH).status_code == 400
+    assert c.get("/api/insights/devices/99/causes", headers=AUTH).status_code == 404
+    assert c.get("/api/insights/devices/1/impact", headers=AUTH).json()["risk"] == "none"
+    assert c.get("/api/insights/devices/99/impact", headers=AUTH).status_code == 404
+    assert c.get("/api/insights", headers=AUTH).json()["incidents"] is not None

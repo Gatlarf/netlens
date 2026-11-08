@@ -2,6 +2,7 @@ import { get, post, put, patch, del } from "../api.js";
 import { h, clear, toast, timeAgo, fmtTime, isAdmin } from "../util.js";
 import { pageHead } from "../ui.js";
 import { boardPage } from "../layout_cards.js";
+import { showCauses } from "../cards/causes.js";
 
 const TYPES = ["router", "switch", "ap", "server", "pc", "phone", "tablet", "tv", "speaker", "console", "appliance", "printer", "iot", "camera", "nas", "vm"];
 
@@ -139,7 +140,15 @@ export async function render(container) {
         } catch (err) { toast(err.message || "Failed", "error"); }
         rep.disabled = false;
       });
-      row.append(dig, rep, why, repOut);
+      const target = i.cause ? i.cause.device_id : (i.device_ids || [])[0];
+      const before = h("button", { class: "btn", type: "button", title: "Ports, updates, containers and settings that changed shortly before this started (suspects, not proof)" }, "What changed before?");
+      const beforeOut = h("div", { class: "ins-text" });
+      before.addEventListener("click", async () => {
+        before.disabled = true;
+        try { showCauses(beforeOut, await get(`/api/insights/devices/${target}/causes?at=${encodeURIComponent(i.start)}`)); } catch (err) { toast(err.message || "Failed", "error"); }
+        before.disabled = false;
+      });
+      row.append(dig, rep, ...(target != null ? [before] : []), why, repOut, beforeOut);
       if (data.status.llm_ready) {
         const words = h("button", { class: "btn ghost", type: "button" }, "Say it in the model's words");
         words.addEventListener("click", async () => {

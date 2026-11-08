@@ -269,6 +269,9 @@ def route(question: str, known_names: list[str], conn=None) -> tuple[str, dict]:
     """(tool, args) for a question, by its words: a device name wins, then the first keyword group that matches."""
     q = question.lower()
     if conn is not None:
+        own = ask_more.route_device_questions(q, known_names)           # before the others: "reboot" belongs to them too
+        if own:
+            return own
         wide = ask_data.route(q, known_names)           # the open-ended questions first: their words are specific (reboot, free addresses, most bandwidth)
         if wide:
             return wide

@@ -56,10 +56,11 @@ export function replay({ onChange, getTree, getDevices }) {
         counts[b] += cur; total[b]++;
       }
     }
-    data = { from, to, series, changes, counts, total };
+    const markers = (body.markers || []).map((m) => ({ id: m.id, t: Date.parse(m.ts), text: m.text })).filter((m) => m.t >= from && m.t <= to).sort((a, b) => a.t - b.t);
+    data = { from, to, series, changes, counts, total, markers };
     slider.max = String(Math.round((to - from) / 60000));
     set(to, false);
-    note.textContent = changes.length ? "" : "No device changed state in this period.";
+    note.textContent = changes.length ? (markers.length ? "Amber ticks at the top: something changed (a port, an update, a container)." : "") : "No device changed state in this period.";
     if (!series.size) note.textContent = "There are no checks in this period yet.";
   }
 
@@ -69,14 +70,23 @@ export function replay({ onChange, getTree, getDevices }) {
     for (let p = parent.get(id), i = 0; p != null && i < 40; p = parent.get(p), i++) if (state(p, at) === 0) return p;
     return null;
   }
+  function suspect(id, at) {          // a change on the device, or on something above it, in the three hours before it went down
+    const parent = new Map((getTree() || []).map((n) => [n.id, n.parent_id]));
+    const mine = new Set([id]);
+    for (let p = parent.get(id), i = 0; p != null && i < 40; p = parent.get(p), i++) mine.add(p);
+    let best = null;
+    for (const m of data.markers) if (m.t <= at && at - m.t <= 3 * 3600000 && mine.has(m.id)) best = m;
+    return best;
+  }
   function drawList() {
     clear(list);
     const shown = data ? data.changes.filter((c) => c.t <= t).slice(-3).reverse() : [];
     if (!shown.length) { list.appendChild(h("div", { class: "hud-rev" }, "No changes yet in this period.")); return; }
     for (const c of shown) {
-      const cause = !c.up ? behind(c.id, c.t) : null;
+      const cause = !c.up ? behind(c.id, c.t) : null, after = !c.up && cause == null ? suspect(c.id, c.t) : null;
       list.appendChild(h("a", { class: `hud-rev ${c.up ? "ok" : "bad"}`, href: `#/device/${c.id}` },
-        h("span", { class: "t" }, fmt(c.t)), ` ${nameOf(c.id)} ${c.up ? "answered again" : cause != null ? `unreachable (behind ${nameOf(cause)})` : "stopped answering"}`));
+        h("span", { class: "t" }, fmt(c.t)), ` ${nameOf(c.id)} ${c.up ? "answered again" : cause != null ? `unreachable (behind ${nameOf(cause)})` : "stopped answering"}`,
+        after ? h("span", { class: "hud-rmark", title: "Something changed shortly before; open the device and ask 'What changed before it broke?'" }, ` · after: ${after.text}`) : ""));
     }
   }
   const fmt = (ms) => new Date(ms).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
@@ -100,6 +110,8 @@ export function replay({ onChange, getTree, getDevices }) {
     const g = c.createLinearGradient(0, 0, 0, hh); g.addColorStop(0, "rgba(0,229,255,.28)"); g.addColorStop(1, "rgba(0,229,255,0)"); c.fillStyle = g; c.fill();
     c.fillStyle = "rgba(255,59,92,.75)";
     for (const ch of data.changes) if (!ch.up) c.fillRect((ch.t - data.from) / (data.to - data.from) * w, hh - 5, 2, 5);
+    c.fillStyle = "rgba(255,176,32,.9)";
+    for (const m of data.markers) c.fillRect((m.t - data.from) / (data.to - data.from) * w - 1, 0, 2, 7);
     const x = (t - data.from) / (data.to - data.from) * w; c.strokeStyle = "#fff"; c.lineWidth = 1; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, hh); c.stroke();
     void max;
   }

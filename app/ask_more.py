@@ -298,6 +298,58 @@ def t_connections(conn, args, now=None) -> dict:
             "directly_connected_count": len(children), "everything_below_count": len(below), "offline_below": [device_name(devices[i]) for i in below if i in devices and not devices[i]["online"]][:12]}
 
 
+def _find_device(conn, args) -> tuple[int | None, str]:
+    from app.hierarchy import device_name, load_hierarchy
+
+    needle = str(args.get("device") or args.get("name") or "").strip().lower()
+    devices, _ = load_hierarchy(conn)
+    row = next((d for d in devices.values() if needle and (needle == device_name(d).lower() or needle == (d.get("primary_ip") or ""))), None) \
+        or next((d for d in devices.values() if needle and needle in device_name(d).lower()), None)
+    return (row["id"] if row else None), needle
+
+
+def t_causes(conn, args, now=None) -> dict:
+    from app import causes
+
+    device_id, needle = _find_device(conn, args)
+    if device_id is None:
+        return {"error": f"no device matches {needle!r}"}
+    out = causes.before(conn, device_id, hours=float(args.get("hours") or 6))
+    return {"device": out["device"], "outage_at": out["at"], "basis": out["basis"], "window_hours": out["window_hours"],
+            "changed_before": [{"when": s["when"], "what": s["text"], "on": s["device"] or "the network", "relation": s["relation"], "by": s["who"], "times": s["times"]} for s in out["suspects"]], "note": out["note"]}
+
+
+def r_causes(r: dict) -> str:
+    if r.get("error"):
+        return r["error"]
+    if not r["changed_before"]:
+        return f"Nothing that counts as a change was recorded in the {r['window_hours']:g} hours before {r['device']} went offline ({r['basis']}, {r['outage_at']})."
+    lines = [f"{s['when']}: {s['what']} ({s['on']}, {s['relation']}{', by ' + s['by'] if s['by'] else ''}{', ' + str(s['times']) + ' times' if s['times'] > 1 else ''})" for s in r["changed_before"][:6]]
+    return f"Changes shortly before {r['device']} went offline ({r['basis']}, {r['outage_at']}), most suspicious first: " + "; ".join(lines) + ". These are suspects, not proof."
+
+
+def t_impact(conn, args, now=None) -> dict:
+    from app import causes
+
+    device_id, needle = _find_device(conn, args)
+    if device_id is None:
+        return {"error": f"no device matches {needle!r}"}
+    out = causes.impact(conn, device_id)
+    return {"device": out["device"], "plugged_into": out["plugged_into"], "risk": out["risk"], "summary": out["summary"], "devices_affected": out["total"], "levels": out["depth"],
+            "always_on_affected": out["always_on_count"], "already_offline": out["already_offline"],
+            "devices": [d["name"] for level in out["levels"] for d in level][:20], "containers": [g["name"] for g in out["guests"]][:15],
+            "service_checks": [s["name"] for s in out["services"]][:15], "note": out["note"]}
+
+
+def r_impact(r: dict) -> str:
+    if r.get("error"):
+        return r["error"]
+    text = r["summary"]
+    if r["devices"]:
+        text += " Devices: " + ", ".join(r["devices"][:10]) + ("…" if r["devices_affected"] > 10 else "") + "."
+    return text + f" Risk: {r['risk']}."
+
+
 def t_wifi(conn, args, now=None) -> dict:
     rows = conn.execute("SELECT s.device_id, s.rssi, s.band, s.node, s.ts FROM wifi_samples s JOIN (SELECT device_id, MAX(id) AS m FROM wifi_samples WHERE ts >= ? GROUP BY device_id) x ON x.m = s.id WHERE s.rssi IS NOT NULL ORDER BY s.rssi LIMIT 40",
                         (_since(1, now),)).fetchall()
@@ -578,9 +630,25 @@ def _days_in(q: str, default: int) -> int:
     return 1 if re.search(r"today|24 ?h|yesterday|last night|tonight", q) else 30 if "month" in q else 7 if "week" in q else default
 
 
+def route_device_questions(q: str, names: list[str]) -> tuple[str, dict] | None:
+    """"What changed before X broke" and "what happens if I reboot X": asked first, because words like reboot also belong to the open-ended questions."""
+    if re.search(r"what changed (before|prior|ahead|leading|just before)|what (did i|have i|was) (change|changed|break|broke)|what (caused|broke|led to|happened before)|before .{1,60}(went|broke|failed)", q):
+        name = find_named(q, names)
+        if name:
+            return "causes", {"device": name}
+    if re.search(r"what (would|will|could) (break|happen|go down|stop|be affected|fail)|if i (reboot|restart|shut ?down|power off|unplug|turn off|take|switch off)|blast radius|impact of|safe to (reboot|restart|shut|unplug|turn off|power)|what is affected|what.s affected|affected if", q):
+        name = find_named(q, names)
+        if name:
+            return "impact", {"device": name}
+    return None
+
+
 def route(conn, q: str, names: list[str]) -> tuple[str, dict] | None:
     """(tool, args) for the new kinds of question, or None when the question is not one of them."""
     online = False if re.search(r"offline|\bdown\b|unreachable|not responding", q) else True if re.search(r"\bonline\b|\bup\b|reachable|responding", q) else None
+    own = route_device_questions(q, names)
+    if own:
+        return own
     # one device and what it is connected to
     if re.search(r"connected to|plugged|behind|depends? on|upstream|downstream|uplink|attached|what is on", q):
         name = find_named(q, names)
@@ -874,7 +942,7 @@ def r_flapping(r: dict) -> str:
 
 RENDERERS = {"networks": r_networks, "bonds": r_bonds, "storage": r_storage, "reliability": r_reliability, "coverage": r_coverage, "flapping": r_flapping, "site": r_site, "search_devices": r_search_devices, "counts": r_counts, "ports": r_ports, "guests": r_guests, "backups": r_backups, "certificates": r_certificates, "speedtest": r_speedtest,
              "network_services": r_network_services, "remote_sites": r_remote_sites, "smart_home": r_smart_home, "security": r_security, "audit": r_audit, "connections": r_connections,
-             "wifi": r_wifi, "maintenance": r_maintenance, "system": r_system, "updates": r_updates, "changes": r_changes, "ipv6": r_ipv6}
+             "wifi": r_wifi, "maintenance": r_maintenance, "system": r_system, "updates": r_updates, "changes": r_changes, "ipv6": r_ipv6, "causes": r_causes, "impact": r_impact}
 
 TOOLS = {
     "search_devices": (t_search_devices, "find devices by a property and count them. args (all optional): type (printer, camera, nas, switch ...), vendor (manufacturer word), os (windows, linux, android ...), online (true/false), port (number), service (name), group, tag, text (part of the name or address, for anything that is not a kind: iphone, raspberry ...), new_days, untrusted (true), missing (hostname, vendor, type, os or ip: devices that have none), not_seen_days (offline for at least that many days), sort (oldest, newest, last_seen, longest_gone or name), limit (up to 50), offset (to page through a long list). Counts are always complete; the devices shown are one page. Rows carry first_seen and last_seen when sorted or filtered by time"),
@@ -896,6 +964,8 @@ TOOLS = {
     "updates": (t_updates, "software updates that are waiting: containers and guests, smart-home devices, Netlens. args: none"),
     "changes": (t_changes, "what changed on the network and in the settings in a period, by category. args: days (1, 7 or 30)"),
     "site": (t_site, "a website or service by its domain or name: its checks and whether the site is enabled or DISABLED on the reverse proxy (nginx proxy manager), and where it forwards to. Use it for 'why is <domain> down/offline'. args: name (a domain such as example.com, or a service name)"),
+    "causes": (t_causes, "what changed shortly before a device went offline (a port opened, an update, a container stopped, the device above it went away, a setting somebody changed), ranked; suspects, not proof. args: device (a name or address), hours (optional, 1-72)"),
+    "impact": (t_impact, "what would break if one device went down or is rebooted: the devices, containers and service checks that depend on it, level by level, with a risk. args: device (a name or address)"),
     "ipv6": (t_ipv6, "devices that have IPv6 addresses. args: none"),
     "networks": (t_networks, "the scanned networks (ranges, VLANs): whether each keeps answering (a quiet one is a routing, firewall or VPN problem), devices per network, hosts in the last scan against the usual number, devices without MAC address. args: none"),
     "bonds": (t_bonds, "bonded connections (NIC teaming, LACP) that the owner linked to switch ports: per bond how many links are up and which ports have no link. args: none"),

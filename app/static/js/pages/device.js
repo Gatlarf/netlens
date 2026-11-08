@@ -23,6 +23,7 @@ import { buildParentCard } from "../cards/device_parent.js";
 import { buildDeviceSitesCards } from "../cards/proxy_sites.js";
 import { buildDeviceVulnCard } from "../cards/vulns.js";
 import { buildStabilitySection, isStabilityOpen } from "../cards/stability.js";
+import { buildCausesSection, buildImpactSection, isInsightOpen } from "../cards/causes.js";
 
 const WEB_PORTS = new Set([80, 443, 8080, 8443, 8006, 5000, 5001, 9000]);
 
@@ -869,6 +870,7 @@ export async function render(container, params) {
         const section = buildStabilitySection(device);
         section.classList.add("admin-only");
         c.appendChild(section);
+        for (const extra of [buildCausesSection(device), buildImpactSection(device)]) { extra.classList.add("admin-only"); c.appendChild(extra); }
       }
       uptimeSlot.appendChild(c);
     }).catch(() => {});
@@ -1094,7 +1096,7 @@ export async function render(container, params) {
   const interval = setInterval(() => {
     if (document.hidden) return;
     if (terminalSlot && isTerminalActive(terminalSlot)) return;
-    if (isStabilityOpen() || customizing) return;
+    if (isStabilityOpen() || isInsightOpen() || customizing) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
     if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isProbeBusy() || editing(container)) return;     // never wipe a form someone is filling in
     load(true);
@@ -1103,7 +1105,7 @@ export async function render(container, params) {
   // show the result of a (full) scan as soon as it is done
   const onScanFinished = () => {
     if (customizing) return;
-    if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isProbeBusy() || isStabilityOpen() || (terminalSlot && isTerminalActive(terminalSlot))) return;
+    if (deleteOpen || isMonitorFormOpen() || isPortMapBusy() || isProbeBusy() || isStabilityOpen() || isInsightOpen() || (terminalSlot && isTerminalActive(terminalSlot))) return;
     if (editResult && (editResult.isDirty() || editResult.isFocused())) return;
     if (editing(container)) return;
     load();

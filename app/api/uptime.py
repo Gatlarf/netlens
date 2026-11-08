@@ -37,7 +37,7 @@ def get_uptime_latest(request: Request, conn=Depends(get_conn)) -> list[dict]:
 @router.get("/uptime/replay")
 def get_uptime_replay(request: Request, hours: int = Query(24, ge=1, le=168), conn=Depends(get_conn)) -> dict:
     """What the HUD time machine replays: for every device with checks in the last `hours`, its state at the start of the window (`initial`) and every
-    change after that. Only changes are returned, not the checks, so a week of a big network stays small. {from, to, changes: [{id, ts, up, initial}]}"""
+    change after that. Only changes are returned, not the checks, so a week of a big network stays small. `markers` are the things that changed in the same period (a port opened, an update, a container stopped) for the amber ticks. {from, to, changes: [{id, ts, up, initial}], markers: [{ts, id, kind, text}]}"""
     from app.db import ago, utcnow
 
     since = ago(hours=hours)
@@ -53,7 +53,15 @@ def get_uptime_replay(request: Request, hours: int = Query(24, ge=1, le=168), co
             continue
         first = r["prev"] is None
         changes.append({"id": r["device_id"], "ts": since if first else r["ts"], "up": bool(r["up"]), "initial": first})
-    return {"from": since, "to": utcnow(), "changes": changes}
+    from app import causes
+
+    marks = ",".join("?" * len(causes.CHANGES))
+    markers = []
+    for r in conn.execute(f"SELECT ts, device_id, kind, detail FROM events WHERE ts >= ? AND kind IN ({marks}) AND device_id IS NOT NULL AND maintenance IS NULL ORDER BY id DESC LIMIT 400", (since, *causes.CHANGES)):
+        if allowed is None or r["device_id"] in allowed:
+            markers.append({"ts": r["ts"], "id": r["device_id"], "kind": r["kind"], "text": (r["detail"] or r["kind"].replace("_", " "))[:140]})
+    markers.reverse()
+    return {"from": since, "to": utcnow(), "changes": changes, "markers": markers}
 
 
 @router.get("/uptime")

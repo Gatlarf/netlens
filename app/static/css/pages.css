@@ -240,3 +240,23 @@
 .link-groups-card .link-group-new { margin-top: 10px; }
 .link-groups-card .link-group-new .edit-grid label { display: grid; gap: 2px; }
 .networks-card .edit-grid label { display: grid; gap: 2px; }
+
+/* What depends on a device (cards/causes.js) */
+.impact-summary { font-weight: 600; margin: 0 0 8px; padding-left: 10px; border-left: 4px solid var(--border); }
+.impact-summary.risk-high { border-left-color: #dc2626; }
+.impact-summary.risk-medium { border-left-color: #d97706; }
+.impact-summary.risk-low { border-left-color: var(--accent); }
+.impact-summary.risk-none { border-left-color: #16a34a; }
+.impact-grid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.impact-rings { width: auto; max-height: 280px; max-width: 100%; flex: 0 0 auto; }
+.impact-ring { fill: none; stroke: var(--border); stroke-dasharray: 3 4; }
+.impact-centre { fill: var(--accent); }
+.impact-dot { fill: #16a34a; }
+.impact-dot.down { fill: #dc2626; }
+.impact-dot.core { stroke: var(--accent); stroke-width: 2; }
+i.impact-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; background: #16a34a; }
+i.impact-dot.down { background: #dc2626; }
+.impact-levels { flex: 1 1 220px; min-width: 0; }
+.impact-levels h4 { margin: 8px 0 4px; font-size: 0.9rem; }
+.impact-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.impact-list li { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }

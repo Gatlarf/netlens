@@ -53,3 +53,14 @@ def test_an_id_too_large_for_the_database_is_not_found_not_a_server_error(tmp_pa
     client, _ = _client(tmp_path)
     for path in ("/api/devices/99999999999999999999", "/api/devices/99999999999999999999/applications"):
         assert client.get(path).status_code == 404, path
+
+
+def test_replay_carries_the_changes_for_the_amber_ticks(tmp_path):
+    client, conn = _client(tmp_path)
+    a = get_or_create_device(conn, "aa:00:00:00:00:01", "10.0.0.1", ago(hours=30))
+    _check(conn, a, 5, 1)
+    for hrs, kind, detail in ((4, "port_opened", "tcp/23 telnet"), (3, "device_offline", "a is offline"), (40, "port_opened", "too old")):
+        conn.execute("INSERT INTO events (ts, device_id, kind, detail) VALUES (?, ?, ?, ?)", (ago(hours=hrs), a, kind, detail))
+    conn.commit()
+    body = client.get("/api/uptime/replay?hours=24").json()
+    assert [(m["id"], m["kind"], m["text"]) for m in body["markers"]] == [(a, "port_opened", "tcp/23 telnet")]

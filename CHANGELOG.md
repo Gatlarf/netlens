@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.373 — 2026-11-08
+
+### Added
+- ★ **What changed before it broke?** (Insights, on every device page under Uptime, and as a button on every incident): the ports, updates, containers, upstream devices and settings that changed shortly before an outage, ranked by how close in time and how related they are. Pick any recent outage. They are suspects, not proof, and the page says so.
+- ★ **If this goes down…** (device page): what depends on the device, as rings around it (one ring per level, a dot per device, green online, red offline) and as a list, plus its containers and service checks, with a risk and a sentence such as "If switch goes down, 14 devices in 3 levels depend on it. 2 of them are always-on." Use it before you reboot or unplug something.
+- **Ask and the MCP server know both**: "What changed before the camera went offline?" and "What would break if I reboot the switch?" (tools `causes` and `impact`, and `get_device_causes` / `get_device_impact` for assistants).
+- **Time machine (HUD)**: amber ticks on the strip show where something changed, and a device that went down shortly after a change on itself or on the device above it says "after: <what changed>".
+
 ## 0.4.372 — 2026-11-08
 
 ### Fixed

@@ -123,6 +123,10 @@ tool("list_analysis_reports", "overview", "The analysis reports of the digital e
      {"limit": i("How many"), "incident_id": i("Only this incident (INC-<id>)"), "device_id": i("Only this device")}, query=("limit", "incident_id", "device_id"))
 tool("get_analysis_report", "overview", "One analysis report by its id (AR-<id>): the incident id, probable cause, findings (including what is different from normal), what was ruled out, and how to fetch it again. INFORMATION ONLY: nothing was changed on any host; whoever acts on it needs their own rights.", "GET", "/api/analysis/{report_id}",
      {"report_id": i("Report id")}, ("report_id",))
+tool("get_device_causes", "overview", "What changed shortly before a device went offline (the latest outage, or the one at `at`): ports that opened, updates, containers that stopped, the device above it going away, settings people changed. Ranked suspects, not proof.", "GET", "/api/insights/devices/{device_id}/causes",
+     {"device_id": i("Device id"), "at": s("Outage time as 2026-11-08T19:15:00Z (default: the latest outage)"), "hours": i("How many hours before to look (1-72, default 6)")}, ("device_id",), query=("at", "hours"))
+tool("get_device_impact", "overview", "What depends on a device: the devices below it level by level, the containers it hosts and the service checks on them, with a risk. Use it before rebooting or unplugging something.", "GET", "/api/insights/devices/{device_id}/impact",
+     {"device_id": i("Device id")}, ("device_id",))
 tool("get_incident_analysis", "overview", "The newest analysis of an incident by its id (INC-<id>, the id in get_insights and in the messages Netlens sends); makes one now when there is none. Read-only information about the cause, for a person or an automation system.", "GET", "/api/insights/incidents/{incident_id}/analysis",
      {"incident_id": i("Incident id")}, ("incident_id",))
 tool("get_incident_for_event", "overview", "Which incident an alert event belongs to (the event id is in every message and webhook Netlens sends), with the id of the newest analysis report.", "GET", "/api/events/{event_id}/incident",

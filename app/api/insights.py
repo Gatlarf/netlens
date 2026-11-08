@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app import aireport, anomaly, asklog, relevance, ask, forecast, identify, incidents, insights, investigate, modelcheck, postmortem
+from app import aireport, anomaly, asklog, causes, relevance, ask, forecast, identify, incidents, insights, investigate, modelcheck, postmortem
 from app import engineer
 from app.api.devices import get_conn
 
@@ -40,7 +41,7 @@ def _overview(conn, include_all: bool = False) -> dict[str, Any]:
     out: dict[str, Any] = {"status": state, "presets": [{"id": p["id"], "text": p["text"]} for p in ask.PRESETS]}
     if not state["allowed"]:
         return out
-    out["incidents"] = [{k: i[k] for k in ("id", "start", "end", "title", "summary", "devices", "device_count", "resolved", "ongoing")} for i in incidents.incidents(conn, 7, only=keep)[:30]]
+    out["incidents"] = [{k: i[k] for k in ("id", "start", "end", "title", "summary", "devices", "device_count", "device_ids", "cause", "resolved", "ongoing")} for i in incidents.incidents(conn, 7, only=keep)[:30]]
     out["anomalies"] = _cached(conn, "anomalies", lambda: [{**a, "text": anomaly.describe(a)} for a in anomaly.scan(conn)])
     out["anomalies"] = [a for a in out["anomalies"] if keep is None or a.get("device_id") is None or a["device_id"] in keep][:30]
     out["predictions"] = {"disks": [f for f in forecast.cached(conn) if f["days_to_full"] is not None][:20], "memory": forecast.memory_trends(conn)[:20]}
@@ -107,6 +108,28 @@ async def investigate_incident(incident_id: int, words: bool = False, conn=Depen
         raise HTTPException(status_code=404, detail="that incident is no longer in the list")
     if words:
         out["words"] = await asyncio.to_thread(investigate.narrate, conn, out)
+    return out
+
+
+@router.get("/insights/devices/{device_id}/causes")
+async def device_causes(device_id: int, at: str | None = None, hours: float = 6, conn=Depends(get_conn)) -> dict:
+    """What changed shortly before an outage of a device (the latest one unless `at` is given): suspects ranked by closeness in time and relation."""
+    _allowed(conn)
+    if at is not None and not re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", at):
+        raise HTTPException(status_code=400, detail="at must look like 2026-11-08T19:15:00Z")
+    out = await asyncio.to_thread(causes.before, conn, device_id, at, hours)
+    if out is None:
+        raise HTTPException(status_code=404, detail="no such device")
+    return out
+
+
+@router.get("/insights/devices/{device_id}/impact")
+async def device_impact(device_id: int, conn=Depends(get_conn)) -> dict:
+    """What depends on a device: the devices below it level by level, its containers and service checks (\"is it safe to reboot this?\")."""
+    _allowed(conn)
+    out = await asyncio.to_thread(causes.impact, conn, device_id)
+    if out is None:
+        raise HTTPException(status_code=404, detail="no such device")
     return out
 
 
