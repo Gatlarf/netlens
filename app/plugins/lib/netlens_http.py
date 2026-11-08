@@ -76,6 +76,23 @@ class ClientCertError(NetError):
     kind = "client_cert"
 
 
+_EXTRA_CA = ""          # PEM text of certificate authorities the administrator added in Netlens (Settings > Plugin manager); trusted besides the system ones
+
+
+def trust(pem: str) -> None:
+    """Also trust these CA certificates (PEM text) when a certificate is checked. The worker calls this with what the administrator saved; a plugin does not need to."""
+    global _EXTRA_CA
+    _EXTRA_CA = str(pem or "").strip()
+
+
+_CLEARTEXT: set[str] = set()      # hosts that were sent a login (Authorization, a token, a cookie) over plain http in this process
+
+
+def cleartext_logins() -> list[str]:
+    """The hosts that got a login over plain http during this call (the worker adds a note to the result of "Test connection")."""
+    return sorted(_CLEARTEXT)
+
+
 _URLLIB_REDIRECT = urllib.request.HTTPRedirectHandler.redirect_request      # urllib's own rule, kept before guard_urllib() replaces it
 
 
@@ -86,6 +103,11 @@ def ssl_context(verify_tls: bool = True, client_cert: tuple[str, str] | None = N
     if not verify_tls:
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
+    elif _EXTRA_CA:
+        try:
+            context.load_verify_locations(cadata=_EXTRA_CA)
+        except (ssl.SSLError, ValueError):
+            pass                                                           # a broken addition never makes the normal check weaker, and it is refused when it is saved
     if client_cert:
         paths = []
         try:
@@ -277,6 +299,8 @@ class Session:
             hdrs.setdefault("Content-Type", "application/x-www-form-urlencoded")
         elif isinstance(data, str):
             data = data.encode()
+        if parts.scheme.lower() == "http" and (any(k.lower() in SECRET_HEADERS for k in hdrs) or (self.jar is not None and len(self.jar))):
+            _CLEARTEXT.add(host)
         req = urllib.request.Request(url, data=data, headers=hdrs, method=method.upper())
         limit = max_bytes or self.max_bytes
         try:

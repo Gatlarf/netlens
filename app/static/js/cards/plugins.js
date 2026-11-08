@@ -1,4 +1,5 @@
 import { get, post, put, upload } from "../api.js";
+import { longHint } from "../ui.js";
 import { h, clear, toast, timeAgo } from "../util.js";
 import { groupByCategory, openSet, remember } from "./plugin_groups.js";
 import { confirmText } from "./plugin_browse.js";
@@ -120,6 +121,23 @@ function fillPluginsCard(card, data, notice = null) {
     });
     graceBox.append(h("label", {}, "Report a plugin as a problem after "), input, " failed syncs in a row ", save,
       h("span", { class: "hint" }, " Syncs run after every scan, so 3 is about 45 minutes with the usual 15-minute scan. A refused login is always reported at once."));
+    // the certificate authorities of the company: plugins then trust devices whose certificate was made by them, without switching "Verify TLS certificate" off
+    const caArea = h("textarea", { rows: "4", class: "w-xl mono admin-only", id: "plugin-ca", placeholder: "-----BEGIN CERTIFICATE-----", spellcheck: "false" });
+    caArea.value = s.ca_certs || "";
+    const caSave = h("button", { type: "button", class: "btn admin-only" }, "Save");
+    const caCount = h("span", { class: "hint" }, s.ca_count ? ` ${s.ca_count} certificate${s.ca_count === 1 ? "" : "s"} saved.` : " None saved.");
+    caSave.addEventListener("click", async () => {
+      try {
+        const res = await put("/api/plugin-settings", { ca_certs: caArea.value });
+        caArea.value = res.ca_certs || "";
+        caCount.textContent = res.ca_count ? ` ${res.ca_count} certificate${res.ca_count === 1 ? "" : "s"} saved.` : " None saved.";
+        toast("Saved", "success");
+      } catch (err) {
+        toast(err.message || "Could not save", "error");
+      }
+    });
+    graceBox.after(h("div", { class: "inline-setting" }, h("label", { for: "plugin-ca" }, "Certificate authorities that plugins trust"), h("div", {}, caArea),
+      h("div", {}, caSave, caCount), longHint("Paste the certificate of your own certification authority (PEM text, only the -----BEGIN CERTIFICATE----- blocks, never a private key). Every plugin then accepts devices whose certificate was issued by it, with the host name still checked, in addition to the usual authorities. That is safer than switching “Verify TLS certificate” off for a plugin. A device with a self-signed certificate of its own is better pinned by its fingerprint where the plugin offers that.")));
   }).catch(() => {});
 
   if ((data.missing || []).length) {

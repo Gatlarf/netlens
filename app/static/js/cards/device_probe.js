@@ -61,7 +61,7 @@ export async function buildDeviceProbeCard(device, mode = "health") {
   }
 
   function findingsList(items) {
-    return h("ul", { class: "plain" }, items.map((f) => h("li", { class: f.level === "cause" || f.level === "warn" ? "warn-text" : "" }, f.text, f.unusual ? h("span", { class: "badge", style: "margin-left:.4rem" }, "different from normal") : null)));
+    return h("ul", { class: "plain" }, items.map((f) => h("li", { class: f.level === "cause" || f.level === "warn" ? "warn-text" : "" }, f.text, f.unusual ? h("span", { class: "badge gap-l" }, "different from normal") : null)));
   }
 
   // The report that was kept under an id: other systems fetch it with that id; people can have it mailed

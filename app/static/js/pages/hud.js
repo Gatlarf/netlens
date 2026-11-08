@@ -419,7 +419,7 @@ export async function render(container) {
   const ticker = h("div", { class: "hud-ticker" });
 
   const panelTitle = h("h3", {}, MODE_TITLE.radar);
-  const radarPanel = h("section", { class: "hud-panel hud-radar-panel", style: "flex:1;display:flex;flex-direction:column" }, h("div", { class: "hud-panel-head" }, textBtn, modeWrap, panelTitle, h("span", { class: "hud-spacer" }), viewSwitch, containerBtn, radarFs), radarBox, timeMachine.el);
+  const radarPanel = h("section", { class: "hud-panel hud-radar-panel grow col" }, h("div", { class: "hud-panel-head" }, textBtn, modeWrap, panelTitle, h("span", { class: "hud-spacer" }), viewSwitch, containerBtn, radarFs), radarBox, timeMachine.el);
   radarPanel.addEventListener("fullscreenchange", () => { const on = document.fullscreenElement === radarPanel; radarFs.replaceChildren(fsIcon(on)); radarFs.title = on ? "Leave full screen (Esc)" : "Show only this panel on the whole screen (Esc to leave)"; radarPanel.classList.toggle("is-full", on); if (mode === "replay") timeMachine.activate(true); });
   if (!document.fullscreenEnabled) radarFs.hidden = true;
   function applyMode() {
@@ -435,9 +435,9 @@ export async function render(container) {
 
   const root = h("div", { class: "hud" },
     h("div", { class: "hud-top" }, h("span", { class: "hud-title" }, h("i", { class: "hud-live" }), "Netlens // situation"), scopeSwitch, h("span", { class: "hud-top-right" }, clock, fsButton)),
-    h("div", { class: "hud-left" }, h("section", { class: "hud-panel" }, h("h3", {}, "Vitals"), gauges), h("section", { class: "hud-panel", style: "flex:1" }, h("h3", {}, "Needs attention"), attn)),
+    h("div", { class: "hud-left" }, h("section", { class: "hud-panel" }, h("h3", {}, "Vitals"), gauges), h("section", { class: "hud-panel grow" }, h("h3", {}, "Needs attention"), attn)),
     h("div", { class: "hud-mid" }, radarPanel, h("section", { class: "hud-panel" }, stats)),
-    h("div", { class: "hud-right" }, h("section", { class: "hud-panel hud-feed", style: "flex:1" }, h("h3", {}, "Live event stream"), feed), trafficPanel),
+    h("div", { class: "hud-right" }, h("section", { class: "hud-panel hud-feed grow" }, h("h3", {}, "Live event stream"), feed), trafficPanel),
     h("div", { class: "hud-bottom" }, ticker));
   clear(container);
   container.appendChild(root);

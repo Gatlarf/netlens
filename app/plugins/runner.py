@@ -93,7 +93,20 @@ def _remote(plugin: Plugin, action: str, request: bytes, timeout: float) -> tupl
         raise PluginRunError(f"the plugin runner cannot be reached ({exc}); the plugin was not run") from exc
     if answer.get("timeout"):
         raise PluginRunError(f"the plugin did not answer within {int(timeout)} seconds")
-    return str(answer.get("stdout") or "").encode(), str(answer.get("stderr") or "").encode()
+    out, err = str(answer.get("stdout") or ""), str(answer.get("stderr") or "")
+    from app.version import VERSION
+
+    if answer.get("version") != VERSION and not out.strip():     # an old runner image lacks the shared plugin library: say so instead of "No module named ..."
+        raise PluginRunError(f"the plugin runner runs Netlens {answer.get('version') or 'an older version'} but Netlens is {VERSION}: recreate the plugin-runner container (docker compose up -d --force-recreate plugin-runner)")
+    return out.encode(), err.encode()
+
+
+EXTRA_CA = ""          # PEM text the administrator added under Settings > Plugin manager; every plugin call carries it (see lib/netlens_http.py)
+
+
+def set_extra_ca(pem: str) -> None:
+    global EXTRA_CA
+    EXTRA_CA = str(pem or "").strip()
 
 
 def run_subprocess(plugin: Plugin, action: str, config: dict, timeout: float | None = None, payload=None):
@@ -101,7 +114,7 @@ def run_subprocess(plugin: Plugin, action: str, config: dict, timeout: float | N
     if plugin.manifest is None:
         raise PluginRunError(plugin.problem or "the plugin is broken")
     timeout = timeout or plugin.manifest["timeout"]
-    request = json.dumps({"config": config, **({"payload": payload} if payload is not None else {})}).encode()
+    request = json.dumps({"config": config, **({"payload": payload} if payload is not None else {}), **({"ca_certs": EXTRA_CA} if EXTRA_CA else {})}).encode()
     if runner_url():
         stdout, stderr = _remote(plugin, action, request, timeout)
     else:

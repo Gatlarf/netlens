@@ -42,11 +42,21 @@ def main() -> int:
         request = json.loads(sys.stdin.read() or "{}")
         config = request.get("config", {})
         payload_in = request.get("payload")
+        if request.get("ca_certs"):
+            import netlens_http
+
+            netlens_http.trust(str(request["ca_certs"]))               # the CA certificates the administrator added (Settings > Plugin manager)
         module = _load(plugin_dir, mode == "builtin")
         function = getattr(module, action, None)
         if not callable(function):
             raise RuntimeError(f"the plugin has no {action}(config) function")
         result = function(config) if payload_in is None else function(config, payload_in)
+        if action == "test" and isinstance(result, dict):
+            import netlens_http
+
+            hosts = netlens_http.cleartext_logins()
+            if hosts:                                                  # the admin should know before the plugin runs for months
+                result = {**result, "message": f"{result.get('message') or 'Connected.'} Note: the login was sent over plain http, which anybody on the network path can read. Use https if the device offers it."}
         payload = {"ok": True, "result": result}
     except BaseException as exc:  # noqa: BLE001 - everything the plugin raises is reported, not crashed on
         payload = {

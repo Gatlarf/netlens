@@ -2,6 +2,19 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.371 — 2026-11-08
+
+### Added
+- **Your own certificate authorities for plugins** (Settings → Plugin manager): paste the CA certificate of your company once, and every plugin accepts devices whose certificate it issued (the host name is still checked), instead of switching "Verify TLS certificate" off per plugin.
+- **A warning after "Test connection"** when a plugin sent its login over plain http.
+
+### Changed
+- The last browser pop-ups for typing (rename a remote site, customer, the access-review note, a client-certificate identity, the reason for denying an approval, the device to try a remediation rule on, copying a share link) are proper dialogs. The last inline styles became shared classes.
+
+### Fixed
+- **An outdated plugin runner is named**: when the optional plugin-runner container runs an older Netlens version than the app, plugins now say "recreate the plugin-runner container" instead of "No module named …".
+- **Ask with a language model:** a model that answered with something that is not a tool name (for example a list) made the question fail with an error; the built-in logic now answers instead.
+
 ## 0.4.370 — 2026-11-08
 
 ### Fixed

@@ -490,7 +490,7 @@ def _ask_model(conn, question: str, names: list[str], now, ask) -> dict | None:
                     continue
             return {"answer": redact.restore(text) if redact else text, "source": "model", "tools": used}
         tool = doc.get("tool")
-        if tool not in TOOLS or len(used) >= MAX_STEPS:
+        if not isinstance(tool, str) or tool not in TOOLS or len(used) >= MAX_STEPS:         # a model may send anything, also a list (not hashable)
             return None
         used.append(tool)
         token = _FOR_MODEL.set(True)

@@ -206,3 +206,25 @@ def test_the_context_checks_the_hostname_with_the_chain():
     assert ctx.verify_mode == ssl.CERT_REQUIRED and ctx.check_hostname
     off = nh.ssl_context(False)
     assert off.verify_mode == ssl.CERT_NONE and not off.check_hostname
+
+
+@pytest.mark.skipif(not shutil.which("openssl"), reason="needs the openssl program")
+def test_a_certificate_authority_added_by_the_administrator_is_trusted_with_the_host_name_still_checked(tmp_path, server):
+    def run(*args):
+        subprocess.run(["openssl", *args], check=True, capture_output=True, cwd=tmp_path)
+
+    run("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "ca.key", "-out", "ca.pem", "-days", "2", "-subj", "/CN=Test CA")
+    run("req", "-newkey", "rsa:2048", "-nodes", "-keyout", "srv.key", "-out", "srv.csr", "-subj", "/CN=device")
+    (tmp_path / "ext.cnf").write_text("subjectAltName=IP:127.0.0.1\n")
+    run("x509", "-req", "-in", "srv.csr", "-CA", "ca.pem", "-CAkey", "ca.key", "-CAcreateserial", "-out", "srv.pem", "-days", "2", "-extfile", "ext.cnf")
+    tls = _Server(type("H", (server.httpd.RequestHandlerClass,), {}), tls=(str(tmp_path / "srv.pem"), str(tmp_path / "srv.key")))
+    try:
+        with pytest.raises(nh.CertificateError):
+            nh.request("GET", tls.url + "/json", timeout=5)                         # not trusted yet
+        nh.trust((tmp_path / "ca.pem").read_text())
+        assert nh.request("GET", tls.url + "/json", timeout=5).json() == {"a": 1}  # trusted now, no switch turned off
+        with pytest.raises(nh.CertificateError):
+            nh.request("GET", tls.url.replace("127.0.0.1", "localhost") + "/json", timeout=5)      # the name is not in the certificate: still refused
+    finally:
+        nh.trust("")
+        tls.close()

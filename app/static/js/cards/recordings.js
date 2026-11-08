@@ -13,7 +13,7 @@ export async function buildRecordingsCard() {
     let full;
     try { full = await get(`/api/recordings/${rec.id}`); } catch (err) { toast(err.message || "Could not open it", "error"); return; }
     await loadXterm();
-    const box = h("div", { class: "terminal-wrap", style: "height:26rem" });
+    const box = h("div", { class: "terminal-wrap tall" });
     const status = h("p", { class: full.verified ? "hint" : "error" }, full.verified ? "Verified: every piece is authentic and the file matches the hash in the audit log." : `NOT VERIFIED: ${full.problem}`);
     const speed = h("select", { "aria-label": "Speed" }, [["1", "real time"], ["4", "4× faster"], ["20", "20× faster"]].map(([v, t]) => h("option", { value: v }, t)));
     const view = h("div", {}, h("h3", {}, `Session #${full.id}: ${full.user} on ${full.device}`), status, box, h("div", { class: "btn-row" }, speed, h("button", { class: "btn", type: "button", onclick: () => run() }, "Play again")));

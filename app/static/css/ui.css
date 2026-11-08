@@ -189,3 +189,8 @@ pre.code-cols { columns: 2; column-gap: 2em; }
 .card.spaced { margin-bottom: 16px; }
 details.hint-more > summary { cursor: pointer; color: var(--accent, #2563eb); font-size: .9em; }
 details.hint-more[open] > summary { margin-bottom: .3em; }
+.gap-l { margin-left: .4rem; }
+.wrap-pre { overflow-wrap: anywhere; white-space: pre-wrap; }
+.terminal-wrap.tall { height: 26rem; }
+.hud-panel.grow { flex: 1; }
+.hud-panel.col { display: flex; flex-direction: column; }

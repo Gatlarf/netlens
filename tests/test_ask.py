@@ -73,6 +73,10 @@ def test_a_confused_or_failing_model_falls_back_to_the_plain_answer(conn):
 
     assert ask.answer(conn, "what is wrong?", NOW, ask=broken)["source"] == "rules"
     assert ask.answer(conn, "what is wrong?", NOW, ask=lambda m: json.dumps({"tool": "rm -rf", "args": {}}))["source"] == "rules"
+    for odd in (["overview"], {"x": 1}, 7, None, True):          # a model may send anything as the tool name
+        assert ask.answer(conn, "what is wrong?", NOW, ask=lambda m, odd=odd: json.dumps({"tool": odd, "args": {}}))["source"] == "rules"
+    for args in ("text", [1, 2], 5, {"days": {"x": 1}}, {"device": ["a"]}, {"days": "999999999999999999999"}):      # and anything as the arguments
+        assert ask.answer(conn, "what is wrong?", NOW, ask=lambda m, args=args: json.dumps({"tool": "events", "args": args}))["source"] in ("rules", "model")
 
 
 def test_the_model_cannot_loop_forever(conn):

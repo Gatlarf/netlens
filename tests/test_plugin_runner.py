@@ -296,3 +296,95 @@ def test_a_payload_reaches_the_second_argument_and_an_empty_error_gets_its_class
     assert run_subprocess(p, "act", {}, payload={"x": 7}) == {"got": 7}
     with pytest.raises(PluginRunError, match="KeyError"):
         run_subprocess(p, "test", {})
+
+
+def test_a_plugin_in_the_worker_can_use_the_shared_http_client_but_not_the_rest_of_netlens(tmp_path):
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            body = b'{"hello": "world"}'
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    srv = HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        p = plugin(tmp_path, """
+            import netlens_http
+            def test(config):
+                resp = netlens_http.request("GET", config["url"], timeout=5)
+                try:
+                    import app
+                    leaked = True
+                except ImportError:
+                    leaked = False
+                return {"message": "%s %s leaked=%s" % (resp.status, resp.json()["hello"], leaked)}
+            def fetch(config):
+                try:
+                    netlens_http.request("GET", "file:///etc/passwd")
+                except netlens_http.BadUrl as exc:
+                    return {"nodes": [], "clients": [], "note": exc.kind}
+        """)
+        assert run_subprocess(p, "test", {"url": f"http://127.0.0.1:{srv.server_port}/"})["message"] == "200 world leaked=False"
+        assert run_subprocess(p, "fetch", {})["note"] == "bad_url"
+    finally:
+        srv.shutdown()
+
+
+def test_a_login_sent_over_plain_http_is_pointed_out_after_test_connection_and_the_added_authorities_reach_the_worker(tmp_path):
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from app.plugins import runner
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+    srv = HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    p = plugin(tmp_path, """
+        import netlens_http
+        def test(config):
+            netlens_http.request("GET", config["url"], headers=({"Authorization": "Bearer x"} if config.get("login") else {}), timeout=5)
+            return {"message": "ok extra=%d" % len(netlens_http._EXTRA_CA)}
+        def fetch(config):
+            return {"nodes": [], "clients": []}
+    """)
+    try:
+        url = f"http://127.0.0.1:{srv.server_port}/"
+        assert run_subprocess(p, "test", {"url": url})["message"] == "ok extra=0"                      # no login, no note
+        assert "plain http" in run_subprocess(p, "test", {"url": url, "login": True})["message"]
+        runner.set_extra_ca("-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----")
+        assert "extra=" in run_subprocess(p, "test", {"url": url})["message"] and "extra=0" not in run_subprocess(p, "test", {"url": url})["message"]
+    finally:
+        runner.set_extra_ca("")
+        srv.shutdown()
+
+
+def test_an_outdated_runner_is_named_instead_of_a_missing_module(tmp_path, runner, monkeypatch):
+    from app.plugins import runner_server
+
+    p = plugin(tmp_path, """
+        def test(config):
+            return {"message": "ran"}
+        def fetch(config):
+            return {}
+    """)
+    monkeypatch.setattr("app.version.VERSION", "9.9.9")                                  # Netlens moved on, the runner image did not
+    monkeypatch.setattr(runner_server, "run_call", lambda call: {"version": "0.4.1", "stdout": "", "stderr": "No module named 'netlens_http'"})
+    with pytest.raises(PluginRunError, match="recreate the plugin-runner"):
+        run_subprocess(p, "test", {})

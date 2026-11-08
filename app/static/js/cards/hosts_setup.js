@@ -32,7 +32,7 @@ export async function buildHostsSetupCard() {
   const probeText = (x) => {
     const p = x.probes;
     if (!p.enabled && !p.installed_version) return h("span", { class: "hint" }, "off");
-    return h("span", {}, p.installed_version ? `script v${p.installed_version}` : p.mode === "direct" ? "direct (no script on the host)" : "on", p.update_available ? h("span", { class: "tag unknown-tag", style: "margin-left:.4rem" }, "update") : null,
+    return h("span", {}, p.installed_version ? `script v${p.installed_version}` : p.mode === "direct" ? "direct (no script on the host)" : "on", p.update_available ? h("span", { class: "tag unknown-tag gap-l" }, "update") : null,
       p.last ? h("span", { class: "hint" }, ` · looked ${timeAgo(p.last)}`) : null);
   };
 

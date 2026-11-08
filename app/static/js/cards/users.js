@@ -143,9 +143,11 @@ function userRow(user, data, refresh, shown) {
   }
   if (data.privileged_allowed !== false) {
     const cert = h("button", { type: "button", class: "btn", title: user.cert_identity ? `Linked to: ${user.cert_identity}` : "Link a client certificate (Enterprise): what the reverse proxy reports for it, for example the subject" }, user.cert_identity ? "Certificate ✓" : "Certificate");
-    cert.addEventListener("click", () => {
-      const id = window.prompt(`What must the client certificate of ${user.username} say it is? (exactly what your proxy puts in the identity header, for example CN=anna,O=Example). Empty removes the link.`, user.cert_identity || "");
-      if (id === null) return;
+    cert.addEventListener("click", async () => {
+      const got = await formDialog({ title: `Client certificate of ${user.username}`, ok: "Save",
+        fields: [{ key: "id", label: "What the certificate must say it is", value: user.cert_identity || "", placeholder: "CN=anna,O=Example", hint: "Exactly what your proxy puts in the identity header. Empty removes the link." }] });
+      if (!got) return;
+      const id = got.id;
       call(() => api(`/api/users/${user.id}`, { method: "PATCH", body: { cert_identity: id.trim() } }), id.trim() ? "Certificate linked" : "Certificate unlinked");
     });
     more.push(cert);

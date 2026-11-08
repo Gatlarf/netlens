@@ -1,4 +1,5 @@
 import { api, get } from "../api.js";
+import { formDialog } from "../formdialog.js";
 import { rowMenu } from "../ui.js";
 import { h, clear, toast, fmtTime } from "../util.js";
 import { keepDrafts } from "../editguard.js";
@@ -165,7 +166,7 @@ function fillNow(card, state, editing) {
           await navigator.clipboard.writeText(linkUrl(link));
           toast("Link copied", "success");
         } catch (e) {
-          window.prompt("Copy this link:", linkUrl(link));
+          formDialog({ title: "Copy this link", ok: "Close", fields: [{ key: "link", label: "Link", value: linkUrl(link), readonly: true }] });
         }
       });
       const open = h("a", { class: "btn", href: `/share/${link.token}`, target: "_blank", rel: "noopener" }, "Open");

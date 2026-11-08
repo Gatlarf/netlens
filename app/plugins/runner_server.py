@@ -33,6 +33,9 @@ _gate = threading.BoundedSemaphore(MAX_PARALLEL)
 _ROOT = Path(os.environ.get("NETLENS_RUNNER_DIR") or tempfile.gettempdir()) / "netlens-plugins"
 
 
+from app.version import VERSION  # noqa: E402
+
+
 def _directory(plugin_id: str, files: dict) -> Path:
     """The plugin's files under a folder named by their hash: the same files are written once, other files never replace them."""
     if not SAFE_NAME.match(plugin_id or "") or not isinstance(files, dict) or "plugin.py" not in files or "plugin.json" not in files:
@@ -82,7 +85,7 @@ def run_call(call: dict) -> dict:
         if "did not answer" in str(exc):
             return {"timeout": True}
         raise
-    return {"stdout": stdout[:MAX_OUTPUT].decode("utf-8", errors="replace"), "stderr": stderr[-4000:].decode("utf-8", errors="replace")}
+    return {"version": VERSION, "stdout": stdout[:MAX_OUTPUT].decode("utf-8", errors="replace"), "stderr": stderr[-4000:].decode("utf-8", errors="replace")}
 
 
 def _token() -> str:
@@ -105,7 +108,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._send(200, {"status": "ok"})
+            self._send(200, {"status": "ok", "version": VERSION})
         else:
             self._send(404, {"error": "not found"})
 

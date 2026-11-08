@@ -91,6 +91,9 @@ async def lifespan(app: FastAPI):
     init_db(conn)
     from app import hardening, secpolicy, vault
 
+    from app.api.plugins import load_extra_ca
+
+    load_extra_ca(conn)          # the certificate authorities the administrator added for plugins
     secpolicy.forget()
     secpolicy.get(conn)          # warm: the per-request checks (the access token, step-up, sessions) then cost no query
 

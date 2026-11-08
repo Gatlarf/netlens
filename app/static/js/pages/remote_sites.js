@@ -1,6 +1,7 @@
 import { get, post, patch, put, del } from "../api.js";
 import { editing } from "../editguard.js";
 import { h, clear, toast, statusDot, shortName, timeAgo, isAdmin, fmtTime } from "../util.js";
+import { formDialog } from "../formdialog.js";
 import { pageHead, emptyState, previewHtml } from "../ui.js";
 import { buildPerformanceCard } from "../cards/performance.js";
 import { snoozeMenu, wakeButton, untilText } from "../snooze.js";
@@ -367,13 +368,15 @@ export async function render(container) {
           try { await post(`/api/probes/${id}/command`, { command: "scan" }); toast("Asked. The site starts the scan with its next report.", "success"); showDetail(id); } catch (err) { toast(err.message || "Could not send the command", "error"); }
         } }, data.pending_commands.includes("scan") ? "Scan requested…" : "Scan now"),
       h("button", { class: "btn", type: "button", onclick: async () => {
-        const name = window.prompt("New name", p.name);
-        if (!name || name.trim() === p.name) return;
+        const got = await formDialog({ title: "Rename this site", ok: "Rename", fields: [{ key: "name", label: "New name", value: p.name, required: true }] });
+        if (!got || got.name.trim() === p.name) return;
+        const name = got.name.trim();
         try { await patch(`/api/probes/${id}`, { name }); toast("Renamed", "success"); showList(); } catch (err) { toast(err.message || "Could not rename", "error"); }
       } }, "Rename"),
       h("button", { class: "btn", type: "button", onclick: async () => {
-        const customer = window.prompt("Customer (leave empty for none)", p.customer || "");
-        if (customer === null || customer.trim() === (p.customer || "")) return;
+        const got = await formDialog({ title: "Customer of this site", ok: "Save", fields: [{ key: "customer", label: "Customer", value: p.customer || "", hint: "Leave empty for none." }] });
+        if (!got || got.customer.trim() === (p.customer || "")) return;
+        const customer = got.customer;
         try { await patch(`/api/probes/${id}`, { customer }); toast("Saved", "success"); showList(); } catch (err) { toast(err.message || "Could not save", "error"); }
       } }, p.customer ? `Customer: ${p.customer}` : "Set customer"),
       h("button", { class: "btn", type: "button", title: "A page about this site for the customer (devices, checks, open points)",

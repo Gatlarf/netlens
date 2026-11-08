@@ -251,11 +251,41 @@ def test_failure_grace_setting(tmp_path):
     app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
     admin = {"Authorization": "Bearer secret"}
     with TestClient(app) as c:
-        assert c.get("/api/plugin-settings", headers=admin).json() == {"failure_grace": 3}
-        assert c.put("/api/plugin-settings", json={"failure_grace": 5}, headers=admin).json() == {"failure_grace": 5}
-        assert c.get("/api/plugin-settings", headers=admin).json() == {"failure_grace": 5}
+        assert c.get("/api/plugin-settings", headers=admin).json() == {"failure_grace": 3, "ca_certs": "", "ca_count": 0}
+        assert c.put("/api/plugin-settings", json={"failure_grace": 5}, headers=admin).json()["failure_grace"] == 5
+        assert c.get("/api/plugin-settings", headers=admin).json()["failure_grace"] == 5
+        assert c.put("/api/plugin-settings", json={}, headers=admin).status_code == 422
         for bad in (0, 49, "x"):
             assert c.put("/api/plugin-settings", json={"failure_grace": bad}, headers=admin).status_code == 422
+
+
+def test_certificate_authorities_for_plugins_are_checked_saved_and_handed_to_the_runner(tmp_path):
+    import shutil
+    import subprocess
+
+    import pytest
+    from fastapi.testclient import TestClient
+
+    from app.config import load_settings
+    from app.main import create_app
+    from app.plugins import runner
+
+    if not shutil.which("openssl"):
+        pytest.skip("needs the openssl program")
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(tmp_path / "k.pem"), "-out", str(tmp_path / "ca.pem"), "-days", "2", "-subj", "/CN=Test CA"], check=True, capture_output=True)
+    pem = (tmp_path / "ca.pem").read_text()
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=tmp_path / "t.db")
+    admin = {"Authorization": "Bearer secret"}
+    try:
+        with TestClient(app) as c:
+            for bad in ("hello", (tmp_path / "k.pem").read_text(), "-----BEGIN CERTIFICATE-----\nnot base64 at all!\n-----END CERTIFICATE-----", pem + "\nextra words"):
+                assert c.put("/api/plugin-settings", json={"ca_certs": bad}, headers=admin).status_code == 422
+            got = c.put("/api/plugin-settings", json={"ca_certs": "\n" + pem + "\n"}, headers=admin).json()
+            assert got["ca_count"] == 1 and got["ca_certs"].startswith("-----BEGIN CERTIFICATE-----\n") and runner.EXTRA_CA == got["ca_certs"]
+            assert c.get("/api/plugin-settings", headers=admin).json()["ca_certs"] == got["ca_certs"]
+            assert c.put("/api/plugin-settings", json={"ca_certs": ""}, headers=admin).json()["ca_count"] == 0 and runner.EXTRA_CA == ""
+    finally:
+        runner.set_extra_ca("")
 
 
 def test_plugin_runs_list_the_enabled_plugins_like_service_checks(env):

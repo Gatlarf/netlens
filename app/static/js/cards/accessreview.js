@@ -1,5 +1,6 @@
 import { get, post } from "../api.js";
 import { h, clear, toast, fmtTime, can } from "../util.js";
+import { formDialog } from "../formdialog.js";
 
 // Settings -> Access review: who has access and how it is protected, with findings; a CSV, a signed evidence pack, and "mark as reviewed".
 export async function buildAccessReviewCard() {
@@ -22,8 +23,9 @@ export async function buildAccessReviewCard() {
     if (can("access_review") && document.body.dataset.role === "admin") {
       buttons.push(h("button", { class: "btn", type: "button", onclick: async () => { try { const doc = await post("/api/access-review/pack", {}); download(`netlens-evidence-${doc.report.generated.slice(0, 10)}.json`, JSON.stringify(doc, null, 2), "application/json"); toast("Signed pack made; its hash is in the audit log", "success"); } catch (err) { toast(err.message || "Failed", "error"); } } }, "Download signed evidence pack"));
       buttons.push(h("button", { class: "btn primary", type: "button", onclick: async () => {
-        const comment = window.prompt("Mark the review as done. A note for the record (what you checked, what you changed):", "") ;
-        if (comment === null) return;
+        const got = await formDialog({ title: "Mark the review as done", ok: "Record it", fields: [{ key: "comment", label: "A note for the record", type: "textarea", hint: "What you checked, what you changed." }] });
+        if (!got) return;
+        const comment = got.comment;
         try { await post("/api/access-review/complete", { comment }); rep = await get("/api/access-review"); draw(); toast("Review recorded", "success"); } catch (err) { toast(err.message || "Failed", "error"); }
       } }, "Mark as reviewed"));
     }

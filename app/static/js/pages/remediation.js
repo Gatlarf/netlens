@@ -1,5 +1,6 @@
 import { get, post, put, del } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
+import { formDialog } from "../formdialog.js";
 import { pageHead, tile as uiTile, tileRow } from "../ui.js";
 
 const MODE_TEXT = {
@@ -155,7 +156,13 @@ export async function render(container) {
       edit.addEventListener("click", () => { formOpen = true; editing = r; draw(); });
       const test = h("button", { class: "btn", type: "button", title: "Run it once now on the device" }, "Try it");
       test.addEventListener("click", async () => {
-        const target = r.device_id || Number(window.prompt("Device id to try it on (see the device page address)", ""));
+        let target = r.device_id;
+        if (!target) {
+          const got = await formDialog({ title: `Try “${r.name}”`, text: "This rule is for any device: pick the one to try it on.", ok: "Continue",
+            fields: [{ key: "device", label: "Device", type: "select", options: data.devices.map((d) => [d.id, d.name]) }] });
+          if (!got) return;
+          target = Number(got.device);
+        }
         if (!target || !window.confirm(`Run “${r.name}” now?`)) return;
         try { const res = await post(`/api/remediation/rules/${r.id}/run`, { device_id: target }); toast(res.state === "ok" ? `Done: ${res.result}` : `Failed: ${res.result}`, res.state === "ok" ? "success" : "error"); } catch (err) { toast(err.message || "Failed", "error"); }
         await load();

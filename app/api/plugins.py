@@ -6,8 +6,10 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 import json
+import logging
+import re
 
-from app.db import connect, set_setting, utcnow
+from app.db import connect, get_setting, set_setting, utcnow
 from app.plugins import autoupdate
 from app.plugins import index_install as inst
 from app.plugins import registry
@@ -31,6 +33,7 @@ from app.plugins.service import (
     save_state,
 )
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["plugins"])
 GUIDE = Path(__file__).resolve().parent.parent / "plugins" / "PLUGINS.md"
 
@@ -70,15 +73,55 @@ def _summary(conn, plugin, categories: dict | None = None, auto: dict | None = N
 
 
 class PluginSettings(BaseModel):
-    failure_grace: int = Field(ge=1, le=48)
+    failure_grace: int | None = Field(default=None, ge=1, le=48)
+    ca_certs: str | None = Field(default=None, max_length=65536)
+
+
+CA_KEY = "plugins.ca_certs"
+PEM_BLOCK = re.compile(r"-----BEGIN CERTIFICATE-----[A-Za-z0-9+/=\s]+?-----END CERTIFICATE-----")
+
+
+def load_extra_ca(conn) -> str:
+    """Hand the saved CA certificates to the plugin runner (at start and after a change)."""
+    from app.plugins import runner
+
+    pem = get_setting(conn, CA_KEY) or ""
+    runner.set_extra_ca(pem)
+    return pem
+
+
+def clean_ca(text: str) -> str:
+    """The certificates of a PEM text, one after the other, or HTTPException 422 when something in it is not a certificate."""
+    import ssl
+
+    blocks = PEM_BLOCK.findall(text or "")
+    if (text or "").strip() and not blocks:
+        raise HTTPException(status_code=422, detail="that is not a PEM certificate (it starts with -----BEGIN CERTIFICATE-----)")
+    if len(blocks) > 50:
+        raise HTTPException(status_code=422, detail="at most 50 certificates")
+    leftover = PEM_BLOCK.sub("", text or "").strip()
+    if leftover:
+        raise HTTPException(status_code=422, detail="the text holds more than certificates: paste only the -----BEGIN CERTIFICATE----- blocks (never a private key)")
+    pem = "\n".join(" ".join(b.split()).replace("-----BEGIN CERTIFICATE----- ", "-----BEGIN CERTIFICATE-----\n").replace(" -----END CERTIFICATE-----", "\n-----END CERTIFICATE-----") for b in blocks)
+    if pem:
+        try:
+            ssl.create_default_context().load_verify_locations(cadata=pem)
+        except (ssl.SSLError, ValueError):
+            raise HTTPException(status_code=422, detail="one of the certificates is not valid") from None
+    return pem
+
+
+def _settings_answer(conn) -> dict:
+    pem = get_setting(conn, CA_KEY) or ""
+    return {"failure_grace": failure_grace(conn), "ca_certs": pem, "ca_count": len(PEM_BLOCK.findall(pem))}
 
 
 @router.get("/plugin-settings")
 def get_plugin_settings(request: Request) -> dict:
-    """How many failed syncs in a row make a plugin a problem (dashboard, problem count)."""
+    """How many failed syncs in a row make a plugin a problem (dashboard, problem count), and the extra certificate authorities plugins trust."""
     conn = connect(request.app.state.db_path)
     try:
-        return {"failure_grace": failure_grace(conn)}
+        return _settings_answer(conn)
     finally:
         conn.close()
 
@@ -87,8 +130,18 @@ def get_plugin_settings(request: Request) -> dict:
 def put_plugin_settings(request: Request, body: PluginSettings) -> dict:
     conn = connect(request.app.state.db_path)
     try:
-        set_setting(conn, "plugins.failure_grace", str(body.failure_grace))
-        return {"failure_grace": failure_grace(conn)}
+        if body.failure_grace is None and body.ca_certs is None:
+            raise HTTPException(status_code=422, detail="nothing to change")
+        pem = clean_ca(body.ca_certs) if body.ca_certs is not None else None
+        if body.failure_grace is not None:
+            set_setting(conn, "plugins.failure_grace", str(body.failure_grace))
+        if pem is not None:
+            set_setting(conn, CA_KEY, pem)
+            audit_note = "removed" if not pem else f"set ({len(PEM_BLOCK.findall(pem))})"
+            log.info("plugin CA certificates %s", audit_note)
+        conn.commit()
+        load_extra_ca(conn)
+        return _settings_answer(conn)
     finally:
         conn.close()
 

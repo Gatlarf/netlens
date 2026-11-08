@@ -1,5 +1,6 @@
 import { get, post } from "../api.js";
 import { h, clear, toast, timeAgo } from "../util.js";
+import { formDialog } from "../formdialog.js";
 
 // Settings -> Approvals: requests from other administrators that wait for a decision, your own requests, and what was decided lately.
 export async function buildApprovalsCard() {
@@ -11,7 +12,12 @@ export async function buildApprovalsCard() {
   }
 
   async function decide(item, approve) {
-    const comment = approve ? "" : (window.prompt("Why not? (they see this)", "") || "");
+    let comment = "";
+    if (!approve) {
+      const got = await formDialog({ title: "Deny this request", ok: "Deny", fields: [{ key: "comment", label: "Why not?", type: "textarea", hint: "They see this." }] });
+      if (!got) return;
+      comment = got.comment;
+    }
     try { await post(`/api/approvals/${item.id}/decide`, { approve, comment }); toast(approve ? "Approved" : "Denied", "success"); data = await get("/api/approvals"); draw(); } catch (err) { toast(err.message || "Could not decide", "error"); }
   }
 
