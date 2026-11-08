@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app import vault
+from app import csvsafe
 from app.db import get_setting, set_setting, utcnow
 
 DORMANT_DAYS = 90
@@ -115,7 +116,7 @@ def csv_text(rep: dict[str, Any]) -> str:
     for p in rep["people"]:
         cells = [p["username"], p["role"], p["custom_role"] or "", p["source"], p["second_factor"], "yes" if p["disabled"] else "no", "yes" if p["break_glass"] else "no", "yes" if p["customer_view"] else "no",
                  p["last_login"] or "never", p["days_since_login"] if p["days_since_login"] is not None else "", p["sessions_open"], len(p["tokens"])]
-        writer.writerow([("'" + c if isinstance(c, str) and c[:1] in "=+-@" else c) for c in cells])
+        writer.writerow([csvsafe.cell(c) for c in cells])
     return out.getvalue()
 
 

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 
 from app import audit, auditchain, roles
+from app import csvsafe
 from app.api.devices import get_conn
 
 router = APIRouter(prefix="/api", tags=["audit"])
@@ -37,5 +38,5 @@ def audit_csv(conn=Depends(get_conn)) -> PlainTextResponse:
     writer.writerow(["time (UTC)", "user", "role", "address", "what", "method", "path", "status"])
     for r in audit.entries(conn, 1000):
         cells = [r["ts"], r["user"], r["role"], r["ip"], r["action"], r["method"], r["path"], r["status"]]
-        writer.writerow([("'" + c if isinstance(c, str) and c[:1] in "=+-@" else c) for c in cells])
+        writer.writerow([csvsafe.cell(c) for c in cells])
     return PlainTextResponse(out.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": 'attachment; filename="netlens-audit-log.csv"'})

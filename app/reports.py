@@ -16,7 +16,7 @@ import operator
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app import checkstats
+from app import checkstats, csvsafe
 from app.db import get_setting, set_setting
 
 log = logging.getLogger(__name__)
@@ -129,8 +129,8 @@ def business_spans(start: datetime, end: datetime, business: dict[str, Any]) -> 
     last = (end + timedelta(days=1)).astimezone().date()
     while day <= last:
         if day.weekday() in business["business_days"]:
-            first = datetime(day.year, day.month, day.day).astimezone() + timedelta(hours=business["business_start"])
-            spans.append((_fmt(first), _fmt(datetime(day.year, day.month, day.day).astimezone() + timedelta(hours=business["business_end"]))))
+            midnight = datetime(day.year, day.month, day.day)           # local, naive: the hours are added to the wall clock and only then turned into UTC (a day with a clock change has 23 or 25 hours)
+            spans.append((_fmt((midnight + timedelta(hours=business["business_start"])).astimezone()), _fmt((midnight + timedelta(hours=business["business_end"])).astimezone())))
         day += timedelta(days=1)
     return _Spans(spans)
 
@@ -286,9 +286,7 @@ def availability(conn, start: datetime, end: datetime, scope: str = "all", with_
 
 def availability_csv(report: dict[str, Any]) -> str:
     def cell(v: Any) -> str:
-        t = "" if v is None else str(v)
-        if t[:1] in "=+-@":                       # a spreadsheet would run it as a formula
-            t = "'" + t
+        t = csvsafe.cell("" if v is None else str(v))                    # a spreadsheet would run a text that starts with = + - @ as a formula
         return '"' + t.replace('"', '""') + '"'
 
     goal = report["summary"].get("target") is not None

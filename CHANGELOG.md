@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.370 — 2026-11-08
+
+### Fixed
+- **CSV downloads of the audit log and of the access review** no longer put a stray apostrophe in front of every empty cell, and a text starting with a tab or a line break is also protected against being run as a formula by a spreadsheet (one shared rule for all CSV files).
+- **Reports for business hours only** count the right hours on the two days a year the clock changes (before, the day was shifted by an hour).
+
 ## 0.4.369 — 2026-11-08
 
 ### Changed
