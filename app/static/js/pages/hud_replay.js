@@ -10,12 +10,12 @@ const SPEEDS = [[60, "1 min/s"], [360, "6 min/s"], [1800, "30 min/s"], [7200, "2
 export function replay({ onChange, getTree, getDevices }) {
   const el = h("div", { class: "hud-replay", hidden: true });
   const playBtn = h("button", { type: "button", class: "hud-rbtn" }, "▶ Play");
-  const rangeSel = h("select", { "aria-label": "How far back to replay" }, ...RANGES.map(([k]) => h("option", { value: k }, `Last ${k}`)));
-  const speedSel = h("select", { "aria-label": "Replay speed" }, ...SPEEDS.map(([v, l]) => h("option", { value: String(v) }, l)));
+  const rangeSel = h("select", { "data-nosave": "1", "aria-label": "How far back to replay" }, ...RANGES.map(([k]) => h("option", { value: k }, `Last ${k}`)));
+  const speedSel = h("select", { "data-nosave": "1", "aria-label": "Replay speed" }, ...SPEEDS.map(([v, l]) => h("option", { value: String(v) }, l)));
   const nowBtn = h("button", { type: "button", class: "hud-rbtn" }, "Back to now");
   const clock = h("span", { class: "hud-rclock" });
   const strip = h("canvas", { class: "hud-rstrip", height: 36, title: "Amber ticks: something changed (a port, an update, a container)", "aria-hidden": "true" });
-  const slider = h("input", { type: "range", min: 0, max: 1, step: 1, value: 1, "aria-label": "Moment to show" });
+  const slider = h("input", { type: "range", "data-nosave": "1", min: 0, max: 1, step: 1, value: 1, "aria-label": "Moment to show" });
   const list = h("div", { class: "hud-revents" });
   const note = h("div", { class: "hud-rnote" });
   el.append(h("div", { class: "hud-rbar" }, playBtn, rangeSel, speedSel, nowBtn, clock), strip, slider, list, note);

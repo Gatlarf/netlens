@@ -34,7 +34,7 @@ const RELATION = { "this device": "this device", "above it": "the device it is p
 export function showCauses(body, out, reload) {
   clear(body);
   if (reload && out.outages.length) {
-    const pick = h("select", { name: "outage", "aria-label": "Which outage" });
+    const pick = h("select", { "data-nosave": "1", name: "outage", "aria-label": "Which outage" });
     for (const ts of out.outages) pick.appendChild(h("option", { value: ts, selected: ts === out.at }, `went offline ${fmtTime(ts)}`));
     pick.addEventListener("change", () => reload(pick.value));
     body.appendChild(h("div", { class: "btn-row" }, pick));

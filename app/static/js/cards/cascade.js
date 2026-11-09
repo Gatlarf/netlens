@@ -32,7 +32,7 @@ export function cascade(box, data) {
     dots.set(n.id, dot);
   }
   const play = h("button", { type: "button", class: "btn" }, "▶ Play");
-  const slider = h("input", { type: "range", min: 0, max: 1000, value: 0, "aria-label": "Moment of the incident" });
+  const slider = h("input", { type: "range", "data-nosave": "1", min: 0, max: 1000, value: 0, "aria-label": "Moment of the incident" });
   const clock = h("span", { class: "cascade-clock" });
   const span = Math.max(data.steps[data.steps.length - 1].t, data.duration);
   let t = 0, playing = false, last = 0, raf = 0;

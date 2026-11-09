@@ -10,7 +10,7 @@
 
 const FIELDS = "input, select, textarea";
 const SKIP_TYPES = new Set(["button", "submit", "reset", "image", "file", "hidden"]);
-const looksLikeFilter = (el) => el.type === "search" || el.closest("[data-filter], .toolbar, .filters") !== null
+const looksLikeFilter = (el) => el.type === "search" || el.closest("[data-filter], [data-nosave], .toolbar, .filters") !== null
   || /\b(filter|search|find|zoek)/i.test(`${el.placeholder || ""} ${el.getAttribute("aria-label") || ""}`);
 
 // the option a select starts on: the one marked selected, or the first (a select without a marked option shows its first, which is not a change)
