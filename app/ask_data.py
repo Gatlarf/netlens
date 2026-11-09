@@ -180,6 +180,7 @@ def t_usage(conn, args, now=None) -> dict:
         return {"available": False, "enabled": got.get("enabled", False), "note": "No plugin reports traffic per device or per application (or it is switched off under Settings)."}
     gb = lambda b: round(b / 1e9, 2)  # noqa: E731
     return {"available": True, "from": got["from"], "to": got["to"], "total_down_gb": gb(got["rx"]), "total_up_gb": gb(got["tx"]),
+            "top_categories": [{"name": a["name"], "gb": gb(a["rx"] + a["tx"]), "share_percent": a["share"]} for a in got["categories"][:10]],
             "top_applications": [{"name": a["name"], "gb": gb(a["rx"] + a["tx"]), "share_percent": a["share"]} for a in got["applications"][:10]],
             "top_devices": [{"name": c["name"], "gb": gb(c["rx"] + c["tx"]), "down_gb": gb(c["rx"]), "up_gb": gb(c["tx"])} for c in got["clients"][:10]]}
 

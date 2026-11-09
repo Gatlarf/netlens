@@ -715,6 +715,9 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_client_app_usage_device ON client_app_usage (device_id, day)")
+    # privacy choices for the traffic statistics (app/usagecat.py): a category shown under another label, and the administrator's own category rules
+    cur.execute("CREATE TABLE IF NOT EXISTS usage_redirects (category TEXT PRIMARY KEY, label TEXT NOT NULL)")
+    cur.execute("CREATE TABLE IF NOT EXISTS usage_rules (id INTEGER PRIMARY KEY, pattern TEXT NOT NULL UNIQUE, category TEXT NOT NULL)")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS firewall_state (

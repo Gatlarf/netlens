@@ -39,6 +39,7 @@ const TIPS = [
   ["Most common open ports", "The ports found open on the most devices."],
   ["Most common services", "The services (web, SSH, SMB and so on) found on the most devices."],
   ["Devices with the most open ports", "Devices exposing the most ports. More open ports means a bigger surface to keep secure."],
+  ["Top categories", "The traffic grouped by what the applications are for (streaming, social media...)."],
   ["Traffic flow", "Devices on the left, applications on the right, the width of a band is the amount of traffic. The router counts devices and applications separately, so a band does not say which device used which application."],
   ["Roaming", "How often Wi-Fi clients moved from one access point to another in the chosen range; a thicker arrow is more moves."],
   ["Top applications", "The applications that used the most traffic in the chosen range, as the router's traffic analyser (for example ASUS Traffic Analyzer) counts them. Down is traffic towards your devices, up is traffic from them."],
@@ -219,11 +220,32 @@ function build(s) {
     const bytesItem = (r, extra = {}) => ({ label: r.name, count: both(r), text: fmtBytes(both(r)), ...extra });
     root.appendChild(section("applications", "Applications",
       h("div", { class: "tiles inline" }, tile(fmtBytes(ap.rx), "downloaded"), tile(fmtBytes(ap.tx), "uploaded"), tile(fmtNumber(ap.applications_total), "applications seen"), tile(fmtNumber(ap.days), ap.days === 1 ? "day counted" : "days counted")),
-      ap.clients.length && ap.applications.length ? card("Traffic flow", trafficBands(ap.clients.slice(0, 8).map((r) => ({ label: r.name, value: both(r) })), (() => {
-        const shown = ap.applications.slice(0, 8).map((r) => ({ label: r.name, value: both(r) })), rest = ap.rx + ap.tx - shown.reduce((a, b) => a + b.value, 0);
-        return rest > 0 ? [...shown, { label: "others", value: rest }] : shown;
-      })(), fmtBytes)) : null,
-      card("Top applications", barList(ap.applications.map((r) => bytesItem(r)))),
+      (() => {
+        // names with their category can be looked at either way; with categories only, the list already is the categories
+        const box = h("div", { class: "stats-group" });
+        const show = (kind) => {
+          const list = kind === "categories" ? ap.categories : ap.applications;
+          box.replaceChildren(...[
+            ap.clients.length && list.length ? card("Traffic flow", trafficBands(ap.clients.slice(0, 8).map((r) => ({ label: r.name, value: both(r) })), (() => {
+              const shown = list.slice(0, 8).map((r) => ({ label: r.name, value: both(r) })), rest = ap.rx + ap.tx - shown.reduce((x, y) => x + y.value, 0);
+              return rest > 0 ? [...shown, { label: "others", value: rest }] : shown;
+            })(), fmtBytes)) : null,
+            card(kind === "categories" ? "Top categories" : "Top applications", barList(list.map((r) => bytesItem(r))))].filter(Boolean));
+        };
+        const wrap = h("div", { class: "stats-group" });
+        if (ap.detail === "names") {
+          const tabs = h("div", { class: "range-tabs", role: "group", "aria-label": "Group traffic by" });
+          for (const [kind, text] of [["applications", "Applications"], ["categories", "Categories"]]) {
+            const b = h("button", { type: "button", "aria-pressed": String(kind === "applications") }, text);
+            b.addEventListener("click", () => { for (const o of tabs.children) o.setAttribute("aria-pressed", String(o === b)); show(kind); });
+            tabs.appendChild(b);
+          }
+          wrap.appendChild(tabs);
+        }
+        show(ap.detail === "names" ? "applications" : "categories");
+        wrap.appendChild(box);
+        return wrap;
+      })(),
       card("Top devices by traffic", barList(ap.clients.map((r) => bytesItem(r, dev({ id: r.id, label: r.name }))))),
       ap.per_day.length > 1 ? card("Traffic per day", columnChart(ap.per_day.map((r) => ({ x: r.day, v: both(r) })))) : null));
   }

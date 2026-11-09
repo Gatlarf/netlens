@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.377 — 2026-11-09
+
+### Added
+- ★ **Traffic by category** (Statistics → Network, and on the device page): the applications and domains a router reports are grouped into categories (streaming, social media, messaging, gaming, shopping, cloud, software updates...), next to the list of applications. Your own rules (`*.example.com` or a word) refine it; names nothing matches show as "Uncategorised".
+- ★ **Categories only** (Settings → Traffic statistics → What is kept): store only the category, so no application or domain name ever reaches the database. New installs start this way; an install that already holds names keeps them until you choose. Switching rewrites what is stored and cannot be undone.
+- ★ **Show a category as…** (same card): show a whole category, such as Adult or Social media, under another label such as "Others", for the privacy of the people on the network. The names of such a category are never stored, and the statistics, device pages, Ask and the reports only see the label. Setting it rewrites the stored history after a warning; that cannot be undone.
+
 ## 0.4.376 — 2026-11-09
 
 ### Fixed

@@ -7,17 +7,20 @@ const PERIODS = [[1, "Today"], [7, "7 days"], [30, "30 days"]];
 // What one device used the traffic for, as the router's traffic analyser counts it. Returns null when application statistics are off
 // or the router has nothing for this device, so the card only exists where it has something to say.
 export async function buildDeviceApplicationsCard(device) {
-  let days = 7;
+  let days = 7, by = "applications";
+  let last = null;
   const first = await get(`/api/devices/${device.id}/applications?days=${days}`).catch(() => null);
   if (!first || !first.available) return null;
   const card = h("div", { class: "card device-apps-card" });
   const body = h("div", {});
   async function draw(data) {
+    last = data;
     body.replaceChildren();
     const total = data.rx + data.tx;
     body.appendChild(h("p", { class: "hint" }, `${fmtBytes(data.rx)} downloaded, ${fmtBytes(data.tx)} uploaded${data.days > 1 ? ` over ${fmtNumber(data.days)} days` : ""}.`));
-    if (data.applications.length) {
-      body.appendChild(barList(data.applications.map((a) => ({ label: a.name, count: a.rx + a.tx, text: `${fmtBytes(a.rx + a.tx)} · ${Math.round(a.share)}%` }))));
+    const list = by === "categories" ? data.categories : data.applications;
+    if (list.length) {
+      body.appendChild(barList(list.map((a) => ({ label: a.name, count: a.rx + a.tx, text: `${fmtBytes(a.rx + a.tx)} · ${Math.round(a.share)}%` }))));
     } else {
       body.appendChild(emptyNote(total ? "The router did not tell which applications this device used." : "No traffic."));
     }
@@ -33,7 +36,15 @@ export async function buildDeviceApplicationsCard(device) {
     });
     tabs.appendChild(b);
   }
-  card.append(h("div", { class: "upc-head" }, h("h2", {}, "Applications"), tabs), body);
+  const kinds = h("div", { class: "range-tabs", role: "group", "aria-label": "Group by" });
+  if (first.detail === "names") {
+    for (const [kind, text] of [["applications", "Applications"], ["categories", "Categories"]]) {
+      const b = h("button", { type: "button", "aria-pressed": String(kind === by) }, text);
+      b.addEventListener("click", () => { by = kind; for (const o of kinds.children) o.setAttribute("aria-pressed", String(o === b)); draw(last); });
+      kinds.appendChild(b);
+    }
+  }
+  card.append(h("div", { class: "upc-head" }, h("h2", {}, first.detail === "names" ? "Applications" : "Categories"), kinds, tabs), body);
   await draw(first);
   return card;
 }

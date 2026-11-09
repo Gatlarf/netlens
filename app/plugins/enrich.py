@@ -319,11 +319,14 @@ def record_usage(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str 
     earlier ones). Devices are found by MAC; traffic of a device Netlens does not know is left out. Returns the number of application rows written."""
     from datetime import datetime, timedelta
 
+    from app import usagecat
+
     now = now or utcnow()
     by_mac, _ = device_lookup(conn)
+    policy = usagecat.Policy(conn)          # what is kept: the name, or only its category, or the label a redirected category stands under
     written = 0
     for entry in data.get("usage") or []:
-        for app in entry["applications"]:
+        for app in usagecat.merge(policy, entry["applications"]):
             conn.execute(
                 "INSERT INTO app_usage (day, source, name, rx_bytes, tx_bytes, updated) VALUES (?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(day, source, name) DO UPDATE SET rx_bytes = excluded.rx_bytes, tx_bytes = excluded.tx_bytes, updated = excluded.updated",
@@ -341,7 +344,7 @@ def record_usage(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str 
                 if client.get("applications"):          # an empty list means "not read this time": what was stored stays
                     # the day's figures replace what was stored for this device and day (an application that no longer appears is dropped)
                     conn.execute("DELETE FROM client_app_usage WHERE day = ? AND source = ? AND device_id = ?", (entry["day"], plugin_id, device_id))
-                    for app in client["applications"]:
+                    for app in usagecat.merge(policy, client["applications"]):
                         conn.execute(
                             "INSERT INTO client_app_usage (day, source, device_id, name, rx_bytes, tx_bytes, updated) VALUES (?, ?, ?, ?, ?, ?, ?)",
                             (entry["day"], plugin_id, device_id, app["name"], app["rx_bytes"], app["tx_bytes"], now),

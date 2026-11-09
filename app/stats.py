@@ -452,7 +452,11 @@ def _applications(conn, days: int) -> dict:
         "WHERE u.day >= ? GROUP BY d.id ORDER BY SUM(u.rx_bytes) + SUM(u.tx_bytes) DESC LIMIT 10", (first,)
     ).fetchall()
     total = sum(r["rx"] + r["tx"] for r in apps)
+    from app import usagecat
+
+    policy = usagecat.Policy(conn)
     return {
+        "detail": policy.detail, "categories": usagecat.categorise(conn, apps, policy)[:15], "categories_total": len(usagecat.categorise(conn, apps, policy)),
         "available": True, "enabled": True, "from": first, "to": last, "days": len(per_day),
         "rx": sum(r["rx"] for r in apps), "tx": sum(r["tx"] for r in apps), "applications_total": len(apps),
         "applications": [{"name": r["name"], "rx": r["rx"], "tx": r["tx"], "share": _pct(r["rx"] + r["tx"], total)} for r in apps[:15]],

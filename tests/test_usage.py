@@ -20,6 +20,9 @@ def conn(tmp_path):
     init_db(c)
     c.execute("INSERT INTO devices (id, mac, primary_ip, custom_name, online, first_seen, last_seen) VALUES (1, '02:00:00:00:00:01', '10.0.0.5', 'laptop', 1, 'x', 'x')")
     c.commit()
+    from app import usagecat
+
+    usagecat.set_detail(c, "names")          # these tests are about the names themselves; categories have their own tests
     return c
 
 
@@ -127,10 +130,12 @@ def test_api_switch_and_device_applications(tmp_path):
         device = get_or_create_device(conn, "02:00:00:00:00:01", "10.0.0.5")
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        assert c.get("/api/usage").json() == {"enabled": False, "stored_rows": 0}
+        state = c.get("/api/usage").json()
+        assert (state["enabled"], state["stored_rows"]) == (False, 0)
         assert c.get(f"/api/devices/{device}/applications").json() == {"enabled": False, "available": False}
         assert c.put("/api/usage", json={"enabled": True}).json()["enabled"] is True
         assert c.get(f"/api/devices/{device}/applications").json() == {"enabled": True, "available": False}
+        c.put("/api/usage/detail", json={"detail": "names"})
         record_usage(conn, "asus", with_apps(today), now)
         body = c.get(f"/api/devices/{device}/applications?days=7").json()
         assert body["available"] and body["rx"] == 900 and [a["name"] for a in body["applications"]] == ["Netflix", "Steam"]
@@ -138,7 +143,7 @@ def test_api_switch_and_device_applications(tmp_path):
         assert c.get("/api/stats?range=7d").json()["applications"]["available"] is True
         assert c.get("/api/devices/9999/applications").status_code == 404
         removed = c.put("/api/usage", json={"enabled": False}).json()["removed_rows"]
-        assert removed >= 4 and c.get("/api/usage").json() == {"enabled": False, "stored_rows": 0}
+        assert removed >= 4 and (c.get("/api/usage").json()["enabled"], c.get("/api/usage").json()["stored_rows"]) == (False, 0)
         assert c.get("/api/stats?range=7d").json()["applications"]["available"] is False
         # a viewer may not read or change the switch
         assert c.get("/api/usage", headers={"Authorization": "Bearer nope"}).status_code in (401, 403)
