@@ -30,4 +30,6 @@ def device_wifi(device_id: int, hours: int = Query(24, ge=1, le=336), conn=Depen
     current = None
     if last is not None:
         current = {**dict(last), "quality": signal_quality(last["rssi"])}
-    return {"current": current, "samples": samples, "roams": roams}
+    from app import wifipin
+
+    return {"current": current, "samples": samples, "roams": roams, "advice": wifipin.advice(conn, device_id)}

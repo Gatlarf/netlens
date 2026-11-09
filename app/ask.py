@@ -220,9 +220,15 @@ def t_device(conn, args, now=None) -> dict:
     mine = next((d for d in rep["devices"] if d["id"] == r["id"]), None)
     events = conn.execute("SELECT ts, kind, detail FROM events WHERE device_id = ? ORDER BY id DESC LIMIT 8", (r["id"],)).fetchall()
     services = [{"name": s["name"], "up": None if s["last_up"] is None else bool(s["last_up"])} for s in conn.execute("SELECT name, last_up FROM service_checks WHERE enabled = 1 AND device_id = ?", (r["id"],))]
-    return {"name": _name(r), "type": r["type_override"] or r["device_type"], "vendor": r["vendor"], "online": bool(r["online"]), "first_seen": r["first_seen"], "last_seen": r["last_seen"],
-            "availability_7d_pct": mine["availability"] if mine else None, "outages_7d": mine["outages"] if mine else None, "services": services,
-            "recent_events": [{"at": e["ts"], "kind": e["kind"], "detail": (e["detail"] or "")[:120]} for e in events], "other_matches": len(rows) - 1}
+    out = {"name": _name(r), "type": r["type_override"] or r["device_type"], "vendor": r["vendor"], "online": bool(r["online"]), "first_seen": r["first_seen"], "last_seen": r["last_seen"],
+           "availability_7d_pct": mine["availability"] if mine else None, "outages_7d": mine["outages"] if mine else None, "services": services,
+           "recent_events": [{"at": e["ts"], "kind": e["kind"], "detail": (e["detail"] or "")[:120]} for e in events], "other_matches": len(rows) - 1}
+    from app import wifipin
+
+    wifi = wifipin.advice(conn, r["id"], now=end)
+    if wifi:
+        out["wifi"] = wifi          # the access points it used, and, for a device that does not move, whether to lock it to one
+    return out
 
 
 TYPE_WORDS = ("router", "switch", "tablet", "tv", "speaker", "console", "appliance", "printer", "iot", "camera", "nas", "phone", "server", "pc")
@@ -380,6 +386,8 @@ def render(tool: str, r: dict) -> str:
             parts.append(f"Over the last 7 days it was up {r['availability_7d_pct']}% of the time with {r['outages_7d']} outage(s).")
         if r["services"]:
             parts.append("Services: " + ", ".join(f"{s['name']} {'up' if s['up'] else 'down' if s['up'] is False else '?'}" for s in r["services"]) + ".")
+        if r.get("wifi") and r["wifi"].get("suggestion"):
+            parts.append(r["wifi"]["suggestion"])
         if r["recent_events"]:
             parts.append("Latest: " + "; ".join(f"{e['kind'].replace('_', ' ')} {e['at'][:16].replace('T', ' ')}" for e in r["recent_events"][:3]) + ".")
         return " ".join(parts)
