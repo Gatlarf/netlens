@@ -193,7 +193,7 @@ export async function render(container) {
         rangeTabs(range, (key) => { range = key; data = null; clear(list); list.append(h("p", { class: "hint" }, "Loading…")); load(); }))),
     chooser,
     tiles,
-    h("div", { class: "up-tools" },
+    h("div", { class: "up-tools", "data-nosave": "1" },
       h("input", { type: "text", placeholder: "Filter by name or IP", "aria-label": "Filter by name or IP", oninput: (e) => { filterText = e.target.value; drawList(); } }),
       h("select", { "aria-label": "Sort", onchange: (e) => { sort = e.target.value; drawList(); } }, SORTS.map(([k, label]) => h("option", { value: k, selected: k === sort }, label))),
       h("label", {}, h("input", { type: "checkbox", onchange: (e) => { onlyProblems = e.target.checked; drawList(); } }), "Only devices with a problem"),

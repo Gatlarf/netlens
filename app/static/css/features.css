@@ -752,6 +752,14 @@ tr.has-problem > td:first-child { box-shadow: inset 3px 0 0 var(--warn, #d97706)
 .settings-content .card input:is([type="text"], [type="password"], [type="number"], [type="url"], [type="email"], [type="search"]) { max-width: 720px; }
 @media (min-width: 1900px) { .up-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 2800px) { .up-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* with two or three rows side by side a row is too narrow for four columns: the two graphs go side by side on a second line */
+@media (min-width: 1900px) {
+  .up-list:not(.up-compact) .up-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .up-list:not(.up-compact) .up-row .up-who { grid-row: 1; grid-column: 1; }
+  .up-list:not(.up-compact) .up-row .up-nums { grid-row: 1; grid-column: 2; }
+  .up-list:not(.up-compact) .up-row .up-avail { grid-row: 2; grid-column: 1; }
+  .up-list:not(.up-compact) .up-row .up-resp { grid-row: 2; grid-column: 2; }
+}
 button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background: var(--surface); color: inherit; }
 .dns-chip.active { box-shadow: 0 0 0 2px var(--accent); }
 /* remote access: one line per device, the session buttons on the right */
