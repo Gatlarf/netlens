@@ -3,7 +3,7 @@
 It is off until an admin switches it on, because it connects to a handful of ports on the router and asks it for its UPnP port mappings. It never logs in and never tries a
 password. Everything is read-only, and every run is written to the audit log. Findings are kept (last result only) and a *new* risk or warning raises `gateway_exposure`.
 
-What it can not know is said so: a port that answers on the LAN is not proof that it is reachable from the internet, and the admin password and WPS can not be seen from here.
+What it can not know is said so: a port that answers on the LAN is not proof that it is reachable from the internet. The admin password and WPS can not be seen from here, so they are not listed at all.
 """
 
 from __future__ import annotations
@@ -208,6 +208,26 @@ def _upnp(ip: str) -> dict:
     return out
 
 
+def _web(ip: str) -> dict:
+    """What the plain-HTTP admin page does: {'redirect': Location} when it sends you on (without following it), {'redirect': None} otherwise."""
+    import http.client
+
+    conn = http.client.HTTPConnection(ip, 80, timeout=3)
+    try:
+        conn.request("GET", "/", headers={"User-Agent": "Netlens"})
+        res = conn.getresponse()
+        res.read(1)
+        return {"redirect": (res.getheader("Location") or "")[:200] if 300 <= res.status < 400 else None}
+    except (OSError, http.client.HTTPException):
+        return {"redirect": None}
+    finally:
+        conn.close()
+
+
+async def probe_web(ip: str) -> dict:
+    return await asyncio.to_thread(_web, ip)
+
+
 async def probe_upnp(ip: str) -> dict:
     return await asyncio.to_thread(_upnp, ip)
 
@@ -221,7 +241,7 @@ def _login(gw: str) -> str:
     return f"Open the router admin page (http://{gw}/) and sign in. The address and password are usually on a sticker on the router."
 
 
-def evaluate(gw: str, ports: dict, upnp: dict) -> list[dict]:
+def evaluate(gw: str, ports: dict, upnp: dict, web: dict | None = None) -> list[dict]:
     """Turn what the router answered into findings. Pure: no network."""
     states = {int(p): s for p, s in ports.items()}
     silent = bool(states) and all(s == "filtered" for s in states.values())
@@ -255,12 +275,15 @@ def evaluate(gw: str, ports: dict, upnp: dict) -> list[dict]:
 
     if silent:
         out.append(_f("admin-http", "Router admin page encryption", "unknown", "medium", quiet))
-    elif states.get(80) == "open" and states.get(443) != "open":
+    elif states.get(80) == "open" and str(((web or {}).get("redirect")) or "").lower().startswith("https://"):
+        out.append(_f("admin-http", "Router admin page redirects to HTTPS", "ok", "medium", f"http://{gw}/ sends the browser on to {web['redirect']}, so a password is not typed on the plain page."))
+    elif states.get(80) == "open":
+        https = [p for p in (443, 8443) if states.get(p) == "open"]
         out.append(_f("admin-http", "Router admin page is plain HTTP", "warn", "medium",
-                      f"http://{gw}/ answers and there is no HTTPS on port 443, so the admin password travels unencrypted on your network.",
+                      f"http://{gw}/ answers without sending you to HTTPS" + (f" (HTTPS is available on port {https[0]})" if https else "") + ", so the admin password can travel unencrypted on your network.",
                       [_login(gw), "Turn on HTTPS for the admin page if the router has the option, or update its firmware."]))
     else:
-        out.append(_f("admin-http", "Router admin page can use HTTPS", "ok", "medium", f"Port 80 is not the only admin page on {gw}."))
+        out.append(_f("admin-http", "Router admin page has no plain HTTP", "ok", "medium", f"Port 80 on {gw} does not answer."))
 
     if not upnp.get("found"):
         out.append(_f("upnp", "UPnP port opening is off", "ok", "medium", f"The router ({gw}) did not answer a UPnP discovery request within {UPNP_WAIT:g} seconds."))
@@ -276,9 +299,6 @@ def evaluate(gw: str, ports: dict, upnp: dict) -> list[dict]:
             note = "No ports are open through it right now." if upnp.get("readable") else "The router would not list its port mappings, so it can not be told whether any are open."
             out.append(_f("upnp", "Any device can open ports on the router", "warn", "medium", f"{who} accepts UPnP requests. {note} Any app or infected device on the network can open a port to the internet without asking.", steps))
 
-    out.append(_f("admin-password", "Router admin password", "unknown", "medium",
-                  "Netlens never tries passwords on your router, so it can not tell whether the factory password is still set.", [_login(gw), "Set a long unique password under Administration or System."]))
-    out.append(_f("wps", "WPS on the router", "unknown", "medium", "Whether WPS is on is only visible in the router settings.", [_login(gw), "Turn WPS off under the wireless settings."]))
     return out
 
 
@@ -291,7 +311,7 @@ def score(findings: list[dict]) -> int:
 
 
 # ----------------------------------------------------------------------------- run
-async def run(conn, gateway_ip: str | None, who: str = "system", now: str | None = None, ports_probe=probe_ports, upnp_probe=probe_upnp) -> dict:
+async def run(conn, gateway_ip: str | None, who: str = "system", now: str | None = None, ports_probe=probe_ports, upnp_probe=probe_upnp, web_probe=probe_web) -> dict:
     """Probe the gateway, store the findings and raise `gateway_exposure` for each risk or warning that was not there before."""
     from app import audit
 
@@ -300,7 +320,8 @@ async def run(conn, gateway_ip: str | None, who: str = "system", now: str | None
     previous = get_last(conn)
     ports = await ports_probe(gw)
     upnp = await upnp_probe(gw)
-    findings = evaluate(gw, ports, upnp)
+    web = await web_probe(gw) if ports.get(80) == "open" else {}
+    findings = evaluate(gw, ports, upnp, web)
     result = {"at": now, "gateway": gw, "score": score(findings), "findings": findings, "open_ports": sorted(p for p, s in ports.items() if s == "open")}
     before = {f["id"]: f["status"] for f in (previous or {}).get("findings", [])}
     for f in findings:

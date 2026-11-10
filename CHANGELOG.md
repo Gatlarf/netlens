@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.383 — 2026-11-10
+
+### Fixed
+- **Router exposure check**: an admin page on port 80 that sends the browser on to HTTPS (for example to port 8443) is no longer reported as plain HTTP, because Netlens now follows what the page answers. The admin password and WPS are no longer listed at all, since they can not be seen from outside the router.
+
 ## 0.4.382 — 2026-11-10
 
 ### Added

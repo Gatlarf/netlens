@@ -26,7 +26,7 @@ def by_id(findings):
 def test_everything_closed_is_ok_with_honest_unknowns():
     f = by_id(g.evaluate("192.168.1.1", closed(), {"found": False}))
     assert f["tr069"]["status"] == "ok" and f["telnet"]["status"] == "ok" and f["upnp"]["status"] == "ok"
-    assert f["admin-password"]["status"] == "unknown" and f["wps"]["status"] == "unknown"
+    assert "admin-password" not in f and "wps" not in f                      # what can not be seen from here is not listed
 
 
 def test_tr069_and_telnet_are_risks():
@@ -45,7 +45,10 @@ def test_a_silent_router_proves_nothing():
 
 def test_plain_http_admin_only_without_https():
     assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open"}, {}))["admin-http"]["status"] == "warn"
-    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open", 443: "open"}, {}))["admin-http"]["status"] == "ok"
+    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open", 443: "open"}, {}))["admin-http"]["status"] == "warn"
+    redirect = {"redirect": "https://10.0.0.1:8443/"}
+    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open", 8443: "open"}, {}, redirect))["admin-http"]["status"] == "ok"
+    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open"}, {}, {"redirect": "http://10.0.0.1/login"}))["admin-http"]["status"] == "warn"
 
 
 def test_upnp_mappings_are_listed():
@@ -72,7 +75,10 @@ def fake(ports=None, upnp=None):
 
 def run(conn, ports=None, upnp=None, now="2026-11-10T10:00:00Z"):
     p, u = fake(ports, upnp)
-    return asyncio.run(g.run(conn, "192.168.1.1", now=now, ports_probe=p, upnp_probe=u))
+
+    async def w(ip):
+        return {"redirect": None}
+    return asyncio.run(g.run(conn, "192.168.1.1", now=now, ports_probe=p, upnp_probe=u, web_probe=w))
 
 
 def events(conn):
@@ -174,3 +180,31 @@ def test_api_is_off_until_switched_on_and_needs_admin(client):
     anon.post("/api/login", json={"username": "vera", "password": "longenough1"})
     assert anon.put("/api/netchecks/exposure", json={"enabled": False}).status_code == 403
     assert anon.post("/api/netchecks/exposure/run").status_code == 403
+
+
+def test_web_probe_reads_the_redirect_without_following_it():
+    import http.server
+    import threading
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", "https://router.lan:8443/")
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    import http.client
+    orig = http.client.HTTPConnection
+
+    class C(orig):
+        def __init__(self, host, port=80, timeout=None):
+            super().__init__(host, srv.server_address[1], timeout=timeout)
+    http.client.HTTPConnection = C
+    try:
+        assert g._web("127.0.0.1") == {"redirect": "https://router.lan:8443/"}
+    finally:
+        http.client.HTTPConnection = orig
+        srv.shutdown()
