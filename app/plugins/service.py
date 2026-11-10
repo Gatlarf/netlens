@@ -444,6 +444,12 @@ class PluginService:
                     linkgroups.evaluate(conn)
                     record_node_health(conn, plugin.id, data)
                     record_firewall(conn, plugin.id, data)
+                    try:
+                        from app import configchange
+
+                        configchange.record(conn, plugin.id, data)
+                    except Exception:  # noqa: BLE001 - tracking the settings is an extra: it must never fail the sync
+                        log.exception("could not record the router's configuration")
                     if usagecfg.enabled(conn):
                         record_usage(conn, plugin.id, data)
                 except db_Error:

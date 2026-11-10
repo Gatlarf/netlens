@@ -101,6 +101,9 @@ class Fake(BaseHTTPRequestHandler):
             return self._ok(CLIENTS)
         if path in ("/api/s/branch/stat/device", "/api/s/branch/stat/sta"):
             return self._ok([])
+        if path.startswith("/api/s/default/rest/"):
+            rows = s.get("rest", {}).get(path.rsplit("/", 1)[1])
+            return self._ok(rows) if rows is not None else self._send({"meta": {"rc": "error", "msg": "api.err.NotFound"}, "data": []}, 404)
         self._send({"meta": {"rc": "error", "msg": "api.err.NoSiteContext"}, "data": []}, 400)
 
 
@@ -287,3 +290,49 @@ def test_every_device_reports_its_health_firmware_and_ports(server):
     sw = nodes[SW]
     assert {m["metric"]: m["value"] for m in sw["metrics"]} == {"cpu_pct": 3.0, "mem_pct": 30.0, "temp_c": 52.0} and sw["firmware"] == {"version": "7.0.50", "latest": None}     # the hottest sensor
     assert not nodes[AP1]["metrics"] and nodes[AP1]["firmware"] is None                     # a device that says nothing about itself is left as it was
+
+
+REST = {
+    "networkconf": [{"name": "LAN", "purpose": "corporate", "vlan_enabled": False, "ip_subnet": "192.168.1.1/24", "dhcpd_enabled": True, "dhcpd_start": "192.168.1.100", "x_passphrase": "no"},
+                    {"name": "IoT", "purpose": "corporate", "vlan": 20, "ip_subnet": "192.168.20.1/24"}],
+    "wlanconf": [{"name": "Home", "enabled": True, "security": "wpapsk", "x_passphrase": "supersecret", "hide_ssid": False}],
+    "portforward": [{"name": "Web", "proto": "tcp", "dst_port": "443", "fwd": "192.168.1.9", "fwd_port": "443", "enabled": True},
+                    {"name": "Web", "proto": "tcp", "dst_port": "80", "fwd": "192.168.1.9", "fwd_port": "80", "enabled": False}],
+    # firewallrule is missing on purpose: the section is reported as failed instead of vanishing
+}
+
+
+def test_configuration_is_only_read_when_asked_for():
+    httpd, url = start(True, rest=REST)
+    try:
+        out = validate_output("topology", plugin.fetch(cfg(url)))
+        assert all("config" not in n for n in out["nodes"])
+        assert not any("/rest/" in path for _method, path in Fake.state["calls"])
+    finally:
+        httpd.shutdown()
+
+
+def test_configuration_goes_on_the_gateway_without_secrets_and_names_the_failed_section():
+    httpd, url = start(True, rest=REST)
+    try:
+        raw = plugin.fetch(cfg(url, record_config=True))
+        out = validate_output("topology", raw)
+        gw = next(n for n in out["nodes"] if n["role"] == "gateway")
+        items = {i["key"]: i["value"] for i in gw["config"]}
+        assert items["network.LAN.ip_subnet"] == "192.168.1.1/24" and items["network.IoT.vlan"] == "20" and items["wifi.Home.security"] == "wpapsk"
+        assert items["portforward.Web"].startswith("tcp 443 -> 192.168.1.9:443") and items["portforward.Web#2"].endswith("enabled=false")   # a repeated name gets a stable number
+        assert "supersecret" not in json.dumps(raw) and not any("passphrase" in k for k in items)
+        assert gw["config_failed"] == ["firewall"]
+        assert all("config" not in n for n in out["nodes"] if n is not gw)
+    finally:
+        httpd.shutdown()
+
+
+def test_a_failing_configuration_read_does_not_cost_the_sync_its_devices(monkeypatch):
+    httpd, url = start(True, rest=REST)
+    try:
+        monkeypatch.setattr(plugin.Controller, "settings", lambda self: (_ for _ in ()).throw(RuntimeError("boom")))
+        out = validate_output("topology", plugin.fetch(cfg(url, record_config=True)))
+        assert len(out["nodes"]) >= 3 and out["clients"] and all("config" not in n for n in out["nodes"])
+    finally:
+        httpd.shutdown()

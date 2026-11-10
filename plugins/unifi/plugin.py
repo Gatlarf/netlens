@@ -157,6 +157,28 @@ class Controller:
             raise UnifiError("this account cannot see any site")
         return sites
 
+    # ---- the settings Netlens keeps track of (only when "Record configuration changes" is on) -------------------
+    def settings(self):
+        """(items, failed sections): networks, Wi-Fi networks, port forwards and firewall rules as flat key/value pairs. Never the Wi-Fi password or any other secret:
+        only the fields listed in the builders below are copied. A section that cannot be read is named in `failed` so that Netlens does not take it for a change."""
+        items, failed = [], []
+        sites = self.sites()
+        for site in sites:
+            tag = f"{site['name']}." if len(sites) > 1 else ""
+            base = f"/api/s/{urllib.parse.quote(site['name'])}/rest/"
+            for section, endpoint, build in (("network", "networkconf", _cfg_network), ("wifi", "wlanconf", _cfg_wifi),
+                                             ("portforward", "portforward", _cfg_portforward), ("firewall", "firewallrule", _cfg_firewall)):
+                try:
+                    rows = self._get(base + endpoint)
+                except UnifiError:
+                    failed.append(tag + section)
+                    continue
+                used = set()
+                for row in rows:
+                    if isinstance(row, dict):
+                        items.extend(_cfg_unique(tag + k, v, used) for k, v in build(row))
+        return items, failed
+
     def snapshot(self):
         nodes, clients, have_gateway, seen_nodes, seen_clients = [], [], False, set(), set()
         for site in self.sites():
@@ -257,6 +279,48 @@ def _rate_mbps(value):
     return round(value / 1000, 1) if value is not None and value > 0 else None
 
 
+def _cfg_text(value):
+    if value is None:
+        return None
+    return str(value).lower() if isinstance(value, bool) else str(value)
+
+
+def _cfg_name(row, fallback):
+    return str(row.get("name") or fallback or "unnamed")[:50].replace(".", "_")
+
+
+def _cfg_unique(key, value, used):
+    """Two rules can share a name: the second gets a number, so the pair of keys is stable from one sync to the next."""
+    final, n = key, 2
+    while final in used:
+        final, n = f"{key}#{n}", n + 1
+    used.add(final)
+    return {"key": final, "value": value}
+
+
+def _cfg_fields(prefix, row, fields):
+    return [(f"{prefix}.{f}", _cfg_text(row.get(f))) for f in fields if row.get(f) is not None]
+
+
+def _cfg_network(row):
+    return _cfg_fields(f"network.{_cfg_name(row, row.get('_id'))}", row, ("purpose", "vlan", "ip_subnet", "dhcpd_enabled", "dhcpd_start", "dhcpd_stop", "igmp_snooping", "domain_name"))
+
+
+def _cfg_wifi(row):
+    return _cfg_fields(f"wifi.{_cfg_name(row, row.get('_id'))}", row, ("enabled", "security", "wpa_mode", "wpa_enc", "vlan", "hide_ssid", "is_guest", "mac_filter_enabled", "pmf_mode", "wlan_bands"))   # not x_passphrase
+
+
+def _cfg_portforward(row):
+    rule = f"{row.get('proto') or 'tcp_udp'} {row.get('dst_port')} -> {row.get('fwd') or '?'}:{row.get('fwd_port')}" + (f" from {row['src']}" if row.get("src") not in (None, "", "any") else "")
+    return [(f"portforward.{_cfg_name(row, row.get('_id'))}", f"{rule} enabled={_cfg_text(row.get('enabled', True))}")]
+
+
+def _cfg_firewall(row):
+    rule = " ".join(str(x) for x in (row.get("action"), row.get("protocol") or "all", "from", row.get("src_address") or row.get("src_networkconf_type") or "any", "to",
+                                     row.get("dst_address") or row.get("dst_networkconf_type") or "any", row.get("dst_port") or "") if x not in (None, "")) + f" enabled={_cfg_text(row.get('enabled', True))}"
+    return [(f"firewall.{row.get('ruleset') or 'rules'}.{_cfg_name(row, row.get('rule_index'))}", rule)]
+
+
 def to_topology(nodes, raw_clients):
     known = {n["mac"] for n in nodes}
     for n in nodes:
@@ -300,11 +364,21 @@ def test(config):
 def fetch(config):
     controller = Controller(config)
     controller.login()
+    cfg = ([], [])
     try:
         nodes, clients = controller.snapshot()
+        if config.get("record_config"):
+            try:       # an extra: whatever goes wrong here must not cost the sync its devices and clients
+                cfg = controller.settings()
+            except Exception:  # noqa: BLE001
+                cfg = ([], [])
     finally:
         controller.logout()
-    return to_topology(nodes, clients)
+    out = to_topology(nodes, clients)
+    holder = next((n for n in out["nodes"] if n.get("role") == "gateway"), out["nodes"][0] if out["nodes"] else None)
+    if holder is not None and cfg[0]:
+        holder["config"], holder["config_failed"] = cfg[0], cfg[1]
+    return out
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)

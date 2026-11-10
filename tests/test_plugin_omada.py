@@ -134,6 +134,11 @@ class Fake(BaseHTTPRequestHandler):
             s["pages"].append(page)
             rows = CLIENTS[(page - 1) * size: page * size]
             return self._send({"errorCode": 0, "result": {"data": rows, "totalRows": len(CLIENTS), "currentPage": page, "currentSize": len(rows)}})
+        if p.startswith("sites/site1/setting/"):
+            rows = s.get("setting", {}).get(p.removeprefix("sites/site1/setting/"))
+            if rows is None:
+                return self._send({"errorCode": -1, "msg": "not available"})
+            return self._send({"errorCode": 0, "result": {"data": rows, "totalRows": len(rows)}})
         if p.startswith("sites/site2/"):
             return self._send({"errorCode": 0, "result": [] if p.endswith("devices") else {"data": [], "totalRows": 0}})
         self._send({"errorCode": -1, "msg": "unknown " + p}, 200)
@@ -467,3 +472,39 @@ def test_the_site_wide_statistics_of_the_web_interface_need_no_open_api_client(s
     assert 0 < end - start <= 86400 + 3600 and select == ["true"] and state["token_calls"] == []
     assert "Application statistics: working (3 applications today" in plugin.test(cfg(url))["message"]
     assert plugin.fetch(cfg(url, collect_usage=False))["usage"] == []
+
+
+SETTING = {
+    "lan/networks": [{"name": "LAN", "purpose": "interface", "vlan": 1, "gatewaySubnet": "192.168.0.1/24", "dhcpSettings": {"enable": True, "ipaddrStart": "192.168.0.100", "ipaddrEnd": "192.168.0.200"}}],
+    "wlans": [{"id": "g1", "name": "Default"}],
+    "wlans/g1/ssids": [{"name": "Home", "band": 3, "security": 3, "broadcast": True, "pskSetting": {"securityKey": "supersecret"}}],
+    "transmission/portForwardings": [{"name": "Web", "protocol": "tcp", "externalPort": "443", "forwardIp": "192.168.0.9", "forwardPort": "443", "status": True}],
+    # firewall/acls missing on purpose: the section is reported as failed
+}
+
+
+def test_configuration_is_only_read_when_asked_for(server):
+    url, state = server
+    state["setting"] = SETTING
+    out = validate_output("topology", plugin.fetch(cfg(url)))
+    assert all("config" not in n for n in out["nodes"])
+    assert not any("/setting/" in path for _m, path in state["calls"])
+
+
+def test_configuration_goes_on_the_gateway_without_secrets(server):
+    url, state = server
+    state["setting"] = SETTING
+    raw = plugin.fetch(cfg(url, record_config=True))
+    out = validate_output("topology", raw)
+    gw = next(n for n in out["nodes"] if n["role"] == "gateway")
+    items = {i["key"]: i["value"] for i in gw["config"]}
+    assert items["network.LAN.gatewaySubnet"] == "192.168.0.1/24" and items["network.LAN.dhcp_enable"] == "true" and items["wifi.Home.security"] == "3"
+    assert items["portforward.Web"].startswith("tcp 443 -> 192.168.0.9:443")
+    assert "supersecret" not in json.dumps(raw) and gw["config_failed"] == ["firewall"]
+
+
+def test_a_failing_configuration_read_does_not_cost_the_sync_its_devices(server, monkeypatch):
+    url, state = server
+    monkeypatch.setattr(plugin.Controller, "settings", lambda self: (_ for _ in ()).throw(RuntimeError("boom")))
+    out = validate_output("topology", plugin.fetch(cfg(url, record_config=True)))
+    assert len(out["nodes"]) >= 3 and out["clients"] and all("config" not in n for n in out["nodes"])

@@ -1087,6 +1087,25 @@ def _switch_ports(value: Any, path: str) -> list[dict]:
 NODE_METRICS = {"cpu_pct": "%", "mem_pct": "%", "temp_c": "\u00b0C", "uptime_s": "s", "load1": ""}      # what a router or access point may report about itself
 
 
+MAX_CONFIG_ITEMS = 500
+SECRET_KEY = re.compile(r"pass(word|phrase|wd)?|psk|secret|token|api[-_.]?key|private|community|credential|x[-_.]?passphrase|shared[-_.]?key|\bpin\b", re.I)
+
+
+def _node_config(value: Any, path: str) -> list[dict]:
+    """The settings of a router or controller as flat `key` / `value` text pairs, for change tracking. Anything whose key looks like a secret (password, key, token, PSK ...)
+    is dropped here as well, so a plugin that forgets to strip one can not store it. Dynamic values (a lease, a counter, today's public address) do not belong here."""
+    out, seen = [], set()
+    for i, raw in enumerate(_list(value, path)[:MAX_CONFIG_ITEMS]):
+        raw = _dict(raw, f"{path}[{i}]")
+        key = _text(raw.get("key"), f"{path}[{i}].key", required=True, max_len=120)
+        if key in seen or SECRET_KEY.search(key):
+            continue
+        seen.add(key)
+        val = raw.get("value")
+        out.append({"key": key, "value": "" if val is None else (str(val).lower() if isinstance(val, bool) else str(val))[:300]})
+    return out
+
+
 def _node_metrics(value: Any, path: str) -> list[dict]:
     """The health of a node as readings: processor, memory, temperature, uptime. A reading is a `value`, or for a figure that has to be worked out from two
     syncs (the processor time of a router only counts up) `used` and `total`: Netlens turns the growth between two syncs into a percentage."""
@@ -1189,6 +1208,8 @@ def _topology(data: Any) -> dict:
             "metrics": _node_metrics(raw.get("metrics"), f"{path}.metrics"),
             "firmware": _firmware(raw.get("firmware"), f"{path}.firmware"),
             "firewall": _firewall(raw.get("firewall"), f"{path}.firewall"),
+            **({"config": cfg} if (cfg := _node_config(raw.get("config"), f"{path}.config")) else {}),
+            **({"config_failed": [_text(s, f"{path}.config_failed", max_len=60) for s in _list(raw.get("config_failed"), f"{path}.config_failed")[:20]]} if raw.get("config_failed") else {}),
         })
     known = {m for n in nodes for m in n["macs"]}
     for i, n in enumerate(nodes):

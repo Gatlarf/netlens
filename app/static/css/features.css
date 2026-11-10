@@ -846,3 +846,7 @@ button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background:
 .exposure-item.st-ok { border-left-color: var(--ok, #30a46c); }
 .exposure-item p { margin: .15rem 0; }
 .exposure-item ol { margin: .3rem 0 .2rem 1.2rem; }
+
+.config-change { border-left: 3px solid var(--warn, #f5a524); padding: .1rem 0 .1rem .75rem; margin: .6rem 0; }
+.config-change p { margin: .15rem 0; }
+.config-change ul { margin: .25rem 0 .2rem 1.1rem; padding: 0; }

@@ -82,6 +82,7 @@ class AsusConfig:
     traffic: bool = True      # also read the Traffic Analyzer statistics (applications and devices)
     interfaces: bool = True   # also read the health and the interfaces of the routers (processor, memory, temperature, uptime, ports, byte counters)
     nodes: bool = True        # ... of the AiMesh nodes too: they accept the main router's login, and their address is taken from the router's list every sync
+    record_config: bool = False   # also read the main router's settings so that Netlens can tell when one changes (never a password or key)
 
 
 def normalize_url(url: str) -> str:
@@ -354,6 +355,56 @@ class AsusClient:
         except (AsusError, ValueError):
             return None
 
+    # The settings Netlens keeps track of (only with "Record configuration changes"): (section, key, nvram name). Nothing dynamic (no current public address, lease or
+    # counter) and no secret: no Wi-Fi password, no admin password, no DDNS or VPN key. Names that a firmware does not have are simply not answered.
+    CONFIG_KEYS = (
+        ("wan", "wan.proto", "wan0_proto"), ("wan", "wan.dns_auto", "wan_dnsenable_x"), ("wan", "wan.dns1", "wan0_dns1_x"), ("wan", "wan.dns2", "wan0_dns2_x"), ("wan", "wan.nat", "wan0_nat_x"),
+        ("lan", "lan.ip", "lan_ipaddr"), ("lan", "lan.netmask", "lan_netmask"), ("lan", "lan.dhcp", "dhcp_enable_x"), ("lan", "lan.dhcp_start", "dhcp_start"), ("lan", "lan.dhcp_end", "dhcp_end"),
+        ("lan", "lan.dhcp_lease", "dhcp_lease"), ("lan", "lan.dhcp_dns1", "dhcp_dns1_x"),
+        ("wifi", "wifi.2g.ssid", "wl0_ssid"), ("wifi", "wifi.2g.auth", "wl0_auth_mode_x"), ("wifi", "wifi.2g.channel", "wl0_channel"), ("wifi", "wifi.2g.hidden", "wl0_closed"), ("wifi", "wifi.2g.bandwidth", "wl0_bw"),
+        ("wifi", "wifi.5g.ssid", "wl1_ssid"), ("wifi", "wifi.5g.auth", "wl1_auth_mode_x"), ("wifi", "wifi.5g.channel", "wl1_channel"), ("wifi", "wifi.5g.hidden", "wl1_closed"), ("wifi", "wifi.5g.bandwidth", "wl1_bw"),
+        ("wifi", "wifi.guest.enabled", "wl0.1_bss_enabled"), ("wifi", "wifi.wps", "wps_enable"), ("wifi", "wifi.roaming_assistant", "rast_static_client"),
+        ("admin", "admin.http", "http_enable"), ("admin", "admin.https_port", "https_lanport"), ("admin", "admin.wan_access", "misc_http_x"), ("admin", "admin.wan_port", "misc_httpport_x"),
+        ("admin", "admin.ssh", "sshd_enable"), ("admin", "admin.ssh_wan", "sshd_wan"), ("admin", "admin.telnet", "telnetd_enable"), ("admin", "admin.ssh_port", "sshd_port"),
+        ("nat", "nat.upnp", "upnp_enable"), ("nat", "nat.portforward_enabled", "vts_enable_x"), ("nat", "nat.dmz", "dmz_ip"),
+        ("security", "security.firewall", "fw_enable_x"), ("security", "security.dos_protection", "fw_dos_x"), ("security", "security.ipv6_firewall", "ipv6_fw_enable"),
+        ("security", "security.dns_filter", "dnsfilter_enable_x"), ("security", "security.ddns", "ddns_enable_x"), ("security", "security.aiprotection", "wrs_protect_enable"),
+        ("system", "system.timezone", "time_zone"), ("system", "system.ntp", "ntp_server0"), ("system", "system.qos", "qos_enable"),
+    )
+    BATCH = 12
+
+    def settings(self) -> tuple[list[dict], list[str]]:
+        """(items, failed sections): the settings above and the port forwards (`vts_rulelist`, one item per rule). A group of names that the router does not answer puts its
+        sections in `failed`, so Netlens does not take a read that did not work for a change."""
+        items: list[dict] = []
+        failed: set[str] = set()
+        keys = list(self.CONFIG_KEYS)
+        for start in range(0, len(keys), self.BATCH):
+            group = keys[start:start + self.BATCH]
+            answer = self._hook(";".join(f"nvram_get({nv})" for _s, _k, nv in group))
+            if not isinstance(answer, dict) or not any(nv in answer for _s, _k, nv in group):
+                failed.update(s for s, _k, _nv in group)
+                continue
+            for _s, key, nv in group:
+                if nv in answer and answer[nv] is not None:
+                    items.append({"key": key, "value": str(answer[nv])[:300]})
+        answer = self._hook("nvram_get(vts_rulelist)")
+        if isinstance(answer, dict) and "vts_rulelist" in answer:
+            used: set[str] = set()
+            for rule in str(answer["vts_rulelist"]).split("<"):
+                parts = rule.split(">")
+                if len(parts) < 2 or not parts[0]:
+                    continue
+                key, n = f"portforward.{parts[0][:50].replace('.', '_')}", 2
+                base = key
+                while key in used:
+                    key, n = f"{base}#{n}", n + 1
+                used.add(key)
+                items.append({"key": key, "value": " ".join(p for p in parts[1:] if p)[:300]})
+        else:
+            failed.add("portforward")
+        return items, sorted(failed)
+
     def interfaces(self) -> list[dict]:
         """The interfaces as ports with byte counters (`INTERNET` is the internet connection; a node has no such interface)."""
         answer = self._hook("netdev(appobj)")
@@ -466,6 +517,11 @@ class AsusClient:
             snapshot["usage"] = self.usage() if self.cfg.traffic else []
             if self.cfg.interfaces:
                 self.add_health(snapshot)
+            if self.cfg.record_config:
+                try:       # an extra: whatever goes wrong here must not cost the sync its devices and clients
+                    snapshot["config"], snapshot["config_failed"] = self.settings()
+                except Exception:  # noqa: BLE001
+                    snapshot["config"], snapshot["config_failed"] = [], []
             return snapshot
         finally:
             self.logout()
@@ -485,6 +541,7 @@ def _client(config: dict):
         traffic=bool(config.get("traffic", True)) and bool(config.get("collect_usage", True)),     # Netlens' own switch (Settings > Statistics) has the last word
         interfaces=bool(config.get("interfaces", True)),
         nodes=bool(config.get("nodes", True)),
+        record_config=bool(config.get("record_config", False)),
     )
     if not (cfg.url and cfg.username and cfg.password):
         raise ValueError("enter the router address, username and password")
@@ -507,6 +564,7 @@ def to_topology(snapshot: dict) -> dict:
             **({"ports": n["ports"]} if n.get("ports") else {}),                    # the interfaces and physical ports; Netlens turns the counters into speeds
             **({"metrics": n["metrics"]} if n.get("metrics") else {}),               # processor, memory, temperature, uptime
             **({"firmware": n["firmware"]} if (n.get("firmware") or {}).get("version") else {}),
+            **({"config": snapshot["config"], "config_failed": snapshot.get("config_failed") or []} if n is main and snapshot.get("config") else {}),      # the settings belong to the main router
         })
     known = {m for n in nodes for m in n["macs"]}
     clients = []
@@ -575,6 +633,8 @@ def diagnose(config: dict) -> dict:
                     "days_parsed": len(client.usage(1))}
 
         step("traffic_analyzer", read_traffic)
+        if client.cfg.record_config:
+            step("configuration", client.settings, lambda r: {"items": len(r[0]), "failed_sections": r[1], "keys": [i["key"] for i in r[0][:12]]})
         step("router_health", lambda: client.own_stats(), lambda st: {"metrics": [m["metric"] for m in st["metrics"]], "ports": [p["name"] for p in st["ports"]],
                                                                        "counters_ok": all(isinstance(p.get("rx_bytes", 0), int) for p in st["ports"])})
         if clientlist is not None and onboarding is not None:

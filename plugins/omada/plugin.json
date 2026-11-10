@@ -50,6 +50,13 @@
       "help": "The secret of that Open API client."
     },
     {
+      "key": "record_config",
+      "type": "bool",
+      "label": "Record configuration changes",
+      "default": false,
+      "help": "Reads the LAN networks, Wi-Fi networks (never the password), port forwards and firewall rules every sync and tells you when one of them changes. Read-only. Needs Netlens 0.4.387."
+    },
+    {
       "key": "verify_tls",
       "type": "bool",
       "label": "Verify TLS certificate",

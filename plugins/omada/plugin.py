@@ -236,6 +236,44 @@ class Controller:
         ports = detail.get("ports") if kind == "switch" and isinstance(detail, dict) else None
         return parent, [p for p in (_port(raw) for raw in ports or []) if p]
 
+    # ---- the settings Netlens keeps track of (only when "Record configuration changes" is on) -------------------
+    def settings(self):
+        """(items, failed sections): LAN networks, Wi-Fi networks, port forwards and firewall rules as flat key/value pairs. Only the fields named in the builders below are
+        copied, so no Wi-Fi password or other secret can end up in the result. A section this controller version does not answer is named in `failed`, which Netlens
+        does not take for a change. The paths follow the Omada 5 web API and have not been tried on every controller version."""
+        items, failed = [], []
+        sites = self.sites()
+        for site in sites:
+            tag = f"{site['name']}." if len(sites) > 1 else ""
+            base = f"sites/{site['key']}/setting/"
+            for section, reader, build in (("network", lambda b=base: self._cfg_rows(b + "lan/networks"), _cfg_network),
+                                           ("wifi", lambda b=base: self._cfg_wifi_rows(b), _cfg_wifi),
+                                           ("portforward", lambda b=base: self._cfg_rows(b + "transmission/portForwardings", {"type": "User"}), _cfg_portforward),
+                                           ("firewall", lambda b=base: self._cfg_rows(b + "firewall/acls", {"type": "0"}), _cfg_firewall)):
+                try:
+                    rows = reader()
+                except OmadaError:
+                    failed.append(tag + section)
+                    continue
+                used = set()
+                for row in rows:
+                    items.extend(_cfg_unique(tag + k, v, used) for k, v in build(row))
+        return items, failed
+
+    def _cfg_rows(self, path, params=None):
+        result = self._api(path, {**(params or {}), "currentPage": 1, "currentPageSize": 200})
+        rows = result.get("data") if isinstance(result, dict) else result
+        return [r for r in rows or [] if isinstance(r, dict)]
+
+    def _cfg_wifi_rows(self, base):
+        out = []
+        for group in self._cfg_rows(base + "wlans"):
+            if not group.get("id"):
+                continue
+            for ssid in self._cfg_rows(base + f"wlans/{group['id']}/ssids"):
+                out.append({**ssid, "_group": group.get("name")})
+        return out
+
     def snapshot(self):
         nodes, clients, have_gateway, seen_nodes, seen_clients = [], [], False, set(), set()
         for site in self.sites():
@@ -497,6 +535,49 @@ def _rate_mbps(value):
     return round(value / 1000, 1) if value > 20000 else float(value)
 
 
+def _cfg_text(value):
+    if value is None or isinstance(value, (dict, list)):
+        return None
+    return str(value).lower() if isinstance(value, bool) else str(value)
+
+
+def _cfg_name(row, fallback=""):
+    return str(row.get("name") or row.get("id") or fallback or "unnamed")[:50].replace(".", "_")
+
+
+def _cfg_unique(key, value, used):
+    final, n = key, 2
+    while final in used:
+        final, n = f"{key}#{n}", n + 1
+    used.add(final)
+    return {"key": final, "value": value}
+
+
+def _cfg_fields(prefix, row, fields):
+    return [(f"{prefix}.{f}", _cfg_text(row.get(f))) for f in fields if _cfg_text(row.get(f)) is not None]
+
+
+def _cfg_network(row):
+    out = _cfg_fields(f"network.{_cfg_name(row)}", row, ("purpose", "vlan", "gatewaySubnet", "domain"))
+    dhcp = row.get("dhcpSettings") if isinstance(row.get("dhcpSettings"), dict) else {}
+    out += [(f"network.{_cfg_name(row)}.dhcp_{k}", _cfg_text(dhcp.get(k))) for k in ("enable", "ipaddrStart", "ipaddrEnd") if _cfg_text(dhcp.get(k)) is not None]
+    return out
+
+
+def _cfg_wifi(row):          # never pskSetting: that is where the password lives
+    return _cfg_fields(f"wifi.{_cfg_name(row)}", row, ("band", "security", "broadcast", "guestNetEnable", "vlanEnable", "vlanId", "rateLimit", "pmfMode", "enable"))
+
+
+def _cfg_portforward(row):
+    rule = f"{row.get('protocol') or row.get('protocols') or 'all'} {row.get('externalPort') or row.get('sourcePort')} -> {row.get('forwardIp') or row.get('forwardIP') or '?'}:{row.get('forwardPort')}"
+    return [(f"portforward.{_cfg_name(row)}", f"{rule} enabled={_cfg_text(row.get('status', True))}")]
+
+
+def _cfg_firewall(row):
+    rule = " ".join(str(x) for x in (row.get("policy"), row.get("protocols") if not isinstance(row.get("protocols"), list) else ",".join(map(str, row["protocols"])), row.get("direction")) if x not in (None, ""))
+    return [(f"firewall.{_cfg_name(row)}", f"{rule} enabled={_cfg_text(row.get('status', True))}".strip())]
+
+
 def to_topology(nodes, raw_clients, usage=None):
     known = {n["mac"] for n in nodes}
     for n in nodes:
@@ -550,12 +631,22 @@ def test(config):
 def fetch(config):
     controller = Controller(config)
     controller.login()
+    cfg = ([], [])
     try:
         nodes, clients = controller.snapshot()
         days, _problem_text = controller.site_usage()
+        if config.get("record_config"):
+            try:       # an extra: whatever goes wrong here must not cost the sync its devices and clients
+                cfg = controller.settings()
+            except Exception:  # noqa: BLE001
+                cfg = ([], [])
     finally:
         controller.logout()
-    return to_topology(nodes, clients, days)
+    out = to_topology(nodes, clients, days)
+    holder = next((n for n in out["nodes"] if n.get("role") == "gateway"), out["nodes"][0] if out["nodes"] else None)
+    if holder is not None and cfg[0]:
+        holder["config"], holder["config_failed"] = cfg[0], cfg[1]
+    return out
 
 
 # ----------------------------------------------------------------------------- diagnostic (for the plugin's author)

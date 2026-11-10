@@ -728,6 +728,10 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    # the settings a router or controller reports (plugins with the optional `config` output) and what changed between two syncs (app/configchange.py)
+    cur.execute("CREATE TABLE IF NOT EXISTS config_state (device_id INTEGER PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE, plugin_id TEXT NOT NULL, items TEXT NOT NULL, updated TEXT NOT NULL)")
+    cur.execute("CREATE TABLE IF NOT EXISTS config_changes (id INTEGER PRIMARY KEY, device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE, ts TEXT NOT NULL, plugin_id TEXT NOT NULL, summary TEXT NOT NULL, changes TEXT NOT NULL)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_config_changes_device ON config_changes (device_id, id)")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS switch_port_samples (

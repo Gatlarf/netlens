@@ -1,7 +1,9 @@
 import json
+import re
 
 import pytest
 
+from app.plugins.contract import validate_output
 from tests.plugin_modules import load
 
 _asus = load("asus")
@@ -261,3 +263,56 @@ def test_a_router_that_does_not_say_still_syncs_and_the_switches_turn_it_off():
         logins = [c for c in quiet.calls if c[1] == "/login.cgi"]
         assert len(logins) == 1                                                                   # only the main router
         assert bool(snap["nodes"][0].get("metrics")) == ("interfaces" not in kwargs)
+
+
+NVRAM = {"wan0_proto": "dhcp", "lan_ipaddr": "192.168.0.1", "upnp_enable": "0", "wl0_ssid": "Home", "http_enable": "2", "https_lanport": "8443", "wl0_wpa_psk": "supersecret",
+         "vts_rulelist": "<Web>443>192.168.0.9>443>TCP>"}
+
+
+class NvramTransport(FakeTransport):
+    answers = True
+
+    def __call__(self, method, url, headers, data):
+        path = url.split("8443", 1)[-1]
+        if path.startswith("/appGet.cgi?hook=nvram_get("):
+            self.calls.append((method, path, headers.get("Cookie")))
+            names = re.findall(r"nvram_get\(([^)]+)\)", path)
+            return 200, json.dumps({n: NVRAM[n] for n in names if n in NVRAM} if self.answers else {}).encode()
+        return super().__call__(method, url, headers, data)
+
+
+def test_configuration_is_only_read_when_asked_for():
+    t = NvramTransport()
+    snap = AsusClient(AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False), transport=t).snapshot()
+    assert "config" not in snap and not any("nvram_get" in p for _m, p, _c in t.calls)
+    assert all("config" not in n for n in to_topology(snap)["nodes"])
+
+
+def test_configuration_goes_on_the_main_router_without_secrets():
+    t = NvramTransport()
+    cfg = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, record_config=True)
+    snap = AsusClient(cfg, transport=t).snapshot()
+    out = to_topology(snap)
+    main = next(n for n in out["nodes"] if n["role"] == "gateway")
+    items = {i["key"]: i["value"] for i in main["config"]}
+    assert items["wan.proto"] == "dhcp" and items["nat.upnp"] == "0" and items["admin.https_port"] == "8443" and items["portforward.Web"] == "443 192.168.0.9 443 TCP"
+    asked = " ".join(p for _m, p, _c in t.calls if "nvram_get" in p).lower()
+    assert "psk" not in asked and "passwd" not in asked and "wpa_key" not in asked and "supersecret" not in json.dumps(out)       # secrets are never even asked for
+    assert all("config" not in n for n in out["nodes"] if n is not main)
+    assert validate_output("topology", out)["nodes"][0] is not None
+
+
+def test_a_router_that_does_not_answer_the_settings_names_the_failed_sections():
+    t = NvramTransport()
+    t.answers = False
+    cfg = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, record_config=True)
+    snap = AsusClient(cfg, transport=t).snapshot()
+    assert snap["config"] == [] and {"wan", "lan", "wifi", "admin", "nat", "security", "system", "portforward"} <= set(snap["config_failed"])
+    assert snap["nodes"] and all("config" not in n for n in to_topology(snap)["nodes"])
+
+
+def test_a_failing_configuration_read_does_not_cost_the_sync_its_devices(monkeypatch):
+    monkeypatch.setattr(AsusClient, "settings", lambda self: (_ for _ in ()).throw(RuntimeError("boom")))
+    cfg = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, record_config=True)
+    snap = AsusClient(cfg, transport=NvramTransport()).snapshot()
+    assert snap["nodes"] and snap["clients"] and snap["config"] == []

@@ -56,6 +56,13 @@
       "label": "Read the AiMesh nodes too",
       "default": true,
       "help": "The nodes accept the main router's user name and password. Netlens asks each node at the address the router lists for it on every sync, so a node that gets another address is still found; nothing to set up per node. A node that refuses the login is skipped."
+    },
+    {
+      "key": "record_config",
+      "type": "bool",
+      "label": "Record configuration changes",
+      "default": false,
+      "help": "Reads the main router's WAN, LAN, DHCP, Wi-Fi (never the passwords), administration, NAT, UPnP and port-forward settings every sync and tells you when one of them changes. Read-only. Needs Netlens 0.4.387."
     }
   ],
   "homepage": "https://www.asus.com/"

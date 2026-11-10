@@ -15,6 +15,7 @@ import { buildSwitchPortsCard } from "../cards/switch_ports.js";
 import { buildLinkGroupsCard } from "../cards/link_groups.js";
 import { buildNicsCard } from "../cards/nics.js";
 import { buildDeviceApplicationsCard } from "../cards/device_apps.js";
+import { buildDeviceConfigCard } from "../cards/device_config.js";
 import { buildPortMapCard, isPortMapBusy } from "../cards/port_map.js";
 import { buildFirewallCard } from "../cards/firewall.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
@@ -914,6 +915,9 @@ export async function render(container, params) {
     const appsSlot = slot("apps", "Applications", false, "list");
     flow.appendChild(appsSlot);
     buildDeviceApplicationsCard(device).then((c) => { if (c && !disposed) appsSlot.appendChild(c); }).catch(() => {});
+    const configSlot = slot("config", "Configuration changes", false, "list");
+    flow.appendChild(configSlot);
+    buildDeviceConfigCard(device).then((c) => { if (c && !disposed) configSlot.appendChild(c); }).catch(() => {});
     flow.appendChild(tag(buildPortsCard(device, () => load()), "openports", "Open ports", true, "table"));
     const wifiSlot = slot("wifi", "Wi-Fi");
     flow.appendChild(wifiSlot);

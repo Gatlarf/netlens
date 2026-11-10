@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.387 — 2026-11-10
+
+### Added
+- ★ **Configuration change control**: a router, firewall or controller plugin can now report its settings (networks, Wi-Fi, port forwards, firewall rules, UPnP, remote administration), and Netlens keeps the latest set and tells you what changed between two syncs: **Configuration changed** in the timeline, in notifications and in "What changed before it broke?", with the before and after of every setting on the device page (administrators only). The first read is only a baseline. Nothing is written to a router, and Netlens drops any setting whose name looks like a password, key or token. A section a plugin could not read is not reported as a change.
+- **Plugins**: the ASUS, UniFi and Omada plugins have a new setting, **Record configuration changes**, off by default. The changed plugins are in the repository but not released to the plugin store yet. The UniFi and Omada readers are tested against simulated controllers only.
+
 ## 0.4.386 — 2026-11-10
 
 ### Changed

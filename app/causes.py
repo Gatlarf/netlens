@@ -30,10 +30,10 @@ CHANGES: dict[str, float] = {
     "ip_changed": 1.5, "ip_reused": 2.0, "device_new": 1.0, "device_deleted": 1.0,
     "gateway_changed": 2.5, "dhcp_rogue": 2.5, "dns_removed": 1.0,
     "link_down": 2.0, "link_up": 1.0, "link_degraded": 2.0, "storage_degraded": 2.0,
-    "remediation_ran": 2.5,
+    "remediation_ran": 2.5, "config_changed": 2.5,
 }
 ABOVE_ONLY = {"device_offline": (2.0, "went offline"), "device_online": (1.5, "came back")}      # the device above it going away is a change for the one below
-NETWORK_WIDE = {"gateway_changed", "dhcp_rogue"}
+NETWORK_WIDE = {"gateway_changed", "dhcp_rogue", "config_changed"}
 # Requests that are not a change of anything (a test, a run, a heartbeat of the audit chain)
 NOT_A_CHANGE = re.compile(r"/(run|ping|trace|wake|scan|scans|login|logout|anchor|verify|test|ask|model-check|probe|decide)(/|$)|^/api/insights|/audit/")
 DEVICE_PATH = re.compile(r"^/api/devices/(\d+)(?:/|$)")
