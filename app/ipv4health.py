@@ -108,7 +108,7 @@ async def collect(ip_path: str = "ip") -> dict[str, Any]:
 
 def facts_from(conn: sqlite3.Connection, ranges: list[str]) -> dict[str, Any]:
     """What Netlens knows: devices, the scanned ranges, the DHCP servers, the gateway it remembers and the notable events of 30 days."""
-    from app import netchecks
+    from app import gatewaycheck, netchecks
 
     from app.scanner.vendor import mac_kind
 
@@ -119,7 +119,7 @@ def facts_from(conn: sqlite3.Connection, ranges: list[str]) -> dict[str, Any]:
                for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS name, primary_ip, mac, online, last_seen FROM devices WHERE primary_ip IS NOT NULL")]
     events = {r["kind"]: r["n"] for r in conn.execute("SELECT kind, COUNT(*) AS n FROM events WHERE kind IN ('ip_reused', 'gateway_changed', 'dhcp_rogue') AND ts >= ? GROUP BY kind", (ago(days=30),))}
     reused = conn.execute("SELECT COUNT(DISTINCT detail) FROM events WHERE kind = 'ip_reused' AND ts >= ?", (ago(days=30),)).fetchone()[0]
-    return {"devices": devices, "ranges": ranges, "dhcp": netchecks.list_servers(conn), "dhcp_last": netchecks.get_last(conn), "gateway": netchecks.get_gateway(conn), "events": events, "reused_addresses": reused}
+    return {"devices": devices, "ranges": ranges, "dhcp": netchecks.list_servers(conn), "dhcp_last": netchecks.get_last(conn), "gateway": netchecks.get_gateway(conn), "exposure": gatewaycheck.get_last(conn), "events": events, "reused_addresses": reused}
 
 
 RECENT_DAYS = 14        # a device not seen for this long no longer counts as using an address
@@ -246,6 +246,15 @@ def analyse(raw: dict[str, Any], facts: dict[str, Any]) -> dict[str, Any]:
         add("info", "No DHCP check yet", "Netlens looks for DHCP servers now and then (Settings → Network checks). Until it has, rogue servers are not noticed.")
     else:
         add("info", "No DHCP server answered", "Netlens asked and nothing answered. Normal when every device has a fixed address; otherwise the DHCP server may be down.")
+
+    exposure = facts.get("exposure")
+    if exposure:
+        risks = [f for f in exposure["findings"] if f["status"] == "risk"]
+        warns = [f for f in exposure["findings"] if f["status"] == "warn"]
+        level = "bad" if risks else "warn" if warns else "good"
+        title = "The router exposes something risky" if risks else "The router exposes something to review" if warns else "The router exposes nothing risky"
+        text = "; ".join(f["title"] for f in risks + warns) + ". Details and steps on Settings → Network checks." if risks or warns else f"{exposure['gateway']} was checked {exposure['at'][:16].replace('T', ' ')} (score {exposure['score']} of 100)."
+        findings.append({"level": level, "key": finding_key(title), "title": title, "text": text, "own_alert": True})
 
     findings.sort(key=lambda f: ("bad", "warn", "info", "good").index(f["level"]))      # the problems first (the sort keeps the order within a level)
     levels = {f["level"] for f in findings}

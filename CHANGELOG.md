@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.386 — 2026-11-10
+
+### Changed
+- **Router exposure check**: the findings are no longer only on the Settings page. A risk or warning appears in the dashboard's "needs attention" list (and so in reports and Ask), as a line on Network health, and in the MCP tool for the network checks. Nothing is shown while the check is switched off.
+
 ## 0.4.385 — 2026-11-10
 
 ### Fixed

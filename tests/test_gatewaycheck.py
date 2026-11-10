@@ -236,3 +236,30 @@ def test_web_probe_scenarios(name, monkeypatch):
         srv.shutdown()
     for key, value in expect.items():
         assert got[key] == value, (name, got)
+
+
+def test_router_findings_reach_the_dashboard_only_when_the_check_is_on(conn):
+    from app import dashboard
+
+    run(conn, {**closed(), 7547: "open", 22: "open"})
+    assert dashboard._router_attention(conn) == []                       # a stored result of a check that is switched off is not shown
+    g.set_settings(conn, True, 24)
+    items = dashboard._router_attention(conn)
+    assert [i["level"] for i in items] == ["bad", "warn"] and items[0]["href"] == "#/settings/netchecks" and "192.168.1.1" in items[0]["text"]
+
+
+def test_network_health_shows_the_router_without_a_second_alert(conn):
+    from app import ipv4health, nethealth
+    from tests.test_ipv4health import facts, raw
+
+    last = run(conn, {**closed(), 23: "open"})
+    for _ in range(3):
+        res = ipv4health.analyse(raw(), facts(exposure=last))
+        nethealth.update(conn, "v4", res)
+    found = [f for f in res["findings"] if f["title"].startswith("The router exposes")]
+    assert found and found[0]["level"] == "bad" and found[0]["own_alert"]
+    kinds = {r["kind"] for r in conn.execute("SELECT kind FROM events")}
+    assert "gateway_exposure" in kinds and not any("router" in r["detail"].lower() for r in conn.execute("SELECT detail FROM events WHERE kind LIKE 'net_%'"))
+    clean = ipv4health.analyse(raw(), facts(exposure=run(conn, now="2026-11-12T10:00:00Z")))
+    assert [f["level"] for f in clean["findings"] if f["title"] == "The router exposes nothing risky"] == ["good"]
+    assert not any(f["title"].startswith("The router") for f in ipv4health.analyse(raw(), facts())["findings"])      # no result yet: no line

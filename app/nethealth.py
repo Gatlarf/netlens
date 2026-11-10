@@ -39,7 +39,7 @@ def update(conn: sqlite3.Connection, family: str, result: dict[str, Any], now: s
     raised: list[str] = []
     seen: set[str] = set()
     for f in result.get("findings", []):
-        if f["level"] not in KINDS:
+        if f["level"] not in KINDS or f.get("own_alert"):       # the router exposure has its own event (gateway_exposure)
             continue
         seen.add(f["key"])
         cur = mine.get(f["key"]) or {"runs": 0, "alerted": None}

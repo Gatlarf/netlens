@@ -141,7 +141,7 @@ tool("get_dns", "overview", "DNS names of the devices and the conflicts between 
 tool("get_agent_status", "overview", "Which hosts report through an agent (a collector on a locked-down host that pushes its readings): state, last time it sent data, whether it is silent, days left on its certificate. No secrets.", "GET", "/api/agent-status")
 tool("get_monitors", "overview", "The health monitors (memory, processor, disk, temperature ...) of the monitored hosts, their latest readings and the readings past their limit.", "GET", "/api/monitors")
 tool("get_remediation", "overview", "The automatic fixes: rules, what ran, what waits for approval and whether it helped.", "GET", "/api/remediation")
-tool("get_network_checks", "overview", "DHCP servers seen on the network (trusted or not), the gateway and the DNS registration.", "GET", "/api/netchecks")
+tool("get_network_checks", "overview", "DHCP servers seen on the network (trusted or not), the gateway, the DNS registration and the router exposure check (what the gateway answers: provider remote management, Telnet, UPnP mappings, admin page; findings with evidence and a score).", "GET", "/api/netchecks")
 
 # devices
 tool("list_devices", "devices", "Every device Netlens knows: name, addresses, vendor, type, online, group, always-on, trusted.", "GET", "/api/devices",

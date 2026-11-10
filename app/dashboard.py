@@ -28,6 +28,17 @@ def _network_attention(conn: sqlite3.Connection) -> list[dict]:
     return [{"level": i["level"], "text": i["text"], "href": "#/network-health"} for i in nethealth.attention(conn)]
 
 
+def _router_attention(conn: sqlite3.Connection) -> list[dict]:
+    """What the last router exposure check found that is a risk or a warning (the check is off until an admin switches it on)."""
+    from app import gatewaycheck
+
+    last = gatewaycheck.get_last(conn)
+    if not last or not gatewaycheck.get_settings(conn)["enabled"]:
+        return []
+    return [{"level": "bad" if f["status"] == "risk" else "warn", "text": f"Router {last['gateway']}: {f['title']}", "href": "#/settings/netchecks"}
+            for f in last["findings"] if f["status"] in ("risk", "warn")]
+
+
 def _llm_attention(conn: sqlite3.Connection) -> list[dict]:
     """The free language model that was chosen on OpenRouter has gone away or is no longer free."""
     from app import openrouter
@@ -301,7 +312,7 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "summary": s,
         "devices_uptime": uptime,
         "service_checks": _services(conn, now)["checks"],
-        "attention": sorted(_attention(s, certs, login_failed, down, core_down, down_checks, _tiers(conn)) + _network_attention(conn) + _site_vuln_attention(conn) + _llm_attention(conn)
+        "attention": sorted(_attention(s, certs, login_failed, down, core_down, down_checks, _tiers(conn)) + _network_attention(conn) + _router_attention(conn) + _site_vuln_attention(conn) + _llm_attention(conn)
                             + _extra_attention(conn), key=lambda i: {"bad": 0, "warn": 1}.get(i["level"], 2)),
         "events": events,
         "services_down": down,
