@@ -43,11 +43,10 @@ def test_a_silent_router_proves_nothing():
     assert f["tr069"]["status"] == "unknown" and f["telnet"]["status"] == "unknown" and f["admin-http"]["status"] == "unknown"
 
 
-def test_plain_http_admin_only_without_https():
+def test_plain_http_admin_warns_only_when_no_https_exists():
     assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open"}, {}))["admin-http"]["status"] == "warn"
-    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open", 443: "open"}, {}))["admin-http"]["status"] == "warn"
-    redirect = {"redirect": "https://10.0.0.1:8443/"}
-    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open", 8443: "open"}, {}, redirect))["admin-http"]["status"] == "ok"
+    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open", 8443: "open"}, {}))["admin-http"]["status"] == "ok"      # an ASUS: HTTP answers, HTTPS on 8443
+    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open"}, {}, {"redirect": "https://10.0.0.1:8443/"}))["admin-http"]["status"] == "ok"
     assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open"}, {}, {"redirect": "http://10.0.0.1/login"}))["admin-http"]["status"] == "warn"
 
 

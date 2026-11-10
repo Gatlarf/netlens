@@ -275,13 +275,17 @@ def evaluate(gw: str, ports: dict, upnp: dict, web: dict | None = None) -> list[
 
     if silent:
         out.append(_f("admin-http", "Router admin page encryption", "unknown", "medium", quiet))
-    elif states.get(80) == "open" and str(((web or {}).get("redirect")) or "").lower().startswith("https://"):
-        out.append(_f("admin-http", "Router admin page redirects to HTTPS", "ok", "medium", f"http://{gw}/ sends the browser on to {web['redirect']}, so a password is not typed on the plain page."))
     elif states.get(80) == "open":
+        redirect = str((web or {}).get("redirect") or "")
         https = [p for p in (443, 8443) if states.get(p) == "open"]
-        out.append(_f("admin-http", "Router admin page is plain HTTP", "warn", "medium",
-                      f"http://{gw}/ answers without sending you to HTTPS" + (f" (HTTPS is available on port {https[0]})" if https else "") + ", so the admin password can travel unencrypted on your network.",
-                      [_login(gw), "Turn on HTTPS for the admin page if the router has the option, or update its firmware."]))
+        if redirect.lower().startswith("https://") or https:
+            how = f"it sends the browser on to {redirect}" if redirect.lower().startswith("https://") else f"HTTPS is available on port {https[0]}"
+            out.append(_f("admin-http", "Router admin page offers HTTPS", "ok", "medium",
+                          f"http://{gw}/ also answers, but {how}. Choosing HTTPS only in the router settings would rule out a plain login completely."))
+        else:
+            out.append(_f("admin-http", "Router admin page is plain HTTP", "warn", "medium",
+                          f"http://{gw}/ answers and no HTTPS was found on port 443 or 8443, so the admin password travels unencrypted on your network.",
+                          [_login(gw), "Turn on HTTPS for the admin page if the router has the option, or update its firmware."]))
     else:
         out.append(_f("admin-http", "Router admin page has no plain HTTP", "ok", "medium", f"Port 80 on {gw} does not answer."))
 
