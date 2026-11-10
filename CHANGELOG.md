@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.385 — 2026-11-10
+
+### Fixed
+- **Router exposure check, admin page**: Netlens now reads what the plain-HTTP admin page really does before anyone signs in. It is OK when the server or the page itself sends the browser to HTTPS (an HTTP redirect, a meta refresh, a script, or the HTTPS redirect of ASUS routers), and it follows the small redirect pages that routers put in front of their login page. It is a warning when the sign-in form or a Basic login is served over plain HTTP, even when HTTPS also exists. A page that only shows a status page, with HTTPS available, is OK. The UPnP question is now also asked on the multicast group, because many routers only answer that.
+
 ## 0.4.384 — 2026-11-10
 
 ### Fixed

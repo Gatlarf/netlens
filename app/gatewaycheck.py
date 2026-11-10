@@ -122,13 +122,19 @@ async def probe_ports(ip: str, ports=tuple(PORTS), timeout: float = CONNECT_TIME
 
 
 def _ssdp(ip: str) -> str | None:
-    """Ask the router itself (unicast, no multicast) for its Internet Gateway Device description URL."""
+    """Ask for the router's Internet Gateway Device description URL: directly at the router, and on the multicast group (many routers only answer that),
+    taking only an answer that comes from the router's own address."""
     msg = ("M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\n"
            "ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n\r\n").encode()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(UPNP_WAIT)
     try:
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
         sock.sendto(msg, (ip, 1900))
+        try:
+            sock.sendto(msg, ("239.255.255.250", 1900))
+        except OSError:
+            pass                                                  # no multicast route: the direct question was still asked
         while True:
             data, addr = sock.recvfrom(4096)
             if addr[0] != ip:
@@ -208,20 +214,64 @@ def _upnp(ip: str) -> dict:
     return out
 
 
+_HTTPS_HINT = re.compile(r"https_redirect|redirect_?to_?https|force_?https|redirect_?https", re.I)
+_JS_HTTPS = re.compile(r"""location(?:\.href|\.replace\(|\.assign\()?\s*=?\s*\(?\s*['"]https:""", re.I)
+_META_REFRESH = re.compile(r"""<meta[^>]+http-equiv=["']?refresh["']?[^>]+content=["'][^"']*url=\s*([^"'>\s]+)""", re.I)
+_JS_LOCAL = re.compile(r"""location(?:\.href|\.replace\(|\.assign\()?\s*=?\s*\(?\s*['"](/[^'"]*)['"]""", re.I)
+_PASSWORD = re.compile(r"""<input[^>]+type\s*=\s*["']?password""", re.I)
+
+
 def _web(ip: str) -> dict:
-    """What the plain-HTTP admin page does: {'redirect': Location} when it sends you on (without following it), {'redirect': None} otherwise."""
+    """What the plain-HTTP admin page does before anyone signs in. Follows at most two same-host hops (a login page often hides behind a small redirect page).
+
+    {'redirect': an https:// address the server or the page itself sends the browser to, else None, 'login_form': a password field is served over HTTP,
+     'basic_auth': the server asks for a Basic login over HTTP, 'read': the page could be read at all}
+    """
     import http.client
 
-    conn = http.client.HTTPConnection(ip, 80, timeout=3)
-    try:
-        conn.request("GET", "/", headers={"User-Agent": "Netlens"})
-        res = conn.getresponse()
-        res.read(1)
-        return {"redirect": (res.getheader("Location") or "")[:200] if 300 <= res.status < 400 else None}
-    except (OSError, http.client.HTTPException):
-        return {"redirect": None}
-    finally:
-        conn.close()
+    out = {"redirect": None, "login_form": False, "basic_auth": False, "read": False}
+    path = "/"
+    for _ in range(3):
+        conn = http.client.HTTPConnection(ip, 80, timeout=3)
+        try:
+            conn.request("GET", path, headers={"User-Agent": "Netlens", "Accept": "text/html"})
+            res = conn.getresponse()
+            body = res.read(100_000).decode("utf-8", "replace")
+            location = (res.getheader("Location") or "")[:200]
+            auth = (res.getheader("WWW-Authenticate") or "").lower()
+        except (OSError, http.client.HTTPException):
+            return out
+        finally:
+            conn.close()
+        out["read"] = True
+        if 300 <= res.status < 400 and location:
+            if location.lower().startswith("https://"):
+                out["redirect"] = location
+                return out
+            target = urllib.parse.urlsplit(location)
+            if target.scheme in ("", "http") and target.hostname in (None, ip):
+                path = target.path or "/"
+                continue
+            return out
+        if res.status == 401 and auth.startswith("basic"):
+            out["basic_auth"] = True
+            return out
+        meta = _META_REFRESH.search(body)
+        if meta and meta.group(1).lower().startswith("https://"):
+            out["redirect"] = meta.group(1)[:200]
+            return out
+        if _JS_HTTPS.search(body) or _HTTPS_HINT.search(body):
+            out["redirect"] = "https (the page sends the browser there)"
+            return out
+        if _PASSWORD.search(body):
+            out["login_form"] = True
+            return out
+        hop = (meta.group(1) if meta else None) or (_JS_LOCAL.search(body).group(1) if _JS_LOCAL.search(body) else None)
+        if hop and hop.startswith("/") and hop != path and len(body) < 2000:
+            path = hop[:200]
+            continue
+        return out
+    return out
 
 
 async def probe_web(ip: str) -> dict:
@@ -276,16 +326,26 @@ def evaluate(gw: str, ports: dict, upnp: dict, web: dict | None = None) -> list[
     if silent:
         out.append(_f("admin-http", "Router admin page encryption", "unknown", "medium", quiet))
     elif states.get(80) == "open":
-        redirect = str((web or {}).get("redirect") or "")
+        w = web or {}
+        redirect = str(w.get("redirect") or "")
         https = [p for p in (443, 8443) if states.get(p) == "open"]
-        if redirect.lower().startswith("https://") or https:
-            how = f"it sends the browser on to {redirect}" if redirect.lower().startswith("https://") else f"HTTPS is available on port {https[0]}"
-            out.append(_f("admin-http", "Router admin page offers HTTPS", "ok", "medium",
-                          f"http://{gw}/ also answers, but {how}. Choosing HTTPS only in the router settings would rule out a plain login completely."))
+        fix = [_login(gw), "Turn on HTTPS for the admin page if the router has the option (some call it 'HTTPS only' or 'Disable HTTP'), or update its firmware."]
+        also = f" HTTPS is available on port {https[0]}." if https else " No HTTPS was found on port 443 or 8443."
+        if redirect:
+            out.append(_f("admin-http", "Router admin page moves you to HTTPS", "ok", "medium",
+                          f"http://{gw}/ answers, but the browser is sent on to {redirect if redirect.startswith('https://') else 'HTTPS'} before anyone signs in."))
+        elif w.get("basic_auth"):
+            out.append(_f("admin-http", "Router admin page asks for a password over plain HTTP", "warn", "medium",
+                          f"http://{gw}/ asks for a Basic login, which sends the password unencrypted.{also}", fix))
+        elif w.get("login_form"):
+            out.append(_f("admin-http", "Router sign-in page is plain HTTP", "warn", "medium",
+                          f"The sign-in page at http://{gw}/ is served without encryption and does not move the browser to HTTPS, so the admin password can travel unencrypted on your network.{also}", fix))
+        elif https:
+            out.append(_f("admin-http", "Router admin page offers HTTPS", "ok", "low",
+                          f"http://{gw}/ answers but shows no sign-in form there.{also}"))
         else:
             out.append(_f("admin-http", "Router admin page is plain HTTP", "warn", "medium",
-                          f"http://{gw}/ answers and no HTTPS was found on port 443 or 8443, so the admin password travels unencrypted on your network.",
-                          [_login(gw), "Turn on HTTPS for the admin page if the router has the option, or update its firmware."]))
+                          f"http://{gw}/ answers and no HTTPS was found on port 443 or 8443; " + ("Netlens could not tell whether it asks for a password there." if not w.get("read") else "it shows no sign-in form on the first page."), fix))
     else:
         out.append(_f("admin-http", "Router admin page has no plain HTTP", "ok", "medium", f"Port 80 on {gw} does not answer."))
 

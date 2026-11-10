@@ -43,11 +43,19 @@ def test_a_silent_router_proves_nothing():
     assert f["tr069"]["status"] == "unknown" and f["telnet"]["status"] == "unknown" and f["admin-http"]["status"] == "unknown"
 
 
-def test_plain_http_admin_warns_only_when_no_https_exists():
-    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open"}, {}))["admin-http"]["status"] == "warn"
-    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open", 8443: "open"}, {}))["admin-http"]["status"] == "ok"      # an ASUS: HTTP answers, HTTPS on 8443
-    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open"}, {}, {"redirect": "https://10.0.0.1:8443/"}))["admin-http"]["status"] == "ok"
-    assert by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open"}, {}, {"redirect": "http://10.0.0.1/login"}))["admin-http"]["status"] == "warn"
+def admin(web, extra=None):
+    return by_id(g.evaluate("10.0.0.1", {**closed(), 80: "open", **(extra or {})}, {}, web))["admin-http"]
+
+
+def test_admin_page_scenarios():
+    moved = {"redirect": "https://10.0.0.1:8443/", "login_form": False, "basic_auth": False, "read": True}
+    assert admin(moved)["status"] == "ok"                                                                  # moved to HTTPS before sign-in, whatever the means
+    assert admin({"redirect": None, "login_form": True, "basic_auth": False, "read": True}, {8443: "open"})["status"] == "warn"   # HTTPS exists but the plain login works
+    assert admin({"redirect": None, "login_form": False, "basic_auth": True, "read": True})["status"] == "warn"
+    assert admin({"redirect": None, "login_form": False, "basic_auth": False, "read": True}, {443: "open"})["status"] == "ok"      # no form on it, HTTPS exists
+    assert admin({"redirect": None, "login_form": False, "basic_auth": False, "read": False})["status"] == "warn"                 # nothing known, no HTTPS
+    assert admin(None, {443: "open"})["status"] == "ok"
+    assert "8443" in admin({"redirect": None, "login_form": True}, {8443: "open"})["evidence"]
 
 
 def test_upnp_mappings_are_listed():
@@ -181,29 +189,50 @@ def test_api_is_off_until_switched_on_and_needs_admin(client):
     assert anon.post("/api/netchecks/exposure/run").status_code == 403
 
 
-def test_web_probe_reads_the_redirect_without_following_it():
+PAGES = {
+    "https-redirect": ({"/": (302, {"Location": "https://router.lan:8443/"}, "")}, {"redirect": "https://router.lan:8443/"}),
+    "relative-then-form": ({"/": (302, {"Location": "/login.html"}, ""), "/login.html": (200, {}, "<form><input type='password' name=p></form>")}, {"login_form": True}),
+    "basic": ({"/": (401, {"WWW-Authenticate": 'Basic realm="r"'}, "")}, {"basic_auth": True}),
+    "js-hop-then-form": ({"/": (200, {}, "<script>window.top.location.href='/Main_Login.asp';</script>"), "/Main_Login.asp": (200, {}, "<input type=password>")}, {"login_form": True}),
+    "js-hop-https-marker": ({"/": (200, {}, "<script>top.location.href='/l.asp'</script>"), "/l.asp": (200, {}, "<script src='/js/https_redirect/https_redirect.js'></script><input type=password>")}, {"redirect": "https (the page sends the browser there)"}),
+    "meta-https": ({"/": (200, {}, "<meta http-equiv='refresh' content='0; url=https://r.lan/'>")}, {"redirect": "https://r.lan/"}),
+    "js-https": ({"/": (200, {}, "<script>location.href = 'https://r.lan/'</script><input type=password>")}, {"redirect": "https (the page sends the browser there)"}),
+    "plain-landing": ({"/": (200, {}, "<html>status page</html>")}, {"login_form": False, "redirect": None}),
+    "redirect-loop": ({"/": (302, {"Location": "/"}, "")}, {"redirect": None, "login_form": False}),
+    "other-host": ({"/": (302, {"Location": "http://evil.example/"}, "")}, {"redirect": None, "login_form": False}),
+}
+
+
+@pytest.mark.parametrize("name", list(PAGES))
+def test_web_probe_scenarios(name, monkeypatch):
+    import http.client
     import http.server
     import threading
 
+    routes, expect = PAGES[name]
+
     class H(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
-            self.send_response(302)
-            self.send_header("Location", "https://router.lan:8443/")
+            status, headers, body = routes.get(self.path, (404, {}, ""))
+            self.send_response(status)
+            for k, v in headers.items():
+                self.send_header(k, v)
             self.end_headers()
+            self.wfile.write(body.encode())
 
         def log_message(self, *a):
             pass
     srv = http.server.HTTPServer(("127.0.0.1", 0), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    import http.client
     orig = http.client.HTTPConnection
 
     class C(orig):
         def __init__(self, host, port=80, timeout=None):
             super().__init__(host, srv.server_address[1], timeout=timeout)
-    http.client.HTTPConnection = C
+    monkeypatch.setattr(http.client, "HTTPConnection", C)
     try:
-        assert g._web("127.0.0.1") == {"redirect": "https://router.lan:8443/"}
+        got = g._web("127.0.0.1")
     finally:
-        http.client.HTTPConnection = orig
         srv.shutdown()
+    for key, value in expect.items():
+        assert got[key] == value, (name, got)
