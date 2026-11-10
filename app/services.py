@@ -628,6 +628,15 @@ async def _hourly(db_path: str) -> None:
                 notify_soon(db_path)
 
         await _step("DHCP check", dhcp_step)
+
+        async def exposure_step():
+            from app import gatewaycheck, netchecks
+
+            gw = netchecks.get_gateway(conn)
+            if gw and gatewaycheck.due(conn):
+                await gatewaycheck.run(conn, gw["ip"])
+
+        await _step("router exposure check", exposure_step)
         await _step("housekeeping checks", lambda: asyncio.to_thread(_housekeeping_checks, conn, here))
 
         def cve_step():

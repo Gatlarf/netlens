@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.382 — 2026-11-10
+
+### Added
+- ★ **Router exposure check**: Netlens can now check what the gateway itself exposes to the network: provider remote management (TR-069 on 7547, 4567, 30005), Telnet, SSH, FTP, MikroTik Winbox, an admin page without HTTPS, and UPnP including the port mappings that devices have opened. Each finding shows the evidence and numbered steps to fix it, and there is a score out of 100. A risk or warning that was not there on the previous run raises "Router exposes something new". It is off until you switch it on in Settings → Network checks, it only reads, it never logs in or tries a password, and every run is in the audit log. Where it cannot know something (the admin password, WPS, or a router that answers nothing) it says unknown. Ask and the security overview include the findings.
+
 ## 0.4.381 — 2026-11-10
 
 ### Fixed

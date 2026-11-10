@@ -12,12 +12,20 @@ class NetchecksBody(BaseModel):
     dhcp_hours: int | None = None
 
 
+class ExposureBody(BaseModel):
+    enabled: bool | None = None
+    hours: int | None = None
+
+
 class TrustBody(BaseModel):
     trusted: bool = True
 
 
 def _view(conn) -> dict:
+    from app import gatewaycheck
+
     return {
+        "exposure": {"settings": gatewaycheck.get_settings(conn), "intervals": list(gatewaycheck.INTERVALS), "last": gatewaycheck.get_last(conn)},
         "settings": netchecks.get_settings(conn), "intervals": list(netchecks.INTERVALS),
         "last": netchecks.get_last(conn), "servers": netchecks.list_servers(conn), "gateway": netchecks.get_gateway(conn),
     }
@@ -83,6 +91,43 @@ def forget_dhcp(request: Request, ip: str) -> dict:
             netchecks.forget_server(conn, ip)
         except KeyError:
             raise HTTPException(status_code=404, detail="no such DHCP server")
+        return _view(conn)
+    finally:
+        conn.close()
+
+
+@router.put("/netchecks/exposure")
+def put_exposure(request: Request, body: ExposureBody) -> dict:
+    from app import gatewaycheck
+
+    conn = connect(request.app.state.db_path)
+    try:
+        try:
+            gatewaycheck.set_settings(conn, body.enabled, body.hours)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return _view(conn)
+    finally:
+        conn.close()
+
+
+@router.post("/netchecks/exposure/run")
+async def run_exposure(request: Request) -> dict:
+    """Probe the gateway now (a few seconds). Only when the check has been switched on."""
+    from app import gatewaycheck
+
+    conn = connect(request.app.state.db_path)
+    try:
+        if not gatewaycheck.get_settings(conn)["enabled"]:
+            raise HTTPException(status_code=409, detail="the router exposure check is switched off")
+        gw = netchecks.get_gateway(conn)
+        try:
+            await gatewaycheck.run(conn, gw["ip"] if gw else None, who=getattr(getattr(request.state, "user", None), "username", "") or "an admin")
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        from app.notify.channels import process_channels
+
+        await process_channels(request.app.state.db_path)
         return _view(conn)
     finally:
         conn.close()

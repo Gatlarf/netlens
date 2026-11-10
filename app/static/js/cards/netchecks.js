@@ -67,6 +67,43 @@ function fill(card, data) {
     card.appendChild(h("p", { class: "hint" }, "No DHCP server seen yet. Press Check now."));
   }
 
+  // ---- router exposure
+  card.appendChild(h("h3", {}, "Router exposure"));
+  const ex = data.exposure;
+  const exOn = h("input", { type: "checkbox", name: "exposure_enabled" });
+  exOn.checked = ex.settings.enabled;
+  exOn.title = "Connects to a few ports on the gateway and asks it for its UPnP port mappings. Read-only, never logs in, every run is audited.";
+  const exEvery = h("select", { name: "exposure_hours" });
+  for (const hours of ex.intervals) exEvery.appendChild(h("option", { value: String(hours) }, hours === 168 ? "every week" : HOURS[hours] || `every ${hours} hours`));
+  exEvery.value = String(ex.settings.hours);
+  const exSave = h("button", { type: "button", class: "btn" }, "Save");
+  exSave.addEventListener("click", () => call(exSave, () => api("/api/netchecks/exposure", { method: "PUT", body: { enabled: exOn.checked, hours: Number(exEvery.value) } }), "Saved"));
+  const exRun = h("button", { type: "button", class: "btn", id: "exposure-run" }, "Check now");
+  exRun.disabled = !ex.settings.enabled;
+  exRun.addEventListener("click", () => {
+    exRun.textContent = "Checking…";
+    call(exRun, () => api("/api/netchecks/exposure/run", { method: "POST" }), "Router checked");
+  });
+  card.appendChild(h("div", { class: "field" }, h("label", { class: "check" }, exOn, " Check what the gateway exposes")));
+  card.appendChild(h("div", { class: "field" }, h("label", {}, "How often"), exEvery));
+  card.appendChild(h("div", { class: "form-actions" }, exSave, exRun));
+  if (ex.last) {
+    card.appendChild(h("p", { class: "hint", id: "exposure-last" }, `Gateway ${ex.last.gateway}, checked ${fmtTime(ex.last.at)}. Score ${ex.last.score} of 100.`));
+    const list = h("div", { class: "exposure-list" });
+    const order = { risk: 0, warn: 1, unknown: 2, ok: 3 };
+    for (const f of [...ex.last.findings].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9))) {
+      const tag = { risk: "RISK", warn: "REVIEW", unknown: "UNKNOWN", ok: "OK" }[f.status] || f.status;
+      const row = h("div", { class: `exposure-item st-${f.status}`, "data-finding": f.id },
+        h("p", {}, h("strong", {}, f.title), " ", h("span", { class: f.status === "risk" ? "error" : "hint" }, `${tag} · ${f.severity}`)),
+        h("p", { class: "hint" }, f.evidence));
+      if (f.steps.length && f.status !== "ok") {
+        row.appendChild(h("details", {}, h("summary", {}, `How to fix · ${f.steps.length} steps`), h("ol", {}, ...f.steps.map((s) => h("li", {}, s)))));
+      }
+      list.appendChild(row);
+    }
+    card.appendChild(list);
+  }
+
   // ---- gateway
   card.appendChild(h("h3", {}, "Gateway"));
   card.appendChild(data.gateway

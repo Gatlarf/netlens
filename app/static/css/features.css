@@ -839,3 +839,10 @@ button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background:
 .page-head h1 .info-tip { font-size: 14px; margin-left: 10px; }
 .page-head h1 .info-tip::after { max-width: min(420px, 80vw); font-size: 13px; }
 .page-head .page-title { display: flex; align-items: center; }
+
+.exposure-item { border-left: 3px solid var(--border, #444); padding: .1rem 0 .1rem .75rem; margin: .5rem 0; }
+.exposure-item.st-risk { border-left-color: var(--danger, #e5484d); }
+.exposure-item.st-warn { border-left-color: var(--warn, #f5a524); }
+.exposure-item.st-ok { border-left-color: var(--ok, #30a46c); }
+.exposure-item p { margin: .15rem 0; }
+.exposure-item ol { margin: .3rem 0 .2rem 1.2rem; }

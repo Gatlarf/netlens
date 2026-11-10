@@ -21,7 +21,7 @@ from app.remediation import RECOVERY
 STAMP = "%Y-%m-%dT%H:%M:%SZ"
 GAP = timedelta(minutes=10)
 PROBLEMS = set(RECOVERY) | {"anomaly", "capacity_warning", "capacity_critical", "container_unhealthy", "container_restarting", "container_stopped", "backup_failed", "dhcp_rogue",
-                            "gateway_changed", "cert_expiring", "guest_backup_late", "guest_backup_failed", "storage_degraded", "link_degraded", "network_quiet",
+                            "gateway_changed", "gateway_exposure", "cert_expiring", "guest_backup_late", "guest_backup_failed", "storage_degraded", "link_degraded", "network_quiet",
                             "vuln_critical", "port_unexpected", "firewall_ha", "firewall_licence", "dns_failed", "host_timeout", "plugin_update_failed", "inventory_battery_low", "agent_silent", "ingest_cert_expiring", "ingest_ca_expiring", "audit_tampered"}
 RECOVERS = {v: k for k, v in RECOVERY.items()}
 RECOVERS["storage_recovered"] = "storage_degraded"

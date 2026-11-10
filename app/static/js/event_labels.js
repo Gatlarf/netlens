@@ -54,6 +54,7 @@ export const EVENT_LABELS = {
   backup_failed: "Backup failed",
   dhcp_rogue: "Rogue DHCP?",
   gateway_changed: "Gateway changed",
+  gateway_exposure: "Router exposes something new",
   totp_recovery_used: "Recovery code used",
   totp_reset: "Second factor reset",
   break_glass_login: "Break-glass sign-in",
