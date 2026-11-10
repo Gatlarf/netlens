@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.380 — 2026-11-10
+
+### Fixed
+- **Processor use of a container (LXC)**: a container is now measured by what it used itself, not by what `/proc/stat` shows. On a Proxmox node that file can show the physical cores the container is pinned to, including the virtual machines running on them, so a frozen VM next door looked like a container with 90% processor use and raised false warnings, anomalies and analysis reports. Ordinary hosts and virtual machines are measured as before.
+
 ## 0.4.379 — 2026-11-09
 
 ### Added

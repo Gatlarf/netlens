@@ -24,6 +24,9 @@ SCRIPT = (
     'echo "##loadavg"; cat /proc/loadavg 2>/dev/null; '
     'echo "##stat"; grep "^cpu " /proc/stat 2>/dev/null; '
     'echo "##mem"; grep -E "^(MemTotal|MemAvailable|SwapTotal|SwapFree):" /proc/meminfo 2>/dev/null; '
+    # what this system's own cgroup used (a container's /proc/stat can show the cores it is pinned to, with the other guests on them)
+    'echo "##cgroup"; grep "^usage_usec" /sys/fs/cgroup/cpu.stat 2>/dev/null; echo "cpumax $(cat /sys/fs/cgroup/cpu.max 2>/dev/null)"; '
+    'echo "cpuset $(cat /sys/fs/cgroup/cpuset.cpus.effective 2>/dev/null)"; echo "ncpu $(grep -c "^cpu[0-9]" /proc/stat 2>/dev/null)"; '
     'echo "##uptime"; cat /proc/uptime 2>/dev/null; '
     'echo "##df"; df -PkT 2>/dev/null; '
     'echo "##net"; cat /proc/net/dev 2>/dev/null; '
@@ -218,6 +221,53 @@ def parse_mdstat(lines: list[str]) -> list[tuple]:
     return out
 
 
+def _own_cpu(sec: dict, uptime: list[str], state: dict, now: float) -> float | None | bool:
+    """The processor share this system's own cgroup used since the last round, as a percentage of the cpus it may use.
+    False when the cgroup says nothing (an older kernel: /proc/stat is used), None on the first round (nothing to compare with)."""
+    usage = None
+    info: dict[str, str] = {}
+    for item in sec.get("cgroup", []):
+        key, _, rest = item.strip().partition(" ")
+        if key == "usage_usec":
+            try:
+                usage = int(rest)
+            except ValueError:
+                return False
+        else:
+            info[key] = rest.strip()
+    if usage is None:
+        return False
+    try:
+        clock = float(uptime[0]) if uptime else now
+    except ValueError:
+        clock = now
+    limits = []
+    quota = info.get("cpumax", "").split()
+    if len(quota) == 2 and quota[0] != "max":
+        try:
+            limits.append(int(quota[0]) / int(quota[1]))
+        except (ValueError, ZeroDivisionError):
+            pass
+    count = 0
+    for part in info.get("cpuset", "").split(","):
+        lo, _, hi = part.strip().partition("-")
+        try:
+            count += (int(hi) - int(lo) + 1) if hi else (1 if lo else 0)
+        except ValueError:
+            count = 0
+            break
+    if count:
+        limits.append(count)
+    if info.get("ncpu", "").isdigit() and int(info["ncpu"]):
+        limits.append(int(info["ncpu"]))
+    cpus = min(limits) if limits else 1
+    before = state.get("cg")
+    state["cg"] = (usage, clock)
+    if before is None or clock <= before[1] or usage < before[0]:          # the first round, a restart or a counter that was reset
+        return None
+    return max(0.0, min(100.0, 100.0 * (usage - before[0]) / 1e6 / ((clock - before[1]) * cpus)))
+
+
 def parse(text: str, state: dict, now: float | None = None) -> tuple[list[tuple], list[str]]:
     """Points (metric, label, value, unit) and the groups that were there. `state` carries the counters of the last round."""
     now = now if now is not None else time.time()
@@ -243,7 +293,16 @@ def parse(text: str, state: dict, now: float | None = None) -> tuple[list[tuple]
     # processor: busy share since the previous round (the counters in /proc/stat only grow)
     line = (sec.get("stat") or [""])[0].split()
     cpu = []
-    if len(line) >= 8 and line[0] == "cpu":
+    inside = [x.strip().lower() for x in sec.get("container", []) if x.strip()]
+    in_container = bool(inside) and inside[0] != "none"
+    own = _own_cpu(sec, parts, state, now) if in_container else False
+    if own is not False:
+        # in a container: its own cgroup says what it used; /proc/stat may count the VMs and containers that share its cores
+        if own is not None:
+            cpu.append(("cpu_pct", "", own, "%"))
+        else:
+            found.append("cpu")
+    elif len(line) >= 8 and line[0] == "cpu":
         try:
             nums = [int(x) for x in line[1:9]]
             total, idle = sum(nums), nums[3] + nums[4]
