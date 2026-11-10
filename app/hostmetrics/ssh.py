@@ -315,7 +315,7 @@ def parse(text: str, state: dict, now: float | None = None) -> tuple[list[tuple]
         except ValueError:
             pass
     load = (sec.get("loadavg") or [""])[0].split()
-    if load:
+    if load and not in_container:          # a container sees the host's load average, not its own
         try:
             cpu.append(("load1", "", float(load[0]), ""))
         except ValueError:

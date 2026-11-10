@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.381 — 2026-11-10
+
+### Fixed
+- **Load average of a container (LXC)**: a container no longer reports a load average, because it can only see the one of the whole machine, which made a quiet container look overloaded.
+
 ## 0.4.380 — 2026-11-10
 
 ### Fixed

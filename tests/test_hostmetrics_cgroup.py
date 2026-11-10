@@ -50,3 +50,9 @@ def test_a_container_without_cgroup_figures_falls_back_to_proc_stat():
     ssh.parse(sample("cpu 100 0 100 800 0 0 0 0", None, 100), state)
     points, _ = ssh.parse(sample("cpu 200 0 200 1000 0 0 0 0", None, 160), state)
     assert round(cpu(points)) == 50
+
+
+def test_container_reports_no_load_average():
+    import inspect
+    from app.hostmetrics import ssh
+    assert "not in_container" in inspect.getsource(ssh.parse)
