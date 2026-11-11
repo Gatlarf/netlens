@@ -111,7 +111,7 @@ export function keepDrafts(root, rebuild) {
   [...root.querySelectorAll(FIELDS)].forEach((el) => {
     const key = keyOf(el, seen);
     if (el === document.activeElement) { focusKey = key; try { selection = [el.selectionStart, el.selectionEnd]; } catch (err) { selection = null; } }
-    if (SKIP_TYPES.has(el.type) || el.type === "password" || !differs(el)) return;
+    if (SKIP_TYPES.has(el.type) || el.type === "password" || el.dataset.dirty !== "1" || !differs(el)) return;          // only what somebody typed: a value the page itself chose (a select set to "viewer") is no draft
     drafts.set(key, el.tagName === "SELECT" ? { value: el.value, was: el.options[startOption(el)]?.value }
       : el.type === "checkbox" || el.type === "radio" ? { checked: el.checked, was: el.defaultChecked } : { value: el.value, was: el.defaultValue });
   });

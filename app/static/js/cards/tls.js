@@ -29,13 +29,13 @@ export async function buildTlsCard() {
     }
     if (st.env_managed) return;
     const names = h("input", { type: "text", value: location.hostname, placeholder: "netlens.example.com, 192.168.1.10", "aria-label": "Names for the certificate" });
-    const make = h("button", { class: "btn", type: "button" }, "Make a self-signed certificate");
+    const make = h("button", { class: "btn primary", type: "button" }, "Make a self-signed certificate");
     make.addEventListener("click", async () => {
       try { st = await post("/api/tls/self-signed", { names: names.value.split(",").map((x) => x.trim()).filter(Boolean) }); toast("Certificate made", "success"); draw(); } catch (err) { toast(err.message || "Failed", "error"); }
     });
     const cert = h("textarea", { rows: 5, class: "mono", placeholder: "-----BEGIN CERTIFICATE----- (the server certificate first, then the chain)", "aria-label": "Certificate" });
     const key = h("textarea", { rows: 4, class: "mono", placeholder: "-----BEGIN PRIVATE KEY----- (without a password)", "aria-label": "Private key" });
-    const upload = h("button", { class: "btn", type: "button" }, "Use this certificate and key");
+    const upload = h("button", { class: "btn primary", type: "button" }, "Save certificate and key");
     upload.addEventListener("click", async () => {
       try { st = await post("/api/tls/upload", { certificate: cert.value, key: key.value }); key.value = ""; toast("Certificate installed", "success"); draw(); } catch (err) { toast(err.message || "Failed", "error"); }
     });

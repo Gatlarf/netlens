@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.409 — 2026-11-11
+
+### Fixed
+- **"You have changes that are not saved" after adding a user** (and after any other change that redraws a card with a list of users, roles or other pre-selected choices): the redraw treated a choice the page itself had made (a new user's role set to Viewer) as something you had typed. Only what you typed counts as unsaved now.
+- **Settings → HTTPS** had no clear save button: *Make a self-signed certificate* and *Save certificate and key* are now blue, like the other save buttons.
+
 ## 0.4.408 — 2026-11-11
 
 ### Changed
