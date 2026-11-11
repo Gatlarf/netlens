@@ -178,6 +178,18 @@
    ],
    "releases": [
     {
+     "version": "1.6.3",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.6.3/asus.zip",
+     "sha256": "0cc924acdbbbc1b42fa0bedbdfee01e8d7f3e243138826b6646a801ede5f769d",
+     "api_version": 1,
+     "min_netlens": "0.4.387",
+     "released": "2026-11-11",
+     "changelog": "Record configuration changes also reads the second DHCP DNS server, so Netlens can tell a single resolver from two (one more small request per sync, only with the option on). Nothing changes while the option is off. Needs Netlens 0.4.387.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.6.2",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.6.2/asus.zip",
      "sha256": "dfe208990b855e8dcb57eb0d10fb78d5e47da570ba608fed7289bc75a77e5619",
