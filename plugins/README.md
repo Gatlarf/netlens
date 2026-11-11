@@ -86,5 +86,5 @@ A plugin for a router, access point, mesh node, switch or firewall (kind `topolo
 - **Mesh and cluster nodes**: log in to each member with the main login, at the address the main device lists for it *right now* (addresses change; nothing to set up per node). A node that refuses the login is skipped and the others still count.
 - Put the extras behind plugin settings that switch them off, keep everything read-only, and never let an extra fail the sync. Say in the plugin README what was tested on real hardware and what only follows the vendor's documentation.
 
-The ASUS plugin (1.5.0) is the reference.
+The ASUS plugin (1.6.0) is the reference.
 
