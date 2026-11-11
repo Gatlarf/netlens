@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import fnmatch
 import json
 import re
 import time
@@ -65,8 +66,8 @@ WIN_SCRIPT = (
     "catch{$m=$_.Exception.Message;try{$r.nics=@([System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()|?{$_.OperationalStatus -eq 'Up'}|"
     "%{$t=$_.GetIPv4Statistics();@{name=$_.Description;rx=[double]$t.BytesReceived;tx=[double]$t.BytesSent}})}catch{$e+='network: '+$m}};"
     "try{$r.pd=@(Get-PhysicalDisk|%{@{n=$_.FriendlyName;h=[string]$_.HealthStatus}})}catch{};"
-    # automatic services that stopped with an error (a clean stop has exit code 0, 1077 = never started: both are normal)
-    "try{$r.sv=@(Get-CimInstance Win32_Service -Filter \"StartMode='Auto' AND State='Stopped' AND ExitCode<>0 AND ExitCode<>1077\"|Select-Object -First 20|%{[string]$_.DisplayName})}catch{};"
+    # every service (name, display name, start mode, state, exit code): Netlens decides which stopped ones matter (the host's must-run and ignore lists)
+    "try{$r.svc=@(Get-CimInstance Win32_Service|%{@{n=[string]$_.Name;d=[string]$_.DisplayName;m=[string]$_.StartMode;s=[string]$_.State;x=[int]$_.ExitCode}})}catch{};"
     "$r.e=$e;'##netlens-windows';$r|ConvertTo-Json -Compress -Depth 4"
 )
 
@@ -83,6 +84,48 @@ SKIP_WIN_NICS = re.compile(r"(loopback|isatap|teredo|wan miniport|pseudo|kernel 
 
 class SshError(Exception):
     pass
+
+
+SERVICE_NORMAL_EXIT = (0, 1077)           # a clean stop, or never started: normal for an automatic service
+
+
+def _service_match(patterns: list[str], svc: dict) -> bool:
+    names = (str(svc.get("n") or "").lower(), str(svc.get("d") or "").lower())
+    return any(fnmatch.fnmatchcase(n, p.lower()) for p in patterns for n in names if n)
+
+
+def _stopped_services(data: dict, lists: dict) -> list[str] | None:
+    """The services to raise as stopped, or None when the host did not report its services.
+    Automatic services that stopped with an error count, unless they are on the ignore list; services on the must-run list count
+    whenever they are not running (also a clean stop, or a service that is not installed). Names and patterns (* ?) match the service name or its display name."""
+    must = [x for x in (lists.get("must") or []) if isinstance(x, str) and x.strip()]
+    ignore = [x for x in (lists.get("ignore") or []) if isinstance(x, str) and x.strip()]
+    svc = data.get("svc")
+    if not isinstance(svc, list):
+        old = data.get("sv")                                  # an older script on the host: automatic services that stopped with an error
+        if not isinstance(old, (list, str)):
+            return None
+        names = old if isinstance(old, list) else [old]
+        return [n.strip() for n in names if isinstance(n, str) and n.strip() and not _service_match(ignore, {"n": n, "d": n})][:20]
+    svc = [x for x in svc if isinstance(x, dict)]
+    out: list[str] = []
+
+    def add(label: str) -> None:
+        if label and label not in out:
+            out.append(label)
+
+    failed = [x for x in svc if str(x.get("m")).lower() == "auto" and str(x.get("s")).lower() == "stopped" and x.get("x") not in SERVICE_NORMAL_EXIT
+              and not _service_match(must, x) and not _service_match(ignore, x)]
+    for x in failed[:20]:
+        add(str(x.get("d") or x.get("n") or "").strip())
+    for pattern in must:
+        hits = [x for x in svc if _service_match([pattern], x)]
+        if not hits:
+            add(f"{pattern} (not installed)")
+        for x in hits:
+            if str(x.get("s")).lower() != "running":
+                add(str(x.get("d") or x.get("n") or "").strip())
+    return out
 
 
 def parse_windows(text: str, state: dict, now: float | None = None) -> tuple[list[tuple], list[str]]:
@@ -168,11 +211,11 @@ def parse_windows(text: str, state: dict, now: float | None = None) -> tuple[lis
     if storage:
         points.extend(storage[:40])
         found.append("storage")
-    if isinstance(data.get("sv"), (list, str)):               # the service list was read: a service that is not in it any more is running again
+    services = _stopped_services(data, (state or {}).get("services") or {})
+    if services is not None:                                  # the service list was read: a service that is not in it any more is running again
         points.append(("service_stopped", "", 0.0, "state"))
-        for name in many(data.get("sv")) if isinstance(data.get("sv"), list) else [data["sv"]]:
-            if isinstance(name, str) and name.strip():
-                points.append(("service_stopped", name.strip()[:60], 1.0, "state"))
+        for name in services:
+            points.append(("service_stopped", name[:60], 1.0, "state"))
         found.append("services")
     if not points and problems:
         raise SshError("Windows refused the readings: " + "; ".join(problems[:3]) + ". Make the account a member of the local Administrators group, or of Performance Monitor Users (see the setup notes).")

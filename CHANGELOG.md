@@ -4,6 +4,14 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 
 ## 0.4.398 — 2026-11-11
 
+### Added
+- ★ **Windows services you care about**: on a Windows host's device page (Health monitoring → *Services for this device*) you can list the services that **must always run** and the ones **never to report**. One name per line; the service name or its display name, with `*` and `?` as wildcards (for example `MSSQLSERVER` or `Veeam*`). A must-run service raises *Stopped service* whenever it is not running, also after a clean stop, and when it is not installed on the host. Automatic services that stop with an error are still reported, except those on the ignore list. Works over WinRM and SSH.
+
+### Changed
+- The Windows readout now sends the list of services and Netlens decides which stopped ones matter. Hosts with the read-only probe keep working as before (the ignore list also applies); to use the must-run list on them, press *Update* for the probe, which is now script version 8.
+
+## 0.4.398 — 2026-11-11
+
 ### Fixed
 - **Setting up monitoring for several Windows hosts at once** no longer fails with "neither SSH nor WinRM is open on this host" on hosts that are ready. The scan does not record the https WinRM port (5986), so a host that showed only 5985 in the scan was refused even though adding it on its own page worked. Netlens now tries the ports (22, 5986) on the host itself when the scan did not show one, uses 5986 when it answers, and the host list shows "WinRM ?" instead of a warning for such hosts and includes them in "not monitored".
 

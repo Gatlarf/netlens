@@ -26,7 +26,7 @@ TITLES = {"storage": "Storage", "cpu": "Processor", "memory": "Memory", "network
           "schedule": "Scheduled jobs", "hardware": "Hardware health", "security": "Security"}
 READINGS = "readings"      # not a probe with snapshots: the numbers of the health monitor (processor, memory, disks, network ...), asked every minute or so through the same locked-down account
 INSTALLED = PROBES + (READINGS,)       # every name the host-side script and sudo rule accept
-SCRIPT_VERSION = 7          # raise it when a script changes: a host that has an older copy installed is told so
+SCRIPT_VERSION = 8          # raise it when a script changes: a host that has an older copy installed is told so
 WRAPPER_PATH = "/usr/local/sbin/netlens-probe"
 ENTRY_PATH = "/usr/local/sbin/netlens-probe-entry"
 WRAPPER_NAME = "netlens-probe"
