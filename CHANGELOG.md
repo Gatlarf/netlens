@@ -2,7 +2,7 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
-## 0.4.398 — 2026-11-11
+## 0.4.399 — 2026-11-11
 
 ### Added
 - ★ **Windows services you care about**: on a Windows host's device page (Health monitoring → *Services for this device*) you can list the services that **must always run** and the ones **never to report**. One name per line; the service name or its display name, with `*` and `?` as wildcards (for example `MSSQLSERVER` or `Veeam*`). A must-run service raises *Stopped service* whenever it is not running, also after a clean stop, and when it is not installed on the host. Automatic services that stop with an error are still reported, except those on the ignore list. Works over WinRM and SSH.
