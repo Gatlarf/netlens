@@ -27,7 +27,7 @@ DEFAULT_PORT = {"snmp": 161, "ssh": 22, "winrm": 5986}
 MIN_INTERVAL, MAX_INTERVAL, DEFAULT_INTERVAL = 30, 3600, 60
 MAX_CONCURRENT = 6
 THRESHOLDS_KEY = "hostmetrics.thresholds"
-SERVICE_LISTS_KEY = "hostmetrics.service_lists"        # {device id: {must: [...], ignore: [...]}}: Windows services that must run, and ones never to report
+SERVICE_LISTS_KEY = "hostmetrics.service_lists"        # {device id: {ignore: [...]}}: Windows services never to report as stopped
 MAX_SERVICE_NAMES = 50
 DEVICE_LIMITS_KEY = "hostmetrics.device_limits"      # {device id: {metric: {warn, crit, enabled}}}: a device that differs from the rest
 
@@ -184,36 +184,33 @@ def level_of(rule: dict[str, Any], value: float) -> str:
 
 
 def service_lists(conn, device_id: int) -> dict[str, list[str]]:
-    """The Windows services of this host that must always run, and those never to report as stopped."""
+    """The Windows services of this host that are never to be reported as stopped."""
     mine = _saved(conn, SERVICE_LISTS_KEY)
     item = mine.get(str(device_id)) if isinstance(mine, dict) else None
     item = item if isinstance(item, dict) else {}
-    return {k: [x for x in (item.get(k) or []) if isinstance(x, str)] for k in ("must", "ignore")}
+    return {"ignore": [x for x in (item.get("ignore") or []) if isinstance(x, str)]}
 
 
 def save_service_lists(conn, device_id: int, data: dict) -> dict[str, list[str]]:
-    """Validate and store the lists (names or patterns with * and ?, matched on the service name or its display name)."""
-    clean: dict[str, list[str]] = {}
-    for key in ("must", "ignore"):
-        names = data.get(key) or []
-        if not isinstance(names, list) or any(not isinstance(x, str) for x in names):
-            raise MonitorError("a list of services must be a list of names")
-        out: list[str] = []
-        for x in names:
-            x = " ".join(x.split())
-            if not x:
-                continue
-            if len(x) > 100:
-                raise MonitorError("a service name may hold at most 100 characters")
-            if x.lower() not in {y.lower() for y in out}:
-                out.append(x)
-        if len(out) > MAX_SERVICE_NAMES:
-            raise MonitorError(f"at most {MAX_SERVICE_NAMES} services per list")
-        clean[key] = out
+    """Validate and store the ignore list (names or patterns with * and ?, matched on the service name or its display name)."""
+    names = data.get("ignore") or []
+    if not isinstance(names, list) or any(not isinstance(x, str) for x in names):
+        raise MonitorError("a list of services must be a list of names")
+    out: list[str] = []
+    for x in names:
+        x = " ".join(x.split())
+        if not x:
+            continue
+        if len(x) > 100:
+            raise MonitorError("a service name may hold at most 100 characters")
+        if x.lower() not in {y.lower() for y in out}:
+            out.append(x)
+    if len(out) > MAX_SERVICE_NAMES:
+        raise MonitorError(f"at most {MAX_SERVICE_NAMES} services")
     mine = _saved(conn, SERVICE_LISTS_KEY)
     mine = mine if isinstance(mine, dict) else {}
-    if clean["must"] or clean["ignore"]:
-        mine[str(device_id)] = clean
+    if out:
+        mine[str(device_id)] = {"ignore": out}
     else:
         mine.pop(str(device_id), None)
     set_setting(conn, SERVICE_LISTS_KEY, json.dumps(mine))

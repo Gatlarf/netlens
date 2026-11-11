@@ -66,7 +66,7 @@ WIN_SCRIPT = (
     "catch{$m=$_.Exception.Message;try{$r.nics=@([System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()|?{$_.OperationalStatus -eq 'Up'}|"
     "%{$t=$_.GetIPv4Statistics();@{name=$_.Description;rx=[double]$t.BytesReceived;tx=[double]$t.BytesSent}})}catch{$e+='network: '+$m}};"
     "try{$r.pd=@(Get-PhysicalDisk|%{@{n=$_.FriendlyName;h=[string]$_.HealthStatus}})}catch{};"
-    # every service (name, display name, start mode, state, exit code): Netlens decides which stopped ones matter (the host's must-run and ignore lists)
+    # every service (name, display name, start mode, state, exit code): Netlens decides which stopped ones matter (the host's ignore list)
     "try{$r.svc=@(Get-CimInstance Win32_Service|%{@{n=[string]$_.Name;d=[string]$_.DisplayName;m=[string]$_.StartMode;s=[string]$_.State;x=[int]$_.ExitCode}})}catch{};"
     "$r.e=$e;'##netlens-windows';$r|ConvertTo-Json -Compress -Depth 4"
 )
@@ -96,9 +96,8 @@ def _service_match(patterns: list[str], svc: dict) -> bool:
 
 def _stopped_services(data: dict, lists: dict) -> list[str] | None:
     """The services to raise as stopped, or None when the host did not report its services.
-    Automatic services that stopped with an error count, unless they are on the ignore list; services on the must-run list count
-    whenever they are not running (also a clean stop, or a service that is not installed). Names and patterns (* ?) match the service name or its display name."""
-    must = [x for x in (lists.get("must") or []) if isinstance(x, str) and x.strip()]
+    Automatic services that stopped with an error count, unless they are on the host's ignore list (names or patterns with * and ?,
+    matched on the service name or its display name). A service that must always run is a service check (Service checks on the device page)."""
     ignore = [x for x in (lists.get("ignore") or []) if isinstance(x, str) and x.strip()]
     svc = data.get("svc")
     if not isinstance(svc, list):
@@ -107,24 +106,13 @@ def _stopped_services(data: dict, lists: dict) -> list[str] | None:
             return None
         names = old if isinstance(old, list) else [old]
         return [n.strip() for n in names if isinstance(n, str) and n.strip() and not _service_match(ignore, {"n": n, "d": n})][:20]
-    svc = [x for x in svc if isinstance(x, dict)]
+    failed = [x for x in svc if isinstance(x, dict) and str(x.get("m")).lower() == "auto" and str(x.get("s")).lower() == "stopped"
+              and x.get("x") not in SERVICE_NORMAL_EXIT and not _service_match(ignore, x)]
     out: list[str] = []
-
-    def add(label: str) -> None:
+    for x in failed[:20]:
+        label = str(x.get("d") or x.get("n") or "").strip()
         if label and label not in out:
             out.append(label)
-
-    failed = [x for x in svc if str(x.get("m")).lower() == "auto" and str(x.get("s")).lower() == "stopped" and x.get("x") not in SERVICE_NORMAL_EXIT
-              and not _service_match(must, x) and not _service_match(ignore, x)]
-    for x in failed[:20]:
-        add(str(x.get("d") or x.get("n") or "").strip())
-    for pattern in must:
-        hits = [x for x in svc if _service_match([pattern], x)]
-        if not hits:
-            add(f"{pattern} (not installed)")
-        for x in hits:
-            if str(x.get("s")).lower() != "running":
-                add(str(x.get("d") or x.get("n") or "").strip())
     return out
 
 

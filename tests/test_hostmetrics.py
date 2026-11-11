@@ -567,12 +567,6 @@ def test_services_ignore_list_matches_name_display_and_patterns():
     assert _services(SVC, {"ignore": ["Noisy Updater"]}) == {"Backup Agent"}
 
 
-def test_services_must_run_list_reports_clean_stops_and_missing_ones():
-    got = _services(SVC, {"must": ["MSSQLSERVER", "Veeam*", "Missing Service"]})
-    assert got == {"Backup Agent", "Noisy Updater", "SQL Server (MSSQLSERVER)", "Missing Service (not installed)"}
-    assert _services([{**SVC[3], "s": "Stopped"}], {"must": ["Veeam*"]}) == {"Veeam Backup Service"}
-
-
 def test_services_older_script_still_honours_the_ignore_list():
     data = json.loads(win_output().split("##netlens-windows\n", 1)[1])
     data["sv"] = ["Backup Agent", "Noisy Updater"]
@@ -581,15 +575,15 @@ def test_services_older_script_still_honours_the_ignore_list():
 
 
 def test_service_lists_are_validated_and_stored(conn):
-    assert hm.service_lists(conn, 1) == {"must": [], "ignore": []}
-    saved = hm.save_service_lists(conn, 1, {"must": [" Spooler ", "spooler", ""], "ignore": ["Noisy*"]})
-    assert saved == {"must": ["Spooler"], "ignore": ["Noisy*"]} and hm.service_lists(conn, 2) == {"must": [], "ignore": []}
+    assert hm.service_lists(conn, 1) == {"ignore": []}
+    saved = hm.save_service_lists(conn, 1, {"ignore": [" Noisy* ", "noisy*", ""]})
+    assert saved == {"ignore": ["Noisy*"]} and hm.service_lists(conn, 2) == {"ignore": []}
     with pytest.raises(hm.MonitorError):
-        hm.save_service_lists(conn, 1, {"must": ["x" * 101]})
+        hm.save_service_lists(conn, 1, {"ignore": ["x" * 101]})
     with pytest.raises(hm.MonitorError):
         hm.save_service_lists(conn, 1, {"ignore": [str(i) for i in range(51)]})
     hm.save_service_lists(conn, 1, {})
-    assert hm.service_lists(conn, 1) == {"must": [], "ignore": []}
+    assert hm.service_lists(conn, 1) == {"ignore": []}
 
 
 def test_stopped_service_raises_and_clears(conn):

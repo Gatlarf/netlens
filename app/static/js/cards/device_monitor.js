@@ -28,13 +28,15 @@ const NAMES = {
 let formOpen = false;
 // While the set-up form is open the device page must not refresh itself, or what was typed would vanish
 export function isMonitorFormOpen() {
-  return formOpen;
+  return formOpen || !!(shownCard && shownCard.querySelector("details.limits-box[open]"));          // an opened list or limits box counts too, also before anything is typed
 }
+let shownCard = null;
 
 // Health monitoring of one device: how it is read (SNMP or SSH), what it answers, and the form to set it up.
 export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
   formOpen = false;
   const card = h("div", { class: "card admin-only monitor-card" });
+  shownCard = card;
   let info = null;
 
   async function load() {
@@ -157,9 +159,9 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
     return box;
   }
 
-  // Windows services: the ones that must always run (also after a clean stop) and the ones never to report. One name or pattern (* ?) per line.
+  // Windows services that are never reported as stopped (one name or pattern per line, * and ?). "Must always run" is a service check.
   function servicesBox() {
-    const box = h("details", { class: "limits-box" }, h("summary", { title: "Windows hosts only" }, "Services for this device"));
+    const box = h("details", { class: "limits-box" }, h("summary", { title: "Windows hosts only" }, "Services never reported as stopped"));
     box.addEventListener("toggle", async () => {
       if (!box.open || box.dataset.ready) return;
       box.dataset.ready = "1";
@@ -167,23 +169,21 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
       try {
         data = await get(`/api/devices/${device.id}/services`);
       } catch (err) {
-        box.appendChild(h("p", { class: "error" }, "The lists could not be loaded"));
+        box.appendChild(h("p", { class: "error" }, "The list could not be loaded"));
         return;
       }
-      const must = h("textarea", { rows: "4", placeholder: "one per line, for example MSSQLSERVER or Veeam*", "aria-label": "Services that must always run", title: "Reported as stopped whenever they are not running, also after a clean stop or when not installed. Matches the service name or its display name; * and ? are allowed." }, (data.must || []).join("\n"));
-      const ignore = h("textarea", { rows: "4", placeholder: "one per line", "aria-label": "Services never to report", title: "Automatic services that stop with an error are reported, except these." }, (data.ignore || []).join("\n"));
-      const lines = (t) => t.value.split("\n").map((x) => x.trim()).filter(Boolean);
+      const ignore = h("textarea", { rows: "4", style: "width:100%", placeholder: "one per line, for example Google Update* (service name or display name)", "aria-label": "Services never reported as stopped",
+        title: "Automatic services that stop with an error are reported as stopped, except these. To be told when a service is not running, add a service check instead." }, (data.ignore || []).join("\n"));
       const save = h("button", { class: "btn primary", type: "button" }, "Save");
       save.addEventListener("click", async () => {
         try {
-          await put(`/api/devices/${device.id}/services`, { must: lines(must), ignore: lines(ignore) });
-          toast("Services saved", "success");
-          if (onChange) onChange();
+          await put(`/api/devices/${device.id}/services`, { ignore: ignore.value.split("\n").map((x) => x.trim()).filter(Boolean) });
+          toast("Saved", "success");
         } catch (err) {
-          toast(err.message || "Could not save the services", "error");
+          toast(err.message || "Could not save the list", "error");
         }
       });
-      box.append(h("div", { class: "edit-grid" }, h("label", {}, "Must always run", must), h("label", {}, "Never report", ignore)), h("div", { class: "form-actions" }, save));
+      box.append(h("div", { class: "field" }, ignore), h("div", { class: "form-actions" }, save));
     });
     return box;
   }

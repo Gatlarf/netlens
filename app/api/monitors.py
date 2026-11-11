@@ -223,13 +223,12 @@ def put_device_limits(device_id: int, body: LimitsBody, conn=Depends(get_conn)) 
 
 
 class ServiceListsBody(BaseModel):
-    must: list[str] = []
     ignore: list[str] = []
 
 
 @router.get("/devices/{device_id}/services")
 def get_service_lists(device_id: int, conn=Depends(get_conn)) -> dict:
-    """Windows services of this host that must always run, and those never to report."""
+    """Windows services of this host that are never reported as stopped."""
     _device(conn, device_id)
     return hm.service_lists(conn, device_id)
 

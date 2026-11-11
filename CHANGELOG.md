@@ -5,10 +5,13 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ## 0.4.399 — 2026-11-11
 
 ### Added
-- ★ **Windows services you care about**: on a Windows host's device page (Health monitoring → *Services for this device*) you can list the services that **must always run** and the ones **never to report**. One name per line; the service name or its display name, with `*` and `?` as wildcards (for example `MSSQLSERVER` or `Veeam*`). A must-run service raises *Stopped service* whenever it is not running, also after a clean stop, and when it is not installed on the host. Automatic services that stop with an error are still reported, except those on the ignore list. Works over WinRM and SSH.
+- **Windows services never reported as stopped**: on a Windows host's device page (Health monitoring → *Services never reported as stopped*) you can list services that stop with an error all the time and should not raise *Stopped service*. One name per line; the service name or its display name, with `*` and `?` as wildcards. To be told when a specific service is not running, use a service check as before.
 
 ### Changed
-- The Windows readout now sends the list of services and Netlens decides which stopped ones matter. Hosts with the read-only probe keep working as before (the ignore list also applies); to use the must-run list on them, press *Update* for the probe, which is now script version 8.
+- The Windows readout now sends the list of services and Netlens decides which stopped ones matter. Hosts with the read-only probe keep working as before (the list matches on the display name only until the probe is updated, script version 8).
+
+### Fixed
+- The device page no longer refreshes (and closes) the *Limits for this device* and services boxes while they are open.
 
 ## 0.4.398 — 2026-11-11
 
