@@ -276,7 +276,7 @@ class NvramTransport(FakeTransport):
         path = url.split("8443", 1)[-1]
         if path.startswith("/appGet.cgi?hook=nvram_get("):
             self.calls.append((method, path, headers.get("Cookie")))
-            names = re.findall(r"nvram_get\(([^)]+)\)", path)
+            names = re.findall(r"nvram_get\(([^)]+)\)", path)[:1]       # a real router answers only the first name of a request
             return 200, json.dumps({n: NVRAM[n] for n in names if n in NVRAM} if self.answers else {}).encode()
         return super().__call__(method, url, headers, data)
 
@@ -318,11 +318,10 @@ def test_a_failing_configuration_read_does_not_cost_the_sync_its_devices(monkeyp
     assert snap["nodes"] and snap["clients"] and snap["config"] == []
 
 
-def test_the_names_probe_lists_names_only_never_values():
+
+def test_every_setting_is_its_own_request_because_the_router_answers_only_the_first_name():
     t = NvramTransport()
     cfg = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, record_config=True)
-    c = AsusClient(cfg, transport=t)
-    c.login()
-    out = c.settings_probe()
-    assert out["asked"] == len(AsusClient.CONFIG_KEYS) and "wan0_proto" in out["batches"][0]["answered"] and out["single"]["wan0_proto"] == "value"
-    assert "8443\"" not in json.dumps(out) and "192.168.0.9" not in json.dumps(out) and "supersecret" not in json.dumps(out)
+    AsusClient(cfg, transport=t).snapshot()
+    asked = [p for _m, p, _c in t.calls if "nvram_get" in p]
+    assert asked and all(p.count("nvram_get(") == 1 for p in asked) and len(asked) == len(AsusClient.CONFIG_KEYS) + 1

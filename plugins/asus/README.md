@@ -27,4 +27,4 @@ Switches in the plugin settings: *Record the health of the routers* (everything 
 
 With *Record configuration changes* ticked, every sync also reads a fixed list of the router's settings (`nvram_get` through `appGet.cgi`: firewall, UPnP, remote access, DHCP, DNS, Wi-Fi names and security mode, VPN servers, port forwards) and Netlens tells what changed on the device page (**Network** tab) and as a *Configuration changed* event. Passwords, keys and pre-shared keys are never requested. Read-only; a failed read never fails the sync. **Not yet verified on a real router**: **Run diagnostic** has a *configuration* step that shows how many settings the router returned. Needs Netlens 0.4.387.
 
-**1.6.1:** the diagnostic has a `configuration_names` step with the names (never the values) the router answers, in groups and one by one, to find out which settings a firmware does not hand out.
+**1.6.2:** the router answers only the first setting of a request, so every setting is now asked on its own (about 45 small requests per sync, only when this option is on).
