@@ -395,7 +395,12 @@ dialog.whats-new h2 { margin: 0; }
 .remote-form { max-width: 460px; }
 .remote-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 6px 0; }
 .remote-bar-end { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
-.remote-bar .btn[aria-pressed="true"] { border-color: var(--accent, #3b82f6); }
+.remote-bar .btn[aria-pressed="true"], .remote-keys .btn[aria-pressed="true"] { border-color: var(--accent, #3b82f6); }
+.remote-keys { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 0 6px; }
+.remote-keys[hidden] { display: none; }
+.remote-keys .btn { min-width: 44px; }
+/* the text box that brings up the system keyboard: out of sight, but real (the system keyboard needs a focused field; 16px keeps iOS from zooming in) */
+.remote-kbd-input { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; font-size: 16px; resize: none; pointer-events: none; }
 .remote-screen { background: #000; border-radius: var(--radius); height: min(72vh, 900px); min-height: 360px; overflow: hidden; display: flex; align-items: flex-start; justify-content: center; outline: none; }
 .remote-screen:focus { box-shadow: 0 0 0 2px var(--accent, #3b82f6); }
 .remote-setup h3 { margin: 18px 0 6px; }

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.413 — 2026-11-11
+
+### Added
+- **Keyboard button for remote desktop on a touch screen (iPad)**: an RDP or VNC session on a touch screen has a *Keyboard* button that brings up the system keyboard and sends what you type to the remote machine. A row of keys the iPad keyboard lacks appears with it: Esc, Tab, Ctrl, Alt, Shift and Win (each for the next key), the arrow keys and Delete. Tapping the screen keeps the keyboard open.
+
 ## 0.4.412 — 2026-11-11
 
 ### Changed

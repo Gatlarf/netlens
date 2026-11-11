@@ -9,6 +9,9 @@ import { reasonFor } from "../reason.js";
 import { ask as askApproval, isApprovalRequired, parse as parseApproval } from "../approval.js";
 
 let guacLoaded = null;
+// a touch screen (iPad, tablet, phone): there is no hardware keyboard to type on, so the session gets a Keyboard button
+const TOUCH = (navigator.maxTouchPoints || 0) > 0 && window.matchMedia("(pointer: coarse)").matches;
+
 function loadGuac() {
   if (typeof Guacamole !== "undefined") return Promise.resolve();
   if (!guacLoaded) {
@@ -137,10 +140,13 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
       h("strong", {}, `${SHORT[svc.proto]} · ${shortName(device.name) || device.ip}`), status,
       h("span", { class: "remote-bar-end" },
         h("button", { type: "button", class: "btn", title: "Send Ctrl+Alt+Del", onclick: () => { for (const k of [0xFFE3, 0xFFE9, 0xFFFF]) client && client.sendKeyEvent(1, k); for (const k of [0xFFFF, 0xFFE9, 0xFFE3]) client && client.sendKeyEvent(0, k); } }, "Ctrl+Alt+Del"),
+        TOUCH ? h("button", { type: "button", class: "btn", id: "remote-kbd", title: "Show the on-screen keyboard", "aria-pressed": "false" }, "Keyboard") : null,
         h("button", { type: "button", class: "btn", id: "remote-fit", title: "Scale the screen to the window", "aria-pressed": "true", onclick: (e) => { fit = !fit; e.currentTarget.setAttribute("aria-pressed", String(fit)); scale(); } }, "Fit"),
         h("button", { type: "button", class: "btn", title: "Full screen", onclick: () => (screen.requestFullscreen ? screen.requestFullscreen() : null) }, "Full screen"),
         h("button", { type: "button", class: "btn danger", onclick: () => { teardown(); showForm(); } }, "Disconnect")));
-    root.append(bar, screen);
+    const keys = h("div", { class: "remote-keys", hidden: true });
+    const kbInput = h("textarea", { class: "remote-kbd-input", rows: "1", autocapitalize: "off", autocomplete: "off", autocorrect: "off", spellcheck: "false", "aria-label": "Keyboard input for the remote screen", tabindex: "-1" });
+    root.append(bar, keys, screen, kbInput);
 
     const width = Math.max(640, screen.clientWidth || 1024), height = Math.max(400, screen.clientHeight || 640);
     let ticket;
@@ -179,8 +185,61 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
     keyboard = new Guacamole.Keyboard(screen);
     keyboard.onkeydown = (sym) => client && client.sendKeyEvent(1, sym);
     keyboard.onkeyup = (sym) => client && client.sendKeyEvent(0, sym);
+    // The on-screen keyboard (iPad and other touch screens): a hidden text box brings the system keyboard up and what is typed in it is sent as key presses.
+    let kbOpen = false;
+    const mods = { ctrl: false, alt: false, shift: false, win: false };
+    const MOD_SYM = { ctrl: 0xFFE3, alt: 0xFFE9, shift: 0xFFE1, win: 0xFFEB };
+    const modButtons = {};
+    const paintMods = () => { for (const [m, b] of Object.entries(modButtons)) b.setAttribute("aria-pressed", String(mods[m])); };
+    const tap = (sym) => {
+      if (!client) return;
+      const held = Object.keys(mods).filter((m) => mods[m]);
+      for (const m of held) client.sendKeyEvent(1, MOD_SYM[m]);
+      client.sendKeyEvent(1, sym);
+      client.sendKeyEvent(0, sym);
+      for (const m of held.reverse()) client.sendKeyEvent(0, MOD_SYM[m]);
+      if (held.length) { for (const m of held) mods[m] = false; paintMods(); }          // Ctrl, Alt, Shift and Win apply to the next key only
+    };
+    const symOf = (ch) => { const c = ch.codePointAt(0); return ch === "\n" ? 0xFF0D : c <= 0xFF ? c : 0x01000000 | c; };
+    const SPECIAL = { Backspace: 0xFF08, Enter: 0xFF0D, Tab: 0xFF09, Escape: 0xFF1B, Delete: 0xFFFF, ArrowLeft: 0xFF51, ArrowUp: 0xFF52, ArrowRight: 0xFF53, ArrowDown: 0xFF54, Home: 0xFF50, End: 0xFF57, PageUp: 0xFF55, PageDown: 0xFF56 };
+    const refocus = () => { if (kbOpen) kbInput.focus({ preventScroll: true }); };
+    kbInput.addEventListener("keydown", (e) => {
+      const sym = SPECIAL[e.key];
+      if (sym) { e.preventDefault(); tap(sym); }
+      else if (e.key.length === 1 && (e.ctrlKey || e.altKey || e.metaKey)) {                // a hardware keyboard with the box focused: Ctrl+C and the like
+        e.preventDefault();
+        const was = { ...mods };
+        mods.ctrl = mods.ctrl || e.ctrlKey; mods.alt = mods.alt || e.altKey; mods.win = mods.win || e.metaKey;
+        tap(symOf(e.key));
+        Object.assign(mods, was); paintMods();
+      }
+    });
+    const flush = () => { const text = kbInput.value; kbInput.value = ""; for (const ch of text) tap(symOf(ch)); };
+    kbInput.addEventListener("input", (e) => { if (!e.isComposing) flush(); });
+    kbInput.addEventListener("compositionend", flush);
+    const keyButton = (label, title, action, mod) => {
+      const b = h("button", { type: "button", class: "btn", title, ...(mod ? { "aria-pressed": "false" } : {}) }, label);
+      b.addEventListener("mousedown", (e) => e.preventDefault());                          // the keyboard stays up
+      b.addEventListener("click", () => { action(); refocus(); });
+      if (mod) modButtons[mod] = b;
+      return b;
+    };
+    const toggleMod = (m) => () => { mods[m] = !mods[m]; paintMods(); };
+    keys.append(keyButton("Esc", "Escape", () => tap(0xFF1B)), keyButton("Tab", "Tab", () => tap(0xFF09)),
+      keyButton("Ctrl", "Control for the next key", toggleMod("ctrl"), "ctrl"), keyButton("Alt", "Alt for the next key", toggleMod("alt"), "alt"),
+      keyButton("Shift", "Shift for the next key", toggleMod("shift"), "shift"), keyButton("Win", "The Windows key for the next key", toggleMod("win"), "win"),
+      keyButton("←", "Left", () => tap(0xFF51)), keyButton("↑", "Up", () => tap(0xFF52)), keyButton("↓", "Down", () => tap(0xFF54)), keyButton("→", "Right", () => tap(0xFF53)),
+      keyButton("Del", "Delete", () => tap(0xFFFF)));
+    const kbButton = bar.querySelector("#remote-kbd");
+    if (kbButton) kbButton.addEventListener("click", () => {
+      if (kbOpen && document.activeElement !== kbInput) { kbInput.focus({ preventScroll: true }); return; }          // the keyboard was put away with its own button: bring it back
+      kbOpen = !kbOpen;
+      keys.hidden = !kbOpen;
+      kbButton.setAttribute("aria-pressed", String(kbOpen));
+      if (kbOpen) kbInput.focus({ preventScroll: true }); else kbInput.blur();
+    });
     // the mouse handler of the display stops the click, so a bubbling listener never hears it and the keys would stay with whatever had focus before: listen while the event goes down
-    for (const type of ["mousedown", "touchstart"]) screen.addEventListener(type, () => screen.focus({ preventScroll: true }), true);
+    for (const type of ["mousedown", "touchstart"]) screen.addEventListener(type, () => (kbOpen ? kbInput : screen).focus({ preventScroll: true }), true);
     // clipboard: what is pasted into the window goes to the remote machine; what the remote machine copies is put on this one
     screen.addEventListener("paste", (e) => {
       const text = e.clipboardData && e.clipboardData.getData("text/plain");
