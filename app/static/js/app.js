@@ -7,6 +7,7 @@ import { initThemeToggle } from "./theme.js";
 import { initUpdateBadge } from "./update.js";
 import { initTopbar } from "./topbar.js";
 import { initMainNav, showRoute, setFeatures } from "./mainnav.js";
+import { autoMasonry } from "./masonry.js";
 import { maybeShowWhatsNew } from "./changelog.js";
 import { renderSetup } from "./setup.js";
 import { applyInterface } from "./interface.js";
@@ -586,6 +587,8 @@ async function applyFeatures() {
 
 async function init() {
   initActions();
+  const viewRoot = el("#view");
+  if (viewRoot) autoMasonry(viewRoot);                    // cards of different heights fill the grid on every page of cards
   const session = await applySession();
   await stylesheetsReady();
   hideBoot();

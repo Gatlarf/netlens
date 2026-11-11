@@ -25,3 +25,19 @@ export function masonry(grid, { unit = 4, gap = 12 } = {}) {
   fit();
   return { refresh: fit, stop: () => { changes.disconnect(); if (sizes) sizes.disconnect(); if (frame) cancelAnimationFrame(frame); grid.classList.remove("masonry"); } };
 }
+
+// Every card flow of the app (device page, statistics, network health, insights ...) is packed the same way, whenever one appears in `root`.
+const FLOWS = ".dev-flow, .stat-grid";
+export function autoMasonry(root) {
+  const seen = new WeakSet();
+  const scan = (node) => {
+    if (!(node instanceof HTMLElement)) return;
+    for (const grid of [...(node.matches(FLOWS) ? [node] : []), ...node.querySelectorAll(FLOWS)]) {
+      if (seen.has(grid)) continue;
+      seen.add(grid);
+      masonry(grid);
+    }
+  };
+  new MutationObserver((records) => { for (const r of records) for (const n of r.addedNodes) scan(n); }).observe(root, { childList: true, subtree: true });
+  scan(root);
+}
