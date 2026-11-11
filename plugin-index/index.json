@@ -178,6 +178,18 @@
    ],
    "releases": [
     {
+     "version": "1.6.2",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.6.2/asus.zip",
+     "sha256": "dfe208990b855e8dcb57eb0d10fb78d5e47da570ba608fed7289bc75a77e5619",
+     "api_version": 1,
+     "min_netlens": "0.4.387",
+     "released": "2026-11-11",
+     "changelog": "Record configuration changes: the router answers only the first setting of a request, so every setting is now asked on its own (about 45 small requests per sync, only with this option on). Nothing changes while the option is off. Needs Netlens 0.4.387.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.6.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.6.1/asus.zip",
      "sha256": "b6643416f88795d05348e48ef608f2962788fe321ab519d74458c3ee3a890b59",
