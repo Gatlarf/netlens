@@ -544,46 +544,21 @@ def test_windows_stopped_services_are_read():
     assert {label for m, label, _v, _u in pts if m == "service_stopped"} == {"", "Spooler"}
 
 
-def _services(svc, lists=None):
+def _services(svc):
     data = json.loads(win_output().split("##netlens-windows\n", 1)[1])
     data["svc"] = svc
-    pts, _ = ssh.parse_windows("##netlens-windows\n" + json.dumps(data), {"services": lists or {}}, now=1_773_144_000)
+    pts, _ = ssh.parse_windows("##netlens-windows\n" + json.dumps(data), {}, now=1_773_144_000)
     return {label for m, label, _v, _u in pts if m == "service_stopped"} - {""}
 
 
-SVC = [{"n": "Backup", "d": "Backup Agent", "m": "Auto", "s": "Stopped", "x": 1},
-       {"n": "Spooler", "d": "Print Spooler", "m": "Auto", "s": "Stopped", "x": 0},          # a clean stop: normal
-       {"n": "MSSQLSERVER", "d": "SQL Server (MSSQLSERVER)", "m": "Auto", "s": "Stopped", "x": 0},
-       {"n": "VeeamBackupSvc", "d": "Veeam Backup Service", "m": "Manual", "s": "Running", "x": 0},
-       {"n": "Noisy", "d": "Noisy Updater", "m": "Auto", "s": "Stopped", "x": 1}]
-
-
-def test_services_default_reports_only_failed_automatic_ones():
-    assert _services(SVC) == {"Backup Agent", "Noisy Updater"}
-
-
-def test_services_ignore_list_matches_name_display_and_patterns():
-    assert _services(SVC, {"ignore": ["noisy", "Backup*"]}) == set()
-    assert _services(SVC, {"ignore": ["Noisy Updater"]}) == {"Backup Agent"}
-
-
-def test_services_older_script_still_honours_the_ignore_list():
-    data = json.loads(win_output().split("##netlens-windows\n", 1)[1])
-    data["sv"] = ["Backup Agent", "Noisy Updater"]
-    pts, _ = ssh.parse_windows("##netlens-windows\n" + json.dumps(data), {"services": {"ignore": ["Noisy*"]}}, now=1_773_144_000)
-    assert {label for m, label, _v, _u in pts if m == "service_stopped"} == {"", "Backup Agent"}
-
-
-def test_service_lists_are_validated_and_stored(conn):
-    assert hm.service_lists(conn, 1) == {"ignore": []}
-    saved = hm.save_service_lists(conn, 1, {"ignore": [" Noisy* ", "noisy*", ""]})
-    assert saved == {"ignore": ["Noisy*"]} and hm.service_lists(conn, 2) == {"ignore": []}
-    with pytest.raises(hm.MonitorError):
-        hm.save_service_lists(conn, 1, {"ignore": ["x" * 101]})
-    with pytest.raises(hm.MonitorError):
-        hm.save_service_lists(conn, 1, {"ignore": [str(i) for i in range(51)]})
-    hm.save_service_lists(conn, 1, {})
-    assert hm.service_lists(conn, 1) == {"ignore": []}
+def test_services_report_only_failed_automatic_ones():
+    svc = [{"n": "Backup", "d": "Backup Agent", "m": "Auto", "s": "Stopped", "x": 1},
+           {"n": "Spooler", "d": "Print Spooler", "m": "Auto", "s": "Stopped", "x": 0},           # a clean stop: normal
+           {"n": "Later", "d": "Later Service", "m": "Auto", "s": "Stopped", "x": 1077},          # never started: normal
+           {"n": "Manual1", "d": "Manual One", "m": "Manual", "s": "Stopped", "x": 1},
+           {"n": "Fine", "d": "Fine Service", "m": "Auto", "s": "Running", "x": 0}]
+    assert _services(svc) == {"Backup Agent"}
+    assert _services([]) == set()
 
 
 def test_stopped_service_raises_and_clears(conn):

@@ -222,26 +222,6 @@ def put_device_limits(device_id: int, body: LimitsBody, conn=Depends(get_conn)) 
     return {"rules": hm.rules(conn, device_id), "general": hm.rules(conn), "overrides": hm.device_overrides(conn, device_id)}
 
 
-class ServiceListsBody(BaseModel):
-    ignore: list[str] = []
-
-
-@router.get("/devices/{device_id}/services")
-def get_service_lists(device_id: int, conn=Depends(get_conn)) -> dict:
-    """Windows services of this host that are never reported as stopped."""
-    _device(conn, device_id)
-    return hm.service_lists(conn, device_id)
-
-
-@router.put("/devices/{device_id}/services")
-def put_service_lists(device_id: int, body: ServiceListsBody, conn=Depends(get_conn)) -> dict:
-    _device(conn, device_id)
-    try:
-        return hm.save_service_lists(conn, device_id, body.model_dump())
-    except hm.MonitorError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-
-
 @router.get("/forecast")
 def get_forecast(conn=Depends(get_conn)) -> dict:
     """Monitored disks with their growth trend and the day they run full, the ones that fill soonest first."""

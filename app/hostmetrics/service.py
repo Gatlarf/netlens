@@ -27,8 +27,6 @@ DEFAULT_PORT = {"snmp": 161, "ssh": 22, "winrm": 5986}
 MIN_INTERVAL, MAX_INTERVAL, DEFAULT_INTERVAL = 30, 3600, 60
 MAX_CONCURRENT = 6
 THRESHOLDS_KEY = "hostmetrics.thresholds"
-SERVICE_LISTS_KEY = "hostmetrics.service_lists"        # {device id: {ignore: [...]}}: Windows services never to report as stopped
-MAX_SERVICE_NAMES = 50
 DEVICE_LIMITS_KEY = "hostmetrics.device_limits"      # {device id: {metric: {warn, crit, enabled}}}: a device that differs from the rest
 
 # What is worth a message by default. `low` means the value is bad when it is LOW (battery, supplies). `confirm` is the number
@@ -181,40 +179,6 @@ def level_of(rule: dict[str, Any], value: float) -> str:
     if beyond(rule.get("warn")):
         return "warning"
     return "ok"
-
-
-def service_lists(conn, device_id: int) -> dict[str, list[str]]:
-    """The Windows services of this host that are never to be reported as stopped."""
-    mine = _saved(conn, SERVICE_LISTS_KEY)
-    item = mine.get(str(device_id)) if isinstance(mine, dict) else None
-    item = item if isinstance(item, dict) else {}
-    return {"ignore": [x for x in (item.get("ignore") or []) if isinstance(x, str)]}
-
-
-def save_service_lists(conn, device_id: int, data: dict) -> dict[str, list[str]]:
-    """Validate and store the ignore list (names or patterns with * and ?, matched on the service name or its display name)."""
-    names = data.get("ignore") or []
-    if not isinstance(names, list) or any(not isinstance(x, str) for x in names):
-        raise MonitorError("a list of services must be a list of names")
-    out: list[str] = []
-    for x in names:
-        x = " ".join(x.split())
-        if not x:
-            continue
-        if len(x) > 100:
-            raise MonitorError("a service name may hold at most 100 characters")
-        if x.lower() not in {y.lower() for y in out}:
-            out.append(x)
-    if len(out) > MAX_SERVICE_NAMES:
-        raise MonitorError(f"at most {MAX_SERVICE_NAMES} services")
-    mine = _saved(conn, SERVICE_LISTS_KEY)
-    mine = mine if isinstance(mine, dict) else {}
-    if out:
-        mine[str(device_id)] = {"ignore": out}
-    else:
-        mine.pop(str(device_id), None)
-    set_setting(conn, SERVICE_LISTS_KEY, json.dumps(mine))
-    return service_lists(conn, device_id)
 
 
 PLAIN_WINRM_KEY = "hostmetrics.allow_plain_winrm"
@@ -857,7 +821,6 @@ async def run_monitor(db_path: str, monitor_id: int, now_ts: float | None = None
 
             known = get_fingerprint(conn, row["device_id"])
         state = _STATES.setdefault(monitor_id, {})
-        state["services"] = service_lists(conn, row["device_id"])
         locked = None
         if row["method"] in ("ssh", "winrm"):
             from app.hostprobe import service as host_probes

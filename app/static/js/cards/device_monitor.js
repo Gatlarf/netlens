@@ -96,7 +96,7 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
       try { await del(`/api/devices/${device.id}/monitor`); toast("Health monitoring removed", "success"); } catch (err) { toast(err.message || "Could not remove", "error"); }
       await load();
     });
-    card.append(limitsBox(), ...(m.method === "winrm" || m.method === "ssh" ? [servicesBox()] : []), h("div", { class: "form-actions" }, run, h("button", { class: "btn", type: "button", onclick: () => showForm(m) }, "Edit"), remove));
+    card.append(limitsBox(), h("div", { class: "form-actions" }, run, h("button", { class: "btn", type: "button", onclick: () => showForm(m) }, "Edit"), remove));
   }
 
   // The limits of this device alone: empty boxes follow the general limits (Monitoring -> Health)
@@ -155,35 +155,6 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
       box.append(h("p", { class: "hint" }, "Leave a box empty to use the general limit shown in grey. Changes apply to the warnings and to the lines in the graphs."), table,
         h("div", { class: "edit-grid" }, h("label", {}, "Alert when a link goes down", linkMode), h("label", {}, "Interfaces to watch (separated by commas)", linkOnly)),
         h("p", { class: "hint" }, "For a host with a bond: name the interfaces of its network cards (for example eno1, eno2). The link of each is read from the host itself."), h("div", { class: "form-actions" }, save));
-    });
-    return box;
-  }
-
-  // Windows services that are never reported as stopped (one name or pattern per line, * and ?). "Must always run" is a service check.
-  function servicesBox() {
-    const box = h("details", { class: "limits-box" }, h("summary", { title: "Windows hosts only" }, "Services never reported as stopped"));
-    box.addEventListener("toggle", async () => {
-      if (!box.open || box.dataset.ready) return;
-      box.dataset.ready = "1";
-      let data;
-      try {
-        data = await get(`/api/devices/${device.id}/services`);
-      } catch (err) {
-        box.appendChild(h("p", { class: "error" }, "The list could not be loaded"));
-        return;
-      }
-      const ignore = h("textarea", { rows: "4", style: "width:100%", placeholder: "one per line, for example Google Update* (service name or display name)", "aria-label": "Services never reported as stopped",
-        title: "Automatic services that stop with an error are reported as stopped, except these. To be told when a service is not running, add a service check instead." }, (data.ignore || []).join("\n"));
-      const save = h("button", { class: "btn primary", type: "button" }, "Save");
-      save.addEventListener("click", async () => {
-        try {
-          await put(`/api/devices/${device.id}/services`, { ignore: ignore.value.split("\n").map((x) => x.trim()).filter(Boolean) });
-          toast("Saved", "success");
-        } catch (err) {
-          toast(err.message || "Could not save the list", "error");
-        }
-      });
-      box.append(h("div", { class: "field" }, ignore), h("div", { class: "form-actions" }, save));
     });
     return box;
   }

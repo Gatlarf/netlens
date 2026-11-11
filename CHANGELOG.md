@@ -4,14 +4,11 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 
 ## 0.4.399 — 2026-11-11
 
-### Added
-- **Windows services never reported as stopped**: on a Windows host's device page (Health monitoring → *Services never reported as stopped*) you can list services that stop with an error all the time and should not raise *Stopped service*. One name per line; the service name or its display name, with `*` and `?` as wildcards. To be told when a specific service is not running, use a service check as before.
-
 ### Changed
-- The Windows readout now sends the list of services and Netlens decides which stopped ones matter. Hosts with the read-only probe keep working as before (the list matches on the display name only until the probe is updated, script version 8).
+- The Windows readout now sends the list of services and Netlens decides which stopped ones matter (automatic services that stopped with an error, as before). Hosts with the read-only probe keep working as before; the probe script is now version 8.
 
 ### Fixed
-- The device page no longer refreshes (and closes) the *Limits for this device* and services boxes while they are open.
+- The device page no longer refreshes (and closes) the *Limits for this device* box while it is open.
 
 ## 0.4.398 — 2026-11-11
 
