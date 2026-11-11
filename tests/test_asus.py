@@ -316,3 +316,13 @@ def test_a_failing_configuration_read_does_not_cost_the_sync_its_devices(monkeyp
     cfg = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, record_config=True)
     snap = AsusClient(cfg, transport=NvramTransport()).snapshot()
     assert snap["nodes"] and snap["clients"] and snap["config"] == []
+
+
+def test_the_names_probe_lists_names_only_never_values():
+    t = NvramTransport()
+    cfg = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, record_config=True)
+    c = AsusClient(cfg, transport=t)
+    c.login()
+    out = c.settings_probe()
+    assert out["asked"] == len(AsusClient.CONFIG_KEYS) and "wan0_proto" in out["batches"][0]["answered"] and out["single"]["wan0_proto"] == "value"
+    assert "8443\"" not in json.dumps(out) and "192.168.0.9" not in json.dumps(out) and "supersecret" not in json.dumps(out)

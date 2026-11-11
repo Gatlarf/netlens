@@ -405,6 +405,29 @@ class AsusClient:
             failed.add("portforward")
         return items, sorted(failed)
 
+    def settings_probe(self) -> dict:
+        """For the diagnostic: which setting names the router answers (names only, never a value), asked in groups and one by one."""
+        names = [nv for _s, _k, nv in self.CONFIG_KEYS]
+        out: dict = {"asked": len(names), "batches": [], "single": {}}
+        for start in range(0, len(names), self.BATCH):
+            group = names[start:start + self.BATCH]
+            try:
+                status, text = self._send("/appGet.cgi?hook=" + ";".join(f"nvram_get({n})" for n in group))
+            except AsusError as exc:
+                out["batches"].append({"asked": len(group), "error": type(exc).__name__})
+                continue
+            try:
+                data = json.loads(text)
+            except ValueError:
+                data = None
+            out["batches"].append({"asked": len(group), "http": status, "json": isinstance(data, dict), "length": len(text or ""),
+                                   "answered": [n for n in group if isinstance(data, dict) and n in data],
+                                   "empty": [n for n in group if isinstance(data, dict) and n in data and data[n] in ("", None)]})
+        for n in names[:60]:
+            answer = self._hook(f"nvram_get({n})")
+            out["single"][n] = "no answer" if not isinstance(answer, dict) else ("empty" if answer.get(n) in ("", None) else ("value" if n in answer else "missing"))
+        return out
+
     def interfaces(self) -> list[dict]:
         """The interfaces as ports with byte counters (`INTERNET` is the internet connection; a node has no such interface)."""
         answer = self._hook("netdev(appobj)")
@@ -635,6 +658,7 @@ def diagnose(config: dict) -> dict:
         step("traffic_analyzer", read_traffic)
         if client.cfg.record_config:
             step("configuration", client.settings, lambda r: {"items": len(r[0]), "failed_sections": r[1], "keys": [i["key"] for i in r[0][:12]]})
+            step("configuration_names", client.settings_probe, lambda r: r)
         step("router_health", lambda: client.own_stats(), lambda st: {"metrics": [m["metric"] for m in st["metrics"]], "ports": [p["name"] for p in st["ports"]],
                                                                        "counters_ok": all(isinstance(p.get("rx_bytes", 0), int) for p in st["ports"])})
         if clientlist is not None and onboarding is not None:

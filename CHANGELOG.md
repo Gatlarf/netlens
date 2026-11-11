@@ -6,7 +6,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 
 ### Added
 - ★ **Configuration change control**: a router, firewall or controller plugin can now report its settings (networks, Wi-Fi, port forwards, firewall rules, UPnP, remote administration), and Netlens keeps the latest set and tells you what changed between two syncs: **Configuration changed** in the timeline, in notifications and in "What changed before it broke?", with the before and after of every setting on the device page (administrators only). The first read is only a baseline. Nothing is written to a router, and Netlens drops any setting whose name looks like a password, key or token. A section a plugin could not read is not reported as a change.
-- **Plugins**: the ASUS, UniFi and Omada plugins have a new setting, **Record configuration changes**, off by default. ASUS 1.6.0 is released to the plugin store (needs this Netlens); the UniFi and Omada changes are in the repository but not released yet. The UniFi and Omada readers are tested against simulated controllers only.
+- **Plugins**: the ASUS, UniFi and Omada plugins have a new setting, **Record configuration changes**, off by default. ASUS 1.6.1 is released to the plugin store (needs this Netlens); the UniFi and Omada changes are in the repository but not released yet. The UniFi and Omada readers are tested against simulated controllers only.
 
 ## 0.4.386 — 2026-11-10
 
