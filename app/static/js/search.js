@@ -5,6 +5,7 @@ import { h, clear, isAdmin, shortName } from "./util.js";
 
 const PAGES = [
   ["Version check (CVE)", "#/settings/cvecheck", "vulnerabilities cve nvd versions check settings"],
+  ["HUD", "#/hud", "heads up display constellation time machine replay live view wall screen"],
   ["Dashboard", "#/dashboard", "overview home summary problems attention"],
   ["Map", "#/map", "network map topology layout"],
   ["Devices", "#/devices", "list hosts computers inventory table"],
@@ -84,6 +85,28 @@ const SETTINGS = [
   ["Account", "session", "password change my profile start page preferences", ""],
   ["Start page", "session", "home page opens on landing default", "Start page"],
   ["Plugin manager", "plugins", "plugins install integrations proxmox unifi hyper-v synology npm turn on off running", ""],
+  ["Router exposure", "netchecks", "router gateway ports open upnp internet exposed remote administration check probe", "Router exposure"],
+  ["Gateway", "netchecks", "gateway mac changed replaced router spoof arp", "Gateway"],
+  ["DNS registration", "dns", "register names hostnames technitium zone push records", ""],
+  ["Reliability target", "reliability", "availability target percent sla uptime goal", ""],
+  ["Hosts: set up monitoring", "hosts", "monitoring set-up bulk several windows linux hosts winrm ssh probe install read-only health monitor administrator login", ""],
+  ["Credentials", "credentials", "stored logins passwords keys ssh winrm snmp store vault pam secrets", ""],
+  ["Host probes", "hostprobes", "read-only script storage inspection locked down account certificate ssh windows linux snapshots update version", ""],
+  ["Host agents (locked-down hosts)", "ingest", "agent push otel collector telegraf mtls enterprise ingest metrics", ""],
+  ["Analysis reports", "analysis", "digital engineer analysis report diagnose host problem", ""],
+  ["Traffic statistics", "usage", "applications usage categories traffic collect clients per device privacy names", ""],
+  ["Show a traffic category as", "usage", "category redirect others hide names privacy categories only rewrite history", "Show a category as"],
+  ["Own traffic rules", "usage", "rules domain keyword suffix category application classify", "Your own rules"],
+  ["AI agents (assistant, MCP)", "agents", "assistant mcp openclaw claude tools token agent switch on", ""],
+  ["Sign-in security", "security", "two factor totp mfa password policy lockout step-up session timeout", ""],
+  ["HTTPS", "tls", "certificate tls ssl lets encrypt self-signed secure port", ""],
+  ["Client certificates", "certlogin", "mtls certificate login smart card sign in", ""],
+  ["Provisioning (SCIM)", "scim", "scim users groups provisioning entra okta sync accounts", ""],
+  ["Roles", "roles", "permissions custom role viewer operator administrator rights", ""],
+  ["Approvals", "approvals", "four eyes approve request access privileged change", ""],
+  ["Session recordings", "recordings", "terminal recording remote access privileged playback", ""],
+  ["Access review", "accessreview", "who has access users review audit recertify", ""],
+  ["Plugin guide", "plugin-guide", "write plugin developer manifest sdk build own integration", ""],
   ["Plugin store", "plugin-browse", "plugins browse index catalogue download install new", ""],
 ];
 
@@ -157,7 +180,10 @@ function search(query, devs, plugs = []) {
 function sectionName(key) {
   const names = { networks: "Networks", nmap: "Scan performance", schedule: "Scan schedule", map: "Map", groups: "Groups", netchecks: "Network checks", dns: "DNS registration",
     ignored: "Ignored devices", interface: "Interface", ipv6: "IPv6", sso: "Single sign-on", escalation: "Escalation", oncall: "On-call schedule", siem: "Log forwarding", inbound: "Device messages", engineer: "AI", licence: "Licence", wizard: "Setup guide", central: "Central Netlens", users: "Users & tokens", terminal: "Web terminal", channels: "Alert channels & quiet hours", maintenance: "Maintenance windows",
-    backup: "Backup & restore", export: "Export", shares: "Share links", audit: "Audit log", about: "About", session: "Account", plugins: "Plugin manager", "plugin-browse": "Plugin store" };
+    backup: "Backup & restore", export: "Export", shares: "Share links", audit: "Audit log", about: "About", session: "Account", plugins: "Plugin manager", "plugin-browse": "Plugin store",
+    dns: "DNS registration", reliability: "Reliability target", hosts: "Hosts", credentials: "Credentials", hostprobes: "Host probes", ingest: "Host agents", analysis: "Analysis reports",
+    usage: "Traffic statistics", agents: "AI agents", security: "Sign-in security", tls: "HTTPS", certlogin: "Client certificates", scim: "Provisioning (SCIM)", roles: "Roles", approvals: "Approvals",
+    recordings: "Session recordings", accessreview: "Access review", "plugin-guide": "Plugin guide" };
   return names[key] || key;
 }
 

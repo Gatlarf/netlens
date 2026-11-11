@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.404 — 2026-11-11
+
+### Fixed
+- **Search** now finds the settings added over the last weeks: Hosts (monitoring set-up), Credentials, Host probes, Host agents, Traffic statistics (categories and own rules), Router exposure, Gateway, AI agents, Sign-in security, HTTPS, Client certificates, SCIM, Roles, Approvals, Session recordings, Access review, DNS registration, Reliability target, Analysis reports and the Plugin guide, and the HUD page. A test now fails when a settings section is added without being searchable.
+
 ## 0.4.403 — 2026-11-11
 
 ### Fixed
