@@ -7,3 +7,7 @@ DEVICE = (Path(__file__).resolve().parent.parent / "app" / "static" / "js" / "pa
 def test_the_settings_tab_of_a_device_tucks_its_explanations_away():
     assert 'import { compactHelp } from "../ui.js"' in DEVICE
     assert "compactHelp(panels.settings)" in DEVICE and "new MutationObserver" in DEVICE
+
+
+def test_the_small_sections_of_the_edit_form_sit_side_by_side():
+    assert 'h("div", { class: "edit-columns" })' in DEVICE and "form.appendChild(cols)" in DEVICE

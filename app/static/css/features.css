@@ -467,6 +467,16 @@ dialog.whats-new h2 { margin: 0; }
 .dev-panel:not(.grid-2) { display: flex; flex-direction: column; gap: 16px; }
 .dev-panel[hidden] { display: none !important; }
 .edit-card .field { align-content: start; }
+/* the device edit form: Identity across the top, the small sections side by side below it, tighter rows */
+.edit-card .edit-form.compact { gap: 6px; }
+.edit-card .edit-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 4px 28px; align-items: start; }
+.edit-card .edit-section { margin: 0 0 8px; }
+.edit-card .edit-section > legend { font-size: 0.98rem; margin-bottom: 4px; }
+.edit-card .check-field { margin-bottom: 4px; }
+.edit-card .edit-form.compact .field { margin-bottom: 6px; }
+.edit-card .parent-slot .card { box-shadow: none; border: 0; border-top: 1px solid var(--border); border-radius: 0; padding: 8px 0 0; margin-top: 4px; }
+.edit-card .parent-slot .edit-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 4px 28px; align-items: start; }
+.edit-card .parent-slot .edit-form > :not(.field) { grid-column: 1 / -1; }
 .edit-card .field > label:not(.check) { display: flex; align-items: center; gap: 6px; height: 26px; }          /* a label with a "?" is taller: all labels get the same height so the fields line up */
 .dev-panel > .bd-f { align-self: stretch; }          /* a card set to full width is as wide as the page, whatever its text happens to be */
 .dev-panel.grid-2, .dev-panel > .grid-2 { align-items: start; }

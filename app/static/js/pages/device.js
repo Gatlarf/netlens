@@ -322,7 +322,7 @@ function buildEditCard(device, onSaved) {
   for (const g of groupChoices) groupSelect.appendChild(h("option", { value: String(g.id) }, g.name));
   groupSelect.value = device.group_id != null ? String(device.group_id) : "";
   const tagsInput = h("input", { type: "text", name: "tags", value: (device.tags || []).join(", ") });
-  const notesTextarea = h("textarea", { name: "notes", rows: "3" });
+  const notesTextarea = h("textarea", { name: "notes", rows: "2" });
   notesTextarea.value = device.notes || "";
   form.appendChild(section("Identity",
     h("div", { class: "edit-grid" },
@@ -339,14 +339,15 @@ function buildEditCard(device, onSaved) {
   tierSelect.value = device.tier || "normal";
   const excludeInput = h("input", { type: "checkbox", name: "report_exclude", checked: device.report_exclude === true });
   const gentleInput = h("input", { type: "checkbox", name: "gentle", checked: device.gentle === true });
-  form.appendChild(section("Monitoring and reports",
+  const cols = h("div", { class: "edit-columns" });          // the small sections side by side instead of one long column
+  cols.appendChild(section("Monitoring and reports",
     labelled("Importance", tierSelect, "How much a problem with this device matters. Critical problems lead the list on the dashboard and can be sent to their own alert channel; low ones are shown quietly and are left out of channels set to normal or critical only."),
     checkRow(trustInput, "Known device", "Tick it for devices you recognise. Devices that appear later start as unknown, so you can spot newcomers."),
     checkRow(alwaysInput, "Always-on device (should always be online)", "For devices that should be on all the time (router, switch, server, NAS, camera). The Uptime page and the dashboard then show the availability of these core devices separately from phones, tablets and laptops that come and go."),
     checkRow(notifyInput, "Alert me when it goes offline", "Needs an alert channel (for example e-mail) under Settings → Alert channels."),
     checkRow(excludeInput, "Leave out of reports", "The weekly and monthly reports leave this device out: its outages and availability do not count. Use it for a test machine or a phone that comes and goes.")));
 
-  form.appendChild(section("Scanning",
+  cols.appendChild(section("Scanning",
     checkRow(gentleInput, "Gentle scanning (don't probe its services)",
       "Scans only check which ports are open and never connect to them to identify the service. Use it for devices that complain about it, such as a Samsung TV asking whether a smart device may connect. Service names, versions and the OS are then no longer refreshed. Applies to quick and deep scans, not to a full scan you start yourself. It is on by default for printers, smart devices, cameras, TVs, speakers, consoles and appliances (some print the probe, hang or ask for permission); untick it to scan this device normally, or change the list under Settings → Scan performance.")));
 
@@ -354,7 +355,7 @@ function buildEditCard(device, onSaved) {
   const pinSelect = h("select", { name: "pinned_ip" }, h("option", { value: "" }, "Automatic"),
     ...(device.ips || []).map((a) => h("option", { value: a.ip }, a.ip)));
   pinSelect.value = device.pinned_ip || "";
-  form.appendChild(section("Addresses",
+  cols.appendChild(section("Addresses",
     checkRow(multiInput, "Several addresses on purpose",
       "Tick it for a device that is meant to answer on more than one address (a virtual or failover address, a second service address). Netlens then keeps one address for monitoring and DNS and does not report the others as address changes. A device that really moves to a new address is still reported."),
     labelled("Address to use", pinSelect, "Choose the address Netlens (and DNS) should use while it answers. Automatic keeps the address the device has now. If the chosen address stops answering, Netlens follows the device and says so on this page.")));
@@ -363,11 +364,12 @@ function buildEditCard(device, onSaved) {
     h("option", { value: "auto" }, "Automatic"), h("option", { value: "always" }, "Always register"), h("option", { value: "never" }, "Never register"));
   dnsMode.value = device.dns_mode || "auto";
   const dnsName = h("input", { type: "text", name: "dns_name", value: device.dns_name || "", placeholder: "(automatic)", maxlength: "100" });
-  form.appendChild(section("DNS registration",
+  cols.appendChild(section("DNS registration",
     h("div", { class: "edit-grid" },
       labelled("Register in DNS", dnsMode, "Automatic follows the DNS settings. Always registers the device even when it would be skipped (a Windows machine, an unknown device). Never keeps it out of DNS."),
       labelled("DNS name", dnsName, "The host name Netlens registers for this device. Leave empty for the automatic name."))));
 
+  form.appendChild(cols);
   const saveBtn = h("button", { type: "submit", class: "btn primary" }, "Save");
   form.appendChild(saveBtn);
 
