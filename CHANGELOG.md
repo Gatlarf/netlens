@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.416 — 2026-11-12
+
+### Changed
+- **The Settings tab of a device is shorter**: the long explanations next to the fields and under the headings are now behind a "?" (like on the Settings pages), so the form shows only the fields. The edit form keeps its full width, and the fields in a row line up.
+
 ## 0.4.415 — 2026-11-11
 
 ### Changed

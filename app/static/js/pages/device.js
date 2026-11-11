@@ -1,5 +1,6 @@
 import { get, patch, post, del, ApiError } from "../api.js";
 import { editing } from "../editguard.js";
+import { compactHelp } from "../ui.js";
 import { applyLayout, loadLayout, startBoard } from "../layout_cards.js";
 import { h, clear, fmtTime, timeAgo, typeBadge, statusDot, toast, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { eventLabel } from "../event_labels.js";
@@ -966,6 +967,10 @@ export async function render(container, params) {
       deleteCard.classList.add("admin-only");
       sRight.appendChild(tag(deleteCard, "delete", "Delete this device"));
       panels.settings = flowOf(sLeft, sRight);
+      // long explanations sit behind a "?" like on the Settings pages (the cards fill in a moment after the tab is built)
+      const tidy = new MutationObserver(() => { tidy.disconnect(); compactHelp(panels.settings); tidy.observe(panels.settings, { childList: true, subtree: true }); });
+      compactHelp(panels.settings);
+      tidy.observe(panels.settings, { childList: true, subtree: true });
       buildParentCard(device, (message) => { toast(message, "success"); load(); })
         .then((c) => {
           if (disposed) return;

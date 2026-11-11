@@ -466,6 +466,9 @@ dialog.whats-new h2 { margin: 0; }
 .dev-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .dev-panel:not(.grid-2) { display: flex; flex-direction: column; gap: 16px; }
 .dev-panel[hidden] { display: none !important; }
+.edit-card .field { align-content: start; }
+.edit-card .field > label:not(.check) { display: flex; align-items: center; gap: 6px; height: 26px; }          /* a label with a "?" is taller: all labels get the same height so the fields line up */
+.dev-panel > .bd-f { align-self: stretch; }          /* a card set to full width is as wide as the page, whatever its text happens to be */
 .dev-panel.grid-2, .dev-panel > .grid-2 { align-items: start; }
 .tg-box { scroll-margin-top: calc(var(--topbar-vis, 52px) + 64px); }
 .glance-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
