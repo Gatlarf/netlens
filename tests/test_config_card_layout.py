@@ -7,3 +7,9 @@ JS = (Path(__file__).resolve().parent.parent / "app" / "static" / "js" / "cards"
 def test_recommendations_and_changes_are_collapsed_to_their_title():
     assert 'h("details", { class: `exposure-item' in JS and 'h("details", { class: "config-change" }' in JS
     assert 'h("summary", { class: "config-title" }, h("strong", {}, f.title)' in JS and "e.preventDefault();" in JS and "e.stopPropagation();" in JS
+
+
+def test_recommendations_and_changes_are_two_cards():
+    device = (Path(__file__).resolve().parent.parent / "app" / "static" / "js" / "pages" / "device.js").read_text()
+    assert "buildDeviceConfigCards" in device and 'slot("config", "Recommendations"' in device and 'slot("config-changes", "Configuration changes"' in device
+    assert "return { advice: card, changes: changesCard }" in JS

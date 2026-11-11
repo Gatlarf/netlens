@@ -3,24 +3,25 @@ import { h, fmtTime, clear } from "../util.js";
 import { formDialog } from "../formdialog.js";
 
 // The settings of a router, firewall or controller as its plugin reports them: recommendations from Netlens' rules (accept with a reason), an optional review by the
-// language model, and what changed. Returns null when no plugin reports settings for this device (or the viewer is not an administrator).
-export async function buildDeviceConfigCard(device) {
+// language model, and what changed: two cards. Returns {advice, changes}, both null when no plugin reports settings for this device (or the viewer is not an administrator).
+export async function buildDeviceConfigCards(device) {
   const data = await get(`/api/devices/${device.id}/config?limit=30`).catch(() => null);
-  if (!data || !data.plugin) return null;
+  if (!data || !data.plugin) return { advice: null, changes: null };
   const card = h("div", { class: "card device-config-card" });
-  card.appendChild(h("h2", {}, "Configuration"));
+  card.appendChild(h("h2", {}, "Recommendations"));
   card.appendChild(h("p", { class: "hint", title: `Read by the ${data.plugin} plugin. Netlens never writes to the device.` }, `${data.items} settings, last read ${fmtTime(data.updated)}.`));
   const advice = h("div", { class: "config-advice" });
   card.appendChild(advice);
+  const changesCard = h("div", { class: "card device-changes-card" });
+  changesCard.appendChild(h("h2", {}, "Configuration changes"));
   const history = h("div", {});
-  card.appendChild(history);
+  changesCard.appendChild(history);
 
   async function loadAdvice() {
     const a = await get(`/api/devices/${device.id}/config/advice`).catch(() => null);
     clear(advice);
     if (!a || !a.plugin) return;
     if (a.rules) {
-      advice.appendChild(h("h3", {}, "Recommendations"));
       if (!a.findings.length) advice.appendChild(h("p", { class: "hint" }, `Nothing to recommend (${a.checked} checks).`));
       for (const f of a.findings) advice.appendChild(findingRow(f, false));
       if (a.accepted.length) {
@@ -84,9 +85,8 @@ export async function buildDeviceConfigCard(device) {
   await loadAdvice();
   if (!data.changes.length) {
     history.appendChild(h("p", { class: "hint" }, "No change since Netlens started recording."));
-    return card;
+    return { advice: card, changes: changesCard };
   }
-  history.appendChild(h("h3", {}, "Changes"));
   for (const c of data.changes) {
     const rows = [
       ...c.changed.map((x) => h("li", {}, h("span", { class: "mono" }, x.key), `: ${x.before || "(empty)"} → ${x.after || "(empty)"}`)),
@@ -95,5 +95,5 @@ export async function buildDeviceConfigCard(device) {
     ];
     history.appendChild(h("details", { class: "config-change" }, h("summary", { class: "config-title" }, h("strong", {}, fmtTime(c.ts)), ` ${c.changed.length} changed, ${c.added.length} added, ${c.removed.length} removed`), h("ul", {}, ...rows)));
   }
-  return card;
+  return { advice: card, changes: changesCard };
 }
