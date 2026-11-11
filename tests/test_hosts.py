@@ -211,3 +211,22 @@ def test_live_ports_reports_only_what_answers():
 
     port, got = asyncio.run(main())
     assert got == {port}
+
+
+def test_choosing_a_stored_login_again_does_not_drop_a_working_https_port_back_to_5985(client, monkeypatch):
+    """A host that already has a WinRM monitor on 5986 is set up again (the screen sends the login every time): the scan still shows 5985 only, the port must stay 5986."""
+    conn = connect(client.db)
+    conn.execute("INSERT INTO devices (id, mac, primary_ip, hostname, online, first_seen, last_seen) VALUES (12, 'aa:bb:cc:dd:ee:12', '192.168.1.12', 'gp', 1, 'x', 'x')")
+    conn.execute("INSERT INTO ports (device_id, proto, port, state, updated) VALUES (12, 'tcp', 5985, 'open', 'x')")
+    conn.commit()
+    conn.close()
+
+    async def answers(ip, timeout=2.0):
+        return {5986}
+
+    monkeypatch.setattr(hosts, "live_ports", answers)
+    cred = client.post("/api/credentials", json={"name": "Win", "kind": "login", "username": "DOMAIN\\mon", "password": "pw"}).json()
+    for _ in range(2):
+        r = client.post("/api/hosts/apply", json={"device_ids": [12], "level": "basic", "credential_id": cred["id"]}).json()
+        assert r["done"] == 1, r
+        assert hm.get_monitor(connect(client.db), 12)["port"] == 5986

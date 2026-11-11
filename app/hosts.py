@@ -119,7 +119,7 @@ async def _one(db_path, device_id: int, level: str, opts: dict[str, Any], who, i
                 return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": "this monitor is managed by the central Netlens"}
             method = opts.get("method") if opts.get("method") in ("ssh", "winrm") else (row["method"] if row is not None and row["method"] in ("ssh", "winrm") else _method_of(conn, device_id, d["primary_ip"]))
             live: set[int] = set()
-            if method is None or (method == "winrm" and row is None):
+            if method is None or method == "winrm":
                 live = await live_ports(d["primary_ip"])                    # the scan does not record 5986: ask the host
                 method = method or _method_of(conn, device_id, d["primary_ip"], live)
             if method is None:
