@@ -370,8 +370,10 @@ function buildEditCard(device, onSaved) {
       labelled("DNS name", dnsName, "The host name Netlens registers for this device. Leave empty for the automatic name."))));
 
   form.appendChild(cols);
-  const saveBtn = h("button", { type: "submit", class: "btn primary" }, "Save");
-  form.appendChild(saveBtn);
+  // the one Save button sits at the very end of the card, below the network position too; it belongs to this form by its id
+  const formId = `edit-form-${++fieldSeq}`;
+  form.id = formId;
+  const saveBtn = h("button", { type: "submit", class: "btn primary", form: formId }, "Save");
 
   let dirty = false;
   let focused = false;
@@ -419,6 +421,7 @@ function buildEditCard(device, onSaved) {
   card.appendChild(form);
   const parentSlot = h("div", { class: "parent-slot" });  // "Network position", filled in by the page
   card.appendChild(parentSlot);
+  card.appendChild(h("div", { class: "form-actions edit-save" }, saveBtn));
 
   return { card, parentSlot, isDirty: () => dirty, isFocused: () => focused, saveWith: (f) => { extraForms.push(f); f.addEventListener("input", () => { dirty = true; }); f.addEventListener("change", () => { dirty = true; }); } };
 }

@@ -471,6 +471,7 @@ dialog.whats-new h2 { margin: 0; }
 .edit-card .edit-form.compact { gap: 6px; }
 .edit-card .edit-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 4px 28px; align-items: start; }
 .edit-card .edit-section { margin: 0 0 8px; }
+.edit-card .edit-save { margin-top: 10px; }
 .edit-card .edit-section > legend { font-size: 0.98rem; margin-bottom: 4px; }
 .edit-card .check-field { margin-bottom: 4px; }
 .edit-card .edit-form.compact .field { margin-bottom: 6px; }

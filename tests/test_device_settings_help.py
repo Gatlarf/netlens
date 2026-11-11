@@ -11,3 +11,8 @@ def test_the_settings_tab_of_a_device_tucks_its_explanations_away():
 
 def test_the_small_sections_of_the_edit_form_sit_side_by_side():
     assert 'h("div", { class: "edit-columns" })' in DEVICE and "form.appendChild(cols)" in DEVICE
+
+
+def test_the_save_button_is_the_last_thing_of_the_edit_card():
+    assert 'class: "btn primary", form: formId' in DEVICE and 'card.appendChild(h("div", { class: "form-actions edit-save" }, saveBtn))' in DEVICE
+    assert DEVICE.index("card.appendChild(parentSlot)") < DEVICE.index('class: "form-actions edit-save"')
