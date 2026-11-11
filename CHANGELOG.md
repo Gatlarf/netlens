@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.405 — 2026-11-11
+
+### Added
+- **Search** also finds service checks (by name or device) and configuration recommendations (by title or device) and opens the services page or the device.
+- **Ask**: "Which Windows services are stopped?" lists the automatic services that stopped with an error, per host.
+
 ## 0.4.404 — 2026-11-11
 
 ### Fixed

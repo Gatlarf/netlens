@@ -138,7 +138,7 @@ def t_disks(conn, args, now=None) -> dict:
 
 
 HEALTH_METRICS = {"memory": "mem_pct", "ram": "mem_pct", "cpu": "cpu_pct", "processor": "cpu_pct", "disk": "disk_pct", "storage": "disk_pct", "temperature": "temp_c", "temp": "temp_c",
-                  "battery": "battery_pct", "ups": "battery_pct"}
+                  "battery": "battery_pct", "ups": "battery_pct", "service": "service_stopped", "services": "service_stopped", "stopped": "service_stopped"}
 LOW_IS_BAD = {"battery_pct"}
 
 
@@ -155,10 +155,12 @@ def t_health(conn, args, now=None) -> dict:
     known = store.metrics_of_many("device", [r["device_id"] for r in monitored]) if store else {}
     for r in monitored:
         for s in known.get(r["device_id"], []):
-            if s["metric"] == metric and s["last"] is not None and s["last_ts"] is not None and t - s["last_ts"] < 3 * 3600:
+            if s["metric"] == metric and s["last"] is not None and s["last_ts"] is not None and t - s["last_ts"] < 3 * 3600 and metric != "service_stopped":
                 rows.append({"device": r["name"], "label": s["label"], "value": round(s["last"], 1), "unit": s["unit"]})
     rows.sort(key=lambda x: x["value"], reverse=metric not in LOW_IS_BAD)
-    limits = [{"device": p["device"], "reading": p["title"], "value": p["value"], "level": p["level"]} for p in hm.problems(conn) if p["metric"] == metric]
+    limits = [{"device": p["device"], "reading": p["title"], "value": p["value"], "level": p["level"], "label": p.get("label") or ""} for p in hm.problems(conn) if p["metric"] == metric]
+    if metric == "service_stopped":          # a service that runs again writes no more readings: what is stopped now is what the alerts say
+        rows = [{"device": x["device"], "label": x["label"], "value": 1, "unit": ""} for x in limits if x["label"]]
     return {"metric": metric, "monitored_hosts": len(monitored), "readings": rows[:12], "past_their_limit": limits[:12]}
 
 
@@ -242,7 +244,7 @@ TOOLS: dict[str, tuple[Callable, str]] = {
     "new_devices": (t_new_devices, "devices first seen in a period. args: days (1-30)"),
     "incidents": (t_incidents, "incidents (grouped problems with a probable cause) of a period. args: days (1-30)"),
     "anomalies": (t_anomalies, "readings that are unusual right now for the time of day. args: none"),
-    "health": (t_health, "CURRENT readings of the monitored hosts: memory (RAM), cpu (processor), disk (usage), temperature, battery. Most worrying first. args: metric (memory, cpu, disk, temperature or battery)"),
+    "health": (t_health, "CURRENT readings of the monitored hosts: memory (RAM), cpu (processor), disk (usage), temperature, battery, and stopped Windows services (services). Most worrying first. args: metric (memory, cpu, disk, temperature, battery or services)"),
     "disks": (t_disks, "FORECAST only, not current usage: disks that will fill up and memory use that keeps rising, with the days left. For current usage use health. args: none"),
     "fixes": (t_fixes, "recent automatic fixes (auto-remediation) and whether they worked. args: none"),
     "services": (t_services, "all service checks (websites, ports, DNS) with their state and response time. args: none"),
@@ -274,6 +276,8 @@ KEYWORDS = [
 def route(question: str, known_names: list[str], conn=None) -> tuple[str, dict]:
     """(tool, args) for a question, by its words: a device name wins, then the first keyword group that matches."""
     q = question.lower()
+    if re.search(r"stopped services?|services? (that )?(are |is |have )?(stopped|not running|crashed)|windows services?", q):
+        return "health", {"metric": "services"}
     if conn is not None:
         own = ask_more.route_device_questions(q, known_names)           # before the others: "reboot" belongs to them too
         if own:
@@ -356,7 +360,10 @@ def render(tool: str, r: dict) -> str:
     if tool == "fixes":
         return "\n".join(f"{x['at'][:16].replace('T', ' ')} {x['rule']} on {x['device']}: {x['state']}" + (" (the problem went away)" if x["recovered"] else "") for x in r["runs"][:8]) or "No automatic fixes have run."
     if tool == "health":
-        names = {"mem_pct": "Memory in use", "cpu_pct": "Processor busy", "disk_pct": "Disk usage", "temp_c": "Temperature", "battery_pct": "Battery"}
+        names = {"mem_pct": "Memory in use", "cpu_pct": "Processor busy", "disk_pct": "Disk usage", "temp_c": "Temperature", "battery_pct": "Battery", "service_stopped": "Stopped services"}
+        if r["metric"] == "service_stopped":
+            return ("Stopped Windows services: " + "; ".join(f"{x['label']} on {x['device']}" for x in r["readings"][:10]) + ".") if r["readings"] else \
+                f"No automatic Windows service has stopped with an error ({r['monitored_hosts']} host(s) are monitored)."
         if not r["readings"]:
             return f"No recent {names.get(r['metric'], r['metric']).lower()} readings: {r['monitored_hosts']} host(s) are monitored (Settings → Host monitoring)." if r["monitored_hosts"] else "No host is monitored yet, so there are no memory, processor, disk or temperature readings (device page → Monitor)."
         lines = [f"{names.get(r['metric'], r['metric'])}, most worrying first:"]

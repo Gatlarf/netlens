@@ -134,6 +134,20 @@ async function loadPlugins() {
   return plugins;
 }
 
+// Service checks and configuration recommendations: what lives on pages that have no settings section of their own (administrators only)
+let extras = null;
+let extrasAt = 0;
+async function loadExtras() {
+  if (extras && Date.now() - extrasAt < 60000) return extras;
+  const [checks, advice] = await Promise.all([get("/api/service-checks").catch(() => []), get("/api/config-advice").catch(() => ({ findings: [] }))]);
+  extras = {
+    checks: (Array.isArray(checks) ? checks : []).map((c) => ({ name: c.name || "", device: c.device_name || c.device || "", href: "#/services" })),
+    findings: ((advice && advice.findings) || []).map((f) => ({ title: f.title, device: f.device, href: `#/device/${f.device_id}` })),
+  };
+  extrasAt = Date.now();
+  return extras;
+}
+
 function score(query, text, extra = "") {
   const t = text.toLowerCase();
   const words = query.split(/\s+/).filter(Boolean);
@@ -148,7 +162,7 @@ function score(query, text, extra = "") {
   return total;
 }
 
-function search(query, devs, plugs = []) {
+function search(query, devs, plugs = [], more = null) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const out = [];
@@ -172,7 +186,17 @@ function search(query, devs, plugs = []) {
     const s = score(q, `${d.name} ${d.ip}`, `${d.mac} ${d.vendor} ${d.type}`);
     if (s) out.push({ group: "Devices", title: shortName(d.name) || d.ip, hint: [d.ip, d.vendor].filter(Boolean).join(" · "), href: `#/device/${d.id}`, s });
   }
-  const order = { Pages: 0, Settings: 1, Devices: 2, "Remote sites": 3 };
+  if (isAdmin() && more) {
+    for (const c of more.checks) {
+      const s = score(q, c.name, `${c.device} service check`);
+      if (s) out.push({ group: "Service checks", title: c.name, hint: c.device, href: c.href, s });
+    }
+    for (const f of more.findings) {
+      const s = score(q, f.title, `${f.device} configuration recommendation`);
+      if (s) out.push({ group: "Recommendations", title: f.title, hint: f.device, href: f.href, s });
+    }
+  }
+  const order = { Pages: 0, Settings: 1, Devices: 2, "Service checks": 3, Recommendations: 4, "Remote sites": 5 };
   out.sort((a, b) => order[a.group] - order[b.group] || b.s - a.s || a.title.localeCompare(b.title));
   return out.slice(0, 40);
 }
@@ -208,7 +232,7 @@ function close() {
 
 export async function openSearch(initial = "") {
   if (dialog) { dialog.querySelector("input").focus(); return; }
-  const input = h("input", { type: "search", class: "search-input", placeholder: "Search pages, settings and devices", "aria-label": "Search", autocomplete: "off", spellcheck: "false" });
+  const input = h("input", { type: "search", class: "search-input", placeholder: "Search pages, settings, devices and checks", "aria-label": "Search", autocomplete: "off", spellcheck: "false" });
   const list = h("div", { class: "search-results", role: "listbox" });
   const foot = h("div", { class: "search-foot hint" }, "↑ ↓ to choose, Enter to open, Esc to close");
   dialog = h("dialog", { class: "search-dialog", "aria-label": "Search" }, input, list, foot);
@@ -217,6 +241,7 @@ export async function openSearch(initial = "") {
   let index = 0;
   let devs = [];
   let plugs = [];
+  let more = null;
 
   const go = (r) => {
     if (!r) return;
@@ -242,7 +267,7 @@ export async function openSearch(initial = "") {
   let remote = [];
   let remoteFor = "";
   const update = () => {
-    results = [...search(input.value, devs, plugs), ...remote.map((r) => ({ group: "Remote sites", title: shortName(r.name) || r.ip, hint: [r.site, r.ip, r.vendor].filter(Boolean).join(" · "), href: `#/remote-sites?id=${r.probe_id}`, s: 1 }))];
+    results = [...search(input.value, devs, plugs, more), ...remote.map((r) => ({ group: "Remote sites", title: shortName(r.name) || r.ip, hint: [r.site, r.ip, r.vendor].filter(Boolean).join(" · "), href: `#/remote-sites?id=${r.probe_id}`, s: 1 }))];
     index = 0; draw();
     const q = input.value.trim();
     if (q.length >= 2 && q !== remoteFor && isAdmin()) {
@@ -262,7 +287,7 @@ export async function openSearch(initial = "") {
   input.value = initial;
   input.focus();
   draw();
-  [devs, plugs] = await Promise.all([loadDevices(), loadPlugins()]);
+  [devs, plugs, more] = await Promise.all([loadDevices(), loadPlugins(), isAdmin() ? loadExtras() : null]);
   if (dialog) update();
 }
 

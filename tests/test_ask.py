@@ -187,3 +187,18 @@ def test_the_plugin_answer_says_whether_the_last_sync_worked(conn):
     conn.commit()
     row = ask.TOOLS["plugins"][0](conn, {"days": 7}, now=datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc))["plugins"][0]
     assert row["failed"] == 1 and row["last_sync_ok"] is True and row["last_error_at"] == "2026-11-01T08:00:00Z"
+
+
+def test_stopped_windows_services_can_be_asked_for(conn):
+    from app.hostmetrics import service as hm
+
+    conn.execute("INSERT INTO host_monitors (device_id, method, address, port, created) VALUES (1, 'winrm', '192.168.1.20', 5986, '2026-10-31T00:00:00Z')")
+    conn.commit()
+    mid = hm.get_monitor(conn, 1)["id"]
+    sentinel = ("service_stopped", "", 0.0, "state")
+    stopped = ("service_stopped", "Backup Agent", 1.0, "state")
+    hm.evaluate(conn, mid, 1, "nas", [sentinel, stopped], "2026-11-01T11:00:00Z")
+    a = ask.answer(conn, "which windows services are stopped?", NOW)
+    assert a["tools"] == ["health"] and "Backup Agent on nas" in a["answer"]
+    hm.evaluate(conn, mid, 1, "nas", [sentinel], "2026-11-01T11:05:00Z")            # it runs again: nothing is listed any more
+    assert "No automatic Windows service has stopped" in ask.answer(conn, "any stopped services?", NOW)["answer"]
