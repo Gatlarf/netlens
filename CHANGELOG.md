@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.407 — 2026-11-11
+
+### Fixed
+- An analysis report opened from the app (Open the report, or Reports → Analysis reports) now has a **Back to Netlens** bar. In an installed app, for example on an iPad, the report opens in its own window without a browser bar, and there was no way back. The e-mail version is unchanged.
+
 ## 0.4.406 — 2026-11-11
 
 ### Added

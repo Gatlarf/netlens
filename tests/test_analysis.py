@@ -213,7 +213,10 @@ def test_other_systems_fetch_the_analysis_by_incident_id_or_report_id(client):
     assert tc.get(f"/api/events/{eid}/incident").json()["latest_report_id"] == doc["report_id"]
     assert tc.get(f"/api/analysis/{doc['report_id']}").json()["report_id"] == doc["report_id"]
     assert doc["report_ref"] in tc.get(f"/api/analysis/{doc['report_id']}/text").text
-    assert tc.get(f"/api/analysis/{doc['report_id']}/html").headers["content-type"].startswith("text/html")
+    shown = tc.get(f"/api/analysis/{doc['report_id']}/html")
+    assert shown.headers["content-type"].startswith("text/html")
+    assert "Back to Netlens" in shown.text and shown.text.index("Back to Netlens") < shown.text.index(doc["report_ref"])       # the page opened from the app brings its own way back
+    assert "Back to Netlens" not in analysis.render_html(doc)          # the e-mail does not
     assert [r["report_id"] for r in tc.get("/api/analysis", params={"incident_id": eid}).json()["reports"]] == [doc["report_id"]]
     assert tc.post(f"/api/insights/incidents/{eid}/analysis").json()["report_id"] > doc["report_id"]
     assert tc.get("/api/analysis/99999").status_code == 404 and tc.get("/api/events/99999/incident").status_code == 404 and tc.get("/api/insights/incidents/99999/analysis").status_code == 404

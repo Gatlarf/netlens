@@ -4,6 +4,7 @@ Administrators only (a report names devices, folders and log lines)."""
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -51,7 +52,11 @@ def get_report(report_id: int, request: Request, conn=Depends(get_conn)) -> dict
 @router.get("/analysis/{report_id}/html", response_class=HTMLResponse)
 def get_report_html(report_id: int, request: Request, conn=Depends(get_conn)) -> HTMLResponse:
     require_admin(request)
-    return HTMLResponse(analysis.render_html(_doc(conn, report_id)))
+    page = analysis.render_html(_doc(conn, report_id))
+    # opened from the app: an installed app (an iPad home-screen app) has no browser bar and no back button, so the page brings its own way back
+    bar = ('<div style="background:#101828;padding:10px 16px"><a href="/#/reports" onclick="if(history.length>1){history.back();return false}" '
+           'style="color:#fff;font:600 15px -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;text-decoration:none">&larr; Back to Netlens</a></div>')
+    return HTMLResponse(re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + bar, page, count=1))
 
 
 @router.get("/analysis/{report_id}/text", response_class=PlainTextResponse)
