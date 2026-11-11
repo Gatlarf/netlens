@@ -178,6 +178,18 @@
    ],
    "releases": [
     {
+     "version": "1.6.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.6.0/asus.zip",
+     "sha256": "47f6ed89b5cde97ff0a8a928b9597873b04173f58898c28088bf2b632aa8fcd0",
+     "api_version": 1,
+     "min_netlens": "0.4.387",
+     "released": "2026-11-11",
+     "changelog": "New setting Record configuration changes (off by default): the plugin reads a fixed list of the router's settings (firewall, UPnP, remote access, DHCP, DNS, Wi-Fi security, VPN, port forwards; never passwords or keys) and Netlens tells what changed. Read-only; a failed read never fails the sync. Run diagnostic has a new configuration step. Nothing changes while the setting is off. Needs Netlens 0.4.387.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.5.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.5.1/asus.zip",
      "sha256": "bef43655b979904dfda50c32785a598fabd75f587ef9df1ab708bb2f9a0ffa7f",
