@@ -467,6 +467,7 @@ dialog.whats-new h2 { margin: 0; }
 .dev-panel:not(.grid-2) { display: flex; flex-direction: column; gap: 16px; }
 .dev-panel[hidden] { display: none !important; }
 .dev-panel.grid-2, .dev-panel > .grid-2 { align-items: start; }
+.tg-box { scroll-margin-top: calc(var(--topbar-vis, 52px) + 64px); }
 .glance-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .glance-chip { appearance: none; display: flex; flex-direction: column; gap: 2px; min-width: 96px; padding: 6px 12px; border: 1px solid var(--border); border-left: 4px solid var(--ok); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
 .glance-chip.glance-warn { border-left-color: var(--warn); }

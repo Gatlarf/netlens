@@ -266,7 +266,7 @@ function summary(points, unit) {
 
 // One graph with a title, the newest value and a lowest / average / highest line. `range` is a string key.
 export function metricGraph({ entity, id, metric, label = "", title, unit = "", warn = null, crit = null, range, height = 110, fixedMax = null, showLimits = false }) {
-  const box = h("section", { class: "tg-box" });
+  const box = h("section", { class: "tg-box", "data-metric": metric, "data-label": label });          // the health chips at the top of a device page find their graph by these
   const head = h("div", { class: "tg-head" }, h("strong", {}, title));
   const now = h("span", { class: "tg-now" });
   head.appendChild(now);

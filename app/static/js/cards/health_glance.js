@@ -47,7 +47,7 @@ export async function buildHealthGlance(device, onOpen) {
     const label = (rows.length > 1 || c.unit === "storage") && c.pick !== "sum" ? (rows.find((s) => s.last === value) || {}).label : "";
     const lvl = c.unit === "storage" ? (value >= 2 ? "crit" : value >= 1 ? "warn" : "ok") : level(value, rules[c.metric], c.lowIsBad);
     const shown = c.unit === "storage" ? `${STORAGE_TEXT[Math.min(2, Math.round(value))]}${value >= 1 && label ? ` (${label})` : ""}` : formatValue(value, c.unit);
-    chips.push(h("button", { type: "button", class: `glance-chip glance-${lvl}`, title: `${c.title}${label ? ` (${label})` : ""}: open the health graphs`, onclick: onOpen },
+    chips.push(h("button", { type: "button", class: `glance-chip glance-${lvl}`, title: `${c.title}${label ? ` (${label})` : ""}: go to its graph`, onclick: () => onOpen(c.metric, c.pick === "sum" ? "" : label || "") },
       h("span", { class: "glance-title" }, c.title), h("span", { class: "glance-value" }, shown)));
   }
   if (!chips.length) return null;

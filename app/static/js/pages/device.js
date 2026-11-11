@@ -1011,7 +1011,21 @@ export async function render(container, params) {
       } }, "Customize"));
     }
     select(activeTab);
-    buildHealthGlance(device, () => select("health")).then((el) => { if (el && !disposed) strip.appendChild(el); }).catch(() => {});
+    // a chip at the top (Processor, Memory ...) opens the Health tab and goes to the first graph of that reading (the worst disk, if there are several)
+    const goToGraph = (metric, label) => {
+      select("health");
+      let tries = 0;
+      const look = () => {
+        const boxes = [...page.querySelectorAll(".tg-box")].filter((b) => b.dataset.metric === metric);
+        const box = boxes.find((b) => b.dataset.label === label) || boxes[0];
+        if (!box) { if (++tries < 30 && !disposed) setTimeout(look, 150); return; }          // the graphs are drawn a moment after the tab opens
+        box.scrollIntoView({ block: "start", behavior: "smooth" });
+        box.classList.add("search-found");
+        setTimeout(() => box.classList.remove("search-found"), 2500);
+      };
+      look();
+    };
+    buildHealthGlance(device, goToGraph).then((el) => { if (el && !disposed) strip.appendChild(el); }).catch(() => {});
 
     if (!keepConsole) disposeTerminal();
     editResult = newEdit;
