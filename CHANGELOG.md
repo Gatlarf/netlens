@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.419 — 2026-11-12
+
+### Changed
+- **The dashboard fills the screen**: a card next to a tall one (Needs attention, Recent events) was stretched to its height and left empty. Cards now keep their own height and the shorter ones move up beside the tall one, so the grid has no holes. Cards that grow or shrink when their numbers refresh are fitted again by themselves.
+
 ## 0.4.418 — 2026-11-12
 
 ### Fixed

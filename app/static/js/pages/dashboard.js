@@ -12,6 +12,7 @@ import { buildCapacityCard, capacityTone } from "../cards/capacity.js";
 import { snoozeMenu, snoozedList } from "../snooze.js";
 import { WIDGETS as STAT_WIDGETS } from "./overview.js";
 import { controlBar, dragCard, nextSize, openDrawer } from "../board.js";
+import { masonry } from "../masonry.js";
 
 const REFRESH_MS = 30000;
 const KINDS = {
@@ -368,6 +369,7 @@ export async function render(container) {
   let mapStarted = false;
   const header = h("div", { class: "dash-head" });
   const grid = h("div", { class: "dash-grid" });
+  const packing = masonry(grid);          // short cards move up beside tall ones: no empty space inside the grid
   const nudge = h("div", {});
   container.append(nudge, header, grid);
   // administrators who have not been through the getting-started guide (or closed it halfway) get a one-line invitation
@@ -625,5 +627,5 @@ export async function render(container) {
   document.addEventListener("netlens:snoozed", onSnoozed);
   await refresh();
   timer = setInterval(() => { if (!editing && !document.hidden) refresh(); }, REFRESH_MS);
-  return () => { disposed = true; clearInterval(timer); if (drawerApi) { const api = drawerApi; drawerApi = null; api.close(); } map.destroy(); document.removeEventListener("netlens:snoozed", onSnoozed); };
+  return () => { disposed = true; clearInterval(timer); packing.stop(); if (drawerApi) { const api = drawerApi; drawerApi = null; api.close(); } map.destroy(); document.removeEventListener("netlens:snoozed", onSnoozed); };
 }

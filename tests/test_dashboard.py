@@ -303,7 +303,7 @@ def test_remote_desktop_keeps_the_keyboard():
     """The display's mouse handler stops clicks, so the screen must take focus while the click goes down, and the global shortcuts must leave it alone."""
     root = Path(__file__).resolve().parent.parent / "app" / "static" / "js"
     remote = (root / "pages" / "remote.js").read_text()
-    assert '"mousedown", "touchstart"' in remote and "screen.focus({ preventScroll: true }), true)" in remote
+    assert '"mousedown", "touchstart"' in remote and "screen.focus({ preventScroll: true })" in remote and "}, true);" in remote          # the screen takes focus while the click goes down (a capturing listener)
     assert ".remote-screen" in (root / "search.js").read_text()
 
 

@@ -653,6 +653,7 @@ body.setup-mode .app-shell { display: block; }
 .dash-status .hint { font-weight: 400; }
 .dash-tools { display: flex; gap: 8px; }
 .dash-grid { grid-auto-flow: dense; display: grid; grid-template-columns: repeat(auto-fill, minmax(max(260px, calc((100% - 60px) / 6)), 1fr)); gap: 12px; align-items: stretch; }
+.dash-grid.masonry { grid-auto-rows: 4px; row-gap: 0; align-items: start; }          /* each card spans as many 4px rows as it is tall (js/masonry.js) */
 .dcard { position: relative; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: var(--radius); }
 .dcard.size-w { grid-column: span 2; }
 .dcard.size-f { grid-column: 1 / -1; }
