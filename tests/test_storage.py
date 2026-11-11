@@ -172,3 +172,14 @@ def test_a_filling_pool_and_a_failed_disk_are_health_page_problems(conn):
     got = storage.problems(conn)
     assert [(p["kind"], p["level"]) for p in got] == [("disk", "critical"), ("pool", "warning")]
     assert "pool aggr1 is 90% full" in got[1]["text"] and got[1]["system"] == "ontap1"
+
+
+def test_a_system_warning_explained_by_its_pool_is_not_listed_twice(conn):
+    storage.apply_storage(conn, "ontap", doc(used=900), now=NOW)
+    conn.execute("UPDATE storage_systems SET health = 'warning'")
+    got = storage.problems(conn)
+    assert [p["kind"] for p in got] == ["pool"]
+    conn.execute("UPDATE storage_pools SET level = 'ok', health = 'ok'")
+    assert [p["kind"] for p in storage.problems(conn)] == ["system"]          # nothing else explains it: the system line stays
+    conn.execute("UPDATE storage_systems SET online = 0")
+    assert [p["level"] for p in storage.problems(conn)] == ["critical"]
