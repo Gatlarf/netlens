@@ -195,3 +195,23 @@ def test_a_system_warning_explained_by_its_pool_is_not_listed_twice(conn):
     assert [p["kind"] for p in storage.problems(conn)] == ["system"]          # nothing else explains it: the system line stays
     conn.execute("UPDATE storage_systems SET online = 0")
     assert [p["level"] for p in storage.problems(conn)] == ["critical"]
+
+
+def test_a_nas_plugin_that_is_on_brings_the_storage_page(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.api import features
+    from app.plugins import service as plugin_service
+
+    db = tmp_path / "n.db"
+    c = connect(db)
+    init_db(c)
+    storage.apply_storage(c, "truenas", doc(), now=NOW)          # the NAS plugin has the kind "hypervisor" but reports storage
+    c.commit()
+    on = {"value": True}
+    monkeypatch.setattr(plugin_service.PluginService, "plugins", lambda self: {"truenas": SimpleNamespace(manifest={"kind": "hypervisor"})})
+    monkeypatch.setattr(plugin_service, "get_state", lambda conn, plugin: {"enabled": on["value"]})
+    client = TestClient(create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=db), headers={"Authorization": "Bearer secret"})
+    assert client.get("/api/features").json()["storage"] is True and features.FEATURES["storage"][1] == "storage_systems"
+    on["value"] = False                                          # switched off: the rows it left do not keep the page in the menu
+    assert client.get("/api/features").json()["storage"] is False
