@@ -1,3 +1,5 @@
+import { fold, unfold } from "../sidefold.js";
+import { slideAwayOnScroll } from "../tabbar.js";
 import { buildMaintenanceCard } from "../cards/maintenance.js";
 import { del, get, patch, post, put } from "../api.js";
 import { groupButtons, compactHelp, longHint } from "../ui.js";
@@ -491,39 +493,11 @@ function fillTabs(tabs, groups, activeKey) {
 }
 
 // Settings has room for itself: the page menu folds away while you are here (your own choice with the menu button is kept), and comes back when you leave.
-let mainMenu = null;
-const WIDE_MENU = "(min-width: 1041px)";
-function foldMainMenu() {
-  if (mainMenu || !window.matchMedia(WIDE_MENU).matches) return;
-  const burger = document.getElementById("nav-toggle");
-  mainMenu = { wasHidden: document.body.classList.contains("side-hidden"), touched: false, burger, onClick: () => { if (mainMenu) mainMenu.touched = true; } };
-  if (burger) burger.addEventListener("click", mainMenu.onClick, true);
-  document.body.classList.add("side-hidden");
-  if (burger) burger.setAttribute("aria-expanded", "false");
-}
-function unfoldMainMenu() {
-  if (!mainMenu) return;
-  const { wasHidden, touched, burger, onClick } = mainMenu;
-  mainMenu = null;
-  if (burger) burger.removeEventListener("click", onClick, true);
-  if (touched) return;
-  document.body.classList.toggle("side-hidden", wasHidden);
-  if (burger) burger.setAttribute("aria-expanded", String(!wasHidden));
-}
+const foldMainMenu = fold;
+const unfoldMainMenu = unfold;
 
 window.addEventListener("hashchange", () => { if (!/^#\/settings(\/|$)/.test(location.hash)) unfoldMainMenu(); });
 
-function hideTabsOnScroll(tabs) {
-  let lastY = window.scrollY;
-  const onScroll = () => {
-    const y = window.scrollY;
-    if (y < 80 || y < lastY - 2) tabs.classList.remove("tabs-away");
-    else if (y > lastY + 6) tabs.classList.add("tabs-away");
-    lastY = y;
-  };
-  window.addEventListener("scroll", onScroll, { passive: true });
-  return () => window.removeEventListener("scroll", onScroll);
-}
 
 export async function render(container, params) {
   clear(container);
@@ -542,7 +516,7 @@ export async function render(container, params) {
   fillNav(nav, groups, item.key);
   const tabs = h("div", { class: "settings-tabs", role: "tablist", "aria-label": "Pages of this part of Settings" });
   fillTabs(tabs, groups, item.key);
-  const stopScroll = hideTabsOnScroll(tabs);
+  const stopScroll = slideAwayOnScroll(tabs);
   const content = h("div", { class: "settings-content", id: `sec-${item.key}` });
   // narrow screens: the page list folds into one button that names the current page
   const toggle = h("button", { type: "button", class: "btn settings-nav-toggle", "aria-expanded": "false", id: "settings-nav-toggle" },

@@ -35,14 +35,16 @@ a.btn { text-decoration: none; color: inherit; display: inline-block; }
 .settings-nav-toggle { display: none; }
 /* the pages of one part of Settings, as tabs; the bar slides away behind the top bar while reading down and returns at once on the way up (like ProxMenux Monitor) */
 .settings-main { min-width: 0; }
-.settings-tabs { position: sticky; top: var(--topbar-vis, var(--topbar-h, 52px)); z-index: 15; display: flex; gap: 2px; margin: 0 0 12px; padding: 0 2px; overflow-x: auto; scrollbar-width: thin;
+.settings-tabs, .page-tabs { position: sticky; top: var(--topbar-vis, var(--topbar-h, 52px)); z-index: 15; display: flex; gap: 2px; margin: 0 0 12px; padding: 0 2px; overflow-x: auto; scrollbar-width: thin;
   background: var(--bg); border-bottom: 1px solid var(--border); transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), top 0.18s ease-out; }
-.settings-tabs[hidden] { display: none; }
-.settings-tabs.tabs-away { transform: translateY(-110%); }
-.settings-tabs a { flex: 0 0 auto; padding: 10px 14px 9px; color: var(--muted); text-decoration: none; font-size: 0.95em; white-space: nowrap; border-bottom: 3px solid transparent; margin-bottom: -1px; }
-.settings-tabs a:hover { color: var(--text); background: var(--surface); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
-.settings-tabs a.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
-@media (prefers-reduced-motion: reduce) { .settings-tabs { transition: none; } }
+.settings-tabs[hidden], .page-tabs[hidden] { display: none; }
+.settings-tabs.tabs-away, .page-tabs.tabs-away { transform: translateY(-110%); }
+.settings-tabs a, .page-tabs a { flex: 0 0 auto; padding: 10px 14px 9px; color: var(--muted); text-decoration: none; font-size: 0.95em; white-space: nowrap; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.settings-tabs a:hover, .page-tabs a:hover { color: var(--text); background: var(--surface); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.settings-tabs a.active, .page-tabs a.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+.page-tabs { margin: 0; padding: 0 14px; max-height: 80px; transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), top 0.18s ease-out, max-height 0.35s ease, opacity 0.35s ease; }
+.page-tabs.tabs-folded { max-height: 0; opacity: 0; border-bottom-width: 0; overflow: hidden; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .settings-tabs, .page-tabs { transition: none; } }
 @media (max-width: 800px) {
   .settings-layout { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   /* the list of settings pages is long: show only the current page, the rest opens on request */

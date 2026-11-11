@@ -1,4 +1,6 @@
-"""Which optional parts of Netlens are in use, so the menu only shows pages that have something to show."""
+"""Which optional parts of Netlens are in use, so the menu only shows pages that have something to show.
+A page that comes from plugins (backups, storage, smart home, vulnerabilities, DNS) is listed only while a plugin of its kind is installed and switched on: data left behind by a
+plugin that was removed does not bring the page back. The demo has no real plugins, so there the data counts."""
 
 from __future__ import annotations
 
@@ -29,7 +31,9 @@ def get_features(request: Request, conn=Depends(get_conn)) -> dict:
     for plugin in service.plugins().values():
         if plugin.manifest and get_state(conn, plugin).get("enabled"):
             kinds.add(plugin.manifest["kind"])
+    demo = bool(getattr(request.app.state.settings, "demo", False))
     out = {}
     for name, (kind, sql) in FEATURES.items():
-        out[name] = (kind in kinds) or bool(conn.execute(sql).fetchone()[0])
+        has_data = bool(conn.execute(sql).fetchone()[0])
+        out[name] = has_data if kind is None else (kind in kinds) or (demo and has_data)
     return out

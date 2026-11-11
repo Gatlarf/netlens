@@ -797,7 +797,7 @@ body.site-view .admin-only, body.site-view .act-only, body.site-view [data-route
 .dev-flow > .card, .dev-flow > div > .card { margin-top: 0; }
 
 /* ---------- the side menu ---------- */
-.app-shell { display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: start; }
+.app-shell { display: grid; grid-template-columns: 170px minmax(0, 1fr); align-items: start; }
 body.side-hidden .app-shell { grid-template-columns: minmax(0, 1fr); }
 body.side-hidden .sidenav { display: none; }
 .app-main { min-width: 0; }
@@ -808,7 +808,12 @@ body.side-hidden .sidenav { display: none; }
 }
 .side-group { margin-bottom: 6px; }
 .side-title { margin: 14px 12px 4px; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.sidenav .nav-link { white-space: normal; }
+.sidenav .nav-link { white-space: normal; border-left: 3px solid transparent; border-radius: var(--radius-sm); font-weight: 400; margin-bottom: 2px; }
+.sidenav .nav-link.active { background: var(--bg); color: var(--text); border-left-color: var(--accent); font-weight: 600; box-shadow: 0 0 0 1px var(--border); }
+.sidenav .nav-more { color: var(--muted); margin-top: 10px; font-size: 0.9em; }
+/* the HUD keeps its menu away; the left edge of the screen brings it back for a moment */
+.side-peek { position: fixed; left: 0; top: var(--topbar-h, 52px); bottom: 0; width: 14px; z-index: 14; }
+@media (max-width: 1040px) { .side-peek { display: none; } }
 .beta-tag { font-size: 0.65rem; letter-spacing: 0.04em; text-transform: uppercase; border: 1px solid currentColor; border-radius: 999px; padding: 0 6px; margin-left: 4px; opacity: 0.8; vertical-align: 1px; }
 .sidenav .popmenu { position: static; min-width: 0; margin-top: 10px; padding: 0; border: 0; box-shadow: none; background: none; }
 .sidenav .popmenu .menu-item { padding: 12px; font-size: 1rem; }

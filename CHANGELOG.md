@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.410 — 2026-11-11
+
+### Changed
+- ★ **The page menu works like the Settings menu**: the left menu lists only the headings (Dashboard, Network, Monitoring, Analysis, Automation, Settings); the pages of a heading are tabs above the page. A heading opens the tab you used last. The tab bar slides away while you read down a page and returns at once when you scroll up. Every page keeps its address.
+- **Only what is useful to you**: Backups, Storage, Smart home, Vulnerabilities and DNS are listed only while a plugin of that kind is installed and switched on (data left behind by a plugin that was removed no longer keeps them in the menu). A read-only user no longer sees pages that need an administrator: DNS, Network health, Vulnerabilities, Backups, Storage, Smart home, Insights, Remediation and Remote access.
+- **The HUD gives its menu up**: after 8 seconds on the HUD the page menu and the tab bar fold away, because the HUD is meant to stay open. Move the pointer to the left edge of the screen, or press the menu button, to bring them back for a moment. Leaving the HUD restores the menu as it was.
+
 ## 0.4.409 — 2026-11-11
 
 ### Fixed

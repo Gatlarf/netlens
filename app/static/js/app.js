@@ -6,6 +6,7 @@ import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
 import { initUpdateBadge } from "./update.js";
 import { initTopbar } from "./topbar.js";
+import { initMainNav, showRoute, setFeatures } from "./mainnav.js";
 import { maybeShowWhatsNew } from "./changelog.js";
 import { renderSetup } from "./setup.js";
 import { applyInterface } from "./interface.js";
@@ -71,9 +72,7 @@ function parseRoute() {
 }
 
 function updateNav(name) {
-  document.querySelectorAll(".nav-link").forEach((link) => {
-    link.classList.toggle("active", link.dataset.route === (name === "device" ? "devices" : name));
-  });
+  showRoute(name);
 }
 
 let displayLoaded = false;
@@ -357,6 +356,7 @@ async function applySession() {
   const session = await get("/api/session");
   if (session.interface) applyInterface(session.interface);
   setSessionUser(session.authenticated ? session.user : null);
+  initMainNav();                                  // who may see what is known now: build the menu
   // the coffee button in the top bar is for free and open-source use; a licensed install keeps it in the account menu only
   get("/api/licence").then((lic) => document.body.classList.toggle("licensed", lic.state === "active" || lic.state === "grace")).catch(() => {});
   if (session.authenticated && session.user && session.user.scoped) { scopedUser = session.user; restrictToOwnDevices(); }
@@ -577,22 +577,11 @@ function hideBoot() {
   if (boot) boot.remove();
 }
 
-// The menu only lists the optional pages (backups, storage, ...) that have a plugin switched on or already hold data; an admin gets a link to add more.
+// The menu only lists the optional pages (backups, storage, ...) that have a plugin of their kind switched on; an admin gets a link to add more.
 async function applyFeatures() {
   let features;
   try { features = await get("/api/features"); } catch { return; }
-  let hidden = 0;
-  for (const link of document.querySelectorAll("#side-links [data-feature]")) {
-    const on = features[link.dataset.feature] !== false;
-    link.hidden = !on;
-    if (!on) hidden += 1;
-  }
-  for (const group of document.querySelectorAll("#side-links .side-group")) {
-    const links = group.querySelectorAll(".nav-link");
-    group.hidden = links.length > 0 && [...links].every((l) => l.hidden);
-  }
-  const more = el("#nav-more");
-  if (more) more.hidden = !hidden;
+  setFeatures(features);
 }
 
 async function init() {

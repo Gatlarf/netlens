@@ -152,17 +152,29 @@ def test_alert_texts_lose_their_html_and_are_not_cut_short():
     assert len(out["alerts"][1]["text"]) == 600 and out["alerts"][1]["text"].endswith("…")
 
 
-def test_features_follow_the_data(tmp_path):
+def test_a_page_from_plugins_needs_an_installed_plugin_not_left_over_data(tmp_path):
     db = tmp_path / "f.db"
     c = connect(db)
     init_db(c)
     c.commit()
     client = TestClient(create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=db), headers={"Authorization": "Bearer secret"})
     assert client.get("/api/features").json()["storage"] is False
-    storage.apply_storage(c, "ontap", doc(), now=NOW)
+    storage.apply_storage(c, "ontap", doc(), now=NOW)            # data from a plugin that is not installed (any more)
     c.commit()
     features = client.get("/api/features").json()
-    assert features["storage"] is True and features["backups"] is False
+    assert features["storage"] is False and features["backups"] is False
+
+
+def test_features_follow_the_data_in_the_demo(tmp_path):
+    db = tmp_path / "d.db"
+    c = connect(db)
+    init_db(c)
+    storage.apply_storage(c, "ontap", doc(), now=NOW)
+    c.commit()
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=db)
+    app.state.settings = app.state.settings.__class__(**{**app.state.settings.__dict__, "demo": True}) if hasattr(app.state.settings, "__dict__") else app.state.settings
+    client = TestClient(app, headers={"Authorization": "Bearer secret"})
+    assert client.get("/api/features").json()["storage"] is True
 
 
 def test_a_filling_pool_and_a_failed_disk_are_health_page_problems(conn):
