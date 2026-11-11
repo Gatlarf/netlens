@@ -878,6 +878,12 @@ button.dns-chip { font: inherit; font-size: 0.8rem; cursor: pointer; background:
 .exposure-item.st-warn { border-left-color: var(--warn, #f5a524); }
 .exposure-item.st-ok { border-left-color: var(--ok, #30a46c); }
 .exposure-item p { margin: .15rem 0; }
+.config-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; cursor: pointer; list-style: none; padding: .2rem 0; }
+.config-title::-webkit-details-marker { display: none; }
+.config-title::before { content: "▸"; color: var(--muted); font-size: .9em; width: 1em; flex: 0 0 auto; transition: transform .12s ease; }
+details[open] > .config-title::before { transform: rotate(90deg); }
+.config-title > .btn { margin-left: auto; padding: 3px 12px; }
+details.exposure-item > :not(summary), .config-change > :not(summary) { margin-left: 1.4em; }
 .exposure-item ol { margin: .3rem 0 .2rem 1.2rem; }
 
 .config-change { border-left: 3px solid var(--warn, #f5a524); padding: .1rem 0 .1rem .75rem; margin: .6rem 0; }

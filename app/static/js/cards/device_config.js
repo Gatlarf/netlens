@@ -32,13 +32,13 @@ export async function buildDeviceConfigCard(device) {
     advice.appendChild(reviewBlock(a));
   }
 
+  // One line per recommendation: its title, with the Accept button behind it. Clicking the title opens the explanation and the steps.
   function findingRow(f, isAccepted) {
-    const row = h("div", { class: `exposure-item st-${f.status === "risk" ? "risk" : "warn"}` });
-    row.appendChild(h("p", {}, h("strong", {}, f.title), f.accepted ? ` · accepted by ${f.accepted.who}: ${f.accepted.reason}` : ""));
-    row.appendChild(h("p", { class: "hint" }, f.evidence));
-    if (f.steps.length) row.appendChild(h("details", {}, h("summary", {}, `How to fix · ${f.steps.length} step${f.steps.length === 1 ? "" : "s"}`), h("ol", {}, ...f.steps.map((s) => h("li", {}, s)))));
+    const row = h("details", { class: `exposure-item st-${f.status === "risk" ? "risk" : "warn"}` });
     const btn = h("button", { class: "btn", type: "button", title: isAccepted ? "Show it as a recommendation again" : "This is intended: keep it out of the problem list" }, isAccepted ? "Undo" : "Accept…");
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault();          // the button is in the title line: it must not open or close the item
+      e.stopPropagation();
       if (isAccepted) await del(`/api/devices/${device.id}/config/advice/${encodeURIComponent(f.id)}`);
       else {
         const v = await formDialog({ title: "Accept this recommendation", fields: [{ key: "reason", label: "Why is this intended?", type: "textarea", required: true }], ok: "Accept" });
@@ -47,7 +47,9 @@ export async function buildDeviceConfigCard(device) {
       }
       await loadAdvice();
     });
-    row.appendChild(btn);
+    row.appendChild(h("summary", { class: "config-title" }, h("strong", {}, f.title), f.accepted ? h("span", { class: "hint" }, ` accepted by ${f.accepted.who}: ${f.accepted.reason}`) : null, btn));
+    row.appendChild(h("p", { class: "hint" }, f.evidence));
+    if (f.steps.length) row.appendChild(h("div", {}, h("strong", {}, `How to fix · ${f.steps.length} step${f.steps.length === 1 ? "" : "s"}`), h("ol", {}, ...f.steps.map((x) => h("li", {}, x)))));
     return row;
   }
 
@@ -59,7 +61,7 @@ export async function buildDeviceConfigCard(device) {
       clear(out);
       if (!r) return;
       if (!r.items.length) out.appendChild(h("p", { class: "hint" }, "The AI found nothing more."));
-      for (const x of r.items) out.appendChild(h("div", { class: `exposure-item st-${x.severity === "high" ? "risk" : "warn"}` }, h("p", {}, h("strong", {}, x.title), h("span", { class: "mono" }, `  ${x.key}`)), h("p", { class: "hint" }, `${x.why} ${x.fix}`)));
+      for (const x of r.items) out.appendChild(h("details", { class: `exposure-item st-${x.severity === "high" ? "risk" : "warn"}` }, h("summary", { class: "config-title" }, h("strong", {}, x.title), h("span", { class: "mono hint" }, x.key)), h("p", { class: "hint" }, `${x.why} ${x.fix}`)));
       out.appendChild(h("p", { class: "hint" }, `Written by the AI on ${fmtTime(r.ts)}${r.outdated ? "; the settings changed since" : ""}. Advice only.`));
     }
     show(a.review);
@@ -91,7 +93,7 @@ export async function buildDeviceConfigCard(device) {
       ...c.added.map((x) => h("li", {}, "Added ", h("span", { class: "mono" }, x.key), `: ${x.value || "(empty)"}`)),
       ...c.removed.map((x) => h("li", {}, "Removed ", h("span", { class: "mono" }, x.key), `: ${x.value || "(empty)"}`)),
     ];
-    history.appendChild(h("div", { class: "config-change" }, h("p", {}, h("strong", {}, fmtTime(c.ts)), ` ${c.changed.length} changed, ${c.added.length} added, ${c.removed.length} removed`), h("ul", {}, ...rows)));
+    history.appendChild(h("details", { class: "config-change" }, h("summary", { class: "config-title" }, h("strong", {}, fmtTime(c.ts)), ` ${c.changed.length} changed, ${c.added.length} added, ${c.removed.length} removed`), h("ul", {}, ...rows)));
   }
   return card;
 }

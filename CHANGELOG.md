@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.421 — 2026-11-12
+
+### Changed
+- **Configuration card on a device**: every recommendation and every change is one line with just its title. Click the title to open it and see the explanation and the steps to fix it. The **Accept…** (or Undo) button sits at the end of the title line and does not open or close the item. The same goes for the second opinion of the AI.
+
 ## 0.4.420 — 2026-11-12
 
 ### Changed
