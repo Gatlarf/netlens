@@ -202,7 +202,6 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
     };
     const symOf = (ch) => { const c = ch.codePointAt(0); return ch === "\n" ? 0xFF0D : c <= 0xFF ? c : 0x01000000 | c; };
     const SPECIAL = { Backspace: 0xFF08, Enter: 0xFF0D, Tab: 0xFF09, Escape: 0xFF1B, Delete: 0xFFFF, ArrowLeft: 0xFF51, ArrowUp: 0xFF52, ArrowRight: 0xFF53, ArrowDown: 0xFF54, Home: 0xFF50, End: 0xFF57, PageUp: 0xFF55, PageDown: 0xFF56 };
-    const refocus = () => { if (kbOpen) kbInput.focus({ preventScroll: true }); };
     kbInput.addEventListener("keydown", (e) => {
       const sym = SPECIAL[e.key];
       if (sym) { e.preventDefault(); tap(sym); }
@@ -219,8 +218,10 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
     kbInput.addEventListener("compositionend", flush);
     const keyButton = (label, title, action, mod) => {
       const b = h("button", { type: "button", class: "btn", title, ...(mod ? { "aria-pressed": "false" } : {}) }, label);
+      let had = false;
       b.addEventListener("mousedown", (e) => e.preventDefault());                          // the keyboard stays up
-      b.addEventListener("click", () => { action(); refocus(); });
+      b.addEventListener("pointerdown", () => { had = document.activeElement === kbInput; });
+      b.addEventListener("click", () => { action(); if (had) kbInput.focus({ preventScroll: true }); });          // only a keyboard that is up stays up: a hidden one is not brought back by a key
       if (mod) modButtons[mod] = b;
       return b;
     };
@@ -231,15 +232,22 @@ function graphicalSession(device, svc, saved, helperOk, onClose) {
       keyButton("←", "Left", () => tap(0xFF51)), keyButton("↑", "Up", () => tap(0xFF52)), keyButton("↓", "Down", () => tap(0xFF54)), keyButton("→", "Right", () => tap(0xFF53)),
       keyButton("Del", "Delete", () => tap(0xFFFF)));
     const kbButton = bar.querySelector("#remote-kbd");
-    if (kbButton) kbButton.addEventListener("click", () => {
-      if (kbOpen && document.activeElement !== kbInput) { kbInput.focus({ preventScroll: true }); return; }          // the keyboard was put away with its own button: bring it back
+    if (kbButton) kbButton.addEventListener("click", () => {          // on / off: the same button puts the keyboard away again
       kbOpen = !kbOpen;
       keys.hidden = !kbOpen;
       kbButton.setAttribute("aria-pressed", String(kbOpen));
-      if (kbOpen) kbInput.focus({ preventScroll: true }); else kbInput.blur();
+      if (kbOpen) kbInput.focus({ preventScroll: true }); else { kbInput.blur(); for (const m of Object.keys(mods)) mods[m] = false; paintMods(); }
     });
     // the mouse handler of the display stops the click, so a bubbling listener never hears it and the keys would stay with whatever had focus before: listen while the event goes down
-    for (const type of ["mousedown", "touchstart"]) screen.addEventListener(type, () => (kbOpen ? kbInput : screen).focus({ preventScroll: true }), true);
+    // a tap keeps the keyboard when it is up; it does not bring a keyboard back that was put away with its own hide key
+    for (const type of ["mousedown", "touchstart"]) {
+      screen.addEventListener(type, (e) => {
+        if (document.activeElement === kbInput) {
+          if (type === "mousedown") e.preventDefault();                          // the click must not move the focus to the screen: the keyboard would go away
+          setTimeout(() => kbInput.focus({ preventScroll: true }), 0);
+        } else screen.focus({ preventScroll: true });
+      }, true);
+    }
     // clipboard: what is pasted into the window goes to the remote machine; what the remote machine copies is put on this one
     screen.addEventListener("paste", (e) => {
       const text = e.clipboardData && e.clipboardData.getData("text/plain");

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.414 — 2026-11-11
+
+### Fixed
+- **Remote desktop on a touch screen**: every click in the session brought the keyboard up again, also after you had put it away. A tap now keeps a keyboard that is up and never brings back one that is away. The *Keyboard* button is an on/off switch: press it again to put the keyboard (and the key row) away.
+
 ## 0.4.413 — 2026-11-11
 
 ### Added
