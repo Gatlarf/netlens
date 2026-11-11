@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.406 — 2026-11-11
+
+### Added
+- ★ **Analysis reports in the interface**: Reports → *Analysis reports* lists every report the digital engineer wrote (the AR-… numbers in the e-mails), with the incident it belongs to and what it found. You can find one by number, device or text, open it again and send it again. Typing `AR-745` in the search box opens that report.
+- **MCP**: the health monitor tool now says that it also returns Windows services that stopped with an error.
+
 ## 0.4.405 — 2026-11-11
 
 ### Added

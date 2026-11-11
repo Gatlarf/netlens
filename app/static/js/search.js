@@ -26,7 +26,7 @@ const PAGES = [
   ["Storage", "#/storage", "storage array netapp dell pure ceph pool volume lun disk raid nas san capacity"],
   ["Backups", "#/backups", "backup proxmox backup server pbs guests vm snapshot datastore failed late"],
   ["Statistics", "#/stats", "charts numbers vendors types"],
-  ["Reports", "#/reports", "weekly monthly availability csv"],
+  ["Reports", "#/reports", "weekly monthly availability csv analysis reports ar engineer incident past earlier previous"],
   ["What changed", "#/changes", "timeline new devices alerts history last night changes"],
   ["Scans & events", "#/scans", "events log scan history"],
   ["Setup guide", "#/wizard", "wizard getting started tour"],
@@ -196,6 +196,8 @@ function search(query, devs, plugs = [], more = null) {
       if (s) out.push({ group: "Recommendations", title: f.title, hint: f.device, href: f.href, s });
     }
   }
+  const ar = q.match(/^ar-?(\d+)$/);
+  if (ar && isAdmin()) out.push({ group: "Pages", title: `Analysis report AR-${ar[1]}`, hint: "Opens the report", href: `#/reports`, report: ar[1], s: 99 });
   const order = { Pages: 0, Settings: 1, Devices: 2, "Service checks": 3, Recommendations: 4, "Remote sites": 5 };
   out.sort((a, b) => order[a.group] - order[b.group] || b.s - a.s || a.title.localeCompare(b.title));
   return out.slice(0, 40);
@@ -247,6 +249,7 @@ export async function openSearch(initial = "") {
     if (!r) return;
     try { if (r.find) sessionStorage.setItem("netlens.find", r.find); else sessionStorage.removeItem("netlens.find"); } catch (e) { /* no storage */ }
     close();
+    if (r.report) { window.open(`/api/analysis/${r.report}/html`, "_blank", "noopener"); return; }
     if (location.hash === r.href) window.dispatchEvent(new HashChangeEvent("hashchange"));
     else location.hash = r.href;
   };
