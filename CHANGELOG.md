@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.408 — 2026-11-11
+
+### Changed
+- ★ **Settings is easier to find your way in.** The left menu now holds only the ten headings (Scanning, Monitoring, Hosts, Display, Access, Privileged access, Notifications, AI, Integrations, Data, System). The pages of a heading are tabs above the page; a heading opens the tab you used last. Every page keeps its address (`#/settings/<page>`), so old links, search results and bookmarks still work.
+- **More room**: while you are in Settings the page menu on the left folds away on a wide screen, and returns when you leave (your own choice with the menu button is kept). The tab bar slides away while you read down the page and comes back at once when you scroll up, like in ProxMenux Monitor.
+- **Settings moved to where they belong**: *Version check*, *Traffic statistics* and *Device messages* are under Monitoring; *Hosts*, *Credentials*, *Host probes* and *Host agents* have their own heading; *Web terminal*, *Approvals*, *Session recordings* and *Access review* are under Privileged access; *Analysis reports* are under AI; *Report to a central Netlens* is under Integrations; *Log forwarding* stays with Notifications.
+- **Fixed: Settings → Plugin guide froze the browser tab.** A table row separated from its table by a blank line made the page's Markdown reader loop for ever. The guide is repaired and the reader can no longer get stuck.
+- **One Save per page**: *Router exposure* is now its own page next to *Network checks*, and *AI agents* is split into *AI assistant* and *MCP server*.
+
 ## 0.4.407 — 2026-11-11
 
 ### Fixed

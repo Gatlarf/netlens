@@ -58,7 +58,7 @@ export function renderMarkdown(markdown) {
     } else if (line.trim() === "") {
       i += 1;
     } else {
-      const para = [];
+      const para = [lines[i++]];          // the first line is always taken: a line that looks like the start of something else but is not (a table row without a header) must not stop the loop
       while (i < lines.length && lines[i].trim() !== "" && !/^(```|#{1,4} |\||\s*([-*]|\d+\.) )/.test(lines[i])) para.push(lines[i++]);
       root.appendChild(h("p", {}, inline(para.join(" "))));
     }

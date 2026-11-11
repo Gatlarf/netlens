@@ -10,7 +10,7 @@ import { buildPluginGuideCard } from "../cards/plugin_guide.js";
 import { buildMapCard } from "../cards/map_settings.js";
 import { buildChannelsCard } from "../cards/channels.js";
 import { buildCentralCard } from "../cards/central.js";
-import { buildAiModelCard, buildAiAgentsCard } from "../cards/ai.js";
+import { buildAiModelCard, buildAiAssistantPage, buildAiMcpPage } from "../cards/ai.js";
 import { buildHostProbeCard } from "../cards/hostprobe_settings.js";
 import { buildAnalysisSettingsCard } from "../cards/analysis_settings.js";
 import { buildIngestCard } from "../cards/ingest.js";
@@ -40,7 +40,7 @@ import { buildScimCard } from "../cards/scim.js";
 import { buildAuditCard } from "../cards/audit.js";
 import { buildUsersCard } from "../cards/users.js";
 import { buildSharesCard } from "../cards/shares.js";
-import { buildNetchecksCard } from "../cards/netchecks.js";
+import { buildNetchecksCard, buildExposureCard } from "../cards/netchecks.js";
 import { buildCveCheckCard } from "../cards/cve_check.js";
 import { buildDnsCard } from "../cards/dns.js";
 import { buildReliabilityCard } from "../cards/reliability_settings.js";
@@ -314,12 +314,29 @@ const STATIC_GROUPS = [
       { key: "networks", label: "Networks", build: buildNetworksCard },
       { key: "nmap", label: "Scan performance", build: buildScanPage },
       { key: "schedule", label: "Scan schedule", build: buildScheduleCard },
-      { key: "netchecks", label: "Network checks", build: buildNetchecksCard },
+      { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
       { key: "ipv6", label: "IPv6", build: buildIpv6Card },
       { key: "dns", label: "DNS registration", build: () => buildDnsCard("settings") },
+    ],
+  },
+  {
+    title: "Monitoring",
+    items: [
+      { key: "netchecks", label: "Network checks", build: buildNetchecksCard },
+      { key: "exposure", label: "Router exposure", build: buildExposureCard },
       { key: "reliability", label: "Reliability target", build: buildReliabilityCard },
-      { key: "cvecheck", label: "Version check (CVE)", build: () => buildCveCheckCard() },
-      { key: "ignored", label: "Ignored devices", build: buildIgnoredCard },
+      { key: "cvecheck", label: "Version check (CVE)", tab: "Version check", build: () => buildCveCheckCard() },
+      { key: "usage", label: "Traffic statistics", build: buildUsageCard },
+      { key: "inbound", label: "Device messages (traps, syslog)", tab: "Device messages", build: buildInboundCard },
+    ],
+  },
+  {
+    title: "Hosts",
+    items: [
+      { key: "hosts", label: "Hosts (monitoring set-up)", tab: "Set-up", build: buildHostsSetupCard },
+      { key: "credentials", label: "Credentials", build: buildCredentialsCard },
+      { key: "hostprobes", label: "Host probes", build: buildHostProbeCard },
+      { key: "ingest", label: "Host agents (locked-down hosts)", tab: "Host agents", build: buildIngestCard },
     ],
   },
   {
@@ -335,48 +352,47 @@ const STATIC_GROUPS = [
     items: [
       { key: "users", label: "Users & tokens", build: buildUsersCard },
       { key: "roles", label: "Roles", build: buildRolesCard },
-      { key: "approvals", label: "Approvals", build: buildApprovalsCard },
-      { key: "recordings", label: "Session recordings", build: buildRecordingsCard },
-      { key: "accessreview", label: "Access review", build: buildAccessReviewCard },
-      { key: "tls", label: "HTTPS", build: buildTlsCard },
-      { key: "certlogin", label: "Client certificates", build: buildCertLoginCard },
-      { key: "sso", label: "Single sign-on", build: buildSsoCard },
-      { key: "scim", label: "Provisioning (SCIM)", build: buildScimCard },
       { key: "security", label: "Sign-in security", build: buildSecurityCard },
+      { key: "sso", label: "Single sign-on", build: buildSsoCard },
+      { key: "scim", label: "Provisioning (SCIM)", tab: "Provisioning", build: buildScimCard },
+      { key: "certlogin", label: "Client certificates", build: buildCertLoginCard },
+      { key: "tls", label: "HTTPS", build: buildTlsCard },
+    ],
+  },
+  {
+    title: "Privileged access",
+    items: [
       { key: "terminal", label: "Web terminal", build: buildTerminalCard },
+      { key: "approvals", label: "Approvals", build: buildApprovalsCard },
+      { key: "recordings", label: "Session recordings", tab: "Recordings", build: buildRecordingsCard },
+      { key: "accessreview", label: "Access review", build: buildAccessReviewCard },
     ],
   },
   {
     title: "Notifications",
     items: [
-      { key: "channels", label: "Alert channels & quiet hours", build: buildChannelsCard },
-      { key: "maintenance", label: "Maintenance windows", build: buildMaintenanceCard },
+      { key: "channels", label: "Alert channels & quiet hours", tab: "Channels", build: buildChannelsCard },
+      { key: "maintenance", label: "Maintenance windows", tab: "Maintenance", build: buildMaintenanceCard },
       { key: "escalation", label: "Escalation", build: buildEscalationCard },
-      { key: "oncall", label: "On-call schedule", build: buildOncallCard },
+      { key: "oncall", label: "On-call schedule", tab: "On-call", build: buildOncallCard },
       { key: "siem", label: "Log forwarding", build: buildSiemCard },
-      { key: "inbound", label: "Device messages (traps, syslog)", build: buildInboundCard },
+    ],
+  },
+  {
+    title: "AI",
+    items: [
+      { key: "engineer", label: "AI language model", tab: "Language model", build: buildAiModelCard },
+      { key: "agents", label: "AI assistant", build: buildAiAssistantPage },
+      { key: "mcp", label: "MCP server", build: buildAiMcpPage },
+      { key: "analysis", label: "Analysis reports", build: buildAnalysisSettingsCard },
     ],
   },
   "integrations",
   {
-    title: "Connections",
-    items: [
-      { key: "central", label: "Report to a central Netlens", build: buildCentralCard },
-      { key: "engineer", label: "AI language model", build: buildAiModelCard },
-      { key: "agents", label: "AI agents (assistant, MCP)", build: buildAiAgentsCard },
-      { key: "hosts", label: "Hosts (monitoring set-up)", build: buildHostsSetupCard },
-      { key: "credentials", label: "Credentials", build: buildCredentialsCard },
-      { key: "hostprobes", label: "Host probes", build: buildHostProbeCard },
-      { key: "analysis", label: "Analysis reports", build: buildAnalysisSettingsCard },
-      { key: "ingest", label: "Host agents (locked-down hosts)", build: buildIngestCard },
-    ],
-  },
-  {
     title: "Data",
     items: [
-      { key: "backup", label: "Backup & restore", build: buildBackupCard },
+      { key: "backup", label: "Backup & restore", tab: "Backup", build: buildBackupCard },
       { key: "database", label: "Database", build: buildDatabaseCard },
-      { key: "usage", label: "Traffic statistics", build: buildUsageCard },
       { key: "export", label: "Export", build: buildExportCard },
       { key: "shares", label: "Share links", build: buildSharesCard },
     ],
@@ -396,12 +412,13 @@ const STATIC_GROUPS = [
 const DEFAULT_PAGE = "networks";
 const VIEWER_PAGE = "session";
 // the connectors were plugins-to-be before: keep their old addresses working
-const ALIASES = { ranges: "networks", proxmox: "plugin-proxmox", asus: "plugin-asus", notifications: "channels", assistant: "agents", mcp: "agents" };  // e-mail is a channel now
+const ALIASES = { ranges: "networks", proxmox: "plugin-proxmox", asus: "plugin-asus", notifications: "channels", assistant: "agents" };  // e-mail is a channel now
 
 function integrationsGroup(plugins, updates = 0) {
   const items = [
     { key: "plugins", label: "Plugin manager", build: buildPluginsCard },
     { key: "plugin-browse", label: updates ? `Plugin store (${updates} update${updates === 1 ? "" : "s"})` : "Plugin store", build: buildBrowseCard },
+    { key: "central", label: "Report to a central Netlens", tab: "Central Netlens", build: buildCentralCard },
     // a plugin's own page is not in the menu: open it from the Plugin manager (its name is a link)
     ...plugins.map((p) => ({ key: `plugin-${p.id}`, label: p.name, hidden: true, parent: "plugins", build: () => buildPluginCard(p.id) })),
     { key: "plugin-guide", label: "Plugin guide", hidden: true, parent: "plugins", build: buildPluginGuideCard },
@@ -427,23 +444,85 @@ async function loadGroups() {
   return STATIC_GROUPS.map((g) => (g === "integrations" ? integrationsGroup(plugins, updates) : g));
 }
 
+// The group (heading) a page belongs to; a plugin's own page counts for the Plugin manager's group
+function groupOf(groups, key) {
+  return groups.find((g) => g.items.some((e) => e.key === key)) || groups[0];
+}
+
+const lastTab = (title) => { try { return sessionStorage.getItem(`netlens.settings.tab.${title}`) || ""; } catch (e) { return ""; } };
+const rememberTab = (title, key) => { try { sessionStorage.setItem(`netlens.settings.tab.${title}`, key); } catch (e) { /* private window */ } };
+
+// Left menu: only the headings. A heading opens the page you were on in that group last, or its first page.
 function fillNav(nav, groups, activeKey) {
   clear(nav);
+  const here = groupOf(groups, activeKey);
+  for (const group of groups) {
+    const shown = group.items.filter((e) => !e.hidden);
+    if (!shown.length) continue;
+    const wanted = lastTab(group.title);
+    const target = shown.find((e) => e.key === wanted) || shown[0];
+    const link = h("a", { href: `#/settings/${target.key}`, "data-section": target.key, "data-group": group.title }, group.title);
+    if (group === here) {
+      link.classList.add("active");
+      link.setAttribute("aria-current", "page");
+    }
+    nav.appendChild(link);
+  }
+}
+
+// The pages of the current group as tabs above the page. The bar slides away while reading down and comes back at once on the way up.
+function fillTabs(tabs, groups, activeKey) {
+  clear(tabs);
   const all = groups.flatMap((g) => g.items);
   const here = all.find((e) => e.key === activeKey);
   const current = here && here.parent ? here.parent : activeKey;     // on a plugin's page the Plugin manager is the one lit up
-  for (const group of groups) {
-    nav.appendChild(h("div", { class: "nav-group" }, group.title));
-    for (const entry of group.items) {
-      if (entry.hidden) continue; // reachable by address (linked from the Plugin manager), not listed in the menu
-      const link = h("a", { href: `#/settings/${entry.key}`, "data-section": entry.key }, entry.label);
-      if (entry.key === current) {
-        link.classList.add("active");
-        link.setAttribute("aria-current", "page");
-      }
-      nav.appendChild(link);
+  const group = groupOf(groups, activeKey);
+  const shown = group.items.filter((e) => !e.hidden);
+  tabs.hidden = shown.length < 2;
+  for (const entry of shown) {
+    const link = h("a", { href: `#/settings/${entry.key}`, role: "tab", "data-section": entry.key, title: entry.label }, entry.tab || entry.label);
+    if (entry.key === current) {
+      link.classList.add("active");
+      link.setAttribute("aria-current", "page");
+      link.setAttribute("aria-selected", "true");
     }
+    tabs.appendChild(link);
   }
+}
+
+// Settings has room for itself: the page menu folds away while you are here (your own choice with the menu button is kept), and comes back when you leave.
+let mainMenu = null;
+const WIDE_MENU = "(min-width: 1041px)";
+function foldMainMenu() {
+  if (mainMenu || !window.matchMedia(WIDE_MENU).matches) return;
+  const burger = document.getElementById("nav-toggle");
+  mainMenu = { wasHidden: document.body.classList.contains("side-hidden"), touched: false, burger, onClick: () => { if (mainMenu) mainMenu.touched = true; } };
+  if (burger) burger.addEventListener("click", mainMenu.onClick, true);
+  document.body.classList.add("side-hidden");
+  if (burger) burger.setAttribute("aria-expanded", "false");
+}
+function unfoldMainMenu() {
+  if (!mainMenu) return;
+  const { wasHidden, touched, burger, onClick } = mainMenu;
+  mainMenu = null;
+  if (burger) burger.removeEventListener("click", onClick, true);
+  if (touched) return;
+  document.body.classList.toggle("side-hidden", wasHidden);
+  if (burger) burger.setAttribute("aria-expanded", String(!wasHidden));
+}
+
+window.addEventListener("hashchange", () => { if (!/^#\/settings(\/|$)/.test(location.hash)) unfoldMainMenu(); });
+
+function hideTabsOnScroll(tabs) {
+  let lastY = window.scrollY;
+  const onScroll = () => {
+    const y = window.scrollY;
+    if (y < 80 || y < lastY - 2) tabs.classList.remove("tabs-away");
+    else if (y > lastY + 6) tabs.classList.add("tabs-away");
+    lastY = y;
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  return () => window.removeEventListener("scroll", onScroll);
 }
 
 export async function render(container, params) {
@@ -457,13 +536,18 @@ export async function render(container, params) {
     history.replaceState(null, "", `#/settings/${item.key}`);
   }
 
-  const nav = h("nav", { class: "settings-nav", "aria-label": "Settings pages" });
+  foldMainMenu();
+  rememberTab(groupOf(groups, item.key).title, item.key);
+  const nav = h("nav", { class: "settings-nav", "aria-label": "Settings" });
   fillNav(nav, groups, item.key);
+  const tabs = h("div", { class: "settings-tabs", role: "tablist", "aria-label": "Pages of this part of Settings" });
+  fillTabs(tabs, groups, item.key);
+  const stopScroll = hideTabsOnScroll(tabs);
   const content = h("div", { class: "settings-content", id: `sec-${item.key}` });
   // narrow screens: the page list folds into one button that names the current page
   const toggle = h("button", { type: "button", class: "btn settings-nav-toggle", "aria-expanded": "false", id: "settings-nav-toggle" },
-    h("span", {}, `Settings: ${item.label}`), h("span", { class: "caret" }, "▾"));
-  const finder = h("button", { type: "button", class: "btn settings-find", title: "Search pages, settings and devices (press /)", onclick: () => openSearch() }, "Search settings…  ( / )");
+    h("span", {}, `Settings: ${groupOf(groups, item.key).title}`), h("span", { class: "caret" }, "▾"));
+  const finder = h("button", { type: "button", class: "btn settings-find", title: "Search pages, settings and devices (press /)", onclick: () => openSearch() }, "Search settings");
   const side = h("div", { class: "settings-side" }, toggle, finder, nav);
   toggle.addEventListener("click", () => {
     const open = !side.classList.contains("open");
@@ -471,7 +555,7 @@ export async function render(container, params) {
     toggle.setAttribute("aria-expanded", String(open));
     toggle.querySelector(".caret").textContent = open ? "▴" : "▾";
   });
-  container.appendChild(h("div", { class: "settings-layout" }, side, content));
+  container.appendChild(h("div", { class: "settings-layout" }, side, h("div", { class: "settings-main" }, tabs, content)));
   // in the middle of the setup guide: a way back
   if (isAdmin()) {
     get("/api/wizard").then((w) => {
@@ -488,6 +572,7 @@ export async function render(container, params) {
     if (destroyed) return;
     groups = fresh;
     fillNav(nav, groups, item.key);
+    fillTabs(tabs, groups, item.key);
   };
   document.addEventListener("netlens:plugins-changed", onPluginsChanged);
 
@@ -510,6 +595,8 @@ export async function render(container, params) {
 
   return () => {
     destroyed = true;
+    stopScroll();
     document.removeEventListener("netlens:plugins-changed", onPluginsChanged);
+    if (!/^#\/settings(\/|$)/.test(location.hash)) unfoldMainMenu();          // moving on to another page of Settings keeps the room
   };
 }

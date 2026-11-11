@@ -3,14 +3,30 @@ import { h, clear, toast, fmtTime } from "../util.js";
 
 const HOURS = { 1: "every hour", 6: "every 6 hours", 12: "every 12 hours", 24: "every day", 72: "every 3 days" };
 
-function fill(card, data) {
+// part "checks": DHCP servers and the gateway; part "exposure": what the router exposes (its own page: one Save per page)
+function fill(card, data, part = "checks") {
   clear(card);
-  card.appendChild(h("h2", {}, "Network checks"));
-  card.appendChild(h("p", { class: "hint" },
-    "Netlens watches for two things that should not change by themselves. A second DHCP server (a rogue one hands out wrong addresses, gateways or DNS) " +
-    "and a changed MAC address behind your gateway (a replaced router, or someone pretending to be it). Alerts go to your notification channels and break through quiet hours."));
+  const exposure = part === "exposure";
+  card.appendChild(h("h2", {}, exposure ? "Router exposure" : "Network checks"));
+  if (!exposure) {
+    card.appendChild(h("p", { class: "hint" },
+      "Netlens watches for two things that should not change by themselves. A second DHCP server (a rogue one hands out wrong addresses, gateways or DNS) " +
+      "and a changed MAC address behind your gateway (a replaced router, or someone pretending to be it). Alerts go to your notification channels and break through quiet hours."));
+  }
+  const call = async (btn, request, done) => {
+    btn.disabled = true;
+    try {
+      const res = await request();
+      toast(typeof done === "function" ? done(res) : done, "success");
+      fill(card, res, part);
+    } catch (err) {
+      toast(err.message || "Failed", "error");
+      btn.disabled = false;
+    }
+  };
 
   // ---- DHCP
+  if (!exposure) {
   card.appendChild(h("h3", {}, "DHCP servers"));
   const enabled = h("input", { type: "checkbox", name: "dhcp_enabled" });
   enabled.checked = data.settings.dhcp_enabled;
@@ -19,17 +35,6 @@ function fill(card, data) {
   every.value = String(data.settings.dhcp_hours);
   const save = h("button", { type: "button", class: "btn" }, "Save");
   const run = h("button", { type: "button", class: "btn", id: "dhcp-run" }, "Check now");
-  const call = async (btn, request, done) => {
-    btn.disabled = true;
-    try {
-      const res = await request();
-      toast(typeof done === "function" ? done(res) : done, "success");
-      fill(card, res);
-    } catch (err) {
-      toast(err.message || "Failed", "error");
-      btn.disabled = false;
-    }
-  };
   save.addEventListener("click", () => call(save, () => api("/api/netchecks", { method: "PUT", body: { dhcp_enabled: enabled.checked, dhcp_hours: Number(every.value) } }), "Saved"));
   run.addEventListener("click", () => {
     run.textContent = "Listening for about 10 seconds…";
@@ -67,8 +72,11 @@ function fill(card, data) {
     card.appendChild(h("p", { class: "hint" }, "No DHCP server seen yet. Press Check now."));
   }
 
+  }
+
   // ---- router exposure
-  card.appendChild(h("h3", {}, "Router exposure"));
+  if (exposure) {
+
   const ex = data.exposure;
   const exOn = h("input", { type: "checkbox", name: "exposure_enabled" });
   exOn.checked = ex.settings.enabled;
@@ -104,15 +112,25 @@ function fill(card, data) {
     card.appendChild(list);
   }
 
+  }
+
   // ---- gateway
+  if (!exposure) {
   card.appendChild(h("h3", {}, "Gateway"));
   card.appendChild(data.gateway
     ? h("p", {}, `Gateway ${data.gateway.ip} answers with MAC address `, h("span", { class: "mono" }, data.gateway.mac), `, known since ${fmtTime(data.gateway.since)}. A change is reported as "Gateway changed".`)
     : h("p", { class: "hint" }, "The gateway is recorded after the next scan."));
+  }
 }
 
 export async function buildNetchecksCard() {
   const card = h("div", { class: "card" });
   fill(card, await get("/api/netchecks"));
+  return card;
+}
+
+export async function buildExposureCard() {
+  const card = h("div", { class: "card" });
+  fill(card, await get("/api/netchecks"), "exposure");
   return card;
 }

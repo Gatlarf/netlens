@@ -59,7 +59,8 @@ const SETTINGS = [
   ["On-call schedule", "oncall", "on call oncall rota shifts who is notified override holiday swap fallback week rotation schedule", ""],
   ["Log forwarding", "siem", "syslog siem graylog splunk wazuh elastic rsyslog audit events forward logs", ""],
   ["AI", "engineer", "ai llm language model digital engineer assistant claude chatgpt token guide ollama openai openrouter free insights model anonymise", ""],
-  ["MCP server", "engineer", "mcp model context protocol agent tools openclaw claude code cursor server endpoint token ai assistant switch on off", "MCP server"],
+  ["MCP server", "mcp", "mcp model context protocol agent tools openclaw claude code cursor server endpoint token ai assistant switch on off", ""],
+  ["AI assistant", "agents", "assistant token guide api claude chatgpt set up change settings help", ""],
   ["Licence", "licence", "license key edition paid activate community trial", ""],
   ["Setup guide", "wizard", "wizard getting started tour first run", ""],
   ["Report to a central Netlens", "central", "probe remote site central accept configuration push", ""],
@@ -85,7 +86,7 @@ const SETTINGS = [
   ["Account", "session", "password change my profile start page preferences", ""],
   ["Start page", "session", "home page opens on landing default", "Start page"],
   ["Plugin manager", "plugins", "plugins install integrations proxmox unifi hyper-v synology npm turn on off running", ""],
-  ["Router exposure", "netchecks", "router gateway ports open upnp internet exposed remote administration check probe", "Router exposure"],
+  ["Router exposure", "exposure", "router gateway ports open upnp internet exposed remote administration check probe", "Router exposure"],
   ["Gateway", "netchecks", "gateway mac changed replaced router spoof arp", "Gateway"],
   ["DNS registration", "dns", "register names hostnames technitium zone push records", ""],
   ["Reliability target", "reliability", "availability target percent sla uptime goal", ""],
@@ -206,9 +207,9 @@ function search(query, devs, plugs = [], more = null) {
 function sectionName(key) {
   const names = { networks: "Networks", nmap: "Scan performance", schedule: "Scan schedule", map: "Map", groups: "Groups", netchecks: "Network checks", dns: "DNS registration",
     ignored: "Ignored devices", interface: "Interface", ipv6: "IPv6", sso: "Single sign-on", escalation: "Escalation", oncall: "On-call schedule", siem: "Log forwarding", inbound: "Device messages", engineer: "AI", licence: "Licence", wizard: "Setup guide", central: "Central Netlens", users: "Users & tokens", terminal: "Web terminal", channels: "Alert channels & quiet hours", maintenance: "Maintenance windows",
-    backup: "Backup & restore", export: "Export", shares: "Share links", audit: "Audit log", about: "About", session: "Account", plugins: "Plugin manager", "plugin-browse": "Plugin store",
+    backup: "Backup & restore", export: "Export", shares: "Share links", audit: "Audit log", about: "About", session: "Account", plugins: "Plugin manager", "plugin-browse": "Plugin store", exposure: "Router exposure", mcp: "MCP server",
     dns: "DNS registration", reliability: "Reliability target", hosts: "Hosts", credentials: "Credentials", hostprobes: "Host probes", ingest: "Host agents", analysis: "Analysis reports",
-    usage: "Traffic statistics", agents: "AI agents", security: "Sign-in security", tls: "HTTPS", certlogin: "Client certificates", scim: "Provisioning (SCIM)", roles: "Roles", approvals: "Approvals",
+    usage: "Traffic statistics", agents: "AI assistant", security: "Sign-in security", tls: "HTTPS", certlogin: "Client certificates", scim: "Provisioning (SCIM)", roles: "Roles", approvals: "Approvals",
     recordings: "Session recordings", accessreview: "Access review", "plugin-guide": "Plugin guide" };
   return names[key] || key;
 }

@@ -36,3 +36,19 @@ export async function buildAiAgentsCard() {
   }
   return card;
 }
+
+// The two parts of "AI agents" as pages of their own (one Save per page): the part's heading becomes the page heading
+async function asPage(build) {
+  const part = await build();
+  part.className = "card";
+  const first = part.querySelector("h3");
+  if (first) {
+    const title = h("h2", {});
+    while (first.firstChild) title.appendChild(first.firstChild);
+    first.replaceWith(title);
+  }
+  return part;
+}
+
+export const buildAiAssistantPage = () => asPage(buildAssistantCard);
+export const buildAiMcpPage = () => asPage(buildMcpCard);

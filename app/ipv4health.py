@@ -253,7 +253,7 @@ def analyse(raw: dict[str, Any], facts: dict[str, Any]) -> dict[str, Any]:
         warns = [f for f in exposure["findings"] if f["status"] == "warn"]
         level = "bad" if risks else "warn" if warns else "good"
         title = "The router exposes something risky" if risks else "The router exposes something to review" if warns else "The router exposes nothing risky"
-        text = "; ".join(f["title"] for f in risks + warns) + ". Details and steps on Settings → Network checks." if risks or warns else f"{exposure['gateway']} was checked {exposure['at'][:16].replace('T', ' ')} (score {exposure['score']} of 100)."
+        text = "; ".join(f["title"] for f in risks + warns) + ". Details and steps on Settings → Router exposure." if risks or warns else f"{exposure['gateway']} was checked {exposure['at'][:16].replace('T', ' ')} (score {exposure['score']} of 100)."
         findings.append({"level": level, "key": finding_key(title), "title": title, "text": text, "own_alert": True})
 
     findings.sort(key=lambda f: ("bad", "warn", "info", "good").index(f["level"]))      # the problems first (the sort keeps the order within a level)
