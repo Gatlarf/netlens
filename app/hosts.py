@@ -25,10 +25,31 @@ LEVELS = ("basic", "probes", "update", "unprobe", "remove")
 CONCURRENCY = 3
 
 
-def _method_of(conn, device_id: int, ip: str | None) -> str | None:
-    """SSH when the port is open, WinRM otherwise (Windows hosts without an SSH server)."""
+PROBE_PORTS = (22, 5986, 5985)
+PROBE_TIMEOUT = 2.0
+
+
+async def live_ports(ip: str | None, timeout: float = PROBE_TIMEOUT) -> set[int]:
+    """Which of SSH, WinRM over https and WinRM over http answer right now. The scan does not look at every port (5986 is usually not in it), so what the scan
+    recorded is not proof that a port is closed."""
+    if not ip:
+        return set()
+
+    async def one(port: int) -> int | None:
+        try:
+            _r, w = await asyncio.wait_for(asyncio.open_connection(ip, port), timeout)
+        except (OSError, asyncio.TimeoutError):
+            return None
+        w.close()
+        return port
+
+    return {p for p in await asyncio.gather(*(one(p) for p in PROBE_PORTS)) if p is not None}
+
+
+def _method_of(conn, device_id: int, ip: str | None, extra: set[int] | None = None) -> str | None:
+    """SSH when the port is open, WinRM otherwise (Windows hosts without an SSH server). `extra`: ports found open by trying them now."""
     open_ports = {(r["proto"], r["port"]) for r in conn.execute("SELECT proto, port FROM ports WHERE device_id = ? AND state LIKE 'open%'", (device_id,))}
-    ports = {p for _proto, p in open_ports}
+    ports = {p for _proto, p in open_ports} | (extra or set())
     if 22 in ports:
         return "ssh"
     if 5986 in ports:
@@ -38,9 +59,9 @@ def _method_of(conn, device_id: int, ip: str | None) -> str | None:
     return None
 
 
-def _winrm_port(conn, device_id: int) -> int:
+def _winrm_port(conn, device_id: int, extra: set[int] | None = None) -> int:
     """5986 (https) when it is open, otherwise 5985 (plain http, only used on your own network)."""
-    ports = {r["port"] for r in conn.execute("SELECT port FROM ports WHERE device_id = ? AND state LIKE 'open%'", (device_id,))}
+    ports = {r["port"] for r in conn.execute("SELECT port FROM ports WHERE device_id = ? AND state LIKE 'open%'", (device_id,))} | (extra or set())
     return 5986 if 5986 in ports or 5985 not in ports else 5985
 
 
@@ -97,15 +118,19 @@ async def _one(db_path, device_id: int, level: str, opts: dict[str, Any], who, i
             if row is not None and row["source"] == "central":
                 return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": "this monitor is managed by the central Netlens"}
             method = opts.get("method") if opts.get("method") in ("ssh", "winrm") else (row["method"] if row is not None and row["method"] in ("ssh", "winrm") else _method_of(conn, device_id, d["primary_ip"]))
+            live: set[int] = set()
+            if method is None or (method == "winrm" and row is None):
+                live = await live_ports(d["primary_ip"])                    # the scan does not record 5986: ask the host
+                method = method or _method_of(conn, device_id, d["primary_ip"], live)
             if method is None:
-                return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": "neither SSH nor WinRM is open on this host"}
+                return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": "neither SSH nor WinRM answers on this host (22, 5986" + (", 5985" if winrm.ALLOW_PLAIN_HTTP else "") + ")"}
             if opts.get("credential_id"):
                 if credstore.peek(conn, user, str(opts["credential_id"])) is None:
                     return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": "no such stored login"}
             elif row is None or not hm.raw_secret(conn, row):
                 return {"device_id": device_id, "name": name, "ok": False, "steps": steps, "error": "this host has no health monitor yet: choose \"Login for the basic monitoring\" (a login from Settings → Credentials; add one there first if the list is empty)"}
             if row is None or opts.get("credential_id") or row["method"] != method:
-                data = {"method": method, "address": d["primary_ip"], **({"port": _winrm_port(conn, device_id), **({"auth": "basic"} if _winrm_port(conn, device_id) == 5985 else {})} if method == "winrm" else {}),
+                data = {"method": method, "address": d["primary_ip"], **({"port": _winrm_port(conn, device_id, live), **({"auth": "basic"} if _winrm_port(conn, device_id, live) == 5985 else {})} if method == "winrm" else {}),
                         **({"credential_id": opts["credential_id"]} if opts.get("credential_id") else {})}
                 try:
                     hm.save_monitor(conn, device_id, data)

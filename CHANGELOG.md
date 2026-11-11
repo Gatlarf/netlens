@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.397 — 2026-11-11
+
+### Fixed
+- **Setting up monitoring for several Windows hosts at once** no longer fails with "neither SSH nor WinRM is open on this host" on hosts that are ready. The scan does not record the https WinRM port (5986), so a host that showed only 5985 in the scan was refused even though adding it on its own page worked. Netlens now tries the ports (22, 5986) on the host itself when the scan did not show one, uses 5986 when it answers, and the host list shows "WinRM ?" instead of a warning for such hosts and includes them in "not monitored".
+
 ## 0.4.394 — 2026-11-11
 
 ### Added

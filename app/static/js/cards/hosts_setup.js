@@ -22,7 +22,7 @@ export async function buildHostsSetupCard() {
   let busy = false;
   const form = { level: "basic", credential: "", adminCredential: "", adminUser: "", adminPass: "", sshd: false };
 
-  const reach = (x) => (x.can_monitor ? x.can_monitor.toUpperCase() : x.winrm_http_only ? h("span", { class: "error", title: "Only the plain-http WinRM port (5985) is open. Plain http sends the Windows password unencrypted, so it is switched off. Switch WinRM over HTTPS on (see below)." }, "WinRM: http only ⚠") : "–");
+  const reach = (x) => (x.can_monitor ? x.can_monitor.toUpperCase() : x.winrm_http_only ? h("span", { title: "The scan saw WinRM on the plain-http port (5985) only, and it does not look at the https port (5986). Netlens tries 5986 when you set the host up." }, "WinRM ?") : "–");
   const monText = (x) => {
     if (!x.monitor) return h("span", { class: "hint" }, "not monitored");
     if (x.monitor.other) return h("span", { class: "hint" }, `monitored over ${x.monitor.method.toUpperCase()}`);
@@ -49,7 +49,7 @@ export async function buildHostsSetupCard() {
     const all = h("input", { type: "checkbox", checked: shown.length > 0 && shown.every((x) => chosen.has(x.id)) });
     all.addEventListener("change", () => { for (const x of shown) (all.checked ? chosen.add(x.id) : chosen.delete(x.id)); draw(); });
     const pickOnly = (label, test) => h("button", { class: "btn linklike", type: "button", onclick: () => { chosen.clear(); for (const x of data.hosts.filter(test)) chosen.add(x.id); draw(); } }, label);
-    card.appendChild(h("div", { class: "toolbar" }, search, " Select: ", pickOnly("not monitored", (x) => !x.monitor && x.can_monitor), pickOnly("monitored", (x) => x.monitor && !x.monitor.other),
+    card.appendChild(h("div", { class: "toolbar" }, search, " Select: ", pickOnly("not monitored", (x) => !x.monitor && (x.can_monitor || x.winrm_http_only)), pickOnly("monitored", (x) => x.monitor && !x.monitor.other),
       pickOnly("with an old probe", (x) => x.probes.update_available), pickOnly("none", () => false)));
 
     const rows = shown.map((x) => {
@@ -71,7 +71,7 @@ export async function buildHostsSetupCard() {
       catch (err) { plain.checked = !plain.checked; toast(err.message || "Could not change it", "error"); }
     });
     const needsHttps = data.hosts.filter((x) => x.winrm_http_only).length;
-    card.appendChild(h("details", { class: "limits-box", open: needsHttps > 0 },
+    card.appendChild(h("details", { class: "limits-box" },
       h("summary", {}, needsHttps ? `Windows hosts: switch WinRM over HTTPS on (${needsHttps} host${needsHttps === 1 ? " has" : "s have"} only the plain http port open)` : "Windows hosts: WinRM over HTTPS"),
       h("p", { class: "hint" }, "A Windows host is monitored over WinRM with https (port 5986): the connection is encrypted. Plain http (port 5985) is switched off by default because it can only carry the Windows password unencrypted. " +
         "Run this once in PowerShell as administrator on each Windows host (or with your software distribution), then press Rescan, and the host shows up as WinRM."),

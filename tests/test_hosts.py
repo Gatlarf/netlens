@@ -24,6 +24,11 @@ def client(tmp_path, monkeypatch):
         return {"ok": True, "error": None, "events": []}
 
     monkeypatch.setattr(hm, "run_monitor", fake_read)
+
+    async def no_live_ports(ip, timeout=2.0):            # never touch the network from a test
+        return set()
+
+    monkeypatch.setattr(hosts, "live_ports", no_live_ports)
     looks = []
 
     async def fake_first_look(db_path, device_id, actor=None):
@@ -54,7 +59,7 @@ def test_basic_monitoring_for_several_hosts_with_one_stored_login(client):
     cred = client.post("/api/credentials", json={"name": "Monitor", "kind": "login", "username": "mon", "password": "pw"}).json()
     r = client.post("/api/hosts/apply", json={"device_ids": [1, 2, 3, 4], "level": "basic", "credential_id": cred["id"]}).json()
     assert (r["done"], r["failed"]) == (3, 1)
-    assert [x["error"] for x in r["results"] if not x["ok"]] == ["neither SSH nor WinRM is open on this host"]
+    assert [x["error"] for x in r["results"] if not x["ok"]] == ["neither SSH nor WinRM answers on this host (22, 5986)"]
     conn = connect(client.db)
     assert [hm.get_monitor(conn, i)["method"] for i in (1, 2, 3)] == ["ssh", "ssh", "winrm"]
     assert hm.load_secret(conn, hm.get_monitor(conn, 3))["password"] == "pw"
@@ -165,3 +170,44 @@ def test_a_windows_host_with_only_the_plain_winrm_port_open_is_monitored_on_that
     client.put("/api/hosts/settings", json={"allow_plain_winrm": True})
     r = client.post("/api/hosts/apply", json={"device_ids": [10], "level": "probes"}).json()
     assert r["failed"] == 1 and "Login for the basic monitoring" in r["results"][0]["error"]
+
+
+def test_a_host_whose_https_winrm_port_is_not_in_the_scan_is_found_by_asking_it(client, monkeypatch):
+    """The scan does not look at port 5986: a prepared Windows host that shows 5985 (or nothing) in the scan must still be set up over https."""
+    conn = connect(client.db)
+    conn.execute("INSERT INTO devices (id, mac, primary_ip, hostname, online, first_seen, last_seen) VALUES (11, 'aa:bb:cc:dd:ee:11', '192.168.1.11', 'blue', 1, 'x', 'x')")
+    conn.execute("INSERT INTO ports (device_id, proto, port, state, updated) VALUES (11, 'tcp', 5985, 'open', 'x')")
+    conn.commit()
+    conn.close()
+    asked = []
+
+    async def answers(ip, timeout=2.0):
+        asked.append(ip)
+        return {5985, 5986}
+
+    monkeypatch.setattr(hosts, "live_ports", answers)
+    cred = client.post("/api/credentials", json={"name": "Win", "kind": "login", "username": "DOMAIN\\mon", "password": "pw"}).json()
+    r = client.post("/api/hosts/apply", json={"device_ids": [11], "level": "basic", "credential_id": cred["id"]}).json()
+    assert r["done"] == 1, r
+    assert asked == ["192.168.1.11"]
+    conn = connect(client.db)
+    row = hm.get_monitor(conn, 11)
+    assert row["method"] == "winrm" and row["port"] == 5986
+
+
+def test_live_ports_reports_only_what_answers():
+    import asyncio
+
+    async def main():
+        server = await asyncio.start_server(lambda r, w: w.close(), "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        old = hosts.PROBE_PORTS
+        hosts.PROBE_PORTS = (port, 1)
+        try:
+            return port, await hosts.live_ports("127.0.0.1", timeout=1.0)
+        finally:
+            hosts.PROBE_PORTS = old
+            server.close()
+
+    port, got = asyncio.run(main())
+    assert got == {port}
