@@ -7,9 +7,9 @@ import { slideAwayOnScroll } from "./tabbar.js";
 // route = the page's name in app.js; also = other routes that belong to the same tab (a device page is part of Devices)
 export const NAV = [
   { key: "dashboard", title: "Dashboard", items: [{ route: "dashboard", href: "#/dashboard", label: "Dashboard" }] },
+  { key: "hud", title: "HUD", items: [{ route: "hud", href: "#/hud", label: "HUD" }] },
   { key: "network", title: "Network", items: [
     { route: "map", href: "#/map", label: "Map" },
-    { route: "hud", href: "#/hud", label: "HUD" },
     { route: "devices", href: "#/devices", label: "Devices", also: ["device"] },
     { route: "dns", href: "#/dns", label: "DNS", feature: "dns", admin: true },
     { route: "remote_sites", href: "#/remote-sites", label: "Remote sites", feature: "remote_sites" },
@@ -38,7 +38,8 @@ export const NAV = [
 ];
 
 const ALSO = { hierarchy: "network", wizard: "settings" };          // pages that belong to a heading without a tab of their own
-const HUD_DELAY = 8000;                                             // the HUD stays open for hours: its menu goes away after this long
+const AUTOHIDE = new Set(["hud", "dashboard"]);                     // pages that stay open for hours (a wall screen): their menu goes away after this long
+const AUTOHIDE_DELAY = 8000;
 
 let features = {};
 let current = "";
@@ -96,7 +97,7 @@ function drawTabs() {
   }
 }
 
-// ---- the HUD: a page that stays open. Its menu goes away after a while; the left edge of the screen or the menu button brings it back for a moment.
+// ---- the HUD and the dashboard: pages that stay open. Its menu goes away after a while; the left edge of the screen or the menu button brings it back for a moment.
 let hudTimer = 0;
 let hudStop = null;
 function hudMenu(show) {
@@ -106,7 +107,7 @@ function hudMenu(show) {
 }
 function startHud() {
   stopHud();
-  const arm = () => { clearTimeout(hudTimer); hudTimer = setTimeout(() => hudMenu(false), HUD_DELAY); };
+  const arm = () => { clearTimeout(hudTimer); hudTimer = setTimeout(() => hudMenu(false), AUTOHIDE_DELAY); };
   const edge = h("div", { id: "side-peek", class: "side-peek", "aria-hidden": "true" });
   document.body.appendChild(edge);
   const onEdge = () => { hudMenu(true); arm(); };
@@ -148,8 +149,8 @@ export function showRoute(route) {
   }
   drawSide();
   drawTabs();
-  if (current === "hud" && was !== "hud") startHud();
-  else if (current !== "hud" && was === "hud") stopHud();
+  if (AUTOHIDE.has(current) && current !== was) startHud();
+  else if (!AUTOHIDE.has(current) && AUTOHIDE.has(was)) stopHud();
 }
 
 export function setFeatures(next) {

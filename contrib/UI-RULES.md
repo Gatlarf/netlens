@@ -28,7 +28,7 @@ The rules every page follows, so a new page does not need a review round. Most a
 - Every problem shown anywhere links to the page that explains it, and the target opens the affected row (`?focus=problems` on Storage and Backups).
 - **The page menu is a model, not HTML**: `static/js/mainnav.js` (`NAV`): headings on the left, the pages of the current heading as tabs above the page (Settings works the same way, `pages/settings.js`). A new page goes into a heading there, with `admin: true` when a read-only user gets "this needs an administrator" from it, and `feature: "<name>"` when it comes from plugins (add the name to `FEATURES` in `app/api/features.py`).
 - Optional pages (Backups, Storage, Smart home, Vulnerabilities, DNS) are in the menu only while a plugin of that kind is installed and switched on; data left by a removed plugin does not bring the page back. Remote sites appear when there are sites.
-- A page that stays open for hours (the HUD) gives its menu up after a few seconds (`HUD_DELAY`); the left edge of the screen or the menu button shows it again for a moment.
+- A page that stays open for hours (the HUD, the dashboard) gives its menu up after a few seconds (`AUTOHIDE` and `AUTOHIDE_DELAY` in `mainnav.js`); the left edge of the screen or the menu button shows it again for a moment.
 - Long host names: show `shortName()` where space is tight; tables wrap, they never push the page sideways (no horizontal scroll on the page at 820 or 1400 px).
 
 ## Wide screens

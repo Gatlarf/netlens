@@ -82,7 +82,7 @@ def test_start_page_and_menu_groups_are_wired():
     for route in ("dashboard", "map", "devices", "uptime", "services", "stats", "scans", "insights", "remediation", "settings"):
         assert f'route: "{route}"' in nav, route
     assert 'route: "hierarchy"' not in nav and '"#/hierarchy": "hierarchy"' in app_js        # Hierarchy is a view of the Map now; its old address opens the Map in that view
-    assert nav.count('key: "') == 6                                   # the headings: Dashboard, Network, Monitoring, Analysis, Automation, Settings
+    assert nav.count('key: "') == 7                                   # the headings: Dashboard, HUD, Network, Monitoring, Analysis, Automation, Settings
     assert nav.count("admin: true, items:") == 2                      # Automation and Settings are for administrators
     assert 'id="page-tabs"' in index and 'id="side-links"' in index
     assert 'route: "overview"' not in nav and '"#/overview": "dashboard"' in app_js      # the Overview widgets are dashboard cards now

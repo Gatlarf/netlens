@@ -36,5 +36,10 @@ def test_pages_that_need_an_administrator_are_marked_so():
     assert ADMIN_PAGES <= marked, sorted(ADMIN_PAGES - marked)
 
 
-def test_the_hud_gives_its_menu_up_after_a_while():
-    assert "HUD_DELAY" in NAV and 'current === "hud"' in NAV and "side-peek" in NAV
+def test_the_hud_and_the_dashboard_give_their_menu_up_after_a_while():
+    assert "AUTOHIDE_DELAY" in NAV and 'new Set(["hud", "dashboard"])' in NAV and "side-peek" in NAV
+
+
+def test_the_hud_has_its_own_heading_between_dashboard_and_network():
+    keys = re.findall(r'^  \{ key: "([a-z]+)"', NAV, re.M)
+    assert keys[:3] == ["dashboard", "hud", "network"]
