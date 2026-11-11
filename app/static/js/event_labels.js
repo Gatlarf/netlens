@@ -55,6 +55,7 @@ export const EVENT_LABELS = {
   dhcp_rogue: "Rogue DHCP?",
   gateway_changed: "Gateway changed",
   gateway_exposure: "Router exposes something new",
+  config_advice: "Configuration recommendation",
   config_changed: "Configuration changed",
   totp_recovery_used: "Recovery code used",
   totp_reset: "Second factor reset",

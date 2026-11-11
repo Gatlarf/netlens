@@ -43,8 +43,10 @@ def _carry(old: dict[str, str], new: dict[str, str], failed: list[str]) -> dict[
     return {**{k: v for k, v in new.items() if k not in keep}, **keep}
 
 
-def record(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None) -> dict:
-    """Store the settings a topology result carries and raise `config_changed` for each device whose settings differ from the last sync. Returns the counts."""
+def record(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None, version: str | None = None) -> dict:
+    """Store the settings a topology result carries and raise `config_changed` for each device whose settings differ from the last sync. Returns the counts.
+    `version` is the plugin's version: when it differs from the one that wrote the last set, the plugin may simply read more (or fewer) settings than before, so only the
+    values of settings both sets have are compared and the others are taken over silently."""
     from app.plugins.enrich import device_lookup
 
     now = now or utcnow()
@@ -58,14 +60,18 @@ def record(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None
         if device_id is None:
             continue
         new = {i["key"]: i["value"] for i in items}
-        row = conn.execute("SELECT items FROM config_state WHERE device_id = ?", (device_id,)).fetchone()
+        row = conn.execute("SELECT items, plugin_version FROM config_state WHERE device_id = ?", (device_id,)).fetchone()
         try:
             old = json.loads(row["items"]) if row else None
         except ValueError:
             old = None
         if isinstance(old, dict):
             new = _carry(old, new, node.get("config_failed") or [])
-            d = diff(old, new)
+            if version and row["plugin_version"] != version:
+                shared = old.keys() & new.keys()
+                d = diff({k: old[k] for k in shared}, {k: new[k] for k in shared})
+            else:
+                d = diff(old, new)
             if any(d.values()):
                 name = node.get("name") or node["mac"]
                 text = summary_of(name, d)
@@ -73,12 +79,18 @@ def record(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None
                 add_event(conn, "config_changed", text[:400], device_id=device_id, now=now)
                 out["changed"] += 1
         conn.execute(
-            "INSERT INTO config_state (device_id, plugin_id, items, updated) VALUES (?, ?, ?, ?) "
-            "ON CONFLICT(device_id) DO UPDATE SET plugin_id = excluded.plugin_id, items = excluded.items, updated = excluded.updated",
-            (device_id, plugin_id, json.dumps(new), now),
+            "INSERT INTO config_state (device_id, plugin_id, items, updated, plugin_version) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(device_id) DO UPDATE SET plugin_id = excluded.plugin_id, items = excluded.items, updated = excluded.updated, plugin_version = excluded.plugin_version",
+            (device_id, plugin_id, json.dumps(new), now, version),
         )
         conn.execute("DELETE FROM config_changes WHERE device_id = ? AND id NOT IN (SELECT id FROM config_changes WHERE device_id = ? ORDER BY id DESC LIMIT ?)", (device_id, device_id, KEEP_CHANGES))
         out["devices"] += 1
+        try:
+            from app import configadvice
+
+            configadvice.refresh(conn, device_id, now)
+        except Exception:  # noqa: BLE001 - the recommendations are an extra: they never cost the sync
+            log.warning("config recommendations failed", exc_info=True)
     conn.execute("DELETE FROM config_changes WHERE ts < ?", (_ago(now, KEEP_DAYS),))
     conn.commit()
     return out

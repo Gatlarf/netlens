@@ -447,7 +447,7 @@ class PluginService:
                     try:
                         from app import configchange
 
-                        configchange.record(conn, plugin.id, data)
+                        configchange.record(conn, plugin.id, data, version=str((plugin.manifest or {}).get("version") or "") or None)
                     except Exception:  # noqa: BLE001 - tracking the settings is an extra: it must never fail the sync
                         log.exception("could not record the router's configuration")
                     if usagecfg.enabled(conn):

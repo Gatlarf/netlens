@@ -270,7 +270,10 @@ def t_security(conn, args, now=None) -> dict:
 
     last = gatewaycheck.get_last(conn)
     router = {"checked_at": last["at"], "gateway": last["gateway"], "score": last["score"], "findings": [{"title": f["title"], "status": f["status"], "evidence": f["evidence"]} for f in last["findings"] if f["status"] in ("risk", "warn")]} if last else None
-    return {"days": days, "router_exposure": router if router is not None else ("not checked yet" if gatewaycheck.get_settings(conn)["enabled"] else "the router exposure check is switched off"), "events": counts, "untrusted_devices": conn.execute("SELECT COUNT(*) FROM devices WHERE trusted = 0").fetchone()[0],
+    from app import configadvice
+
+    advice = configadvice.attention(conn)
+    return {"config_recommendations": [{"device": a["device"], "problem": a["title"], "severity": a["severity"]} for a in advice[:LIMIT]], "days": days, "router_exposure": router if router is not None else ("not checked yet" if gatewaycheck.get_settings(conn)["enabled"] else "the router exposure check is switched off"), "events": counts, "untrusted_devices": conn.execute("SELECT COUNT(*) FROM devices WHERE trusted = 0").fetchone()[0],
             "unknown_dhcp_servers": [r["ip"] for r in conn.execute("SELECT ip FROM dhcp_servers WHERE trusted = 0")],
             "port_changes_from_baseline": [{"device": names.get(i), **d} for i, d in list(drift.items())[:LIMIT]],
             "recent_failed_logins": [r["detail"] for r in conn.execute("SELECT detail FROM events WHERE kind = 'login_failed' AND ts >= ? ORDER BY id DESC LIMIT 5", (since,))]}
@@ -530,6 +533,8 @@ def r_security(r: dict) -> str:
         lines.append(f"Router {rx['gateway']} (checked {rx['checked_at'][:16].replace('T', ' ')}): " + ("; ".join(f"{f['title']}" for f in rx["findings"]) if rx["findings"] else "nothing exposed that Netlens can see") + ".")
     elif rx:
         lines.append(f"Router exposure: {rx}.")
+    if r.get("config_recommendations"):
+        lines.append("Configuration recommendations (from the settings routers and controllers report): " + "; ".join(f"{c['device']}: {c['problem']}" for c in r["config_recommendations"]) + ".")
     if r["port_changes_from_baseline"]:
         lines.append("Ports differ from the accepted baseline on: " + "; ".join(f"{p['device']} ({p['unexpected']} new, {p['missing']} missing)" for p in r["port_changes_from_baseline"]) + ".")
     if r["recent_failed_logins"]:

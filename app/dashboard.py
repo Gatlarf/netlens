@@ -39,6 +39,13 @@ def _router_attention(conn: sqlite3.Connection) -> list[dict]:
             for f in last["findings"] if f["status"] in ("risk", "warn")]
 
 
+def _config_attention(conn: sqlite3.Connection) -> list[dict]:
+    """Risky settings that the rules found in a router's or controller's configuration and that nobody accepted."""
+    from app import configadvice
+
+    return [{"level": "bad" if f["status"] == "risk" else "warn", "text": f"{f['device']}: {f['title']}", "href": f"#/device/{f['device_id']}"} for f in configadvice.attention(conn)]
+
+
 def _llm_attention(conn: sqlite3.Connection) -> list[dict]:
     """The free language model that was chosen on OpenRouter has gone away or is no longer free."""
     from app import openrouter
@@ -312,7 +319,7 @@ def build(conn: sqlite3.Connection, s: dict, now: str | None = None) -> dict:
         "summary": s,
         "devices_uptime": uptime,
         "service_checks": _services(conn, now)["checks"],
-        "attention": sorted(_attention(s, certs, login_failed, down, core_down, down_checks, _tiers(conn)) + _network_attention(conn) + _router_attention(conn) + _site_vuln_attention(conn) + _llm_attention(conn)
+        "attention": sorted(_attention(s, certs, login_failed, down, core_down, down_checks, _tiers(conn)) + _network_attention(conn) + _router_attention(conn) + _config_attention(conn) + _site_vuln_attention(conn) + _llm_attention(conn)
                             + _extra_attention(conn), key=lambda i: {"bad": 0, "warn": 1}.get(i["level"], 2)),
         "events": events,
         "services_down": down,

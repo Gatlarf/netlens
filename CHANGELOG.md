@@ -2,6 +2,16 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.394 — 2026-11-11
+
+### Added
+- ★ **Configuration recommendations**: from the settings a router or controller reports (ASUS, UniFi, Omada), Netlens now points out what looks wrong: a DNS server that is public next to local ones (and when it looks like a typing mistake, such as 102.168.0.200 for 192.168.0.200), a single DNS server, remote administration from the internet, Telnet, SSH from the internet, an admin page over HTTP, UPnP, WPS, a firewall that is off, a DMZ host, Wi-Fi without a password or with WEP/WPA/TKIP, port forwards to dangerous ports (Remote Desktop, SMB, databases...) and "allow everything" firewall rules. They show on the device's Configuration card with the steps to fix, on the dashboard, in Ask, through the MCP tool `get_config_advice`, as a *Configuration recommendation* event for notifications, and in the problem list. A finding that is intended can be accepted with a reason: it then stays out of the problem list but remains visible on the device. Administrators only.
+- **Second opinion from the language model** (optional, needs the digital engineer and Insights): a button on the Configuration card sends the settings, with addresses anonymised like every other question, and shows what else the model sees. Only findings that cite a setting that really exists are kept, an unchanged configuration is not sent again, and the answer is advice, never an alert.
+- **Plugins**: ASUS 1.6.3 also reads the second DHCP DNS server.
+
+### Fixed
+- A plugin that starts reading more settings after an update no longer raises a *Configuration changed* event for every new setting; only a changed value of a setting both versions read is a change.
+
 ## 0.4.387 — 2026-11-10
 
 ### Added

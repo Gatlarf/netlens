@@ -360,7 +360,7 @@ class AsusClient:
     CONFIG_KEYS = (
         ("wan", "wan.proto", "wan0_proto"), ("wan", "wan.dns_auto", "wan_dnsenable_x"), ("wan", "wan.dns1", "wan0_dns1_x"), ("wan", "wan.dns2", "wan0_dns2_x"), ("wan", "wan.nat", "wan0_nat_x"),
         ("lan", "lan.ip", "lan_ipaddr"), ("lan", "lan.netmask", "lan_netmask"), ("lan", "lan.dhcp", "dhcp_enable_x"), ("lan", "lan.dhcp_start", "dhcp_start"), ("lan", "lan.dhcp_end", "dhcp_end"),
-        ("lan", "lan.dhcp_lease", "dhcp_lease"), ("lan", "lan.dhcp_dns1", "dhcp_dns1_x"),
+        ("lan", "lan.dhcp_lease", "dhcp_lease"), ("lan", "lan.dhcp_dns1", "dhcp_dns1_x"), ("lan", "lan.dhcp_dns2", "dhcp_dns2_x"),
         ("wifi", "wifi.2g.ssid", "wl0_ssid"), ("wifi", "wifi.2g.auth", "wl0_auth_mode_x"), ("wifi", "wifi.2g.channel", "wl0_channel"), ("wifi", "wifi.2g.hidden", "wl0_closed"), ("wifi", "wifi.2g.bandwidth", "wl0_bw"),
         ("wifi", "wifi.5g.ssid", "wl1_ssid"), ("wifi", "wifi.5g.auth", "wl1_auth_mode_x"), ("wifi", "wifi.5g.channel", "wl1_channel"), ("wifi", "wifi.5g.hidden", "wl1_closed"), ("wifi", "wifi.5g.bandwidth", "wl1_bw"),
         ("wifi", "wifi.guest.enabled", "wl0.1_bss_enabled"), ("wifi", "wifi.wps", "wps_enable"), ("wifi", "wifi.roaming_assistant", "rast_static_client"),

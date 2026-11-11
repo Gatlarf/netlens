@@ -142,6 +142,7 @@ tool("get_agent_status", "overview", "Which hosts report through an agent (a col
 tool("get_monitors", "overview", "The health monitors (memory, processor, disk, temperature ...) of the monitored hosts, their latest readings and the readings past their limit.", "GET", "/api/monitors")
 tool("get_remediation", "overview", "The automatic fixes: rules, what ran, what waits for approval and whether it helped.", "GET", "/api/remediation")
 tool("get_config_changes", "overview", "What changed in the configuration of routers, firewalls and controllers (plugins that report their settings): per change the device, the time and what was added, removed or changed. Administrators only.", "GET", "/api/config-changes", {"days": i("1 to 400, default 7")}, query=("days",))
+tool("get_config_advice", "overview", "Recommendations from the settings of routers, firewalls and controllers (DNS servers outside the network, remote administration, Telnet, open or old Wi-Fi security, WPS, UPnP, firewall off, DMZ, dangerous port forwards): per finding the device, title and severity. Administrators only.", "GET", "/api/config-advice")
 tool("get_network_checks", "overview", "DHCP servers seen on the network (trusted or not), the gateway, the DNS registration and the router exposure check (what the gateway answers: provider remote management, Telnet, UPnP mappings, admin page; findings with evidence and a score).", "GET", "/api/netchecks")
 
 # devices
