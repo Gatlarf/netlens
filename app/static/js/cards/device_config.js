@@ -58,13 +58,13 @@ export async function buildDeviceConfigCard(device) {
     function show(r) {
       clear(out);
       if (!r) return;
-      if (!r.items.length) out.appendChild(h("p", { class: "hint" }, "The language model found nothing more."));
+      if (!r.items.length) out.appendChild(h("p", { class: "hint" }, "The AI found nothing more."));
       for (const x of r.items) out.appendChild(h("div", { class: `exposure-item st-${x.severity === "high" ? "risk" : "warn"}` }, h("p", {}, h("strong", {}, x.title), h("span", { class: "mono" }, `  ${x.key}`)), h("p", { class: "hint" }, `${x.why} ${x.fix}`)));
-      out.appendChild(h("p", { class: "hint" }, `Written by the language model on ${fmtTime(r.ts)}${r.outdated ? "; the settings changed since" : ""}. Advice only.`));
+      out.appendChild(h("p", { class: "hint" }, `Written by the AI on ${fmtTime(r.ts)}${r.outdated ? "; the settings changed since" : ""}. Advice only.`));
     }
     show(a.review);
     const btn = h("button", { class: "btn", type: "button", disabled: !a.review_available, title: a.review_available ? "Send the settings (addresses anonymised) to the language model for a second opinion" : "Needs the digital engineer (Settings → AI) and Insights" },
-      a.review ? "Review again" : "Review with the language model");
+      a.review ? "Review again" : "Review with AI");
     btn.addEventListener("click", async () => {
       btn.disabled = true;
       try {
