@@ -194,3 +194,14 @@ details.hint-more[open] > summary { margin-bottom: .3em; }
 .terminal-wrap.tall { height: 26rem; }
 .hud-panel.grow { flex: 1; }
 .hud-panel.col { display: flex; flex-direction: column; }
+
+/* Devices: mass edit (pages/devices_bulk.js) */
+.bulk-edit .bulk-bar { align-items: center; position: sticky; top: 0; z-index: 2; background: var(--bg); padding-block: 6px; }
+.bulk-edit .bulk-status { font-weight: 600; }
+.bulk-table th, .bulk-table td { padding: 5px 8px; vertical-align: middle; }
+.bulk-table th.bulk-flag, .bulk-table td.bulk-flag { text-align: center; white-space: normal; width: 6.5rem; }
+.bulk-table th label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-weight: inherit; }
+.bulk-table td.bulk-name input { width: 100%; min-width: 11rem; }
+.bulk-table td.bulk-name .hint { margin: 2px 0 0; }
+.bulk-table select { max-width: 11rem; }
+.bulk-table tr.bulk-changed td { background: color-mix(in srgb, var(--accent) 12%, transparent); }

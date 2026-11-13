@@ -2,6 +2,17 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.423 — 2026-11-13
+
+### Added
+- ★ **Edit many devices at once**: the **Edit many** button on the Devices page opens a separate list with one row per device and a control for each of Name, Known device, Always on, Alert when offline, Leave out of reports, Gentle scanning, Type and Group. The tick box in a column title sets all listed devices at once (the filters of the page choose which), changed rows are marked, and nothing is saved until **Save changes**. The normal list stays as it was.
+
+### Changed
+- The list of devices now reports gentle scanning as the device page does: also on when the device is gentle because of its type.
+
+### Fixed
+- The check that every kind of event is known to the AI did not know `config_changed` (a notice, not a problem).
+
 ## 0.4.422 — 2026-11-12
 
 ### Changed

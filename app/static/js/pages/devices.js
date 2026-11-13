@@ -1,6 +1,8 @@
 import { get, post } from "../api.js";
 import { h, clear, patch, toast, foldToolbarOnPhone, fmtTime, timeAgo, debounce, typeBadge, statusDot, TYPE_LABELS, shortName, vendorText, vendorTitle } from "../util.js";
 import { pageHead } from "../ui.js";
+import { createBulkEditor } from "./devices_bulk.js";
+import { editing } from "../editguard.js";
 
 const REFRESH_MS = 15000;
 
@@ -213,6 +215,10 @@ function buildToolbar(state) {
   });
   toolbar.appendChild(baselineAll);
 
+  const bulkBtn = h("button", { type: "button", class: "btn bulk-toggle admin-only keep", title: "Change the name, type, group and the on/off settings of many devices at once" }, "Edit many");
+  bulkBtn.addEventListener("click", () => setBulk(true));
+  toolbar.appendChild(bulkBtn);
+
   const count = h("span", { class: "count keep" }, "0 devices");
   toolbar.appendChild(count);
 
@@ -365,6 +371,13 @@ async function load() {
   else if (state.ports === "baseline") devices = devices.filter((d) => d.ports_drift !== null);
   else if (state.ports === "none") devices = devices.filter((d) => d.ports_drift === null);
 
+  if (bulkMode) {                      // the editor is on screen: rebuild it only when other devices are listed, and never under the hands of the user
+    const listed = devices.map((d) => d.id).join(",");
+    if (listed !== bulkListed && !editing(bulk && bulk.el)) { bulkListed = listed; bulk.refresh(); }
+    count.textContent = devices.length + (devices.length === 1 ? " device" : " devices");
+    return;
+  }
+
   if (!devices.length) {
     const empty = h("tr");
     const td = h("td", { class: "empty", colspan: String(SORT_KEYS.length) }, "No devices yet. Run a scan.");
@@ -378,6 +391,19 @@ async function load() {
 }
 
 let devices = [];
+let bulk = null;                     // the mass edit (devices_bulk.js), made when the page is drawn
+let bulkMode = false;
+let bulkListed = "";
+let tableWrap;
+
+function setBulk(on) {
+  bulkMode = on;
+  tableWrap.hidden = on;
+  bulk.el.hidden = !on;
+  if (on) { bulkListed = devices.map((d) => d.id).join(","); bulk.refresh(); }
+  else renderRows();
+}
+
 let groupList = [];
 let networkList = [];
 let tbody;
@@ -421,10 +447,20 @@ export async function render(container, params) {
 
   const wrap = h("div", { class: "table-wrap" });
   wrap.appendChild(table);
+  tableWrap = wrap;
+  bulkMode = false;
+  bulk = createBulkEditor({
+    getDevices: () => devices,
+    getGroups: () => groupList,
+    onSaved: async (allDone) => { await load(); if (allDone) setBulk(false); else bulk.refresh(); },
+    onLeave: () => setBulk(false)
+  });
+  bulk.el.hidden = true;
 
   container.appendChild(pageHead("Devices", "Everything Netlens has found on your network. Click a device for its page; use the filters to narrow the list."));
   container.appendChild(toolbar);
   container.appendChild(wrap);
+  container.appendChild(bulk.el);
 
   await load();
 

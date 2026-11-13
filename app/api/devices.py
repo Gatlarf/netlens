@@ -354,9 +354,13 @@ def list_devices(
     if scope is not None:                  # a customer view: only the devices of its groups
         rows = [r for r in rows if r["group_id"] in scope]
     drift = baselines.drift_counts(conn)
+    from app.scanner.options import saved_gentle_types
+
+    gentle_types = saved_gentle_types(conn)
     result = []
     for row in rows:
         d = _device_dict(row)
+        d["gentle"] = d["gentle"] or (not row["gentle_off"] and d["type"] in gentle_types)      # as on the device page: also gentle because of its type
         counts = drift.get(row["id"])
         # None = no baseline; otherwise how many ports differ from it
         d["ports_drift"] = None if counts is None else counts["unexpected"] + counts["missing"]
@@ -409,6 +413,50 @@ def assign_group(body: GroupAssignBody, conn: sqlite3.Connection = Depends(get_c
         return {"changed": groups_mod.assign(conn, body.ids, body.group_id)}
     except KeyError:
         raise HTTPException(status_code=422, detail="no such group")
+
+
+class BulkChange(BaseModel):
+    """One row of the mass edit on the Devices page: the device and only the fields that changed."""
+
+    model_config = {"extra": "forbid"}
+    id: int
+    custom_name: str | None = Field(default=None, max_length=100)
+    type_override: str | None = None
+    group_id: int | None = None
+    trusted: bool | None = None
+    always_on: bool | None = None
+    notify_offline: bool | None = None
+    report_exclude: bool | None = None
+    gentle: bool | None = None
+
+
+class BulkEditBody(BaseModel):
+    changes: list[BulkChange] = Field(max_length=2000)
+
+
+@router.post("/devices/bulk")
+def bulk_edit_devices(body: BulkEditBody, request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Save the mass edit of the Devices page: each change is applied exactly like the edit of one device (same checks), and a device that
+    cannot be changed is reported without stopping the others."""
+    scope = scope_of(request)
+    allowed = None
+    if scope is not None:                   # a customer view only touches the devices of its groups
+        allowed = {r["id"] for r in conn.execute("SELECT id, group_id FROM devices").fetchall() if r["group_id"] in scope}
+    changed = 0
+    errors: list[dict[str, Any]] = []
+    for change in body.changes:
+        if allowed is not None and change.id not in allowed:
+            errors.append({"id": change.id, "detail": "device not found"})
+            continue
+        fields = {k: getattr(change, k) for k in change.model_fields_set if k != "id"}
+        if not fields:
+            continue
+        try:
+            patch_device(change.id, DevicePatch(**fields), request, conn)
+            changed += 1
+        except HTTPException as err:
+            errors.append({"id": change.id, "detail": err.detail})
+    return {"changed": changed, "errors": errors}
 
 
 @router.post("/devices/baseline")
