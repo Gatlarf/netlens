@@ -205,3 +205,6 @@ details.hint-more[open] > summary { margin-bottom: .3em; }
 .bulk-table td.bulk-name .hint { margin: 2px 0 0; }
 .bulk-table select { max-width: 11rem; }
 .bulk-table tr.bulk-changed td { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* tabs inside a card (Sign-in security): on the card, not as a band of page colour */
+.card > .tabbed > .dev-tabs { position: static; background: none; margin: 4px 0 12px; padding-top: 0; }
