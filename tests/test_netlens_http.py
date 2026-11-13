@@ -213,9 +213,9 @@ def test_a_certificate_authority_added_by_the_administrator_is_trusted_with_the_
     def run(*args):
         subprocess.run(["openssl", *args], check=True, capture_output=True, cwd=tmp_path)
 
-    run("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "ca.key", "-out", "ca.pem", "-days", "2", "-subj", "/CN=Test CA")
+    run("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "ca.key", "-out", "ca.pem", "-days", "2", "-subj", "/CN=Test CA", "-addext", "keyUsage=critical,keyCertSign,cRLSign")
     run("req", "-newkey", "rsa:2048", "-nodes", "-keyout", "srv.key", "-out", "srv.csr", "-subj", "/CN=device")
-    (tmp_path / "ext.cnf").write_text("subjectAltName=IP:127.0.0.1\n")
+    (tmp_path / "ext.cnf").write_text("subjectAltName=IP:127.0.0.1\nauthorityKeyIdentifier=keyid\n")      # Python 3.13+ verifies strictly and wants the key identifier
     run("x509", "-req", "-in", "srv.csr", "-CA", "ca.pem", "-CAkey", "ca.key", "-CAcreateserial", "-out", "srv.pem", "-days", "2", "-extfile", "ext.cnf")
     tls = _Server(type("H", (server.httpd.RequestHandlerClass,), {}), tls=(str(tmp_path / "srv.pem"), str(tmp_path / "srv.key")))
     try:

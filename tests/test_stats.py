@@ -268,7 +268,7 @@ def test_device_wifi_endpoint(client, db):
     assert [s["rssi"] for s in body["samples"]] == [-60, -62, -70]
     assert body["current"]["node"] == "Attic" and body["current"]["quality"] == "fair" and body["current"]["tx_mbps"] == 72.2
     assert body["roams"] == [{"ts": roam_ts, "detail": "Garden -> Attic (5 GHz)"}]
-    assert client.get("/api/devices/1/wifi").json() == {"current": None, "samples": [], "roams": []}
+    assert client.get("/api/devices/1/wifi").json() == {"current": None, "samples": [], "roams": [], "advice": None}
     assert client.get("/api/devices/99/wifi").status_code == 404
     assert client.get("/api/devices/3/wifi", headers={"Authorization": "Bearer no"}).status_code == 401
 

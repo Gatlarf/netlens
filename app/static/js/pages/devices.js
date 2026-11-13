@@ -401,7 +401,7 @@ function setBulk(on) {
   tableWrap.hidden = on;
   bulk.el.hidden = !on;
   if (on) { bulkListed = devices.map((d) => d.id).join(","); bulk.refresh(); }
-  else renderRows();
+  else { bulk.reset(); renderRows(); }
 }
 
 let groupList = [];

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.424 — 2026-11-13
+
+### Fixed
+- **"You have changes that are not saved" after editing many devices**: after **Save changes** (or throwing the changes away) the page still asked whether to leave. The editor now empties itself when you leave it, so the question only comes when something is really not saved.
+
 ## 0.4.423 — 2026-11-13
 
 ### Added

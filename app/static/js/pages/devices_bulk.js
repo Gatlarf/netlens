@@ -192,5 +192,13 @@ export function createBulkEditor({ getDevices, getGroups, onSaved, onLeave }) {
     paintBar();
   }
 
-  return { el: root, refresh: build, pending: () => staged.size };
+  // leaving the editor: take every field out of the page, or the "unsaved changes" question of the page still sees the ticks that were just saved
+  function reset() {
+    staged.clear();
+    clear(root);
+    heads.length = 0;
+    rowsByDevice = new Map();
+  }
+
+  return { el: root, refresh: build, reset, pending: () => staged.size };
 }

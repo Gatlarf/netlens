@@ -28,7 +28,12 @@ def _cert(subject, key, issuer_name, issuer_key, ca=False, san=None, client=Fals
     now = datetime.datetime.now(datetime.timezone.utc)
     b = (x509.CertificateBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, subject)])).issuer_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, issuer_name)]))
          .public_key(key.public_key()).serial_number(x509.random_serial_number()).not_valid_before(now - datetime.timedelta(minutes=5)).not_valid_after(now + datetime.timedelta(days=2))
-         .add_extension(x509.BasicConstraints(ca=ca, path_length=None), critical=True))
+         .add_extension(x509.BasicConstraints(ca=ca, path_length=None), critical=True)
+         .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+         .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_key.public_key()), critical=False))      # Python 3.13+ verifies strictly and wants both
+    if ca:
+        b = b.add_extension(x509.KeyUsage(digital_signature=True, content_commitment=False, key_encipherment=False, data_encipherment=False, key_agreement=False,
+                                          key_cert_sign=True, crl_sign=True, encipher_only=False, decipher_only=False), critical=True)
     if san:
         b = b.add_extension(x509.SubjectAlternativeName([x509.DNSName(san), x509.IPAddress(__import__("ipaddress").ip_address("127.0.0.1"))]), critical=False)
     return b.sign(issuer_key, hashes.SHA256()).public_bytes(serialization.Encoding.PEM).decode()
