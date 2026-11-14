@@ -2,11 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.429 — 2026-11-14
+
+### Added
+- **Accept… on the dashboard**: a router or controller recommendation in *Needs attention* has an **Accept…** button next to it (instead of a Snooze menu, because it is a choice, not an event). It asks why it is intended and takes the line off the list at once; *Undo* is on the device page. Accepting or undoing now also refreshes the dashboard immediately.
+
 ## 0.4.427 — 2026-11-14
 
 ### Fixed
 - **A router recommendation on the dashboard now opens the place where you can accept it**: "ariel: UPnP is switched on" and the other findings of a router's or controller's configuration used to open the device on its Overview tab, where there is nothing to dismiss. The link now opens the device's **Network** tab at the **Recommendations** card (briefly outlined), where **Accept…** keeps a finding out of the problem list. Device addresses can name a tab and a card: `#/device/5/network/config`.
-- **Accept… on the dashboard**: a router or controller recommendation in *Needs attention* has an **Accept…** button next to it (instead of a Snooze menu, because it is a choice, not an event). It asks why it is intended and takes the line off the list at once; *Undo* is on the device page. Accepting or undoing now also refreshes the dashboard immediately.
 
 ## 0.4.426 — 2026-11-14
 
