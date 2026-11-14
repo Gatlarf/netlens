@@ -88,6 +88,8 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
     for p in s["plugins"]:
         if p["enabled"] and p.get("failing", p["ok"] is False):
             add("bad", f"Plugin {p['id']} is failing" + (f": {p['error']}" if p.get("error") else ""), f"#/settings/plugin-{p['id']}")
+        elif p["enabled"] and p.get("stale"):            # its host is simply off (that is not a failure), but for a long time: is the plugin still in use?
+            add("warn", f"Plugin {p['id']} has had no answer from {p['host']} for {p['waiting_days']} days: still in use?", f"#/settings/plugin-{p['id']}")
     last = s["scans"]["last"]
     if last and last["status"] == "failed":
         add("bad", "The last scan failed", "#/scans")

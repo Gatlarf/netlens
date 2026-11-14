@@ -17,6 +17,7 @@ async function checkUpdates(refresh) {
 // one coloured dot and a short text: green synced, red failed or in trouble, grey off or waiting
 function health(p) {
   if (p.problem && !p.status) return "bad";
+  if (p.status && !p.status.ok && p.status.reason === "host_down") return "off";       // its host is off: waiting, not failing
   if (p.status && !p.status.ok) return "bad";
   if (p.status && p.status.ok) return p.enabled ? "ok" : "off";
   return "off";
@@ -27,12 +28,14 @@ function statusCell(p) {
   if (p.problem && !p.status) return h("td", { class: "error plugin-status" }, p.problem);
   if (!p.status) return h("td", { class: "hint plugin-status" }, p.enabled ? "waiting for the first sync" : "");
   if (p.status.ok) return h("td", { class: "hint plugin-status" }, `synced ${timeAgo(p.status.ts)}`);
+  if (p.status.reason === "host_down") return h("td", { class: "hint plugin-status" }, `waiting for ${p.status.host_name || p.status.host || "the host"} (offline)`);
   return h("td", { class: "error plugin-status" }, `failed ${timeAgo(p.status.ts)}: ${p.status.error}`);
 }
 
 // the running state before the switch: green Running, red Failing or Off
 function runCell(p) {
-  const state = !p.enabled ? ["Off", "bad"] : health(p) === "bad" ? ["Failing", "bad"] : ["Running", "ok"];
+  const waiting = p.enabled && p.status && !p.status.ok && p.status.reason === "host_down";
+  const state = !p.enabled ? ["Off", "bad"] : waiting ? ["Waiting", "off"] : health(p) === "bad" ? ["Failing", "bad"] : ["Running", "ok"];
   return h("td", { class: `run run-${state[1]}` }, state[0]);
 }
 

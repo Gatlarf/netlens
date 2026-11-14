@@ -181,6 +181,9 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
 
     for p in doc["plugins"]:
         if p["enabled"]:
+            if p.get("host_down"):
+                out.sample("netlens_plugin_waiting_for_host", 1, "1 while the plugin waits for a host that is offline (not a failure)", plugin=p["id"])
+                continue
             out.sample("netlens_plugin_up", 1 if p["ok"] else 0, "1 when the plugin's last sync worked", plugin=p["id"])
             out.sample("netlens_plugin_last_sync_timestamp_seconds", _ts(p["ts"]), "When the plugin last synced", plugin=p["id"])
 

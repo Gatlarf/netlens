@@ -549,6 +549,7 @@ def _services(conn, now: str) -> dict:
 
 
 def _plugin_status(conn) -> list[dict]:
+    from app.plugins.reach import unreachable_days
     from app.plugins.service import failure_grace
 
     grace = failure_grace(conn)
@@ -566,10 +567,20 @@ def _plugin_status(conn) -> list[dict]:
         ok = (status or {}).get("ok") if status else None
         fails = ((status or {}).get("fails") or grace) if ok is False else 0      # a failure stored before the count existed is judged as before
         # a refused login is a problem at once (syncing is paused); a timeout or a busy server only after a few failures in a row
-        failing = ok is False and (bool((status or {}).get("auth_failed")) or fails >= grace)
+        host_down = ok is False and (status or {}).get("reason") == "host_down"       # its host is off: not a plugin problem (see app/plugins/reach.py)
+        failing = ok is False and not host_down and (bool((status or {}).get("auth_failed")) or fails >= grace)
+        since = (status or {}).get("first_failed") if host_down else None
+        waiting_days = None
+        if since:
+            try:
+                waiting_days = max(0, (_parse(utcnow()) - _parse(since)).days)
+            except (ValueError, TypeError):
+                pass
         out.append({
             "id": plugin_id, "enabled": enabled,
             "ok": ok, "failing": failing, "fails": fails, "grace": grace,
+            "host_down": host_down, "host": (status or {}).get("host_name") or (status or {}).get("host") if host_down else None, "waiting_days": waiting_days,
+            "stale": host_down and waiting_days is not None and waiting_days >= unreachable_days(conn),
             "error": (status or {}).get("error") if status and not status.get("ok") else None,
             "ts": (status or {}).get("ts"),
         })

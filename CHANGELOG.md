@@ -2,6 +2,13 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.426 — 2026-11-14
+
+### Changed
+- **★ A plugin whose host is switched off is no longer reported as "failing"**: when a sync cannot reach a machine (no route, timed out, refused, name not found) and Netlens itself sees the device behind that address as offline, the plugin now shows a grey *Waiting for <host>* instead of a red *Failing*, raises no problem on the dashboard, in the reports or in Ask, and no longer spoils the plugin's own heartbeat. The host's own offline handling (importance, always-on, notifications) says that the machine is down. A plugin that fails while its host is up (a refused login, a certificate or service error, a closed port) is reported as before. Without a matching device only a private address counts as a silent host; a cloud address stays a plugin problem.
+- While a host is offline its plugin is tried once an hour instead of at every scan, and at once when the host is back online.
+- When a host has not answered for 7 days (setting `plugins.unreachable_days`) the dashboard shows one quiet warning: "Plugin X has had no answer from <host> for 9 days: still in use?".
+
 ## 0.4.425 — 2026-11-13
 
 ### Changed

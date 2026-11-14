@@ -13,7 +13,7 @@ from typing import Any, Callable
 from app import containers, imageupdates, linkgroups, usagecfg
 from app.db import Error as db_Error, add_event, connect, delete_setting, get_setting, set_setting, utcnow
 from app.plugins.contract import ContractError, clean_config, default_config, migrate_servers, missing_required, validate_output
-from app.plugins import enrich, runs
+from app.plugins import enrich, reach, runs
 from app.plugins.enrich import device_lookup, record_client_hints, record_client_links, record_firewall, record_router_names, record_node_health, record_switch_ports, record_usage, record_wifi
 from app.plugins.matching import match_hypervisor, norm_mac, topology_links
 from app.plugins.registry import Plugin, discover
@@ -115,7 +115,7 @@ def set_status(conn: sqlite3.Connection, plugin_id: str, **fields) -> None:
     status = {"ts": utcnow(), **fields}
     if fields.get("ok") is False:
         before = get_status(conn, plugin_id) or {}
-        again = before.get("ok") is False
+        again = before.get("ok") is False and before.get("reason") == fields.get("reason")      # waiting for a host and failing are separate stretches
         status["fails"] = (before.get("fails") or 1) + 1 if again else 1
         status["first_failed"] = (before.get("first_failed") or before.get("ts")) if again else status["ts"]
         status["grace"] = failure_grace(conn)
@@ -410,14 +410,20 @@ class PluginService:
                 raw = await self._call(plugin, "fetch", state["config"])
                 data = validate_output(plugin.manifest["kind"], raw)
             except PluginRunError as exc:
+                why = reach.classify(conn, state["config"], str(exc), exc.auth_failed)
+                if why["reason"] == reach.HOST_DOWN:
+                    # the machine is off, which is not the plugin's fault: no heartbeat failure, and the dashboard stays quiet (the device's own offline handling speaks)
+                    log.info("plugin %s: host %s does not answer", plugin.id, why["host"])
+                    set_status(conn, plugin.id, ok=False, error=str(exc), auth_failed=False, reason=reach.HOST_DOWN, host=why["host"], host_device_id=why["device_id"], host_name=why["device"])
+                    return {"error": str(exc), "auth_failed": False, "host_down": True}
                 log.warning("plugin %s failed: %s", plugin.id, exc)
-                set_status(conn, plugin.id, ok=False, error=str(exc), auth_failed=exc.auth_failed)
+                set_status(conn, plugin.id, ok=False, error=str(exc), auth_failed=exc.auth_failed, reason=reach.FAILED)
                 runs.record(conn, plugin.id, False, None, str(exc))
                 return {"error": str(exc), "auth_failed": exc.auth_failed}
             except ContractError as exc:
                 log.warning("plugin %s returned invalid data: %s", plugin.id, exc)
                 message = f"the plugin returned data that does not follow the contract: {exc}"
-                set_status(conn, plugin.id, ok=False, error=message, auth_failed=False)
+                set_status(conn, plugin.id, ok=False, error=message, auth_failed=False, reason=reach.FAILED)
                 runs.record(conn, plugin.id, False, None, message)
                 return {"error": message, "auth_failed": False}
             set_setting(conn, _key(plugin.id, "data"), json.dumps(data))
@@ -481,7 +487,7 @@ class PluginService:
         """Scan hook: refresh every enabled plugin, then put back the links the scan's inference just replaced.
 
         A plugin whose last attempt was a refused login is not asked again until the user saves or syncs it (so a
-        wrong password cannot get an account locked). A failing plugin keeps its last good links.
+        wrong password cannot get an account locked). A plugin waiting for a host that is offline is only tried once an hour, and at once when the host is back. A failing plugin keeps its last good links.
         """
         conn = connect(self.db_path)
         try:
@@ -491,7 +497,8 @@ class PluginService:
                     continue
                 if get_state(conn, plugin)["enabled"]:
                     status = get_status(conn, plugin.id) or {}
-                    enabled.append((plugin, bool(status.get("auth_failed"))))
+                    paused = bool(status.get("auth_failed")) or (status.get("reason") == reach.HOST_DOWN and not reach.due_again(conn, status))
+                    enabled.append((plugin, paused))
         finally:
             conn.close()
         for plugin, paused in enabled:

@@ -7,6 +7,9 @@ const KIND_LABEL = { hypervisor: "Hypervisor", topology: "Network topology", dns
 function statusText(plugin) {
   const s = plugin.status;
   if (!s) return null;
+  if (!s.ok && s.reason === "host_down") {
+    return { error: false, text: `Waiting for ${s.host_name || s.host || "the host"}: it does not answer and Netlens sees it as offline (${timeAgo(s.ts)}). That is not a plugin problem; it is tried again when the host is back, and otherwise once an hour.` };
+  }
   if (!s.ok) {
     const paused = s.auth_failed ? ". Automatic syncing is paused until you save or sync again." : "";
     const retry = !s.auth_failed && s.fails && s.fails < s.grace ? `. Failure ${s.fails} of ${s.grace} before it counts as a problem; it is tried again at the next scan.` : "";

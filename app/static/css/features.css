@@ -653,6 +653,7 @@ table.plist td:nth-child(4) { width: 84px; font-weight: 600; text-align: right; 
 table.plist td:nth-child(5) { width: 110px; text-align: right; }
 .run-ok { color: #15803d; }
 .run-bad { color: #b91c1c; }
+.run-off { color: #6b7280; }
 table.plist td:nth-child(3) { overflow: hidden; text-overflow: ellipsis; }
 table.plist .btn { padding: 3px 10px; font-size: 0.85em; }
 @media (max-width: 640px) { table.plist td:nth-child(1) { width: 36%; } table.plist td:nth-child(2), table.plist td:nth-child(3) { display: none; } table.plist td:nth-child(4) { width: 64px; } table.plist td:nth-child(5) { width: 84px; } }
