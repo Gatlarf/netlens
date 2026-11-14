@@ -167,7 +167,10 @@ def test_api_advice_accept_and_review(client):
     assert [x["id"] for x in done["accepted"]] == ["upnp"]
     assert "upnp" not in {x["id"] for x in client.get("/api/config-advice").json()["findings"]}
     assert client.get(f"/api/devices/{dev}/config/advice").json()["accepted"][0]["accepted"]["who"]
+    mine = lambda: [i for i in client.get("/api/dashboard").json()["attention"] if i.get("accept", {}).get("finding") == "upnp"]      # noqa: E731
+    assert mine() == []                                  # the dashboard (which keeps its list for a few seconds) shows it gone at once
     assert client.delete(f"/api/devices/{dev}/config/advice/upnp").status_code == 200
+    assert len(mine()) == 1 and mine()[0]["accept"]["device_id"] == dev          # and back again after Undo
     assert client.post(f"/api/devices/{dev}/config/review").status_code == 409              # no model set up
     assert client.get("/api/devices/9999/config/advice").status_code == 404
     anon = TestClient(client.app_)
@@ -183,6 +186,7 @@ def test_recommendations_reach_the_dashboard_ask_and_mcp(conn):
     cc.record(conn, "asus", data(LIVE), "2026-11-11T10:00:00Z", version="1.6.3")
     items = dashboard._config_attention(conn)
     assert items and items[0]["level"] == "bad" and items[0]["href"] == "#/device/1/network/config" and "typing mistake" in items[0]["text"]
+    assert set(items[0]["accept"]) == {"device_id", "finding"} and items[0]["accept"]["device_id"] == 1
     r = ask_more.t_security(conn, {})
     assert any("typing mistake" in c["problem"] for c in r["config_recommendations"]) and "typing mistake" in ask_more.r_security(r)
     assert "get_config_advice" in mcp.TOOLS

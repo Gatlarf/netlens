@@ -9,7 +9,7 @@ import { openEditor } from "../dashboard_editor.js";
 import { layoutHorizontal } from "../layout_horizontal.js";
 import { buildHealthCard, healthTone } from "../cards/health_map.js";
 import { buildCapacityCard, capacityTone } from "../cards/capacity.js";
-import { snoozeMenu, snoozedList } from "../snooze.js";
+import { acceptButton, snoozeMenu, snoozedList } from "../snooze.js";
 import { WIDGETS as STAT_WIDGETS } from "./overview.js";
 import { controlBar, dragCard, nextSize, openDrawer } from "../board.js";
 import { masonry } from "../masonry.js";
@@ -168,7 +168,7 @@ const CARDS = [
     tone: (d) => (d.attention.some((a) => a.level === "bad") ? "bad" : d.attention.some((a) => a.level === "warn") ? "warn" : "ok"),
     build: ({ attention, snoozed }) => h("div", {},
       attention.length
-        ? h("ul", { class: "d-attention" }, attention.map((a) => h("li", { class: `d-${a.level}` }, h("a", { href: a.href }, a.text), a.snooze ? " " : null, snoozeMenu(a.snooze))))
+        ? h("ul", { class: "d-attention" }, attention.map((a) => h("li", { class: `d-${a.level}` }, h("a", { href: a.href }, a.text), a.snooze || a.accept ? " " : null, snoozeMenu(a.snooze), acceptButton(a.accept))))
         : h("p", { class: "d-quiet" }, snoozed && snoozed.length ? "All quiet. What you snoozed is below." : "All quiet. Nothing needs your attention."),
       snoozedList(snoozed)) },
   { id: "health", title: "Health", href: "#/health", size: "w", def: true, about: "A heat-map of the devices whose health is monitored (processor, memory, disk), with what is past a limit.",

@@ -47,6 +47,13 @@ def device_advice(device_id: int, request: Request, conn=Depends(get_conn)) -> d
     return {**advice, "review": configadvice.last_review(conn, device_id), "review_available": bool(insights.allowed(conn) and insights.llm_ready(conn))}
 
 
+def _forget_dashboard(request: Request) -> None:
+    """The dashboard's list of problems is kept for a few seconds: an accepted (or restored) recommendation must show at once."""
+    from app.api.stats import _cache_clear
+
+    _cache_clear(request)
+
+
 @router.put("/devices/{device_id}/config/advice/{finding_id:path}")
 def accept_finding(device_id: int, finding_id: str, body: AcceptBody, request: Request, conn=Depends(get_conn)) -> dict:
     """Accept a finding with a reason: it leaves the problem list and stays visible on the device."""
@@ -59,6 +66,7 @@ def accept_finding(device_id: int, finding_id: str, body: AcceptBody, request: R
     if finding_id not in {x["id"] for x in advice.get("findings", []) + advice.get("accepted", [])}:
         raise HTTPException(status_code=404, detail="no such finding")
     configadvice.accept(conn, device_id, finding_id, reason, getattr(getattr(request.state, "user", None), "username", "") or "an admin")
+    _forget_dashboard(request)
     return configadvice.for_device(conn, device_id)
 
 
@@ -67,6 +75,7 @@ def unaccept_finding(device_id: int, finding_id: str, request: Request, conn=Dep
     require_admin(request)
     _device(conn, device_id)
     configadvice.unaccept(conn, device_id, finding_id)
+    _forget_dashboard(request)
     return configadvice.for_device(conn, device_id) or {"plugin": None}
 
 

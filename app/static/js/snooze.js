@@ -1,4 +1,5 @@
-import { post, del } from "./api.js";
+import { post, put, del } from "./api.js";
+import { formDialog } from "./formdialog.js";
 import { h, toast, isAdmin, timeAgo } from "./util.js";
 
 // "I know about this": a small menu that snoozes one problem for a while, and the button that ends it.
@@ -23,6 +24,26 @@ export function snoozeMenu(subject) {
     }
   });
   return select;
+}
+
+// A recommendation about a router's or controller's settings is not snoozed but accepted (it is a choice, not an event): with a reason, until it is undone.
+export function acceptButton(accept) {
+  if (!accept || !isAdmin()) return null;
+  const b = h("button", { class: "btn act-only", type: "button", title: "This is intended: keep it out of the problem list (Undo on the device page, Network tab, Recommendations)" }, "Accept…");
+  b.addEventListener("click", async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const v = await formDialog({ title: "Accept this recommendation", fields: [{ key: "reason", label: "Why is this intended?", type: "textarea", required: true }], ok: "Accept" });
+    if (!v || !v.reason.trim()) return;
+    try {
+      await put(`/api/devices/${accept.device_id}/config/advice/${encodeURIComponent(accept.finding)}`, { reason: v.reason });
+      toast("Accepted. It stays out of the problem list until you undo it.", "success");
+      changed();
+    } catch (err) {
+      toast(err.message || "Could not accept", "error");
+    }
+  });
+  return b;
 }
 
 export function wakeButton(subject) {
