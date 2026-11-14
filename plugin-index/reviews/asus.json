@@ -2,6 +2,17 @@
   "id": "asus",
   "reviews": [
     {
+      "version": "1.6.4",
+      "sha256": "98ef2cd8ba6b606b5dafcb0a1bee4345574a351957b5978e93b7ac2a11f4416d",
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-14",
+      "tested_on": [
+        "ASUS RT-AX92U on stock ASUSWRT 3.0.0.4.388, the maintainer's router: with UPnP switched off on the WAN page the plugin now reads wan_upnp_enable = 0 (the global upnp_enable flag still read 1), and the UPnP recommendation disappeared after a scan"
+      ],
+      "notes": "Written with the assistant Claude. Only changes which setting Record configuration changes reads for UPnP (wan_upnp_enable first, then upnp_enable on a firmware without it); no new request when the option is off. Reviewed and confirmed by the maintainer on this router."
+    },
+    {
       "version": "1.5.0",
       "sha256": "7f0c7b6df39d7f586689fae5c540a66c5cdf0d4a09cf6b4401ef0e2a70188ed1",
       "level": "reviewed",

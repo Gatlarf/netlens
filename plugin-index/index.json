@@ -186,7 +186,13 @@
      "released": "2026-11-14",
      "changelog": "Record configuration changes reads the UPnP setting of the WAN page (wan_upnp_enable) instead of the global upnp_enable flag, which can stay on while the router says UPnP is off (ASUS 3.0.0.4.388), so the UPnP recommendation goes away when you switch UPnP off. Nothing changes while the option is off. Needs Netlens 0.4.387.",
      "review": {
-      "level": "community"
+      "level": "reviewed",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-14",
+      "tested_on": [
+       "ASUS RT-AX92U on stock ASUSWRT 3.0.0.4.388, the maintainer's router: with UPnP switched off on the WAN page the plugin now reads wan_upnp_enable = 0 (the global upnp_enable flag still read 1), and the UPnP recommendation disappeared after a scan"
+      ],
+      "notes": "Written with the assistant Claude. Only changes which setting Record configuration changes reads for UPnP (wan_upnp_enable first, then upnp_enable on a firmware without it); no new request when the option is off. Reviewed and confirmed by the maintainer on this router."
      }
     },
     {
