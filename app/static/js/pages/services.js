@@ -131,7 +131,8 @@ export async function render(container) {
       const doEdit = () => showForm(c);
       const doPause = async () => { await patch(`/api/service-checks/${c.id}`, { enabled: !c.enabled }); load(); };
       const doRemove = async () => {
-        if (!window.confirm(`Delete the check "${c.name}" and its history?`)) return;
+        const made = c.source && !String(c.source).startsWith("central:");         // a plugin made it for a site: it stays deleted until restored
+        if (!window.confirm(`Delete the check "${c.name}" and its history?${made ? " It was made by a plugin for a site; it stays deleted (you can restore it from the site's list)." : ""}`)) return;
         try {
           await del(`/api/service-checks/${c.id}`);
           toast("Check deleted", "success");

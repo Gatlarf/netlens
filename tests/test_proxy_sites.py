@@ -225,6 +225,38 @@ def test_checks_follow_the_list_and_keep_what_the_user_changed(db):
     assert set(checks(conn)) == {None}
 
 
+def test_a_deleted_site_check_stays_deleted_until_it_is_restored(tmp_path):
+    path = tmp_path / "t.db"
+    app = create_app(load_settings({"NETLENS_TOKEN": "t", "NETLENS_DATA_DIR": str(tmp_path)}), db_path=path)
+    with TestClient(app, headers={"Authorization": "Bearer t"}) as c:
+        conn = connect(path)
+        get_or_create_device(conn, "aa:00:00:00:00:84", "192.168.0.184")
+        data = output(site("1", ["cam.example.com"], "192.168.0.50", 80), site("2", ["keep.example.com"], "192.168.0.50", 80))
+        sites.apply_proxy(conn, "npm", data, {}, NOW)
+        victim = conn.execute("SELECT id FROM service_checks WHERE source = 'npm:npm:1'").fetchone()[0]
+        mine = conn.execute("INSERT INTO service_checks (name, kind, host, port, created) VALUES ('mine', 'tcp', 'x', 22, 'now')").lastrowid
+        conn.commit()
+        assert c.delete(f"/api/service-checks/{victim}").json() == {"removed": victim, "stays_removed": True}
+        assert c.delete(f"/api/service-checks/{mine}").json() == {"removed": mine}             # a check of your own has no memory to keep
+        for _ in range(3):                                                                           # the plugin syncs again and again
+            sites.apply_proxy(conn, "npm", data, {}, NOW)
+        assert set(checks(conn)) == {"npm:npm:2"}
+        listed = {s["id"]: s for s in c.get("/api/sites").json()["sites"]}
+        assert listed["1"]["check_id"] is None and listed["1"]["check_removed"] is True and listed["2"]["check_removed"] is False
+        assert c.post("/api/sites/check", json={"plugin_id": "npm", "proxy_id": "npm", "site_id": "1"}).json() == {"restored": True}
+        assert set(checks(conn)) == {"npm:npm:1", "npm:npm:2"} and c.get("/api/sites").json()["sites"][0]["check_removed"] is False
+        sites.apply_proxy(conn, "npm", data, {}, NOW)
+        assert set(checks(conn)) == {"npm:npm:1", "npm:npm:2"}                                       # and it is kept up to date again
+        assert c.post("/api/sites/check", json={"plugin_id": "npm", "proxy_id": "npm", "site_id": "nope"}).status_code == 404
+        # the memory goes when the site is gone from the proxy, so a new site with that id gets its check
+        c.delete(f"/api/service-checks/{conn.execute('SELECT id FROM service_checks WHERE source = ?', ('npm:npm:2',)).fetchone()[0]}")
+        sites.apply_proxy(conn, "npm", output(site("1", ["cam.example.com"], "192.168.0.50", 80)), {}, NOW)
+        assert sites.removed_checks(conn) == set()
+        sites.apply_proxy(conn, "npm", data, {}, NOW)
+        assert "npm:npm:2" in checks(conn)
+        conn.close()
+
+
 def test_a_proxy_without_an_address_gets_no_checks(db):
     conn, _ = db
     assert sites.apply_proxy(conn, "npm", output(site("1", ["a.example.com"], "192.168.0.50", 80), ip=None), {}, NOW)["checks"] == 0

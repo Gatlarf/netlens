@@ -166,8 +166,55 @@ def _site_check(site: dict, proxy_ip: str | None, device_id: int | None, interva
             "interval_s": interval, "timeout_s": 10, "device_id": device_id}
 
 
+REMOVED_KEY = "sites.removed_checks"      # JSON list: the sources of site checks the user deleted. A sync does not make them again.
+
+
+def removed_checks(conn: sqlite3.Connection) -> set[str]:
+    data = _json(get_setting(conn, REMOVED_KEY), [])
+    return {x for x in data if isinstance(x, str)} if isinstance(data, list) else set()
+
+
+def _save_removed(conn: sqlite3.Connection, sources: set[str]) -> None:
+    set_setting(conn, REMOVED_KEY, json.dumps(sorted(sources)))
+
+
+def keep_removed(conn: sqlite3.Connection, source: str | None) -> bool:
+    """Called when somebody deletes a service check: one a plugin made for a site is remembered as removed, so the next sync does not bring it back."""
+    if not source or source.startswith("central:"):
+        return False
+    _save_removed(conn, removed_checks(conn) | {source})
+    return True
+
+
+def _insert_check(conn: sqlite3.Connection, source: str, c: dict, now: str) -> None:
+    conn.execute(
+        "INSERT INTO service_checks (device_id, name, kind, host, port, path, expect, interval_s, timeout_s, enabled, created, source, via) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+        (c["device_id"], c["name"], c["kind"], c["host"], c["port"], c["path"], c["expect"], c["interval_s"], c["timeout_s"], now, source, c["via"]))
+
+
+def restore_check(conn: sqlite3.Connection, plugin_id: str, proxy_id: str, site_id: str) -> bool:
+    """Make the check of a site again after it was deleted. False when there is no such site or it cannot have a check."""
+    source = f"{plugin_id}:{proxy_id}:{site_id}"
+    row = conn.execute("SELECT * FROM proxy_sites WHERE plugin_id = ? AND proxy_id = ? AND site_id = ?", (plugin_id, proxy_id, site_id)).fetchone()
+    if row is None:
+        return False
+    _save_removed(conn, removed_checks(conn) - {source})
+    if conn.execute("SELECT 1 FROM service_checks WHERE source = ?", (source,)).fetchone():
+        return True
+    proxy_ip = conn.execute("SELECT primary_ip FROM devices WHERE id = ?", (row["proxy_device_id"],)).fetchone() if row["proxy_device_id"] else None
+    details = _json(row["details"], {})
+    site = {"type": row["type"], "enabled": bool(row["enabled"]), "domains": _json(row["domains"], []), "ssl": bool(details.get("ssl"))}
+    check = _site_check(site, proxy_ip["primary_ip"] if proxy_ip else None, row["target_device_id"] or row["proxy_device_id"], 300)
+    if check is None:
+        return False
+    _insert_check(conn, source, check, utcnow())
+    conn.commit()
+    return True
+
+
 def _sync_checks(conn: sqlite3.Connection, plugin_id: str, wanted: dict[str, dict], now: str) -> int:
     existing = {r["source"]: dict(r) for r in conn.execute("SELECT * FROM service_checks WHERE source LIKE ?", (f"{plugin_id}:%",))}
+    gone = removed_checks(conn)
     for source, row in existing.items():
         if source not in wanted:
             conn.execute("DELETE FROM service_checks WHERE id = ?", (row["id"],))
@@ -179,10 +226,8 @@ def _sync_checks(conn: sqlite3.Connection, plugin_id: str, wanted: dict[str, dic
             if (row["host"], row["via"], row["port"]) != (c["host"], c["via"], c["port"]):     # another target: the old state says nothing about it
                 conn.execute("UPDATE service_checks SET last_ts = NULL, last_up = NULL, last_ms = NULL, last_detail = NULL, since = NULL WHERE id = ?", (row["id"],))
                 conn.execute("DELETE FROM service_results WHERE check_id = ?", (row["id"],))
-        else:
-            conn.execute(
-                "INSERT INTO service_checks (device_id, name, kind, host, port, path, expect, interval_s, timeout_s, enabled, created, source, via) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
-                (c["device_id"], c["name"], c["kind"], c["host"], c["port"], c["path"], c["expect"], c["interval_s"], c["timeout_s"], now, source, c["via"]))
+        elif source not in gone:          # one the user deleted stays deleted
+            _insert_check(conn, source, c, now)
     return min(len(wanted), MAX_CHECKS)
 
 
@@ -222,6 +267,10 @@ def apply_proxy(conn: sqlite3.Connection, plugin_id: str, data: dict, config: di
             if check:
                 wanted[f"{plugin_id}:{s['proxy_id']}:{s['id']}"] = check
     checks = _sync_checks(conn, plugin_id, wanted, stamp)
+    if config.get("create_checks", True):          # a site that is gone from the proxy needs no memory of its deleted check
+        stale = {x for x in removed_checks(conn) if x.startswith(f"{plugin_id}:") and x not in wanted}
+        if stale:
+            _save_removed(conn, removed_checks(conn) - stale)
     warn = int(config.get("cert_warn_days") or 14)
     fresh = _cert_events(conn, plugin_id, data, proxy_device, max(1, min(warn, 90)), now)
     conn.commit()
@@ -236,7 +285,7 @@ def _present(conn: sqlite3.Connection, r: sqlite3.Row, names: dict[int, str], no
     check = conn.execute("SELECT id, last_up FROM service_checks WHERE source = ?", (f"{r['plugin_id']}:{r['proxy_id']}:{r['site_id']}",)).fetchone()
     days = _cert_days(details.get("cert_expires"), now)
     return {
-        "plugin_id": r["plugin_id"], "id": r["site_id"], "type": r["type"], "domains": _json(r["domains"], []), "enabled": bool(r["enabled"]),
+        "plugin_id": r["plugin_id"], "proxy_id": r["proxy_id"], "id": r["site_id"], "type": r["type"], "domains": _json(r["domains"], []), "enabled": bool(r["enabled"]),
         "proxy": r["proxy_name"], "proxy_device_id": r["proxy_device_id"], "proxy_device": names.get(r["proxy_device_id"]),
         "scheme": r["scheme"], "forward_host": r["forward_host"], "forward_port": r["forward_port"],
         "target_device_id": r["target_device_id"], "target_device": names.get(r["target_device_id"]), "target_name": r["target_name"], "target_how": r["target_how"],
@@ -244,6 +293,7 @@ def _present(conn: sqlite3.Connection, r: sqlite3.Row, names: dict[int, str], no
         "ssl": bool(details.get("ssl")), "cert_expires": details.get("cert_expires"), "cert_days": days, "cert_name": details.get("cert_name"),
         "access_list": details.get("access_list"), "redirect_to": details.get("redirect_to"), "incoming_port": details.get("incoming_port"),
         "protocols": details.get("protocols"), "websockets": bool(details.get("websockets")), "name": details.get("name"),
+        "check_removed": not check and f"{r['plugin_id']}:{r['proxy_id']}:{r['site_id']}" in removed_checks(conn),
         "check_id": check["id"] if check else None, "check_state": None if not check or check["last_up"] is None else ("up" if check["last_up"] else "down"),
     }
 

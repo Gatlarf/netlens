@@ -18,7 +18,7 @@ from typing import Any
 
 from app import arpcache, dbengine, tsdb, vault
 from app.db import add_event, connect, get_setting, set_setting, utcnow
-from app.hostmetrics import snmp, snmpv3, ssh, winrm
+from app.hostmetrics import loadwatch, snmp, snmpv3, ssh, winrm
 
 log = logging.getLogger(__name__)
 
@@ -636,7 +636,7 @@ async def check_process(db_path: str, device_id: int | None, name: str, timeout:
 
 
 # ----------------------------------------------------------------------------- alerts
-def _describe(rule: dict[str, Any], metric: str, label: str, value: float, level: str, device: str) -> str:
+def _describe(rule: dict[str, Any], metric: str, label: str, value: float, level: str, device: str, cause: str | None = None) -> str:
     unit = rule["unit"]
     shown = f"{value:.0f}{unit}" if unit else f"{value:g}"
     where = f" on {label}" if label else ""
@@ -660,12 +660,17 @@ def _describe(rule: dict[str, Any], metric: str, label: str, value: float, level
     if level == "ok":
         return f"{device}: {rule['title'].lower()}{where} is back to normal ({shown})"
     limit = rule["crit"] if level == "critical" else rule["warn"]
-    return f"{device}: {rule['title'].lower()}{where} is {shown} (limit {limit:g}{unit})"
+    return f"{device}: {rule['title'].lower()}{where} is {shown} (limit {limit:g}{unit})" + (f", {cause}" if cause else "")
 
 
-def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: list[tuple], now: str | None = None) -> list[str]:
-    """Move each reading through its level (ok / warning / critical). Returns the events that were raised."""
+def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: list[tuple], now: str | None = None, top: list | None = None) -> list[str]:
+    """Move each reading through its level (ok / warning / critical). Returns the events that were raised.
+
+    `top` = [(process, share of the whole machine in %)] busiest first, read while the processor was high: it names the cause of a processor warning and
+    lets Netlens recognise a known heavy job. A scheduled or recurring busy period is not reported (app/hostmetrics/loadwatch.py)."""
     now = now or utcnow()
+    now_ts = datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+    explain = loadwatch.enabled(conn)
     the_rules = rules(conn, device_id)
     raised: list[str] = []
     for metric, label, value, _unit in points:
@@ -676,12 +681,21 @@ def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: li
             continue
         level = level_of(rule, value)
         row = conn.execute("SELECT * FROM metric_state WHERE monitor_id = ? AND metric = ? AND label = ?", (monitor_id, metric, label)).fetchone()
+        cause = None
+        if metric == "cpu_pct" and explain:
+            episode = loadwatch.track(conn, monitor_id, metric, label, level != "ok", value, top, now_ts)
+            verdict = loadwatch.judge(conn, monitor_id, metric, label, episode, value, top, now_ts) if level != "ok" else None
+            if verdict:
+                cause = verdict["cause"]
+                if verdict["explained"] and (row is None or row["level"] == "ok"):          # a warning that is already out is left to clear by itself
+                    loadwatch.note(conn, episode["id"], cause)
+                    level = "ok"
         if row is None:
             conn.execute("INSERT INTO metric_state (monitor_id, metric, label, level, since, value, pending, pending_n) VALUES (?,?,?,?,?,?,NULL,0)",
                          (monitor_id, metric, label, level, now, value))
             if level != "ok":     # a problem that exists the first time we look is a problem: tell about it
                 kind = "metric_critical" if level == "critical" else "metric_warning"
-                add_event(conn, kind, _describe(rule, metric, label, value, level, device_name), device_id=device_id, now=now, subject=f"metric:{device_id}:{metric}:{label}")
+                add_event(conn, kind, _describe(rule, metric, label, value, level, device_name, cause), device_id=device_id, now=now, subject=f"metric:{device_id}:{metric}:{label}")
                 raised.append(kind)
             continue
         if level == row["level"]:
@@ -696,7 +710,7 @@ def evaluate(conn, monitor_id: int, device_id: int, device_name: str, points: li
         conn.execute("UPDATE metric_state SET level = ?, since = ?, value = ?, pending = NULL, pending_n = 0 WHERE monitor_id = ? AND metric = ? AND label = ?",
                      (level, now, value, monitor_id, metric, label))
         kind = {"ok": "metric_ok", "warning": "metric_warning", "critical": "metric_critical"}[level]
-        add_event(conn, kind, _describe(rule, metric, label, value, level, device_name), device_id=device_id, now=now, subject=f"metric:{device_id}:{metric}:{label}")
+        add_event(conn, kind, _describe(rule, metric, label, value, level, device_name, cause if level != "ok" else None), device_id=device_id, now=now, subject=f"metric:{device_id}:{metric}:{label}")
         raised.append(kind)
     # a service that is no longer in the list of stopped ones runs again (the empty-label reading says the list was read)
     rule = the_rules.get("service_stopped")
@@ -826,6 +840,7 @@ async def run_monitor(db_path: str, monitor_id: int, now_ts: float | None = None
             from app.hostprobe import service as host_probes
 
             state.pop("via", None)
+            state.pop("top", None)
             locked = await host_probes.locked_readings(conn, row, state, now_ts)          # a host with the probe installed is asked through the locked-down account
         if locked is not None:
             points, found, fingerprint = locked
@@ -851,7 +866,7 @@ async def run_monitor(db_path: str, monitor_id: int, now_ts: float | None = None
                 groups = found
                 conn.execute("UPDATE host_monitors SET groups = ? WHERE id = ?", (json.dumps(found), monitor_id))
             if row["alerts"]:
-                raised = evaluate(conn, monitor_id, row["device_id"], name, points, stamp)
+                raised = evaluate(conn, monitor_id, row["device_id"], name, points, stamp, state.pop("top", None))
         if error is None and row["method"] == "snmp":
             await _learn_arp(conn, row, secret, state, now_ts, stamp)
         since = row["since"] if row["last_ok"] == (1 if error is None else 0) and row["since"] else stamp

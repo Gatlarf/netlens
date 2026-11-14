@@ -2,6 +2,22 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.430 — 2026-11-14
+
+### Fixed
+- **A service check you deleted came back**: the check "Site <domain>" is not made by hand but by the reverse-proxy plugin (one per proxied site), and every sync made the missing ones again. A check a plugin made is now remembered as deleted and stays deleted (the delete question says so). The site's list (plugin card, device page) then shows "removed" with a **Restore** button that makes the check again. The memory is dropped when the site itself disappears from the proxy.
+
+### Changed
+- **The device card "Recommendations" is now "Gateway recommendations" and has a "Scan again" button** (Network tab of a router, firewall or controller). It reads the settings again through the device's plugin and checks the recommendations at once, so you can see that what you just fixed is solved: the card says how many recommendations are solved and how many are still open, and the "last read" time is updated.
+
+### Added
+- **★ No more processor warnings for expected busy periods** (Health → *When to warn* → "Do not warn about expected busy periods"; on by default). A processor that is past its limit is now judged by what it is doing and when it happens:
+  - **A known heavy job**: when one process holds most of the load and it is a known harmless job (Windows Defender / MsMpEng, Windows Update, Windows telemetry and search indexing, package updates, the ClamAV scan, log rotation, backups such as borg and restic, RAID checks, Greenbone / OpenVAS scans), there is no warning as long as it runs for a normal time (for example 90 minutes for a Defender scan).
+  - **A regular time**: Netlens now keeps every busy period of a host (also the ones it did not warn about) and recognises when the host is busy every day around the same hour, on the same weekday, or at a steady interval (every 4 hours). A busy period that fits is not reported while it lasts no longer than the earlier ones (plus a margin).
+  - **When it does warn**, the warning names the cause: "…is 99% (limit 98%), mostly msmpeng (Windows Defender, the anti-malware scan); it has been busy for 95 minutes, longer than the usual 90". A stuck scan is still a problem. A warning that is already out is never hidden afterwards.
+  - The readings of Windows (WinRM and SSH) and Linux (SSH) hosts now also note the busiest processes while the processor is busy (Windows: three processes through one extra query; Linux: the processor time of the busiest 40 processes between two rounds). Hosts read over SNMP or through the locked-down probe account have no process names; the regular-time check still works for them.
+  - A device's **Health** tab lists its **Busy periods** of the last 14 days: when, how long, how high, what, and whether Netlens explained it.
+
 ## 0.4.429 — 2026-11-14
 
 ### Added

@@ -1,5 +1,5 @@
-import { get } from "../api.js";
-import { h } from "../util.js";
+import { get, post } from "../api.js";
+import { h, toast } from "../util.js";
 
 const TYPE_TEXT = { proxy: "", redirect: "redirects to ", stream: "stream ", dead: "404 page" };
 
@@ -48,6 +48,21 @@ function certCell(s) {
 
 function checkCell(s) {
   const cell = h("td", {});
+  if (!s.check_id && s.check_removed) {
+    const restore = h("button", { class: "btn admin-only", type: "button", title: "You deleted the check of this site. Make it again." }, "Restore");
+    restore.addEventListener("click", async () => {
+      restore.disabled = true;
+      try {
+        await post("/api/sites/check", { plugin_id: s.plugin_id, proxy_id: s.proxy_id || "", site_id: s.id });
+        toast("The check is back", "success");
+        restore.replaceWith(h("span", { class: "hint" }, "restored"));
+      } catch (err) {
+        toast(err.message || "Could not restore the check", "error");
+        restore.disabled = false;
+      }
+    });
+    return cell.append(h("span", { class: "hint" }, "removed "), restore), cell;
+  }
   if (!s.check_id) return cell.appendChild(h("span", { class: "hint" }, "–")), cell;
   cell.appendChild(h("a", { href: "#/services", title: "See it under Services" }, s.check_state === "up" ? "up" : s.check_state === "down" ? "DOWN" : "waiting"));
   return cell;

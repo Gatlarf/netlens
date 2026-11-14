@@ -17,6 +17,7 @@ import { buildLinkGroupsCard } from "../cards/link_groups.js";
 import { buildNicsCard } from "../cards/nics.js";
 import { buildDeviceApplicationsCard } from "../cards/device_apps.js";
 import { buildDeviceConfigCards } from "../cards/device_config.js";
+import { buildDeviceBusyCard } from "../cards/device_busy.js";
 import { buildPortMapCard, isPortMapBusy } from "../cards/port_map.js";
 import { buildFirewallCard } from "../cards/firewall.js";
 import { buildDeviceServicesCard } from "../cards/device_services.js";
@@ -919,6 +920,9 @@ export async function render(container, params) {
     const servicesSlot = slot("services", "Service checks", false, "list");
     hRight.appendChild(servicesSlot);
     buildDeviceServicesCard(device).then((c) => { if (!disposed) servicesSlot.appendChild(c); }).catch(() => {});
+    const busySlot = slot("busy", "Busy periods", false, "list");
+    hRight.appendChild(busySlot);
+    buildDeviceBusyCard(device).then((c) => { if (c && !disposed) busySlot.appendChild(c); }).catch(() => {});
     health.appendChild(flowOf(performanceSlot, hLeft, hRight));
     panels.health = health;
 
@@ -931,7 +935,7 @@ export async function render(container, params) {
     const appsSlot = slot("apps", "Applications", false, "list");
     flow.appendChild(appsSlot);
     buildDeviceApplicationsCard(device).then((c) => { if (c && !disposed) appsSlot.appendChild(c); }).catch(() => {});
-    const configSlot = slot("config", "Recommendations", false, "list");
+    const configSlot = slot("config", "Gateway recommendations", false, "list");
     const changesSlot = slot("config-changes", "Configuration changes", false, "list");
     flow.append(configSlot, changesSlot);
     buildDeviceConfigCards(device).then(({ advice, changes }) => {

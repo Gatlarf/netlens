@@ -1144,6 +1144,24 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    # busy periods of a host's processor (see app/hostmetrics/loadwatch.py): kept also when they raised nothing, so Netlens learns when a host is normally busy
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS load_episodes (
+            id INTEGER PRIMARY KEY,
+            monitor_id INTEGER NOT NULL REFERENCES host_monitors(id) ON DELETE CASCADE,
+            metric TEXT NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            start_ts INTEGER NOT NULL,
+            last_ts INTEGER NOT NULL,
+            end_ts INTEGER,
+            peak REAL NOT NULL DEFAULT 0,
+            process TEXT,
+            explained TEXT
+        )
+        """
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_load_episodes ON load_episodes(monitor_id, metric, label, start_ts)")
 
     # --- schema v23: remote sites (other Netlens instances that report to this one) --------------------------------
     cur.execute(

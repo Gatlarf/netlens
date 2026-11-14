@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app import tsdb
+from app import sites, tsdb
 from app.api.devices import get_conn
 from app.db import insert_id, utcnow
 from app.services import CheckError, describe, record_result, run_check, validate_check
@@ -134,11 +134,12 @@ def delete_check(check_id: int, conn=Depends(get_conn)) -> dict:
     if str(row["source"] or "").startswith("central:"):
         raise HTTPException(status_code=409, detail="this check is managed by the central Netlens and cannot be removed here")
     conn.execute("DELETE FROM service_checks WHERE id = ?", (check_id,))
+    stays = sites.keep_removed(conn, row["source"])           # a check a plugin made for a site would otherwise be made again by the next sync
     conn.commit()
     store = tsdb.for_conn(conn)
     if store is not None:
         store.forget("service", check_id)
-    return {"removed": check_id}
+    return {"removed": check_id, **({"stays_removed": True} if stays else {})}
 
 
 @router.post("/service-checks/{check_id}/run")

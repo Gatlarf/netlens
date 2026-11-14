@@ -29,7 +29,7 @@ export function snoozeMenu(subject) {
 // A recommendation about a router's or controller's settings is not snoozed but accepted (it is a choice, not an event): with a reason, until it is undone.
 export function acceptButton(accept) {
   if (!accept || !isAdmin()) return null;
-  const b = h("button", { class: "btn act-only", type: "button", title: "This is intended: keep it out of the problem list (Undo on the device page, Network tab, Recommendations)" }, "Accept…");
+  const b = h("button", { class: "btn act-only", type: "button", title: "This is intended: keep it out of the problem list (Undo on the device page, Network tab, Gateway recommendations)" }, "Accept…");
   b.addEventListener("click", async (e) => {
     e.preventDefault();
     e.stopPropagation();

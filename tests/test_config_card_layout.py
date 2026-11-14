@@ -11,5 +11,5 @@ def test_recommendations_and_changes_are_collapsed_to_their_title():
 
 def test_recommendations_and_changes_are_two_cards():
     device = (Path(__file__).resolve().parent.parent / "app" / "static" / "js" / "pages" / "device.js").read_text()
-    assert "buildDeviceConfigCards" in device and 'slot("config", "Recommendations"' in device and 'slot("config-changes", "Configuration changes"' in device
+    assert "buildDeviceConfigCards" in device and 'slot("config", "Gateway recommendations"' in device and 'slot("config-changes", "Configuration changes"' in device
     assert "return { advice: card, changes: changesCard }" in JS

@@ -203,6 +203,7 @@ def overview(conn=Depends(get_conn)) -> dict:
 
 class LimitsBody(BaseModel):
     rules: dict[str, dict[str, Any]]
+    explain_load: bool | None = None        # no warning for a busy processor that is a known heavy job or happens at regular times (app/hostmetrics/loadwatch.py)
 
 
 @router.get("/devices/{device_id}/limits")
@@ -230,14 +231,23 @@ def get_forecast(conn=Depends(get_conn)) -> dict:
     return {"items": forecast.forecasts(conn), "alert_days": forecast.alert_days(conn)}
 
 
+@router.get("/devices/{device_id}/busy-periods")
+def get_busy_periods(device_id: int, days: int = 14, conn=Depends(get_conn)) -> dict:
+    """The times this host's processor was past its limit (also the ones Netlens explained and did not warn about), newest first."""
+    return {"enabled": hm.loadwatch.enabled(conn), "periods": hm.loadwatch.recent(conn, device_id, max(1, min(60, days)))}
+
+
 @router.get("/monitoring/limits")
 def get_limits(conn=Depends(get_conn)) -> dict:
-    return {"rules": hm.rules(conn)}
+    return {"rules": hm.rules(conn), "explain_load": hm.loadwatch.enabled(conn)}
 
 
 @router.put("/monitoring/limits")
 def put_limits(body: LimitsBody, conn=Depends(get_conn)) -> dict:
     try:
-        return {"rules": hm.save_rules(conn, body.rules)}
+        saved = hm.save_rules(conn, body.rules)
+        if body.explain_load is not None:
+            hm.loadwatch.set_enabled(conn, body.explain_load)
+        return {"rules": saved, "explain_load": hm.loadwatch.enabled(conn)}
     except hm.MonitorError as exc:
         raise HTTPException(status_code=422, detail=str(exc))

@@ -33,6 +33,7 @@ export async function render(container) {
   const list = h("div", {});
   const limitsSlot = h("div", {});
   let limitsOpen = false;      // kept when the page refreshes
+  let explainLoad = true;      // the "expected busy periods" switch of the limits card
   let filter = "";
 
   function draw() {
@@ -124,7 +125,9 @@ export async function render(container) {
       }
       save.disabled = true;
       try {
-        rules = (await put("/api/monitoring/limits", { rules: payload })).rules;
+        const saved = await put("/api/monitoring/limits", { rules: payload, explain_load: explainBox.checked });
+        rules = saved.rules;
+        explainLoad = saved.explain_load;
         toast("Limits saved", "success");
         draw();
       } catch (err) {
@@ -132,7 +135,11 @@ export async function render(container) {
       }
       save.disabled = false;
     });
-    card.append(h("div", { class: "table-wrap" }, table), save);
+    const explainBox = h("input", { type: "checkbox", checked: explainLoad, class: "admin-only" });
+    card.append(h("div", { class: "table-wrap" }, table),
+      h("label", { class: "check", title: "A processor that is busy because of a known job (Windows Defender, Windows Update, a backup, a vulnerability scan ...) or that is busy at the same time every day or week raises no warning, as long as it does not last longer than such a period usually does. A warning that does come names the process." },
+        explainBox, " Do not warn about expected busy periods (known jobs, regular times)"),
+      save);
     const heading = card.querySelector("h2");
     const folded = h("details", { class: "card health-limits", open: limitsOpen }, h("summary", {}, h("strong", {}, "When to warn"), h("span", { class: "hint" }, " the limits that raise a warning (admins can change them)")));
     folded.addEventListener("toggle", () => { limitsOpen = folded.open; });
@@ -150,6 +157,7 @@ export async function render(container) {
       data = overview;
       const first = !Object.keys(rules).length;
       rules = limits.rules;
+      explainLoad = limits.explain_load !== false;
       draw();
       if (first) limitsCard();
     } catch (err) {

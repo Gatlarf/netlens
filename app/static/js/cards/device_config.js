@@ -1,5 +1,5 @@
 import { get, post, put, del } from "../api.js";
-import { h, fmtTime, clear } from "../util.js";
+import { h, fmtTime, clear, toast, isAdmin } from "../util.js";
 import { formDialog } from "../formdialog.js";
 
 // The settings of a router, firewall or controller as its plugin reports them: recommendations from Netlens' rules (accept with a reason), an optional review by the
@@ -8,8 +8,32 @@ export async function buildDeviceConfigCards(device) {
   const data = await get(`/api/devices/${device.id}/config?limit=30`).catch(() => null);
   if (!data || !data.plugin) return { advice: null, changes: null };
   const card = h("div", { class: "card device-config-card" });
-  card.appendChild(h("h2", {}, "Recommendations"));
-  card.appendChild(h("p", { class: "hint", title: `Read by the ${data.plugin} plugin. Netlens never writes to the device.` }, `${data.items} settings, last read ${fmtTime(data.updated)}.`));
+  card.appendChild(h("h2", {}, "Gateway recommendations"));
+  const readInfo = h("span", {});
+  const setRead = (items, updated) => { readInfo.textContent = `${items} settings, last read ${fmtTime(updated)}. `; };
+  setRead(data.items, data.updated);
+  // read the settings again now (the plugin syncs anyway after every scan): to check that what was just fixed is no longer recommended
+  const rescan = h("button", { class: "btn admin-only", type: "button", title: `Read the settings again through the ${data.plugin} plugin and check the recommendations now` }, "Scan again");
+  rescan.addEventListener("click", async () => {
+    rescan.disabled = true;
+    rescan.textContent = "Scanning…";
+    try {
+      const before = (await get(`/api/devices/${device.id}/config/advice`).catch(() => null)) || { findings: [] };
+      await post(`/api/plugins/${encodeURIComponent(data.plugin)}/sync`, {});
+      const fresh = await get(`/api/devices/${device.id}/config?limit=1`);
+      setRead(fresh.items, fresh.updated);
+      await loadAdvice();
+      const now = (await get(`/api/devices/${device.id}/config/advice`).catch(() => null)) || { findings: [] };
+      const open = new Set(now.findings.map((f) => f.id));
+      const solved = before.findings.filter((f) => !open.has(f.id)).length;
+      toast(`Scanned. ${solved ? `${solved} recommendation${solved === 1 ? " is" : "s are"} solved. ` : ""}${now.findings.length ? `${now.findings.length} still open.` : "Nothing left to recommend."}`, "success");
+    } catch (err) {
+      toast(err.message || "Could not read the settings again", "error");
+    }
+    rescan.disabled = false;
+    rescan.textContent = "Scan again";
+  });
+  card.appendChild(h("p", { class: "hint", title: `Read by the ${data.plugin} plugin. Netlens never writes to the device.` }, readInfo, isAdmin() ? rescan : null));
   const advice = h("div", { class: "config-advice" });
   card.appendChild(advice);
   const changesCard = h("div", { class: "card device-changes-card" });

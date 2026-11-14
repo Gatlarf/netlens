@@ -38,6 +38,8 @@ SCRIPT = (
     'echo "##temp"; for z in /sys/class/thermal/thermal_zone*; do [ -r "$z/temp" ] && echo "$(cat "$z/type" 2>/dev/null | tr " " "_") $(cat "$z/temp")"; done 2>/dev/null; '
     'echo "##mdstat"; cat /proc/mdstat 2>/dev/null; '
     'echo "##zpool"; PATH="$PATH:/sbin:/usr/sbin:/usr/local/sbin" zpool list -H -o name,health 2>/dev/null; '
+    # the processor time every process has used so far (the busiest 40): the difference between two rounds says which process was busy, see `top_processes`
+    'echo "##procs"; ps -eo pid=,times=,comm= 2>/dev/null | sort -k2,2 -rn | head -n 40; '
     'echo "##end"'
 )
 COMMAND = "sh -c " + "'" + SCRIPT.replace("'", "'\\''") + "'"
@@ -58,6 +60,9 @@ WIN_SCRIPT = (
     "try{$u=(Get-Counter '\\System\\System Up Time' -ErrorAction Stop).CounterSamples[0].CookedValue;$r.boot=(Get-Date).ToUniversalTime().AddSeconds(-$u).ToString('o')}catch{}};"
     "try{$r.cpu=(Get-CimInstance Win32_Processor|Measure-Object LoadPercentage -Average).Average}"
     "catch{$m=$_.Exception.Message;try{$r.cpu=(Get-Counter '\\Processor(_Total)\\% Processor Time' -ErrorAction Stop).CounterSamples[0].CookedValue}catch{$e+='processor: '+$m}};"
+    # while the processor is busy: the three busiest processes (percent of one core; divided by `nc` it is a share of the machine)
+    "try{if($r.cpu -ge 50){$r.nc=[int]$env:NUMBER_OF_PROCESSORS;$r.top=@(Get-CimInstance Win32_PerfFormattedData_PerfProc_Process|?{$_.Name -ne '_Total' -and $_.Name -ne 'Idle'}|"
+    "sort PercentProcessorTime -Descending|select -First 3|%{@{n=[string]$_.Name;c=[double]$_.PercentProcessorTime}})}}catch{};"
     "try{$r.disks=@(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3'|%{@{id=$_.DeviceID;size=[double]$_.Size;free=[double]$_.FreeSpace}})}"
     "catch{$m=$_.Exception.Message;try{$r.disks=@([System.IO.DriveInfo]::GetDrives()|?{$_.DriveType -eq 'Fixed' -and $_.IsReady}|"
     "%{@{id=$_.Name.TrimEnd('\\');size=[double]$_.TotalSize;free=[double]$_.AvailableFreeSpace}})}catch{$e+='disks: '+$m}};"
@@ -139,6 +144,13 @@ def parse_windows(text: str, state: dict, now: float | None = None) -> tuple[lis
     if cpu is not None:
         points.append(("cpu_pct", "", max(0.0, min(100.0, cpu)), "%"))
         found.append("cpu")
+        cores = num(data.get("nc")) or 1
+        busiest = []
+        for p in many(data.get("top")):
+            n, c = str(p.get("n") or "").strip(), num(p.get("c"))
+            if n and c is not None and c > 0:
+                busiest.append((n[:64], min(100.0, c / max(1.0, cores))))
+        state["top"] = sorted(busiest, key=lambda x: -x[1])[:3]          # a share of the whole machine
     mt, mf = num(data.get("mt")), num(data.get("mf"))
     if mt and mf is not None:
         points.append(("mem_pct", "", 100.0 * (1 - mf / mt), "%"))
@@ -288,6 +300,30 @@ def _own_cpu(sec: dict, uptime: list[str], state: dict, now: float) -> float | N
     return max(0.0, min(100.0, 100.0 * (usage - before[0]) / 1e6 / ((clock - before[1]) * cpus)))
 
 
+def top_processes(sec: dict[str, list[str]], state: dict, now: float) -> list[tuple[str, float]]:
+    """The busiest processes since the previous round: [(name, share of the whole machine in %)], at most 3. `ps` gives the processor seconds used so far."""
+    used: dict[str, tuple[float, str]] = {}
+    for line in sec.get("procs", []):
+        parts = line.split(None, 2)
+        if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
+            used[parts[0]] = (float(parts[1]), parts[2].strip())
+    before, state["procs"] = state.get("procs"), (now, used)
+    if not before or now - before[0] < 1:
+        return []
+    info = {}
+    for line in sec.get("cgroup", []):
+        k, _, v = line.partition(" ")
+        info[k] = v.strip()
+    cores = int(info["ncpu"]) if info.get("ncpu", "").isdigit() and int(info["ncpu"]) else 1
+    elapsed = now - before[0]
+    share: dict[str, float] = {}
+    for pid, (seconds, name) in used.items():
+        old = before[1].get(pid)
+        if old and old[1] == name and seconds >= old[0]:
+            share[name] = share.get(name, 0.0) + 100.0 * (seconds - old[0]) / elapsed / cores
+    return sorted(((n, min(100.0, v)) for n, v in share.items() if v >= 1.0), key=lambda x: -x[1])[:3]
+
+
 def parse(text: str, state: dict, now: float | None = None) -> tuple[list[tuple], list[str]]:
     """Points (metric, label, value, unit) and the groups that were there. `state` carries the counters of the last round."""
     now = now if now is not None else time.time()
@@ -341,6 +377,7 @@ def parse(text: str, state: dict, now: float | None = None) -> tuple[list[tuple]
         except ValueError:
             pass
     add("cpu", cpu)
+    state["top"] = top_processes(sec, state, now)
 
     mem = {}
     for item in sec.get("mem", []):
