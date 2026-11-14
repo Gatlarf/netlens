@@ -43,7 +43,7 @@ def _config_attention(conn: sqlite3.Connection) -> list[dict]:
     """Risky settings that the rules found in a router's or controller's configuration and that nobody accepted."""
     from app import configadvice
 
-    return [{"level": "bad" if f["status"] == "risk" else "warn", "text": f"{f['device']}: {f['title']}", "href": f"#/device/{f['device_id']}"} for f in configadvice.attention(conn)]
+    return [{"level": "bad" if f["status"] == "risk" else "warn", "text": f"{f['device']}: {f['title']}", "href": f"#/device/{f['device_id']}/network/config"} for f in configadvice.attention(conn)]
 
 
 def _llm_attention(conn: sqlite3.Connection) -> list[dict]:

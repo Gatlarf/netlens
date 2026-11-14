@@ -208,3 +208,7 @@ details.hint-more[open] > summary { margin-bottom: .3em; }
 
 /* tabs inside a card (Sign-in security): on the card, not as a band of page colour */
 .card > .tabbed > .dev-tabs { position: static; background: none; margin: 4px 0 12px; padding-top: 0; }
+
+/* the card a link pointed at, for a moment */
+.card-flash { animation: card-flash 2.5s ease-out; }
+@keyframes card-flash { 0%, 40% { box-shadow: 0 0 0 3px var(--accent, #22d3ee); } 100% { box-shadow: 0 0 0 0 transparent; } }

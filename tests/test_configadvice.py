@@ -182,7 +182,7 @@ def test_recommendations_reach_the_dashboard_ask_and_mcp(conn):
 
     cc.record(conn, "asus", data(LIVE), "2026-11-11T10:00:00Z", version="1.6.3")
     items = dashboard._config_attention(conn)
-    assert items and items[0]["level"] == "bad" and items[0]["href"] == "#/device/1" and "typing mistake" in items[0]["text"]
+    assert items and items[0]["level"] == "bad" and items[0]["href"] == "#/device/1/network/config" and "typing mistake" in items[0]["text"]
     r = ask_more.t_security(conn, {})
     assert any("typing mistake" in c["problem"] for c in r["config_recommendations"]) and "typing mistake" in ask_more.r_security(r)
     assert "get_config_advice" in mcp.TOOLS

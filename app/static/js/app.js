@@ -60,9 +60,11 @@ function parseRoute() {
   const hash = location.hash;
   if (!hash || hash === "#/") return { name: "dashboard", params: {} };
   if (hash.startsWith("#/device/")) {
-    const id = Number(hash.slice(9));
+    // #/device/5, or deeper: #/device/5/network/config opens that tab and brings that card into view
+    const m = /^#\/device\/(\d+)(?:\/([a-z]+))?(?:\/([a-z-]+))?$/.exec(hash);
+    const id = m ? Number(m[1]) : 0;
     if (Number.isInteger(id) && id > 0) {
-      return { name: "device", params: { id } };
+      return { name: "device", params: { id, tab: m[2] || null, card: m[3] || null } };
     }
     return { name: "devices", params: {} };
   }

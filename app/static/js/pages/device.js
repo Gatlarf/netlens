@@ -782,6 +782,16 @@ export async function render(container, params) {
     const wanted = sessionStorage.getItem("netlens.devicetab");
     if (wanted) { activeTab = wanted; sessionStorage.removeItem("netlens.devicetab"); }
   } catch (e) { /* no storage */ }     // the chosen section stays when the page refreshes itself
+  if (params.tab) activeTab = params.tab;          // a link such as #/device/5/network/config names its tab (and card)
+  const wantedCard = params.card;
+  let cardShown = false;
+  const showCard = (el) => {                        // bring the card the link named into view, once (not again when the page refreshes itself)
+    if (!wantedCard || !el || el.dataset.card !== wantedCard || cardShown) return;
+    cardShown = true;
+    el.scrollIntoView({ block: "start", behavior: "smooth" });
+    el.classList.add("card-flash");
+    setTimeout(() => el.classList.remove("card-flash"), 2500);
+  };
 
   const disposeTerminal = () => {
     if (terminalHandle && typeof terminalHandle.dispose === "function") {
@@ -928,6 +938,7 @@ export async function render(container, params) {
       if (disposed) return;
       if (advice) configSlot.appendChild(advice);
       if (changes) changesSlot.appendChild(changes);
+      setTimeout(() => showCard(configSlot), 50);       // after the tab is on screen
     }).catch(() => {});
     flow.appendChild(tag(buildPortsCard(device, () => load()), "openports", "Open ports", true, "table"));
     const wifiSlot = slot("wifi", "Wi-Fi");
