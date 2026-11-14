@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.431 — 2026-11-14
+
+### Fixed
+- **ASUS plugin 1.6.4: UPnP was reported as on while the router said it was off.** The plugin read the global `upnp_enable` flag, which can stay 1 on ASUS 3.0.0.4.388 while the **Enable UPnP** setting on the WAN page (`wan_upnp_enable`) is No. It now reads the WAN setting and falls back to the global flag on a firmware that does not have it. The "UPnP is switched on" recommendation (Gateway recommendations) therefore goes away when you switch UPnP off. Netlens records one *Configuration changed* event for `nat.upnp` when the plugin is updated, because the value it reads changes. This is in the repository; it reaches a router only after the plugin is released to the plugin store (or uploaded).
+
 ## 0.4.430 — 2026-11-14
 
 ### Fixed

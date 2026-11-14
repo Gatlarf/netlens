@@ -302,6 +302,25 @@ def test_configuration_goes_on_the_main_router_without_secrets():
     assert validate_output("topology", out)["nodes"][0] is not None
 
 
+def test_upnp_is_the_setting_of_the_wan_page_not_the_global_flag():
+    def items(nvram):
+        old = dict(NVRAM)
+        NVRAM.clear()
+        NVRAM.update(nvram)
+        try:
+            cfg = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, record_config=True)
+            main = next(n for n in to_topology(AsusClient(cfg, transport=NvramTransport()).snapshot())["nodes"] if n["role"] == "gateway")
+            return {i["key"]: i["value"] for i in main["config"]}
+        finally:
+            NVRAM.clear()
+            NVRAM.update(old)
+
+    assert items({"upnp_enable": "1", "wan_upnp_enable": "0"})["nat.upnp"] == "0"          # the page says No, the global flag still says 1 (ASUS 3.0.0.4.388)
+    assert items({"upnp_enable": "0", "wan_upnp_enable": "1"})["nat.upnp"] == "1"
+    assert items({"upnp_enable": "1"})["nat.upnp"] == "1"                                  # a firmware without the WAN setting: the global flag
+    assert "nat.upnp" not in items({"lan_ipaddr": "192.168.0.1"})
+
+
 def test_a_router_that_does_not_answer_the_settings_names_the_failed_sections():
     t = NvramTransport()
     t.answers = False
@@ -324,4 +343,4 @@ def test_every_setting_is_its_own_request_because_the_router_answers_only_the_fi
     cfg = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, record_config=True)
     AsusClient(cfg, transport=t).snapshot()
     asked = [p for _m, p, _c in t.calls if "nvram_get" in p]
-    assert asked and all(p.count("nvram_get(") == 1 for p in asked) and len(asked) == len(AsusClient.CONFIG_KEYS) + 1
+    assert asked and all(p.count("nvram_get(") == 1 for p in asked) and len(asked) == sum(1 if isinstance(k[2], str) else len(k[2]) for k in AsusClient.CONFIG_KEYS) + 1      # a name the router does not answer is followed by the next one

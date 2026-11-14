@@ -355,7 +355,8 @@ class AsusClient:
         except (AsusError, ValueError):
             return None
 
-    # The settings Netlens keeps track of (only with "Record configuration changes"): (section, key, nvram name). Nothing dynamic (no current public address, lease or
+    # The settings Netlens keeps track of (only with "Record configuration changes"): (section, key, nvram name; or a tuple of names, the first one the router answers).
+    # UPnP: the "Enable UPnP" of the WAN page is `wan_upnp_enable` (`upnp_enable` is a global flag that can stay 1 while the page says No). Nothing dynamic (no current public address, lease or
     # counter) and no secret: no Wi-Fi password, no admin password, no DDNS or VPN key. Names that a firmware does not have are simply not answered.
     CONFIG_KEYS = (
         ("wan", "wan.proto", "wan0_proto"), ("wan", "wan.dns_auto", "wan_dnsenable_x"), ("wan", "wan.dns1", "wan0_dns1_x"), ("wan", "wan.dns2", "wan0_dns2_x"), ("wan", "wan.nat", "wan0_nat_x"),
@@ -366,7 +367,7 @@ class AsusClient:
         ("wifi", "wifi.guest.enabled", "wl0.1_bss_enabled"), ("wifi", "wifi.wps", "wps_enable"), ("wifi", "wifi.roaming_assistant", "rast_static_client"),
         ("admin", "admin.http", "http_enable"), ("admin", "admin.https_port", "https_lanport"), ("admin", "admin.wan_access", "misc_http_x"), ("admin", "admin.wan_port", "misc_httpport_x"),
         ("admin", "admin.ssh", "sshd_enable"), ("admin", "admin.ssh_wan", "sshd_wan"), ("admin", "admin.telnet", "telnetd_enable"), ("admin", "admin.ssh_port", "sshd_port"),
-        ("nat", "nat.upnp", "upnp_enable"), ("nat", "nat.portforward_enabled", "vts_enable_x"), ("nat", "nat.dmz", "dmz_ip"),
+        ("nat", "nat.upnp", ("wan_upnp_enable", "upnp_enable")), ("nat", "nat.portforward_enabled", "vts_enable_x"), ("nat", "nat.dmz", "dmz_ip"),
         ("security", "security.firewall", "fw_enable_x"), ("security", "security.dos_protection", "fw_dos_x"), ("security", "security.ipv6_firewall", "ipv6_fw_enable"),
         ("security", "security.dns_filter", "dnsfilter_enable_x"), ("security", "security.ddns", "ddns_enable_x"), ("security", "security.aiprotection", "wrs_protect_enable"),
         ("system", "system.timezone", "time_zone"), ("system", "system.ntp", "ntp_server0"), ("system", "system.qos", "qos_enable"),
@@ -377,12 +378,14 @@ class AsusClient:
         items: list[dict] = []
         asked: dict[str, int] = {}
         answered: dict[str, int] = {}
-        for section, key, nv in self.CONFIG_KEYS:
+        for section, key, names in self.CONFIG_KEYS:
             asked[section] = asked.get(section, 0) + 1
-            answer = self._hook(f"nvram_get({nv})")
-            if isinstance(answer, dict) and answer.get(nv) is not None:
-                answered[section] = answered.get(section, 0) + 1
-                items.append({"key": key, "value": str(answer[nv])[:300]})
+            for nv in ((names,) if isinstance(names, str) else names):        # a tuple = the first name this firmware answers
+                answer = self._hook(f"nvram_get({nv})")
+                if isinstance(answer, dict) and answer.get(nv) is not None:
+                    answered[section] = answered.get(section, 0) + 1
+                    items.append({"key": key, "value": str(answer[nv])[:300]})
+                    break
         failed = {s for s in asked if not answered.get(s)}
         answer = self._hook("nvram_get(vts_rulelist)")
         if isinstance(answer, dict) and "vts_rulelist" in answer:
