@@ -1,0 +1,38 @@
+# Lets Netlens read Greenbone's results, without changing Greenbone itself.
+#
+# Greenbone's own containers talk over a unix socket (that is what its web interface uses) and gvmd cannot listen on that socket and on the network at the
+# same time. This one extra container passes the socket on to port 9390 with TLS. Use it next to Greenbone's official docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.netlens.yml up -d
+#
+# (add -p <name> if you started Greenbone with a project name). The certificate is made on the first start and kept in a volume; its fingerprint is in the log:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.netlens.yml logs netlens-gmp
+#
+# Port 9390 is published to this machine only. If Netlens runs on another machine, set NETLENS_GMP_BIND to this machine's address (and firewall the port to
+# Netlens): anybody who can log in on that port has full control of the scanner.
+
+services:
+  netlens-gmp:
+    image: registry.community.greenbone.net/community/gvmd:stable      # the same image as gvmd, so nothing extra to download
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ ! -s /certs/cert.pem ]; then
+          openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=netlens-gmp" -keyout /certs/key.pem -out /certs/cert.pem 2>/dev/null
+        fi
+        echo "Certificate fingerprint for Netlens:"
+        openssl x509 -in /certs/cert.pem -noout -fingerprint -sha256
+        exec socat OPENSSL-LISTEN:9390,fork,reuseaddr,cert=/certs/cert.pem,key=/certs/key.pem,verify=0 UNIX-CONNECT:/run/gvmd/gvmd.sock
+    ports:
+      - "${NETLENS_GMP_BIND:-127.0.0.1}:9390:9390"
+    volumes:
+      - gvmd_socket_vol:/run/gvmd
+      - netlens_gmp_certs:/certs
+    depends_on:
+      - gvmd
+
+volumes:
+  netlens_gmp_certs:

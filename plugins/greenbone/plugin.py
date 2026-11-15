@@ -78,7 +78,7 @@ class Gmp:
         except netlens_http.CertificateError as exc:
             if exc.detail == "fingerprint":
                 raise GvmError(f"the certificate of {self.id} does not match the fingerprint; nothing was sent")
-            raise GvmError(f"cannot make a secure connection to {self.id}: {exc}. gvmd must listen with TLS (gvmd --listen --port 9390)")
+            raise GvmError(f"cannot make a secure connection to {self.id}: {exc}. check that the bridge container from contrib/greenbone/docker-compose.netlens.yml (or gvmd itself with --listen --port 9390) is running and that the address and port are right")
         except netlens_http.NetError as exc:
             raise GvmError(f"cannot reach {self.id}: {exc}")
         return self

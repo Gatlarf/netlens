@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.434 — 2026-11-15
+
+### Changed
+- **Greenbone plugin 1.0.3: a set-up that keeps Greenbone's web interface working.** The old instructions told you to make gvmd listen on a network port, but gvmd cannot do that and keep the unix socket that Greenbone's own web interface needs, so the web interface stopped working. Leave gvmd alone and add one small container instead: `contrib/greenbone/docker-compose.netlens.yml` passes gvmd's socket on to port 9390 with TLS (made from the same image, nothing extra to download) and prints the certificate fingerprint in its log. The plugin's README, its help text and the connection error now say so. What the plugin reads is unchanged; installs that already use the network-port set-up keep working.
+
 ## 0.4.431 — 2026-11-14
 
 ### Fixed
