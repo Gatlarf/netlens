@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.0.4",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-greenbone-v1.0.4/greenbone.zip",
+      "sha256": "316985ab9e32905085048cf87f55c2c2f8e4d83f297159e9089b36efb7adf1b1",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-15",
+      "changelog": "New set-up instructions: leave gvmd alone (it must keep its unix socket for Greenbone's web interface) and add the small bridge container from contrib/greenbone/docker-compose.netlens.yml, which passes the socket on to port 9390 with TLS. README, help text and the connection error say so. No change in what the plugin reads; existing installs keep working."
+    },
+    {
       "version": "1.0.2",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-greenbone-v1.0.2/greenbone.zip",
       "sha256": "3792b0b8fd7e7e6c9d896730c82969b58b7d2bec9c3149edc3a09c8212ee57f0",

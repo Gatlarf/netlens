@@ -1,7 +1,7 @@
 {
   "id": "greenbone",
   "name": "Greenbone (OpenVAS)",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "api_version": 1,
   "kind": "vulnerability",
   "author": "Netlens",
@@ -10,7 +10,7 @@
   "diagnose": true,
   "info": {
     "title": "Give Netlens a read-only user and reach the scanner",
-    "text": "Netlens talks to the Greenbone Management Protocol (GMP) over TLS on port 9390. Greenbone's own containers only offer a unix socket (their web interface needs it), so do not change gvmd: add the small bridge container from https://github.com/Gatlarf/netlens/blob/main/contrib/greenbone/docker-compose.netlens.yml (docker compose -f docker-compose.yml -f docker-compose.netlens.yml up -d). It passes the socket on to port 9390 with TLS, published to that machine only, and prints the SHA-256 fingerprint of its certificate in its log (fill that in below: Netlens then trusts exactly that certificate). In Greenbone (Administration > Users) make a user with the role 'Observer' (it can read results but not change anything), and in every scan task put that user under Observers (Edit task): a user only sees the tasks that are shared with it."
+    "text": "Netlens talks to Greenbone's GMP over TLS on port 9390. Greenbone itself only offers a unix socket (its web interface needs it), so do not change gvmd: add the small bridge container from https://github.com/Gatlarf/netlens/blob/main/contrib/greenbone/docker-compose.netlens.yml (docker compose -f docker-compose.yml -f docker-compose.netlens.yml up -d). Its log shows the SHA-256 fingerprint of its certificate: fill that in below. In Greenbone (Administration > Users) make a user with the role 'Observer' and put it under Observers in every scan task (Edit task): a user only sees tasks shared with it."
   },
   "config": [
     {
