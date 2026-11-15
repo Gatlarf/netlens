@@ -602,7 +602,13 @@
      "released": "2026-11-15",
      "changelog": "Also reads what a failing container health check printed last (cut to 200 characters), so Netlens (0.4.436 and newer) can show why a container is unhealthy. A Netlens older than that ignores it. Nothing else changed; no new requests.",
      "review": {
-      "level": "community"
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-15",
+      "tested_on": [
+       "Docker Engine through tecnativa/docker-socket-proxy on the maintainer's docker hosts (lxc-dockerdev and lxc-docker1, 65 containers): an unhealthy container's last health-check output was read ('failed: Connection refused.') and shown in Netlens as the reason; healthy and exited containers carry no output"
+      ],
+      "notes": "Written with the assistant Claude. The only change is one extra read of data the plugin already fetched (State.Health.Log from the container inspect call): the last output of a failing health check, whitespace folded and cut to 200 characters, kept only while the container is unhealthy. No new request, no new permission. Confirmed by the maintainer."
      }
     },
     {
