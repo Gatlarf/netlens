@@ -566,7 +566,7 @@ function buildVirtualizationCard(device) {
     card.appendChild(h("p", { class: "hint" }, docker && info.guests.every((g) => g.kind === "container")
       ? `Docker host with ${info.guests.length} container${info.guests.length === 1 ? "" : "s"}:`
       : `Hypervisor host with ${info.guests.length} guest${info.guests.length === 1 ? "" : "s"}:`));
-    const sick = info.guests.filter((g) => g.kind === "container" && (g.status === "restarting" || (g.details && g.details.health === "unhealthy")));
+    const sick = info.guests.filter((g) => g.kind === "container" && (g.status === "restarting" || (g.status === "running" && g.details && g.details.health === "unhealthy")));
     if (sick.length) {       // what is wrong, with the output of the failing health check when the plugin could read it
       card.appendChild(h("h3", {}, "Needs attention"));
       card.appendChild(h("ul", { class: "container-problems" }, ...sick.map((g) => {

@@ -90,7 +90,7 @@ def summary(conn: sqlite3.Connection) -> dict[str, Any]:
         sick = []
         if r["status"] == "restarting":
             sick.append("restarting")
-        if d.get("health") == "unhealthy":
+        if d.get("health") == "unhealthy" and r["status"] == "running":        # a container that has exited keeps the health it had; a finished one-shot job is not a problem
             unhealthy += 1
             sick.append("unhealthy")
         if sick:

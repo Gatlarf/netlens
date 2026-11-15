@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.437 — 2026-11-15
+
+### Fixed
+- **Stopped containers were counted as "unhealthy".** A container that has exited keeps the last health Docker saw (a finished one-shot job such as a Greenbone set-up step, or a container you stopped), so it was counted in "N unhealthy containers" on the dashboard, in Statistics and in the metrics. Only a running container can be unhealthy now. It is no longer listed under **Needs attention** on the host's card either.
+
 ## 0.4.436 — 2026-11-15
 
 ### Changed

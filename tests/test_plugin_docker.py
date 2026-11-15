@@ -275,3 +275,16 @@ def test_the_digest_an_image_was_pulled_as_is_reported_for_the_matching_reposito
     assert d("ghcr.io/x/y:2", ["other/thing@sha256:" + "e" * 64, f"ghcr.io/x/y@{sha}"]) == sha
     assert d("a:1", ["b@sha256:" + "e" * 64, "c@sha256:" + "f" * 64]) == ""         # cannot tell which one
     assert d("local:1", []) == "" and d("local:1", None) == ""
+
+
+def test_an_exited_container_is_not_counted_as_unhealthy(tmp_path):
+    from app.db import connect, init_db
+
+    conn = connect(tmp_path / "u.db")
+    init_db(conn)
+    rows = [("job", "exited", '{"health": "unhealthy"}'), ("web", "running", '{"health": "unhealthy"}'), ("ok", "running", '{"health": "healthy"}')]
+    for i, (name, status, details) in enumerate(rows):
+        conn.execute("INSERT INTO hypervisor_guests (plugin_id, guest_id, name, kind, host_name, status, details, updated) VALUES ('docker', ?, ?, 'container', 'h', ?, ?, '2026-11-15T00:00:00Z')", (str(i), name, status, details))
+    numbers = container_module.summary(conn)
+    assert numbers["unhealthy"] == 1 and [p["name"] for p in numbers["problems"]] == ["web"]      # the finished job keeps its last health, which is no longer news
+    conn.close()
