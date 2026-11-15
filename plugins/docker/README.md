@@ -53,10 +53,14 @@ Start the API service with `podman system service --time=0 tcp:192.168.0.189:237
 proxy address. Podman's API has **no read-only mode**, so reach it only from the Netlens machine (firewall) or through the socket proxy of a
 rootless user's socket. Containers of a rootless Podman appear for that user only.
 
+## Unhealthy and restarting containers
+
+The dashboard's *Needs attention* lists them by name ("4 unhealthy and 0 restarting containers: ...") and its link opens the Docker host's page at the **Virtualization** card. There a **Needs attention** list shows for each one why: how many times a restarting container has restarted, and for an unhealthy one what its health check printed last (for example `socat ... connect ... No such file or directory`). An *unhealthy* container is one whose own Docker health check fails; *restarting* means Docker keeps starting it again.
+
 ## Privacy
 
 A container's inspect data contains its environment variables, which often hold passwords. The plugin reads that data to get the
-health and restart count, but **only keeps** image, compose labels, network, ports, health, restarts and start time; nothing else is
+health and restart count, but **only keeps** image, compose labels, network, ports, health, restarts and start time, and, while a container is unhealthy, the last 200 characters its health check printed (that is the reason it is unhealthy); nothing else is
 stored or sent anywhere. The diagnostic report contains counts only.
 
 ## Restarting a guest (auto-remediation)
