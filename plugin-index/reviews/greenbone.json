@@ -2,6 +2,17 @@
   "id": "greenbone",
   "reviews": [
     {
+      "version": "1.0.4",
+      "sha256": "316985ab9e32905085048cf87f55c2c2f8e4d83f297159e9089b36efb7adf1b1",
+      "level": "verified",
+      "reviewer": "Gatlarf",
+      "date": "2026-11-15",
+      "tested_on": [
+        "Greenbone Community Containers 22.7 on the maintainer's docker host with the new set-up: stock gvmd (unix socket) plus the netlens-gmp bridge container from contrib/greenbone/docker-compose.netlens.yml: GMP get_version and authenticate as an Admin and as an Observer user through the bridge; the Greenbone web interface works at the same time; the plugin's connection test passes with the bridge certificate's SHA-256 fingerprint"
+      ],
+      "notes": "Written with the assistant Claude. Only the set-up changed (instructions, help text and the connection error now describe the bridge container); what the plugin reads is unchanged and its tests pass. Not re-tested: a scan with results through the bridge, and the bridge on a Netlens that runs on another machine (NETLENS_GMP_BIND)."
+    },
+    {
       "version": "1.0.2",
       "sha256": "3792b0b8fd7e7e6c9d896730c82969b58b7d2bec9c3149edc3a09c8212ee57f0",
       "reviewer": "Gatlarf",
