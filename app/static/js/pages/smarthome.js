@@ -11,7 +11,8 @@ export async function render(container) {
   let destroyed = false;
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
   container.append(pageHead("Smart home", "The devices of your smart-home hub, with what Netlens cannot see on the network. It comes from a plugin (Home Assistant)."), body);
-  let filter = "", area = "", only = "";
+  const wanted = (/[?&]only=(unavailable|battery|network|update)/.exec(location.hash) || [])[1] || "";          // "#/smarthome?only=unavailable" opens the list on those devices
+  let filter = "", area = "", only = wanted;
 
   let lastSig = "";
   async function load() {

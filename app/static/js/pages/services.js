@@ -90,7 +90,7 @@ export async function render(container) {
   async function load() {
     let checks;
     try {
-      checks = await get("/api/service-checks");
+      checks = (await get("/api/service-checks")).sort((a, b) => (b.enabled && b.state === "down") - (a.enabled && a.state === "down"));          // the checks that fail come first
     } catch (err) {
       if (!destroyed) body.replaceChildren(h("p", { class: "error" }, err.message || "Failed to load"));
       return;

@@ -13,7 +13,9 @@ export async function render(container) {
   container.append(pageHead("Vulnerabilities", "What your vulnerability scanner found on the devices of this network, the most serious first.", board.button()));
   const body = h("div", {}, h("p", { class: "hint" }, "Loading…"));
   container.append(body);
-  let sev = "", q = "", all = false;
+  const hint = (name) => (new RegExp(`[?&]${name}=([a-z0-9]+)`).exec(location.hash) || [])[1] || "";          // "#/vulnerabilities?severity=critical" or "?exploited=1"
+  let sev = ["critical", "high", "medium", "low"].includes(hint("severity")) ? hint("severity") : "", q = "", all = false;
+  const onlyExploited = hint("exploited") === "1";
   let data;
 
   const draw = () => {
@@ -42,7 +44,7 @@ export async function render(container) {
           h("tbody", {}, data.top.map((d) => h("tr", {}, h("td", {}, d.device_id ? h("a", { href: `#/device/${d.device_id}` }, d.device) : d.device),
             h("td", {}, d.critical ? sevBadge("critical") : "", d.critical ? ` ${d.critical}` : ""), h("td", {}, String(d.high || "")), h("td", {}, String(d.medium || "")), h("td", {}, String(d.low || ""))))))));
     }
-    const list = data.findings;
+    const list = onlyExploited ? data.findings.filter((f) => f.exploited) : data.findings;
     const bar = h("div", { class: "toolbar" },
       h("select", { onchange: (e) => { sev = e.target.value; load(); } }, h("option", { value: "" }, "All severities"), Object.entries(SEV_LABEL).map(([k, v]) => h("option", { value: k, selected: k === sev }, v))),
       h("input", { type: "search", placeholder: "Search title, device or CVE", value: q, oninput: (e) => { q = e.target.value; clearTimeout(render.t); render.t = setTimeout(load, 250); } }));

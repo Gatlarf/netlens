@@ -175,17 +175,17 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
     if vu.get("allowed") and vu.get("configured"):
         crit = (vu.get("counts") or {}).get("critical", 0)
         if crit:
-            add("bad", f"{crit} critical vulnerabilit{'ies' if crit != 1 else 'y'}" + (f", {vu['exploited']} known to be exploited" if vu.get("exploited") else ""), "#/vulnerabilities")
+            add("bad", f"{crit} critical vulnerabilit{'ies' if crit != 1 else 'y'}" + (f", {vu['exploited']} known to be exploited" if vu.get("exploited") else ""), "#/vulnerabilities?severity=critical")
         elif vu.get("exploited"):
-            add("warn", f"{vu['exploited']} vulnerabilit{'ies' if vu['exploited'] != 1 else 'y'} known to be exploited", "#/vulnerabilities")
+            add("warn", f"{vu['exploited']} vulnerabilit{'ies' if vu['exploited'] != 1 else 'y'} known to be exploited", "#/vulnerabilities?exploited=1")
     rm = s.get("remediation") or {}
     if rm.get("pending"):
         add("warn", f"{rm['pending']} automatic fix{'es' if rm['pending'] != 1 else ''} waiting for your approval", "#/remediation")
     sh = s.get("smarthome") or {}
     if sh.get("unavailable"):
-        add("warn", f"{sh['unavailable']} smart-home device{'s' if sh['unavailable'] != 1 else ''} unavailable", "#/smarthome")
+        add("warn", f"{sh['unavailable']} smart-home device{'s' if sh['unavailable'] != 1 else ''} unavailable", "#/smarthome?only=unavailable")
     if sh.get("battery_low"):
-        add("warn", f"{sh['battery_low']} smart-home device{'s' if sh['battery_low'] != 1 else ''} with a low battery", "#/smarthome")
+        add("warn", f"{sh['battery_low']} smart-home device{'s' if sh['battery_low'] != 1 else ''} with a low battery", "#/smarthome?only=battery")
     if s["update"].get("plugin_problems"):
         n = s["update"]["plugin_problems"]
         add("warn", f"{n} plugin{'s' if n != 1 else ''} may not work with this Netlens version", "#/settings/plugins")
