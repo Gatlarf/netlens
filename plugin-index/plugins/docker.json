@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.6.2",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.6.2/docker.zip",
+      "sha256": "23f39f17969c9bfa2307b76da67de2fc4e585f84f6dbdb816685eb984771cede",
+      "api_version": 1,
+      "min_netlens": "0.4.366",
+      "released": "2026-11-15",
+      "changelog": "Also reads what a failing container health check printed last (cut to 200 characters), so Netlens (0.4.436 and newer) can show why a container is unhealthy. A Netlens older than that ignores it. Nothing else changed; no new requests."
+    },
+    {
       "version": "1.6.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-docker-v1.6.1/docker.zip",
       "sha256": "9f53e0b56a4bee4acca99d3b5ddacb5aa6669f472b71ce2b5f9cf1793b2d7bf6",
