@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.438 — 2026-11-15
+
+### Changed
+- **Every "needs attention" line now opens the place that shows what it is about.** Checked one by one: expiring certificates and proxy sites that do not answer open Statistics at the Reverse proxy sites section (which now lists the failing sites by name); "devices not marked as known" opens the device list on "Unknown only"; failed sign-ins open the event list on that kind; devices that keep going up and down open the Uptime page on the devices with a problem; a disk, temperature, UPS, interface or service problem opens the device's graphs; a lost bonded connection opens the bonded-connection card; a remote site's failed backups open that site; and a login the customer's PAM refused now shows the reason in the Credentials list. Device links can name any card (`#/device/5/health/performance`).
+
 ## 0.4.437 — 2026-11-15
 
 ### Fixed

@@ -256,7 +256,7 @@ def test_attention_separates_core_and_other_devices():
     assert ("info", "2 other devices keep going up and down") in texts
     # nothing marked: all flapping devices stay a warning, as before
     plain = dashboard._attention(_summary_stub(devices={"flapping": 2, "unknown": 0}), [], 0, [])
-    assert plain == [{"level": "warn", "text": "2 other devices keep going up and down", "href": "#/uptime"}]
+    assert plain == [{"level": "warn", "text": "2 other devices keep going up and down", "href": "#/uptime?focus=problems"}]
 
 
 def test_shared_cards_are_available_to_every_user(tmp_path):

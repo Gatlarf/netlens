@@ -1050,6 +1050,11 @@ export async function render(container, params) {
       } }, "Customize"));
     }
     select(activeTab);
+    if (wantedCard) {          // any card a link names (#/device/5/health/performance), once the cards are on the page
+      let looks = 0;
+      const find = () => { const el = page.querySelector(`[data-card="${wantedCard}"]`); if (el) showCard(el); else if (++looks < 20 && !disposed) setTimeout(find, 150); };
+      setTimeout(find, 100);
+    }
     // a chip at the top (Processor, Memory ...) opens the Health tab and goes to the first graph of that reading (the worst disk, if there are several)
     const goToGraph = (metric, label) => {
       select("health");

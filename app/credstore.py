@@ -62,7 +62,17 @@ def public(entry: dict[str, Any], user: str) -> dict[str, Any]:
     """What the API may show: never a secret, only whether one is set."""
     return {"id": entry["id"], "name": entry["name"], "kind": entry["kind"], "owner": entry["owner"], "shared": bool(entry.get("shared")), "mine": entry["owner"] == user,
             "username": entry.get("username", ""), "domain": entry.get("domain", ""), "has_secret": any(entry.get(f) for f in SECRET_FIELDS),
-            "created": entry.get("created"), "updated": entry.get("updated"), "last_used": entry.get("last_used"), "used_for": entry.get("used_for", "")} | _pam_public(entry) | _route_public(entry)
+            "created": entry.get("created"), "updated": entry.get("updated"), "last_used": entry.get("last_used"), "used_for": entry.get("used_for", ""), "refused": _pam_refused(entry)} | _pam_public(entry) | _route_public(entry)
+
+
+def _pam_refused(entry: dict[str, Any]) -> str:
+    """Why the customer's PAM did not hand out this login the last time (what the dashboard says too), or an empty text."""
+    if entry.get("kind") != "pam":
+        return ""
+    from app import pam
+
+    last = pam.last_status(entry["id"])
+    return last["message"] if last and not last["ok"] else ""
 
 
 def _route_public(entry: dict[str, Any]) -> dict[str, Any]:

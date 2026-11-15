@@ -19,7 +19,7 @@ const tone = (pct) => (pct === null || pct === undefined ? "off" : pct >= 99 ? "
 export async function render(container) {
   let disposed = false, inFlight = false, timer = null;
   const openGraphs = new Set();      // devices whose history graph is open (kept when the list is redrawn)
-  let range = savedRange(), scope = savedScope() || "all", scopeChosen = savedScope() !== null, sort = "worst", filterText = "", onlyProblems = false, data = null;
+  let range = savedRange(), scope = savedScope() || "all", scopeChosen = savedScope() !== null, sort = "worst", filterText = "", onlyProblems = /[?&]focus=problems/.test(location.hash), data = null;
 
   const phone = () => window.matchMedia("(max-width: 700px)").matches;
   const slots = () => (phone() ? 30 : 60);
@@ -196,7 +196,7 @@ export async function render(container) {
     h("div", { class: "up-tools", "data-nosave": "1" },
       h("input", { type: "text", placeholder: "Filter by name or IP", "aria-label": "Filter by name or IP", oninput: (e) => { filterText = e.target.value; drawList(); } }),
       h("select", { "aria-label": "Sort", onchange: (e) => { sort = e.target.value; drawList(); } }, SORTS.map(([k, label]) => h("option", { value: k, selected: k === sort }, label))),
-      h("label", {}, h("input", { type: "checkbox", onchange: (e) => { onlyProblems = e.target.checked; drawList(); } }), "Only devices with a problem"),
+      h("label", {}, h("input", { type: "checkbox", checked: onlyProblems, onchange: (e) => { onlyProblems = e.target.checked; drawList(); } }), "Only devices with a problem"),
       h("label", {}, h("input", { type: "checkbox", checked: graphs, onchange: (e) => { graphs = e.target.checked; list.classList.toggle("up-compact", !graphs); try { localStorage.setItem(DENSE_KEY, graphs ? "on" : "off"); } catch (err) { /* only this page remembers it */ } } }), "Response-time graphs"),
       h("button", { class: "btn admin-only", type: "button", onclick: openChooser }, "Choose always-on devices")),
     list);

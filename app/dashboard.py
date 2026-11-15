@@ -108,11 +108,11 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
     expired = [x for x in certs if x["days"] < 0]
     soon = [x for x in certs if 0 <= x["days"] <= 14]
     if expired:
-        add("bad", f"{len(expired)} certificate{'s' if len(expired) != 1 else ''} expired: {expired[0]['name']}", "#/stats")
+        add("bad", f"{len(expired)} certificate{'s' if len(expired) != 1 else ''} expired: {expired[0]['name']}", "#/stats?focus=sites")
     if soon:
-        add("warn", f"Certificate {soon[0]['name']} ends in {soon[0]['days']} day{'s' if soon[0]['days'] != 1 else ''}", "#/stats")
+        add("warn", f"Certificate {soon[0]['name']} ends in {soon[0]['days']} day{'s' if soon[0]['days'] != 1 else ''}", "#/stats?focus=sites")
     if s["sites"]["down"]:
-        add("bad", f"{s['sites']['down']} proxy site{'s' if s['sites']['down'] != 1 else ''} not answering", "#/stats")
+        add("bad", f"{s['sites']['down']} proxy site{'s' if s['sites']['down'] != 1 else ''} not answering", "#/stats?focus=sites")
     behind_root: dict[int, list[dict]] = {}
     shown_down: list[dict] = []
     for dev in core_down or []:                       # a device that is down because of the device above it is part of that one problem
@@ -128,21 +128,21 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
     for dev in (core_down or [])[:3]:
         add("bad", f"{dev['name']} should always be online but is not answering", f"#/device/{dev['id']}", f"device:{dev['id']}")
     if len(core_down or []) > 3:
-        add("bad", f"{len(core_down) - 3} more always-on devices are not answering", "#/uptime")
+        add("bad", f"{len(core_down) - 3} more always-on devices are not answering", "#/uptime?focus=problems")
     core_flap = (s.get("core") or {}).get("flapping", 0)
     other_flap = s["devices"]["flapping"] - core_flap
     if core_flap:     # the always-on devices are the ones that matter; a phone or tablet flapping is only worth a note
-        add("warn", f"{core_flap} always-on device{'s' if core_flap != 1 else ''} keep going up and down", "#/uptime")
+        add("warn", f"{core_flap} always-on device{'s' if core_flap != 1 else ''} keep going up and down", "#/uptime?focus=problems")
     if other_flap > 0:
-        add("warn" if not core_flap and not (s.get("core") or {}).get("devices") else "info", f"{other_flap} other device{'s' if other_flap != 1 else ''} keep going up and down", "#/uptime")
+        add("warn" if not core_flap and not (s.get("core") or {}).get("devices") else "info", f"{other_flap} other device{'s' if other_flap != 1 else ''} keep going up and down", "#/uptime?focus=problems")
     if s["devices"]["unknown"]:
-        add("info", f"{s['devices']['unknown']} device{'s' if s['devices']['unknown'] != 1 else ''} not marked as known yet", "#/devices")
+        add("info", f"{s['devices']['unknown']} device{'s' if s['devices']['unknown'] != 1 else ''} not marked as known yet", "#/devices?trusted=false")
     if s["dns"]["conflicts"]:
         add("warn", f"{s['dns']['conflicts']} DNS name conflict{'s' if s['dns']['conflicts'] != 1 else ''}", "#/dns")
     if s["netchecks"]["untrusted"]:
         add("bad", f"{s['netchecks']['untrusted']} DHCP server{'s' if s['netchecks']['untrusted'] != 1 else ''} you do not trust", "#/settings/netchecks")
     if login_failed:
-        add("warn", f"{login_failed} burst{'s' if login_failed != 1 else ''} of failed sign-ins in the last 24 hours", "#/scans")
+        add("warn", f"{login_failed} burst{'s' if login_failed != 1 else ''} of failed sign-ins in the last 24 hours", "#/scans?kind=login_failed")
     if s["update"]["available"]:
         add("info", f"Netlens {s['update']['latest']} is available", "#/settings/about")
     gb = s.get("guest_backups") or {}
@@ -168,9 +168,9 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
         add("bad", f"{nw['quiet']} scanned network{'s' if nw['quiet'] != 1 else ''} stopped answering: {', '.join(nw['quiet_names'][:3])}", "#/settings/networks")
     lg = s.get("link_groups") or {}
     if lg.get("down"):
-        add("bad", f"{lg['down']} bonded connection{'s' if lg['down'] != 1 else ''} lost every link", f"#/device/{lg['first_host']}" if lg.get("first_host") else "#/devices")
+        add("bad", f"{lg['down']} bonded connection{'s' if lg['down'] != 1 else ''} lost every link", f"#/device/{lg['first_host']}/network/linkgroups" if lg.get("first_host") else "#/devices")
     if lg.get("degraded"):
-        add("warn", f"{lg['degraded']} bonded connection{'s' if lg['degraded'] != 1 else ''} lost a link (the host is still reachable)", f"#/device/{lg['first_host']}" if lg.get("first_host") else "#/devices")
+        add("warn", f"{lg['degraded']} bonded connection{'s' if lg['degraded'] != 1 else ''} lost a link (the host is still reachable)", f"#/device/{lg['first_host']}/network/linkgroups" if lg.get("first_host") else "#/devices")
     vu = s.get("vulns") or {}
     if vu.get("allowed") and vu.get("configured"):
         crit = (vu.get("counts") or {}).get("critical", 0)
@@ -215,13 +215,13 @@ def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
             text = f"{p['device']}: the link of {p['label'] or 'an interface'} is down"
         if p["metric"] == "service_stopped":
             text = f"{p['device']}: the service {p['label']} has stopped with an error"
-        out.append({"level": "bad" if p["level"] == "critical" else "warn", "text": text, "href": f"#/device/{p['device_id']}", "snooze": p["snooze"]})
+        out.append({"level": "bad" if p["level"] == "critical" else "warn", "text": text, "href": f"#/device/{p['device_id']}/health/performance", "snooze": p["snooze"]})
     full = {(p["device_id"], p["label"]) for p in problems if p["metric"] == "disk_pct"}
     for f in forecast.cached(conn):        # a disk that is not full yet but will be within two weeks
         days = f.get("days_to_full")
         if days is not None and days <= 14 and (f.get("device_id"), f["label"]) not in full:
             out.append({"level": "bad" if days <= 3 else "warn", "text": f"{f['device']}: {f['label']} is {f['current']:g}% full and will be full in {days:g} day{'s' if days != 1 else ''}",
-                        "href": f"#/device/{f['device_id']}" if f.get("device_id") else "#/insights"})
+                        "href": f"#/device/{f['device_id']}/health/performance" if f.get("device_id") else "#/insights"})
     from app import licence, secpolicy
     from app.ingest import core as ingest
 
@@ -267,7 +267,7 @@ def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
             continue
         bk = site.get("backups") or {}
         if bk.get("failed") or bk.get("late"):
-            out.append({"level": "bad" if bk.get("failed") else "warn", "text": f"{site['name']}: {bk.get('failed', 0)} backup(s) failed, {bk.get('late', 0)} late", "href": "#/backups"})
+            out.append({"level": "bad" if bk.get("failed") else "warn", "text": f"{site['name']}: {bk.get('failed', 0)} backup(s) failed, {bk.get('late', 0)} late", "href": href})
         down = site["devices"]["core_down"]
         if down:
             out.append({"level": "bad", "text": f"{site['name']}: {down} always-on device{'s' if down != 1 else ''} offline", "href": href})

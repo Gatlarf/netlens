@@ -416,5 +416,5 @@ def test_a_network_without_proxy_sites_has_empty_numbers_and_no_metrics(db):
     from app.stats import summary
 
     conn, _ = db
-    assert summary(conn)["sites"] == {"total": 0, "enabled": 0, "unmatched": 0, "expiring": 0, "down": 0, "certificates": 0, "certificates_expiring": 0, "certificates_expired": 0, "next_expiry_days": None}
+    assert summary(conn)["sites"] == {"total": 0, "enabled": 0, "unmatched": 0, "expiring": 0, "down": 0, "down_list": [], "certificates": 0, "certificates_expiring": 0, "certificates_expired": 0, "next_expiry_days": None}
     assert "netlens_sites" not in render_metrics(conn) and "netlens_certificate" not in render_metrics(conn)

@@ -173,6 +173,7 @@ function build(s) {
         tile(fmtNumber(px.enabled), `sites published (of ${px.total})`), tile(fmtNumber(px.unmatched), "not tied to a device", { tone: px.unmatched ? "warn" : "" }),
         tile(fmtNumber(px.down), "failing their check", { tone: px.down ? "warn" : "" }),
         tile(px.next_expiry_days === null ? "–" : fmtNumber(px.next_expiry_days), "days to the next certificate", { tone: px.next_expiry_days !== null && px.next_expiry_days <= 14 ? "warn" : "" })),
+      ...(px.down_list && px.down_list.length ? [card("Failing their check", table(["Site", "Proxy"], px.down_list.map((x) => [x.name, x.proxy || ""])))] : []),
       card("Certificates", px.certificate_list.length
         ? table(["Certificate", "Proxy", "Used by", "Ends", "Days left"], px.certificate_list.map((c) => [c.name, c.proxy || "", c.domains.slice(0, 3).join(", ") + (c.domains.length > 3 ? ` +${c.domains.length - 3}` : ""), fmtTime(c.expires), c.days < 0 ? "expired" : String(c.days)]))
         : emptyNote("No site uses a certificate."))));
@@ -363,7 +364,7 @@ export async function render(container) {
     showTab();
   }
 
-  let lastSig = "";
+  let lastSig = "", jumped = false;
   const fresh = latest();
   async function load() {
     const current = fresh();
@@ -387,7 +388,12 @@ export async function render(container) {
       applyLayout(panelEls, layoutState.doc.effective);
       body.replaceChildren(built);
       buildNav();
-      if (Math.abs(window.scrollY - keepAt) > 2) window.scrollTo(0, keepAt);
+      const wantedSection = !jumped && /[?&]focus=([a-z-]+)/.exec(location.hash);          // "#/stats?focus=sites" opens the group with that section and brings it into view, once
+      if (wantedSection) {
+        jumped = true;
+        const sec = body.querySelector(`#stat-${wantedSection[1]}`);
+        if (sec) { tab = sec.dataset.tab; showTab(); setTimeout(() => sec.scrollIntoView({ block: "start", behavior: "smooth" }), 50); }
+      } else if (Math.abs(window.scrollY - keepAt) > 2) window.scrollTo(0, keepAt);
       stamp.textContent = `Updated ${timeAgo(data.generated)}`;
     } catch (err) {
       if (destroyed) return;

@@ -112,6 +112,8 @@ function buildToolbar(state) {
   trustSel.appendChild(h("option", { value: "" }, "Known and unknown"));
   trustSel.appendChild(h("option", { value: "false" }, "Unknown only"));
   trustSel.appendChild(h("option", { value: "true" }, "Known only"));
+  const wantsTrust = /[?&]trusted=(true|false)/.exec(location.hash);          // "#/devices?trusted=false" lists the devices not marked as known yet
+  if (wantsTrust) state.trusted = wantsTrust[1];
   trustSel.value = state.trusted;
   trustSel.addEventListener("change", () => {
     state.trusted = trustSel.value;

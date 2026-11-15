@@ -338,5 +338,6 @@ def summary(conn: sqlite3.Connection) -> dict[str, Any]:
             "unmatched": sum(1 for s in sites if s["type"] == "proxy" and s["enabled"] and s["target_device_id"] is None),
             "expiring": sum(1 for s in sites if s["cert_days"] is not None and s["cert_days"] <= 14),
             "down": sum(1 for s in sites if s["check_state"] == "down"),
+            "down_list": [{"name": (s["domains"] or [None])[0] or s.get("name") or "site", "proxy": s["proxy"]} for s in sites if s["check_state"] == "down"][:20],
             "certificates": len(certs), "certificates_expiring": sum(1 for c in certs if 0 <= c["days"] <= 14),
             "certificates_expired": sum(1 for c in certs if c["days"] < 0), "next_expiry_days": certs[0]["days"] if certs else None}

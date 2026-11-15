@@ -95,6 +95,8 @@ export async function render(container, params) {
     const opt = h("option", { value: kind }, KIND_LABELS[kind] || kind);
     select.appendChild(opt);
   }
+  const wantsKind = /[?&]kind=([a-z_]+)/.exec(location.hash);          // "#/scans?kind=login_failed" opens the event list on that kind
+  if (wantsKind && KIND_ORDER.includes(wantsKind[1])) select.value = wantsKind[1];
   filterRow.appendChild(select);
   const eventsBody = h("div", { class: "card-body" });
   eventsCard.appendChild(eventsTitle);
