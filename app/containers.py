@@ -94,7 +94,8 @@ def summary(conn: sqlite3.Connection) -> dict[str, Any]:
             unhealthy += 1
             sick.append("unhealthy")
         if sick:
-            problems.append({"name": r["name"], "host": r["host_name"], "problem": ", ".join(sick), "restarts": d.get("restarts"), "device_id": r["device_id"] or r["host_device_id"]})
+            problems.append({"name": r["name"], "host": r["host_name"], "problem": ", ".join(sick), "restarts": d.get("restarts"), "device_id": r["device_id"] or r["host_device_id"],
+                             "host_device_id": r["host_device_id"], "reason": d.get("health_output") or ""})
     return {"total": total, "running": running, "stopped": stopped, "restarting": restarting, "unhealthy": unhealthy, "exposed": exposed,
             "hosts": len(hosts), "problems": problems[:20]}
 

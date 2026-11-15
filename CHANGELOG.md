@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.436 — 2026-11-15
+
+### Changed
+- **"N unhealthy and N restarting containers" on the dashboard now says which, and opens the right place.** The item names the containers ("4 unhealthy and 0 restarting containers: greenbone-gvmd-1, ...") and its link opens the Docker host's page at its **Virtualization** card (before: the list of all devices, which showed nothing useful). The card has a new **Needs attention** list above the container table: for a restarting container the number of restarts, for an unhealthy one what its health check printed last (for example `socat ... connect ... No such file or directory`), so you can see why without logging in to the host.
+- **Docker plugin 1.6.2** reads that health-check output (cut to 200 characters). Until the plugin is updated the card says "the health check is failing" without the reason.
+
 ## 0.4.434 — 2026-11-15
 
 ### Changed

@@ -289,6 +289,15 @@ def test_storage_problems_lead_to_the_storage_page():
     assert len(items) == 4 and all(i["href"] == "#/storage?focus=problems" for i in items)
 
 
+def test_unhealthy_containers_are_named_and_lead_to_the_host_card():
+    s = _summary_stub(containers={"unhealthy": 4, "restarting": 0, "to_check": [{"name": f"c{i}", "host": "dockerdev", "problem": "unhealthy", "host_device_id": 7} for i in range(4)]})
+    item = next(i for i in dashboard._attention(s, [], 0, []) if "unhealthy" in i["text"])
+    assert item["text"] == "4 unhealthy and 0 restarting containers: c0, c1, c2 and 1 more"
+    assert item["href"] == "#/device/7/network/virtualization"
+    plain = next(i for i in dashboard._attention(_summary_stub(containers={"unhealthy": 1, "restarting": 0}), [], 0, []) if "unhealthy" in i["text"])
+    assert plain["href"] == "#/devices"             # no host known (an older summary): the list of devices, as before
+
+
 def test_card_widths_are_kept_and_cleaned(tmp_path):
     from app.db import connect, init_db
 

@@ -583,7 +583,7 @@ def validate_dns_results(data: Any, expected_ids: list[str]) -> list[dict]:
 
 
 MAX_DETAIL_PORTS = 100
-DETAIL_TEXT_KEYS = ("image", "image_created", "image_digest", "project", "service", "health", "started", "network", "network_driver", "os", "tags", "version")
+DETAIL_TEXT_KEYS = ("image", "image_created", "image_digest", "project", "service", "health", "health_output", "started", "network", "network_driver", "os", "tags", "version")
 
 
 def _guest_details(value: Any, path: str) -> dict:

@@ -566,6 +566,15 @@ function buildVirtualizationCard(device) {
     card.appendChild(h("p", { class: "hint" }, docker && info.guests.every((g) => g.kind === "container")
       ? `Docker host with ${info.guests.length} container${info.guests.length === 1 ? "" : "s"}:`
       : `Hypervisor host with ${info.guests.length} guest${info.guests.length === 1 ? "" : "s"}:`));
+    const sick = info.guests.filter((g) => g.kind === "container" && (g.status === "restarting" || (g.details && g.details.health === "unhealthy")));
+    if (sick.length) {       // what is wrong, with the output of the failing health check when the plugin could read it
+      card.appendChild(h("h3", {}, "Needs attention"));
+      card.appendChild(h("ul", { class: "container-problems" }, ...sick.map((g) => {
+        const d = g.details || {};
+        const why = g.status === "restarting" ? `keeps restarting${d.restarts ? ` (${d.restarts} restarts)` : ""}` : (d.health_output ? `the health check says: ${d.health_output}` : "the health check is failing");
+        return h("li", {}, h("strong", {}, g.name), ": ", h("span", { class: "warn-text" }, why));
+      })));
+    }
     const table = h("table", { class: "data" });
     const headRow = h("tr");
     (docker ? ["Name", "Status", "Image", "Ports", "Device"] : ["ID", "Name", "Type", "Status", ...(info.guests.some((g) => resourceText(g.details || {})) ? ["Resources"] : []), "Device"]).forEach((c) => headRow.appendChild(h("th", {}, c)));
@@ -963,7 +972,7 @@ export async function render(container, params) {
     flow.appendChild(portMapSlot);
     buildPortMapCard(device).then((c) => { if (c && !disposed) portMapSlot.appendChild(c); }).catch(() => {});
     const virtualizationCard = buildVirtualizationCard(device);
-    if (virtualizationCard) flow.appendChild(tag(virtualizationCard, "virtualization", "Virtual machines and containers"));
+    if (virtualizationCard) { flow.appendChild(tag(virtualizationCard, "virtualization", "Virtual machines and containers")); setTimeout(() => showCard(virtualizationCard), 50); }
     const backupCard = buildBackupCard(device);
     if (backupCard) flow.appendChild(tag(backupCard, "backup", "Backup"));
     const storageCard = buildStorageCard(device);

@@ -211,7 +211,7 @@ def test_events_names_and_numbers(tmp_path):
             assert conn.execute("SELECT hostname FROM devices WHERE id = ?", (lan,)).fetchone()[0] == "app"
             assert conn.execute("SELECT source FROM device_names WHERE device_id = ?", (lan,)).fetchone()[0] == "docker"
             # now the web container turns unhealthy, "app" crashes and "old" had already stopped
-            d.inspect_data["c1"] = {"RestartCount": 0, "State": {"Health": {"Status": "unhealthy"}}}
+            d.inspect_data["c1"] = {"RestartCount": 0, "State": {"Health": {"Status": "unhealthy", "Log": [{"Output": "old"}, {"Output": "socat[618] E connect(, AF=1 \"/run/gvmd/gvmd.sock\"): No such file\n"}]}}}
             d.containers[1]["State"] = "exited"
             d.inspect_data["c2"] = {"RestartCount": 0, "State": {"ExitCode": 1}}
             _sync(client)
@@ -225,6 +225,9 @@ def test_events_names_and_numbers(tmp_path):
             numbers = container_module.summary(conn)
             assert numbers["total"] == 7 and numbers["unhealthy"] == 1 and numbers["restarting"] == 1 and numbers["hosts"] == 1
             assert {p["name"] for p in numbers["problems"]} == {"web", "flaky"}
+            web = next(p for p in numbers["problems"] if p["name"] == "web")
+            assert web["reason"].startswith("socat[618] E connect") and "gvmd.sock" in web["reason"] and "\n" not in web["reason"]     # why the health check fails
+            assert [x["name"] for x in stats_summary(conn)["containers"]["to_check"]][:1] != []
             doc = stats_summary(conn)
             assert doc["containers"]["unhealthy"] == 1 and doc["problems"] >= 1
             conn.close()

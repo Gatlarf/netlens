@@ -205,6 +205,7 @@ def to_guest(host, container, inspect, drivers, images=None, digests=None):
         "network": ", ".join(names),
         "network_driver": driver,
         "health": (inspected_state.get("Health") or {}).get("Status") or "",
+        "health_output": _health_output(inspected_state),
         "restarts": (inspect or {}).get("RestartCount"),
         "restarting": bool(inspected_state.get("Restarting")),
         "started": inspected_state.get("StartedAt") if state == "running" else "",
@@ -225,6 +226,16 @@ def to_guest(host, container, inspect, drivers, images=None, digests=None):
         "ips": ips,
         "details": {k: v for k, v in details.items() if v not in ("", None)},
     }
+
+
+def _health_output(state: dict) -> str:
+    """What the failing health check printed last (the reason a container is unhealthy), cut short; nothing while it is healthy."""
+    health = state.get("Health") or {}
+    if health.get("Status") != "unhealthy":
+        return ""
+    log = health.get("Log") or []
+    text = str((log[-1] if log else {}).get("Output") or "").strip()
+    return " ".join(text.split())[:200]
 
 
 def read_host(host):

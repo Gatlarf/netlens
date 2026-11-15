@@ -101,7 +101,10 @@ def _attention(s: dict, certs: list[dict], login_failed: int, down: list[str], c
         add("bad", "The last backup failed", "#/settings/backup")
     c = s["containers"]
     if c["unhealthy"] or c["restarting"]:
-        add("warn", f"{c['unhealthy']} unhealthy and {c['restarting']} restarting containers", "#/devices")
+        sick = c.get("to_check") or []
+        names = ", ".join(x["name"] for x in sick[:3]) + (f" and {len(sick) - 3} more" if len(sick) > 3 else "")
+        host = next((x["host_device_id"] for x in sick if x.get("host_device_id")), None)       # the Docker host's own page, at the card that lists its containers
+        add("warn", f"{c['unhealthy']} unhealthy and {c['restarting']} restarting containers" + (f": {names}" if names else ""), f"#/device/{host}/network/virtualization" if host else "#/devices")
     expired = [x for x in certs if x["days"] < 0]
     soon = [x for x in certs if 0 <= x["days"] <= 14]
     if expired:
