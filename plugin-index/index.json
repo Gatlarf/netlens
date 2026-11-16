@@ -178,6 +178,18 @@
    ],
    "releases": [
     {
+     "version": "1.7.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.7.0/asus.zip",
+     "sha256": "dcb96b1959e071169fae866df34daf97ba179dcc8471e159fd85c5770706eb0f",
+     "api_version": 1,
+     "min_netlens": "0.4.446",
+     "released": "2026-11-16",
+     "changelog": "Wi-Fi channels and dual WAN: reads the channel and width of every radio of the router and of every AiMesh node, and the two connections of a router in dual-WAN mode (failover, failback or load balancing). New setting Read the Wi-Fi channels and the internet connections (about ten extra reads per router per sync). Simulated answers only. Needs Netlens 0.4.446.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.6.4",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.6.4/asus.zip",
      "sha256": "98ef2cd8ba6b606b5dafcb0a1bee4345574a351957b5978e93b7ac2a11f4416d",
@@ -1531,6 +1543,18 @@
    ],
    "releases": [
     {
+     "version": "1.2.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.2.0/mikrotik.zip",
+     "sha256": "16b10ef597a3ea6c3df79646f94254451b8e5a8628a089e2f609f1eb2236e18a",
+     "api_version": 1,
+     "min_netlens": "0.4.446",
+     "released": "2026-11-16",
+     "changelog": "Wi-Fi channels and internet connections: reads the radios (frequency in use as band and channel, width, stations) and, with two or more default routes, the internet connections (state, priority, which carries traffic, failover or load sharing). Simulated answers only. Needs Netlens 0.4.446.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.1.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.1.1/mikrotik.zip",
      "sha256": "de62111862629aca68497083270cc9bcda954acaf56413298b0e2bae3d1828ee",
@@ -1915,6 +1939,18 @@
    ],
    "releases": [
     {
+     "version": "1.6.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.6.0/omada.zip",
+     "sha256": "b6b7a70d2d3b462700341667dbd5c3561957b5d95e41433d47494ca922ac1673",
+     "api_version": 1,
+     "min_netlens": "0.4.446",
+     "released": "2026-11-16",
+     "changelog": "Wi-Fi channels: reads the radios of every access point (channel in use, width, clients) from the detail Netlens already reads. Simulated controller only. Needs Netlens 0.4.446.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.5.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.5.1/omada.zip",
      "sha256": "5dd8054cc20c8de9bb3e17c75ffb9d53b4307f36f6b04fa24b7aa7c97d1bce66",
@@ -2192,6 +2228,18 @@
     "Wi-Fi stations (not tested)"
    ],
    "releases": [
+    {
+     "version": "1.2.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.2.0/openwrt.zip",
+     "sha256": "ebfd0779ea579487636e7a1c388d976e366dc902ca2df1d02f481318232e8397",
+     "api_version": 1,
+     "min_netlens": "0.4.446",
+     "released": "2026-11-16",
+     "changelog": "Wi-Fi channels, traffic and internet connections: reads the channel, width, noise and clients of every radio; scans for neighbouring networks when you switch Scan for neighbouring networks on (off by default, at most every 30 minutes, a scan interrupts the radio for a few seconds); reads the internet connections of mwan3 and the traffic per device from nlbwmon. The login needs the extra permissions in the box at the top of the plugin's page (iwinfo scan, mwan3 status, running nlbw). Simulated answers only; the lab router has no radio, mwan3 or nlbwmon. Needs Netlens 0.4.446.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.1.1/openwrt.zip",
@@ -3689,6 +3737,18 @@
     "UniFi OS consoles (Dream Machine, Cloud Gateway, Cloud Key Gen2+) and the classic self-hosted controller on port 8443 are both supported by the code"
    ],
    "releases": [
+    {
+     "version": "1.2.0",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.2.0/unifi.zip",
+     "sha256": "7a516eede1681d8432f5d85a9583e6f1aa98982fcaefc527a8297f2136215170",
+     "api_version": 1,
+     "min_netlens": "0.4.446",
+     "released": "2026-11-16",
+     "changelog": "Wi-Fi channels, traffic and internet connections: reads each access point's channel, width, clients and busy airtime and the neighbouring networks the controller hears (nothing is interrupted), the byte counters of every client (Netlens works out the traffic per device and day) and, for a gateway with two or more internet connections, their state, which one is in use and whether the load is shared. New setting Read the Wi-Fi channels and neighbouring networks. Written from the controller's documented fields and tested against a simulated controller; not yet on real hardware. Needs Netlens 0.4.446.",
+     "review": {
+      "level": "community"
+     }
+    },
     {
      "version": "1.1.1",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.1.1/unifi.zip",

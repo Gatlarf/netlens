@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.2.0/mikrotik.zip",
+      "sha256": "16b10ef597a3ea6c3df79646f94254451b8e5a8628a089e2f609f1eb2236e18a",
+      "api_version": 1,
+      "min_netlens": "0.4.446",
+      "released": "2026-11-16",
+      "changelog": "Wi-Fi channels and internet connections: reads the radios (frequency in use as band and channel, width, stations) and, with two or more default routes, the internet connections (state, priority, which carries traffic, failover or load sharing). Simulated answers only. Needs Netlens 0.4.446."
+    },
+    {
       "version": "1.1.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-mikrotik-v1.1.1/mikrotik.zip",
       "sha256": "de62111862629aca68497083270cc9bcda954acaf56413298b0e2bae3d1828ee",

@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.2.0/unifi.zip",
+      "sha256": "7a516eede1681d8432f5d85a9583e6f1aa98982fcaefc527a8297f2136215170",
+      "api_version": 1,
+      "min_netlens": "0.4.446",
+      "released": "2026-11-16",
+      "changelog": "Wi-Fi channels, traffic and internet connections: reads each access point's channel, width, clients and busy airtime and the neighbouring networks the controller hears (nothing is interrupted), the byte counters of every client (Netlens works out the traffic per device and day) and, for a gateway with two or more internet connections, their state, which one is in use and whether the load is shared. New setting Read the Wi-Fi channels and neighbouring networks. Written from the controller's documented fields and tested against a simulated controller; not yet on real hardware. Needs Netlens 0.4.446."
+    },
+    {
       "version": "1.1.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-unifi-v1.1.1/unifi.zip",
       "sha256": "3d87a43e3c378c1d62f3aaf9be3886e6646cf64fcbdccfe7323adc9609462f25",

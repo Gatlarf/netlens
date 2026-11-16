@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.7.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.7.0/asus.zip",
+      "sha256": "dcb96b1959e071169fae866df34daf97ba179dcc8471e159fd85c5770706eb0f",
+      "api_version": 1,
+      "min_netlens": "0.4.446",
+      "released": "2026-11-16",
+      "changelog": "Wi-Fi channels and dual WAN: reads the channel and width of every radio of the router and of every AiMesh node, and the two connections of a router in dual-WAN mode (failover, failback or load balancing). New setting Read the Wi-Fi channels and the internet connections (about ten extra reads per router per sync). Simulated answers only. Needs Netlens 0.4.446."
+    },
+    {
       "version": "1.6.4",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-asus-v1.6.4/asus.zip",
       "sha256": "98ef2cd8ba6b606b5dafcb0a1bee4345574a351957b5978e93b7ac2a11f4416d",

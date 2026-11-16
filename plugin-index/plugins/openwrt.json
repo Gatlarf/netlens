@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.2.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.2.0/openwrt.zip",
+      "sha256": "ebfd0779ea579487636e7a1c388d976e366dc902ca2df1d02f481318232e8397",
+      "api_version": 1,
+      "min_netlens": "0.4.446",
+      "released": "2026-11-16",
+      "changelog": "Wi-Fi channels, traffic and internet connections: reads the channel, width, noise and clients of every radio; scans for neighbouring networks when you switch Scan for neighbouring networks on (off by default, at most every 30 minutes, a scan interrupts the radio for a few seconds); reads the internet connections of mwan3 and the traffic per device from nlbwmon. The login needs the extra permissions in the box at the top of the plugin's page (iwinfo scan, mwan3 status, running nlbw). Simulated answers only; the lab router has no radio, mwan3 or nlbwmon. Needs Netlens 0.4.446."
+    },
+    {
       "version": "1.1.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-openwrt-v1.1.1/openwrt.zip",
       "sha256": "49f84207286c83265a8244e47e02e257df72efc578f785f050319ef519d1bb56",

@@ -12,6 +12,15 @@
   ],
   "releases": [
     {
+      "version": "1.6.0",
+      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.6.0/omada.zip",
+      "sha256": "b6b7a70d2d3b462700341667dbd5c3561957b5d95e41433d47494ca922ac1673",
+      "api_version": 1,
+      "min_netlens": "0.4.446",
+      "released": "2026-11-16",
+      "changelog": "Wi-Fi channels: reads the radios of every access point (channel in use, width, clients) from the detail Netlens already reads. Simulated controller only. Needs Netlens 0.4.446."
+    },
+    {
       "version": "1.5.1",
       "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.5.1/omada.zip",
       "sha256": "5dd8054cc20c8de9bb3e17c75ffb9d53b4307f36f6b04fa24b7aa7c97d1bce66",
