@@ -1461,6 +1461,13 @@ def add_event(
             window = snooze.tag(conn, kind, subject, now)
         except Exception:  # noqa: BLE001 - same: never lose an event over a broken snooze list
             window = None
+    if window is None:
+        try:
+            from app import alertrules
+
+            window = alertrules.tag(conn, kind, device_id, detail, now)        # a rule of the administrator's own: recorded, not sent
+        except Exception:  # noqa: BLE001 - a broken rule must never lose an event
+            window = None
     tier = "normal"
     try:
         if subject and subject.startswith("service:") and subject[8:].isdigit():

@@ -30,6 +30,7 @@ def list_events(
     kind: str | None = None,
     device_id: int | None = None,
     since_id: int | None = Query(None, ge=0, description="only events newer than this id (for integrations that poll)"),
+    held: bool | None = Query(None, description="true: only the events that were not sent (a maintenance window, a snooze or an alert rule held them back); false: only the others"),
     conn: sqlite3.Connection = Depends(get_conn),
 ) -> list[dict[str, Any]]:
     conditions: list[str] = []
@@ -46,6 +47,9 @@ def list_events(
     if since_id is not None:
         conditions.append("e.id > ?")
         params.append(since_id)
+
+    if held is not None:
+        conditions.append("e.maintenance IS NOT NULL" if held else "e.maintenance IS NULL")
 
     scope = scope_of(request)
     if scope is not None:                  # a customer view: only events of the devices in its groups

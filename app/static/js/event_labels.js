@@ -15,6 +15,7 @@ export const EVENT_LABELS = {
   firmware_update: "Firmware update waiting",
   link_up: "Link up",
   firewall_ha: "Firewall failover",
+  alerts_muted: "Alerts muted by a rule",
   uplink_down: "Internet connection down",
   uplink_up: "Internet connection back",
   uplink_failover: "Internet failover",

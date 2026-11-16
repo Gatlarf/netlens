@@ -3,6 +3,7 @@
 import { get } from "./api.js";
 import { h } from "./util.js";
 import { describeSeries } from "./seriesinfo.js";
+import { loadDevices } from "./devicelist.js";
 import { formatValue, overlayColour } from "./timegraph.js";
 import { canOverlay, describeCorrelation, niceScale } from "./graphmath.js";
 
@@ -14,19 +15,7 @@ const el = (tag, attrs = {}) => {
 };
 
 // ---------- what can be picked ----------
-let deviceCache = null;
-async function devices() {
-  if (deviceCache && Date.now() - deviceCache.at < 60000) return deviceCache.list;
-  let list = [];
-  try {
-    list = (await get("/api/map")).nodes.filter((n) => !String(n.id).startsWith("v")).map((n) => ({ id: n.id, name: n.label || n.ip || `device ${n.id}`, ip: n.ip }));
-  } catch (err) {
-    list = [];                                              // a customer view may not list devices: only the device at hand is offered
-  }
-  list.sort((a, b) => a.name.localeCompare(b.name));
-  deviceCache = { at: Date.now(), list };
-  return list;
-}
+const devices = loadDevices;
 
 async function seriesOf(entity, id) {
   try {

@@ -96,7 +96,8 @@ tool("get_insights", "overview", "Netlens' own findings: incidents, anomalies, p
 tool("get_changes", "overview", "What changed in a period: new, gone, moved and renamed devices, open ports, certificates.", "GET", "/api/changes",
      {"period": s("6h, 24h, 7d or 30d"), "category": s("Only this kind of change"), "limit": i("Maximum rows"), "always_on": b("Only always-on devices")}, query=("period", "category", "limit", "always_on"))
 tool("list_events", "overview", "Recent events (device offline/online, new device, service down, certificate, ...), newest first.", "GET", "/api/events",
-     {"limit": i("Maximum rows, default 100"), "kind": s("Only this event kind"), "device_id": i("Only this device"), "since_id": i("Only events after this event id")}, query=("limit", "kind", "device_id", "since_id"))
+     {"limit": i("Maximum rows, default 100"), "kind": s("Only this event kind"), "device_id": i("Only this device"), "since_id": i("Only events after this event id"),
+      "held": b("true: only the events that were not sent (held back by a maintenance window, a snooze or an alert rule); false: only the others")}, query=("limit", "kind", "device_id", "since_id", "held"))
 tool("get_forecast", "overview", "Predictions: disks that fill up, certificates that expire, memory trends.", "GET", "/api/forecast")
 tool("get_uptime", "overview", "Uptime of every device over a range, with the bars shown on the Uptime page.", "GET", "/api/uptime", {"bars": i("Number of bars"), "range": s("6h, 24h, 7d or 30d")}, query=("bars", "range"))
 tool("get_availability_report", "overview", "Availability report for a month: per device or service, outages, target met or not.", "GET", "/api/reports/availability",
@@ -161,6 +162,10 @@ tool("get_metric", "devices", "Points of one measured series over a range (graph
 tool("correlate_metrics", "devices", "Whether two measurements move together over a period: the paired readings, the correlation r (-1 to 1) and the line that fits. Each is entity:id:metric, with an optional :label.",
      "GET", "/api/timeseries/correlate", {"x": s("First series, for example device:12:cpu_pct"), "y": s("Second series, for example device:5:rtt_ms"), "range": s("For example 24h, 7d"),
                                           "start": i("Start of a period, epoch seconds (with end; instead of range)"), "end": i("End of the period, epoch seconds")}, ("x", "y"), ("range", "start", "end"))
+tool("list_alert_rules", "overview", "The alert rules: which events are recorded but not sent (muted), for which devices and when, and how many each muted in the last 7 days.", "GET", "/api/alert-rules")
+tool("preview_alert_rule", "overview", "What an alert rule would have done to the events of the last days (how many it would have muted, by kind, with examples). It changes nothing.", "POST", "/api/alert-rules/preview",
+     {"rule": {"type": "object", "description": "The rule: name, type (mute, while_down or repeat), kinds (event kinds, or [\"*\"]), scope {type: all, group, devices, below, tier or type, plus ids, device_id or value}, when {days, from, to}, device_id (while_down), count and minutes (repeat)"},
+      "days": i("Days to replay, 1 to 30")}, ("rule",))
 tool("get_hierarchy", "devices", "The network hierarchy: which device sits behind which.", "GET", "/api/hierarchy", {"guests": b("Include virtual machines and containers")}, query=("guests",))
 tool("list_groups", "devices", "Device groups (rooms, floors, owners).", "GET", "/api/groups")
 tool("list_vulnerabilities", "devices", "Vulnerabilities found by the scanner plugins.", "GET", "/api/vulns",

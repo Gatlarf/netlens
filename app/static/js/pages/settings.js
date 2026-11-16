@@ -11,6 +11,7 @@ import { buildPluginsCard } from "../cards/plugins.js";
 import { buildPluginGuideCard } from "../cards/plugin_guide.js";
 import { buildMapCard } from "../cards/map_settings.js";
 import { buildChannelsCard } from "../cards/channels.js";
+import { buildAlertRulesCard } from "../cards/alert_rules.js";
 import { buildCentralCard } from "../cards/central.js";
 import { buildAiModelCard, buildAiAssistantPage, buildAiMcpPage } from "../cards/ai.js";
 import { buildHostProbeCard } from "../cards/hostprobe_settings.js";
@@ -374,6 +375,7 @@ const STATIC_GROUPS = [
     title: "Notifications",
     items: [
       { key: "channels", label: "Alert channels & quiet hours", tab: "Channels", build: buildChannelsCard },
+      { key: "alertrules", label: "Alert rules", tab: "Alert rules", build: buildAlertRulesCard },
       { key: "maintenance", label: "Maintenance windows", tab: "Maintenance", build: buildMaintenanceCard },
       { key: "escalation", label: "Escalation", build: buildEscalationCard },
       { key: "oncall", label: "On-call schedule", tab: "On-call", build: buildOncallCard },

@@ -132,3 +132,19 @@ def test_a_dashboard_is_exported_with_its_own_cards_and_imported_without_clashes
     assert odd["ok"] and sorted(s["id"] for s in odd["skipped"]) == ["c-dev", "c-missing", "plugin-card"] and odd["counts"]["skipped"] == 3
     assert any("number here" in s["why"] for s in odd["skipped"] if s["id"] == "c-dev")                                           # a card that names one device means nothing elsewhere
     assert [r[0] for r in out["bad"]] == [False] * 5 and "valid JSON" in out["bad"][0][1] and "newer" in out["bad"][2][1] and "None of the cards" in out["bad"][3][1] and "too large" in out["bad"][4][1]
+
+
+def test_a_rule_reads_as_a_sentence():
+    out = run("alert_rules_text.js", """
+      const ctx = { kindName: (k) => ({ device_offline: 'device offline', service_down: 'service down' })[k] || k, groupName: (id) => ({ 1: 'Garden', 2: 'Office' })[id], deviceName: (id) => ({ 3: 'Garden AP', 4: 'NAS' })[id] };
+      const base = { kinds: ['device_offline'], scope: { type: 'all' }, when: null, keep_critical: true };
+      return { days: [[0,1,2,3,4], [5,6], [0,1,2,3,4,5,6], [0,2,3,4,6], [1]].map(m.describeDays),
+        mute: m.describeRule({ ...base, type: 'mute', kinds: ['device_offline', 'service_down'], scope: { type: 'group', ids: [1, 2] }, when: { days: [0,1,2,3,4], from: '22:00', to: '07:00' } }, ctx),
+        down: m.describeRule({ ...base, type: 'while_down', device_id: 4, scope: { type: 'below', device_id: 3 } }, ctx),
+        repeat: m.describeRule({ ...base, type: 'repeat', count: 3, minutes: 10, per: 'device', keep_critical: false }, ctx),
+        all: m.describeRule({ ...base, type: 'mute', kinds: ['*'] }, ctx), none: m.listOf([], 'nothing') };""")
+    assert out["days"] == ["Monday to Friday", "at the weekend", "every day", "Mon, Wed–Fri, Sun", "Tue"]
+    assert out["mute"] == "Ignore device offline and service down for devices in Garden and Office, Monday to Friday 22:00–07:00."
+    assert out["down"] == "Ignore device offline for everything behind Garden AP while NAS is offline."
+    assert out["repeat"] == "After 3 device offline events within 10 minutes for the same device, ignore the rest and tell me once (critical events too)."
+    assert out["all"] == "Ignore any event for every device." and out["none"] == "nothing"

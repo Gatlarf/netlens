@@ -19,6 +19,7 @@ const KIND_ORDER = [
   "device_deleted",
   "ip_reused",
   "wifi_roamed",
+  "alerts_muted",
   "uplink_down",
   "uplink_up",
   "uplink_failover",
@@ -101,6 +102,10 @@ export async function render(container, params) {
   const wantsKind = /[?&]kind=([a-z_]+)/.exec(location.hash);          // "#/scans?kind=login_failed" opens the event list on that kind
   if (wantsKind && KIND_ORDER.includes(wantsKind[1])) select.value = wantsKind[1];
   filterRow.appendChild(select);
+  // events that were recorded but not sent: held back by a maintenance window, a snooze or an alert rule
+  const heldSel = h("select", { class: "kind-filter", "aria-label": "Sent or held back" }, h("option", { value: "" }, "Sent and held back"), h("option", { value: "true" }, "Only held back (muted)"), h("option", { value: "false" }, "Only the ones sent"));
+  if (/[?&]held=1/.test(location.hash)) heldSel.value = "true";           // "#/scans?held=1": what the alert rules muted
+  filterRow.appendChild(heldSel);
   const eventsBody = h("div", { class: "card-body" });
   eventsCard.appendChild(eventsTitle);
   eventsCard.appendChild(filterRow);
@@ -236,7 +241,7 @@ export async function render(container, params) {
     const current = freshEvents();
     try {
       const kind = select.value;
-      const url = kind ? `/api/events?limit=200&kind=${encodeURIComponent(kind)}` : "/api/events?limit=200";
+      const url = `/api/events?limit=200${kind ? `&kind=${encodeURIComponent(kind)}` : ""}${heldSel.value ? `&held=${heldSel.value}` : ""}`;
       const events = await get(url);
       if (!current()) return;
       if (!events || !events.length) {
@@ -254,7 +259,8 @@ export async function render(container, params) {
 
         const label = h("span", { class: `event-kind ${ev.kind}` }, eventLabel(ev.kind));
         li.appendChild(label);
-        if (ev.maintenance) li.appendChild(h("span", { class: "badge maint", title: "Held back by a maintenance window: not sent to e-mail or channels" }, `maintenance: ${ev.maintenance}`));
+        if (ev.maintenance && ev.maintenance.startsWith("Rule: ")) li.appendChild(h("span", { class: "badge maint", title: "Muted by an alert rule: recorded, not sent to e-mail or channels" }, `muted: ${ev.maintenance.slice(6)}`));
+        else if (ev.maintenance) li.appendChild(h("span", { class: "badge maint", title: "Held back by a maintenance window or a snooze: not sent to e-mail or channels" }, `maintenance: ${ev.maintenance}`));
 
         const detail = h("span", { class: "event-detail" }, ev.detail || "");
         li.appendChild(detail);
@@ -281,6 +287,7 @@ export async function render(container, params) {
   select.addEventListener("change", () => {
     loadEvents();
   });
+  heldSel.addEventListener("change", loadEvents);
 
   refresh();
 
