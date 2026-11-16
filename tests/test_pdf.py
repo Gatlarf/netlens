@@ -88,7 +88,7 @@ def test_a_file_is_well_formed_and_holds_what_was_drawn():
     first = content_of(pages[0], objs).decode("latin-1")
     assert "BT /F2 14 Tf" in first and " re B" in first and "[3 2] 0 d" in first
     assert bytes.fromhex(re.search(r"<([0-9a-f]+)> Tj", first).group(1)).decode("cp1252") == "Hello, “world” — é ?"           # a character Latin-1 lacks is a question mark
-    assert b"/Title <" in objs[max(objs)] and bytes.fromhex(re.search(rb"/Title <([0-9a-f]+)>", objs[max(objs)]).group(1)).decode("cp1252") == "Report é"
+    assert b"/Title <" in objs[max(objs)] and bytes.fromhex(re.search(rb"/Title <([0-9a-f]+)>", objs[max(objs)]).group(1).decode()).decode("cp1252") == "Report é"
 
 
 def test_text_is_measured_with_the_widths_of_helvetica_and_wrapped_to_fit():
