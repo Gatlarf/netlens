@@ -174,6 +174,7 @@ EVENT_LABELS = {
     "login_failed": "Someone keeps entering a wrong password or token (a possible attack)",
 }
 DEFAULT_EVENTS = ["alerts_muted", "device_new", "device_offline", "service_down", "service_up", "metric_critical", "remote_offline", "remote_service_down", "remote_metric_critical", "probe_offline", "probe_online", "central_unreachable", "central_reachable", "port_opened", "port_unexpected", "port_missing", "link_down", "firewall_ha", "vpn_down", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "vuln_critical", "net_critical", "login_failed"]
+DEFAULT_EVENTS = [k for k in EVENT_LABELS if k in DEFAULT_EVENTS]           # in the order of the list of events, which is the order a saved channel keeps
 
 
 class ChannelError(Exception):
