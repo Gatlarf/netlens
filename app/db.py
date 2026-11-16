@@ -651,6 +651,8 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_wifi_device_ts ON wifi_samples(device_id, ts)")
+    # the network health score once a day (the newest reading of the day), for the trend and the reports (app/healthscore.py)
+    cur.execute("CREATE TABLE IF NOT EXISTS score_history (day TEXT PRIMARY KEY, score INTEGER NOT NULL, cameras INTEGER, updated TEXT NOT NULL)")
     # the air around an access point (its radios, the neighbouring networks it hears), the internet connections of a gateway, and the byte counters of clients (a plugin reports them; see app/airspace.py, app/uplinks.py)
     cur.execute(
         """

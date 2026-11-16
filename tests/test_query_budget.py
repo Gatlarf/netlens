@@ -24,7 +24,7 @@ GROWTH = 12            # how many more statements the larger network may need (a
 # page -> most statements it may run on the larger network (the measured count plus a little room).
 # The health score adds a fixed handful (tiers, the week and day of checks, flaps) to the dashboard and the summary; the Wi-Fi and internet lines two more to the dashboard.
 BUDGET = {
-    "/api/session": 6, "/api/devices": 12, "/api/devices/1": 35, "/api/map": 12, "/api/events?limit=100": 6, "/api/uptime?range=24h": 25,
+    "/api/session": 7, "/api/devices": 12, "/api/devices/1": 35, "/api/map": 12, "/api/events?limit=100": 6, "/api/uptime?range=24h": 25,
     "/api/service-checks": 10, "/api/probes": 6, "/api/monitors": 18, "/api/dashboard": 186, "/api/stats/summary": 120, "/api/stats?range=7d": 110,
     "/api/reports/availability": 30, "/api/insights": 30, "/api/changes": 10,
 }

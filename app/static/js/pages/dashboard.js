@@ -38,7 +38,8 @@ const CARDS = [
       const part = (label, v, unit = "") => (v === null || v === undefined ? null : h("div", { class: "d-part" }, label, h("strong", { class: `d-${scoreTone(v)}` }, `${v}${unit}`)));
       return h("div", { class: "d-score" }, scoreRing(sc.score, tone),
         h("div", { class: "d-score-text" },
-          h("div", { class: `d-score-head d-${tone}` }, `Health is ${sc.label}`),
+          h("div", { class: `d-score-head d-${tone}` }, `Health is ${sc.label}`,
+            sc.trend && sc.trend.delta ? h("span", { class: `d-note d-${sc.trend.delta > 0 ? "ok" : "bad"}`, title: `Was ${sc.trend.was} on ${sc.trend.since}` }, ` ${sc.trend.delta > 0 ? "+" : "−"}${Math.abs(sc.trend.delta)} ${sc.trend.since === new Date(Date.now() - 86400000).toISOString().slice(0, 10) ? "since yesterday" : `since ${sc.trend.since.slice(5)}`}`) : null),
           h("p", { class: "d-score-why" }, sc.why || `${plural(sc.counted.gear, "network device")}, ${plural(sc.counted.hosts, "host")} and ${plural(sc.counted.containers, "container")} are in good shape.`),
           sc.costs.length ? h("ul", { class: "d-costs" }, sc.costs.slice(0, 3).map((c) => h("li", {},
             c.device_id ? h("a", { href: `#/device/${c.device_id}` }, shortName(c.name)) : h("a", { href: c.href || "#/devices" }, c.name),

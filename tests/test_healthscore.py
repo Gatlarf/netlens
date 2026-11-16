@@ -123,3 +123,40 @@ def test_a_camera_that_is_all_but_perfect_is_not_listed_as_weak(conn):
     conn.commit()
     out = hs.compute(conn, NOW, _listing(conn), {}, {"running": 0, "unhealthy": 0, "restarting": 0, "problems": []})
     assert out["cameras"]["score"] == 100 and out["cameras"]["weakest"] == []
+
+
+def test_the_score_of_each_day_is_kept_and_the_trend_compares_with_the_last_day(tmp_path):
+    from app import healthscore
+    from app.db import connect, init_db
+
+    conn = connect(tmp_path / "n.db")
+    init_db(conn)
+    block = lambda score, cams=100: {"score": score, "cameras": {"score": cams}}
+    healthscore.remember(conn, "2026-11-15T10:00:00Z", block(90))
+    healthscore.remember(conn, "2026-11-16T10:00:00Z", block(93))
+    healthscore.remember(conn, "2026-11-16T22:00:00Z", block(91, 95))                    # the newest reading of the day replaces the earlier one
+    healthscore.remember(conn, "2026-11-16T22:05:00Z", block(91, 95))                    # nothing changed: nothing written
+    healthscore.remember(conn, "2026-11-17T08:00:00Z", {"score": None})                  # no score: nothing kept
+    assert healthscore.history(conn, "2026-11-01") == [{"day": "2026-11-15", "score": 90, "cameras": 100}, {"day": "2026-11-16", "score": 91, "cameras": 95}]
+    assert healthscore.history(conn, "2026-11-16", "2026-11-16") == [{"day": "2026-11-16", "score": 91, "cameras": 95}]
+    assert healthscore.trend(conn, "2026-11-17T08:00:00Z", 95) == {"delta": 4, "since": "2026-11-16", "was": 91}
+    assert healthscore.trend(conn, "2026-11-15T08:00:00Z", 95) is None and healthscore.trend(conn, "2026-11-17T08:00:00Z", None) is None
+    healthscore.remember(conn, "2028-06-01T08:00:00Z", block(80))                       # a new day far later: what is older than 400 days goes
+    assert [r["day"] for r in healthscore.history(conn, "2026-01-01")] == ["2028-06-01"]
+    conn.close()
+
+
+def test_the_summary_carries_the_trend(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app import tsdb
+    from app.config import load_settings
+    from app.main import create_app
+
+    tsdb.forget_all()
+    app = create_app(load_settings({"NETLENS_TOKEN": "t", "NETLENS_DATA_DIR": str(tmp_path)}), db_path=tmp_path / "netlens.db")
+    with TestClient(app) as c:
+        c.headers["Authorization"] = "Bearer t"
+        got = c.get("/api/stats/summary").json()
+        assert "trend" in got["score"]                                                       # None until there is an earlier day
+    tsdb.forget_all()

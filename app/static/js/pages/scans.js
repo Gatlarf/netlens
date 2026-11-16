@@ -20,6 +20,7 @@ const KIND_ORDER = [
   "ip_reused",
   "wifi_roamed",
   "alerts_muted",
+  "report_failed",
   "uplink_down",
   "uplink_up",
   "uplink_failover",

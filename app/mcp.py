@@ -166,6 +166,10 @@ tool("list_alert_rules", "overview", "The alert rules: which events are recorded
 tool("preview_alert_rule", "overview", "What an alert rule would have done to the events of the last days (how many it would have muted, by kind, with examples). It changes nothing.", "POST", "/api/alert-rules/preview",
      {"rule": {"type": "object", "description": "The rule: name, type (mute, while_down or repeat), kinds (event kinds, or [\"*\"]), scope {type: all, group, devices, below, tier or type, plus ids, device_id or value}, when {days, from, to}, device_id (while_down), count and minutes (repeat)"},
       "days": i("Days to replay, 1 to 30")}, ("rule",))
+tool("list_report_templates", "overview", "The customer reports (templates): name, sections, period, schedule, recipients and when each was last sent.", "GET", "/api/report-templates")
+tool("send_customer_report", "settings", "Make a customer report now and e-mail it as a PDF (to its recipients, or only to the addresses given).", "POST", "/api/report-templates/{template_id}/send",
+     {"template_id": s("The report's id, from list_report_templates"), "to": {"type": "array", "items": {"type": "string"}, "description": "Send it only to these addresses (a test)"}, "period": s("7d, 30d or month (default: the report's own)"),
+      "month": s("A calendar month, YYYY-MM, instead of the period")}, ("template_id",))
 tool("get_hierarchy", "devices", "The network hierarchy: which device sits behind which.", "GET", "/api/hierarchy", {"guests": b("Include virtual machines and containers")}, query=("guests",))
 tool("list_groups", "devices", "Device groups (rooms, floors, owners).", "GET", "/api/groups")
 tool("list_vulnerabilities", "devices", "Vulnerabilities found by the scanner plugins.", "GET", "/api/vulns",

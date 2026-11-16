@@ -754,6 +754,12 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
             plugin_problems = 0 if found["dismissed"] else len(found["problems"])
         except Exception:  # noqa: BLE001
             plugin_problems = 0
+    score_block = healthscore.compute(conn, now, devices, health_by_device, container_numbers)
+    try:                                                              # the score of the day is kept, for the trend and the reports
+        healthscore.remember(conn, now, score_block)
+        score_block["trend"] = healthscore.trend(conn, now, score_block["score"])
+    except sqlite3.Error:
+        score_block["trend"] = None
     return {
         "api": SUMMARY_API,
         "update": {"current": upd["current"], "latest": upd["latest"], "available": upd["available"], "plugin_updates": plugin_updates, "plugin_problems": plugin_problems},
@@ -776,7 +782,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "smarthome": inventory.summary(conn),
         "remediation": remediation.summary(conn),
         "health": health,
-        "score": healthscore.compute(conn, now, devices, health_by_device, container_numbers),
+        "score": score_block,
         "remote_sites": _remote_sites(conn),
         "speed": speedtest.summary(conn, now),
         "passive": None if passive is None else {k: passive.get(k) for k in ("enabled", "running", "frames", "applied")},

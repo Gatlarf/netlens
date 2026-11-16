@@ -143,6 +143,7 @@ EVENT_LABELS = {
     "link_up": "A device reports that a network link came back (SNMP trap)",
     "firewall_ha": "A firewall's high-availability state changes (a failover)",
     "alerts_muted": "A rule starts muting repeats of an event (one message when it happens)",
+    "report_failed": "A scheduled report could not be made or sent",
     "uplink_down": "One of a gateway's internet connections goes down (or comes back)",
     "uplink_failover": "A gateway moves its traffic to another internet connection",
     "vpn_down": "A VPN tunnel on a firewall goes down",
@@ -173,7 +174,7 @@ EVENT_LABELS = {
     "net_ok": "A network health problem or warning is gone",
     "login_failed": "Someone keeps entering a wrong password or token (a possible attack)",
 }
-DEFAULT_EVENTS = ["alerts_muted", "device_new", "device_offline", "service_down", "service_up", "metric_critical", "remote_offline", "remote_service_down", "remote_metric_critical", "probe_offline", "probe_online", "central_unreachable", "central_reachable", "port_opened", "port_unexpected", "port_missing", "link_down", "firewall_ha", "vpn_down", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "vuln_critical", "net_critical", "login_failed"]
+DEFAULT_EVENTS = ["alerts_muted", "report_failed", "device_new", "device_offline", "service_down", "service_up", "metric_critical", "remote_offline", "remote_service_down", "remote_metric_critical", "probe_offline", "probe_online", "central_unreachable", "central_reachable", "port_opened", "port_unexpected", "port_missing", "link_down", "firewall_ha", "vpn_down", "dhcp_rogue", "gateway_changed", "dns_failed", "container_unhealthy", "container_restarting", "cert_expiring", "vuln_critical", "net_critical", "login_failed"]
 DEFAULT_EVENTS = [k for k in EVENT_LABELS if k in DEFAULT_EVENTS]           # in the order of the list of events, which is the order a saved channel keeps
 
 
@@ -466,7 +467,7 @@ def _line(e: dict) -> str:
         "os_changed": f"{where}: system changed {detail}",
         "wifi_roamed": f"{name} moved: {detail}",
         "host_timeout": f"Scan timeout: {detail}",
-        "alerts_muted": f"Muted: {detail}", "uplink_down": f"INTERNET CONNECTION DOWN: {detail}", "uplink_up": f"Internet connection back: {detail}", "uplink_failover": f"INTERNET FAILOVER: {detail}", "link_down": f"LINK DOWN on {name}: {detail}", "link_up": f"Link up on {name}: {detail}", "firewall_ha": f"FIREWALL FAILOVER: {detail}", "vpn_down": f"VPN DOWN: {detail}", "vpn_up": f"VPN up: {detail}", "firewall_licence": f"Firewall licence: {detail}", "device_restarted": f"{name} {detail}", "snmp_trap": f"{name}: {detail}", "device_log": f"{name} log {detail}",
+        "alerts_muted": f"Muted: {detail}", "report_failed": f"REPORT FAILED: {detail}", "uplink_down": f"INTERNET CONNECTION DOWN: {detail}", "uplink_up": f"Internet connection back: {detail}", "uplink_failover": f"INTERNET FAILOVER: {detail}", "link_down": f"LINK DOWN on {name}: {detail}", "link_up": f"Link up on {name}: {detail}", "firewall_ha": f"FIREWALL FAILOVER: {detail}", "vpn_down": f"VPN DOWN: {detail}", "vpn_up": f"VPN up: {detail}", "firewall_licence": f"Firewall licence: {detail}", "device_restarted": f"{name} {detail}", "snmp_trap": f"{name}: {detail}", "device_log": f"{name} log {detail}",
         "backup_failed": f"Scheduled backup failed: {detail}",
         "dhcp_rogue": f"ROGUE DHCP? {detail}",
         "gateway_changed": f"GATEWAY CHANGED: {detail}",
@@ -507,7 +508,7 @@ def build_digest(events: list[dict], app_name: str = "Netlens") -> tuple[str, st
     short = {
         "device_new": "new device", "device_offline": "offline", "device_online": "back online", "service_down": "service down",
         "service_up": "service up", "port_opened": "port opened", "port_closed": "port closed", "port_unexpected": "unexpected port", "port_missing": "port missing", "ip_changed": "IP changed", "ip_reused": "IP reused",
-        "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "alerts_muted": "alerts muted", "uplink_down": "connection down", "uplink_up": "connection back", "uplink_failover": "internet failover", "link_down": "link down", "link_up": "link up", "firewall_ha": "firewall failover", "vpn_down": "VPN down", "vpn_up": "VPN up", "firewall_licence": "firewall licence", "device_restarted": "restarted", "snmp_trap": "SNMP trap", "device_log": "device log", "backup_failed": "backup failed", "dhcp_rogue": "rogue DHCP", "gateway_changed": "gateway changed",
+        "os_changed": "OS changed", "wifi_roamed": "Wi-Fi move", "host_timeout": "scan timeout", "alerts_muted": "alerts muted", "report_failed": "report failed", "uplink_down": "connection down", "uplink_up": "connection back", "uplink_failover": "internet failover", "link_down": "link down", "link_up": "link up", "firewall_ha": "firewall failover", "vpn_down": "VPN down", "vpn_up": "VPN up", "firewall_licence": "firewall licence", "device_restarted": "restarted", "snmp_trap": "SNMP trap", "device_log": "device log", "backup_failed": "backup failed", "dhcp_rogue": "rogue DHCP", "gateway_changed": "gateway changed",
         "dns_registered": "registered in DNS", "dns_updated": "DNS updated", "dns_failed": "DNS write failed",
         "remote_new": "remote device new", "remote_offline": "remote offline", "remote_online": "remote online", "remote_service_down": "remote service down",
         "remote_service_up": "remote service up", "remote_metric_warning": "remote health warning", "remote_metric_critical": "remote health critical",
@@ -539,6 +540,22 @@ def http_post(url: str, data: bytes, headers: dict[str, str], timeout: float = 1
 
 
 Poster = Callable[[str, bytes, dict[str, str], float], tuple[int, str]]
+
+
+def send_report_email(channel: dict, title: str, body: str, attachments: list[tuple[str, bytes, str]], to: list[str] | None = None, mailer: Callable = send_mail) -> list[str]:
+    """Send a message with attachments (a report) through an e-mail channel, to its own recipients or to `to`. Returns the addresses it went to."""
+    from app.notify.config import NotifyConfig
+
+    s = channel["settings"]
+    port = int(s["smtp_port"]) if str(s.get("smtp_port") or "").isdigit() else SECURITY_PORT.get(s.get("security") or "starttls", 587)
+    recipients = list(to) if to else parse_addresses(s.get("to_addrs"))
+    cfg = NotifyConfig(smtp_host=s["smtp_host"], smtp_port=port, security=s.get("security") or "starttls", username=s.get("username") or "",
+                       password=s.get("password") or "", from_addr=s["from_addr"], to_addrs=recipients)
+    try:
+        mailer(cfg, title, body + "\n\n-- sent by Netlens", attachments=attachments)
+    except MailError as exc:
+        raise ChannelError(str(exc)) from None
+    return recipients
 
 
 def _send_email(s: dict, title: str, body: str, mailer: Callable, html: str | None = None) -> None:

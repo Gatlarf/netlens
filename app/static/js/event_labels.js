@@ -16,6 +16,7 @@ export const EVENT_LABELS = {
   link_up: "Link up",
   firewall_ha: "Firewall failover",
   alerts_muted: "Alerts muted by a rule",
+  report_failed: "Report not sent",
   uplink_down: "Internet connection down",
   uplink_up: "Internet connection back",
   uplink_failover: "Internet failover",

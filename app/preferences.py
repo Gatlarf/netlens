@@ -108,6 +108,8 @@ def set_role_page(conn: sqlite3.Connection, role: str, page: str | None) -> dict
 def role_default(conn: sqlite3.Connection, principal) -> str | None:
     """The start page the administrator set for this user's role (a custom role first, then the built-in one), or None."""
     pages = role_pages(conn)
+    if not pages:
+        return None                                                                   # nobody set a start page for a role: no further look-up
     uid = getattr(principal, "user_id", None)
     if uid is not None:
         row = conn.execute("SELECT custom_role FROM users WHERE id = ?", (uid,)).fetchone()

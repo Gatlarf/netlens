@@ -604,6 +604,13 @@ async def _hourly(db_path: str) -> None:
 
         await _step("weekly or monthly report", reports_step)
 
+        async def report_templates_step():
+            from app import reportjobs
+
+            await reportjobs.send_due(db_path)                       # the customer reports whose schedule has come
+
+        await _step("scheduled reports", report_templates_step)
+
         async def backup_step():
             from app import backup_schedule
 

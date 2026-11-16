@@ -10,7 +10,7 @@ class MailError(Exception):
     pass
 
 
-def send_mail(cfg: NotifyConfig, subject: str, body: str, *, smtp_factory=None, timeout: float = 20.0, html: str | None = None) -> None:
+def send_mail(cfg: NotifyConfig, subject: str, body: str, *, smtp_factory=None, timeout: float = 20.0, html: str | None = None, attachments: list[tuple[str, bytes, str]] | None = None) -> None:
     if not cfg.smtp_host or not cfg.from_addr or not cfg.to_addrs:
         raise MailError("SMTP host, sender and recipients must be set")
 
@@ -23,6 +23,9 @@ def send_mail(cfg: NotifyConfig, subject: str, body: str, *, smtp_factory=None, 
     msg.set_content(body)
     if html:                                     # people get the formatted version, mail clients that cannot show it get the plain text
         msg.add_alternative(html, subtype="html")
+    for name, data, mime in attachments or []:                   # a report as a PDF: (file name, bytes, "application/pdf")
+        maintype, _, subtype = mime.partition("/")
+        msg.add_attachment(data, maintype=maintype or "application", subtype=subtype or "octet-stream", filename=name)
 
     if smtp_factory is None:
         if cfg.security == "ssl":

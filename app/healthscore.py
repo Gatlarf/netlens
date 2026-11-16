@@ -174,3 +174,45 @@ def compute(conn: sqlite3.Connection, now: str, devices: list[dict], readings: d
                     "weakest": [{"device_id": e["id"], "name": e["name"], "score": round(e["score"])} for e in sorted(cameras, key=lambda e: e["score"])[:3] if round(e["score"]) < 100]},
         "devices": {e["id"]: round(e["score"]) for e in entries},
     }
+
+
+# ----------------------------------------------------------------------------- the score over time
+KEEP_DAYS = 400
+
+
+def remember(conn: sqlite3.Connection, now: str, block: dict[str, Any]) -> None:
+    """Keep today's score (the newest reading of the day). Written only when it changes, so a page that asks all day costs one read."""
+    if block.get("score") is None:
+        return
+    day = now[:10]
+    cameras = (block.get("cameras") or {}).get("score")
+    row = conn.execute("SELECT score, cameras FROM score_history WHERE day = ?", (day,)).fetchone()
+    if row is not None and row["score"] == block["score"] and row["cameras"] == cameras:
+        return
+    conn.execute("INSERT INTO score_history (day, score, cameras, updated) VALUES (?, ?, ?, ?) ON CONFLICT(day) DO UPDATE SET score = excluded.score, cameras = excluded.cameras, updated = excluded.updated",
+                 (day, block["score"], cameras, now))
+    if row is None:                                       # a new day: drop what is too old (once a day)
+        from datetime import datetime, timedelta
+
+        old = (datetime.strptime(day, "%Y-%m-%d") - timedelta(days=KEEP_DAYS)).strftime("%Y-%m-%d")
+        conn.execute("DELETE FROM score_history WHERE day < ?", (old,))
+    conn.commit()
+
+
+def history(conn: sqlite3.Connection, since_day: str, until_day: str | None = None) -> list[dict[str, Any]]:
+    """[{day, score, cameras}] from `since_day` (inclusive), oldest first."""
+    if until_day:
+        rows = conn.execute("SELECT day, score, cameras FROM score_history WHERE day >= ? AND day <= ? ORDER BY day", (since_day, until_day))
+    else:
+        rows = conn.execute("SELECT day, score, cameras FROM score_history WHERE day >= ? ORDER BY day", (since_day,))
+    return [dict(r) for r in rows]
+
+
+def trend(conn: sqlite3.Connection, now: str, score: int | None) -> dict[str, Any] | None:
+    """How the score moved: against the last day before today that has a reading ({"delta": +2, "since": "2026-11-16"}), None while there is no earlier day."""
+    if score is None:
+        return None
+    row = conn.execute("SELECT day, score FROM score_history WHERE day < ? ORDER BY day DESC LIMIT 1", (now[:10],)).fetchone()
+    if row is None:
+        return None
+    return {"delta": score - row["score"], "since": row["day"], "was": row["score"]}
