@@ -380,7 +380,7 @@ async def session(request: Request) -> JSONResponse:
 
     db = connect(request.app.state.db_path)
     try:
-        start_page = preferences.get(db, principal)["start_page"]
+        start_page = preferences.effective(db, principal)
     finally:
         db.close()
     return JSONResponse({

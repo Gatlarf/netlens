@@ -248,6 +248,8 @@ export function buildAccountCard() {
   card.appendChild(startRow);
   get("/api/me/preferences").then((p) => {
     for (const o of p.start_pages) if (o.value !== "#/dashboard") start.appendChild(h("option", { value: o.value }, o.label));
+    const roleLabel = p.role_start_page ? (p.start_pages.find((o) => o.value === p.role_start_page) || {}).label : null;
+    if (roleLabel) start.options[0].textContent = `${roleLabel} (set for your role)`;       // what an empty choice means for this person
     start.value = p.start_page && p.start_page !== "#/dashboard" ? p.start_page : "";
     start.addEventListener("change", async () => {
       try {

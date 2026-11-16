@@ -6,6 +6,9 @@ export async function buildRolesCard() {
   const card = h("div", { class: "card admin-only" });
   let data = await get("/api/roles");
   let editing = null;            // a role id, "" for a new one
+  let starts = null;             // where each role lands after signing in
+  const loadStarts = async () => { try { starts = await get("/api/roles/start-pages"); } catch (err) { starts = null; } };
+  await loadStarts();
 
   function form() {
     const cur = data.roles.find((r) => r.id === editing) || { name: "", base: "viewer", grants: [] };
@@ -20,6 +23,7 @@ export async function buildRolesCard() {
       const body = { name: name.value, base: base.value, grants: boxes.filter(([b]) => b.checked).map(([b]) => b.value) };
       try {
         data = editing ? await put(`/api/roles/${editing}`, body) : await post("/api/roles", body);
+        await loadStarts();
         toast("Saved", "success");
         editing = null;
         draw();
@@ -29,6 +33,30 @@ export async function buildRolesCard() {
       h("div", { class: "field" }, h("label", {}, "Name"), name), h("div", { class: "field" }, h("label", {}, "Based on"), base),
       h("div", { class: "field" }, h("label", {}, "May also read"), ...boxes.map(([, row]) => h("div", {}, row))),
       h("div", { class: "form-actions" }, save, " ", h("button", { class: "btn", type: "button", onclick: () => { editing = null; draw(); } }, "Cancel")));
+  }
+
+  // where each role lands after signing in; chosen here, saved at once (no Save button: one choice, one change)
+  function startPages() {
+    const box = h("section", { class: "probe-section" }, h("h3", {}, "Start page after signing in"),
+      h("p", { class: "hint" }, "Where people with a role land when they open Netlens. Anybody can choose their own page under My account; that wins."));
+    if (!starts) { box.appendChild(h("p", { class: "hint" }, "Could not read the start pages.")); return box; }
+    const rows = starts.roles.map((r) => {
+      const select = h("select", { "aria-label": `Start page for ${r.label}` }, h("option", { value: "" }, "Dashboard (default)"));
+      for (const p of starts.pages) if (p.value !== "#/dashboard" && (r.base === "admin" || !p.admin_only)) select.appendChild(h("option", { value: p.value }, p.label));
+      select.value = starts.start_pages[r.key] || "";
+      select.addEventListener("change", async () => {
+        try {
+          starts = await put("/api/roles/start-pages", { role: r.key, page: select.value || null });
+          toast(select.value ? `${r.label}: Netlens opens on this page` : `${r.label}: Netlens opens on the dashboard`, "success");
+        } catch (err) {
+          toast(err.message || "Could not save", "error");
+          select.value = starts.start_pages[r.key] || "";
+        }
+      });
+      return h("tr", {}, h("td", {}, r.label), h("td", { class: "hint" }, r.base === r.key ? "built in" : `based on ${r.base}`), h("td", {}, select));
+    });
+    box.appendChild(h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("thead", {}, h("tr", {}, ["Role", "", "Opens on"].map((t) => h("th", {}, t)))), h("tbody", {}, rows))));
+    return box;
   }
 
   function draw() {
@@ -41,9 +69,10 @@ export async function buildRolesCard() {
       h("td", {}, h("div", { class: "row-actions" }, h("button", { class: "btn", type: "button", onclick: () => { editing = r.id; draw(); } }, "Change"),
         h("button", { class: "btn danger", type: "button", onclick: async () => {
           if (!window.confirm(`Remove the role “${r.name}”? ${r.users ? `${r.users} user(s) keep their base role (${r.base}).` : ""}`)) return;
-          try { data = await del(`/api/roles/${r.id}`); draw(); } catch (err) { toast(err.message || "Could not remove", "error"); }
+          try { data = await del(`/api/roles/${r.id}`); await loadStarts(); draw(); } catch (err) { toast(err.message || "Could not remove", "error"); }
         } }, "Remove")))));
     card.appendChild(rows.length ? h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("thead", {}, h("tr", {}, ["Role", "Based on", "May also read", "Users", ""].map((t) => h("th", {}, t)))), h("tbody", {}, rows))) : h("p", { class: "hint" }, data.allowed ? "No custom roles yet. Add one, for example an Auditor (a viewer who may also read the audit log and the reports), then give it to a user under Users & tokens." : "No custom roles yet."));
+    card.appendChild(startPages());
     if (editing === null) { if (data.allowed) card.appendChild(h("div", { class: "form-actions" }, h("button", { class: "btn primary", type: "button", onclick: () => { editing = ""; draw(); } }, "Add a role"))); }
     else card.appendChild(form());
   }

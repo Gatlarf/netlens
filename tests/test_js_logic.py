@@ -107,3 +107,28 @@ def test_sorting_puts_missing_values_last_and_csv_quotes_what_it_must():
     assert out["natural"] == ["a", "a9", "a10", "b", "c"]                                                    # a9 before a10
     assert out["none"] == ["b", "a", "c", "a10", "a9"]
     assert out["csv"] == 'N,V\r\n"x, y",1\r\n"say ""hi""",\r\n'
+
+
+def test_a_dashboard_is_exported_with_its_own_cards_and_imported_without_clashes():
+    out = run("dashboard_io.js", """
+      const own = { id: 'c-aaaa11', type: 'value', title: 'Latency', source: 'speed.ping' };
+      const shared = { id: 'c-bbbb22', type: 'notes', title: 'Runbook', text: 'x', links: [] };
+      const doc = m.buildExport({ order: ['attention', 'c-aaaa11', 'c-bbbb22', 'devices'], sizes: { attention: 'w', gone: 'f' }, cardOf: (id) => ({ 'c-aaaa11': own, 'c-bbbb22': shared })[id] || null, name: 'Site A', appVersion: '0.4.450', now: new Date('2026-11-17T10:00:00.123Z') });
+      let n = 0; const newId = () => 'c-new' + (++n);
+      const known = new Set(['attention', 'devices', 'uptime']);
+      const back = m.parseImport(JSON.stringify(doc), { known, newId });
+      const odd = JSON.parse(JSON.stringify(doc));
+      odd.layout.order.push('plugin-card', 'c-missing'); odd.custom.push({ id: 'c-dev', type: 'device', device_id: 7, title: 'Printer' }); odd.layout.order.push('c-dev');
+      return { doc, back, odd: m.parseImport(JSON.stringify(odd), { known, newId }), file: m.exportFileName(new Date('2026-11-17T10:00:00Z')),
+               bad: [m.parseImport('nope', { known, newId }), m.parseImport('{"format":"other"}', { known, newId }), m.parseImport(JSON.stringify({ ...doc, version: 9 }), { known, newId }),
+                     m.parseImport(JSON.stringify({ ...doc, layout: { order: ['zzz'] }, custom: [] }), { known, newId }), m.parseImport('x'.repeat(600000), { known, newId })].map((r) => [r.ok, r.error]) };""")
+    doc = out["doc"]
+    assert doc["format"] == "netlens-dashboard" and doc["version"] == 1 and doc["exported"] == "2026-11-17T10:00:00Z" and doc["layout"]["sizes"] == {"attention": "w"}
+    assert [c["id"] for c in doc["custom"]] == ["c-aaaa11", "c-bbbb22"] and out["file"] == "netlens-dashboard-2026-11-17.json"      # a shared card is carried along as a card of its own
+    back = out["back"]
+    assert back["ok"] and back["order"] == ["attention", "c-new1", "c-new2", "devices"] and back["sizes"] == {"attention": "w"}
+    assert [c["id"] for c in back["custom"]] == ["c-new1", "c-new2"] and back["skipped"] == []                                   # imported cards get new ids: they cannot replace one of yours
+    odd = out["odd"]
+    assert odd["ok"] and sorted(s["id"] for s in odd["skipped"]) == ["c-dev", "c-missing", "plugin-card"] and odd["counts"]["skipped"] == 3
+    assert any("number here" in s["why"] for s in odd["skipped"] if s["id"] == "c-dev")                                           # a card that names one device means nothing elsewhere
+    assert [r[0] for r in out["bad"]] == [False] * 5 and "valid JSON" in out["bad"][0][1] and "newer" in out["bad"][2][1] and "None of the cards" in out["bad"][3][1] and "too large" in out["bad"][4][1]

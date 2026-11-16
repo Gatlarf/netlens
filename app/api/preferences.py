@@ -17,7 +17,7 @@ class PreferencesBody(BaseModel):
 
 @router.get("/preferences")
 def get_preferences(request: Request, conn=Depends(get_conn)) -> dict:
-    return {**preferences.get(conn, request.state.user), "start_pages": preferences.options(request.state.user)}
+    return {**preferences.get(conn, request.state.user), "role_start_page": preferences.role_default(conn, request.state.user), "start_pages": preferences.options(request.state.user)}
 
 
 @router.put("/preferences")
@@ -26,4 +26,4 @@ def put_preferences(body: PreferencesBody, request: Request, conn=Depends(get_co
         saved = preferences.set_start_page(conn, request.state.user, body.start_page)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return {**saved, "start_pages": preferences.options(request.state.user)}
+    return {**saved, "role_start_page": preferences.role_default(conn, request.state.user), "start_pages": preferences.options(request.state.user)}

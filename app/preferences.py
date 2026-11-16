@@ -1,6 +1,6 @@
 """Personal preferences of a signed-in user (kept on the server, so every browser and device of that user shows the same).
 
-Today: the page Netlens opens on. The administrator's access token (no account) has one set of preferences of its own.
+Today: the page Netlens opens on, and the tables' saved views (app/tableviews.py). An administrator can also set a start page per role (an administrator, an operator, a viewer, or a custom role), used until somebody chooses their own. The administrator's access token (no account) has one set of preferences of its own.
 """
 
 from __future__ import annotations
@@ -68,3 +68,60 @@ def set_start_page(conn: sqlite3.Connection, principal, page: str | None) -> dic
         data["start_page"] = page
     set_setting(conn, _key(principal), json.dumps(data))
     return get(conn, principal)
+
+
+# ---- the start page of a role -------------------------------------------------------------------------------------
+ROLE_KEY = "preferences.role_start_pages"
+BASE_ROLES = ("admin", "operator", "viewer")
+
+
+def role_pages(conn: sqlite3.Connection) -> dict[str, str]:
+    """{role: start page}: the built-in roles by name and custom roles by id. A page that no longer exists is not returned."""
+    try:
+        data = json.loads(get_setting(conn, ROLE_KEY) or "{}")
+    except ValueError:
+        return {}
+    return {k: v for k, v in (data.items() if isinstance(data, dict) else []) if isinstance(k, str) and v in START_PAGES}
+
+
+def set_role_page(conn: sqlite3.Connection, role: str, page: str | None) -> dict[str, str]:
+    """Choose where everybody with this role lands after signing in (None = the dashboard). Raises ValueError for an unknown role or page, or a page the role may not open."""
+    from app import roles
+
+    custom = {r["id"]: r for r in roles.load(conn)}
+    if role not in BASE_ROLES and role not in custom:
+        raise ValueError("no such role")
+    data = role_pages(conn)
+    if page in (None, "", "#/", "#/dashboard"):
+        data.pop(role, None)
+    else:
+        if page not in START_PAGES:
+            raise ValueError("that is not a page Netlens can start on")
+        base = role if role in BASE_ROLES else custom[role]["base"]
+        if START_PAGES[page][1] and base != "admin":
+            raise ValueError("that page is only for administrators")
+        data[role] = page
+    set_setting(conn, ROLE_KEY, json.dumps(data))
+    return data
+
+
+def role_default(conn: sqlite3.Connection, principal) -> str | None:
+    """The start page the administrator set for this user's role (a custom role first, then the built-in one), or None."""
+    pages = role_pages(conn)
+    uid = getattr(principal, "user_id", None)
+    if uid is not None:
+        row = conn.execute("SELECT custom_role FROM users WHERE id = ?", (uid,)).fetchone()
+        if row is not None and row["custom_role"] and row["custom_role"] in pages:
+            page = pages[row["custom_role"]]
+        else:
+            page = pages.get(getattr(principal, "role", ""))
+    else:
+        page = pages.get(getattr(principal, "role", ""))
+    if page and START_PAGES[page][1] and not getattr(principal, "is_admin", False):
+        return None
+    return page
+
+
+def effective(conn: sqlite3.Connection, principal) -> str | None:
+    """Where this user lands: their own choice, else the one for their role, else None (the dashboard)."""
+    return get(conn, principal)["start_page"] or role_default(conn, principal)

@@ -6,6 +6,8 @@ import { barList, columnChart, emptyNote, fmtPct, lineChart } from "../charts.js
 import { cssVar } from "../theme.js";
 import { big, customCard, linkList, pluginCard, plural, rows, scoreRing, scoreTone, sparkline, toneUp } from "../dashboard_cards.js";
 import { openEditor } from "../dashboard_editor.js";
+import { formDialog } from "../formdialog.js";
+import { buildExport, exportFileName, parseImport, MAX_BYTES } from "../dashboard_io.js";
 import { layoutHorizontal } from "../layout_horizontal.js";
 import { buildHealthCard, healthTone } from "../cards/health_map.js";
 import { buildCapacityCard, capacityTone } from "../cards/capacity.js";
@@ -561,6 +563,68 @@ export async function render(container) {
       toast(e.message || "Could not remove the default dashboard", "error");
     }
   }
+  // Export and import: the dashboard as a file, to keep, to give to another installation or another customer
+  async function exportDashboard() {
+    const got = await formDialog({ title: "Export this dashboard", text: "The file holds which cards are on it, their order and width, and the cards you made (a shared card is included as a card of its own). It holds no data.",
+      fields: [{ key: "name", label: "Name (optional)", value: "" }], ok: "Download" });
+    if (!got) return;
+    const doc = buildExport({ order, sizes, cardOf: (id) => (registry().get(id) || {}).custom || null, name: got.name.trim(), appVersion: (document.getElementById("app-version")?.textContent || "").replace(/^v/, "") });
+    const url = URL.createObjectURL(new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }));
+    const a = h("a", { href: url, download: exportFileName() });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  function importDashboard() {
+    const input = h("input", { type: "file", accept: "application/json,.json", hidden: true });
+    input.addEventListener("change", async () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) return;
+      const known = new Set([...registry().values()].filter((c) => visible(c) && !c.custom).map((c) => c.id));
+      const parsed = parseImport(file.size > MAX_BYTES ? "x".repeat(MAX_BYTES + 1) : await file.text(), { known, newId: () => `c-${Math.random().toString(36).slice(2, 10).replace(/[^a-z0-9]/g, "x")}` });
+      if (!parsed.ok) { toast(parsed.error, "error"); return; }
+      previewImport(parsed);
+    });
+    document.body.appendChild(input);
+    input.click();
+  }
+  function previewImport(parsed) {
+    const dialog = h("dialog", { class: "stepup-dialog", "aria-label": "Import a dashboard" });
+    const close = () => { dialog.close(); dialog.remove(); };
+    dialog.addEventListener("cancel", () => dialog.remove());
+    const titleOf = (id) => (registry().get(id) || parsed.custom.find((c) => c.id === id) || {}).title || id;
+    const say = parsed.counts;
+    const apply = async (forEveryone) => {
+      const next = { order: parsed.order, custom: parsed.custom, sizes: parsed.sizes };
+      try {
+        if (forEveryone) {
+          await put("/api/dashboard/default", next);
+          toast("Saved. Everybody who has not arranged their own dashboard now sees this one.");
+          close();
+          location.reload();
+          return;
+        }
+        order = next.order; custom = next.custom; sizes = { ...next.sizes };
+        await saveLayout(next, false);
+        own = true;
+        close();
+        draw();
+        toast(`Dashboard imported: ${say.cards} cards`, "success");
+      } catch (e) {
+        toast(e.message || "Could not import the dashboard", "error");
+      }
+    };
+    dialog.append(h("h2", {}, "Import a dashboard"),
+      h("p", {}, parsed.name ? h("strong", {}, `“${parsed.name}”`) : "This file", ` has ${say.cards} card${say.cards === 1 ? "" : "s"}${say.own ? `, ${say.own} of them made by somebody` : ""}${parsed.from ? ` (from Netlens ${parsed.from})` : ""}.`),
+      h("ol", { class: "hint" }, ...parsed.order.slice(0, 12).map((id) => h("li", {}, titleOf(id))), parsed.order.length > 12 ? h("li", {}, `and ${parsed.order.length - 12} more`) : null),
+      say.skipped ? h("div", { class: "hint" }, h("strong", {}, `${say.skipped} card${say.skipped === 1 ? "" : "s"} left out:`), h("ul", {}, ...parsed.skipped.map((s) => h("li", {}, `${s.title}: ${s.why}`)))) : null,
+      h("p", { class: "hint" }, "Your own dashboard is replaced (you can reset it to the default afterwards)."),
+      h("div", { class: "btn-row" }, h("button", { class: "btn primary", type: "button", onclick: () => apply(false) }, "Replace my dashboard"),
+        isAdmin() ? h("button", { class: "btn", type: "button", title: "Everybody who has not arranged their own dashboard will see this one", onclick: () => { if (window.confirm("Use this dashboard as the starting dashboard for everyone who has not arranged their own?")) apply(true); } }, "Use as default for everyone") : null,
+        h("button", { class: "btn", type: "button", onclick: close }, "Cancel")));
+    document.body.appendChild(dialog);
+    dialog.showModal();
+  }
   async function resetMine() {
     const b = base();
     order = [...b.order]; custom = b.custom.map((c) => ({ ...c })); sizes = { ...(b.sizes || {}) }; own = false;
@@ -588,6 +652,8 @@ export async function render(container) {
       h("button", { class: "btn bd-pick", type: "button", onclick: () => edit(null) }, "Create a card of your own")];
     if (!drawerApi) {
       const foot = [h("button", { class: "btn", type: "button", onclick: resetMine }, shared ? "Back to the default" : "Reset to default"),
+        h("button", { class: "btn", type: "button", title: "Download this dashboard as a file", onclick: exportDashboard }, "Export…"),
+        h("button", { class: "btn", type: "button", title: "Use a dashboard file from another installation or customer", onclick: importDashboard }, "Import…"),
         ...(isAdmin() ? [h("button", { class: "btn", type: "button", title: "Everybody who has not arranged their own dashboard will see this one", onclick: setForEveryone }, "Use as default for everyone"),
           shared ? h("button", { class: "btn", type: "button", title: "Back to the built-in default for everybody who has not arranged their own", onclick: clearForEveryone }, "Remove the default") : null] : [])].filter(Boolean);
       drawerApi = openDrawer({ title: "Customize the dashboard", head, rows, footer: foot, onClose: () => { if (drawerApi) { drawerApi = null; editing = false; if (!disposed) draw(); } } });
