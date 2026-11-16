@@ -113,3 +113,13 @@ def test_the_summary_carries_the_score(conn):
     conn.commit()
     s = stats.summary(conn, now=NOW)
     assert set(s["score"]) >= {"score", "label", "why", "costs", "parts", "cameras", "devices", "counted"}
+
+
+def test_a_camera_that_is_all_but_perfect_is_not_listed_as_weak(conn):
+    _device(conn, "r", "router")
+    cam = _device(conn, "cam", "camera")
+    _checks(conn, cam, [1] * 400, ms=5.0)
+    conn.execute("UPDATE checks SET up = 0 WHERE id = (SELECT MIN(id) FROM checks)")
+    conn.commit()
+    out = hs.compute(conn, NOW, _listing(conn), {}, {"running": 0, "unhealthy": 0, "restarting": 0, "problems": []})
+    assert out["cameras"]["score"] == 100 and out["cameras"]["weakest"] == []

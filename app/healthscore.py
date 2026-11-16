@@ -8,7 +8,7 @@ The importance somebody gave a device multiplies its weight: critical x3, normal
 Cameras never lower the network score: they have a score of their own.
 
 A device scores from what is measured about it (a part that is not measured is left out, never counted as zero):
-  uptime       the share of checks that were answered in 7 days, less a few points for every time it went up and down in the last day
+  uptime       the share of checks that were answered in 7 days, less a few points for every time it went up and down in the last day (one outage is free)
   loss         the share of checks that were answered in the last 24 hours
   latency      the average answer time of the last 24 hours (a good answer is under 30 ms, nothing is left at 300 ms)
   temperature  the newest reading (fine below 55 °C, half at 80 °C, nothing at 100 °C)
@@ -29,7 +29,7 @@ TIER = {"critical": 3.0, "normal": 1.0, "low": 0.0}
 PARTS = {"uptime": 40, "loss": 20, "latency": 20, "temperature": 20}          # how much each reading counts in one device's score
 OFFLINE_CAP = 30
 MIN_CHECKS = 3                                                              # fewer checks than this say nothing yet
-FLAP_POINTS = 4                                                             # points off the uptime part for every up/down change in the last day
+FLAP_POINTS = 4                                                             # points off the uptime part for every up/down change in the last day beyond the two of one single outage
 
 
 def _clip(value: float) -> float:
@@ -109,7 +109,7 @@ def compute(conn: sqlite3.Connection, now: str, devices: list[dict], readings: d
         extra: dict[str, Any] = {"flaps": flaps.get(d["id"], 0)}
         if w_n >= MIN_CHECKS:
             extra["uptime"] = 100 * w_ups / w_n
-            parts["uptime"] = _clip(extra["uptime"] - FLAP_POINTS * extra["flaps"])
+            parts["uptime"] = _clip(extra["uptime"] - FLAP_POINTS * max(0, extra["flaps"] - 2))
         if d_n >= MIN_CHECKS:
             extra["day"] = 100 * d_ups / d_n
             parts["loss"] = extra["day"]
@@ -171,6 +171,6 @@ def compute(conn: sqlite3.Connection, now: str, devices: list[dict], readings: d
                   "containers": container_score},
         "counted": {"gear": sum(1 for e in counted if e["group"] == "gear"), "hosts": sum(1 for e in counted if e["group"] == "hosts"), "containers": boxes},
         "cameras": {"score": cam_score, "total": len(cameras), "online": sum(1 for e in cameras if e["online"]),
-                    "weakest": [{"device_id": e["id"], "name": e["name"], "score": round(e["score"])} for e in sorted(cameras, key=lambda e: e["score"])[:3] if e["score"] < 100]},
+                    "weakest": [{"device_id": e["id"], "name": e["name"], "score": round(e["score"])} for e in sorted(cameras, key=lambda e: e["score"])[:3] if round(e["score"]) < 100]},
         "devices": {e["id"]: round(e["score"]) for e in entries},
     }
