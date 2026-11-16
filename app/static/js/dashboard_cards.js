@@ -26,6 +26,33 @@ export function sparkline(values, { height = 28 } = {}) {
   return svg;
 }
 
+// a ring that is filled as far as the score (0-100); the colour says good, fair or poor, the number says the rest
+export function scoreRing(value, tone, size = 132) {
+  const ns = "http://www.w3.org/2000/svg", r = 54, c = 2 * Math.PI * r;
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 132 132");
+  svg.setAttribute("width", String(size));
+  svg.setAttribute("height", String(size));
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", value === null || value === undefined ? "No score yet" : `Score ${value} out of 100`);
+  svg.setAttribute("class", `d-ring ${tone ? `d-${tone}` : ""}`);
+  const track = document.createElementNS(ns, "circle");
+  for (const [k, v] of Object.entries({ cx: 66, cy: 66, r, fill: "none", "stroke-width": 11, class: "d-ring-track" })) track.setAttribute(k, String(v));
+  svg.appendChild(track);
+  if (value !== null && value !== undefined) {
+    const arc = document.createElementNS(ns, "circle");
+    for (const [k, v] of Object.entries({ cx: 66, cy: 66, r, fill: "none", "stroke-width": 11, "stroke-linecap": "round", stroke: "currentColor", "stroke-dasharray": `${(c * Math.max(0, Math.min(100, value))) / 100} ${c}`, transform: "rotate(-90 66 66)" })) arc.setAttribute(k, String(v));
+    svg.appendChild(arc);
+  }
+  const text = document.createElementNS(ns, "text");
+  for (const [k, v] of Object.entries({ x: 66, y: 76, "text-anchor": "middle", class: "d-ring-num" })) text.setAttribute(k, String(v));
+  text.textContent = value === null || value === undefined ? "–" : String(value);
+  svg.appendChild(text);
+  return svg;
+}
+
+export const scoreTone = (v) => (v === null || v === undefined ? "" : v >= 80 ? "ok" : v >= 50 ? "warn" : "bad");
+
 // a big number with a caption and, optionally, a small line chart and extra lines
 export const big = (value, sub, { spark = null, extra = null } = {}) => h("div", { class: "d-body" }, h("div", { class: "d-value" }, value), h("div", { class: "d-sub" }, sub), spark, extra);
 

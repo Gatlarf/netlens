@@ -748,6 +748,19 @@ body.setup-mode .app-shell { display: block; }
 .d-device { display: flex; align-items: center; gap: 8px; font-size: 1.3rem; overflow-wrap: anywhere; }
 .d-status { display: flex; align-items: center; gap: 8px; }
 .d-status-dot { width: 14px; height: 14px; border-radius: 50%; background: currentColor; }
+.d-score { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+.d-ring { flex: none; }
+.d-ring-track { stroke: var(--border); }
+.d-ring-num { font-size: 38px; font-weight: 700; fill: var(--text); font-variant-numeric: tabular-nums; }
+.d-score-text { flex: 1 1 220px; min-width: 0; display: grid; gap: 8px; }
+.d-score-head { font-size: 1.05rem; font-weight: 650; }
+.d-score-why { font-size: 0.88rem; color: var(--muted); margin: 0; }
+.d-parts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-top: 6px; }
+.d-part { font-size: 0.78rem; color: var(--muted); }
+.d-part strong { display: block; font-size: 0.95rem; color: var(--text); font-variant-numeric: tabular-nums; }
+.d-costs { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 0.85rem; }
+.d-costs li { display: flex; gap: 8px; justify-content: space-between; }
+.d-costs .d-note { white-space: normal; text-align: right; }
 .d-gauge { height: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; margin: 6px 0 2px; }
 .d-gauge-fill { display: block; height: 100%; background: var(--accent); }
 .d-gauge-fill.d-ok { background: var(--ok); }

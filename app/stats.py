@@ -726,6 +726,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     services = _services(conn, now)
     backups = _backups(conn, now)
     container_numbers = containers.summary(conn)
+    from app import healthscore
     guest_numbers = containers.guest_summary(conn)
     problems = ((1 if services["down"] else 0) + (1 if container_numbers["problems"] else 0) + (1 if last_info and last_info["status"] == "failed" else 0) + len(failing)
                 + (1 if age is not None and age > stale_after_s else 0) + (1 if backups["last_ok"] is False else 0))
@@ -775,6 +776,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
         "smarthome": inventory.summary(conn),
         "remediation": remediation.summary(conn),
         "health": health,
+        "score": healthscore.compute(conn, now, devices, health_by_device, container_numbers),
         "remote_sites": _remote_sites(conn),
         "speed": speedtest.summary(conn, now),
         "passive": None if passive is None else {k: passive.get(k) for k in ("enabled", "running", "frames", "applied")},

@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.444 — 2026-11-16
+
+### Added
+- **★ Health score.** The dashboard has a new "Network health" card: one number from 0 to 100, a plain sentence about what holds it back, the devices that cost the most points (each a link) and the readings it is made of (uptime, answers lost, answer time, temperature, containers). It counts the always-on routers, switches and access points, the always-on servers, NAS and virtual machines, and the containers. The importance you gave a device multiplies its weight (critical three times, low not at all); a virtual machine counts half of a switch and all containers together a quarter. A reading that is not measured is left out, never counted as zero, and a device that is offline cannot score more than 30. **Cameras have a score of their own** ("Cameras" card: how many are online and how steadily) and never lower the network score. Both cards are on the start page of a new installation; on an existing dashboard, add them with Customize. The number is also in the summary (`score`, so the MCP tool `get_summary` and Home Assistant have it) and in the answer to "what is wrong right now?".
+
 ## 0.4.438 — 2026-11-15
 
 ### Changed

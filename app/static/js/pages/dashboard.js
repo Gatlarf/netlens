@@ -4,7 +4,7 @@ import { h, clear, patch, timeAgo, shortName, isAdmin, sessionInfo, toast } from
 import { eventLabel } from "../event_labels.js";
 import { barList, columnChart, emptyNote, fmtPct, lineChart } from "../charts.js";
 import { cssVar } from "../theme.js";
-import { big, customCard, linkList, pluginCard, plural, rows, sparkline, toneUp } from "../dashboard_cards.js";
+import { big, customCard, linkList, pluginCard, plural, rows, scoreRing, scoreTone, sparkline, toneUp } from "../dashboard_cards.js";
 import { openEditor } from "../dashboard_editor.js";
 import { layoutHorizontal } from "../layout_horizontal.js";
 import { buildHealthCard, healthTone } from "../cards/health_map.js";
@@ -27,6 +27,31 @@ const kindText = (k) => KINDS[k] || eventLabel(k);
 // size: s = one column, w = two, f = the whole row. show(d): has this installation anything for the card? `def` = on the default dashboard.
 
 const CARDS = [
+  { id: "score", title: "Network health", href: "#/uptime", size: "w", def: true,
+    about: "One score from 0 to 100 for the things that matter: routers, switches, access points, always-on servers, virtual machines and containers. It is made of uptime, answers lost, answer time and temperature. Critical devices count three times, low ones not at all; a virtual machine counts half of a switch and all containers together a quarter. Cameras have a score of their own.",
+    show: (d) => !!(d.summary.score && d.summary.score.score !== null && d.summary.score.score !== undefined),
+    tone: (d) => scoreTone(d.summary.score.score),
+    build: ({ summary: s }) => {
+      const sc = s.score, tone = scoreTone(sc.score);
+      const part = (label, v, unit = "") => (v === null || v === undefined ? null : h("div", { class: "d-part" }, label, h("strong", { class: `d-${scoreTone(v)}` }, `${v}${unit}`)));
+      return h("div", { class: "d-score" }, scoreRing(sc.score, tone),
+        h("div", { class: "d-score-text" },
+          h("div", { class: `d-score-head d-${tone}` }, `Health is ${sc.label}`),
+          h("p", { class: "d-score-why" }, sc.why || `${plural(sc.counted.gear, "network device")}, ${plural(sc.counted.hosts, "host")} and ${plural(sc.counted.containers, "container")} are in good shape.`),
+          sc.costs.length ? h("ul", { class: "d-costs" }, sc.costs.slice(0, 3).map((c) => h("li", {},
+            c.device_id ? h("a", { href: `#/device/${c.device_id}` }, shortName(c.name)) : h("a", { href: c.href || "#/devices" }, c.name),
+            h("span", { class: "d-note" }, `−${c.points} · ${c.reason}`)))) : null,
+          h("div", { class: "d-parts" }, part("Uptime", sc.parts.uptime), part("Answers", sc.parts.loss), part("Speed", sc.parts.latency), part("Temperature", sc.parts.temperature), part("Containers", sc.parts.containers))));
+    } },
+  { id: "cameras", title: "Cameras", href: "#/devices", size: "s", def: true, about: "A score of their own for the cameras you marked always-on: how many are online and how steadily they have been reachable this week. A camera that is down never lowers the network score.",
+    show: (d) => !!(d.summary.score && d.summary.score.cameras && d.summary.score.cameras.total),
+    tone: (d) => scoreTone(d.summary.score.cameras.score),
+    build: ({ summary: s }) => {
+      const c = s.score.cameras;
+      return h("div", { class: "d-score" }, scoreRing(c.score, scoreTone(c.score), 96),
+        h("div", { class: "d-score-text" }, h("div", { class: "d-score-head" }, `${c.online} of ${c.total} online`),
+          c.weakest.length ? h("ul", { class: "d-costs" }, c.weakest.map((w) => h("li", {}, h("a", { href: `#/device/${w.device_id}` }, shortName(w.name)), h("span", { class: "d-note" }, String(w.score))))) : h("p", { class: "d-score-why" }, "All steady this week.")));
+    } },
   { id: "devices", title: "Devices online", href: "#/devices", size: "s", def: true, about: "How many devices answer right now, with the 14-day trend.",
     tone: (d) => (d.summary.devices.offline === 0 ? "ok" : ""),
     build: ({ summary: s, trend }) => big(`${s.devices.online} / ${s.devices.total}`, `${s.devices.offline} offline · ${s.devices.new_24h} new today`, { spark: sparkline(trend.map((t) => t.online)) }) },
@@ -224,7 +249,7 @@ for (const w of STAT_WIDGETS) {
     show: (d) => !!d.stats, build: (d) => h("div", { class: "mk-body" }, w.draw(d.stats)) });
 }
 const TYPE_ABOUT = { value: "A value from your data", device: "A device", group: "A group of devices", service: "A service check", notes: "Notes and links" };
-const FIRST_VIEW = ["attention", "devices", "uptime", "services", "reliability", "health", "flapping", "storage", "guestbackups", "vulns", "events", "worst", "trend", "capacity"];   // the order a new installation starts with
+const FIRST_VIEW = ["score", "attention", "cameras", "devices", "uptime", "services", "reliability", "health", "flapping", "storage", "guestbackups", "vulns", "events", "worst", "trend", "capacity"];   // the order a new installation starts with
 const DEFAULT_ORDER = [...FIRST_VIEW.filter((id) => CARDS.some((c) => c.id === id && c.def)), ...CARDS.filter((c) => c.def && !FIRST_VIEW.includes(c.id)).map((c) => c.id)];
 
 // ---------- the chosen layout (per user, kept on the server so every browser and device shows the same dashboard) ----------

@@ -62,7 +62,14 @@ def t_overview(conn, args, now=None) -> dict:
     from app import dashboard
 
     needs_attention = [{"level": i["level"], "text": i["text"]} for i in dashboard.current_problems(conn)][:LIMIT * 2]       # the same list as the dashboard
-    return {"devices": len(rows), "online": sum(1 for r in rows if r["online"]), "offline_devices": down, "services_down": services, "needs_attention": needs_attention}
+    out = {"devices": len(rows), "online": sum(1 for r in rows if r["online"]), "offline_devices": down, "services_down": services, "needs_attention": needs_attention}
+    from app import stats
+
+    score = (stats.summary(conn, now=now if isinstance(now, str) else None)).get("score") or {}        # the same number as the dashboard's health card
+    if score.get("score") is not None:
+        out["health_score"] = {"network": score["score"], "label": score["label"], "why": score["why"], "costs": [f"{c['name']} -{c['points']} ({c['reason']})" for c in score["costs"]],
+                               "cameras": (score["cameras"] or {}).get("score"), "cameras_online": f"{score['cameras']['online']} of {score['cameras']['total']}" if score["cameras"]["total"] else None}
+    return out
 
 
 def t_offline_now(conn, args, now=None) -> dict:
@@ -327,6 +334,10 @@ def render(tool: str, r: dict) -> str:
         return RENDERERS[tool](r)
     if tool == "overview":
         lines = [f"{r['online']} of {r['devices']} devices are online."]
+        hs = r.get("health_score")
+        if hs:
+            lines.append(f"The network health score is {hs['network']} of 100 ({hs['label']})" + (f": {hs['why']}" if hs["why"] else ".")
+                         + (f" The cameras score {hs['cameras']} ({hs['cameras_online']} online)." if hs["cameras"] is not None else ""))
         lines.append("Offline: " + ", ".join(r["offline_devices"]) + "." if r["offline_devices"] else "No device is offline.")
         lines.append("Services down: " + ", ".join(r["services_down"]) + "." if r["services_down"] else "All service checks are up.")
         if r.get("needs_attention"):
