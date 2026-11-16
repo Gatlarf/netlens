@@ -146,6 +146,7 @@ VIEWER_READABLE = re.compile(
     r"|api/(session|update|changelog|map|map-settings|hierarchy|relations|events|uptime|uptime/core|uptime/latest|uptime/replay|scans|scans/current|service-checks|service-checks/\d+/results|monitors|agent-status|monitoring/limits|forecast|reliability|traffic|snoozes|changes|reports/availability|reports/availability\.csv|reports/weekly|probes|probes/\d+|probes/\d+/availability(\.csv)?|timeseries/correlate|timeseries/(device|service|probe)/\d+|timeseries/(device|service|probe)/\d+/[A-Za-z0-9_.-]+"
     r"|me/totp|me/webauthn|me/sessions|me/stepup|stats|stats/summary|dashboard|dashboard/layout|dashboard/default|dashboard/shared|speedtest|speedtest/(status|ping|down)|groups|devices|devices/\d+|devices/\d+/(wifi|uptime|calendar)))$"
 )
+ME_WRITABLE = re.compile(r"^/api/me/(preferences|table-views/[a-z]+)$")      # what everybody may read and change about themselves
 VIEWER_MAY_POST = ("/api/logout", "/api/me/password", "/api/me/totp/begin", "/api/me/totp/confirm", "/api/me/totp/disable", "/api/me/totp/recovery", "/api/me/webauthn/begin", "/api/me/webauthn/finish", "/api/me/webauthn/remove", "/api/me/sessions/end", "/api/me/sessions/revoke-others", "/api/me/stepup", "/api/speedtest/up", "/api/speedtest/browser")  # a viewer may test the line from their own device
 
 # An operator looks like a viewer and may also act on what happens: scan, test, wake, acknowledge, snooze, plan maintenance, approve fixes, edit a device's
@@ -305,7 +306,7 @@ def require_auth(request: HTTPConnection) -> None:
             return
         allowed = ((method in ("GET", "HEAD") and VIEWER_READABLE.match(path)) or (method == "POST" and path in VIEWER_MAY_POST)
                    or (method in ("PUT", "DELETE") and path == "/api/dashboard/layout")     # everybody arranges their own dashboard
-                   or (method in ("GET", "PUT") and path == "/api/me/preferences"))          # and chooses the page to start on
+                   or (method in ("GET", "PUT") and ME_WRITABLE.match(path)))          # and chooses the page to start on and the columns of their tables
         if not allowed and principal.grants:
             from app import roles
 
@@ -320,7 +321,7 @@ def require_auth(request: HTTPConnection) -> None:
 def _check_scoped(request: HTTPConnection, principal: Principal, method: str, path: str) -> None:
     site_ok = bool(principal.sites) and method in ("GET", "HEAD") and SCOPED_SITE_READABLE.match(path)
     allowed = ((method in ("GET", "HEAD") and SCOPED_READABLE.match(path)) or site_ok or (method == "POST" and path in SCOPED_MAY_POST)
-               or (method in ("GET", "PUT") and path == "/api/me/preferences"))
+               or (method in ("GET", "PUT") and ME_WRITABLE.match(path)))
     if not allowed:
         raise HTTPException(status_code=403, detail="this account can only see its own devices")
     if site_ok:

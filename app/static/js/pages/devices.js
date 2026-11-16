@@ -3,73 +3,13 @@ import { h, clear, patch, toast, foldToolbarOnPhone, fmtTime, timeAgo, debounce,
 import { pageHead } from "../ui.js";
 import { createBulkEditor } from "./devices_bulk.js";
 import { editing } from "../editguard.js";
+import { createTableViews } from "../tableview.js";
+import { CATALOG, BUILTIN_VIEWS } from "./devices_columns.js";
 
 const REFRESH_MS = 15000;
 
-const SORT_KEYS = [
-  { key: "online", label: "Status", sortable: true },
-  { key: "name", label: "Name", sortable: true },
-  { key: "primary_ip", label: "IP", sortable: true },
-  { key: "mac", label: "MAC", sortable: true },
-  { key: "vendor", label: "Vendor", sortable: true },
-  { key: "type", label: "Type", sortable: true },
-  { key: "group", label: "Group", sortable: true },
-  { key: "os_name", label: "OS", sortable: true },
-  { key: "open_ports", label: "Open ports", sortable: true },
-  { key: "last_seen", label: "Last seen", sortable: true }
-];
-
-function ipToNum(ip) {
-  if (!ip) return -1;
-  const parts = String(ip).split(".");
-  if (parts.length !== 4) return -1;
-  let n = 0;
-  for (const p of parts) {
-    const v = parseInt(p, 10);
-    if (Number.isNaN(v)) return -1;
-    n = n * 256 + v;
-  }
-  return n;
-}
-
-function sortValue(device, key) {
-  switch (key) {
-    case "online":
-      return device.online ? 1 : 0;
-    case "name":
-      return String(device.name || "").toLowerCase();
-    case "primary_ip":
-      return ipToNum(device.primary_ip);
-    case "mac":
-      return String(device.mac || "").toLowerCase();
-    case "vendor":
-      return String(device.vendor || "").toLowerCase();
-    case "type":
-      return String(device.type || "").toLowerCase();
-    case "group":
-      return String(device.group || "").toLowerCase();
-    case "os_name":
-      return String(device.os_name || "").toLowerCase();
-    case "open_ports":
-      return Number(device.open_ports) || 0;
-    case "last_seen":
-      return String(device.last_seen || "");
-    default:
-      return "";
-  }
-}
-
-function compare(a, b, key, dir) {
-  const va = sortValue(a, key);
-  const vb = sortValue(b, key);
-  let cmp;
-  if (typeof va === "number" && typeof vb === "number") {
-    cmp = va - vb;
-  } else {
-    cmp = String(va).localeCompare(String(vb));
-  }
-  return dir === "desc" ? -cmp : cmp;
-}
+let tv = null;                       // the table views (columns, order, widths, sort, saved views): tableview.js
+const controls = {};                 // the filter boxes of the toolbar by name, so a view can set them
 
 function buildToolbar(state) {
   const toolbar = h("div", { class: "toolbar" });
@@ -83,6 +23,7 @@ function buildToolbar(state) {
     state.q = search.value;
     load();
   }, 250));
+  controls.q = search;
   toolbar.appendChild(search);
 
   const statusSel = h("select", { "aria-label": "Status filter" });
@@ -92,8 +33,10 @@ function buildToolbar(state) {
   statusSel.value = state.online;
   statusSel.addEventListener("change", () => {
     state.online = statusSel.value;
+    tv.filtersChanged();
     load();
   });
+  controls.online = statusSel;
   toolbar.appendChild(statusSel);
 
   const typeSel = h("select", { "aria-label": "Type filter" });
@@ -104,8 +47,10 @@ function buildToolbar(state) {
   typeSel.value = state.type;
   typeSel.addEventListener("change", () => {
     state.type = typeSel.value;
+    tv.filtersChanged();
     load();
   });
+  controls.type = typeSel;
   toolbar.appendChild(typeSel);
 
   const trustSel = h("select", { "aria-label": "Known or unknown devices", class: "trust-filter" });
@@ -117,8 +62,10 @@ function buildToolbar(state) {
   trustSel.value = state.trusted;
   trustSel.addEventListener("change", () => {
     state.trusted = trustSel.value;
+    tv.filtersChanged();
     load();
   });
+  controls.trusted = trustSel;
   toolbar.appendChild(trustSel);
 
   const portsSel = h("select", { "aria-label": "Ports compared with the baseline", class: "ports-filter" });
@@ -129,8 +76,10 @@ function buildToolbar(state) {
   portsSel.value = state.ports;
   portsSel.addEventListener("change", () => {
     state.ports = portsSel.value;
+    tv.filtersChanged();
     load();
   });
+  controls.ports = portsSel;
   toolbar.appendChild(portsSel);
 
   const trustAll = h("button", { type: "button", class: "btn trust-all admin-only", title: "Mark every device on the list as known" }, "Trust all unknown");
@@ -158,8 +107,10 @@ function buildToolbar(state) {
   groupSel.value = state.group;
   groupSel.addEventListener("change", () => {
     state.group = groupSel.value;
+    tv.filtersChanged();
     load();
   });
+  controls.group = groupSel;
   toolbar.appendChild(groupSel);
 
   if (networkList.length > 1) {          // a filter by network (range, VLAN) is only useful when more than one is scanned
@@ -170,9 +121,11 @@ function buildToolbar(state) {
     netSel.value = state.network;
     netSel.addEventListener("change", () => {
       state.network = netSel.value;
+      tv.filtersChanged();
       load();
     });
-    toolbar.appendChild(netSel);
+    controls.network = netSel;
+  toolbar.appendChild(netSel);
   }
 
   if (groupList.length) {
@@ -229,64 +182,29 @@ function buildToolbar(state) {
   toolbar.appendChild(csv);
   toolbar.appendChild(json);
 
+  toolbar.appendChild(tv.controls);
+
   // phones show the list without column headers: this picks the sort order instead
   const sortSel = h("select", { "aria-label": "Sort by" });
-  for (const col of SORT_KEYS.filter((c) => c.sortable)) sortSel.appendChild(h("option", { value: col.key }, "Sort: " + col.label));
-  sortSel.value = state.sortKey;
-  const dirBtn = h("button", { class: "btn", type: "button", "aria-label": "Reverse the order" }, state.sortDir === "asc" ? "↑" : "↓");
-  sortSel.addEventListener("change", () => { state.sortKey = sortSel.value; renderRows(); });
-  dirBtn.addEventListener("click", () => {
-    state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
-    dirBtn.textContent = state.sortDir === "asc" ? "↑" : "↓";
-    renderRows();
-  });
+  const dirBtn = h("button", { class: "btn", type: "button", "aria-label": "Reverse the order" });
+  const syncPhoneSort = () => {
+    sortSel.replaceChildren(...tv.columns().filter((k) => CATALOG.find((c) => c.key === k).sort && CATALOG.find((c) => c.key === k).label).map((k) => h("option", { value: k }, "Sort: " + CATALOG.find((c) => c.key === k).label)));
+    const sort = tv.sortedBy();
+    if (sort) sortSel.value = sort.key;
+    dirBtn.textContent = !sort || sort.dir === "asc" ? "↑" : "↓";
+  };
+  syncPhoneSort();
+  tv.onSortChange = syncPhoneSort;
+  sortSel.addEventListener("change", () => tv.setSort(sortSel.value, (tv.sortedBy() || {}).dir || "asc"));
+  dirBtn.addEventListener("click", () => tv.setSort((tv.sortedBy() || { key: sortSel.value }).key, (tv.sortedBy() || {}).dir === "asc" ? "desc" : "asc"));
   toolbar.appendChild(h("div", { class: "sort-phone keep" }, sortSel, dirBtn));
   foldToolbarOnPhone(toolbar, "Filters");
 
   return { toolbar, count };
 }
 
-function buildTable(state) {
-  const table = h("table", { class: "data devices-table" });
-  const thead = h("thead");
-  const tr = h("tr");
-  for (const col of SORT_KEYS) {
-    const th = h("th", {
-      class: col.sortable ? "sortable" : "",
-      "data-key": col.key
-    }, col.label);
-    if (col.sortable) {
-      th.addEventListener("click", () => {
-        if (state.sortKey === col.key) {
-          state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
-        } else {
-          state.sortKey = col.key;
-          state.sortDir = "asc";
-        }
-        renderRows();
-      });
-    }
-    tr.appendChild(th);
-  }
-  thead.appendChild(tr);
-  table.appendChild(thead);
-
-  const tbody = h("tbody");
-  table.appendChild(tbody);
-
-  return { table, tbody };
-}
-
 function renderRows() {
-  const sorted = devices.slice().sort((a, b) => compare(a, b, state.sortKey, state.sortDir));
-
-  for (const th of thead.querySelectorAll("th.sortable")) {
-    th.classList.remove("sorted-asc", "sorted-desc");
-    if (th.dataset.key === state.sortKey) {
-      th.classList.add(state.sortDir === "asc" ? "sorted-asc" : "sorted-desc");
-    }
-  }
-
+  const sorted = tv.sorted(devices);
   const rows = [];
   for (const d of sorted) {
     const tr = h("tr", {
@@ -298,44 +216,11 @@ function renderRows() {
       location.hash = "#/device/" + d.id;
     });
     tr.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
+      if (e.key === "Enter" && e.target === tr) {
         location.hash = "#/device/" + d.id;
       }
     });
-
-    tr.appendChild(h("td", {}, statusDot(d.online)));
-
-    const nameCell = h("td", {});
-    nameCell.appendChild(h("span", { class: "device-name", title: d.name || null }, shortName(d.name) || "—"));
-    if (!d.trusted) nameCell.appendChild(h("span", { class: "tag unknown-tag", title: "Not marked as a known device yet" }, "unknown"));
-    if (Array.isArray(d.tags) && d.tags.length) {
-      const chips = h("div", { class: "tags" });
-      for (const t of d.tags) {
-        chips.appendChild(h("span", { class: "tag" }, t));
-      }
-      nameCell.appendChild(chips);
-    }
-    tr.appendChild(nameCell);
-
-    const ipCell = h("td", {}, d.primary_ip || "—");
-    if (Array.isArray(d.ipv6) && d.ipv6.length) ipCell.appendChild(h("div", { class: "ipv6-list mono hint", title: d.ipv6.join("\n") }, d.ipv6[0] + (d.ipv6.length > 1 ? " …" : "")));
-    tr.appendChild(ipCell);
-    tr.appendChild(h("td", { class: "mono" }, d.mac || "—"));
-    tr.appendChild(h("td", { title: vendorTitle(d) }, vendorText(d)));
-    tr.appendChild(h("td", {}, typeBadge(d.type)));
-    const groupCell = h("td", {});
-    if (d.group) {
-      const dot = h("span", { class: "legend-dot" });
-      dot.style.background = d.group_color;
-      groupCell.append(dot, d.group);
-    }
-    tr.appendChild(groupCell);
-    tr.appendChild(h("td", {}, d.os_name || "—"));
-    const portsCell = h("td", {}, String(d.open_ports ?? 0));
-    if (d.ports_drift > 0) portsCell.appendChild(h("span", { class: "tag unknown-tag", title: "Open ports differ from the baseline" }, `${d.ports_drift} changed`));
-    tr.appendChild(portsCell);
-    tr.appendChild(h("td", { title: fmtTime(d.last_seen) }, timeAgo(d.last_seen)));
-
+    tr.append(...tv.rowCells(d));
     rows.push(tr);
   }
   patch(tbody, rows);
@@ -349,6 +234,8 @@ async function load() {
   if (state.q) params.set("q", state.q);
   if (state.online) params.set("online", state.online);
   if (state.trusted) params.set("trusted", state.trusted);
+  const extra = tv.needs();
+  if (extra.length) params.set("extra", extra.join(","));        // what the chosen columns need beyond the device itself
 
   const mine = ++loadTicket;
   try {
@@ -382,7 +269,7 @@ async function load() {
 
   if (!devices.length) {
     const empty = h("tr");
-    const td = h("td", { class: "empty", colspan: String(SORT_KEYS.length) }, "No devices yet. Run a scan.");
+    const td = h("td", { class: "empty", colspan: String(tv.columns().length) }, "No devices yet. Run a scan.");
     empty.appendChild(td);
     patch(tbody, empty);
     count.textContent = "0 devices";
@@ -420,9 +307,7 @@ const state = {
   type: "",
   ports: "",
   group: "",
-  network: "",
-  sortKey: "primary_ip",
-  sortDir: "asc"
+  network: ""
 };
 
 export async function render(container, params) {
@@ -438,13 +323,25 @@ export async function render(container, params) {
     networkList = [];
   }
 
+  const filterKeys = ["online", "type", "trusted", "ports", "group", "network"];
+  tv = await createTableViews({
+    table: "devices", catalog: CATALOG, builtins: BUILTIN_VIEWS, locked: ["status", "name"], tableClass: "data devices-table",
+    getFilters: () => Object.fromEntries(filterKeys.map((k) => [k, state[k]])),
+    setFilters: (f) => {                                          // a view brings its own filters (the ones it does not name are cleared)
+      for (const k of filterKeys) { state[k] = (f && f[k]) || ""; if (controls[k]) controls[k].value = state[k]; }
+    },
+    onChange: (reason) => {
+      if (tv.onSortChange) tv.onSortChange();
+      if (reason === "columns" || reason === "view") load(); else if (reason === "sort") renderRows();
+    },
+  });
+  tv.useRows(() => devices);
   const built = buildToolbar(state);
   const toolbar = built.toolbar;
   count = built.count;
 
-  const built2 = buildTable(state);
-  const table = built2.table;
-  tbody = built2.tbody;
+  const table = tv.table;
+  tbody = tv.tbody;
   thead = table.querySelector("thead");
 
   const wrap = h("div", { class: "table-wrap" });

@@ -963,3 +963,35 @@ details.exposure-item > :not(summary), .config-change > :not(summary) { margin-l
 .gt-r.mid { color: var(--warn); border-color: currentColor; }
 .gt-scatter { width: 100%; height: auto; max-height: 56vh; color: var(--text); }
 .tg-head-end { display: flex; align-items: baseline; gap: 4px; }
+
+/* Table views: the View menu, the Columns dialog, moving and sizing columns */
+.tv-controls { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tv-menu-btn { white-space: nowrap; }
+.tv-menu-list { min-width: 15rem; max-height: 70vh; overflow: auto; }
+.tv-heading { padding: 6px 10px 2px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.tv-item { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: inherit; padding: 6px 10px; border-radius: var(--radius-sm); cursor: pointer; font: inherit; }
+.tv-item:hover, .tv-item:focus-visible { background: var(--border); }
+.tv-item.current { font-weight: 700; }
+.tv-item.current::before { content: "✓ "; }
+.tv-item.danger { color: var(--bad); }
+.tv-state { display: inline-flex; gap: 4px; align-items: center; }
+.btn.tv-link { padding: 2px 8px; font-size: 0.8rem; }
+.tv-dialog { max-width: min(42rem, 94vw); width: 42rem; }
+.tv-columns { max-height: 56vh; overflow: auto; padding-right: 4px; }
+.tv-columns h3 { margin: 10px 0 4px; font-size: 0.95rem; }
+.tv-col-list { list-style: none; margin: 0; padding: 0; }
+.tv-col { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 3px 4px; border-bottom: 1px solid var(--border); }
+.tv-col label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.tv-moves { display: inline-flex; gap: 4px; }
+.btn.tv-move { padding: 0 8px; font-size: 0.7rem; line-height: 1.6; }
+.tv-table th { position: relative; user-select: none; white-space: nowrap; }
+.tv-table th[draggable="true"] { cursor: grab; }
+.tv-table th.tv-dragging { opacity: .4; }
+.tv-table th.tv-over { box-shadow: inset 3px 0 0 var(--accent); }
+.tv-table td { overflow: hidden; text-overflow: ellipsis; }
+.tv-table[style*="fixed"] td { white-space: nowrap; }
+.tv-note { display: inline-block; max-width: 28rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.tv-table td.num, .tv-table th.num { text-align: right; }
+.tv-table .col-grip { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; }
+.tv-table .col-grip::after { content: ""; position: absolute; right: 3px; top: 25%; height: 50%; width: 1px; background: var(--border); }
+.tv-table .col-grip:hover::after, .tv-table .col-grip.dragging::after { background: var(--accent); width: 2px; }

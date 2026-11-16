@@ -147,7 +147,8 @@ tool("get_network_checks", "overview", "DHCP servers seen on the network (truste
 
 # devices
 tool("list_devices", "devices", "Every device Netlens knows: name, addresses, vendor, type, online, group, always-on, trusted.", "GET", "/api/devices",
-     {"online": b("Only online (true) or offline (false) devices"), "trusted": b("Only trusted (true) or untrusted (false) devices"), "q": s("Search text (name, address, vendor, MAC)")}, query=("online", "trusted", "q"))
+     {"online": b("Only online (true) or offline (false) devices"), "trusted": b("Only trusted (true) or untrusted (false) devices"), "q": s("Search text (name, address, vendor, MAC)"),
+      "extra": s("More fields per device, comma separated: link (what it hangs on and the port), wifi (band, signal, access point), uptime (7-day availability, answer time)")}, query=("online", "trusted", "q", "extra"))
 tool("get_device", "devices", "One device with its ports, services, history, monitoring and notes.", "GET", "/api/devices/{device_id}", DEV, ("device_id",))
 tool("get_device_uptime", "devices", "Online/offline history of one device.", "GET", "/api/devices/{device_id}/uptime", {**DEV, "limit": i("Maximum rows"), "range": s("6h, 24h, 7d or 30d")}, ("device_id",), ("limit", "range"))
 tool("get_device_flapping", "devices", "How often a device went on and off, by hour of the day.", "GET", "/api/devices/{device_id}/flapping", {**DEV, "days": i("Days to look back")}, ("device_id",), ("days",))

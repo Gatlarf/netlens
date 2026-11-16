@@ -49,12 +49,12 @@
   .view table.devices-table tbody tr { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
   .view table.devices-table tbody tr:nth-child(even), .view table.devices-table tbody tr:hover { background: var(--surface); }
   .view table.devices-table td { display: block; padding: 0; border: 0; min-width: 0; }
-  .view table.devices-table td:nth-child(1) { grid-row: 1 / span 2; grid-column: 1; }
-  .view table.devices-table td:nth-child(2) { grid-row: 1; grid-column: 2; font-weight: 600; overflow-wrap: anywhere; }
-  .view table.devices-table td:nth-child(10) { grid-row: 1; grid-column: 3; color: var(--muted); font-size: 0.85em; white-space: nowrap; }
-  .view table.devices-table td:nth-child(3) { grid-row: 2; grid-column: 2; color: var(--muted); font-size: 0.9em; }
-  .view table.devices-table td:nth-child(6) { grid-row: 2; grid-column: 3; justify-self: end; }
-  .view table.devices-table td:nth-child(4), .view table.devices-table td:nth-child(5), .view table.devices-table td:nth-child(7), .view table.devices-table td:nth-child(8), .view table.devices-table td:nth-child(9) { display: none; }
+  .view table.devices-table td[data-col="status"] { grid-row: 1 / span 2; grid-column: 1; }
+  .view table.devices-table td[data-col="name"] { grid-row: 1; grid-column: 2; font-weight: 600; overflow-wrap: anywhere; }
+  .view table.devices-table td[data-col="last_seen"] { grid-row: 1; grid-column: 3; color: var(--muted); font-size: 0.85em; white-space: nowrap; }
+  .view table.devices-table td[data-col="primary_ip"] { grid-row: 2; grid-column: 2; color: var(--muted); font-size: 0.9em; }
+  .view table.devices-table td[data-col="type"] { grid-row: 2; grid-column: 3; justify-self: end; }
+  .view table.devices-table td:not([data-col="status"], [data-col="name"], [data-col="last_seen"], [data-col="primary_ip"], [data-col="type"]) { display: none; }
   .view table.devices-table td.empty { grid-column: 1 / -1; display: block; }
   .sort-phone { display: flex; }
 

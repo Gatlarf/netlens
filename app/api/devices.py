@@ -4,7 +4,7 @@ import json
 import sqlite3
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app import actions, baselines, flapping, groups as groups_mod, tsdb
@@ -291,6 +291,7 @@ def list_devices(
     online: bool | None = None,
     trusted: bool | None = None,
     q: str | None = None,
+    extra: str | None = Query(None, description="more columns for the table views: link (what it hangs on, which port), wifi (band, signal), uptime (7 days, response time)"),
     conn: sqlite3.Connection = Depends(get_conn),
 ) -> list[dict[str, Any]]:
     sql = """
@@ -375,7 +376,44 @@ def list_devices(
         best = ipv6.best_per_device(conn)
         for d in result:
             d["ipv6"] = best.get(d["id"], [])
+    wanted = {x for x in (extra or "").split(",") if x in EXTRAS}
+    if wanted and scope is None:            # a customer view never sees what hangs on what: that could name devices of another customer
+        _add_extras(conn, result, wanted)
     return result
+
+
+EXTRAS = ("link", "wifi", "uptime")
+
+
+def _add_extras(conn: sqlite3.Connection, devices: list[dict[str, Any]], wanted: set[str]) -> None:
+    """The columns that are not on the device itself, for the table views: a fixed number of statements however many devices there are."""
+    if "link" in wanted:
+        devs, hierarchy = load_hierarchy(conn)
+        ports = {r["device_id"]: r for r in conn.execute("SELECT device_id, node_device_id, port, medium FROM client_links")}
+        for d in devices:
+            info = hierarchy.get(d["id"])
+            parent = devs.get(info.parent_id) if info is not None and info.parent_id is not None else None
+            link = ports.get(d["id"])
+            on_parent = link is not None and parent is not None and link["node_device_id"] in (None, parent["id"])
+            d["link"] = {"parent_id": parent["id"] if parent else None, "parent": device_name(parent) if parent else None,
+                         "port": link["port"] if on_parent and link["port"] else None, "medium": link["medium"] if link and link["medium"] in ("wired", "wifi") else None}
+    if "wifi" in wanted:
+        latest = {r["device_id"]: r for r in conn.execute(
+            "SELECT device_id, ts, node, band, rssi, tx_mbps FROM wifi_samples WHERE id IN (SELECT MAX(id) FROM wifi_samples GROUP BY device_id)")}
+        for d in devices:
+            w = latest.get(d["id"])
+            d["wifi"] = None if w is None else {"ts": w["ts"], "node": w["node"], "band": w["band"], "rssi": w["rssi"], "tx_mbps": w["tx_mbps"]}
+    if "uptime" in wanted:
+        from app import checkstats
+        from app.stats import _ago
+
+        now = utcnow()
+        week, day = checkstats.totals(conn, _ago(now, days=7)), checkstats.totals(conn, _ago(now, hours=24))
+        for d in devices:
+            up, n = (week.get(d["id"]) or (0, 0))[:2]
+            _u, _n, rtt_sum, rtt_n = (day.get(d["id"]) or (0, 0, 0.0, 0))[:4]
+            d["uptime_7d"] = round(100 * up / n, 2) if n >= 3 else None
+            d["rtt_24h"] = round(rtt_sum / rtt_n, 1) if rtt_n >= 3 else None
 
 
 class TrustBody(BaseModel):

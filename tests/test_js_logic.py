@@ -77,3 +77,33 @@ def test_correlation_in_words_and_scales_and_csv():
     lines = out["csv"].splitlines()
     assert lines[0] == 'time (UTC),"CPU, main average (%)","CPU, main lowest","CPU, main highest",Rtt (ms)'          # a name with a comma is quoted
     assert lines[1].endswith(",10,8,12,5") and lines[2].endswith(",20,18,22,")             # a second series with no reading at that time leaves the cell empty
+
+
+def test_table_views_hold_to_what_the_table_offers_and_move_columns_safely():
+    out = run("tableviewmath.js", """
+      const known = ['status', 'name', 'ip', 'mac', 'vendor', 'type'], locked = ['status', 'name'];
+      const v = m.normalise({ columns: ['mac', 'bogus', 'mac', 'ip'], widths: { mac: 200, ip: 10, bogus: 100, vendor: 100 }, sort: { key: 'ip', dir: 'desc' }, filters: { type: 'ap', q: '' } }, known, locked);
+      const cols = ['status', 'name', 'ip', 'mac', 'vendor'];
+      return { v,
+        same: m.sameView({ columns: ['ip'] }, { columns: ['name', 'ip', 'status'] }, known, locked), differ: m.sameView({ columns: ['ip'] }, { columns: ['mac'] }, known, locked),
+        left: m.moveColumn(cols, 'mac', -1, locked), blocked: m.moveColumn(cols, 'ip', -1, locked), lockedStays: m.moveColumn(cols, 'name', 1, locked), edge: m.moveColumn(cols, 'vendor', 1, locked),
+        drop: m.dropColumn(cols, 'vendor', 'ip', locked), dropFront: m.dropColumn(cols, 'vendor', 'status', locked), dropEnd: m.dropColumn(cols, 'ip', null, locked),
+        show: m.toggleColumn(cols, 'type', true, locked), hide: m.toggleColumn(cols, 'mac', false, locked), hideLocked: m.toggleColumn(cols, 'name', false, locked) };""")
+    assert out["v"] == {"columns": ["status", "name", "mac", "ip"], "widths": {"mac": 200}, "sort": {"key": "ip", "dir": "desc"}, "filters": {"type": "ap"}}
+    assert out["same"] is True and out["differ"] is False
+    assert out["left"] == ["status", "name", "mac", "ip", "vendor"] and out["blocked"] == out["lockedStays"] == out["edge"] == ["status", "name", "ip", "mac", "vendor"]
+    assert out["drop"] == ["status", "name", "vendor", "ip", "mac"] and out["dropFront"] == ["status", "name", "vendor", "ip", "mac"] and out["dropEnd"] == ["status", "name", "mac", "vendor", "ip"]
+    assert out["show"][-1] == "type" and "mac" not in out["hide"] and "name" in out["hideLocked"]
+
+
+def test_sorting_puts_missing_values_last_and_csv_quotes_what_it_must():
+    out = run("tableviewmath.js", """
+      const rows = [{ n: 'b', v: 10 }, { n: 'a', v: null }, { n: 'c', v: 2 }, { n: 'a10', v: 5 }, { n: 'a9', v: 7 }];
+      const val = (r, k) => r[k];
+      return { asc: m.sortRows(rows, { key: 'v', dir: 'asc' }, val).map((r) => r.n), desc: m.sortRows(rows, { key: 'v', dir: 'desc' }, val).map((r) => r.n),
+               natural: m.sortRows(rows, { key: 'n', dir: 'asc' }, val).map((r) => r.n), none: m.sortRows(rows, null, val).map((r) => r.n),
+               csv: m.tableCsv([{ n: 'x, y', v: 1 }, { n: 'say "hi"', v: null }], ['n', 'v'], (r, k) => r[k], (k) => k.toUpperCase()) };""")
+    assert out["asc"] == ["c", "a10", "a9", "b", "a"] and out["desc"] == ["b", "a9", "a10", "c", "a"]      # no value: last either way
+    assert out["natural"] == ["a", "a9", "a10", "b", "c"]                                                    # a9 before a10
+    assert out["none"] == ["b", "a", "c", "a10", "a9"]
+    assert out["csv"] == 'N,V\r\n"x, y",1\r\n"say ""hi""",\r\n'
