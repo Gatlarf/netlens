@@ -82,6 +82,7 @@ class AsusConfig:
     traffic: bool = True      # also read the Traffic Analyzer statistics (applications and devices)
     interfaces: bool = True   # also read the health and the interfaces of the routers (processor, memory, temperature, uptime, ports, byte counters)
     nodes: bool = True        # ... of the AiMesh nodes too: they accept the main router's login, and their address is taken from the router's list every sync
+    wifi_air: bool = True     # also read the channel and width of every radio of the routers, and the internet connections of a dual-WAN router
     record_config: bool = False   # also read the main router's settings so that Netlens can tell when one changes (never a password or key)
 
 
@@ -457,6 +458,58 @@ class AsusClient:
             out.append({"metric": "uptime_s", "value": int(match.group(1))})
         return out
 
+    def _nvram(self, name: str) -> str | None:
+        answer = self._hook(f"nvram_get({name})")
+        value = answer.get(name) if isinstance(answer, dict) else None
+        return None if value is None else str(value).strip()
+
+    BAND_OF = {"1": "5 GHz", "2": "2.4 GHz", "4": "6 GHz"}          # `wlN_nband`
+
+    def radios(self) -> list[dict]:
+        """The channel and width of every radio (`wl0`, `wl1`, `wl2`). The chanspec is what the radio really uses ("6", "6l" = 40 MHz, "36/80"); `wlN_channel` is what was asked for (0 = auto)."""
+        out = []
+        for unit in range(3):
+            band = self.BAND_OF.get(self._nvram(f"wl{unit}_nband") or "")
+            if band is None:
+                if unit == 0:
+                    continue
+                break                                                       # no wl1 / wl2: this router has fewer radios
+            spec = self._nvram(f"wl{unit}_chanspec") or ""
+            match = re.match(r"(\d+)([lu])?(?:/(\d+))?", spec)
+            channel = int(match.group(1)) if match and int(match.group(1)) > 0 else None
+            width = int(match.group(3)) if match and match.group(3) else (40 if match and match.group(2) else 20 if channel else None)
+            if channel is None:
+                configured = self._nvram(f"wl{unit}_channel") or ""
+                channel = int(configured) if configured.isdigit() and int(configured) > 0 else None
+            out.append({"name": f"wl{unit}", "band": band, "channel": channel, "width_mhz": width, "ssid": (self._nvram(f"wl{unit}_ssid") or "")[:64] or None})
+        return out
+
+    def uplinks(self) -> dict | None:
+        """The two internet connections of a router in dual-WAN mode (`wans_mode`: fo = failover, fb = failback, lb = load balancing; off = one connection)."""
+        mode = (self._nvram("wans_mode") or "off").lower()
+        if mode not in ("fo", "fb", "lb"):
+            return None
+        names = (self._nvram("wans_dualwan") or "wan none").split()
+        ratio = [int(x) for x in re.findall(r"\d+", self._nvram("wans_lb_ratio") or "")][:2]
+        rows = []
+        for unit in (0, 1):
+            kind = names[unit] if unit < len(names) else "none"
+            if kind == "none":
+                continue
+            state = self._nvram(f"wan{unit}_state_t")
+            primary = self._nvram(f"wan{unit}_primary")
+            ip, gateway = self._nvram(f"wan{unit}_ipaddr") or "", self._nvram(f"wan{unit}_gateway") or ""
+            rows.append({"name": {"wan": "Ethernet WAN", "usb": "USB modem", "lan": "LAN port as WAN", "wan2": "WAN 2"}.get(kind, kind.upper())[:40], "interface": f"wan{unit}",
+                         "up": None if state is None else state == "2", "active": (primary == "1") if mode != "lb" and primary is not None else None,
+                         "ip": ip if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", ip) and ip != "0.0.0.0" else None, "gateway": gateway if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", gateway) and gateway != "0.0.0.0" else None,
+                         "priority": unit + 1 if mode != "lb" else None, "weight": ratio[unit] if mode == "lb" and len(ratio) > unit else None})
+        if len(rows) < 2:
+            return None
+        if mode == "lb":
+            for row in rows:
+                row["active"] = row["up"]
+        return {"mode": "balance" if mode == "lb" else "failover", "connections": rows}
+
     def own_stats(self) -> dict:
         return {"metrics": self.own_metrics(), "ports": self.interfaces() + self.link_ports()}
 
@@ -475,6 +528,8 @@ class AsusClient:
         main = next((n for n in snapshot["nodes"] if n["main"]), None)
         if main is not None:
             main.update(self.own_stats())
+            if self.cfg.wifi_air:
+                main.update(radios=self.radios(), uplinks=self.uplinks())
 
         def one(node: dict) -> tuple[dict, dict | None, str | None]:
             client = self._node_client(node["ip"])
@@ -485,7 +540,10 @@ class AsusClient:
             except AsusError as exc:
                 return node, None, str(exc)
             try:
-                return node, client.own_stats(), None
+                stats = client.own_stats()
+                if self.cfg.wifi_air:
+                    stats["radios"] = client.radios()
+                return node, stats, None
             finally:
                 client.logout()
 
@@ -541,6 +599,7 @@ def _client(config: dict):
         interfaces=bool(config.get("interfaces", True)),
         nodes=bool(config.get("nodes", True)),
         record_config=bool(config.get("record_config", False)),
+        wifi_air=bool(config.get("wifi_air", True)),
     )
     if not (cfg.url and cfg.username and cfg.password):
         raise ValueError("enter the router address, username and password")
@@ -563,6 +622,8 @@ def to_topology(snapshot: dict) -> dict:
             **({"ports": n["ports"]} if n.get("ports") else {}),                    # the interfaces and physical ports; Netlens turns the counters into speeds
             **({"metrics": n["metrics"]} if n.get("metrics") else {}),               # processor, memory, temperature, uptime
             **({"firmware": n["firmware"]} if (n.get("firmware") or {}).get("version") else {}),
+            **({"wifi": {"radios": n["radios"], "neighbours": []}} if n.get("radios") else {}),         # the channel and width of every radio
+            **({"uplinks": n["uplinks"]} if n.get("uplinks") else {}),                                   # dual WAN
             **({"config": snapshot["config"], "config_failed": snapshot.get("config_failed") or []} if n is main and snapshot.get("config") else {}),      # the settings belong to the main router
         })
     known = {m for n in nodes for m in n["macs"]}

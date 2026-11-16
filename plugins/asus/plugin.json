@@ -1,7 +1,7 @@
 {
   "id": "asus",
   "name": "ASUS router (AiMesh)",
-  "version": "1.6.4",
+  "version": "1.7.0",
   "api_version": 1,
   "diagnose": true,
   "kind": "topology",
@@ -56,6 +56,13 @@
       "label": "Read the AiMesh nodes too",
       "default": true,
       "help": "The nodes accept the main router's user name and password. Netlens asks each node at the address the router lists for it on every sync, so a node that gets another address is still found; nothing to set up per node. A node that refuses the login is skipped."
+    },
+    {
+      "key": "wifi_air",
+      "type": "bool",
+      "label": "Read the Wi-Fi channels and the internet connections",
+      "default": true,
+      "help": "The channel and width of every radio of the router and its AiMesh nodes, and the two connections of a router in dual-WAN mode (a few extra reads per router). Needs Netlens 0.4.446."
     },
     {
       "key": "record_config",

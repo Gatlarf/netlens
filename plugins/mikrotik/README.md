@@ -26,3 +26,7 @@ With two or more default routes (`0.0.0.0/0`) leaving through different interfac
 - A device with a srcnat masquerade rule is the gateway, any other is a switch; override with *Role*.
 - Only MikroTik neighbours (platform `MikroTik`) become nodes; other discovery entries are ignored.
 - The bridge host table, ARP and DHCP leases are combined; an offline static lease is not a client. Wi-Fi stations come from `interface/wifi/registration-table` (wifi package) or `interface/wireless/registration-table`.
+
+## Wi-Fi channels (1.2.0)
+
+*Follows the RouterOS documentation; tested against simulated answers only.* A device with Wi-Fi reports its radios in the **Wi-Fi channels** card: the frequency in use (`frequency` of the wireless package; `current-channel` of the wifi package) as band and channel number, the channel width and the number of stations on each radio. A radio that is switched off is left out. Neighbouring networks are not read (RouterOS scans with a streaming command that a read-only REST login cannot use). Switched off with *Read the health of the devices*.

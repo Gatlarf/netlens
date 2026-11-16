@@ -23,6 +23,12 @@ The devices then show up like monitored devices: graphs on their pages, the **He
 
 Switches in the plugin settings: *Record the health of the routers* (everything above) and *Read the AiMesh nodes too* (one extra login per node per sync). Everything is read-only, with the endpoints the router's own web page uses (`appGet.cgi`: `netdev`, `cpu_usage`, `memory_usage`, `get_cpu_temperature`, `get_wan_lan_status`, `uptime`).
 
+## Wi-Fi channels and dual WAN (1.7.0)
+
+*Written from the router's nvram names; tested against simulated answers, not yet on a real router. Please report what you see (Run diagnostic).*
+
+With *Read the Wi-Fi channels and the internet connections* (on) the plugin reads, from the main router and from every AiMesh node that is online, the **channel and width of every radio**: `wlN_nband` (which band), `wlN_chanspec` (what the radio really uses, for example `6l` = 40 MHz or `36/80`; `wlN_channel` when the chanspec says nothing) and the name of the network. Netlens shows them in the **Wi-Fi channels** card of the router and of each node. Neighbouring networks are not read on ASUS. A router in **Dual WAN** mode (`wans_mode`: failover, failback or load balancing) also gets an **Internet connections** card: both connections with their state (`wanN_state_t`), address, gateway, which one is primary and, for load balancing, the ratio. About ten small extra reads per router per sync.
+
 ## Configuration changes (1.6.0, off by default)
 
 With *Record configuration changes* ticked, every sync also reads a fixed list of the router's settings (`nvram_get` through `appGet.cgi`: firewall, UPnP, remote access, DHCP, DNS, Wi-Fi names and security mode, VPN servers, port forwards) and Netlens tells what changed on the device page (**Network** tab) and as a *Configuration changed* event. Passwords, keys and pre-shared keys are never requested. Read-only; a failed read never fails the sync. **Not yet verified on a real router**: **Run diagnostic** has a *configuration* step that shows how many settings the router returned. Needs Netlens 0.4.387.

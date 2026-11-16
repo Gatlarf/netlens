@@ -283,7 +283,7 @@ class NvramTransport(FakeTransport):
 
 def test_configuration_is_only_read_when_asked_for():
     t = NvramTransport()
-    snap = AsusClient(AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False), transport=t).snapshot()
+    snap = AsusClient(AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, wifi_air=False), transport=t).snapshot()
     assert "config" not in snap and not any("nvram_get" in p for _m, p, _c in t.calls)
     assert all("config" not in n for n in to_topology(snap)["nodes"])
 
@@ -340,7 +340,51 @@ def test_a_failing_configuration_read_does_not_cost_the_sync_its_devices(monkeyp
 
 def test_every_setting_is_its_own_request_because_the_router_answers_only_the_first_name():
     t = NvramTransport()
-    cfg = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, record_config=True)
+    cfg = AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, record_config=True, wifi_air=False)
     AsusClient(cfg, transport=t).snapshot()
     asked = [p for _m, p, _c in t.calls if "nvram_get" in p]
     assert asked and all(p.count("nvram_get(") == 1 for p in asked) and len(asked) == sum(1 if isinstance(k[2], str) else len(k[2]) for k in AsusClient.CONFIG_KEYS) + 1      # a name the router does not answer is followed by the next one
+
+
+AIR = {"wl0_nband": "2", "wl0_chanspec": "6l", "wl0_ssid": "Home", "wl1_nband": "1", "wl1_chanspec": "36/80", "wl1_ssid": "Home 5G", "wl2_nband": "",
+       "wans_mode": "fo", "wans_dualwan": "wan usb", "wan0_state_t": "2", "wan0_primary": "1", "wan0_ipaddr": "203.0.113.5", "wan0_gateway": "203.0.113.1",
+       "wan1_state_t": "4", "wan1_primary": "0", "wan1_ipaddr": "0.0.0.0", "wan1_gateway": "0.0.0.0"}
+
+
+def air(extra=None, **kwargs):
+    from app.plugins.contract import validate_output
+
+    values = {**AIR, **(extra or {})}
+
+    class Air(FakeTransport):
+        def __call__(self, method, url, headers, data):
+            path = url.split("8443", 1)[-1]
+            if path.startswith("/appGet.cgi?hook=nvram_get("):
+                self.calls.append((method, path, headers.get("Cookie")))
+                name = re.findall(r"nvram_get\(([^)]+)\)", path)[0]
+                return 200, json.dumps({name: values[name]} if name in values else {}).encode()
+            return super().__call__(method, url, headers, data)
+
+    snap = AsusClient(AsusConfig(enabled=True, url="10.0.0.1", username="u", password="pw", traffic=False, **kwargs), transport=Air()).snapshot()
+    return {n["name"]: n for n in validate_output("topology", to_topology(snap))["nodes"]}
+
+
+def test_the_radios_of_the_router_and_every_node_are_read():
+    nodes = air()
+    radios = {(r["name"], r["band"], r["channel"], r["width_mhz"], r["ssid"]) for r in nodes["Main"]["wifi"]["radios"]}
+    assert radios == {("wl0", "2.4 GHz", 6, 40, "Home"), ("wl1", "5 GHz", 36, 80, "Home 5G")}       # "6l" is a 40 MHz channel; no third radio
+    assert nodes["Garden"]["wifi"]["radios"] and "uplinks" not in nodes["Garden"]                    # a node has radios but no internet connection
+
+
+def test_a_router_in_dual_wan_mode_lists_both_connections():
+    wan = air()["Main"]["uplinks"]
+    assert wan["mode"] == "failover"
+    assert [(c["name"], c["up"], c["active"], c["ip"], c["priority"]) for c in wan["connections"]] == [("Ethernet WAN", True, True, "203.0.113.5", 1), ("USB modem", False, False, None, 2)]
+    shared = air({"wans_mode": "lb", "wans_lb_ratio": "3:1", "wan1_state_t": "2"})["Main"]["uplinks"]
+    assert shared["mode"] == "balance" and [(c["up"], c["active"], c["weight"]) for c in shared["connections"]] == [(True, True, 3), (True, True, 1)]
+    assert "uplinks" not in air({"wans_mode": "off"})["Main"]
+
+
+def test_the_wifi_reads_can_be_switched_off():
+    nodes = air(wifi_air=False)
+    assert all("wifi" not in n and "uplinks" not in n for n in nodes.values())

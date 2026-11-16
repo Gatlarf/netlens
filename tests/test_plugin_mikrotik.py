@@ -140,3 +140,16 @@ def test_two_default_routes_are_two_internet_connections():
         assert validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]["uplinks"]["mode"] == "balance"
     with Ros(routes()) as s:
         assert "uplinks" not in validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]      # one default route is one connection: nothing to show
+
+
+def test_the_radios_are_read_with_their_channel_width_and_stations():
+    r = routes()
+    r["/rest/interface/wireless"] = [{"name": "wlan1", "frequency": "2437", "channel-width": "20/40mhz-Ce", "ssid": "Home", "disabled": "false"}]
+    r["/rest/interface/wifi"] = [{"name": "wifi1", "current-channel": "5180/ax/Ceee", "channel.width": "20/40/80mhz", "disabled": "false", "ssid": "Home5"}, {"name": "wifi2", "disabled": "true", "current-channel": "2412"}]
+    r["/rest/interface/wifi/registration-table"] = [{"mac-address": "02:11:22:33:44:66", "interface": "wifi1", "signal": "-58", "tx-rate": "866.7Mbps-80MHz/2S", "rx-rate": "780Mbps-80MHz/2S", "band": "5ghz-ax"}]
+    with Ros(r) as s:
+        node = validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]
+    radios = {(x["name"], x["band"], x["channel"], x["clients"]) for x in node["wifi"]["radios"]}
+    assert radios == {("wifi1", "5 GHz", 36, 1), ("wlan1", "2.4 GHz", 6, 0)}                 # a switched-off radio is left out
+    with Ros(routes()) as s:
+        assert "wifi" not in validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]

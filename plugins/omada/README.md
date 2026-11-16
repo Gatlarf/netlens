@@ -98,3 +98,7 @@ answered: the controller version, which steps worked, and the **names and types 
 - Controllers older than 5.1 are refused with a clear message.
 - The uplink of a **mesh** access point (connected by radio) may not be reported; such a device then hangs below the gateway.
 - A client connected to a switch that is not an Omada device is shown below the gateway.
+
+## Wi-Fi channels (1.6.0)
+
+*Written from the controller's documented fields; tested against a simulated controller, not yet on real hardware.* Each access point's detail (the read Netlens already does for its uplink) also gives its radios: the channel in use (`wp2g.actualChannel`, else the configured channel when it is not "auto"), the width and the number of clients. Netlens shows them in the **Wi-Fi channels** card of the access point. A radio that is switched off is left out. Neighbouring networks are not read from Omada.

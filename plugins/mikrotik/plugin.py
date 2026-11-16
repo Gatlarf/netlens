@@ -186,6 +186,38 @@ def _ports(interfaces, router):
     return ports
 
 
+def _channel_of(freq):
+    """(band, channel number) of a frequency in MHz."""
+    if 2400 <= freq <= 2500:
+        return "2.4 GHz", 14 if freq == 2484 else (freq - 2407) // 5
+    if 5150 <= freq < 5925:
+        return "5 GHz", (freq - 5000) // 5
+    if 5925 <= freq <= 7125:
+        return "6 GHz", (freq - 5950) // 5
+    return None, None
+
+
+def _radios(router, stations):
+    """The radios of a device with Wi-Fi: the frequency in use (`frequency` of the wireless package, `current-channel` such as "5180/ax/Ceee" or the configured frequency of the wifi package),
+    the channel width and the number of stations. Radios without a readable frequency are left out."""
+    out, seen = [], set()
+    for path in ("interface/wifi", "interface/wireless"):
+        for r in _optional(router, path):
+            name = str(r.get("name") or "")[:40]
+            if not name or name in seen or _yes(r.get("disabled")):
+                continue
+            text = " ".join(str(r.get(k) or "") for k in ("current-channel", "frequency", "channel.frequency", "channel"))
+            match = re.search(r"\b(2[34]\d\d|5\d{3}|[67]\d{3})\b", text)
+            band, channel = _channel_of(int(match.group(1))) if match else (None, None)
+            if channel is None:
+                continue
+            seen.add(name)
+            width = re.search(r"(\d{2,3})\s*MHz", " ".join(str(r.get(k) or "") for k in ("channel-width", "channel.width", "current-channel", "channel")), re.I) or re.search(r"\b(20|40|80|160)\b", str(r.get("channel-width") or ""))
+            out.append({"name": name, "band": band, "channel": channel, "width_mhz": int(width.group(1)) if width and int(width.group(1)) in (20, 40, 80, 160) else None,
+                        "clients": sum(1 for w in stations if str(w.get("interface") or "") == name), "ssid": str(r.get("ssid") or "")[:64] or None})
+    return out
+
+
 def _uplinks(router, addresses):
     """The internet connections of a router with several default routes: one per outgoing interface, with its priority (distance), whether the route is
     usable and whether it carries traffic (`active`). Several active routes at the same distance share the load (ECMP); otherwise the lowest distance is in use and the others wait.
@@ -312,6 +344,10 @@ def read(router):
     wifi = []
     for path in ("interface/wifi/registration-table", "interface/wireless/registration-table"):
         wifi.extend(router.rows(path, optional=True))
+    if router.extras:
+        radios = _radios(router, wifi)
+        if radios:
+            node["wifi"] = {"radios": radios, "neighbours": []}
     for w in wifi:
         m = _mac(w.get("mac-address"))
         if not m:

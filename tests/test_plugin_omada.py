@@ -122,7 +122,9 @@ class Fake(BaseHTTPRequestHandler):
             return self._send({"errorCode": 0, "result": {"mac": GW, "showModel": "ER605 v2", "firmwareVersion": "2.3.1", "dpiEnable": True, "dpiSetting": {"loggingTraffic": False, "name": "secret-name"},
                                                            "devCap": {"supportDpi": True, "maxClients": 300}, "wan": {"ip": "203.0.113.9"}}})
         if p == f"sites/site1/eaps/{AP1}":
-            return self._send({"errorCode": 0, "result": {"mac": AP1, "wiredUplink": {"uplinkMac": SW, "port": 5}}})
+            return self._send({"errorCode": 0, "result": {"mac": AP1, "wiredUplink": {"uplinkMac": SW, "port": 5},
+                                                           "radioSetting2g": {"radioEnable": True, "channel": "0", "channelWidth": "2"}, "wp2g": {"actualChannel": "6", "bandWidth": "40MHz"},
+                                                           "radioSetting5g": {"radioEnable": True, "channel": "44"}, "radioSetting6g": {"radioEnable": False, "channel": "5"}}})
         if p == f"sites/site1/eaps/{AP2}":
             return self._send({"errorCode": -1, "msg": "not available"})  # a failing detail must not break the sync
         if p == "sites/site1/clients":
@@ -508,3 +510,12 @@ def test_a_failing_configuration_read_does_not_cost_the_sync_its_devices(server,
     monkeypatch.setattr(plugin.Controller, "settings", lambda self: (_ for _ in ()).throw(RuntimeError("boom")))
     out = validate_output("topology", plugin.fetch(cfg(url, record_config=True)))
     assert len(out["nodes"]) >= 3 and out["clients"] and all("config" not in n for n in out["nodes"])
+
+
+def test_the_radios_of_an_access_point_are_read_from_its_detail(server):
+    url, _state = server
+    out = validate_output("topology", plugin.fetch(cfg(url)))
+    node = next(n for n in out["nodes"] if n["name"] == "Living room")
+    radios = {(r["band"], r["channel"], r["width_mhz"]) for r in node["wifi"]["radios"]}
+    assert radios == {("2.4 GHz", 6, 40), ("5 GHz", 44, None)}                    # the channel in use beats "auto"; a radio that is switched off is left out
+    assert all("wifi" not in n for n in out["nodes"] if n["name"] != "Living room")     # a detail that cannot be read gives no radios, and the sync goes on

@@ -89,6 +89,7 @@ class Controller:
         self.client_id = str(config.get("client_id") or "").strip()
         self.client_secret = str(config.get("client_secret") or "").strip()
         self.allowed = bool(config.get("collect_usage", True))      # Netlens' own switch (Settings > Statistics) has the last word
+        self.radios = {}        # MAC of an access point -> its radios, read with its detail
         self.targets = []       # (site, client as the controller wrote it) for the application statistics
         self.session = netlens_http.Session(verify_tls=self.verify_tls, cookies=True)
         self.controller_id = None
@@ -233,6 +234,10 @@ class Controller:
                 parent = _mac(link.get("mac") or link.get("uplinkMac"))
                 if parent:
                     break
+        if kind == "ap" and isinstance(detail, dict):
+            radios = _radios(detail, device)
+            if radios:
+                self.radios[device["mac"]] = radios
         ports = detail.get("ports") if kind == "switch" and isinstance(detail, dict) else None
         return parent, [p for p in (_port(raw) for raw in ports or []) if p]
 
@@ -296,6 +301,8 @@ class Controller:
                 nodes[-1]["parent_mac"], ports = self.detail_of(site, device)      # asked for with the MAC exactly as the controller wrote it
                 if ports:
                     nodes[-1]["ports"] = ports
+                if self.radios.get(device["mac"]):
+                    nodes[-1]["wifi"] = {"radios": self.radios[device["mac"]], "neighbours": []}
             for client in self.paged(f"sites/{site['key']}/clients", self.CLIENT_FILTERS):
                 mac = _mac(client.get("mac"))
                 if not mac or mac in seen_clients or client.get("active") is False:
@@ -460,6 +467,30 @@ class Controller:
 
 
 SPEEDS = {1: 10, 2: 100, 3: 1000, 4: 2500, 5: 10000, 6: 25000}      # the controller's link speed codes, in Mbit/s
+
+
+WIDTHS = {"20MHZ": 20, "40MHZ": 40, "80MHZ": 80, "160MHZ": 160, "320MHZ": 320, "20": 20, "40": 40, "80": 80, "160": 160}
+
+
+def _radios(detail, device):
+    """The radios of an access point from its detail: the channel in use (`wp2g.actualChannel`, else the configured one when it is not "auto"), the width and the clients.
+    Written from the controller's documented fields; a radio without a channel is left out."""
+    out = []
+    for key, band in (("2g", "2.4 GHz"), ("5g", "5 GHz"), ("5g2", "5 GHz"), ("6g", "6 GHz")):
+        setting = detail.get("radioSetting" + key) if isinstance(detail.get("radioSetting" + key), dict) else {}
+        live = detail.get("wp" + key) if isinstance(detail.get("wp" + key), dict) else {}
+        if not setting and not live:
+            continue
+        if setting.get("radioEnable") is False:
+            continue
+        raw = live.get("actualChannel") or setting.get("channel")
+        channel = int(raw) if str(raw or "").isdigit() and int(raw) > 0 else None
+        if channel is None:
+            continue
+        width = WIDTHS.get(str(live.get("bandWidth") or live.get("actualChannelWidth") or "").upper().replace(" ", ""))
+        clients = _number(device.get("clientNum" + key[:2]))
+        out.append({"name": f"radio {key}", "band": band, "channel": channel, "width_mhz": width, "clients": int(clients) if clients is not None and clients >= 0 else None})
+    return out
 
 
 def _percent(value):
