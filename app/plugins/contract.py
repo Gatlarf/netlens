@@ -1177,6 +1177,92 @@ def _firewall(value: Any, path: str) -> dict | None:
             "model": _text(value.get("model"), f"{path}.model", max_len=80) or None, "ha": ha, "tunnels": tunnels, "licences": licences}
 
 
+WIFI_BANDS = ("2.4 GHz", "5 GHz", "6 GHz")
+
+
+def _band(value: Any, path: str) -> str | None:
+    text = _text(value, path, max_len=12)
+    return text if text in WIFI_BANDS else None
+
+
+def _node_wifi(value: Any, path: str) -> dict | None:
+    """What an access point knows about the air around it: its own radios (channel, width, clients, how busy the channel is) and the neighbouring networks it can hear."""
+    if not value:
+        return None
+    value = _dict(value, path)
+    radios, names = [], set()
+    for i, raw in enumerate(_list(value.get("radios"), f"{path}.radios")[:12]):
+        p = f"{path}.radios[{i}]"
+        raw = _dict(raw, p)
+        name = _text(raw.get("name"), f"{p}.name", max_len=40) or f"radio{i}"
+        if name in names:
+            continue
+        names.add(name)
+        radios.append({
+            "name": name, "band": _band(raw.get("band"), f"{p}.band"),
+            "channel": _optional_number(raw.get("channel"), f"{p}.channel", 1, 233, integer=True),
+            "width_mhz": _optional_number(raw.get("width_mhz"), f"{p}.width_mhz", 5, 320, integer=True),
+            "clients": _optional_number(raw.get("clients"), f"{p}.clients", 0, 10000, integer=True),
+            "utilization_pct": _optional_number(raw.get("utilization_pct"), f"{p}.utilization_pct", 0, 100),
+            "noise_dbm": _optional_number(raw.get("noise_dbm"), f"{p}.noise_dbm", -127, 0, integer=True),
+            "ssid": _text(raw.get("ssid"), f"{p}.ssid", max_len=64) or None,
+        })
+    neighbours, seen = [], set()
+    for i, raw in enumerate(_list(value.get("neighbours"), f"{path}.neighbours")[:300]):
+        p = f"{path}.neighbours[{i}]"
+        raw = _dict(raw, p)
+        bssid = _mac(raw.get("bssid"), f"{p}.bssid", required=True)
+        if bssid in seen:
+            continue
+        seen.add(bssid)
+        neighbours.append({
+            "bssid": bssid, "ssid": _text(raw.get("ssid"), f"{p}.ssid", max_len=64) or None, "band": _band(raw.get("band"), f"{p}.band"),
+            "channel": _optional_number(raw.get("channel"), f"{p}.channel", 1, 233, integer=True),
+            "signal_dbm": _optional_number(raw.get("signal_dbm"), f"{p}.signal_dbm", -127, 0, integer=True),
+            "width_mhz": _optional_number(raw.get("width_mhz"), f"{p}.width_mhz", 5, 320, integer=True),
+            "security": _text(raw.get("security"), f"{p}.security", max_len=40) or None,
+        })
+    if not radios and not neighbours:
+        return None
+    return {"radios": radios, "neighbours": neighbours, "scanned": bool(value.get("scanned", bool(neighbours)))}
+
+
+UPLINK_MODES = ("failover", "balance", "single")
+
+
+def _node_uplinks(value: Any, path: str) -> dict | None:
+    """The internet connections of a gateway: which exist, which are up, which one carries the traffic and how the load is shared. Read-only."""
+    if not value:
+        return None
+    value = _dict(value, path)
+    mode = value.get("mode")
+    if mode not in (None, *UPLINK_MODES):
+        _fail(f"{path}.mode", f"must be one of {', '.join(UPLINK_MODES)}, got {mode!r}")
+    items, names = [], set()
+    for i, raw in enumerate(_list(value.get("connections"), f"{path}.connections")[:16]):
+        p = f"{path}.connections[{i}]"
+        raw = _dict(raw, p)
+        name = _text(raw.get("name"), f"{p}.name", required=True, max_len=40)
+        if name in names:
+            continue
+        names.add(name)
+        for key in ("up", "active"):
+            if key in raw and raw[key] is not None and not isinstance(raw[key], bool):
+                _fail(f"{p}.{key}", "must be true or false")
+        items.append({
+            "name": name, "interface": _text(raw.get("interface"), f"{p}.interface", max_len=40) or None,
+            "up": raw.get("up"), "active": raw.get("active"),
+            "ip": _ipv4(raw.get("ip"), f"{p}.ip"), "gateway": _ipv4(raw.get("gateway"), f"{p}.gateway"),
+            "weight": _optional_number(raw.get("weight"), f"{p}.weight", 0, 1000, integer=True),
+            "priority": _optional_number(raw.get("priority"), f"{p}.priority", 0, 1000, integer=True),
+            "latency_ms": _optional_number(raw.get("latency_ms"), f"{p}.latency_ms", 0, 100000),
+            "loss_pct": _optional_number(raw.get("loss_pct"), f"{p}.loss_pct", 0, 100),
+        })
+    if not items:
+        return None
+    return {"mode": mode, "connections": items}
+
+
 def _topology(data: Any) -> dict:
     data = _dict(data, "output")
     nodes, node_macs = [], set()
@@ -1208,6 +1294,8 @@ def _topology(data: Any) -> dict:
             "metrics": _node_metrics(raw.get("metrics"), f"{path}.metrics"),
             "firmware": _firmware(raw.get("firmware"), f"{path}.firmware"),
             "firewall": _firewall(raw.get("firewall"), f"{path}.firewall"),
+            **({"wifi": wifi} if (wifi := _node_wifi(raw.get("wifi"), f"{path}.wifi")) else {}),
+            **({"uplinks": uplinks} if (uplinks := _node_uplinks(raw.get("uplinks"), f"{path}.uplinks")) else {}),
             **({"config": cfg} if (cfg := _node_config(raw.get("config"), f"{path}.config")) else {}),
             **({"config_failed": [_text(s, f"{path}.config_failed", max_len=60) for s in _list(raw.get("config_failed"), f"{path}.config_failed")[:20]]} if raw.get("config_failed") else {}),
         })
@@ -1243,6 +1331,8 @@ def _topology(data: Any) -> dict:
             "model": _text(raw.get("model"), f"{path}.model", max_len=100) or None,
             "device_type": _client_type(raw.get("device_type"), f"{path}.device_type"),
             "port": _text(raw.get("port"), f"{path}.port", max_len=60) or None,   # the switch port a wired client sits on ("Gi1/0/5")
+            # bytes the device has sent and received so far (a counter that only goes up, from the router's own table); Netlens works out the traffic per day from its growth
+            **{k: v for k in ("rx_bytes", "tx_bytes") if (v := _optional_number(raw.get(k), f"{path}.{k}", 0, 2**63 - 1, integer=True)) is not None},
         })
     return {"nodes": nodes, "clients": clients, "usage": _usage(data.get("usage"), "usage")}
 

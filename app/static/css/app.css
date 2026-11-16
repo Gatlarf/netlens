@@ -841,3 +841,11 @@ body.side-hidden .sidenav { display: none; }
 #side-links [hidden], .side-group[hidden] { display: none !important; }
 .chg-list { overflow-wrap: anywhere; }
 button[hidden], .btn[hidden] { display: none !important; }
+
+/* Wi-Fi channels card: networks per channel */
+.chan-strip { display: flex; align-items: flex-end; gap: 6px; min-height: 76px; padding: 4px 0 2px; overflow-x: auto; }
+.chan-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 22px; }
+.chan-bar { width: 14px; border-radius: 3px 3px 0 0; background: var(--muted, #8a94a6); opacity: .55; }
+.chan-col.mine .chan-bar { background: var(--accent, #3b82f6); opacity: 1; }
+.chan-num { font-size: 11px; color: var(--muted, #8a94a6); margin-top: 2px; }
+.chan-col.mine .chan-num { color: var(--text, inherit); font-weight: 600; }

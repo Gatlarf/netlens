@@ -3,6 +3,7 @@ and a classic controller (/api/login, no prefix). Answers use the {"meta": {"rc"
 
 import importlib.util
 import json
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -99,6 +100,8 @@ class Fake(BaseHTTPRequestHandler):
             return self._ok(DEVICES)
         if path == "/api/s/default/stat/sta":
             return self._ok(CLIENTS)
+        if path == "/api/s/default/stat/rogueap" and "rogue" in s:
+            return self._ok(s["rogue"])
         if path in ("/api/s/branch/stat/device", "/api/s/branch/stat/sta"):
             return self._ok([])
         if path.startswith("/api/s/default/rest/"):
@@ -334,5 +337,50 @@ def test_a_failing_configuration_read_does_not_cost_the_sync_its_devices(monkeyp
         monkeypatch.setattr(plugin.Controller, "settings", lambda self: (_ for _ in ()).throw(RuntimeError("boom")))
         out = validate_output("topology", plugin.fetch(cfg(url, record_config=True)))
         assert len(out["nodes"]) >= 3 and out["clients"] and all("config" not in n for n in out["nodes"])
+    finally:
+        httpd.shutdown()
+
+
+AIR_DEVICES = [
+    {**DEVICES[0], "wan2": {"up": False, "ip": "", "gateway": ""}, "wan1": {"up": True, "speed": 1000, "rx_bytes": 1, "tx_bytes": 2, "ip": "203.0.113.5", "gateway": "203.0.113.1", "is_uplink": True}},
+    {**DEVICES[2], "radio_table": [{"name": "wifi0", "radio": "ng", "channel": "auto", "ht": "20"}, {"name": "wifi1", "radio": "na", "channel": 36, "ht": "80"}],
+     "radio_table_stats": [{"name": "wifi0", "channel": 6, "num_sta": 7, "cu_total": 42}, {"name": "wifi1", "channel": 36, "num_sta": 3, "cu_total": 9.5}]},
+]
+ROGUE = [
+    {"ap_mac": AP1, "bssid": "de:ad:be:ef:00:01", "essid": "Neighbour", "channel": 6, "signal": -60, "bw": 20, "radio": "ng", "security": "wpa2"},
+    {"ap_mac": AP1, "bssid": "de:ad:be:ef:00:02", "essid": "", "channel": 36, "rssi": 40, "bw": 80, "radio": "na"},
+    {"ap_mac": AP1, "bssid": AP2, "essid": "mine", "channel": 6, "signal": -40, "radio": "ng"},          # one of our own access points is not a neighbour
+    {"ap_mac": "ff:ff:ff:00:00:01", "bssid": "de:ad:be:ef:00:03", "essid": "stray", "channel": 1},      # heard by a device the plugin does not know
+]
+NETWORKS = [{"name": "Internet 1", "purpose": "wan", "wan_networkgroup": "WAN", "wan_load_balance_type": "failover-only", "wan_failover_priority": 1},
+            {"name": "Internet 2", "purpose": "wan", "wan_networkgroup": "WAN2", "wan_load_balance_type": "failover-only", "wan_failover_priority": 2}]
+
+
+def test_wifi_air_connections_and_counters_follow_the_contract(monkeypatch):
+    monkeypatch.setattr(sys.modules[__name__], "DEVICES", [AIR_DEVICES[0], DEVICES[1], AIR_DEVICES[1], *DEVICES[3:]])
+    clients = [{**CLIENTS[0], "rx_bytes": 1000, "tx_bytes": 9000}, {**CLIENTS[1], "wired-rx_bytes": 5, "wired-tx_bytes": 50}]
+    monkeypatch.setattr(sys.modules[__name__], "CLIENTS", clients)
+    httpd, url = start(True, rogue=ROGUE, rest={"networkconf": NETWORKS})
+    try:
+        out = validate_output("topology", plugin.fetch(cfg(url)))
+    finally:
+        httpd.shutdown()
+    nodes = {n["name"]: n for n in out["nodes"]}
+    air = nodes["Hall AP"]["wifi"]
+    assert {(r["band"], r["channel"], r["width_mhz"], r["clients"], r["utilization_pct"]) for r in air["radios"]} == {("2.4 GHz", 6, 20, 7, 42.0), ("5 GHz", 36, 80, 3, 9.5)}
+    assert air["scanned"] and [(n["ssid"], n["channel"], n["signal_dbm"], n["band"]) for n in air["neighbours"]] == [("Neighbour", 6, -60, "2.4 GHz"), (None, 36, -55, "5 GHz")]     # rssi 40 is 40 above the noise floor
+    wan = nodes["Dream Machine"]["uplinks"]
+    assert wan["mode"] == "failover" and [(c["name"], c["up"], c["active"], c["priority"]) for c in wan["connections"]] == [("WAN", True, True, 1), ("WAN 2", False, None, 2)]
+    by_mac = {c["mac"]: c for c in out["clients"]}
+    assert by_mac["11:22:33:44:55:01"]["rx_bytes"] == 9000 and by_mac["11:22:33:44:55:01"]["tx_bytes"] == 1000     # download is what the access point sent to the device
+    assert by_mac["11:22:33:44:55:02"]["rx_bytes"] == 50 and by_mac["11:22:33:44:55:02"]["tx_bytes"] == 5
+
+
+def test_a_gateway_with_one_connection_and_the_switch_off_read_nothing_extra(monkeypatch):
+    httpd, url = start(True, rogue=ROGUE, rest={"networkconf": NETWORKS})
+    try:
+        out = validate_output("topology", plugin.fetch(cfg(url, read_wifi_air=False)))
+        assert all("wifi" not in n and "uplinks" not in n for n in out["nodes"])
+        assert not any("rogueap" in path or "networkconf" in path for _m, path in Fake.state["calls"])
     finally:
         httpd.shutdown()

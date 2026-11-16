@@ -34,6 +34,14 @@ One login, three reads per site and a logout per sync (Netlens syncs after every
 
 A refused login stops automatic syncing until you save the settings or press *Sync now* again, so a wrong password cannot lock the account.
 
+## Wi-Fi channels, traffic per client and internet connections (1.2.0)
+
+Three more reads, all from the controller and all read-only. *Written from the controller's documented fields and tested against a fake controller; not yet against real hardware* (`Run diagnostic` helps: report what it shows).
+
+- **Wi-Fi channels.** Each access point's radios from its device entry (`radio_table`, `radio_table_stats`: channel in use, width, clients, `cu_total` = share of the airtime in use) and the neighbouring networks from the controller's own radio scans (`stat/rogueap`; nothing is interrupted). Netlens shows them in the **Wi-Fi channels** card on the access point's page and says when a quieter channel exists. Switch it off with *Read the Wi-Fi channels and neighbouring networks*.
+- **Traffic per client.** `stat/sta` gives every client's byte counters; Netlens works out the traffic per device and day from their growth (only while Settings > Traffic statistics is on). UniFi counts from the access point's side, so the plugin turns that around: what UniFi calls received is what the device sent.
+- **Internet connections.** A gateway with two or more WANs (`wan1`..`wan3`) gets an **Internet connections** card: state, address, which one is in use (`is_uplink`, else the only one that is up) and, from the WAN networks' settings (`rest/networkconf`: failover or weighted load balancing, priority, weight), the mode. One extra request, only for a gateway with two or more connections.
+
 ## Testing (what we would like to know)
 
 Please check after a sync, and tell us what is wrong:

@@ -82,3 +82,12 @@ def test_api(tmp_path, monkeypatch):
 def test_dockerignore_lets_the_changelog_into_the_image():
     lines = (Path(__file__).resolve().parents[1] / ".dockerignore").read_text().splitlines()
     assert "!CHANGELOG.md" in lines or "*.md" not in lines
+
+
+def test_the_whats_new_window_is_never_silent_after_an_update():
+    js = (Path(__file__).resolve().parent.parent / "app" / "static" / "js")
+    popup, app = (js / "changelog.js").read_text(encoding="utf-8"), (js / "app.js").read_text(encoding="utf-8")
+    assert "watchForUpdates()" in app                      # a tab left open during an update looks again when it comes back
+    assert "visibilitychange" in popup
+    assert "const close = () => { remember(current)" in popup   # seen when closed, not when opened
+    assert "fixed" in popup.lower()                         # without notable changes the new and changed ones are listed

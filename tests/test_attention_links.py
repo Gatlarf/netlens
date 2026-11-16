@@ -34,3 +34,11 @@ def test_pages_understand_their_hints():
     for page, hint in [("stats", "focus="), ("devices", "trusted="), ("scans", "kind="), ("uptime", "focus="), ("storage", "focus="), ("backups", "focus=")]:
         assert hint in (JS / "pages" / f"{page}.js").read_text(), page
     assert "wantedCard" in (JS / "pages" / "device.js").read_text()
+
+
+def test_the_cards_the_wifi_and_internet_lines_open_exist():
+    page = (JS / "pages" / "device.js").read_text()
+    for source in ("airspace.py", "uplinks.py"):
+        for link in re.findall(r'f"(#/device/[^"]+)"', (ROOT / source).read_text()):
+            tab, card = re.fullmatch(r"#/device/\{device_id\}/([a-z]+)/([a-z-]+)", link).groups()
+            assert tab == "network" and f'slot("{card}"' in page, link          # the card the line names is built on that tab

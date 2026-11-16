@@ -122,3 +122,21 @@ def test_a_router_without_the_extras_and_the_switch_to_turn_them_off():
     with Ros(routes()) as s:
         off = validate_output("topology", plugin.fetch({**config({"host": s.url}), "health": False}))["nodes"][0]
     assert not off["metrics"] and off["firmware"] is None and not off["ports"]
+
+
+def test_two_default_routes_are_two_internet_connections():
+    r = routes()
+    r["/rest/ip/route"] = [{"dst-address": "0.0.0.0/0", "active": "true", "inactive": "false", "distance": "1", "gateway": "192.0.2.1", "immediate-gw": "192.0.2.1%ether1", "vrf-interface": "ether1"},
+                           {"dst-address": "0.0.0.0/0", "active": "false", "inactive": "true", "distance": "2", "gateway": "198.51.100.1", "immediate-gw": "", "vrf-interface": "ether2"},
+                           {"dst-address": "10.9.0.0/16", "active": "true", "distance": "1", "gateway": "10.0.0.1", "vrf-interface": "ether3"}]       # not a default route
+    r["/rest/ip/address"] = [{"address": "192.0.2.50/24", "interface": "ether1"}, {"address": "198.51.100.50/24", "interface": "ether2"}, {"address": "192.168.88.1/24", "interface": "bridge-lan"}]
+    with Ros(r) as s:
+        node = validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]
+    wan = node["uplinks"]
+    assert wan["mode"] == "failover"
+    assert [(c["name"], c["up"], c["active"], c["priority"], c["gateway"], c["ip"]) for c in wan["connections"]] == [("ether1", True, True, 1, "192.0.2.1", "192.0.2.50"), ("ether2", False, False, 2, "198.51.100.1", "198.51.100.50")]
+    r["/rest/ip/route"][1].update(active="true", inactive="false", distance="1")                      # two active routes at the same distance share the load
+    with Ros(r) as s:
+        assert validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]["uplinks"]["mode"] == "balance"
+    with Ros(routes()) as s:
+        assert "uplinks" not in validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]      # one default route is one connection: nothing to show

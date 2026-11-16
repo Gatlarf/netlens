@@ -234,6 +234,14 @@ def _extra_attention(conn: sqlite3.Connection) -> list[dict]:
     except Exception:  # noqa: BLE001 - a warning must never break the dashboard
         pass
 
+    from app import airspace, uplinks
+
+    for module in (uplinks, airspace):       # internet connections that are down, a Wi-Fi channel that is crowded
+        try:
+            out.extend(module.attention(conn))
+        except Exception:  # noqa: BLE001 - an extra line must never break the dashboard
+            pass
+
     if licence.allows(conn, "agents"):
         for p in ingest.problems(conn):          # a collector that stopped sending, a certificate that is about to end
             out.append({"level": "warn", "text": p["text"], "href": "#/settings/ingest", "snooze": f"agent:{p['agent_id']}"})

@@ -1,11 +1,11 @@
 {
   "id": "unifi",
   "name": "Ubiquiti UniFi",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "api_version": 1,
   "kind": "topology",
   "author": "Netlens",
-  "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine, Cloud Key Gen2+, Cloud Gateway, or a self-hosted classic controller): gateway, switches and access points, which device hangs below which, which switch or access point every client is on with Wi-Fi signal and link rate, and each device's health: processor, memory, temperature, uptime, firmware (and the waiting upgrade), ports and WAN speed. Read-only: one login, a few reads and a logout per sync.",
+  "description": "Reads the UniFi Network application (UniFi OS consoles such as Dream Machine, Cloud Gateway, or a self-hosted classic controller): gateway, switches, access points, which device hangs below which, every client's switch or access point with Wi-Fi signal and rate, each device's health and ports, the Wi-Fi channels and neighbouring networks, traffic per client and, with two internet connections, which one is in use. Read-only.",
   "timeout": 90,
   "diagnose": true,
   "config": [
@@ -56,6 +56,13 @@
       "label": "Site",
       "placeholder": "Default",
       "help": "The name of one site as shown in UniFi (or its short id, usually default). Leave empty to read every site the account may see."
+    },
+    {
+      "key": "read_wifi_air",
+      "type": "bool",
+      "label": "Read the Wi-Fi channels and neighbouring networks",
+      "default": true,
+      "help": "Takes each access point's channel, width and busy airtime and the networks it hears from the controller (its own radio scans: nothing is interrupted). Netlens then says when a clearly quieter channel exists. Read-only. Needs Netlens 0.4.446."
     },
     {
       "key": "record_config",

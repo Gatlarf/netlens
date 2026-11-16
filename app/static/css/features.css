@@ -890,3 +890,39 @@ details.exposure-item > :not(summary), .config-change > :not(summary) { margin-l
 .config-change { border-left: 3px solid var(--warn, #f5a524); padding: .1rem 0 .1rem .75rem; margin: .6rem 0; }
 .config-change p { margin: .15rem 0; }
 .config-change ul { margin: .25rem 0 .2rem 1.1rem; padding: 0; }
+
+/* Orbit view of the map */
+.orbit-stage { position: relative; height: min(74vh, 820px); min-height: 460px; border: 1px solid var(--border, #d0d5dd); border-radius: 10px; overflow: hidden; background: var(--surface, transparent); }
+.orbit-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; user-select: none; }
+.orbit-svg.panning { cursor: grabbing; }
+.orbit-rings circle { fill: none; stroke: var(--border, #d0d5dd); stroke-width: 1; stroke-dasharray: 2 6; opacity: .7; }
+.orbit-link { fill: none; stroke: var(--muted, #8a94a6); stroke-width: 1; opacity: .35; transition: opacity .15s, stroke .15s; }
+.orbit-link.hub { stroke-width: 1.6; opacity: .55; }
+.orbit-link.off { stroke-dasharray: 3 4; opacity: .25; }
+.orbit-sparks circle { fill: var(--accent, #2563eb); opacity: .8; }
+.orbit-node circle { fill: var(--surface, #fff); stroke-width: 2; transition: opacity .15s; }
+.orbit-node.hub circle { stroke-width: 2.5; }
+.orbit-node.on circle { stroke: var(--ok, #16a34a); }
+.orbit-node.off circle { stroke: var(--bad, #dc2626); stroke-dasharray: 3 3; }
+.orbit-node.held circle { stroke: var(--warn, #d97706); }
+.orbit-node.leaf.on circle { fill: var(--accent, #2563eb); stroke: none; opacity: .85; }
+.orbit-node.leaf.on.k-srv circle { fill: #8b5cf6; }
+.orbit-node.leaf.on.k-guest circle { fill: #14b8a6; }
+.orbit-node.leaf.on.k-net circle { fill: var(--ok, #16a34a); }
+.orbit-node.leaf.off circle { fill: transparent; stroke-width: 1.5; }
+.orbit-node.leaf.held circle { fill: var(--warn, #d97706); stroke: none; }
+.orbit-glyph { font-size: 10px; font-weight: 700; text-anchor: middle; fill: var(--text, currentColor); pointer-events: none; }
+.orbit-label { font-size: 12px; font-weight: 600; text-anchor: middle; fill: var(--text, currentColor); pointer-events: none; }
+.orbit-sub { font-size: 9.5px; text-anchor: middle; fill: var(--muted, #8a94a6); pointer-events: none; }
+.orbit-name { font-size: 9px; fill: var(--muted, #8a94a6); display: none; pointer-events: none; }
+.orbit-svg.show-names .orbit-name { display: block; }
+.orbit-node { cursor: pointer; outline: none; }
+.orbit-node:focus-visible circle { stroke: var(--accent, #2563eb); stroke-width: 3; }
+.orbit-svg.tracing .orbit-node, .orbit-svg.tracing .orbit-link { opacity: .15; }
+.orbit-svg.tracing .orbit-node.lit, .orbit-svg.tracing .orbit-link.lit { opacity: 1; }
+.orbit-svg.tracing .orbit-link.lit { stroke: var(--accent, #2563eb); stroke-width: 2; }
+.orbit-svg.tracing .orbit-node.lit .orbit-name { display: block; }
+.orbit-svg.filtering .orbit-node:not(.match) { opacity: .18; }
+.orbit-svg.filtering .orbit-link { opacity: .12; }
+.orbit-readout { margin-top: 8px; min-height: 1.4em; font-size: 13px; color: var(--muted, #5f6877); }
+@media (prefers-reduced-motion: reduce) { .orbit-sparks { display: none; } }

@@ -79,6 +79,10 @@ class Ubus:
                     key = (obj, method, args.get("device")) if obj == "iwinfo" else (obj, method, "all") if (obj, method) == ("network.device", "status") and not args.get("name") else (obj, method)
                     if (obj, method) == ("file", "read"):
                         key = (obj, method, args.get("path"))
+                    if obj == "mwan3":
+                        key = (obj, method, args.get("section"))
+                    if (obj, method) == ("file", "exec"):
+                        key = (obj, method, args.get("command"))
                     result = [0, answers[key]] if key in answers else [4]
                 self.send({"jsonrpc": "2.0", "id": 1, "result": result})
 
@@ -173,3 +177,49 @@ def test_extras_never_fail_the_sync_and_can_be_switched_off():
     with Ubus(router(denied=("file",))) as s:                    # the file ACL missing: no processor or temperature, the rest stays
         node = validate_output("topology", plugin.fetch(config({"host": s.url})))["nodes"][0]
     assert {m["metric"] for m in node["metrics"]} == {"mem_pct", "load1", "uptime_s"}
+
+
+def with_air(answers):
+    answers[("iwinfo", "info", "phy0-ap0")] = {"frequency": 2437, "channel": 6, "htmode": "HT20", "noise": -95, "ssid": "home", "bssid": "AA:AA:AA:00:00:11"}
+    answers[("iwinfo", "info", "phy1-ap0")] = {"frequency": 5180, "channel": 36, "htmode": "VHT80", "ssid": "home", "bssid": "AA:AA:AA:00:00:12"}
+    answers[("iwinfo", "scan", "phy0-ap0")] = {"results": [
+        {"ssid": "Neighbour", "bssid": "DE:AD:BE:EF:00:01", "channel": 6, "band": 2, "signal": -62, "encryption": {"enabled": True, "description": "WPA2 PSK (CCMP)"}},
+        {"ssid": "home", "bssid": "AA:AA:AA:00:00:12", "channel": 36, "band": 5, "signal": -30, "encryption": {"enabled": True}},        # our own radio is not a neighbour
+        {"ssid": "", "bssid": "DE:AD:BE:EF:00:02", "channel": 1, "signal": -88, "encryption": {"enabled": False}}]}
+    answers[("iwinfo", "scan", "phy1-ap0")] = {"results": [{"ssid": "Far", "bssid": "DE:AD:BE:EF:00:03", "channel": 44, "band": 5, "signal": -70, "encryption": {"enabled": True}}]}
+    return answers
+
+
+def test_radios_are_read_and_the_scan_only_when_asked_for_and_due():
+    answers, denied = router()
+    with Ubus((with_air(answers), denied)) as s:
+        out = validate_output("topology", plugin.fetch(config({"host": s.url})))
+        radios = {(r["band"], r["channel"], r["width_mhz"], r["clients"], r["noise_dbm"]) for r in out["nodes"][0]["wifi"]["radios"]}
+        assert radios == {("2.4 GHz", 6, 20, 1, -95), ("5 GHz", 36, 80, 1, None)}
+        assert out["nodes"][0]["wifi"]["neighbours"] == [] and not out["nodes"][0]["wifi"]["scanned"]       # no scan unless switched on
+        out = validate_output("topology", plugin.fetch({**config({"host": s.url}), "scan_neighbours": True}))
+        heard = {(n["ssid"], n["channel"], n["band"], n["signal_dbm"], n["security"]) for n in out["nodes"][0]["wifi"]["neighbours"]}
+        assert heard == {("Neighbour", 6, "2.4 GHz", -62, "WPA2 PSK (CCMP)"), (None, 1, "2.4 GHz", -88, "open"), ("Far", 44, "5 GHz", -70, "protected")}
+        out = validate_output("topology", plugin.fetch({**config({"host": s.url}), "scan_neighbours": True, "wifi_scan_due": False}))
+        assert out["nodes"][0]["wifi"]["neighbours"] == [] and not out["nodes"][0]["wifi"]["scanned"]       # Netlens said the last scan is recent
+        out = validate_output("topology", plugin.fetch({**config({"host": s.url}), "wifi_air": False}))
+        assert "wifi" not in out["nodes"][0]
+
+
+def test_mwan3_connections_and_nlbwmon_counters():
+    answers, denied = router()
+    answers[("mwan3", "status", "interfaces")] = {"interfaces": {"wan": {"status": "online", "up": True}, "wanb": {"status": "offline", "up": False}}}
+    answers[("mwan3", "status", "policies")] = {"policies": {"failover": [{"interface": "wan", "percent": 100}]}}
+    table = {"columns": ["family", "mac", "ip", "conns", "rx_bytes", "rx_pkts", "tx_bytes", "tx_pkts"], "data": [[4, "02:11:22:33:44:55", "192.168.1.120", 3, 1000, 10, 200, 5], [6, "02:11:22:33:44:55", "fe80::1", 1, 500, 5, 100, 2]]}
+    answers[("file", "exec", "/usr/sbin/nlbw")] = {"code": 0, "stdout": json.dumps(table)}
+    with Ubus((answers, denied)) as s:
+        out = validate_output("topology", plugin.fetch({**config({"host": s.url}), "collect_usage": True}))
+        wan = out["nodes"][0]["uplinks"]
+        assert wan["mode"] == "failover" and [(c["name"], c["up"], c["active"], c["ip"], c["gateway"]) for c in wan["connections"]] == [("wan", True, True, "203.0.113.5", None), ("wanb", False, False, None, None)]
+        laptop = next(c for c in out["clients"] if c["mac"] == "02:11:22:33:44:55")
+        assert (laptop["rx_bytes"], laptop["tx_bytes"]) == (1500, 300)                                      # IPv4 and IPv6 rows of one device are added
+        out = validate_output("topology", plugin.fetch(config({"host": s.url})))
+        assert all("rx_bytes" not in c for c in out["clients"])                                             # not asked for while traffic statistics are off
+        answers.pop(("mwan3", "status", "interfaces"))
+        out = validate_output("topology", plugin.fetch(config({"host": s.url})))
+        assert "uplinks" not in out["nodes"][0]                                                              # no mwan3, no connections card

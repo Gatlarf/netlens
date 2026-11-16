@@ -351,7 +351,9 @@ class PluginService:
 
             conn = connect(self.db_path)
             try:
-                return {**config, "collect_usage": usagecfg.enabled(conn)}
+                from app import airspace
+
+                return {**config, "collect_usage": usagecfg.enabled(conn), "wifi_scan_due": airspace.scan_due(conn, plugin.id)}
             finally:
                 conn.close()
         if kind != "dns":
@@ -450,6 +452,12 @@ class PluginService:
                     linkgroups.evaluate(conn)
                     record_node_health(conn, plugin.id, data)
                     record_firewall(conn, plugin.id, data)
+                    from app import airspace, uplinks
+
+                    airspace.record(conn, plugin.id, data)
+                    uplinks.record(conn, plugin.id, data)
+                    if usagecfg.enabled(conn):
+                        enrich.record_client_counters(conn, plugin.id, data)
                     try:
                         from app import configchange
 

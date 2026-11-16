@@ -3,12 +3,13 @@ import { get, post, patch, del, ApiError } from "../api.js";
 import { popMenu } from "../ui.js";
 import { h, clear, toast, foldToolbarOnPhone, typeBadge, statusDot, TYPE_LABELS, shortName, isAdmin, vendorText, vendorTitle } from "../util.js";
 import { renderTiers } from "./map_tiers.js";
+import { renderOrbit } from "./map_orbit.js";
 import { render as renderHierarchy } from "./hierarchy.js";
 import { buildTree, defaultCollapsed, layoutHorizontal, layoutVertical, leafIds } from "../layout_horizontal.js";
 
 const LAYOUTS = ["free", "horizontal", "vertical", "compact"];       // the layouts drawn with the graph library
-const VIEWS = ["tiers", ...LAYOUTS, "hierarchy"];                      // every view of the map; Tiers is the default
-const LAYOUT_OPTIONS = [["tiers", "Tiers view"], ["free", "Free layout"], ["horizontal", "Horizontal layout"], ["vertical", "Vertical layout"], ["compact", "Compact layout"], ["hierarchy", "Hierarchy (list)"]];
+const VIEWS = ["tiers", "orbit", ...LAYOUTS, "hierarchy"];                      // every view of the map; Tiers is the default
+const LAYOUT_OPTIONS = [["tiers", "Tiers view"], ["orbit", "Orbit view"], ["free", "Free layout"], ["horizontal", "Horizontal layout"], ["vertical", "Vertical layout"], ["compact", "Compact layout"], ["hierarchy", "Hierarchy (list)"]];
 // the compact layout is the dashboard's mini-map at full size: small dots in columns, flattened, with curved links
 const compactPos = (p) => (p ? { x: p.x * 1.1, y: p.y * 0.6 } : undefined);
 const cardMode = (mode) => mode === "horizontal" || mode === "vertical";   // the layouts that draw a card per device
@@ -310,6 +311,9 @@ export async function render(container, params) {
   const changeView = (value) => { savePref("netlens.map.layout", value); window.dispatchEvent(new Event("hashchange")); };
   if (view === "tiers") {       // the Tiers view is drawn without the graph library
     return renderTiers(container, { layouts: LAYOUT_OPTIONS, current: "tiers", onLayout: changeView });
+  }
+  if (view === "orbit") {       // the Orbit view is drawn without the graph library as well
+    return renderOrbit(container, { layouts: LAYOUT_OPTIONS, current: "orbit", onLayout: changeView });
   }
   if (view === "hierarchy") {   // the list of what depends on what: the page that used to be "Hierarchy"
     const select = h("select", { class: "layout-mode", title: "How the devices are shown" }, ...LAYOUT_OPTIONS.map(([v, l]) => h("option", { value: v, selected: v === view }, l)));

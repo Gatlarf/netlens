@@ -67,6 +67,11 @@ class Router:
         self.sid = None
         self.extras = bool(extras)            # the health, firmware and ports (switched off in the plugin settings)
         self.verify_tls = bool(verify_tls)
+        self.air = True                       # channels of the radios (settings: "Read the Wi-Fi channels")
+        self.scan = False                     # scan for neighbouring networks (off unless asked for: a scan briefly interrupts the radio)
+        self.scan_due = True                  # Netlens says when the last scan is old enough (it keeps the time, this process does not)
+        self.traffic = False                  # the byte counters of the clients (only while Netlens collects traffic statistics)
+        self.mwan = True                      # the internet connections of mwan3
 
     def rpc(self, obj, method, args=None, allow=()):
         """One ubus call; returns the result dict. `allow` lists ubus status codes that mean "nothing there" (returns None)."""
@@ -128,7 +133,13 @@ def parse_routers(config):
             raise ValueError(f"line {i}: enter the address")
         if not str(r.get("username") or "").strip() or not str(r.get("password") or ""):
             raise ValueError(f"{url}: enter the user name and password")
-        out.append(Router(url, str(r["username"]).strip(), str(r["password"]), r.get("role"), r.get("uplink"), config.get("verify_tls", False), config.get("timeout") or 15, config.get("health", True)))
+        router = Router(url, str(r["username"]).strip(), str(r["password"]), r.get("role"), r.get("uplink"), config.get("verify_tls", False), config.get("timeout") or 15, config.get("health", True))
+        router.air = config.get("wifi_air", True) is not False
+        router.scan = bool(config.get("scan_neighbours", False))
+        router.scan_due = config.get("wifi_scan_due", True) is not False
+        router.traffic = bool(config.get("collect_usage", False))
+        router.mwan = config.get("multi_wan", True) is not False
+        out.append(router)
     return out
 
 
@@ -235,10 +246,85 @@ def _ports(router, wan_device):
     return ports
 
 
+CHANNEL_BAND = {2: "2.4 GHz", 5: "5 GHz", 6: "6 GHz"}
+
+
+def _width(htmode):
+    """The channel width in MHz from iwinfo's htmode (HT20, HT40+, VHT80, HE160); None for NOHT and anything else."""
+    m = re.search(r"(\d{2,3})", str(htmode or ""))
+    return int(m.group(1)) if m and int(m.group(1)) in (20, 40, 80, 160, 320) else None
+
+
+def _neighbours(router, ifname, own):
+    """The networks one radio hears (`iwinfo scan`). An extra: a radio or login that cannot scan gives an empty list."""
+    out = []
+    for row in (_optional(router, "iwinfo", "scan", {"device": ifname}).get("results") or [])[:200]:
+        if not isinstance(row, dict):
+            continue
+        bssid = _mac(row.get("bssid"))
+        if not bssid or bssid in own:
+            continue
+        channel = row.get("channel") if isinstance(row.get("channel"), int) and row["channel"] > 0 else None
+        band = CHANNEL_BAND.get(row.get("band")) if isinstance(row.get("band"), int) else (None if channel is None else "2.4 GHz" if channel <= 14 else "5 GHz")
+        signal = row.get("signal")
+        enc = row.get("encryption") if isinstance(row.get("encryption"), dict) else {}
+        security = (str(enc.get("description") or "")[:40] or "protected") if enc.get("enabled") else ("open" if "enabled" in enc else None)
+        out.append({"bssid": bssid, "ssid": str(row.get("ssid") or "")[:64] or None, "band": band, "channel": channel,
+                    "signal_dbm": int(signal) if isinstance(signal, (int, float)) and -127 <= signal <= 0 else None, "width_mhz": None, "security": security})
+    return out
+
+
+def _mwan3(router, dump):
+    """The internet connections that mwan3 manages: state, which carry traffic (`percent` in a policy) and the mode. None when mwan3 is not installed or has fewer than two."""
+    status = _optional(router, "mwan3", "status", {"section": "interfaces"}).get("interfaces")
+    if not isinstance(status, dict) or len(status) < 2:
+        return None
+    policies = _optional(router, "mwan3", "status", {"section": "policies"}).get("policies")
+    carrying, balanced = set(), False
+    for policy in (policies or {}).values() if isinstance(policies, dict) else []:
+        members = policy if isinstance(policy, list) else [{"interface": k, **(v if isinstance(v, dict) else {})} for k, v in policy.items()] if isinstance(policy, dict) else []
+        active = [m for m in members if isinstance(m, dict) and m.get("interface") and isinstance(m.get("percent"), (int, float)) and m["percent"] > 0]
+        carrying.update(m["interface"] for m in active)
+        balanced = balanced or len(active) > 1
+    addresses = {str(i.get("interface")): i for i in (dump or {}).get("interface") or [] if isinstance(i, dict)}
+    out = []
+    for name in sorted(status):
+        info = status[name] if isinstance(status[name], dict) else {}
+        state = str(info.get("status") or "")
+        up = True if state == "online" else False if state in ("offline", "error") else (bool(info["up"]) if isinstance(info.get("up"), bool) else None)
+        iface = addresses.get(name) or {}
+        ip = _ipv4(((iface.get("ipv4-address") or [{}])[0]).get("address"))
+        gateway = next((_ipv4(r.get("nexthop")) for r in iface.get("route") or [] if isinstance(r, dict) and r.get("target") == "0.0.0.0" and _ipv4(r.get("nexthop"))), None)
+        out.append({"name": name[:40], "interface": name[:40], "up": up, "active": (name in carrying) if carrying else None, "ip": ip, "gateway": gateway})
+    return {"mode": "balance" if balanced else "failover", "connections": out}
+
+
+def _traffic(router):
+    """{mac: (download, upload)} in bytes from nlbwmon (`nlbw -c json -g mac`, this period), when it is installed and the login may run it."""
+    data = _optional(router, "file", "exec", {"command": "/usr/sbin/nlbw", "params": ["-c", "json", "-g", "mac"]})
+    try:
+        table = json.loads(data.get("stdout") or "")
+        cols = table["columns"]
+        mac_i, rx_i, tx_i = cols.index("mac"), cols.index("rx_bytes"), cols.index("tx_bytes")
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return {}
+    out = {}
+    for row in table.get("data") or []:
+        try:
+            m = _mac(row[mac_i])
+            if m:
+                prev = out.get(m, (0, 0))
+                out[m] = (prev[0] + int(row[rx_i]), prev[1] + int(row[tx_i]))
+        except (IndexError, TypeError, ValueError):
+            continue
+    return out
+
+
 def read(router):
     """Everything about one router: its node entry and its clients."""
     board = router.rpc("system", "board")
-    lan, wan = _lan(router.rpc("network.interface", "dump"))
+    dump = router.rpc("network.interface", "dump")
+    lan, wan = _lan(dump)
     ip = _ipv4(((lan or {}).get("ipv4-address") or [{}])[0].get("address")) or _ipv4(router.host)
     own = set()
     mac = None
@@ -254,6 +340,9 @@ def read(router):
         node.update(metrics=_health(router), ports=_ports(router, (wan or {}).get("device")), firmware={"version": version, "latest": None} if version else None)
     if role == "ap" and router.uplink:
         node["uplink_ip"] = router.uplink
+    uplinks = _mwan3(router, dump) if router.mwan and role == "gateway" else None
+    if uplinks:
+        node["uplinks"] = uplinks
 
     clients = {}
     leases = router.rpc("luci-rpc", "getDHCPLeases", allow=(3, 4, 6)) or {}
@@ -270,10 +359,22 @@ def read(router):
         entry = clients.setdefault(m, {"mac": m, "ip": ip4, "name": None, "medium": "wired"})
         entry["ip"] = entry["ip"] or ip4
         entry["name"] = entry["name"] or (str(hint.get("name") or "")[:100] or None)
-    wifi = wireless_stations(router)
+    air = [] if router.air else None
+    wifi = wireless_stations(router, air)
+    if air:
+        heard = []
+        if router.scan and router.scan_due:
+            own_bssids = {r["bssid"] for r in air if r.get("bssid")} | own
+            for r in air:
+                heard.extend(_neighbours(router, r["ifname"], own_bssids))
+        node["wifi"] = {"radios": [{k: v for k, v in r.items() if k not in ("bssid", "ifname")} for r in air], "neighbours": heard, "scanned": bool(router.scan and router.scan_due)}
     for m, st in wifi.items():
         entry = clients.setdefault(m, {"mac": m, "ip": None, "name": None, "medium": "wifi"})
         entry.update(medium="wifi", **{k: v for k, v in st.items() if v is not None})
+    if router.traffic:
+        for m, (down, up) in _traffic(router).items():
+            if m in clients:
+                clients[m].update(rx_bytes=down, tx_bytes=up)
     own.discard(None)
     if mac:
         own.add(mac)
@@ -281,7 +382,7 @@ def read(router):
     return node, out[:MAX_CLIENTS], {"wan": bool(wan), "version": (board.get("release") or {}).get("description"), "stations": len(wifi)}
 
 
-def wireless_stations(router):
+def wireless_stations(router, air=None):
     """{mac: {band, rssi, tx_mbps, rx_mbps}} for every station associated with a radio of this router."""
     radios = router.rpc("luci-rpc", "getWirelessDevices", allow=(3, 4, 6)) or {}
     stations = {}
@@ -293,6 +394,12 @@ def wireless_stations(router):
             info = router.rpc("iwinfo", "info", {"device": ifname}, allow=(3, 4, 6)) or {}
             band = band_of(info.get("frequency"))
             assoc = router.rpc("iwinfo", "assoclist", {"device": ifname}, allow=(3, 4, 6)) or {}
+            if air is not None and info:
+                channel = info.get("channel")
+                noise = info.get("noise")
+                air.append({"name": ifname, "ifname": ifname, "band": band, "channel": channel if isinstance(channel, int) and channel > 0 else None, "width_mhz": _width(info.get("htmode")),
+                            "clients": len(assoc.get("results") or []), "noise_dbm": int(noise) if isinstance(noise, (int, float)) and -127 <= noise <= 0 else None,
+                            "ssid": str(info.get("ssid") or "")[:64] or None, "bssid": _mac(info.get("bssid"))})
             for st in assoc.get("results") or []:
                 m = _mac(st.get("mac"))
                 if not m:

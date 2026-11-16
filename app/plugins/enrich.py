@@ -357,6 +357,42 @@ def record_usage(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str 
     return written
 
 
+def record_client_counters(conn: sqlite3.Connection, plugin_id: str, data: dict, now: str | None = None) -> int:
+    """Traffic per device and day from the byte counters a router keeps per client: the growth since the previous sync is added to today's figure.
+    A counter that went back (the device re-joined, the router restarted) starts again from its new value. The first sight of a device only stores the counter.
+    Only devices Netlens knows are counted; this runs only while the traffic statistics are switched on. Returns the number of devices that grew."""
+    from datetime import datetime, timedelta
+
+    now = now or utcnow()
+    day = now[:10]
+    by_mac, by_ip = device_lookup(conn)
+    grown = 0
+    seen: set[int] = set()
+    for client in data.get("clients", []):
+        rx, tx = client.get("rx_bytes"), client.get("tx_bytes")
+        device_id = by_mac.get(client["mac"]) or by_ip.get(client.get("ip") or "")
+        if rx is None and tx is None or device_id is None or device_id in seen:
+            continue
+        seen.add(device_id)
+        rx, tx = rx or 0, tx or 0
+        before = conn.execute("SELECT rx_bytes, tx_bytes FROM client_counters WHERE device_id = ? AND source = ?", (device_id, plugin_id)).fetchone()
+        conn.execute("INSERT INTO client_counters (device_id, source, rx_bytes, tx_bytes, ts) VALUES (?, ?, ?, ?, ?) "
+                     "ON CONFLICT(device_id, source) DO UPDATE SET rx_bytes = excluded.rx_bytes, tx_bytes = excluded.tx_bytes, ts = excluded.ts", (device_id, plugin_id, rx, tx, now))
+        if before is None:
+            continue
+        d_rx = rx - before["rx_bytes"] if rx >= before["rx_bytes"] else rx
+        d_tx = tx - before["tx_bytes"] if tx >= before["tx_bytes"] else tx
+        if d_rx or d_tx:
+            conn.execute("INSERT INTO client_usage (day, source, device_id, rx_bytes, tx_bytes, updated) VALUES (?, ?, ?, ?, ?, ?) "
+                         "ON CONFLICT(day, source, device_id) DO UPDATE SET rx_bytes = rx_bytes + excluded.rx_bytes, tx_bytes = tx_bytes + excluded.tx_bytes, updated = excluded.updated",
+                         (day, plugin_id, device_id, d_rx, d_tx, now))
+            grown += 1
+    cutoff = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ") - timedelta(days=USAGE_RETENTION_DAYS)).strftime("%Y-%m-%d")
+    conn.execute("DELETE FROM client_usage WHERE day < ? AND source = ?", (cutoff, plugin_id))
+    conn.commit()
+    return grown
+
+
 LICENCE_WARN_DAYS = 30
 
 

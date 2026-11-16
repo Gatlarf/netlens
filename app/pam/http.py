@@ -66,6 +66,19 @@ def _tls_message(exc: ssl.SSLError) -> str:
     return f"the TLS connection to the PAM system failed ({exc.reason or 'TLS error'})"
 
 
+RESET = (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)
+RESET_TEXT = "the PAM system closed the connection while the TLS connection was being set up: it probably wants a client certificate it trusts (check the certificate and key of the login)"
+
+
+def _unreachable(exc: BaseException, url: str) -> str:
+    """The sentence for a network error. A server that insists on a client certificate may answer a connection without a good one with a TLS alert or simply drop it;
+    which one depends on the TLS version and on timing, so a reset on an https address gets the same advice as the alert."""
+    cause = getattr(exc, "reason", exc)
+    if isinstance(cause, RESET) and url.lower().startswith("https://"):
+        return RESET_TEXT
+    return f"cannot reach the PAM system: {cause}"
+
+
 def call(method: str, url: str, *, headers: dict[str, str] | None = None, body: dict | None = None, ca_cert: str = "", client_cert: str = "", client_key: str = "", timeout: float = TIMEOUT_S) -> tuple[int, Any]:
     """(status, parsed JSON or None). Network problems become a PamError with a sentence; an HTTP error status is returned for the provider to explain."""
     data = json.dumps(body).encode() if body is not None else None
@@ -81,9 +94,9 @@ def call(method: str, url: str, *, headers: dict[str, str] | None = None, body: 
     except urllib.error.URLError as exc:
         if isinstance(exc.reason, ssl.SSLError):
             raise PamError(_tls_message(exc.reason)) from None
-        raise PamError(f"cannot reach the PAM system: {exc.reason}") from None
+        raise PamError(_unreachable(exc, url)) from None
     except (OSError, ValueError) as exc:
-        raise PamError(f"cannot reach the PAM system: {exc}") from None
+        raise PamError(_unreachable(exc, url)) from None
     if len(raw) > MAX_BYTES:
         raise PamError("the PAM system sent a larger answer than expected")
     try:
@@ -102,7 +115,7 @@ def form_call(method: str, url: str, *, fields: dict[str, str], headers: dict[st
     except urllib.error.HTTPError as exc:
         status, raw = exc.code, exc.read(MAX_BYTES + 1)
     except (urllib.error.URLError, OSError, ValueError) as exc:
-        raise PamError(f"cannot reach the PAM system: {getattr(exc, 'reason', exc)}") from None
+        raise PamError(_unreachable(exc, url)) from None
     try:
         return status, (json.loads(raw.decode() or "null") if raw else None)
     except ValueError:
@@ -146,9 +159,9 @@ class Session:
         except urllib.error.URLError as exc:
             if isinstance(exc.reason, ssl.SSLError):
                 raise PamError(_tls_message(exc.reason)) from None
-            raise PamError(f"cannot reach the PAM system: {exc.reason}") from None
+            raise PamError(_unreachable(exc, url)) from None
         except (OSError, ValueError) as exc:
-            raise PamError(f"cannot reach the PAM system: {exc}") from None
+            raise PamError(_unreachable(exc, url)) from None
         if len(raw) > MAX_BYTES:
             raise PamError("the PAM system sent a larger answer than expected")
         try:

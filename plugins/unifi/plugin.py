@@ -72,6 +72,7 @@ class Controller:
         if self.mode not in ("auto", "unifi_os", "classic"):
             raise ValueError("the type of controller must be auto, unifi_os or classic")
         self.site_filter = str(config.get("site") or "").strip().lower()
+        self.read_air = config.get("read_wifi_air", True) is not False
         self.session = netlens_http.Session(verify_tls=bool(config.get("verify_tls", True)), cookies=True)
         self.os = False
         self.csrf = None
@@ -179,6 +180,52 @@ class Controller:
                         items.extend(_cfg_unique(tag + k, v, used) for k, v in build(row))
         return items, failed
 
+    def _neighbours(self, site, nodes):
+        """The networks the access points hear (the controller's own radio scans, so nothing is interrupted): GET stat/rogueap, filed under the access point that heard them."""
+        try:
+            rows = self._get(f"/api/s/{urllib.parse.quote(site)}/stat/rogueap")
+        except UnifiError:
+            return                      # an extra: a controller or account that does not give it costs nothing else
+        by_mac = {n["mac"]: n for n in nodes if n.get("wifi")}
+        own = {n["mac"] for n in nodes}
+        seen = set()
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            ap, bssid = _mac(row.get("ap_mac")), _mac(row.get("bssid"))
+            node = by_mac.get(ap)
+            if node is None or not bssid or bssid in own or (ap, bssid) in seen or row.get("is_adopted") is True:
+                continue
+            seen.add((ap, bssid))
+            signal = _number(row.get("signal"))
+            signal = signal if signal is not None else _number(row.get("rssi"))
+            if signal is not None and signal > 0:
+                signal = signal - 95            # some controllers give the signal as a level above the noise floor (rssi), not in dBm
+            width = _int(row.get("bw"))
+            node["wifi"]["neighbours"].append({
+                "bssid": bssid, "ssid": str(row.get("essid") or row.get("ssid") or "")[:64] or None, "band": BANDS.get(row.get("radio")),
+                "channel": _int(row.get("channel")), "signal_dbm": int(signal) if signal is not None and -127 <= signal <= 0 else None,
+                "width_mhz": width if width and width >= 20 else None, "security": str(row.get("security") or "")[:40] or None})
+            node["wifi"]["scanned"] = True
+
+    def _wan_policy(self, site, gateway):
+        """How the gateway shares its connections: the WAN networks (`networkconf`, purpose wan) say failover or weighted load balancing, and each one's priority or weight."""
+        try:
+            rows = self._get(f"/api/s/{urllib.parse.quote(site)}/rest/networkconf")
+        except UnifiError:
+            return
+        wans = [r for r in rows if isinstance(r, dict) and r.get("purpose") == "wan"]
+        if len(wans) < 2:
+            return
+        kinds = {str(r.get("wan_load_balance_type") or "") for r in wans}
+        gateway["uplinks"]["mode"] = "balance" if "weighted" in kinds else "failover"
+        for conn in gateway["uplinks"]["connections"]:
+            group = {"wan1": "WAN", "wan2": "WAN2", "wan3": "WAN3"}.get(conn["interface"])
+            row = next((r for r in wans if str(r.get("wan_networkgroup") or "") == group), None)
+            if row is not None:
+                conn["priority"] = _int(row.get("wan_failover_priority"))
+                conn["weight"] = _int(row.get("wan_load_balance_weight"))
+
     def snapshot(self):
         nodes, clients, have_gateway, seen_nodes, seen_clients = [], [], False, set(), set()
         for site in self.sites():
@@ -199,6 +246,20 @@ class Controller:
                     "parent_mac": _mac(uplink.get("uplink_mac")) or _mac(device.get("uplink_mac")),
                     "metrics": _health(device), "firmware": _firmware(device), "ports": _ports(device),      # what the device says about itself: Netlens records it like a monitored device
                 })
+                if self.read_air and device.get("radio_table"):
+                    air = _radios(device)
+                    if air:
+                        nodes[-1]["wifi"] = {"radios": air, "neighbours": [], "scanned": False}
+                if role == "gateway":
+                    wans = _uplinks(device)
+                    if len(wans) > 1:               # one connection is not worth a card or a request
+                        nodes[-1]["uplinks"] = {"mode": None, "connections": wans}
+                        nodes[-1]["_site"] = site["name"]
+            if self.read_air:
+                self._neighbours(site["name"], nodes)
+            for node in nodes:
+                if node.pop("_site", None) == site["name"]:
+                    self._wan_policy(site["name"], node)
             for client in self._get(f"/api/s/{urllib.parse.quote(site['name'])}/stat/sta"):
                 mac = _mac(client.get("mac")) if isinstance(client, dict) else None
                 if mac and mac not in seen_clients:
@@ -249,6 +310,41 @@ def _firmware(device):
 def _int(value):
     value = _number(value)
     return int(value) if value is not None and value >= 0 else None
+
+
+def _radios(device):
+    """The radios of an access point: the channel and width in use, the clients on it and the share of the airtime that is busy (`radio_table` and `radio_table_stats`)."""
+    stats = {r.get("name"): r for r in device.get("radio_table_stats") or [] if isinstance(r, dict)}
+    out = []
+    for r in device.get("radio_table") or []:
+        if not isinstance(r, dict) or not r.get("name"):
+            continue
+        st = stats.get(r["name"], {})
+        channel = _int(st.get("channel")) or _int(r.get("channel"))        # the channel in use; the configured one may say "auto"
+        width = int(r["ht"]) if str(r.get("ht") or "").isdigit() else None
+        busy = _float(st.get("cu_total"))
+        out.append({"name": str(r["name"])[:40], "band": BANDS.get(r.get("radio")), "channel": channel, "width_mhz": width if width and width >= 20 else None,
+                    "clients": _int(st.get("num_sta")), "utilization_pct": busy if busy is not None and 0 <= busy <= 100 else None})
+    return out
+
+
+def _uplinks(device):
+    """The internet connections of a gateway (`wan1`..`wan3`): state, address, and which one carries the traffic (`is_uplink` when the controller says so, else the only one that is up)."""
+    out = []
+    for n, key in enumerate(("wan1", "wan2", "wan3"), 1):
+        wan = device.get(key)
+        if not isinstance(wan, dict) or (wan.get("up") is None and wan.get("ip") is None):
+            continue
+        latency = _float(wan.get("latency"))
+        out.append({"name": ("WAN" if n == 1 else f"WAN {n}"), "interface": key, "up": bool(wan.get("up")), "active": wan.get("is_uplink") if isinstance(wan.get("is_uplink"), bool) else None,
+                    "ip": wan.get("ip") if isinstance(wan.get("ip"), str) else None, "gateway": wan.get("gateway") if isinstance(wan.get("gateway"), str) else None,
+                    "latency_ms": latency if latency is not None and latency >= 0 else None})
+    if out and all(c["active"] is None for c in out):
+        up = [c for c in out if c["up"]]
+        if len(up) == 1:
+            for c in out:
+                c["active"] = c is up[0]
+    return out
 
 
 def _ports(device):
@@ -321,6 +417,18 @@ def _cfg_firewall(row):
     return [(f"firewall.{row.get('ruleset') or 'rules'}.{_cfg_name(row, row.get('rule_index'))}", rule)]
 
 
+def _counters(client, wired):
+    """The bytes the device has moved so far. UniFi counts from the access point's side, so what it calls received is what the device sent: download is its `tx_bytes`."""
+    up = _int(client.get("wired-rx_bytes" if wired else "rx_bytes"))
+    down = _int(client.get("wired-tx_bytes" if wired else "tx_bytes"))
+    out = {}
+    if down is not None:
+        out["rx_bytes"] = down
+    if up is not None:
+        out["tx_bytes"] = up
+    return out
+
+
 def to_topology(nodes, raw_clients):
     known = {n["mac"] for n in nodes}
     for n in nodes:
@@ -345,6 +453,7 @@ def to_topology(nodes, raw_clients):
             "rssi": int(signal) if signal is not None and -127 <= signal <= 0 else None,
             "tx_mbps": None if wired else _rate_mbps(client.get("tx_rate")),
             "rx_mbps": None if wired else _rate_mbps(client.get("rx_rate")),
+            **_counters(client, wired),
         })
     return {"nodes": nodes, "clients": out_clients}
 

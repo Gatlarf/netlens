@@ -651,6 +651,46 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_wifi_device_ts ON wifi_samples(device_id, ts)")
+    # the air around an access point (its radios, the neighbouring networks it hears), the internet connections of a gateway, and the byte counters of clients (a plugin reports them; see app/airspace.py, app/uplinks.py)
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS wifi_radios (
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            name TEXT NOT NULL, plugin_id TEXT NOT NULL, band TEXT, channel INTEGER, width_mhz INTEGER, clients INTEGER,
+            utilization_pct REAL, noise_dbm INTEGER, ssid TEXT, updated TEXT NOT NULL,
+            PRIMARY KEY (device_id, name)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS wifi_neighbours (
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            bssid TEXT NOT NULL, plugin_id TEXT NOT NULL, ssid TEXT, band TEXT, channel INTEGER, signal_dbm INTEGER, width_mhz INTEGER, security TEXT,
+            first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
+            PRIMARY KEY (device_id, bssid)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS node_uplinks (
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            name TEXT NOT NULL, plugin_id TEXT NOT NULL, mode TEXT, interface TEXT, up INTEGER, active INTEGER, ip TEXT, gateway TEXT,
+            weight INTEGER, priority INTEGER, latency_ms REAL, loss_pct REAL, updated TEXT NOT NULL,
+            PRIMARY KEY (device_id, name)
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS client_counters (
+            device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+            source TEXT NOT NULL, rx_bytes INTEGER NOT NULL, tx_bytes INTEGER NOT NULL, ts TEXT NOT NULL,
+            PRIMARY KEY (device_id, source)
+        )
+        """
+    )
     # ports of a switch as a topology plugin reports them (link state, speed, packet counters), the latest state and a history of counter samples
     cur.execute(
         """

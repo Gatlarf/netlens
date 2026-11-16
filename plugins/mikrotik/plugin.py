@@ -186,6 +186,33 @@ def _ports(interfaces, router):
     return ports
 
 
+def _uplinks(router, addresses):
+    """The internet connections of a router with several default routes: one per outgoing interface, with its priority (distance), whether the route is
+    usable and whether it carries traffic (`active`). Several active routes at the same distance share the load (ECMP); otherwise the lowest distance is in use and the others wait.
+    None when there is fewer than two."""
+    found = {}
+    for r in _optional(router, "ip/route"):
+        if r.get("dst-address") != "0.0.0.0/0" or _yes(r.get("disabled")):
+            continue
+        gw = str(r.get("immediate-gw") or r.get("gateway") or "")
+        name = str(r.get("vrf-interface") or (gw.split("%", 1)[1] if "%" in gw else "") or r.get("gateway") or "")[:40]
+        if not name:
+            continue
+        distance = _number(r.get("distance"))
+        row = found.setdefault(name, {"name": name, "interface": name, "up": False, "active": False, "gateway": _ipv4(str(r.get("gateway") or "").split("%", 1)[0]),
+                                      "priority": int(distance) if distance is not None and 0 <= distance <= 1000 else None})
+        row["up"] = row["up"] or not _yes(r.get("inactive"))
+        row["active"] = row["active"] or _yes(r.get("active"))
+    if len(found) < 2:
+        return None
+    for name, row in found.items():
+        a = next((a for a in addresses if a.get("interface") == name and _ipv4(str(a.get("address") or "").split("/", 1)[0])), None)
+        row["ip"] = _ipv4(str((a or {}).get("address") or "").split("/", 1)[0]) if a else None
+    rows = sorted(found.values(), key=lambda c: (c["priority"] is None, c["priority"] or 0, c["name"]))
+    active = [c for c in rows if c["active"]]
+    return {"mode": "balance" if len(active) > 1 else "failover", "connections": rows}
+
+
 def parse_routers(config):
     rows = config.get("servers")
     items = [r for r in rows if isinstance(r, dict) and any(str(r.get(k) or "").strip() for k in ("host", "username", "password"))] if isinstance(rows, list) else []
@@ -239,6 +266,10 @@ def read(router):
     node = {"mac": mac, "ip": ip, "name": str(identity.get("name") or router.id)[:100], "model": str(resource.get("board-name") or "")[:100] or None, "role": role}
     if router.extras:                       # the device's own health, firmware and ports (the extras: switched off in the plugin settings)
         node.update(metrics=_health(resource, router), firmware=_firmware(resource, router), ports=_ports(interfaces, router))
+    if role == "gateway" and router.extras:
+        uplinks = _uplinks(router, addresses)
+        if uplinks:
+            node["uplinks"] = uplinks
     if role != "gateway" and router.uplink:
         node["uplink_ip"] = router.uplink
 

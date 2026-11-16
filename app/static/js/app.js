@@ -8,7 +8,7 @@ import { initUpdateBadge } from "./update.js";
 import { initTopbar } from "./topbar.js";
 import { initMainNav, showRoute, setFeatures } from "./mainnav.js";
 import { autoMasonry } from "./masonry.js";
-import { maybeShowWhatsNew } from "./changelog.js";
+import { maybeShowWhatsNew, watchForUpdates } from "./changelog.js";
 import { renderSetup } from "./setup.js";
 import { applyInterface } from "./interface.js";
 import { get, post, ApiError } from "./api.js";
@@ -385,6 +385,7 @@ async function applySession() {
   if (session.authenticated && !whatsNewChecked && !session.demo) {
     whatsNewChecked = true;
     maybeShowWhatsNew();
+    watchForUpdates();
   }
   return session;
 }

@@ -3,6 +3,7 @@ import { h, clear, toast, setDomainSuffix } from "../util.js";
 
 const LAYOUT_LABELS = {
   tiers: "Tiers view (bands from the gateway down, no tangle of lines)",
+  orbit: "Orbit view (the gateway in the middle, switches and access points on a ring, devices circling them)",
   free: "Free layout (drag devices where you like)",
   horizontal: "Horizontal layout (left to right, like Omada)",
   vertical: "Vertical layout (top to bottom)",
