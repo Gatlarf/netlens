@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.449 — 2026-11-17
+
+### Added
+- **★ Graphs you can work with.** The graphs on a device's Health tab (and on service checks and the ports) now behave as one set. **Drag across any graph to zoom in** on that stretch: every graph on the card moves to the same period, a bar above them says what is shown and offers **Earlier / Later / Zoom out / Back / Show full period**, and choosing one of the period buttons ends the zoom. With the keyboard: focus a graph, **+** and **−** change the period, the arrow keys move it, **Esc** goes back. **Point at one graph and a cursor appears at the same moment in all the others**, and the number in each graph's corner follows it. The **⋯** menu on a graph has **Compare with…** (lay another measurement of this or any other device over it: the same unit shares the scale, a different unit, one at a time, gets its own scale on the right; up to three lines, each removable) and **Download as CSV**. The **Correlate…** button (and the same item in the menu) shows two measurements against each other as a scatter plot with the correlation (r, in words) and the line that fits, for the period you are looking at. The ports card works the same way. A zoom and the lines you laid over a graph stay when the page refreshes itself.
+- The MCP server has a new tool, `correlate_metrics`, and `get_metric` accepts `start` and `end` (epoch seconds) for a zoomed period; the API: `GET /api/timeseries/{entity}/{id}/{metric}?start=&end=` and `GET /api/timeseries/correlate?x=&y=`. A viewer may use both; a customer view (limited to some groups) may not correlate, because two devices could belong to different customers.
+
 ## 0.4.446 — 2026-11-16
 
 ### Added

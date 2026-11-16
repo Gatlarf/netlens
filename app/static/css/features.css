@@ -926,3 +926,40 @@ details.exposure-item > :not(summary), .config-change > :not(summary) { margin-l
 .orbit-svg.filtering .orbit-link { opacity: .12; }
 .orbit-readout { margin-top: 8px; min-height: 1.4em; font-size: 13px; color: var(--muted, #5f6877); }
 @media (prefers-reduced-motion: reduce) { .orbit-sparks { display: none; } }
+
+/* Interactive graphs: zoom bar, sharing a cursor, lines laid over a graph, the menu in the corner */
+.tg-zoombar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2, transparent); }
+.tg-zoombar[hidden] { display: none; }
+.tg-zoom-text { font-weight: 600; margin-right: auto; font-variant-numeric: tabular-nums; }
+.tg-zoombar .btn { padding: 3px 10px; font-size: 0.8rem; }
+.tg-svg.tg-interactive { cursor: crosshair; user-select: none; -webkit-user-select: none; }
+.tg-svg.tg-interactive:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+.tg-now.at-cursor { opacity: .85; }
+.tg-head { position: relative; }
+.tg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+.tg-chips[hidden] { display: none; }
+.tg-chip { display: inline-flex; align-items: center; gap: 6px; padding: 1px 4px 1px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 0.78rem; }
+.tg-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.tg-chip-x { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 5px; border-radius: 999px; }
+.tg-chip-x:hover, .tg-chip-x:focus-visible { background: var(--border); }
+.tg-tip-other { display: flex; align-items: center; gap: 6px; }
+.tg-menu { position: relative; margin-left: 6px; }
+.tg-menu > summary { list-style: none; cursor: pointer; padding: 0 7px; border-radius: var(--radius-sm); font-weight: 700; line-height: 1.3; opacity: .55; }
+.tg-menu > summary::-webkit-details-marker { display: none; }
+.tg-box:hover .tg-menu > summary, .tg-menu[open] > summary, .tg-menu > summary:focus-visible { opacity: 1; }
+.tg-menu > summary:hover { background: var(--border); }
+@media (hover: none) { .tg-menu > summary { opacity: 1; } }
+.tg-menu-list { position: absolute; right: 0; top: 100%; z-index: 20; min-width: 12rem; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); display: flex; flex-direction: column; }
+.tg-menu-item { text-align: left; border: 0; background: transparent; color: inherit; padding: 6px 10px; border-radius: var(--radius-sm); cursor: pointer; font: inherit; }
+.tg-menu-item:hover, .tg-menu-item:focus-visible { background: var(--border); }
+.gt-dialog { max-width: min(46rem, 94vw); width: 46rem; }
+.gt-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 12px; }
+.gt-picker { display: grid; gap: 6px; }
+.gt-picker .gt-device, .gt-picker .gt-metric { width: 100%; max-width: none; }
+.gt-note:empty { display: none; }
+.gt-verdict { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 10px 0 4px; }
+.gt-r { font-weight: 700; font-variant-numeric: tabular-nums; padding: 1px 10px; border-radius: 999px; border: 1px solid var(--border); }
+.gt-r.strong { color: var(--ok); border-color: currentColor; }
+.gt-r.mid { color: var(--warn); border-color: currentColor; }
+.gt-scatter { width: 100%; height: auto; max-height: 56vh; color: var(--text); }
+.tg-head-end { display: flex; align-items: baseline; gap: 4px; }

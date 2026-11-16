@@ -1,6 +1,6 @@
 import { get } from "../api.js";
 import { h } from "../util.js";
-import { formatValue, metricGraph, graphRangeTabs, savedGraphRange } from "../timegraph.js";
+import { formatValue, metricGraph, graphRangeTabs, savedGraphRange, GraphGroup } from "../timegraph.js";
 
 const OPEN_PORTS = new Map();      // device id -> labels of the ports whose graphs are shown
 
@@ -37,7 +37,7 @@ export async function buildDevicePortsCard(device) {
   }
   const rows = [...ports.values()].sort((a, b) => natural(a.label, b.label));
   const body = h("tbody", {});
-  let range = savedGraphRange();
+  const group = GraphGroup.shared(`ports:${device.id}`);          // every open port graph shares the period, the zoom and the cursor (kept when the page redraws)
   if (!OPEN_PORTS.has(device.id)) OPEN_PORTS.set(device.id, new Set());
   const open = OPEN_PORTS.get(device.id);      // the ports whose graphs are open stay open when the page refreshes itself
   const details = new Map();
@@ -51,7 +51,7 @@ export async function buildDevicePortsCard(device) {
   function graphsFor(p) {
     const cell = h("td", { colspan: "6" });
     const wrap = h("div", { class: "tg-grid-list" });
-    const add = (metric, title, unit, extra = {}) => { if (p[`${metric}_seen`]) wrap.appendChild(metricGraph({ entity: "device", id: device.id, metric, label: p.label, title: `${title} · ${p.label}`, unit, range, ...extra })); };
+    const add = (metric, title, unit, extra = {}) => { if (p[`${metric}_seen`]) wrap.appendChild(metricGraph({ entity: "device", id: device.id, metric, label: p.label, title: `${title} · ${p.label}`, unit, range: group.range, group, ...extra })); };
     add("net_rx_bps", "Received", "bps");
     add("net_tx_bps", "Sent", "bps");
     add("net_rx_pps", "Received packets", "pps");          // switches that only count packets (TP-Link Easy Smart)
@@ -99,7 +99,8 @@ export async function buildDevicePortsCard(device) {
   const down = rows.filter((p) => p.if_up != null && p.if_up < 0.5).length;
   const upCount = rows.filter((p) => p.if_up != null && p.if_up >= 0.5).length;
   return h("div", { class: "card ports-card" },
-    h("div", { class: "upc-head" }, h("h2", {}, "Ports"), graphRangeTabs(range, (key) => { range = key; draw(); })),
+    h("div", { class: "upc-head" }, h("h2", {}, "Ports"), graphRangeTabs(group.range, () => {}, group)),
+    group.bar(),
     h("p", { class: "hint" }, `${upCount} up, ${down} without a link. Click a port for its graphs.`),
     h("div", { class: "rep-scroll" }, h("table", { class: "rep-table ports-table" },
       h("thead", {}, h("tr", {}, ...["Port", "Link", "In", "Out", "Busy", "Errors"].map((t) => h("th", {}, t)))), body)));

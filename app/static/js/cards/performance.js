@@ -1,42 +1,9 @@
 import { get } from "../api.js";
 import { h } from "../util.js";
-import { metricGraph, graphRangeTabs, savedGraphRange } from "../timegraph.js";
+import { metricGraph, graphRangeTabs, savedGraphRange, GraphGroup, GRAPH_RANGES } from "../timegraph.js";
+import { describeSeries } from "../seriesinfo.js";
 
-// How a measurement is shown: title, unit, fixed scale and limits. Anything not listed gets a plain graph.
-const KNOWN = {
-  rtt_ms: { title: "Response time", unit: "ms", order: 0 },
-  response_ms: { title: "Response time", unit: "ms", order: 0 },
-  up: { title: "Availability", unit: "state", order: 1 },
-  cpu_pct: { title: "Processor", unit: "%", fixedMax: 100, warn: 85, crit: 95, order: 2 },
-  load1: { title: "Load (1 minute)", unit: "", order: 3 },
-  mem_pct: { title: "Memory in use", unit: "%", fixedMax: 100, warn: 85, crit: 95, order: 4 },
-  swap_pct: { title: "Swap in use", unit: "%", fixedMax: 100, order: 5 },
-  disk_pct: { title: "Disk used", unit: "%", fixedMax: 100, warn: 85, crit: 95, order: 6 },
-  disk_free_b: { title: "Disk free", unit: "B", order: 6.5 },
-  supply_pct: { title: "Supply left", unit: "%", fixedMax: 100, order: 11 },
-  battery_pct: { title: "UPS battery", unit: "%", fixedMax: 100, order: 12 },
-  battery_minutes: { title: "UPS runtime", unit: "min", order: 12.5 },
-  on_battery: { title: "UPS on battery", unit: "state", order: 13 },
-  net_rx_bps: { title: "Received", unit: "bps", order: 7 },
-  net_tx_bps: { title: "Sent", unit: "bps", order: 8 },
-  net_rx_pps: { title: "Received packets", unit: "pps", order: 7.1 },
-  net_tx_pps: { title: "Sent packets", unit: "pps", order: 8.1 },
-  if_util_pct: { title: "Port busy", unit: "%", fixedMax: 100, warn: 85, crit: 95, order: 8.5 },
-  if_err_ps: { title: "Port errors", unit: "/s", warn: 1, crit: 10, order: 8.6 },
-  if_up: { title: "Link", unit: "state", order: 8.7 },
-  temp_c: { title: "Temperature", unit: "°C", order: 9 },
-  ups_load_pct: { title: "UPS load", unit: "%", fixedMax: 100, warn: 80, crit: 95, order: 9.05 },
-  fan_rpm: { title: "Fan speed", unit: "rpm", order: 9.1 },
-  voltage_v: { title: "Voltage", unit: "V", order: 9.2 },
-  sensor_fault: { title: "Fan or power supply", unit: "state", order: 9.3 },
-  uptime_s: { title: "Time since start", unit: "s", order: 10 },
-  cert_days: { title: "Certificate days left", unit: "days", order: 14 },
-};
-
-export function describeSeries(s) {
-  const known = KNOWN[s.metric] || { title: s.metric.replace(/_/g, " "), unit: s.unit || "", order: 50 };
-  return { ...known, title: s.label ? `${known.title} · ${s.label}` : known.title };
-}
+export { describeSeries };
 
 // The measurements of one entity (device or service check) with a shared period switch. `only` limits which
 // metrics are shown; `minimum` is how many series there must be before the card appears at all.
@@ -57,7 +24,7 @@ export async function buildPerformanceCard(entity, id, { title = "Performance", 
   } catch (err) {
     limits = {};
   }
-  let range = savedGraphRange();
+  const group = GraphGroup.shared(`perf:${entity}:${id}`);          // the graphs of this card share their period, zoom and cursor (kept when the page redraws)
   const graphs = h("div", { class: "tg-grid-list" });
   let showLimits = false;
   try { showLimits = localStorage.getItem("nl.graph.limits") === "1"; } catch (e) { /* off */ }
@@ -66,7 +33,7 @@ export async function buildPerformanceCard(entity, id, { title = "Performance", 
     const rule = limits[s.metric];            // the limits the user set decide where the dashed lines are
     const warn = rule ? (rule.enabled ? rule.warn : null) : d.warn ?? null;
     const crit = rule ? (rule.enabled ? rule.crit : null) : d.crit ?? null;
-    return metricGraph({ entity, id, metric: s.metric, label: s.label, title: d.title, unit: d.unit, warn, crit, fixedMax: d.fixedMax ?? null, range, showLimits });
+    return metricGraph({ entity, id, metric: s.metric, label: s.label, title: d.title, unit: d.unit, warn, crit, fixedMax: d.fixedMax ?? null, range: group.range, showLimits, group });
   });
   graphs.append(...make());
   const anyLimits = series.some((s) => { const r = limits[s.metric]; const d = describeSeries(s); return r ? r.enabled : d.warn != null || d.crit != null; });
@@ -77,8 +44,17 @@ export async function buildPerformanceCard(entity, id, { title = "Performance", 
     try { localStorage.setItem("nl.graph.limits", showLimits ? "1" : "0"); } catch (e) { /* only this page remembers it */ }
     for (const g of graphs.children) g.setLimits(showLimits);
   });
+  // "Correlate…" starts from the first graph; the same is in the menu of every graph
+  const correlate = series.length >= 2 ? h("button", { type: "button", class: "btn", title: "Do two measurements move together?", onclick: async () => {
+    const first = series[0];
+    const { openCorrelate } = await import("../graphtools.js");
+    const d = describeSeries(first);
+    openCorrelate({ x: { entity, id, metric: first.metric, label: first.label, title: d.title }, query: group.query(),
+      windowText: group.window ? "the zoomed period" : (GRAPH_RANGES.find(([k]) => k === group.range) || [, group.range])[1] });
+  } }, "Correlate…") : null;
   const card = h("div", { class: "card tg-card" },
-    h("div", { class: "upc-head" }, h("h2", {}, title), anyLimits ? h("label", { class: "check" }, limitBox, " Show limits") : null, graphRangeTabs(range, (key) => { range = key; for (const g of graphs.children) g.reload(key); })),
+    h("div", { class: "upc-head" }, h("h2", {}, title), anyLimits ? h("label", { class: "check" }, limitBox, " Show limits") : null, correlate, graphRangeTabs(group.range, () => {}, group)),
+    group.bar(),
     hint ? h("p", { class: "hint" }, hint) : null,
     graphs);
   return card;

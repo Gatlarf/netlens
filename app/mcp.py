@@ -155,7 +155,11 @@ tool("list_metrics", "devices", "The measured series that exist for an entity (f
      {"entity": s("What it belongs to", ["device", "service", "probe", "remote", "remote_service", "plugin"]), "entity_id": i("Its id")}, ("entity", "entity_id"))
 tool("get_metric", "devices", "Points of one measured series over a range (graph data).", "GET", "/api/timeseries/{entity}/{entity_id}/{metric}",
      {"entity": s("What it belongs to", ["device", "service", "probe", "remote", "remote_service", "plugin"]), "entity_id": i("Its id"), "metric": s("Series name, from list_metrics"),
-      "label": s("Label of the series when it has several"), "range": s("For example 1h, 24h, 7d"), "points": i("Maximum points")}, ("entity", "entity_id", "metric"), ("label", "range", "points"))
+      "label": s("Label of the series when it has several"), "range": s("For example 1h, 24h, 7d"), "points": i("Maximum points"),
+      "start": i("Start of a period, epoch seconds (with end; instead of range)"), "end": i("End of the period, epoch seconds")}, ("entity", "entity_id", "metric"), ("label", "range", "points", "start", "end"))
+tool("correlate_metrics", "devices", "Whether two measurements move together over a period: the paired readings, the correlation r (-1 to 1) and the line that fits. Each is entity:id:metric, with an optional :label.",
+     "GET", "/api/timeseries/correlate", {"x": s("First series, for example device:12:cpu_pct"), "y": s("Second series, for example device:5:rtt_ms"), "range": s("For example 24h, 7d"),
+                                          "start": i("Start of a period, epoch seconds (with end; instead of range)"), "end": i("End of the period, epoch seconds")}, ("x", "y"), ("range", "start", "end"))
 tool("get_hierarchy", "devices", "The network hierarchy: which device sits behind which.", "GET", "/api/hierarchy", {"guests": b("Include virtual machines and containers")}, query=("guests",))
 tool("list_groups", "devices", "Device groups (rooms, floors, owners).", "GET", "/api/groups")
 tool("list_vulnerabilities", "devices", "Vulnerabilities found by the scanner plugins.", "GET", "/api/vulns",
