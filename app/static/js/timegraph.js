@@ -377,6 +377,7 @@ function summary(points, unit) {
 // The graphs of a card are one group: the range buttons, dragging across any graph, the zoom bar and the keys act on all of them at once,
 // and pointing at one graph puts a cursor at the same time in the others.
 const GroupMemory = new Map();
+const ZOOM_KEPT_MS = 15 * 60 * 1000;
 export class GraphGroup {
   constructor(range = savedGraphRange()) {
     this.range = range;
@@ -389,8 +390,11 @@ export class GraphGroup {
 
   // The page redraws its cards now and then; the group of a card is kept under a name so that a zoom, and the period, survive that.
   static shared(name) {
-    if (!GroupMemory.has(name)) GroupMemory.set(name, new GraphGroup());
-    return GroupMemory.get(name);
+    let group = GroupMemory.get(name);
+    if (!group) GroupMemory.set(name, group = new GraphGroup());
+    else if (group.window && Date.now() - group.touched > ZOOM_KEPT_MS) { group.window = null; group.trail = []; }      // a zoom is not kept for ever: an hour-old stretch is not what you come back for
+    group.touched = Date.now();
+    return group;
   }
 
   now() { return Math.floor(Date.now() / 1000); }
@@ -409,6 +413,7 @@ export class GraphGroup {
   add(graph) { this.graphs.add(graph); }
 
   changed() {
+    this.touched = Date.now();
     for (const g of [...this.graphs]) { if (g.isConnected) g.reload(); else this.graphs.delete(g); }
     for (const b of [...this.bars]) { if (b.isConnected) b.refresh(); else this.bars.delete(b); }
     for (const t of [...this.tabs]) { if (t.isConnected) t.refresh(); else this.tabs.delete(t); }

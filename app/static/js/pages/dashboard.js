@@ -605,8 +605,14 @@ export async function render(container) {
           location.reload();
           return;
         }
+        const before = { order, custom, sizes };
         order = next.order; custom = next.custom; sizes = { ...next.sizes };
-        await saveLayout(next, false);
+        try {
+          await saveLayout(next, false);
+        } catch (e) {
+          ({ order, custom, sizes } = before);                       // the server refused it: the dashboard stays as it was
+          throw e;
+        }
         own = true;
         close();
         draw();

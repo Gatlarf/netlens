@@ -73,6 +73,8 @@ const SETTINGS = [
   ["Quiet hours", "channels", "night silence do not disturb notifications schedule", "Quiet hours"],
   ["Group alerts by cause", "channels", "root cause noise bundle", "Group alerts by cause"],
   ["Tell me when", "channels", "events which alerts notifications kinds", "Add channel"],
+  ["Alert rules", "alertrules", "mute ignore silence suppress noise flapping repeats dependency rule not told quiet", ""],
+  ["Customer reports", "reporttemplates", "customer report pdf logo branded schedule e-mail weekly monthly template", ""],
   ["Maintenance windows", "maintenance", "planned downtime reboot silence hold back schedule recurring", ""],
   ["Backup and restore", "backup", "export import restore copy database", ""],
   ["Database maintenance", "database", "database vacuum compact purge retention index reindex optimize integrity cleanup old data events size", ""],

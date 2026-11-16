@@ -97,6 +97,37 @@ def r_notifications(r: dict) -> str:
     return text
 
 
+def t_muted(conn, args, now=None) -> dict:
+    """Events that were recorded but not sent, and the alert rules behind them: the answer to "why was I not told?"."""
+    from datetime import timedelta
+
+    from app import alertrules
+
+    now = now or datetime.now(timezone.utc)
+    days = _days(args.get("days"), 1)
+    since = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    needle = str(args.get("device") or "").strip().lower()
+    rows = conn.execute("SELECT e.ts, e.kind, e.detail, e.maintenance, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name FROM events e LEFT JOIN devices d ON d.id = e.device_id "
+                        "WHERE e.ts >= ? AND e.maintenance IS NOT NULL ORDER BY e.id DESC LIMIT 400", (since,)).fetchall()
+    if needle:
+        rows = [r for r in rows if needle in (r["name"] or "").lower() or needle in (r["detail"] or "").lower()]
+    held: dict[str, int] = {}
+    for r in rows:
+        held[r["maintenance"]] = held.get(r["maintenance"], 0) + 1
+    return {"days": days, "held_back": len(rows), "by_reason": [{"reason": k, "events": v} for k, v in sorted(held.items(), key=lambda kv: -kv[1])][:8],
+            "examples": [{"when": r["ts"], "device": r["name"], "kind": r["kind"], "reason": r["maintenance"]} for r in rows[:6]],
+            "rules": [{"name": r["name"], "type": r["type"], "on": r["enabled"], "muted_7d": alertrules.muted_counts(conn).get(r["name"], 0)} for r in alertrules.load(conn)]}
+
+
+def r_muted(r: dict) -> str:
+    if not r["held_back"]:
+        return f"Nothing was held back in the last {r['days']} day(s): every event that was recorded was also sent." + (f" There are {len(r['rules'])} alert rule(s) (Settings → Notifications → Alert rules)." if r["rules"] else "")
+    text = f"{r['held_back']} event(s) were recorded but not sent in the last {r['days']} day(s): " + "; ".join(f"{x['events']} by {x['reason']}" for x in r["by_reason"]) + "."
+    if r["examples"]:
+        text += " For example: " + "; ".join(f"{e['device'] or 'something'} ({e['kind'].replace('_', ' ')})" for e in r["examples"][:3]) + "."
+    return text + " They are listed in Scans & events under “Only held back”."
+
+
 def t_oncall(conn, args, now=None) -> dict:
     from app import oncall
 
@@ -374,6 +405,7 @@ TOOLS = {
     "interface_errors": (t_interface_errors, "ERRORS AND DROPPED PACKETS on network interfaces of ALL hosts at once (host probes, switch ports, SNMP). Use for 'which systems have errors or drops on eth0', 'any bad cable or port', 'packet loss on the network cards'. args: interface (optional, such as eth0), device (optional name)"),
     "vulnerabilities": (t_vulnerabilities, "security weaknesses found by the vulnerability scanners (Greenbone, Tenable ...): counts by severity, known-exploited ones, the worst devices and the critical findings. args: none"),
     "traffic": (t_traffic, "network traffic: bandwidth in and out now and the peak, of the internet line and of the monitored devices together. args: range (1h, 6h, 24h or 7d)"),
+    "muted": (t_muted, "events that were RECORDED BUT NOT SENT (muted by an alert rule, a maintenance window or a snooze) and the alert rules: the answer to 'why was I not told about X'. args: device (optional name), days (1-30)"),
     "notifications": (t_notifications, "who is told about what: the alert channels (e-mail, Telegram ...) and the kinds of event that nobody would hear about. args: none"),
     "coverage": (t_coverage, "which hosts are monitored and how: which can be reached over SSH or WinRM but have no health monitor, which monitors cannot log in, where the read-only probes are on and where their script is old. args: none"),
     "oncall": (t_oncall, "who is on call now and the coming shifts. args: none"),
@@ -383,7 +415,7 @@ TOOLS = {
     "host_activity": (t_host_activity, "WHAT IS GOING ON on one host according to the read-only host probes: what uses the processor, memory and network, which applications or containers are failing or restarting, what changed or was scheduled lately, hardware and security state, chained into a probable cause. Use for 'why is X slow', 'what is using the CPU/memory/network on X', 'why did X restart'. args: device (name), symptom (optional words such as slow, memory, network, restart)"),
     "investigate": (t_investigate, "ROOT CAUSE of the latest incident (or of one device's): what started it, which device moved first, what was running at the time, what else broke, whether anybody was told. args: device (optional name), days (1-30)"),
 }
-RENDERERS = {"interface_errors": r_interface_errors, "analysis": r_analysis, "host_activity": r_host_activity, "storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "notifications": r_notifications, "oncall": r_oncall, "coverage": r_coverage, "system_log": r_system_log, "investigate": r_investigate}
+RENDERERS = {"interface_errors": r_interface_errors, "analysis": r_analysis, "host_activity": r_host_activity, "storage_use": r_storage_use, "vulnerabilities": r_vulnerabilities, "traffic": r_traffic, "muted": r_muted, "notifications": r_notifications, "oncall": r_oncall, "coverage": r_coverage, "system_log": r_system_log, "investigate": r_investigate}
 PRESETS = [
     {"id": "nicerrors", "text": "Which systems have errors or dropped packets on their network interface?", "tool": "interface_errors", "args": {}},
     {"id": "coverage", "text": "Which hosts are not monitored yet?", "tool": "coverage", "args": {}},
@@ -402,6 +434,7 @@ RULES = [
     ("storage_use", r"what (is|are|was|has been) (using|taking|eating|filling|consuming|hogging)\b.{0,30}(space|disk|storage)|where (did|does|is) (the |my )?(disk|space|storage).{0,20}(go|going|gone)|what filled|(biggest|largest) (files?|folders?|directories|dirs?)|disk space (is )?(used|taken|used up) by|what.{0,12}(uses|using) (the )?(disk|space)"),
     ("investigate", r"root cause|investigat|what caused|cause of|post-?mortem|what went wrong|why did .{0,40}(stop|fail|crash|go down|go offline|jump|spike|slow)|why was .{0,40}(slow|full|overloaded|busy)"),
     ("vulnerabilities", r"vulnerab|\bcves?\b|exploit|greenbone|openvas|nessus|unpatched|security (hole|weakness)"),
+    ("muted", r"\bmuted\b|alert rules?|why (didn.?t|did not|wasn.?t|was not) i (get|receive|hear|told|alerted|warned|notified)|(didn.?t|did not) (get|receive) (an? )?(alert|notification|e-?mail|message|warning)|held back|suppressed alerts?"),
     ("notifications", r"notification|alert channel|who (is|gets|would get) (told|alerted|notified)|would i (get|be) (a |told|alerted|warned|notified)|was i (told|warned|alerted|notified)|e-?mail alerts?|quiet hours|nobody (is |was )?told"),
     ("oncall", r"on[- ]?call"),
     ("coverage", r"(which|what) (hosts?|servers?|devices?|machines?).{0,30}(not |un)?monitored|monitoring coverage|(not|isn'?t|aren'?t|un)monitored|without monitoring|(is|are) .{0,30}(being )?monitored|probes? (installed|on|enabled)|where (are|is) the probes?"),

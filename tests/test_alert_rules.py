@@ -211,3 +211,20 @@ def test_the_api(tmp_path):
         assert c.get("/api/events?held=true").status_code == 200 and c.get("/api/events?held=false").status_code == 200
         assert c.delete(f"/api/alert-rules/{rid}").status_code == 204 and c.delete(f"/api/alert-rules/{rid}").status_code == 404
     tsdb.forget_all()
+
+
+def test_ask_can_say_why_nobody_was_told(conn):
+    from app import ask_extra
+
+    rule(conn, name="Garden", scope={"type": "group", "ids": [1]})
+    add_event(conn, "device_offline", "Garden AP offline", device_id=1, now=stamp())
+    add_event(conn, "device_offline", "NAS offline", device_id=3, now=stamp())
+    out = ask_extra.t_muted(conn, {"days": 3}, NOW + timedelta(hours=1))
+    assert out["held_back"] == 1 and out["by_reason"] == [{"reason": "Rule: Garden", "events": 1}] and out["rules"][0]["name"] == "Garden"
+    text = ask_extra.r_muted(out)
+    assert "1 event(s) were recorded but not sent" in text and "Rule: Garden" in text and "Garden AP" in text
+    assert ask_extra.t_muted(conn, {"device": "NAS", "days": 3}, NOW + timedelta(hours=1))["held_back"] == 0
+    import re
+
+    routed = {t for t, rx in ask_extra.RULES if re.search(rx, "why didn't I get an alert for the garden camera", re.I)}
+    assert "muted" in routed and "muted" in ask_extra.TOOLS and "muted" in ask_extra.RENDERERS

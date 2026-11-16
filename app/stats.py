@@ -22,7 +22,7 @@ from typing import Any
 
 from app import checkstats, containers, guestbackups, inventory, linkgroups, networks, remediation, sites, speedtest, storage
 from app import licence as _licence, vulns as _vulns
-from app.db import get_setting, utcnow
+from app.db import Error as db_Error, get_setting, utcnow
 from app.hierarchy import children_map, load_hierarchy
 from app.version import VERSION
 
@@ -758,7 +758,7 @@ def summary(conn: sqlite3.Connection, now: str | None = None, scan_running: bool
     try:                                                              # the score of the day is kept, for the trend and the reports
         healthscore.remember(conn, now, score_block)
         score_block["trend"] = healthscore.trend(conn, now, score_block["score"])
-    except sqlite3.Error:
+    except db_Error:
         score_block["trend"] = None
     return {
         "api": SUMMARY_API,
