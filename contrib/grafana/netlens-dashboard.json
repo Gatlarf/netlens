@@ -3408,7 +3408,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_passive_running"
+     "expr": "netlens_passive_running or vector(0)"
     }
    ],
    "fieldConfig": {

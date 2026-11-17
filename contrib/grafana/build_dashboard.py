@@ -172,7 +172,7 @@ def build():
     p += [stat("Database", "netlens_database_size_bytes", 0, y, 4, 4, unit="bytes", thresholds=steps((None, PURPLE))),
           stat("Failed scans, 24 h", "netlens_scans_failed_24h", 4, y, 4, 4, thresholds=steps((None, GREEN), (1, RED))),
           stat("Flapping devices", "netlens_devices_flapping", 8, y, 4, 4, thresholds=steps((None, GREEN), (1, AMBER))),
-          stat("Passive listening", "netlens_passive_running", 12, y, 4, 4, mappings=YES_NO("Listening", "Off"), thresholds=steps((None, GREY), (1, GREEN)), graph="none"),
+          stat("Passive listening", "netlens_passive_running or vector(0)", 12, y, 4, 4, mappings=YES_NO("Listening", "Off"), thresholds=steps((None, GREY), (1, GREEN)), graph="none"),
           stat("Plugin updates", "netlens_plugin_updates_available", 16, y, 4, 4, thresholds=steps((None, GREEN), (1, AMBER)), graph="none"),
           stat("Version", "netlens_info", 20, y, 4, 4, thresholds=steps((None, BLUE)), graph="none", legend="{{version}}", color_mode="none", reduce="lastNotNull")]
     y += 4

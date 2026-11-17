@@ -25,3 +25,14 @@ Interface and sensor panels need a health monitor (SNMP or SSH) on the device; t
 ## Changing the dashboard
 
 The file is generated: edit `build_dashboard.py`, run `python contrib/grafana/build_dashboard.py`, commit both.
+
+## Demo history (for screenshots)
+
+A fresh Prometheus has no history. For a **demo** Netlens (never a real one), `backfill_demo.py` writes weeks of believable history in the shape of today's numbers:
+
+```sh
+python backfill_demo.py http://demo-netlens:8080 TOKEN 45 > history.om
+docker run --rm --user root -v history.om:/in.om:ro -v stack_prometheus-data:/data --entrypoint sh prom/prometheus:v2.55.1 \
+  -c "promtool tsdb create-blocks-from openmetrics /in.om /data && chown -R 65534:65534 /data"
+docker compose up -d      # start Prometheus after loading, so it picks the blocks up
+```
