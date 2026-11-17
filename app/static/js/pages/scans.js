@@ -1,6 +1,7 @@
 import { get } from "../api.js";
 import { h, clear, fmtTime, timeAgo, isAdmin, patch, latest } from "../util.js";
-import { makeResizable } from "../colresize.js";
+import { createTableViews } from "../tableview.js";
+import { CATALOG, BUILTIN_VIEWS, statusClass } from "../tables/scans.js";
 import { pageHead } from "../ui.js";
 import { EVENT_LABELS as KIND_LABELS, eventLabel } from "../event_labels.js";
 
@@ -48,29 +49,6 @@ const KIND_ORDER = [
   "login_failed",
   "cert_expiring"
 ];
-
-function statusClass(status) {
-  if (status === "done") return "ok";
-  if (status === "failed") return "bad";
-  if (status === "running" || status === "cancelled") return "warn";
-  return "";
-}
-
-function duration(started, finished) {
-  if (!started || !finished) return "—";
-  const start = new Date(started);
-  const end = new Date(finished);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "—";
-  const ms = end.getTime() - start.getTime();
-  if (ms < 0) return "—";
-  const totalSec = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSec / 60);
-  const seconds = totalSec % 60;
-  if (minutes > 0) {
-    return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
-  }
-  return `${seconds}s`;
-}
 
 export async function render(container, params) {
   clear(container);
@@ -169,6 +147,11 @@ export async function render(container, params) {
   let listenerAttached = false;
 
   let scansSig = "";
+  let scanRows = [];
+  const scansTv = await createTableViews({ table: "scans", catalog: CATALOG, builtins: BUILTIN_VIEWS, locked: ["started"], onChange: () => drawScans() });
+  scansTv.useRows(() => scanRows);
+  scansCard.insertBefore(h("div", { class: "filter-row" }, scansTv.controls), scansBody);
+  function drawScans() { scansTv.tbody.replaceChildren(...scansTv.lines(scanRows)); }
   async function loadScans() {
     const current = freshScans();
     try {
@@ -199,39 +182,9 @@ export async function render(container, params) {
             h("li", {}, "Do not use ", h("code", {}, "no-new-privileges"), ". A running container does not pick up new capabilities: re-create it (stack: Update the stack).")),
           h("p", {}, h("a", { href: "https://www.codeshrimp.com/docs/netlens/install/where-do-net-raw-and-net-admin-go/", target: "_blank", rel: "noopener" }, "Step-by-step instructions for Portainer, Synology and compose"))));
       }
-      const table = h("table", { class: "data" });
-      const thead = h("thead");
-      const headRow = h("tr");
-      headRow.appendChild(h("th", {}, "Started"));
-      headRow.appendChild(h("th", {}, "Kind"));
-      headRow.appendChild(h("th", {}, "Status"));
-      headRow.appendChild(h("th", {}, "Hosts found"));
-      headRow.appendChild(h("th", {}, "Duration"));
-      headRow.appendChild(h("th", {}, "Error"));
-      thead.appendChild(headRow);
-      table.appendChild(thead);
-
-      const tbody = h("tbody");
-      for (const scan of scans) {
-        const row = h("tr");
-        row.appendChild(h("td", {}, fmtTime(scan.started)));
-        row.appendChild(h("td", {}, scan.target ? `${scan.kind} ${scan.target}` : scan.kind));
-
-        const statusCell = h("td", { class: statusClass(scan.status) }, scan.status);
-        row.appendChild(statusCell);
-
-        row.appendChild(h("td", {}, String(scan.hosts_found ?? 0)));
-        row.appendChild(h("td", {}, duration(scan.started, scan.finished)));
-
-        const errCell = h("td", { class: "muted col-text" }, scan.error || "");          // all of it: it wraps in the space the column has (drag a heading edge to give it more)
-        if (scan.error) errCell.title = scan.error;
-        row.appendChild(errCell);
-
-        tbody.appendChild(row);
-      }
-      table.appendChild(tbody);
-      makeResizable(table, "scans");
-      scansBody.appendChild(h("div", { class: "table-wrap" }, table));
+      scanRows = scans;
+      scansBody.appendChild(h("div", { class: "table-wrap" }, scansTv.table));
+      drawScans();
     } catch (err) {
       clear(scansBody);
       scansBody.appendChild(h("div", { class: "empty" }, "Failed to load scans."));

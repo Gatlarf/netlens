@@ -90,6 +90,37 @@ def _reason(part: str | None, online: bool, parts: dict, extra: dict) -> str:
     return "is below its best"
 
 
+def _entry(d: dict, group: str, tier: str, week: dict, day: dict, flaps: dict, readings: dict[int, dict]) -> dict | None:
+    """The score of one device (None while nothing is known about it). `group` is where the device counts: "gear", "hosts", "cameras", or "other" for a device that is not in the network score."""
+    w_ups, w_n = (week.get(d["id"]) or (0, 0))[:2]
+    d_ups, d_n, rtt_sum, rtt_n = (day.get(d["id"]) or (0, 0, 0, 0))[:4]
+    parts: dict[str, float | None] = {"uptime": None, "loss": None, "latency": None, "temperature": None}
+    extra: dict[str, Any] = {"flaps": flaps.get(d["id"], 0)}
+    if w_n >= MIN_CHECKS:
+        extra["uptime"] = 100 * w_ups / w_n
+        parts["uptime"] = _clip(extra["uptime"] - FLAP_POINTS * max(0, extra["flaps"] - 2))
+    if d_n >= MIN_CHECKS:
+        extra["day"] = 100 * d_ups / d_n
+        parts["loss"] = extra["day"]
+    if rtt_n and rtt_n >= MIN_CHECKS:
+        extra["ms"] = rtt_sum / rtt_n
+        parts["latency"] = latency_score(extra["ms"])
+    if group != "cameras":
+        temp = (readings.get(d["id"]) or {}).get("temp")
+        if temp is not None:
+            extra["temp"] = temp
+            parts["temperature"] = temperature_score(temp)
+    else:
+        parts["latency"] = None                                                 # a camera is judged on being there, not on how fast it answers
+    score, worst = device_score(parts, bool(d["online"]))
+    if score is None and not d["online"]:
+        score, worst = float(OFFLINE_CAP), "uptime"
+    if score is None:
+        return None
+    return {"id": d["id"], "name": d["name"], "group": group, "tier": tier, "score": score, "parts": parts, "weight": WEIGHT.get(group, 1.0) * TIER[tier],
+            "reason": _reason(worst, bool(d["online"]), parts, extra), "online": bool(d["online"])}
+
+
 def compute(conn: sqlite3.Connection, now: str, devices: list[dict], readings: dict[int, dict], container_numbers: dict) -> dict[str, Any]:
     """The score block of the summary: {score, label, parts, why, costs, cameras, devices: {id: score}}. `devices` is the summary's device list."""
     tiers = {r["id"]: (r["tier"] or "normal", bool(r["always_on"])) for r in conn.execute("SELECT id, tier, always_on FROM devices")}
@@ -103,33 +134,9 @@ def compute(conn: sqlite3.Connection, now: str, devices: list[dict], readings: d
         group = group_of(d["type"], tier, always_on)
         if group is None:
             continue
-        w_ups, w_n = (week.get(d["id"]) or (0, 0))[:2]
-        d_ups, d_n, rtt_sum, rtt_n = (day.get(d["id"]) or (0, 0, 0, 0))[:4]
-        parts: dict[str, float | None] = {"uptime": None, "loss": None, "latency": None, "temperature": None}
-        extra: dict[str, Any] = {"flaps": flaps.get(d["id"], 0)}
-        if w_n >= MIN_CHECKS:
-            extra["uptime"] = 100 * w_ups / w_n
-            parts["uptime"] = _clip(extra["uptime"] - FLAP_POINTS * max(0, extra["flaps"] - 2))
-        if d_n >= MIN_CHECKS:
-            extra["day"] = 100 * d_ups / d_n
-            parts["loss"] = extra["day"]
-        if rtt_n and rtt_n >= MIN_CHECKS:
-            extra["ms"] = rtt_sum / rtt_n
-            parts["latency"] = latency_score(extra["ms"])
-        if group != "cameras":
-            temp = (readings.get(d["id"]) or {}).get("temp")
-            if temp is not None:
-                extra["temp"] = temp
-                parts["temperature"] = temperature_score(temp)
-        else:
-            parts["latency"] = None                                                 # a camera is judged on being there, not on how fast it answers
-        score, worst = device_score(parts, bool(d["online"]))
-        if score is None and not d["online"]:
-            score, worst = float(OFFLINE_CAP), "uptime"
-        if score is None:
-            continue
-        entries.append({"id": d["id"], "name": d["name"], "group": group, "tier": tier, "score": score, "parts": parts, "weight": WEIGHT.get(group, 1.0) * TIER[tier],
-                        "reason": _reason(worst, bool(d["online"]), parts, extra), "online": bool(d["online"])})
+        entry = _entry(d, group, tier, week, day, flaps, readings)
+        if entry is not None:
+            entries.append(entry)
 
     cameras = [e for e in entries if e["group"] == "cameras"]
     counted = [e for e in entries if e["group"] != "cameras" and e["weight"] > 0]
@@ -216,3 +223,35 @@ def trend(conn: sqlite3.Connection, now: str, score: int | None) -> dict[str, An
     if row is None:
         return None
     return {"delta": score - row["score"], "since": row["day"], "was": row["score"]}
+
+
+# ----------------------------------------------------------------------------- one device
+def label_of(score: float | None) -> str | None:
+    return None if score is None else "good" if score >= 80 else "fair" if score >= 50 else "poor"
+
+
+def for_device(conn: sqlite3.Connection, now: str, device_id: int) -> dict[str, Any] | None:
+    """The score of one device for its page: {score, label, reason, counted, parts}, or None when the device does not exist or nothing is known about it yet.
+    `counted` says whether the device is part of the network score (always-on or critical devices); the score itself is worked out the same way for every device."""
+    from app import tsdb
+    from app.hostmetrics import service as hm
+    from app.stats import TYPE
+
+    row = conn.execute("SELECT d.id, COALESCE(d.custom_name, d.hostname, d.primary_ip) AS name, d.online, d.tier, d.always_on, " + TYPE + " AS type FROM devices d WHERE d.id = ?", (device_id,)).fetchone()
+    if row is None:
+        return None
+    tier, always_on = row["tier"] or "normal", bool(row["always_on"])
+    group = group_of(row["type"], tier, always_on)
+    store = tsdb.for_conn(conn)
+    readings: dict[int, dict] = {}
+    if store is not None:
+        known = store.metrics_of_many("device", [device_id]).get(device_id, [])
+        readings[device_id] = hm.latest_readings(store, device_id, known)
+    d = {"id": device_id, "name": row["name"] or str(device_id), "type": row["type"], "online": bool(row["online"])}
+    entry = _entry(d, group or ("cameras" if row["type"] == "camera" else "other"), tier, checkstats.totals(conn, _ago(now, days=7)), checkstats.totals(conn, _ago(now, hours=24)),
+                   _flaps(conn, _ago(now, hours=24)), readings)
+    if entry is None:
+        return None
+    score = round(entry["score"])
+    return {"score": score, "label": label_of(score), "reason": entry["reason"] if score < 100 else None, "counted": group is not None and entry["weight"] > 0,
+            "parts": {k: (None if v is None else round(v)) for k, v in entry["parts"].items()}}

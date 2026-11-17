@@ -1,4 +1,4 @@
-"""Saved views of the big tables (today the Devices table): which columns, in which order and how wide, the sort order and the filters.
+"""Saved views of the big tables (Devices, Services, scans, vulnerability findings, the audit log, speed tests and smart-home devices): which columns, in which order and how wide, the sort order and the filters.
 
 Everybody keeps views of their own (with the one that is open), kept with the rest of their preferences. An administrator can also share views: they appear for
 everybody next to their own, and cannot be changed by anyone else. The columns a table offers are listed here (the page has the same list; a test keeps them the same),
@@ -18,10 +18,30 @@ from app.db import get_setting, set_setting
 COLUMNS: dict[str, tuple[str, ...]] = {
     "devices": ("status", "name", "primary_ip", "type", "group", "mac", "vendor", "network", "ipv6", "tags", "os_name", "open_ports", "tier", "always_on", "first_seen",
                 "last_seen", "trusted", "dns_name", "parent", "port", "medium", "wifi_band", "wifi_signal", "wifi_node", "uptime_7d", "rtt_24h", "maintenance", "notes"),
+    "services": ("status", "name", "device", "kind", "target", "history", "uptime_24h", "last_ms", "last_ts", "interval_s", "tier", "since"),
+    "scans": ("started", "kind", "status", "hosts_found", "duration", "finished", "error"),
+    "vulns": ("severity", "title", "device", "port", "score", "cve", "exploited", "last_seen"),
+    "audit": ("when", "who", "what", "from", "result"),
+    "speedtests": ("when", "test", "target", "download", "upload", "ping", "result"),
+    "smarthome": ("name", "model", "manufacturer", "area", "protocol", "state", "battery", "via", "network"),
 }
-LOCKED: dict[str, tuple[str, ...]] = {"devices": ("status", "name")}
+LOCKED: dict[str, tuple[str, ...]] = {
+    "devices": ("status", "name"),
+    "services": ("status", "name"),
+    "scans": ("started",),
+    "vulns": ("severity", "title"),
+    "audit": ("when",),
+    "speedtests": ("when",),
+    "smarthome": ("name",),
+}
 FILTERS: dict[str, tuple[str, ...]] = {
     "devices": ("q", "online", "type", "trusted", "ports", "group", "network"),
+    "services": (),
+    "scans": (),
+    "vulns": (),
+    "audit": (),
+    "speedtests": (),
+    "smarthome": (),
 }
 MAX_VIEWS = 20
 MAX_COLUMNS = 30

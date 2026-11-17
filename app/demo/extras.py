@@ -133,6 +133,9 @@ def _apply(conn, now: datetime) -> None:
     apply_backup(conn, "pbs", validate_output("backup", backup_data(now)), None, now)
     apply_vulns(conn, "greenbone", validate_output("vulnerability", vuln_data(now)), None, now)
     apply_inventory(conn, "homeassistant", validate_output("inventory", smarthome_data(now)), None, now)
+    from app.demo import newcards
+
+    newcards.apply(conn, now)
     for plugin in ("pbs", "greenbone", "homeassistant", "truenas"):
         raw = get_setting(conn, f"plugin.{plugin}.status")
         if raw:
@@ -242,6 +245,9 @@ def seed(conn, data_dir, ids, now: datetime) -> None:
     _probes(conn, ids, now)
     _maintenance(conn, now)
     _operations(conn, ids, now)
+    from app.demo import newcards
+
+    newcards.seed(conn, ids, now)
     set_setting(conn, "demo.extras", now.strftime(STAMP))
     conn.commit()
 

@@ -3,7 +3,9 @@ import { get } from "../api.js";
 import { h, clear, timeAgo, isAdmin, latest } from "../util.js";
 import { pageHead, tile, tileRow, emptyState } from "../ui.js";
 import { boardPage, gatherCards } from "../layout_cards.js";
-import { findingsTable, sevBadge, SEV_LABEL } from "../cards/vulns.js";
+import { sevBadge, SEV_LABEL } from "../cards/vulns.js";
+import { createTableViews } from "../tableview.js";
+import { CATALOG, BUILTIN_VIEWS } from "../tables/vulns.js";
 
 const SHOW = 25;
 
@@ -17,6 +19,7 @@ export async function render(container) {
   let sev = ["critical", "high", "medium", "low"].includes(hint("severity")) ? hint("severity") : "", q = "", all = false;
   const onlyExploited = hint("exploited") === "1";
   let data;
+  const tv = await createTableViews({ table: "vulns", catalog: CATALOG, builtins: BUILTIN_VIEWS, locked: ["severity", "title"], onChange: () => draw(), tableClass: "data vuln-table" });
 
   const draw = () => {
     clear(body);
@@ -49,9 +52,12 @@ export async function render(container) {
       h("select", { onchange: (e) => { sev = e.target.value; load(); } }, h("option", { value: "" }, "All severities"), Object.entries(SEV_LABEL).map(([k, v]) => h("option", { value: k, selected: k === sev }, v))),
       h("input", { type: "search", placeholder: "Search title, device or CVE", value: q, oninput: (e) => { q = e.target.value; clearTimeout(render.t); render.t = setTimeout(load, 250); } }));
     const shown = all ? list : list.slice(0, SHOW);
+    tv.useRows(() => list);
+    bar.append(tv.controls);
     body.append(h("div", { class: "card" }, h("h2", {}, `Findings (${list.length})`), bar,
-      list.length ? findingsTable(shown) : h("p", { class: "hint" }, "Nothing matches."),
+      list.length ? h("div", { class: "table-wrap" }, tv.table) : h("p", { class: "hint" }, "Nothing matches."),
       list.length > SHOW ? h("button", { class: "btn", type: "button", onclick: () => { all = !all; draw(); } }, all ? "Show fewer" : `Show all ${list.length}`) : null));
+    tv.tbody.replaceChildren(...tv.lines(tv.sorted(list).slice(0, all ? list.length : SHOW).map((f) => f)));
     board.apply({ main: gatherCards(body) });
   };
 

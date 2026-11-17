@@ -122,3 +122,16 @@ def test_the_column_lists_of_the_server_and_of_the_pages_are_the_same():
         assert used[:2] == ["status", "name"] and set(used) <= set(catalog)                                          # a built-in view only names columns that exist
         assert len(used) == len(set(used))
     assert re.search(r'id: "standard"', views)
+
+
+@pytest.mark.parametrize("table", ["services", "scans", "vulns", "audit", "speedtests", "smarthome"])
+def test_the_other_tables_list_the_same_columns_on_the_server_and_in_the_pages(table):
+    text = (JS / "tables" / f"{table}.js").read_text(encoding="utf-8")
+    catalog = re.findall(r'\{\s*key: "([a-z0-9_]+)"', text.split("export const BUILTIN_VIEWS")[0])
+    assert tuple(catalog) == tableviews.COLUMNS[table], set(catalog) ^ set(tableviews.COLUMNS[table])
+    locked = tableviews.LOCKED[table]
+    views = text.split("export const BUILTIN_VIEWS")[1]
+    for columns in re.findall(r'columns: \[([^\]]*)\]', views):
+        used = re.findall(r'"([a-z0-9_]+)"', columns)
+        assert tuple(used[:len(locked)]) == locked and set(used) <= set(catalog) and len(used) == len(set(used))
+    assert re.search(r'id: "standard"', views)

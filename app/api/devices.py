@@ -868,6 +868,18 @@ async def ping_device(device_id: int, request: Request, conn: sqlite3.Connection
         raise HTTPException(status_code=422, detail=str(exc))
 
 
+@router.get("/devices/{device_id}/score")
+def device_score(device_id: int, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """The health score of one device (0 to 100) and what holds it back, for the chip on its page. `score` is null while too little is known about it."""
+    from app import healthscore
+
+    exists = conn.execute("SELECT 1 FROM devices WHERE id = ?", (device_id,)).fetchone()
+    if exists is None:
+        raise HTTPException(status_code=404, detail="device not found")
+    got = healthscore.for_device(conn, utcnow(), device_id)
+    return got or {"score": None, "label": None, "reason": None, "counted": False, "parts": {}}
+
+
 @router.get("/devices/{device_id}/flapping")
 def flapping_report(device_id: int, days: int = 7, tz: int = 0, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
     """Why a device keeps going offline: analysis of the scan history (tz = the browser's offset from UTC in minutes)."""

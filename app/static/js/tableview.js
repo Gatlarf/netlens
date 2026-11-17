@@ -13,7 +13,7 @@ import { normalise, sameView, moveColumn, dropColumn, toggleColumn, sortRows, ta
 
 const GROUP_ORDER = ["Basics", "Network", "Wi-Fi", "System", "Health"];
 
-export async function createTableViews({ table, catalog, builtins, locked, getFilters = () => ({}), setFilters = () => {}, transient = ["q"], onChange = () => {}, tableClass = "data" }) {
+export async function createTableViews({ table, catalog, builtins, locked, getFilters = () => ({}), setFilters = () => {}, transient = ["q"], onChange = () => {}, tableClass = "data", trailing = false, groups = GROUP_ORDER }) {
   const known = catalog.map((c) => c.key);
   const byKey = new Map(catalog.map((c) => [c.key, c]));
   const draftKey = `netlens.tv.${table}.draft`;
@@ -72,8 +72,8 @@ export async function createTableViews({ table, catalog, builtins, locked, getFi
   function setWidths() {
     const any = Object.keys(view.widths).length > 0;
     table_.style.tableLayout = any ? "fixed" : "";
-    table_.style.width = any ? `${view.columns.reduce((a, k) => a + (view.widths[k] || byKey.get(k).min || 110), 0)}px` : "";
-    for (const th of thead.querySelectorAll("th")) {
+    table_.style.width = any ? `${view.columns.reduce((a, k) => a + (view.widths[k] || byKey.get(k).min || 110), 0) + (trailing ? 150 : 0)}px` : "";
+    for (const th of thead.querySelectorAll("th[data-key]")) {
       const w = view.widths[th.dataset.key];
       th.style.width = any ? `${w || byKey.get(th.dataset.key).min || 110}px` : "";
     }
@@ -113,7 +113,7 @@ export async function createTableViews({ table, catalog, builtins, locked, getFi
       grip.addEventListener("pointerdown", (e) => {
         e.preventDefault(); e.stopPropagation();
         const widths = {};
-        for (const t of thead.querySelectorAll("th")) widths[t.dataset.key] = Math.round(t.getBoundingClientRect().width);      // freeze what is on screen, then change this column
+        for (const t of thead.querySelectorAll("th[data-key]")) widths[t.dataset.key] = Math.round(t.getBoundingClientRect().width);      // freeze what is on screen, then change this column
         view = { ...view, widths };
         setWidths();
         const startX = e.clientX, startW = widths[key];
@@ -126,6 +126,7 @@ export async function createTableViews({ table, catalog, builtins, locked, getFi
       th.appendChild(grip);
       row.appendChild(th);
     }
+    if (trailing) row.appendChild(h("th", { class: "tv-trailing", "aria-label": "Actions" }));        // the buttons at the end of a row: not a column, always there
     thead.replaceChildren(row);
     setWidths();
   }
@@ -141,6 +142,20 @@ export async function createTableViews({ table, catalog, builtins, locked, getFi
       if (value instanceof Node) td.appendChild(value); else if (Array.isArray(value)) td.append(...value); else td.textContent = value == null ? "" : String(value);
       return td;
     });
+  }
+  // The lines of the table for these rows (sorted as the view says): each line is the chosen columns, then the buttons the page makes for it (`actions(row)`), and
+  // optionally a second line below it (`detail(row)` returns a <tr> or null) for what unfolds. `line(row, tr)` can give the line its class and its click.
+  function lines(items, { actions = null, detail = null, line = null } = {}) {
+    const out = [];
+    for (const row of sorted(items)) {
+      const tr = h("tr", {}, ...rowCells(row));
+      if (actions) { const a = actions(row); tr.appendChild(h("td", { class: "actions" }, ...(Array.isArray(a) ? a : [a]))); }
+      if (line) line(row, tr);
+      out.push(tr);
+      const more = detail ? detail(row, view.columns.length + (trailing ? 1 : 0)) : null;
+      if (more) out.push(more);
+    }
+    return out;
   }
   const sorted = (rows) => sortRows(rows, view.sort, (row, key) => byKey.get(key).sort(row));
   const needs = () => [...new Set(view.columns.map((k) => byKey.get(k).extra).filter(Boolean))];
@@ -324,11 +339,12 @@ export async function createTableViews({ table, catalog, builtins, locked, getFi
         const move = (delta, text) => h("button", { type: "button", class: "btn tv-move", "aria-label": `Move ${c.title || c.label || c.key} ${delta < 0 ? "up" : "down"}`, title: text, disabled: isLocked || (delta < 0 ? index <= locked.length : index >= shown.length - 1), onclick: () => apply(moveColumn(view.columns, c.key, delta, locked)) }, delta < 0 ? "▲" : "▼");
         return h("li", { class: "tv-col" }, h("label", {}, on, " ", c.title || c.label || c.key, c.group ? h("span", { class: "hint" }, ` · ${c.group}`) : null), isLocked ? h("span", { class: "hint" }, "always shown") : h("span", { class: "tv-moves" }, move(-1, "Earlier"), move(1, "Later")));
       };
-      const groups = GROUP_ORDER.map((g) => [g, hidden.filter((c) => (c.group || "Basics") === g)]).filter(([, cs]) => cs.length);
+      const known_groups = [...groups, ...hidden.map((c) => c.group || "Basics").filter((g) => !groups.includes(g))];
+      const groupsShown = [...new Set(known_groups)].map((g) => [g, hidden.filter((c) => (c.group || "Basics") === g)]).filter(([, cs]) => cs.length);
       body.replaceChildren(
         h("h3", {}, `Shown (${shown.length})`), h("ul", { class: "tv-col-list" }, ...shown.map(rowFor)),
         hidden.length ? h("h3", {}, "Not shown") : null,
-        ...groups.flatMap(([g, cs]) => [h("div", { class: "tv-heading" }, g), h("ul", { class: "tv-col-list" }, ...cs.map((c) => {
+        ...groupsShown.flatMap(([g, cs]) => [h("div", { class: "tv-heading" }, g), h("ul", { class: "tv-col-list" }, ...cs.map((c) => {
           const on = h("input", { type: "checkbox", "aria-label": `Show ${c.title || c.label || c.key}` });
           on.addEventListener("change", () => apply(toggleColumn(view.columns, c.key, true, locked)));
           return h("li", { class: "tv-col" }, h("label", {}, on, " ", c.title || c.label || c.key));
@@ -345,7 +361,7 @@ export async function createTableViews({ table, catalog, builtins, locked, getFi
   refreshControls();
   setFilters(view.filters);
   return {
-    table: table_, tbody, controls, rowCells, sorted, needs, csv,
+    table: table_, tbody, controls, rowCells, lines, sorted, needs, csv, width: () => view.columns.length + (trailing ? 1 : 0),
     get view() { return view; },
     columns: () => view.columns.slice(),
     refresh: refreshControls,                                                // a filter changed: the "changed" mark may have to appear

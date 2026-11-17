@@ -160,3 +160,34 @@ def test_the_summary_carries_the_trend(tmp_path):
         got = c.get("/api/stats/summary").json()
         assert "trend" in got["score"]                                                       # None until there is an earlier day
     tsdb.forget_all()
+
+
+def test_one_device_gets_its_own_score_whether_or_not_it_counts(conn):
+    counted = _device(conn, "nas", "nas", always_on=1)
+    other = _device(conn, "tablet", "phone", always_on=0)
+    _checks(conn, counted, [1] * 40, ms=10)
+    _checks(conn, other, [1] * 20 + [0] * 20, ms=10)
+    a = hs.for_device(conn, NOW, counted)
+    b = hs.for_device(conn, NOW, other)
+    assert a["score"] == 100 and a["label"] == "good" and a["counted"] is True and a["reason"] is None
+    assert b["score"] < 100 and b["counted"] is False and b["reason"]
+    assert hs.for_device(conn, NOW, 9999) is None
+    quiet = _device(conn, "new", "phone", always_on=0)
+    assert hs.for_device(conn, NOW, quiet) is None                 # nothing measured yet: no score rather than a made-up one
+
+
+def test_the_device_page_can_ask_for_the_score(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app.config import load_settings
+    from app.main import create_app
+
+    app = create_app(load_settings({"NETLENS_TOKEN": "t", "NETLENS_DATA_DIR": str(tmp_path)}), db_path=tmp_path / "n.db")
+    with TestClient(app) as c:
+        h = {"Authorization": "Bearer t"}
+        assert c.get("/api/devices/9999/score", headers=h).status_code == 404
+        conn = connect(tmp_path / "n.db")
+        dev = _device(conn, "nas", "nas")
+        conn.commit()
+        got = c.get(f"/api/devices/{dev}/score", headers=h)
+        assert got.status_code == 200 and got.json()["score"] is None          # no checks yet

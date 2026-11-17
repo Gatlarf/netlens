@@ -292,3 +292,13 @@ i.impact-dot.down { background: #dc2626; }
 .cascade-dot.fresh { stroke: currentColor; stroke-width: 3; animation: cascade-pulse 0.9s ease-out; }
 @keyframes cascade-pulse { from { stroke-width: 12; stroke-opacity: 0.6; } to { stroke-width: 0; stroke-opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .cascade-dot.fresh { animation: none; } }
+
+/* the health score of a device, next to its name */
+.score-chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border); font-size: 0.8rem; text-decoration: none; color: inherit; background: var(--surface, transparent); }
+.score-chip[hidden] { display: none; }
+.score-chip .score-num { font-weight: 700; font-variant-numeric: tabular-nums; }
+.score-chip .score-word { opacity: .7; }
+.score-chip.score-good { border-color: var(--ok); } .score-chip.score-good .score-num { color: var(--ok); }
+.score-chip.score-fair { border-color: var(--warn); } .score-chip.score-fair .score-num { color: var(--warn); }
+.score-chip.score-poor { border-color: var(--bad); } .score-chip.score-poor .score-num { color: var(--bad); }
+.score-chip:hover { text-decoration: none; background: var(--hover, rgba(127,127,127,.1)); }

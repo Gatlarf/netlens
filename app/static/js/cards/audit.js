@@ -1,10 +1,16 @@
 import { get } from "../api.js";
 import { h, clear, fmtTime, can, toast, latest } from "../util.js";
+import { createTableViews } from "../tableview.js";
+import { CATALOG, BUILTIN_VIEWS } from "../tables/audit.js";
 
 // Settings → Audit log: who changed what, and when (kept for a year; request bodies, passwords and tokens are never stored).
 export async function buildAuditCard() {
   const card = h("div", { class: "card" });
-  const body = h("tbody", {});
+  const tv = await createTableViews({ table: "audit", catalog: CATALOG, builtins: BUILTIN_VIEWS, locked: ["when"], tableClass: "rep-table", onChange: () => paint() });
+  const body = tv.tbody;
+  let entries = [];
+  tv.useRows(() => entries);
+  const paint = () => body.replaceChildren(...tv.lines(entries, { line: (e, tr) => { if (e.status >= 400) tr.classList.add("audit-bad"); } }));
   const more = h("button", { class: "btn", type: "button", hidden: true }, "Show older entries");
   const note = h("p", { class: "hint" });
   const userSelect = h("select", { "aria-label": "User" }, h("option", { value: "" }, "Everybody"));
@@ -27,14 +33,11 @@ export async function buildAuditCard() {
       note.textContent = err.message || "The log could not be loaded";
       return;
     }
-    if (!append) clear(body);
-    for (const e of data.entries) {
-      body.appendChild(h("tr", { class: e.status >= 400 ? "audit-bad" : "" },
-        h("td", {}, fmtTime(e.ts)), h("td", {}, e.user || "—"), h("td", {}, e.action), h("td", { class: "hint" }, e.ip || "")));
-    }
+    entries = append ? [...entries, ...data.entries] : data.entries;
+    paint();
     if (data.entries.length) last = data.entries[data.entries.length - 1].id;
     more.hidden = !data.more;
-    note.textContent = body.children.length ? "" : "Nothing recorded yet. Changes made from now on appear here.";
+    note.textContent = entries.length ? "" : "Nothing recorded yet. Changes made from now on appear here.";
     if (!append && userSelect.options.length === 1) for (const u of data.users) userSelect.appendChild(h("option", { value: u }, u));
   }
 
@@ -63,8 +66,8 @@ export async function buildAuditCard() {
   card.append(h("h2", {}, "Audit log"),
     h("p", { class: "hint" }, "Who changed what, and when: settings, devices, users, monitors, backups and sign-ins. Kept for a year. Passwords and request contents are never stored."),
     can("audit") ? h("div", { class: "rep-tools" }, integrity, checkNow) : null,
-    h("div", { class: "rep-tools" }, userSelect, search, h("a", { class: "btn", href: "/api/audit.csv", download: "" }, "Download as CSV")),
-    h("div", { class: "rep-scroll" }, h("table", { class: "rep-table" }, h("thead", {}, h("tr", {}, ...["When", "Who", "What", "From"].map((t) => h("th", {}, t)))), body)),
+    h("div", { class: "rep-tools" }, userSelect, search, tv.controls, h("a", { class: "btn", href: "/api/audit.csv", download: "" }, "Download as CSV")),
+    h("div", { class: "rep-scroll" }, tv.table),
     note, more);
   await load(false);
   return card;

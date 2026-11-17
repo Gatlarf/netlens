@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.458 — 2026-11-18
+
+### Added
+- **★ Choose and save the columns of every big list.** The **View** menu and the **Columns** button of the Devices page are now on the other lists too: **Services** (checks and plugins: status, name, device, kind, target, history, availability, answer time, interval, importance, in this state since), **vulnerability findings** (severity, finding, device, port, score, CVE, exploited, last seen; built-in views Standard, Work list and By CVE), **scans**, **speed test results**, **smart-home devices** and the **audit log**. On each of them you can tick and order the columns, drag a heading to move it, drag its edge to resize it, sort on any column, **download the table you see as CSV**, save the set-up as a view of your own, and (administrators) share a view with everybody. Your views follow your account to every browser.
+- **★ A health score on every device page.** Next to the name of a device a small chip shows its health score (0 to 100, green, amber or red): how reachable it was this week, how many checks it answered today, how fast it answers and how warm it runs. Point at it to read what holds the score back and whether the device counts towards the network health score; a click opens the Health tab. The AI can read it too (`get_device_score`).
+
+### Changed
+- The demo network now shows the newer features: Wi-Fi channels with crowded and quiet channels for the mesh nodes, a router with a fibre and a backup 4G connection, a month of health score history, three alert rules and two customer report templates.
+
 ## 0.4.457 — 2026-11-17
 
 ### Changed

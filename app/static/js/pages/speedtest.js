@@ -4,6 +4,8 @@ import { keepDrafts } from "../editguard.js";
 import { h, clear, toast, timeAgo, isAdmin } from "../util.js";
 import { pageHead, tabbed } from "../ui.js";
 import { emptyNote, lineChart, tile } from "../charts.js";
+import { createTableViews } from "../tableview.js";
+import { CATALOG, BUILTIN_VIEWS, kindLabel } from "../tables/speedtests.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const mbps = (v) => (v === null || v === undefined ? "–" : v >= 1000 ? `${(v / 1000).toFixed(2)} Gbps` : `${v >= 100 ? Math.round(v) : v.toFixed(1)} Mbps`);
@@ -87,14 +89,6 @@ function uploadTest(seconds, onRate, streams = 3) {
 }
 
 // ---------- the page ----------
-
-function kindLabel(r) {
-  const d = r.detail || {};
-  if (r.kind === "internet") return "Internet";
-  if (r.kind === "iperf-in") return "iperf3 from a host";
-  if (r.kind === "iperf-out") return "iperf3 to a host";
-  return d.label ? `Browser: ${d.label}` : "Browser";
-}
 
 export async function render(container) {
   let disposed = false, data = null, pollTimer = null, browserRunning = false;
@@ -261,28 +255,27 @@ export async function render(container) {
   }
 
   // ----- history -----
+  const historyTv = await createTableViews({ table: "speedtests", catalog: CATALOG, builtins: BUILTIN_VIEWS, locked: ["when"], onChange: () => fillHistory() });
+  let fillHistory = () => {};
   function drawHistory() {
     const s = sections.history;
     clear(s);
     const filter = h("select", { "aria-label": "Show" }, [["", "All tests"], ["internet", "Internet"], ["iperf-in", "iperf3 from a host"], ["iperf-out", "iperf3 to a host"], ["browser", "Browser"]].map(([v, t]) => h("option", { value: v }, t)));
-    const body = h("tbody", {});
+    let rows = [];
+    const body = historyTv.tbody;
+    historyTv.useRows(() => rows);
     const fill = () => {
-      clear(body);
-      const rows = data.history.filter((r) => !filter.value || r.kind === filter.value).slice(0, 60);
-      if (!rows.length) body.append(h("tr", {}, h("td", { colspan: "6" }, "No results yet.")));
-      for (const r of rows) {
-        body.append(h("tr", { class: r.ok ? "" : "speed-failed" }, h("td", {}, timeAgo(r.ts)), h("td", {}, kindLabel(r)), h("td", {}, r.target || ""),
-          h("td", { class: "num" }, r.ok ? mbps(r.down_mbps) : ""), h("td", { class: "num" }, r.ok ? mbps(r.up_mbps) : ""),
-          h("td", {}, r.ok ? ms(r.latency_ms) : h("span", { class: "error" }, r.error || "failed"))));
-      }
+      rows = data.history.filter((r) => !filter.value || r.kind === filter.value).slice(0, 60);
+      body.replaceChildren(...(rows.length ? historyTv.lines(rows, { line: (r, tr) => { if (!r.ok) tr.classList.add("speed-failed"); } }) : [h("tr", {}, h("td", { colspan: historyTv.width() }, "No results yet."))]));
     };
+    fillHistory = fill;
     filter.addEventListener("change", fill);
     const clearBtn = h("button", { class: "btn danger admin-only", type: "button", onclick: async () => {
       if (clearBtn.dataset.sure !== "1") { clearBtn.dataset.sure = "1"; clearBtn.textContent = "Press again to clear all results"; return; }
       try { await del("/api/speedtest/history"); await load(); } catch (err) { toast(err.message, "error"); }
     } }, "Clear history");
-    s.append(h("div", { class: "toolbar" }, h("h2", {}, "Results"), filter, admin ? clearBtn : null),
-      h("div", { class: "table-wrap" }, h("table", { class: "data" }, h("thead", {}, h("tr", {}, ["When", "Test", "Target", "Download", "Upload", "Ping"].map((t) => h("th", {}, t)))), body)),
+    s.append(h("div", { class: "toolbar" }, h("h2", {}, "Results"), filter, historyTv.controls, admin ? clearBtn : null),
+      h("div", { class: "table-wrap" }, historyTv.table),
       h("p", { class: "hint" }, "Download and upload are seen from the device that tests; for iperf3 from a host, upload means that host sent data to Netlens."));
     fill();
   }

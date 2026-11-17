@@ -1,14 +1,14 @@
 import { get } from "../api.js";
-import { h, clear, timeAgo, webUrl } from "../util.js";
+import { h, clear } from "../util.js";
+import { createTableViews } from "../tableview.js";
+import { CATALOG, BUILTIN_VIEWS } from "../tables/smarthome.js";
 import { pageHead, tile as uiTile, tileRow, emptyState } from "../ui.js";
-
-function battery(d) {
-  if (d.battery === null || d.battery === undefined) return d.battery_low ? h("span", { class: "warn-text" }, "low") : h("span", { class: "hint" }, "");
-  return h("span", { class: d.battery_low ? "warn-text" : "" }, `${d.battery}%`);
-}
 
 export async function render(container) {
   let destroyed = false;
+  let rows = [];
+  const tv = await createTableViews({ table: "smarthome", catalog: CATALOG, builtins: BUILTIN_VIEWS, locked: ["name"], onChange: () => tv.tbody.replaceChildren(...tv.lines(rows)) });
+  tv.useRows(() => rows);
   const body = h("div", {}, h("p", { class: "hint" }, "Loading..."));
   container.append(pageHead("Smart home", "The devices of your smart-home hub, with what Netlens cannot see on the network. It comes from a plugin (Home Assistant)."), body);
   const wanted = (/[?&]only=(unavailable|battery|network|update)/.exec(location.hash) || [])[1] || "";          // "#/smarthome?only=unavailable" opens the list on those devices
@@ -44,28 +44,21 @@ export async function render(container) {
     const search = h("input", { type: "search", placeholder: "Search", value: filter });
     const areaSel = h("select", {}, h("option", { value: "" }, "All areas"), ...areas.map((a) => h("option", { value: a, selected: a === area }, a)));
     const onlySel = h("select", {}, ...[["", "All devices"], ["unavailable", "Unavailable"], ["battery", "Low battery"], ["network", "On the network"], ["update", "Update waiting"]].map(([v, l]) => h("option", { value: v, selected: v === only }, l)));
-    const tbody = h("tbody");
-    const table = h("table", { class: "data" });
-    table.appendChild(h("thead", {}, h("tr", {}, ...["Device", "Model", "Area", "Protocol", "State", "Battery", "Paired through", "On the network"].map((c) => h("th", {}, c)))));
-    table.appendChild(tbody);
+    const tbody = tv.tbody;
+    const table = tv.table;
     function draw() {
-      clear(tbody);
       const q = filter.toLowerCase();
-      const rows = data.devices.filter((d) => (!q || `${d.name} ${d.manufacturer || ""} ${d.model || ""} ${d.area || ""}`.toLowerCase().includes(q)) && (!area || d.area === area)
+      rows = data.devices.filter((d) => (!q || `${d.name} ${d.manufacturer || ""} ${d.model || ""} ${d.area || ""}`.toLowerCase().includes(q)) && (!area || d.area === area)
         && (only === "" || (only === "unavailable" && !d.available) || (only === "battery" && d.battery_low) || (only === "network" && d.device_id) || (only === "update" && d.update)));
-      for (const d of rows.sort((a, b) => (a.available - b.available) || a.name.localeCompare(b.name))) {
-        tbody.appendChild(h("tr", {}, h("td", {}, webUrl(d.url) ? h("a", { href: webUrl(d.url), target: "_blank", rel: "noopener" }, d.name) : d.name),
-          h("td", {}, [d.manufacturer, d.model].filter(Boolean).join(" ")), h("td", {}, d.area || ""), h("td", {}, d.protocol || ""),
-          h("td", { title: d.unavailable_since || "" }, d.available ? h("span", { class: "run-ok" }, "available") : h("span", { class: "error" }, `unavailable${d.unavailable_since ? ` · ${timeAgo(d.unavailable_since)}` : ""}`), d.update ? h("span", { class: "warn-text" }, " · update") : ""),
-          h("td", {}, battery(d)), h("td", {}, d.via || ""), h("td", {}, d.device_id ? h("a", { href: `#/device/${d.device_id}` }, d.device || "device") : "")));
-      }
-      if (!rows.length) tbody.appendChild(h("tr", {}, h("td", { colspan: 8, class: "hint" }, "Nothing matches.")));
+      rows.sort((a, b) => (a.available - b.available) || a.name.localeCompare(b.name));
+      tbody.replaceChildren(...tv.lines(rows));
+      if (!rows.length) tbody.appendChild(h("tr", {}, h("td", { colspan: tv.width(), class: "hint" }, "Nothing matches.")));
     }
     search.addEventListener("input", () => { filter = search.value; draw(); });
     areaSel.addEventListener("change", () => { area = areaSel.value; draw(); });
     onlySel.addEventListener("change", () => { only = onlySel.value; draw(); });
     draw();
-    body.appendChild(h("div", { class: "card" }, h("div", { class: "form-actions" }, search, areaSel, onlySel), h("div", { class: "table-wrap" }, table)));
+    body.appendChild(h("div", { class: "card" }, h("div", { class: "form-actions" }, search, areaSel, onlySel, tv.controls), h("div", { class: "table-wrap" }, table)));
   }
 
   await load();

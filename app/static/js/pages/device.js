@@ -27,6 +27,7 @@ import { stateDot } from "./services.js";
 import { buildParentCard } from "../cards/device_parent.js";
 import { buildDeviceSitesCards } from "../cards/proxy_sites.js";
 import { buildDeviceVulnCard } from "../cards/vulns.js";
+import { buildScoreChip } from "../cards/device_score.js";
 import { buildStabilitySection, isStabilityOpen } from "../cards/stability.js";
 import { buildCalendarSection, buildCausesSection, buildImpactSection, isInsightOpen } from "../cards/causes.js";
 
@@ -837,6 +838,7 @@ export async function render(container, params) {
     heading.appendChild(statusDot(device.online));
     heading.appendChild(h("h1", { title: device.name || null }, shortName(device.name) || device.primary_ip || "Unknown"));
     heading.appendChild(typeBadge(device.type));
+    heading.appendChild(buildScoreChip(device));
     if (device.maintenance) heading.appendChild(h("span", { class: "badge maint", title: "Alarms about this device are held back right now" }, `In maintenance: ${device.maintenance}`));
     heading.appendChild(h("a", { href: "#/devices" }, "← Devices"));
     if (device.primary_ip) {
