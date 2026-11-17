@@ -75,6 +75,15 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
     out.sample("netlens_plugin_updates_available", doc["update"]["plugin_updates"], "Installed plugins that have a newer release in the plugin index")
     out.sample("netlens_problem", 1 if doc["problem"] else 0, "1 when Netlens sees a problem (failed scan, failing plugin or service, old scan)")
 
+    sc = doc.get("score") or {}
+    if sc.get("score") is not None:
+        out.sample("netlens_health_score", sc["score"], "Network health score (0-100): how reachable, fast and cool the always-on and critical devices are")
+        for part, value in (sc.get("parts") or {}).items():
+            out.sample("netlens_health_score_part", value, "A part of the network health score (0-100): latency, loss, uptime, temperature, containers", part=part)
+        names = {r["id"]: r["n"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices")}
+        for device_id, value in sorted((sc.get("devices") or {}).items()):
+            out.sample("netlens_device_health_score", value, "Health score of one device (0-100)", name=names.get(device_id, str(device_id)))
+
     for d in doc["device_list"]:
         labels = {"name": d["name"], "ip": d["ip"] or "", "mac": d["mac"] or "", "type": d["type"]}
         out.sample("netlens_device_up", 1 if d["online"] else 0, "1 when the device is online", **labels)
@@ -245,4 +254,31 @@ def render_metrics(conn: sqlite3.Connection, now: str | None = None, scan_runnin
         "SELECT COALESCE(d.custom_name, d.hostname, d.primary_ip) AS n, s.node, s.band, s.rssi FROM wifi_samples s JOIN devices d ON d.id = s.device_id "
         "WHERE s.id = (SELECT MAX(id) FROM wifi_samples WHERE device_id = d.id) AND s.ts >= ? AND s.rssi IS NOT NULL", (_ago(now, hours=2),)):
         out.sample("netlens_wifi_signal_dbm", r["rssi"], "Signal strength of a Wi-Fi client", device=r["n"], node=r["node"] or "", band=r["band"] or "")
+    _wifi_and_uplinks(conn, out)
     return "\n".join(out.lines) + "\n"
+
+
+def _wifi_and_uplinks(conn: sqlite3.Connection, out: _Out) -> None:
+    """The radios of the access points (channel, airtime, clients, networks sharing the channel) and the internet connections of the gateways."""
+    from app import airspace, uplinks
+
+    names = {r["id"]: r["n"] for r in conn.execute("SELECT id, COALESCE(custom_name, hostname, primary_ip) AS n FROM devices")}
+    for device_id in [r[0] for r in conn.execute("SELECT DISTINCT device_id FROM wifi_radios ORDER BY device_id")]:
+        info = airspace.for_device(conn, device_id)
+        heard: dict[str, int] = {}
+        for n in info["neighbours"]:
+            if not n["known"]:
+                heard[n["band"] or ""] = heard.get(n["band"] or "", 0) + 1
+        for r in info["radios"]:
+            labels = {"access_point": names.get(device_id, str(device_id)), "band": r["band"] or "", "channel": r["channel"]}
+            out.sample("netlens_wifi_radio_clients", r["clients"], "Clients on a radio of an access point", **labels)
+            out.sample("netlens_wifi_radio_airtime_ratio", None if r.get("utilization_pct") is None else r["utilization_pct"] / 100, "Share of the airtime in use on a radio (0-1)", **labels)
+            out.sample("netlens_wifi_radio_neighbour_networks", r["neighbours"], "Other networks heard on the same channel as a radio", **labels)
+            out.sample("netlens_wifi_radio_channel_advice", 1 if r["advice"]["suggest"] else 0, "1 when a much quieter channel exists for this radio", **labels)
+        for band, count in heard.items():
+            out.sample("netlens_wifi_neighbour_networks", count, "Networks of others that an access point hears, by band", access_point=names.get(device_id, str(device_id)), band=band)
+    for device_id in [r[0] for r in conn.execute("SELECT DISTINCT device_id FROM node_uplinks ORDER BY device_id")]:
+        for c in uplinks.for_device(conn, device_id)["connections"]:
+            labels = {"gateway": names.get(device_id, str(device_id)), "connection": c["name"]}
+            out.sample("netlens_uplink_up", None if c["up"] is None else int(c["up"]), "1 when an internet connection of a gateway is up", **labels)
+            out.sample("netlens_uplink_active", None if c["active"] is None else int(c["active"]), "1 when an internet connection carries the traffic now", **labels)

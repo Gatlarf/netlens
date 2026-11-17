@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 60s
+scrape_configs:
+  - job_name: netlens
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/netlens.token      # a read-only API token from Netlens (Settings -> Users & tokens)
+    static_configs:
+      - targets: ["netlens.example.com:8080"]               # <- the address of Netlens (host:port, no http://)
+    # scheme: https        # uncomment when Netlens answers on https

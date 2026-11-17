@@ -2,6 +2,12 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.465 — 2026-11-18
+
+### Added
+- **★ A redesigned Grafana dashboard and a one-command Grafana + Prometheus set-up.** The ready-made dashboard (`contrib/grafana`) was rebuilt: a network health gauge and key numbers at the top, then devices and services, Wi-Fi (airtime, neighbouring networks, signal, clients per radio), internet connections, containers, virtual machines and sites, Netlens itself and the monitored devices. `contrib/grafana/stack` starts Prometheus and Grafana with the data source and the dashboard already installed (`docker compose up -d`).
+- **New numbers at `/metrics`:** the network health score and its parts, the health score of every device, per radio of an access point (clients, airtime, other networks on the same channel, whether a quieter channel exists), the networks each access point hears, and per internet connection of a gateway whether it is up and whether it carries the traffic.
+
 ## 0.4.464 — 2026-11-18
 
 ### Added

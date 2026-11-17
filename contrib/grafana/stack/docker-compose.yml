@@ -1,0 +1,42 @@
+# Prometheus + Grafana for Netlens, ready to run:   cp .env.example .env   (fill it in)   docker compose up -d
+# Grafana opens on http://<this host>:3000 with the Netlens dashboard already installed. Nothing here changes Netlens.
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-90d}
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/netlens.token:/etc/prometheus/netlens.token:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"          # only this host; Grafana reaches it over the compose network
+    security_opt: ["no-new-privileges:true"]
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    restart: unless-stopped
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_DEFAULT_THEME: dark
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/netlens-dashboard.json
+      GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-false}        # true: anyone who can reach the page may look (read-only), e.g. on a wall screen
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../netlens-dashboard.json:/var/lib/grafana/dashboards/netlens-dashboard.json:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  prometheus-data:
+  grafana-data:

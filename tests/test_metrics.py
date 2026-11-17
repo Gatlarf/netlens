@@ -122,3 +122,26 @@ def test_interface_health_is_exported_per_interface(db):
     assert keys["netlens_host_interface_up"] == 1
     assert keys["netlens_host_interface_utilization_ratio"] == pytest.approx(0.42)
     assert keys["netlens_host_interface_errors_per_second"] == pytest.approx(0.5)
+
+
+def test_health_score_wifi_radios_and_internet_connections_are_exported(db):
+    from app import airspace, uplinks
+
+    conn, _ = db
+    ap = conn.execute("SELECT id FROM devices ORDER BY id LIMIT 1").fetchone()[0]
+    mac = conn.execute("SELECT mac FROM devices WHERE id = ?", (ap,)).fetchone()[0]
+    node = {"mac": mac, "ip": "10.0.0.1", "name": "AP", "role": "gateway",
+            "wifi": {"radios": [{"name": "r1", "band": "2.4 GHz", "channel": 6, "width_mhz": 20, "clients": 4, "utilization_pct": 30}],
+                     "neighbours": [{"bssid": f"de:ad:be:ef:00:0{i}", "ssid": "x", "band": "2.4 GHz", "channel": 6, "signal_dbm": -60} for i in range(1, 6)], "scanned": True},
+            "uplinks": {"mode": "failover", "connections": [{"name": "WAN", "up": True, "active": True, "priority": 1}, {"name": "WAN2", "up": False, "active": False, "priority": 2}]}}
+    from app.plugins.contract import validate_output
+
+    data = validate_output("topology", {"nodes": [node], "clients": []})
+    airspace.record(conn, "unifi", data, NOW)
+    uplinks.record(conn, "unifi", data, NOW)
+    s = parse(render_metrics(conn, NOW))
+    base = 'access_point="%s",band="2.4 GHz",channel="6"}' % conn.execute("SELECT COALESCE(custom_name, hostname, primary_ip) FROM devices WHERE id = ?", (ap,)).fetchone()[0]
+    assert s["netlens_wifi_radio_clients{" + base] == 4 and s["netlens_wifi_radio_neighbour_networks{" + base] == 5 and s["netlens_wifi_radio_airtime_ratio{" + base] == pytest.approx(0.3)
+    gw = conn.execute("SELECT COALESCE(custom_name, hostname, primary_ip) FROM devices WHERE id = ?", (ap,)).fetchone()[0]
+    assert s['netlens_uplink_up{gateway="%s",connection="WAN"}' % gw] == 1 and s['netlens_uplink_up{gateway="%s",connection="WAN2"}' % gw] == 0
+    assert s['netlens_uplink_active{gateway="%s",connection="WAN"}' % gw] == 1
