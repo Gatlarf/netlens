@@ -8,6 +8,7 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-90d}
+      - --query.lookback-delta=${PROMETHEUS_LOOKBACK:-5m}      # 20m when you load the demo history (one point per 15 minutes)
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/netlens.token:/etc/prometheus/netlens.token:ro

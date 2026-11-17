@@ -115,7 +115,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_health_score"
+     "expr": "max(netlens_health_score)"
     }
    ],
    "fieldConfig": {
@@ -182,7 +182,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_devices{state=\"online\"}"
+     "expr": "max(netlens_devices{state=\"online\"})"
     }
    ],
    "fieldConfig": {
@@ -243,7 +243,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_devices{state=\"offline\"}"
+     "expr": "max(netlens_devices{state=\"offline\"})"
     }
    ],
    "fieldConfig": {
@@ -308,7 +308,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_devices{state=\"unknown\"}"
+     "expr": "max(netlens_devices{state=\"unknown\"})"
     }
    ],
    "fieldConfig": {
@@ -353,7 +353,7 @@
    "id": 5,
    "type": "stat",
    "title": "Uptime, 24 h",
-   "description": "",
+   "description": "Share of successful checks of the always-on devices (all devices when none is marked).",
    "datasource": {
     "type": "prometheus",
     "uid": "${ds}"
@@ -373,7 +373,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_uptime_ratio{window=\"24h\"}"
+     "expr": "max(netlens_core_uptime_ratio{window=\"24h\"}) or max(netlens_uptime_ratio{window=\"24h\"})"
     }
    ],
    "fieldConfig": {
@@ -406,7 +406,7 @@
    },
    "options": {
     "colorMode": "value",
-    "graphMode": "area",
+    "graphMode": "none",
     "textMode": "auto",
     "justifyMode": "center",
     "wideLayout": true,
@@ -422,8 +422,8 @@
   {
    "id": 6,
    "type": "stat",
-   "title": "Status",
-   "description": "A failed scan, a failing plugin or service, or an old scan.",
+   "title": "Attention",
+   "description": "Failing services, containers, plugins and scans, and anything else Netlens wants a look at. Open Netlens for the list.",
    "datasource": {
     "type": "prometheus",
     "uid": "${ds}"
@@ -443,12 +443,12 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_problem"
+     "expr": "clamp_min((max(netlens_containers_unhealthy) or vector(0)) + (count(netlens_service_up == 0) or vector(0)) + (max(netlens_scans_failed_24h) or vector(0)) + (count(netlens_plugin_up == 0) or vector(0)), scalar(max(netlens_problem) or vector(0)))"
     }
    ],
    "fieldConfig": {
     "defaults": {
-     "unit": "short",
+     "unit": "suffix: to check",
      "thresholds": {
       "mode": "absolute",
       "steps": [
@@ -457,8 +457,12 @@
         "value": null
        },
        {
-        "color": "#ef4b5f",
+        "color": "#f5a623",
         "value": 1
+       },
+       {
+        "color": "#ef4b5f",
+        "value": 3
        }
       ]
      },
@@ -469,10 +473,6 @@
         "0": {
          "text": "All good",
          "color": "#2ecc8f"
-        },
-        "1": {
-         "text": "Look here",
-         "color": "#ef4b5f"
         }
        }
       }
@@ -583,7 +583,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_speedtest_download_bits_per_second"
+     "expr": "max(netlens_speedtest_download_bits_per_second)"
     }
    ],
    "fieldConfig": {
@@ -608,7 +608,7 @@
    },
    "options": {
     "colorMode": "value",
-    "graphMode": "area",
+    "graphMode": "none",
     "textMode": "auto",
     "justifyMode": "center",
     "wideLayout": true,
@@ -645,7 +645,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_speedtest_upload_bits_per_second"
+     "expr": "max(netlens_speedtest_upload_bits_per_second)"
     }
    ],
    "fieldConfig": {
@@ -670,7 +670,7 @@
    },
    "options": {
     "colorMode": "value",
-    "graphMode": "area",
+    "graphMode": "none",
     "textMode": "auto",
     "justifyMode": "center",
     "wideLayout": true,
@@ -707,7 +707,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_speedtest_latency_seconds"
+     "expr": "max(netlens_speedtest_latency_seconds)"
     }
    ],
    "fieldConfig": {
@@ -740,7 +740,7 @@
    },
    "options": {
     "colorMode": "value",
-    "graphMode": "area",
+    "graphMode": "none",
     "textMode": "auto",
     "justifyMode": "center",
     "wideLayout": true,
@@ -777,7 +777,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_wifi_clients"
+     "expr": "max(netlens_wifi_clients)"
     }
    ],
    "fieldConfig": {
@@ -801,7 +801,7 @@
    },
    "options": {
     "colorMode": "value",
-    "graphMode": "area",
+    "graphMode": "none",
     "textMode": "auto",
     "justifyMode": "center",
     "wideLayout": true,
@@ -838,7 +838,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_wifi_weak_clients"
+     "expr": "max(netlens_wifi_weak_clients)"
     }
    ],
    "fieldConfig": {
@@ -907,7 +907,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "time() - netlens_backup_last_timestamp_seconds"
+     "expr": "time() - max(netlens_backup_last_timestamp_seconds)"
     }
    ],
    "fieldConfig": {
@@ -1086,7 +1086,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_health_score_part",
+     "expr": "avg_over_time(max by (part) (netlens_health_score_part)[3h:15m])",
      "legendFormat": "{{part}}"
     },
     {
@@ -1097,7 +1097,7 @@
      "refId": "B",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_health_score",
+     "expr": "avg_over_time(max(netlens_health_score)[3h:15m])",
      "legendFormat": "overall"
     }
    ],
@@ -1111,7 +1111,7 @@
       "drawStyle": "line",
       "lineInterpolation": "smooth",
       "lineWidth": 2,
-      "fillOpacity": 8,
+      "fillOpacity": 6,
       "gradientMode": "opacity",
       "showPoints": "never",
       "spanNulls": true,
@@ -1119,12 +1119,11 @@
        "mode": "none",
        "group": "A"
       },
-      "axisSoftMin": 0,
       "thresholdsStyle": {
        "mode": "dashed+area"
       }
      },
-     "min": 0,
+     "min": 80,
      "max": 100,
      "thresholds": {
       "mode": "absolute",
@@ -1291,7 +1290,7 @@
     "x": 0,
     "y": 18,
     "w": 12,
-    "h": 11
+    "h": 18
    },
    "targets": [
     {
@@ -1374,7 +1373,7 @@
     "x": 12,
     "y": 18,
     "w": 12,
-    "h": 11
+    "h": 18
    },
    "targets": [
     {
@@ -1455,7 +1454,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 29,
+    "y": 36,
     "w": 8,
     "h": 9
    },
@@ -1502,7 +1501,7 @@
     "overrides": []
    },
    "options": {
-    "displayMode": "gradient",
+    "displayMode": "basic",
     "orientation": "horizontal",
     "valueMode": "color",
     "showUnfilled": true,
@@ -1529,7 +1528,7 @@
    },
    "gridPos": {
     "x": 8,
-    "y": 29,
+    "y": 36,
     "w": 8,
     "h": 9
    },
@@ -1592,7 +1591,7 @@
    },
    "gridPos": {
     "x": 16,
-    "y": 29,
+    "y": 36,
     "w": 8,
     "h": 9
    },
@@ -1657,7 +1656,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 38,
+    "y": 45,
     "w": 12,
     "h": 8
    },
@@ -1670,7 +1669,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_service_response_seconds"
+     "expr": "avg_over_time(netlens_service_response_seconds[1h:15m])",
+     "legendFormat": "{{name}}"
     }
    ],
    "fieldConfig": {
@@ -1726,7 +1726,7 @@
    },
    "gridPos": {
     "x": 12,
-    "y": 38,
+    "y": 45,
     "w": 12,
     "h": 8
    },
@@ -1739,7 +1739,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_events_by_kind_24h"
+     "expr": "netlens_events_by_kind_24h",
+     "legendFormat": "{{kind}}"
     }
    ],
    "fieldConfig": {
@@ -1789,7 +1790,7 @@
    "collapsed": false,
    "gridPos": {
     "x": 0,
-    "y": 46,
+    "y": 53,
     "w": 24,
     "h": 1
    },
@@ -1806,7 +1807,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 47,
+    "y": 54,
     "w": 8,
     "h": 8
    },
@@ -1819,7 +1820,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "100 * netlens_wifi_radio_airtime_ratio"
+     "expr": "100 * netlens_wifi_radio_airtime_ratio",
+     "legendFormat": "{{access_point}} {{band}}"
     }
    ],
    "fieldConfig": {
@@ -1889,7 +1891,7 @@
    },
    "gridPos": {
     "x": 8,
-    "y": 47,
+    "y": 54,
     "w": 8,
     "h": 8
    },
@@ -1902,7 +1904,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_wifi_radio_neighbour_networks"
+     "expr": "netlens_wifi_radio_neighbour_networks",
+     "legendFormat": "{{access_point}} {{band}}"
     }
    ],
    "fieldConfig": {
@@ -1912,10 +1915,10 @@
       "mode": "palette-classic"
      },
      "custom": {
-      "drawStyle": "bars",
+      "drawStyle": "line",
       "lineInterpolation": "smooth",
       "lineWidth": 2,
-      "fillOpacity": 70,
+      "fillOpacity": 22,
       "gradientMode": "opacity",
       "showPoints": "never",
       "spanNulls": true,
@@ -1958,7 +1961,7 @@
    },
    "gridPos": {
     "x": 16,
-    "y": 47,
+    "y": 54,
     "w": 8,
     "h": 8
    },
@@ -1971,7 +1974,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_wifi_radio_clients"
+     "expr": "netlens_wifi_radio_clients",
+     "legendFormat": "{{access_point}} {{band}}"
     }
    ],
    "fieldConfig": {
@@ -2019,15 +2023,15 @@
   {
    "id": 29,
    "type": "timeseries",
-   "title": "Signal of Wi-Fi clients",
-   "description": "Every Wi-Fi client; closer to 0 is stronger.",
+   "title": "Average Wi-Fi signal per access point",
+   "description": "The average signal of the clients on each access point and band; closer to 0 is stronger. The dashed line is the weak-signal limit.",
    "datasource": {
     "type": "prometheus",
     "uid": "${ds}"
    },
    "gridPos": {
     "x": 0,
-    "y": 55,
+    "y": 62,
     "w": 12,
     "h": 8
    },
@@ -2040,7 +2044,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_wifi_signal_dbm"
+     "expr": "avg by (node, band) (avg_over_time(netlens_wifi_signal_dbm[1h:15m]))",
+     "legendFormat": "{{node}} {{band}}"
     }
    ],
    "fieldConfig": {
@@ -2053,7 +2058,7 @@
       "drawStyle": "line",
       "lineInterpolation": "smooth",
       "lineWidth": 2,
-      "fillOpacity": 22,
+      "fillOpacity": 6,
       "gradientMode": "opacity",
       "showPoints": "never",
       "spanNulls": true,
@@ -2065,12 +2070,13 @@
        "mode": "dashed+area"
       }
      },
-     "max": -30,
+     "min": -85,
+     "max": -35,
      "thresholds": {
       "mode": "absolute",
       "steps": [
        {
-        "color": "transparent",
+        "color": "#ef4b5f",
         "value": null
        },
        {
@@ -2084,10 +2090,12 @@
    },
    "options": {
     "legend": {
-     "displayMode": "hidden",
+     "displayMode": "table",
      "placement": "bottom",
-     "showLegend": false,
-     "calcs": []
+     "showLegend": true,
+     "calcs": [
+      "lastNotNull"
+     ]
     },
     "tooltip": {
      "mode": "multi",
@@ -2106,7 +2114,7 @@
    },
    "gridPos": {
     "x": 12,
-    "y": 55,
+    "y": 62,
     "w": 6,
     "h": 8
    },
@@ -2179,7 +2187,7 @@
    },
    "gridPos": {
     "x": 18,
-    "y": 55,
+    "y": 62,
     "w": 6,
     "h": 8
    },
@@ -2240,7 +2248,7 @@
    "collapsed": false,
    "gridPos": {
     "x": 0,
-    "y": 63,
+    "y": 70,
     "w": 24,
     "h": 1
    },
@@ -2257,7 +2265,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 64,
+    "y": 71,
     "w": 12,
     "h": 6
    },
@@ -2340,7 +2348,7 @@
    },
    "gridPos": {
     "x": 12,
-    "y": 64,
+    "y": 71,
     "w": 12,
     "h": 6
    },
@@ -2423,7 +2431,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 70,
+    "y": 77,
     "w": 24,
     "h": 7
    },
@@ -2498,7 +2506,7 @@
    "collapsed": false,
    "gridPos": {
     "x": 0,
-    "y": 77,
+    "y": 84,
     "w": 24,
     "h": 1
    },
@@ -2515,7 +2523,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 78,
+    "y": 85,
     "w": 6,
     "h": 7
    },
@@ -2580,7 +2588,7 @@
    },
    "gridPos": {
     "x": 6,
-    "y": 78,
+    "y": 85,
     "w": 6,
     "h": 7
    },
@@ -2645,7 +2653,7 @@
    },
    "gridPos": {
     "x": 12,
-    "y": 78,
+    "y": 85,
     "w": 6,
     "h": 7
    },
@@ -2719,7 +2727,7 @@
    },
    "gridPos": {
     "x": 18,
-    "y": 78,
+    "y": 85,
     "w": 6,
     "h": 7
    },
@@ -2784,7 +2792,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 85,
+    "y": 92,
     "w": 8,
     "h": 7
    },
@@ -2849,7 +2857,7 @@
    },
    "gridPos": {
     "x": 8,
-    "y": 85,
+    "y": 92,
     "w": 8,
     "h": 7
    },
@@ -2923,7 +2931,7 @@
    },
    "gridPos": {
     "x": 16,
-    "y": 85,
+    "y": 92,
     "w": 8,
     "h": 7
    },
@@ -2936,7 +2944,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "(netlens_containers_unhealthy or vector(0)) + (netlens_containers_image_updates or vector(0))"
+     "expr": "(max(netlens_containers_unhealthy) or vector(0)) + (max(netlens_containers_image_updates) or vector(0))"
     }
    ],
    "fieldConfig": {
@@ -2984,7 +2992,7 @@
    "collapsed": false,
    "gridPos": {
     "x": 0,
-    "y": 92,
+    "y": 99,
     "w": 24,
     "h": 1
    },
@@ -3001,7 +3009,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 93,
+    "y": 100,
     "w": 8,
     "h": 7
    },
@@ -3014,7 +3022,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_scan_last_duration_seconds"
+     "expr": "netlens_scan_last_duration_seconds",
+     "legendFormat": "{{kind}}"
     }
    ],
    "fieldConfig": {
@@ -3068,7 +3077,7 @@
    },
    "gridPos": {
     "x": 8,
-    "y": 93,
+    "y": 100,
     "w": 8,
     "h": 7
    },
@@ -3081,7 +3090,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_scan_hosts_found"
+     "expr": "netlens_scan_hosts_found",
+     "legendFormat": "{{kind}}"
     }
    ],
    "fieldConfig": {
@@ -3135,7 +3145,7 @@
    },
    "gridPos": {
     "x": 16,
-    "y": 93,
+    "y": 100,
     "w": 8,
     "h": 7
    },
@@ -3148,7 +3158,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "time() - netlens_plugin_last_sync_timestamp_seconds"
+     "expr": "time() - netlens_plugin_last_sync_timestamp_seconds",
+     "legendFormat": "{{plugin}}"
     }
    ],
    "fieldConfig": {
@@ -3204,7 +3215,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 100,
+    "y": 107,
     "w": 4,
     "h": 4
    },
@@ -3217,7 +3228,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_database_size_bytes"
+     "expr": "max(netlens_database_size_bytes)"
     }
    ],
    "fieldConfig": {
@@ -3265,7 +3276,7 @@
    },
    "gridPos": {
     "x": 4,
-    "y": 100,
+    "y": 107,
     "w": 4,
     "h": 4
    },
@@ -3330,7 +3341,7 @@
    },
    "gridPos": {
     "x": 8,
-    "y": 100,
+    "y": 107,
     "w": 4,
     "h": 4
    },
@@ -3343,7 +3354,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_devices_flapping"
+     "expr": "max(netlens_devices_flapping)"
     }
    ],
    "fieldConfig": {
@@ -3395,7 +3406,7 @@
    },
    "gridPos": {
     "x": 12,
-    "y": 100,
+    "y": 107,
     "w": 4,
     "h": 4
    },
@@ -3437,7 +3448,7 @@
         },
         "0": {
          "text": "Off",
-         "color": "#ef4b5f"
+         "color": "#64748b"
         }
        }
       }
@@ -3474,7 +3485,7 @@
    },
    "gridPos": {
     "x": 16,
-    "y": 100,
+    "y": 107,
     "w": 4,
     "h": 4
    },
@@ -3487,7 +3498,7 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_plugin_updates_available"
+     "expr": "max(netlens_plugin_updates_available)"
     }
    ],
    "fieldConfig": {
@@ -3539,7 +3550,7 @@
    },
    "gridPos": {
     "x": 20,
-    "y": 100,
+    "y": 107,
     "w": 4,
     "h": 4
    },
@@ -3578,7 +3589,7 @@
    "options": {
     "colorMode": "none",
     "graphMode": "none",
-    "textMode": "auto",
+    "textMode": "name",
     "justifyMode": "center",
     "wideLayout": true,
     "reduceOptions": {
@@ -3597,7 +3608,7 @@
    "collapsed": false,
    "gridPos": {
     "x": 0,
-    "y": 104,
+    "y": 111,
     "w": 24,
     "h": 1
    },
@@ -3614,7 +3625,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 105,
+    "y": 112,
     "w": 12,
     "h": 8
    },
@@ -3627,7 +3638,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_host_receive_bits_per_second{device=~\"$device\"}"
+     "expr": "netlens_host_receive_bits_per_second{device=~\"$device\"}",
+     "legendFormat": "{{device}} {{name}}"
     }
    ],
    "fieldConfig": {
@@ -3683,7 +3695,7 @@
    },
    "gridPos": {
     "x": 12,
-    "y": 105,
+    "y": 112,
     "w": 12,
     "h": 8
    },
@@ -3696,7 +3708,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_host_transmit_bits_per_second{device=~\"$device\"}"
+     "expr": "netlens_host_transmit_bits_per_second{device=~\"$device\"}",
+     "legendFormat": "{{device}} {{name}}"
     }
    ],
    "fieldConfig": {
@@ -3752,7 +3765,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 113,
+    "y": 120,
     "w": 12,
     "h": 8
    },
@@ -3765,7 +3778,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_host_interface_utilization_ratio{device=~\"$device\"}"
+     "expr": "netlens_host_interface_utilization_ratio{device=~\"$device\"}",
+     "legendFormat": "{{device}} {{name}}"
     }
    ],
    "fieldConfig": {
@@ -3833,7 +3847,7 @@
    },
    "gridPos": {
     "x": 12,
-    "y": 113,
+    "y": 120,
     "w": 12,
     "h": 8
    },
@@ -3846,7 +3860,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_host_interface_errors_per_second{device=~\"$device\"}"
+     "expr": "netlens_host_interface_errors_per_second{device=~\"$device\"}",
+     "legendFormat": "{{device}} {{name}}"
     }
    ],
    "fieldConfig": {
@@ -3900,7 +3915,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 121,
+    "y": 128,
     "w": 8,
     "h": 8
    },
@@ -3913,7 +3928,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_host_cpu_ratio{device=~\"$device\"}"
+     "expr": "netlens_host_cpu_ratio{device=~\"$device\"}",
+     "legendFormat": "{{device}} {{name}}"
     }
    ],
    "fieldConfig": {
@@ -3970,7 +3986,7 @@
    },
    "gridPos": {
     "x": 8,
-    "y": 121,
+    "y": 128,
     "w": 8,
     "h": 8
    },
@@ -3983,7 +3999,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_host_memory_used_ratio{device=~\"$device\"}"
+     "expr": "netlens_host_memory_used_ratio{device=~\"$device\"}",
+     "legendFormat": "{{device}} {{name}}"
     }
    ],
    "fieldConfig": {
@@ -4040,7 +4057,7 @@
    },
    "gridPos": {
     "x": 16,
-    "y": 121,
+    "y": 128,
     "w": 8,
     "h": 8
    },
@@ -4053,7 +4070,8 @@
      "refId": "A",
      "editorMode": "code",
      "range": true,
-     "expr": "netlens_host_temperature_celsius{device=~\"$device\"}"
+     "expr": "netlens_host_temperature_celsius{device=~\"$device\"}",
+     "legendFormat": "{{device}} {{name}}"
     }
    ],
    "fieldConfig": {
@@ -4120,7 +4138,7 @@
    },
    "gridPos": {
     "x": 0,
-    "y": 129,
+    "y": 136,
     "w": 12,
     "h": 8
    },
@@ -4194,7 +4212,7 @@
    },
    "gridPos": {
     "x": 12,
-    "y": 129,
+    "y": 136,
     "w": 12,
     "h": 8
    },

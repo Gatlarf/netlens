@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Makes believable history for a DEMO Netlens, so a fresh Prometheus + Grafana shows weeks of graphs on the first day.
 
-    python backfill_demo.py http://demo-netlens:8080 TOKEN [days] > history.om
+    python backfill_demo.py http://demo-netlens:8080 TOKEN [days] [instance] [job] > history.om
 
 It reads what the demo exports at /metrics right now and writes an OpenMetrics file in which every series has the same shape as today's value (evening peaks,
-a few short outages, slow drifts), ending a few minutes ago. Load it with `promtool tsdb create-blocks-from openmetrics history.om <blocks dir>` (see
+a few short outages, slow drifts), ending a few minutes ago. `instance` (default: the host:port of the address) and `job` (default netlens) are added as labels,
+so the history and the live scrapes of Prometheus are one series. Load it with `promtool tsdb create-blocks-from openmetrics history.om <blocks dir>` (see
 stack/README.md). Only use it with the demo network: the numbers are invented.
 """
 import hashlib
@@ -104,6 +105,9 @@ def main() -> int:
         return 2
     url, token = sys.argv[1], sys.argv[2]
     days = int(sys.argv[3]) if len(sys.argv) > 3 else 45
+    instance = sys.argv[4] if len(sys.argv) > 4 else url.split("://")[-1].rstrip("/")
+    job = sys.argv[5] if len(sys.argv) > 5 else "netlens"
+    extra = f'instance="{instance}",job="{job}"'
     now = time.time() - 600                      # the history stops before Prometheus's own scrapes begin
     n = days * 86400 // STEP
     rows = fetch(url, token)
@@ -123,7 +127,7 @@ def main() -> int:
             if n2 != name:
                 continue
             for t, v in zip(ts, vals):
-                out.append(f"{name}{labels} {v:.6g} {t:.0f}")
+                out.append(f"{name}{labels[:-1] + ',' + extra + '}' if labels else '{' + extra + '}'} {v:.6g} {t:.0f}")
     out.append("# EOF")
     sys.stdout.write("\n".join(out) + "\n")
     print(f"{len(series)} series, {n} points each", file=sys.stderr)

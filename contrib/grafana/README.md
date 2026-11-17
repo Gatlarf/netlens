@@ -34,5 +34,6 @@ A fresh Prometheus has no history. For a **demo** Netlens (never a real one), `b
 python backfill_demo.py http://demo-netlens:8080 TOKEN 45 > history.om
 docker run --rm --user root -v history.om:/in.om:ro -v stack_prometheus-data:/data --entrypoint sh prom/prometheus:v2.55.1 \
   -c "promtool tsdb create-blocks-from openmetrics /in.om /data && chown -R 65534:65534 /data"
+echo PROMETHEUS_LOOKBACK=20m >> .env   # the history has one point per 15 minutes
 docker compose up -d      # start Prometheus after loading, so it picks the blocks up
 ```
