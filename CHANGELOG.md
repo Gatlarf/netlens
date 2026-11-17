@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.461 — 2026-11-18
+
+### Fixed
+- **Device pages only show the cards that fit the device.** After a check of every device type: **Host probes** (read-only looks over SSH or WinRM), **Network cards** (linking the several cards of one machine) and **Bonded connection** are now shown for computers, servers, NAS boxes, virtual machines and devices of unknown type, not for phones, tablets, TVs, cameras, printers, IoT devices, switches and routers. A card still appears when the device already has something of that kind (probe results, linked cards, a bond). One list of what is a host and what is network gear now serves all the cards.
+
 ## 0.4.459 — 2026-11-18
 
 ### Fixed

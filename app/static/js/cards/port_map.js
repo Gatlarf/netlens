@@ -1,8 +1,7 @@
+import { isGear, HOSTED } from "../devicekinds.js";
 import { ApiError, get, put, del } from "../api.js";
 import { h, clear, toast, statusDot, typeBadge } from "../util.js";
 
-const SWITCHY = new Set(["switch", "router", "ap"]);
-const HOSTED = new Set(["vm", "container", "virtual machine", "docker"]);
 const SELECTED = new Map();      // device id -> the port that is open; kept when the page refreshes itself
 
 function speedText(p) {
@@ -86,11 +85,10 @@ function deviceLine(d, onRemove) {
 // Also where the owner says which device is connected to which port (the only way for a switch that does not tell, like a TP-Link Easy Smart).
 export async function buildPortMapCard(device) {
   const data = await get(`/api/devices/${device.id}/port-map`);
-  const type = device.type_override || device.device_type;
   // A computer that hosts virtual machines has them "below" it in the hierarchy, but it is not a switch: its virtual machines and containers have their own card.
   // The card stays for a device that has ports, is a switch, router or access point, or has something that the owner (or the network) plugged into it.
   const plugged = data.no_port.some((d) => d.manual || !HOSTED.has(d.type));
-  if (!data.ports.length && !plugged && !SWITCHY.has(type)) return null;
+  if (!data.ports.length && !plugged && !isGear(device)) return null;
 
   const card = h("div", { class: "card port-map-card" });
   let selected = SELECTED.get(device.id) || null;

@@ -1,3 +1,4 @@
+import { isHost } from "../devicekinds.js";
 import { get, put, post } from "../api.js";
 import { longHint } from "../ui.js";
 import { h, clear, toast, timeAgo } from "../util.js";
@@ -50,6 +51,14 @@ export function isProbeBusy() {
 // mode "health": what the probes found (device page, Health). mode "setup": the settings and the install of the probe on the host (Settings → Host probes).
 export async function buildDeviceProbeCard(device, mode = "health") {
   const setup = mode === "setup";
+  if (!setup && !isHost(device)) {                       // a phone, a camera or a switch is not a host to log in to: the card only shows when probes already ran there
+    try {
+      const had = await get(`/api/devices/${device.id}/hostprobe`);
+      if (!(had.installed_version || had.monitor_user || (had.snapshots || []).length)) return null;
+    } catch (err) {
+      return null;
+    }
+  }
   const card = h("div", { class: setup ? "probe-card" : "card admin-only probe-card" });
   for (const ev of ["input", "change"]) card.addEventListener(ev, () => { card.dataset.dirty = "1"; });
   let info = null;

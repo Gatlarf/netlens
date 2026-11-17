@@ -1,3 +1,4 @@
+import { isHost } from "../devicekinds.js";
 import { get, post, patch, del, ApiError } from "../api.js";
 import { h, toast } from "../util.js";
 
@@ -34,7 +35,7 @@ export async function buildLinkGroupsCard(device, onChange) {
   const groups = mine.groups;
   const switches = offered.switches.filter((s) => s.id !== device.id);
   const isSwitch = offered.switches.some((s) => s.id === device.id);
-  if (!groups.length && (isSwitch || !switches.length)) return null;
+  if (!groups.length && (isSwitch || !switches.length || !isHost(device))) return null;          // a bond belongs to a machine that logs in, not to a phone or a camera
 
   const card = h("div", { class: "card link-groups-card" });
   card.appendChild(h("h2", {}, "Bonded connection"));

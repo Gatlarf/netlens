@@ -17,6 +17,7 @@ import { buildUplinksCard } from "../cards/device_uplinks.js";
 import { buildSwitchPortsCard } from "../cards/switch_ports.js";
 import { buildLinkGroupsCard } from "../cards/link_groups.js";
 import { buildNicsCard } from "../cards/nics.js";
+import { isHost } from "../devicekinds.js";
 import { buildDeviceApplicationsCard } from "../cards/device_apps.js";
 import { buildDeviceConfigCards } from "../cards/device_config.js";
 import { buildDeviceBusyCard } from "../cards/device_busy.js";
@@ -970,7 +971,7 @@ export async function render(container, params) {
     const switchPortsSlot = slot("switchports", "Switch ports", true, "table");
     flow.appendChild(switchPortsSlot);
     buildSwitchPortsCard(device.id).then((c) => { if (c && !disposed) switchPortsSlot.appendChild(c); }).catch(() => {});
-    flow.appendChild(tag(buildNicsCard(device, () => load()), "nics", "Network cards", false, "list"));
+    if (isHost(device) || device.nic_of || (device.nics || []).length) flow.appendChild(tag(buildNicsCard(device, () => load()), "nics", "Network cards", false, "list"));          // a phone or a camera has one card
     const linkGroupsSlot = slot("linkgroups", "Bonded connection", false, "list");
     flow.appendChild(linkGroupsSlot);
     const drawLinkGroups = () => buildLinkGroupsCard(device, () => { linkGroupsSlot.replaceChildren(); drawLinkGroups(); }).then((c) => { if (c && !disposed) linkGroupsSlot.appendChild(c); }).catch(() => {});
