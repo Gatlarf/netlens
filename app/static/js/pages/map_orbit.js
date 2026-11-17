@@ -146,7 +146,7 @@ export async function renderOrbit(container, { layouts, current, onLayout }) {
   const zoomIn = h("button", { class: "btn", type: "button", title: "Zoom in" }, "+");
   const zoomOut = h("button", { class: "btn", type: "button", title: "Zoom out" }, "−");
   const fit = h("button", { class: "btn", type: "button", title: "Show everything" }, "Fit");
-  const readout = h("div", { class: "orbit-readout", "aria-live": "polite" }, "Point at a device");
+  const readout = h("div", { class: "orbit-readout", "aria-live": "polite" });
   const stage = h("div", { class: "orbit-stage" }, h("p", { class: "hint" }, "Loading..."));
   container.append(h("div", { class: "toolbar" }, search, status, layoutSelect, names, zoomIn, zoomOut, fit), stage, readout);
 
@@ -264,7 +264,7 @@ export async function renderOrbit(container, { layouts, current, onLayout }) {
       canvas.classList.toggle("tracing", id !== null);
       for (const el of elements.values()) el.classList.remove("lit");
       for (const path of linkOf.values()) path.classList.remove("lit");
-      if (id === null) { readout.textContent = "Point at a device"; return; }
+      if (id === null) { readout.textContent = ""; return; }
       const set = lineage(id);
       for (const x of set) { elements.get(x)?.classList.add("lit"); linkOf.get(x)?.classList.add("lit"); }
       const n = byId.get(id), up = tree.parent.get(id) !== undefined ? byId.get(tree.parent.get(id)) : null;
