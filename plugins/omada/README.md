@@ -99,6 +99,8 @@ answered: the controller version, which steps worked, and the **names and types 
 - The uplink of a **mesh** access point (connected by radio) may not be reported; such a device then hangs below the gateway.
 - A client connected to a switch that is not an Omada device is shown below the gateway.
 
-## Wi-Fi channels (1.6.0)
+## Wi-Fi channels (1.6.0) and neighbouring networks (1.6.1)
 
-*Written from the controller's documented fields; tested against a simulated controller, not yet on real hardware.* Each access point's detail (the read Netlens already does for its uplink) also gives its radios: the channel in use (`wp2g.actualChannel`, else the configured channel when it is not "auto"), the width and the number of clients. Netlens shows them in the **Wi-Fi channels** card of the access point. A radio that is switched off is left out. Neighbouring networks are not read from Omada.
+*Written from the controller's documented fields; tested against a simulated controller, not yet on real hardware.* Each access point's detail (the read Netlens already does for its uplink) also gives its radios: the channel in use (`wp2g.actualChannel`, else the configured channel when it is not "auto"), the width and the number of clients. Netlens shows them in the **Wi-Fi channels** card of the access point. A radio that is switched off is left out. 
+
+**Neighbouring networks.** Netlens also reads the controller's *rogue AP* list (the networks your access points hear in their own radio scans, so nothing is interrupted) and files each one under the access point that heard it; when the list does not say which one, under the first access point with a radio on that band. The list is empty unless **rogue AP detection** is switched on in the controller (Insight > Rogue AP). If your controller version does not give the list, or the account may not read it, only this part is skipped. *The request path and field names are written from the web API's documentation and have not been tried on a real controller; if the card shows no neighbours although the controller lists some, run the plugin's diagnose and tell us.*

@@ -111,6 +111,8 @@ class Fake(BaseHTTPRequestHandler):
             return self._send({"errorCode": 0, "result": {"privilege": {"sites": s["sites"]}}})
         if p == "sites/site1/devices":
             return self._send({"errorCode": 0, "result": DEVICES})
+        if p == "sites/site1/insight/rogue-aps" and s.get("rogues") is not None:
+            return self._send({"errorCode": 0, "result": {"data": s["rogues"], "totalRows": len(s["rogues"])}})
         if p == f"sites/site1/switches/{SW}":
             return self._send({"errorCode": 0, "result": {"mac": SW, "uplink": {"mac": GW, "port": 1, "type": "gateway"}, "ports": [
                 {"port": 1, "name": "Port1", "disable": False, "portStatus": {"linkStatus": 1, "linkSpeed": 3, "duplex": 2, "poe": False, "tx": 5000, "rx": 9000}},
@@ -519,3 +521,25 @@ def test_the_radios_of_an_access_point_are_read_from_its_detail(server):
     radios = {(r["band"], r["channel"], r["width_mhz"]) for r in node["wifi"]["radios"]}
     assert radios == {("2.4 GHz", 6, 40), ("5 GHz", 44, None)}                    # the channel in use beats "auto"; a radio that is switched off is left out
     assert all("wifi" not in n for n in out["nodes"] if n["name"] != "Living room")     # a detail that cannot be read gives no radios, and the sync goes on
+
+
+def test_neighbouring_networks_come_from_the_rogue_ap_list(server):
+    url, state = server
+    state["rogues"] = [
+        {"bssid": "AA-11-22-33-44-01", "ssid": "Neighbour", "band": 0, "channel": 6, "signal": -71, "security": 3, "channelWidth": "20MHz"},
+        {"bssid": "AA-11-22-33-44-02", "ssid": "Guest", "band": 1, "channel": 36, "signal": -60, "security": 0},
+        {"bssid": "AA-11-22-33-44-01", "band": 0, "channel": 6, "signal": -70},         # the same network twice: kept once
+        {"bssid": "AA-11-22-33-44-03", "band": 3, "channel": 5, "signal": -50},         # no access point has a 6 GHz radio: left out
+        {"ssid": "no bssid"}]
+    out = validate_output("topology", plugin.fetch(cfg(url)))
+    wifi = next(n for n in out["nodes"] if n["name"] == "Living room")["wifi"]
+    found = {n["bssid"]: n for n in wifi["neighbours"]}
+    assert sorted(found) == ["aa:11:22:33:44:01", "aa:11:22:33:44:02"] and wifi["scanned"] is True
+    assert found["aa:11:22:33:44:01"]["ssid"] == "Neighbour" and found["aa:11:22:33:44:01"]["signal_dbm"] == -71 and found["aa:11:22:33:44:01"]["width_mhz"] == 20
+    assert found["aa:11:22:33:44:02"]["security"] == "open" and found["aa:11:22:33:44:01"]["security"] == "secured"
+
+
+def test_a_controller_without_the_rogue_ap_list_still_syncs(server):
+    url, _state = server
+    out = validate_output("topology", plugin.fetch(cfg(url)))
+    assert next(n for n in out["nodes"] if n["name"] == "Living room")["wifi"]["neighbours"] == []

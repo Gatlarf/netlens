@@ -303,6 +303,7 @@ class Controller:
                     nodes[-1]["ports"] = ports
                 if self.radios.get(device["mac"]):
                     nodes[-1]["wifi"] = {"radios": self.radios[device["mac"]], "neighbours": []}
+            self._neighbours(site, nodes)
             for client in self.paged(f"sites/{site['key']}/clients", self.CLIENT_FILTERS):
                 mac = _mac(client.get("mac"))
                 if not mac or mac in seen_clients or client.get("active") is False:
@@ -311,6 +312,50 @@ class Controller:
                 clients.append((client, mac))
                 self.targets.append((site, client))
         return nodes, clients
+
+    NEIGHBOUR_PATHS = ("insight/rogue-aps", "insight/rogueaps")
+
+    def _neighbours(self, site, nodes):
+        """The networks the access points hear: the controller's own rogue-AP list (its radio scans, so nothing is interrupted). The list is empty unless rogue AP
+        detection is switched on in the controller. A controller or account that does not answer costs nothing else. Written from the web API's documented fields."""
+        with_wifi = [n for n in nodes if n.get("wifi")]
+        if not with_wifi:
+            return
+        rows = None
+        for path in self.NEIGHBOUR_PATHS:
+            try:
+                result = self._api(f"sites/{site['key']}/{path}", {"currentPage": 1, "currentPageSize": 500})
+            except OmadaError:
+                continue
+            rows = result.get("data") if isinstance(result, dict) else result
+            if isinstance(rows, list):
+                break
+        own = {n["mac"] for n in nodes}
+        seen = set()
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict):
+                continue
+            bssid = _mac(row.get("bssid") or row.get("mac"))
+            if not bssid or bssid in own:
+                continue
+            band = BANDS.get(row.get("band") if row.get("band") is not None else row.get("radioId"))
+            ap = _mac(row.get("apMac") or row.get("ap_mac") or row.get("detectedBy"))
+            node = next((n for n in with_wifi if n["mac"] == ap), None)
+            if node is None:        # the list does not say which access point heard it: file it under the first one with a radio on that band
+                node = next((n for n in with_wifi if any(r.get("band") == band for r in n["wifi"]["radios"])), None)
+            if node is None or (node["mac"], bssid) in seen:
+                continue
+            seen.add((node["mac"], bssid))
+            channel = row.get("channel")
+            signal = _number(row.get("signal"))
+            width = WIDTHS.get(str(row.get("channelWidth") or row.get("bandWidth") or "").upper().replace(" ", ""))
+            security = row.get("security")
+            node["wifi"]["neighbours"].append({
+                "bssid": bssid, "ssid": str(row.get("ssid") or "")[:64] or None, "band": band,
+                "channel": int(channel) if str(channel or "").isdigit() and int(channel) > 0 else None,
+                "signal_dbm": int(signal) if signal is not None and -127 <= signal <= 0 else None,
+                "width_mhz": width, "security": ("open" if security in (0, "0") else "secured") if security is not None else None})
+            node["wifi"]["scanned"] = True
 
     # ---- application statistics (Open API) -----------------------------------------------------------------
     @property
