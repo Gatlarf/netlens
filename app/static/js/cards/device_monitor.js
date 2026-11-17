@@ -1,3 +1,4 @@
+import { canMonitor } from "../devicekinds.js";
 import { get, put, post, del } from "../api.js";
 import { WINRM_HTTPS_SCRIPT } from "./winrm_https.js";
 import { h, clear, toast, timeAgo } from "../util.js";
@@ -309,5 +310,6 @@ export async function buildDeviceMonitorCard(device, { onChange = null } = {}) {
   }
 
   await load();
+  if (!info.monitor && !canMonitor(device)) return null;          // a phone or TV with nothing set up: no card
   return card;
 }

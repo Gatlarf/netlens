@@ -124,3 +124,20 @@ def test_an_unknown_device_and_a_client_without_counters_are_left_out(conn):
     out = topo(clients=[{"mac": "02:00:00:00:00:99", "ip": "10.9.9.9", "node_mac": AP, "medium": "wifi", "rx_bytes": 5, "tx_bytes": 5}, {"mac": PHONE, "ip": "10.0.0.50", "node_mac": AP, "medium": "wifi"}])
     assert enrich.record_client_counters(conn, "openwrt", out, "2026-11-16T10:00:00Z") == 0
     assert conn.execute("SELECT COUNT(*) FROM client_counters").fetchone()[0] == 0
+
+
+def test_ask_answers_about_channels_and_internet_connections(conn):
+    from app import ask, ask_more
+
+    both = {"mode": "failover", "connections": [{"name": "WAN", "interface": "wan1", "up": True, "active": True, "priority": 1}, {"name": "WAN2", "interface": "wan2", "up": True, "active": False, "priority": 2}]}
+    failed = {"mode": "failover", "connections": [{**both["connections"][0], "up": False, "active": False}, {**both["connections"][1], "active": True}]}
+    uplinks.record(conn, "unifi", topo(uplinks_=both), "2026-11-16T10:00:00Z")
+    uplinks.record(conn, "unifi", topo(uplinks_=failed), "2026-11-16T10:05:00Z")
+    airspace.record(conn, "unifi", topo({"radios": [radio(6)], "neighbours": [neighbour(i, 6) for i in range(1, 5)] + [neighbour(9, 11, -80)], "scanned": True}), "2026-11-16T10:00:00Z")
+    air, up = ask_more.t_airspace(conn, {}), ask_more.t_uplinks(conn, {})
+    assert air["access_points"][0]["access_point"] == "Hall AP" and air["access_points"][0]["radios"][0]["other_networks_on_this_channel"] == 4
+    assert up["gateways"][0]["connections"][0]["up"] is False and "WAN is down" in up["problems"][0]
+    assert "Hall AP" in ask_more.r_airspace(air) and "WAN DOWN" in ask_more.r_uplinks(up)
+    assert ask.route("is my wifi channel crowded?", ["Hall AP"], conn)[0] == "airspace"
+    assert ask.route("is the second internet connection up?", ["Hall AP"], conn)[0] == "uplinks"
+    assert ask.route("which devices have a weak wifi signal", ["Hall AP"], conn)[0] == "wifi"

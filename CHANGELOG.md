@@ -2,6 +2,17 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.464 — 2026-11-18
+
+### Added
+- **★ Ask and the AI assistant know about Wi-Fi channels and internet connections.** Ask "Is my Wi-Fi channel crowded?" or "Is the second internet connection up?" and Netlens answers from the channel and connection cards (channel in use, other networks on it, airtime used, a quieter channel; failover or balancing, which connection is up and which carries the traffic). The AI assistant (MCP) has two new tools for one device each: `get_device_wifi_channels` and `get_device_uplinks`.
+
+### Changed
+- **★ Phones, tablets, TVs, speakers and game consoles no longer show the "Health monitoring" card** on their page. Nobody sets up SNMP or SSH on them. A device of those types that already has monitoring set up keeps the card.
+
+### Fixed
+- **A DNS name taken by another device stuck for ever.** When two devices shared an address, the second one was registered as, say, `steamdeck-2`; the reverse lookup then returned that name as the device's own hostname, so the device kept it even after the name of the first device was no longer in the way, and its own name in Netlens was never used. A name Netlens gave only because the plain name was taken is no longer mistaken for the device's own hostname.
+
 ## 0.4.463 — 2026-11-18
 
 ### Changed

@@ -365,6 +365,33 @@ def t_wifi(conn, args, now=None) -> dict:
             "strongest": [{"device": names.get(r["device_id"]), "signal_dbm": r["rssi"]} for r in rows[-3:]][::-1]}
 
 
+def t_airspace(conn, args, now=None) -> dict:
+    """The Wi-Fi channels of every access point: the channel in use, how many other networks share it, the airtime in use and a quieter channel when there is one."""
+    from app import airspace
+
+    names = {r["id"]: _name(r) for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices")}
+    aps = []
+    for row in conn.execute("SELECT DISTINCT device_id FROM wifi_radios ORDER BY device_id").fetchall():
+        info = airspace.for_device(conn, row["device_id"])
+        aps.append({"access_point": names.get(row["device_id"]), "networks_heard": len([n for n in info["neighbours"] if not n["known"]]), "scanned": info["scanned"],
+                    "radios": [{"band": r["band"], "channel": r["channel"], "width_mhz": r.get("width_mhz"), "clients": r.get("clients"), "other_networks_on_this_channel": r["neighbours"],
+                                "airtime_used_pct": r.get("utilization_pct"), "quieter_channel": (r["advice"]["suggest"] or {}).get("channel")} for r in info["radios"]]})
+    return {"access_points": aps[:30], "problems": [a["text"] for a in airspace.attention(conn)][:10]}
+
+
+def t_uplinks(conn, args, now=None) -> dict:
+    """The internet connections of the gateways that have more than one (or report them): mode, state, which one carries the traffic."""
+    from app import uplinks
+
+    names = {r["id"]: _name(r) for r in conn.execute("SELECT id, custom_name, hostname, primary_ip FROM devices")}
+    gateways = []
+    for row in conn.execute("SELECT DISTINCT device_id FROM node_uplinks ORDER BY device_id").fetchall():
+        info = uplinks.for_device(conn, row["device_id"])
+        gateways.append({"gateway": names.get(row["device_id"]), "mode": info["mode_text"], "connections": [
+            {"name": c["name"], "up": c["up"], "carrying_traffic": c["active"], "priority": c["priority"]} for c in info["connections"]]})
+    return {"gateways": gateways[:10], "problems": [a["text"] for a in uplinks.attention(conn)][:10]}
+
+
 def t_maintenance(conn, args, now=None) -> dict:
     from app import maintenance, snooze
 
@@ -563,6 +590,29 @@ def r_wifi(r: dict) -> str:
     return f"{r['clients_seen_in_24h']} Wi-Fi clients seen. Weakest signal:\n" + _lines(r["weakest"][:6], lambda w: f"{w['device']}: {w['signal_dbm']} dBm ({w['band'] or '?'} via {w['access_point'] or '?'})")
 
 
+def r_airspace(r: dict) -> str:
+    if not r["access_points"]:
+        return "No Wi-Fi channel information yet (needs an access-point plugin that reports its radios, such as UniFi, Omada, OpenWrt or ASUS)."
+    lines = []
+    for a in r["access_points"]:
+        for x in a["radios"]:
+            extra = f", {x['other_networks_on_this_channel']} other network(s) on it" if a["scanned"] else ""
+            extra += f", {x['airtime_used_pct']:.0f}% airtime used" if x["airtime_used_pct"] is not None else ""
+            extra += f"; channel {x['quieter_channel']} is much quieter" if x["quieter_channel"] else ""
+            lines.append(f"{a['access_point']} {x['band'] or ''} channel {x['channel']}{extra}")
+    return "\n".join(lines[:15]) + ("\n" + "\n".join(r["problems"]) if r["problems"] else "\nNo channel problems.")
+
+
+def r_uplinks(r: dict) -> str:
+    if not r["gateways"]:
+        return "No internet connections are reported yet (needs a gateway plugin that does, such as UniFi, ASUS, OpenWrt or MikroTik)."
+    lines = []
+    for g in r["gateways"]:
+        state = ", ".join(f"{c['name']} {'up' if c['up'] else 'DOWN' if c['up'] is False else '?'}" + (" (carrying the traffic)" if c["carrying_traffic"] else "") for c in g["connections"])
+        lines.append(f"{g['gateway']}: {g['mode'] or 'internet connections'}: {state}")
+    return "\n".join(lines) + ("\n" + "\n".join(r["problems"]) if r["problems"] else "")
+
+
 def r_maintenance(r: dict) -> str:
     lines = [f"{w['name']}: {'ACTIVE NOW' if w['active_now'] else 'not active'}, {w['schedule']}" + (f", next start {w['next_start'][:16].replace('T', ' ')} UTC" if w["next_start"] else "") for w in r["windows"]]
     return "\n".join(lines or ["No maintenance windows are set."]) + f"\n{r['snoozed_alerts']} alert(s) are snoozed."
@@ -697,7 +747,9 @@ def route(conn, q: str, names: list[str]) -> tuple[str, dict] | None:
         ("bonds", r"\bbond(s|ed|ing)?\b|teaming|\blacp\b|link aggregation|redundant links?|lost a link"),
         ("storage", r"\bstorage\b|\bpools?\b|\braid\b|\bzfs\b|\bceph\b|iscsi|\bluns?\b|disk (failed|failure|health|degraded)|failed disks?|\bsmart (status|errors?)\b|volume"),
         ("backups", r"backup|back-up"), ("certificates", r"certificat|\bcerts?\b|\bssl\b|\btls\b|expir"), ("speedtest", r"speed ?test|internet speed|bandwidth|mbit|mbps|download speed|upload speed|how fast is (my|the) internet"),
-        ("remote_sites", r"remote sites?|branch|other (site|location)|probe"), ("wifi", r"wi-?fi|wireless|\bsignal\b|rssi"), ("maintenance", r"maintenance|snooze|planned (downtime|work)|scheduled downtime"),
+        ("remote_sites", r"remote sites?|branch|other (site|location)|probe"), ("airspace", r"(wi-?fi|wireless).*(channel|neighbou?r|interference|crowded|congest)|(channel|neighbou?r|interference|crowded|congest).*(wi-?fi|wireless)|wi-?fi channels?|neighbou?ring (wi-?fi|networks)"),
+        ("uplinks", r"internet connections?|dual[- ]wan|multi[- ]?wan|\bwan (failover|connection|link)|failover|backup (internet )?connection|second internet"),
+        ("wifi", r"wi-?fi|wireless|\bsignal\b|rssi"), ("maintenance", r"maintenance|snooze|planned (downtime|work)|scheduled downtime"),
         ("audit", r"who (changed|did|edited|deleted|added)|audit|changed (the )?settings|logged in|who logged"), ("ipv6", r"ipv6"),
         ("security", r"secur|rogue|intrud|suspicious|untrusted|not trusted|failed logins?|unexpected port|break-?in|attack|exposed to"), ("network_services", r"dhcp|dns record|dns registration|gateway|name servers?"), ("updates", r"updates? (are |is )?(available|waiting|pending)|outdated|out of date|newer (image|version) of|need updating"),
         ("smart_home", r"smart ?home|home assistant|zigbee|thermostat|\bsensors?\b|shelly|battery|batteries"),
@@ -956,7 +1008,7 @@ def r_flapping(r: dict) -> str:
 
 RENDERERS = {"networks": r_networks, "bonds": r_bonds, "storage": r_storage, "reliability": r_reliability, "coverage": r_coverage, "flapping": r_flapping, "site": r_site, "search_devices": r_search_devices, "counts": r_counts, "ports": r_ports, "guests": r_guests, "backups": r_backups, "certificates": r_certificates, "speedtest": r_speedtest,
              "network_services": r_network_services, "remote_sites": r_remote_sites, "smart_home": r_smart_home, "security": r_security, "audit": r_audit, "connections": r_connections,
-             "wifi": r_wifi, "maintenance": r_maintenance, "system": r_system, "updates": r_updates, "changes": r_changes, "ipv6": r_ipv6, "causes": r_causes, "impact": r_impact}
+             "wifi": r_wifi, "airspace": r_airspace, "uplinks": r_uplinks, "maintenance": r_maintenance, "system": r_system, "updates": r_updates, "changes": r_changes, "ipv6": r_ipv6, "causes": r_causes, "impact": r_impact}
 
 TOOLS = {
     "search_devices": (t_search_devices, "find devices by a property and count them. args (all optional): type (printer, camera, nas, switch ...), vendor (manufacturer word), os (windows, linux, android ...), online (true/false), port (number), service (name), group, tag, text (part of the name or address, for anything that is not a kind: iphone, raspberry ...), new_days, untrusted (true), missing (hostname, vendor, type, os or ip: devices that have none), not_seen_days (offline for at least that many days), sort (oldest, newest, last_seen, longest_gone or name), limit (up to 50), offset (to page through a long list). Counts are always complete; the devices shown are one page. Rows carry first_seen and last_seen when sorted or filtered by time"),
@@ -973,6 +1025,8 @@ TOOLS = {
     "audit": (t_audit, "who changed which settings in Netlens recently. args: days (1-30)"),
     "connections": (t_connections, "what one device is plugged into and which devices depend on it (the network hierarchy). args: device (name)"),
     "wifi": (t_wifi, "Wi-Fi signal strength of clients, weakest first. args: none"),
+    "airspace": (t_airspace, "Wi-Fi channels of the access points: channel in use, other networks on it, airtime used, a quieter channel. Use it for 'is my Wi-Fi channel crowded', neighbouring networks, interference. args: none"),
+    "uplinks": (t_uplinks, "the internet connections of the gateways: failover or load balancing, which are up, which carries the traffic. args: none"),
     "maintenance": (t_maintenance, "planned maintenance windows and snoozed alerts. args: none"),
     "system": (t_system, "Netlens itself: version, whether a newer version exists (only trust it when update.answer_is_current is true), last scans, installed plugins, number of monitors. args: none"),
     "updates": (t_updates, "software updates that are waiting: containers and guests, smart-home devices, Netlens. args: none"),

@@ -42,6 +42,16 @@ def PTR(ip, name, managed=False):
     return (REV, names.reverse_name(ip), "PTR", f"{name}.{ZONE}", managed)
 
 
+def test_a_name_taken_by_a_collision_is_not_learned_back_as_the_hostname():
+    """Two devices on one address: the second got "steamdeck-2", the reverse lookup then returned it as ITS hostname and it stayed for ever."""
+    records = [A("steamdeck", "192.168.0.14", True), A("steamdeck-2", "192.168.0.14", True)]
+    shelly = dev(87, ip="192.168.0.14", hostname=f"steamdeck-2.{ZONE}", custom_name="Shelly-freezer-bieke")
+    assert only(plan([shelly], snap(records)), 87)["name"] == f"shelly-freezer-bieke.{ZONE}"
+    # an ordinary suffix the device chose itself, with nothing taken, is kept
+    own = dev(5, ip="192.168.0.15", hostname=f"pc-2.{ZONE}", custom_name="Bert PC")
+    assert only(plan([own], snap([A("pc-2", "192.168.0.15", True)])), 5)["name"] == f"pc-2.{ZONE}"
+
+
 # ---------------------------------------------------------------- the basics
 def test_networks_and_zones():
     nets = parse_networks("192.168.0.0/24 = home.example.com\n10.0.0.0/8 = lab.example.org.\n# comment")

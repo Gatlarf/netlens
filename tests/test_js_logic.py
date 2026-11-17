@@ -154,7 +154,9 @@ def test_the_kind_of_a_device_decides_which_cards_it_gets():
     out = run("devicekinds.js", """
       const kinds = ['pc', 'server', 'nas', 'vm', 'unknown', 'switch', 'router', 'ap', 'phone', 'tablet', 'tv', 'camera', 'iot', 'printer', 'speaker', 'console', 'appliance', 'container', 'app'];
       return { host: kinds.filter((k) => m.isHost({ device_type: k })), gear: kinds.filter((k) => m.isGear({ device_type: k })),
-               override: m.typeOf({ device_type: 'unknown', type_override: 'switch' }), hosted: [...m.HOSTED] };""")
+               override: m.typeOf({ device_type: 'unknown', type_override: 'switch' }), hosted: [...m.HOSTED],
+               unmonitored: kinds.filter((k) => !m.canMonitor({ device_type: k })) };""")
+    assert out["unmonitored"] == ["phone", "tablet", "tv", "speaker", "console"]
     assert out["host"] == ["pc", "server", "nas", "vm", "unknown"]
     assert out["gear"] == ["switch", "router", "ap"]
     assert out["override"] == "switch" and set(out["hosted"]) == {"vm", "container", "app"}

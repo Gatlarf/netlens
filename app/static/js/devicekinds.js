@@ -12,3 +12,7 @@ export const isGear = (device) => GEAR.has(typeOf(device));
 
 // Virtual machines and containers: they hang below their host in the hierarchy, they are not plugged into it.
 export const HOSTED = new Set(["vm", "container", "app"]);
+
+// Things nobody sets up health monitoring on: phones, tablets, TVs, speakers, consoles. Their card is left out unless monitoring is already set up on one (data wins over type).
+const UNMONITORED = new Set(["phone", "tablet", "tv", "speaker", "console"]);
+export const canMonitor = (device) => !UNMONITORED.has(typeOf(device));

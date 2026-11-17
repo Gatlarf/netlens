@@ -14,6 +14,8 @@ Pure functions, no network and no database, so every rule can be tested. The rul
 
 from __future__ import annotations
 
+import re
+
 import ipaddress
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -116,11 +118,28 @@ def _iso(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _label_for(d: DnsDevice, template: str) -> tuple[str | None, str, bool]:
-    """(label, where it came from, generated?). None as label means the user's own name is not usable."""
+def _collision_echoes(ip: str, a_by_value: dict, by_name: dict, ours) -> list[str]:
+    """Names Netlens gave this address only because the plain name was taken ("steamdeck-2" next to "steamdeck"). Those, and only those, can be mistaken for a name the
+    device chose, when the reverse lookup hands them back as its hostname."""
+    out = []
+    for r in a_by_value.get(ip, []):
+        if not ours(r):
+            continue
+        label, _, zone = r["name"].partition(".")
+        match = re.fullmatch(r"(.+)-(\d+)", label)
+        if match and by_name.get((f"{match.group(1)}.{zone}", "A")):
+            out.append(r["name"].lower().rstrip("."))
+    return out
+
+
+def _label_for(d: DnsDevice, template: str, echo: frozenset = frozenset()) -> tuple[str | None, str, bool]:
+    """(label, where it came from, generated?). None as label means the user's own name is not usable.
+    `echo`: the full names Netlens itself registered for this address. A hostname that is exactly one of them is what the reverse lookup answered with after Netlens
+    wrote the record, not a name the device chose, so it is not used (otherwise a name taken by another device, say "steamdeck-2", would be kept for ever)."""
     if d.dns_name:
         return names.clean_label(d.dns_name), "your DNS name", False
-    label = names.first_label(d.hostname)
+    host = (d.hostname or "").strip().lower().rstrip(".")
+    label = None if "." in host and host in echo else names.first_label(d.hostname)
     if label:
         return label, "its hostname", False
     label = names.clean_label(d.custom_name)
@@ -186,7 +205,7 @@ def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, 
         if seen and now_dt - seen > timedelta(days=settings.max_offline_days) and d.dns_mode != "always":
             skip(f"not seen for more than {settings.max_offline_days} days", zone)
             continue
-        label, source, generated = _label_for(d, settings.template)
+        label, source, generated = _label_for(d, settings.template, frozenset(_collision_echoes(d.ip, a_by_value, by_name, ours)))
         if label is None:
             skip("the DNS name you entered is not a valid host name", zone)
             continue
