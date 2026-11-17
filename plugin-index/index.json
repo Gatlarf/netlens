@@ -1939,6 +1939,18 @@
    ],
    "releases": [
     {
+     "version": "1.6.1",
+     "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.6.1/omada.zip",
+     "sha256": "745f2383bc655e3f69d43eaa3fa40e90f76f6681c20bad1b7b610e87dae33712",
+     "api_version": 1,
+     "min_netlens": "0.4.446",
+     "released": "2026-11-17",
+     "changelog": "Neighbouring Wi-Fi networks: reads the controller's rogue AP list (turn on rogue AP detection in the controller) and shows it in the Wi-Fi channels card. Simulated controller only; if the card stays empty although the controller lists networks, run Diagnose. Needs Netlens 0.4.446.",
+     "review": {
+      "level": "community"
+     }
+    },
+    {
      "version": "1.6.0",
      "download_url": "https://github.com/Gatlarf/netlens/releases/download/plugin-omada-v1.6.0/omada.zip",
      "sha256": "b6b7a70d2d3b462700341667dbd5c3561957b5d95e41433d47494ca922ac1673",
