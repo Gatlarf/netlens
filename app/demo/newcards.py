@@ -57,7 +57,7 @@ def seed(conn, ids: dict, now: datetime) -> None:
         day = (now - timedelta(days=back)).strftime("%Y-%m-%d")
         score = max(40, min(99, round(88 + 4 * (30 - back) / 30 - (22 if 14 <= back <= 17 else 0) + rng.randint(-3, 3))))
         cameras = max(40, min(100, score + rng.randint(-6, 4)))
-        conn.execute("INSERT OR REPLACE INTO score_history (day, score, cameras, updated) VALUES (?, ?, ?, ?)", (day, score, cameras, day + "T23:00:00Z"))
+        conn.execute("INSERT INTO score_history (day, score, cameras, updated) VALUES (?, ?, ?, ?) ON CONFLICT(day) DO UPDATE SET score = excluded.score, cameras = excluded.cameras, updated = excluded.updated", (day, score, cameras, day + "T23:00:00Z"))
     conn.commit()
     group = {r["name"]: r["id"] for r in conn.execute("SELECT id, name FROM device_groups")}
     switch = ids.get("sw_garden")
