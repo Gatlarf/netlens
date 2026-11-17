@@ -1031,3 +1031,9 @@ details.exposure-item > :not(summary), .config-change > :not(summary) { margin-l
 .report-templates .ar-form input[type=color] { width: 4rem; height: 2.2rem; padding: 2px; }
 .report-templates .ar-form textarea { width: 100%; max-width: 36rem; }
 .customer-reports .row-actions { flex-wrap: wrap; justify-content: flex-end; }
+
+/* the mass edit: devices marked for deletion */
+.bulk-table tr.bulk-delete td { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.bulk-table tr.bulk-delete .bulk-name input, .bulk-table tr.bulk-delete .bulk-name .hint { text-decoration: line-through; opacity: .6; }
+.bulk-delete-head, .bulk-delete-cell { border-left: 1px solid var(--border); }
+.bulk-delete-head label { color: var(--bad); }

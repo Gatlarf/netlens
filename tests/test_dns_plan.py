@@ -174,6 +174,10 @@ def test_grace_period_gives_clients_time_to_register_themselves():
     assert only(later, 1)["state"] == "wait" and "0.5 h" in only(later, 1)["reason"]
     ready = build_plan([dev(1, first_missing="2026-10-10T09:00:00Z")], snap(), st, NOW)     # 3 h
     assert only(ready, 1)["state"] == "add"
+    # the plan is worked out twice per scan (remember it, then apply it): what the first one stores must still say the grace period is over
+    assert ready["first_missing"] == {1: "2026-10-10T09:00:00Z"}
+    again = build_plan([dev(1, first_missing=ready["first_missing"][1])], snap(), st, NOW)
+    assert only(again, 1)["state"] == "add"
     registered = build_plan([dev(1, first_missing="2026-10-10T09:00:00Z")], snap([A("host1", "192.168.0.10")]), st, NOW)
     assert only(registered, 1)["state"] == "self" and registered["first_missing"] == {1: None}   # it did register itself: the clock is reset
     assert only(build_plan([dev(1, dns_mode="always")], snap(), st, NOW), 1)["state"] == "add"     # always: no waiting

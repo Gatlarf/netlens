@@ -56,3 +56,19 @@ def test_bulk_edit_reports_a_bad_row_and_goes_on(client):
 def test_bulk_edit_refuses_unknown_fields(client):
     one = client.get("/api/devices").json()[0]
     assert client.post("/api/devices/bulk", json={"changes": [{"id": one["id"], "notes": "x"}]}).status_code == 422
+
+
+def test_bulk_delete_removes_many_devices_and_can_ignore_them(client):
+    one, two = sorted(client.get("/api/devices").json(), key=lambda d: d["primary_ip"])
+    res = client.post("/api/devices/bulk-delete", json={"ids": [one["id"], 99999, one["id"]], "ignore": True})
+    assert res.status_code == 200
+    assert res.json() == {"deleted": 1, "errors": [{"id": 99999, "detail": "device not found"}]}       # a repeated id counts once; one that does not exist is reported
+    assert [d["id"] for d in client.get("/api/devices").json()] == [two["id"]]
+    ignored = client.get("/api/ignored").json()
+    ignored = ignored if isinstance(ignored, list) else ignored.get("ignored", ignored.get("devices", []))
+    assert any(i["mac"] == "aa:00:00:00:00:01" for i in ignored)
+    events = [e["kind"] for e in client.get("/api/events?limit=20").json()]
+    assert "device_deleted" in events
+    assert client.post("/api/devices/bulk-delete", json={"ids": []}).status_code == 422
+    assert client.post("/api/devices/bulk-delete", json={"ids": [two["id"]]}).json() == {"deleted": 1, "errors": []}
+    assert client.get("/api/devices").json() == []

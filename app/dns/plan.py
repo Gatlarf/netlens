@@ -302,8 +302,11 @@ def build_plan(devices: list[DnsDevice], snapshot: dict, settings: DnsSettings, 
         if not changes:
             done("ok", "registered by Netlens")
             continue
-        first_missing[d.id] = None
         state = "add" if any(c["action"] == "add" and c["type"] == "A" for c in changes) else "update"
+        if state == "update":
+            first_missing[d.id] = None
+        # an "add" keeps its clock: the plan is worked out twice per scan (once to remember it, once to apply it), and the second one must still see that the grace period is over.
+        # The clock stops by itself when the record exists.
         item(state, "; ".join(reasons), changes)
 
     # ---- containers that share their host's address: a CNAME to the host (only when the host itself is registered)

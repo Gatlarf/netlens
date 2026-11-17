@@ -785,13 +785,8 @@ def patch_device(
     return _build_device_detail(conn, device_id, row)
 
 
-@router.delete("/devices/{device_id}", status_code=204)
-def delete_device(device_id: int, ignore: bool = False, conn: sqlite3.Connection = Depends(get_conn)) -> None:
-    """Delete a device with its ports, names, history and links.
-
-    With ignore=true the device is also put on the ignore list, so scans do not add it back
-    (a device that is still on the network would otherwise reappear at the next scan).
-    """
+def _delete_one(conn: sqlite3.Connection, device_id: int, ignore: bool) -> None:
+    """Delete one device (see delete_device). Raises HTTPException when it does not exist or cannot be ignored."""
     row = conn.execute(
         "SELECT mac, primary_ip, hostname, custom_name FROM devices WHERE id = ?", (device_id,)
     ).fetchone()
@@ -820,6 +815,44 @@ def delete_device(device_id: int, ignore: bool = False, conn: sqlite3.Connection
         series.forget("device", device_id)
     ip = f" ({row['primary_ip']})" if row["primary_ip"] and row["primary_ip"] != label else ""
     add_event(conn, "device_deleted", f"{label}{ip} deleted" + (" and ignored" if ignore else ""))
+
+
+@router.delete("/devices/{device_id}", status_code=204)
+def delete_device(device_id: int, ignore: bool = False, conn: sqlite3.Connection = Depends(get_conn)) -> None:
+    """Delete a device with its ports, names, history and links.
+
+    With ignore=true the device is also put on the ignore list, so scans do not add it back
+    (a device that is still on the network would otherwise reappear at the next scan).
+    """
+    _delete_one(conn, device_id, ignore)
+
+
+class BulkDeleteBody(BaseModel):
+    model_config = {"extra": "forbid"}
+    ids: list[int] = Field(min_length=1, max_length=2000)
+    ignore: bool = False
+
+
+@router.post("/devices/bulk-delete")
+def bulk_delete_devices(body: BulkDeleteBody, request: Request, conn: sqlite3.Connection = Depends(get_conn)) -> dict[str, Any]:
+    """Delete many devices at once (the mass edit on the Devices page), each exactly like the delete of one device. A device that cannot be deleted
+    is reported without stopping the others. Administrators only (every write is)."""
+    scope = scope_of(request)
+    allowed = None
+    if scope is not None:
+        allowed = {r["id"] for r in conn.execute("SELECT id, group_id FROM devices").fetchall() if r["group_id"] in scope}
+    deleted = 0
+    errors: list[dict[str, Any]] = []
+    for device_id in dict.fromkeys(body.ids):
+        if allowed is not None and device_id not in allowed:
+            errors.append({"id": device_id, "detail": "device not found"})
+            continue
+        try:
+            _delete_one(conn, device_id, body.ignore)
+            deleted += 1
+        except HTTPException as err:
+            errors.append({"id": device_id, "detail": err.detail})
+    return {"deleted": deleted, "errors": errors}
 
 
 @router.post("/devices/{device_id}/scan", status_code=202)

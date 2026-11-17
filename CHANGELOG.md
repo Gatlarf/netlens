@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.462 — 2026-11-18
+
+### Added
+- **★ Delete many devices at once.** In **Edit many** on the Devices page there is a new **Delete** column. Tick the devices you no longer need (the tick box in the column title marks every listed device, so a filter such as "offline" plus one click lists and marks them all), press **Save changes**, and confirm: the window names the devices and offers **Also ignore them in future scans** (on by default when some of them are online, so a scan does not add them back). Nothing is deleted before that confirmation; cancelling leaves everything as it was. Marked rows are struck through and tinted red. Administrators only, like the delete on a device's page.
+
+### Fixed
+- **Devices that waited for DNS registration were never registered.** A device without a DNS record waits two hours in case it registers itself. Netlens worked out the plan twice per scan (once to remember it, once to apply it) and the first one cleared the waiting clock when the two hours were over, so the second one started waiting again, every time. Automatic registration therefore only worked for devices that registered themselves. The clock now stays until the record exists.
+
 ## 0.4.461 — 2026-11-18
 
 ### Fixed

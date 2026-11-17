@@ -2,6 +2,7 @@
 // decide which), one control per setting. Changes are only staged here (`staged`, by device id, only the fields that differ from what the
 // server has); nothing is saved until Save. The staged changes survive a change of filter and the refresh of the list underneath.
 import { post } from "../api.js";
+import { formDialog } from "../formdialog.js";
 import { h, clear, toast, statusDot, TYPE_LABELS, shortName } from "../util.js";
 
 // the settings that are a tick box: [field of the API, column title, hint]
@@ -15,6 +16,7 @@ const FLAGS = [
 
 export function createBulkEditor({ getDevices, getGroups, onSaved, onLeave }) {
   const staged = new Map();           // device id -> { field: new value }
+  const marked = new Set();           // devices ticked for deletion (nothing is deleted before Save and a confirmation)
   const root = h("div", { class: "bulk-edit" });
   let rowsByDevice = new Map();       // device id -> { device, controls } of the rows on screen
   let bar;
@@ -42,24 +44,31 @@ export function createBulkEditor({ getDevices, getGroups, onSaved, onLeave }) {
 
   function paintRow(id) {
     const entry = rowsByDevice.get(id);
-    if (entry) entry.tr.classList.toggle("bulk-changed", staged.has(id));
+    if (entry) { entry.tr.classList.toggle("bulk-changed", staged.has(id)); entry.tr.classList.toggle("bulk-delete", marked.has(id)); }
     paintHeads();
   }
 
   function paintBar() {
-    const n = staged.size;
-    status.textContent = n ? `${n} device${n === 1 ? "" : "s"} changed, not saved yet` : "No changes yet";
-    saveBtn.disabled = !n;
+    const n = staged.size, m = marked.size;
+    status.textContent = n || m ? [n ? `${n} device${n === 1 ? "" : "s"} changed` : "", m ? `${m} marked for deletion` : ""].filter(Boolean).join(", ") + ", not saved yet" : "No changes yet";
+    saveBtn.disabled = !n && !m;
+    saveBtn.classList.toggle("danger", m > 0);
   }
 
   // the tick box in a column title shows whether all listed rows are on, none, or a mix
   const heads = [];
+  let deleteHead = null;
   function paintHeads() {
     const devices = getDevices();
     for (const { field, box } of heads) {
       const on = devices.filter((d) => valueOf(d, field)).length;
       box.checked = devices.length > 0 && on === devices.length;
       box.indeterminate = on > 0 && on < devices.length;
+    }
+    if (deleteHead) {
+      const on = devices.filter((d) => marked.has(d.id)).length;
+      deleteHead.checked = devices.length > 0 && on === devices.length;
+      deleteHead.indeterminate = on > 0 && on < devices.length;
     }
   }
 
@@ -71,17 +80,45 @@ export function createBulkEditor({ getDevices, getGroups, onSaved, onLeave }) {
     }
   }
 
+  // Deleting asks first, and asks before anything is saved, so cancelling leaves everything as it was.
+  async function confirmDelete() {
+    const devices = getDevices().filter((d) => marked.has(d.id));
+    const names = devices.slice(0, 8).map((d) => d.name || d.primary_ip).join(", ") + (devices.length > 8 ? ` and ${devices.length - 8} more` : "");
+    const online = devices.filter((d) => d.online).length;
+    return formDialog({
+      title: `Delete ${devices.length} device${devices.length === 1 ? "" : "s"}?`,
+      text: `${names}. This removes them with their ports, names, uptime history and links, and it cannot be undone.`,
+      fields: [{ key: "ignore", label: "Also ignore them in future scans", type: "checkbox", value: online > 0,
+        hint: online ? `${online} of them ${online === 1 ? "is" : "are"} online right now, so without this the next scan adds ${online === 1 ? "it" : "them"} again.` : "They are all offline. Tick this if they should never be added back, even when they appear again." }],
+      ok: `Delete ${devices.length}`,
+    });
+  }
+
   async function save() {
-    const changes = [...staged].map(([id, fields]) => ({ id, ...fields }));
-    if (!changes.length) return;
+    let ignore = false;
+    if (marked.size) {
+      const answer = await confirmDelete();
+      if (!answer) return;
+      ignore = !!answer.ignore;
+    }
+    const changes = [...staged].filter(([id]) => !marked.has(id)).map(([id, fields]) => ({ id, ...fields }));
     saveBtn.disabled = true;
     try {
-      const res = await post("/api/devices/bulk", { changes });
-      const failed = new Set(res.errors.map((e) => e.id));
-      for (const id of [...staged.keys()]) if (!failed.has(id)) staged.delete(id);
-      if (res.errors.length) toast(`${res.changed} saved, ${res.errors.length} could not be saved: ${res.errors[0].detail}`, "error");
-      else toast(`${res.changed} device${res.changed === 1 ? "" : "s"} saved`, "success");
-      await onSaved(!staged.size);       // the page reloads the list; with everything saved it also leaves the editor
+      if (changes.length) {
+        const res = await post("/api/devices/bulk", { changes });
+        const failed = new Set(res.errors.map((e) => e.id));
+        for (const id of [...staged.keys()]) if (!failed.has(id) && !marked.has(id)) staged.delete(id);
+        if (res.errors.length) toast(`${res.changed} saved, ${res.errors.length} could not be saved: ${res.errors[0].detail}`, "error");
+        else if (!marked.size) toast(`${res.changed} device${res.changed === 1 ? "" : "s"} saved`, "success");
+      }
+      if (marked.size) {
+        const res = await post("/api/devices/bulk-delete", { ids: [...marked], ignore });
+        const failed = new Set(res.errors.map((e) => e.id));
+        for (const id of [...marked]) if (!failed.has(id)) { marked.delete(id); staged.delete(id); }
+        if (res.errors.length) toast(`${res.deleted} deleted, ${res.errors.length} could not be deleted: ${res.errors[0].detail}`, "error");
+        else toast(`${res.deleted} device${res.deleted === 1 ? "" : "s"} deleted`, "success");
+      }
+      await onSaved(!staged.size && !marked.size);       // the page reloads the list; with everything saved it also leaves the editor
     } catch (err) {
       toast(err.message || "Could not save the changes", "error");
     }
@@ -89,8 +126,10 @@ export function createBulkEditor({ getDevices, getGroups, onSaved, onLeave }) {
   }
 
   function cancel() {
-    if (staged.size && !window.confirm(`Throw away the changes to ${staged.size} device(s)?`)) return;
+    const pending = staged.size + marked.size;
+    if (pending && !window.confirm(`Throw away the changes to ${pending} device(s)?`)) return;
     staged.clear();
+    marked.clear();
     onLeave();
   }
 
@@ -118,6 +157,15 @@ export function createBulkEditor({ getDevices, getGroups, onSaved, onLeave }) {
       heads.push({ field, box });
       headRow.appendChild(h("th", { class: "bulk-flag", title: hint }, h("label", {}, box, " ", title)));
     }
+    deleteHead = h("input", { type: "checkbox", "aria-label": "Delete: mark all listed devices" });
+    deleteHead.addEventListener("change", () => {
+      for (const d of getDevices()) {
+        if (deleteHead.checked) marked.add(d.id); else marked.delete(d.id);
+        const entry = rowsByDevice.get(d.id);
+        if (entry) { entry.controls.delete.checked = deleteHead.checked; paintRow(d.id); }
+      }
+      paintBar();
+    });
     const typeAll = h("select", { "aria-label": "Type for all listed devices" }, h("option", { value: "" }, "Type: set all…"));
     for (const key of Object.keys(TYPE_LABELS)) typeAll.appendChild(h("option", { value: key }, TYPE_LABELS[key]));
     typeAll.addEventListener("change", () => {
@@ -143,7 +191,7 @@ export function createBulkEditor({ getDevices, getGroups, onSaved, onLeave }) {
         if (entry) entry.controls.group_id.value = id === null ? "" : String(id);
       }
     });
-    headRow.append(h("th", {}, typeAll), h("th", {}, groupAll));
+    headRow.append(h("th", {}, typeAll), h("th", {}, groupAll), h("th", { class: "bulk-flag bulk-delete-head", title: "Mark devices to delete. Nothing is deleted until you press Save and confirm." }, h("label", {}, deleteHead, " Delete")));
     table.appendChild(h("thead", {}, headRow));
 
     const body = h("tbody");
@@ -181,11 +229,17 @@ export function createBulkEditor({ getDevices, getGroups, onSaved, onLeave }) {
       controls.group_id = group;
       tr.appendChild(h("td", {}, group));
 
+      const del = h("input", { type: "checkbox", checked: marked.has(d.id), "aria-label": `Delete ${d.name}` });
+      del.addEventListener("change", () => { if (del.checked) marked.add(d.id); else marked.delete(d.id); paintRow(d.id); paintBar(); });
+      controls.delete = del;
+      tr.appendChild(h("td", { class: "bulk-flag bulk-delete-cell" }, del));
+
       tr.classList.toggle("bulk-changed", staged.has(d.id));
+      tr.classList.toggle("bulk-delete", marked.has(d.id));
       rowsByDevice.set(d.id, { tr, controls });
       body.appendChild(tr);
     }
-    if (!devices.length) body.appendChild(h("tr", {}, h("td", { class: "empty", colspan: String(4 + FLAGS.length) }, "No devices match the filters.")));
+    if (!devices.length) body.appendChild(h("tr", {}, h("td", { class: "empty", colspan: String(5 + FLAGS.length) }, "No devices match the filters.")));
     table.appendChild(body);
     root.appendChild(h("div", { class: "table-wrap" }, table));
     paintHeads();
@@ -195,10 +249,11 @@ export function createBulkEditor({ getDevices, getGroups, onSaved, onLeave }) {
   // leaving the editor: take every field out of the page, or the "unsaved changes" question of the page still sees the ticks that were just saved
   function reset() {
     staged.clear();
+    marked.clear();
     clear(root);
     heads.length = 0;
     rowsByDevice = new Map();
   }
 
-  return { el: root, refresh: build, reset, pending: () => staged.size };
+  return { el: root, refresh: build, reset, pending: () => staged.size + marked.size };
 }
