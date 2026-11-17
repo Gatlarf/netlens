@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.457 — 2026-11-17
+
+### Changed
+- **Correlate and Compare: choose the device from a list.** The device in the Correlate and Compare windows was a box you had to type in; it is now a selection box with every device, so you can pick a measurement of another device (for example a camera's response time against the recorder's processor load) without knowing its name.
+
 ## 0.4.449 — 2026-11-17
 
 ### Added

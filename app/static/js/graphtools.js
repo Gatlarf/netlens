@@ -34,10 +34,10 @@ async function picker({ entity, id, label, metric, mLabel = "", avoid = null, al
   const all = entity === "device" ? await devices() : [];
   const here = all.find((d) => d.id === id) || { id, name: entity === "device" ? `device ${id}` : "this one" };
   const list = all.some((d) => d.id === id) || entity !== "device" ? all : [here, ...all];
-  const names = new Map(list.map((d) => [d.name + (d.ip ? ` (${d.ip})` : ""), d]));
-  const listId = `gt-dev-${Math.random().toString(36).slice(2, 8)}`;
-  const deviceInput = h("input", { type: "text", list: listId, class: "gt-device", autocomplete: "off", value: here.name + (here.ip ? ` (${here.ip})` : ""), "aria-label": `${label}: device`, disabled: entity !== "device" });
-  const datalist = h("datalist", { id: listId }, ...[...names.keys()].map((n) => h("option", { value: n })));
+  // a real selection box (a text box with suggestions shows nothing on a tablet until you type, and hides the rest once a name is filled in)
+  const deviceInput = h("select", { class: "gt-device", "aria-label": `${label}: device`, disabled: entity !== "device" },
+    ...(entity === "device" ? list : [here]).map((d) => h("option", { value: String(d.id), selected: d.id === id }, d.name + (d.ip ? ` (${d.ip})` : ""))));
+  const datalist = document.createComment("");
   const select = h("select", { class: "gt-metric", "aria-label": `${label}: measurement` });
   const note = h("div", { class: "hint gt-note" });
   let current = here;
@@ -61,8 +61,8 @@ async function picker({ entity, id, label, metric, mLabel = "", avoid = null, al
     onChange();
   }
   deviceInput.addEventListener("change", async () => {
-    const found = names.get(deviceInput.value) || list.find((d) => d.name === deviceInput.value);
-    if (!found) { note.textContent = "Choose a device from the list."; return; }
+    const found = list.find((d) => String(d.id) === deviceInput.value);
+    if (!found) return;
     current = found;
     await fill(null);
   });
