@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.459 — 2026-11-18
+
+### Fixed
+- **A computer that hosts virtual machines no longer gets a "Connected devices" card meant for switches.** A PC or server that runs Hyper-V or other virtual machines showed the switch card ("No device is linked to a port of this switch yet") because its virtual machines hang below it. The card now appears only for switches, routers and access points, for devices with ports, and for devices something was plugged into; the virtual machines are in their own card.
+
 ## 0.4.458 — 2026-11-18
 
 ### Added
