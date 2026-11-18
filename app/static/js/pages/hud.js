@@ -372,7 +372,7 @@ export async function render(container) {
     if (document.fullscreenElement) document.exitFullscreen(); else if (root.requestFullscreen) root.requestFullscreen().catch(() => {});
   } }, "Full screen");
   const scopeBtns = {};
-  const hideBtn = h("button", { type: "button", "aria-pressed": String(hideOff), title: "Leave out offline devices that are not always-on, such as phones. They come back as soon as they are online.", onclick: () => {
+  const hideBtn = h("button", { type: "button", class: "hud-hide", "aria-pressed": String(hideOff), title: "Leave out offline devices that are not always-on, such as phones. They come back as soon as they are online.", onclick: () => {
     hideOff = !hideOff;
     try { localStorage.setItem("netlens.hud.hideoffline", hideOff ? "1" : "0"); } catch (e) { /* only this page remembers it */ }
     hideBtn.setAttribute("aria-pressed", String(hideOff));

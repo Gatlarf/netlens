@@ -148,6 +148,7 @@
 
 .hud-scope { display: inline-flex; border: 1px solid var(--border); margin-left: auto; margin-right: 16px; }
 .hud-scope button { background: transparent; color: var(--muted); border: 0; padding: 3px 12px; font: inherit; font-size: 0.78em; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; }
+.hud-scope .hud-hide { margin-left: 8px; border-left: 1px solid var(--border); }
 .hud-scope button[aria-pressed="true"] { background: rgba(0, 229, 255, 0.18); color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
 
 /* everything on the HUD opens what it shows */
