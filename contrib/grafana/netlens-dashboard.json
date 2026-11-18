@@ -1320,7 +1320,7 @@
       "mode": "absolute",
       "steps": [
        {
-        "color": "#ef4b5f",
+        "color": "#64748b",
         "value": null
        },
        {
@@ -1335,7 +1335,7 @@
        "options": {
         "0": {
          "text": "offline",
-         "color": "#ef4b5f"
+         "color": "#64748b"
         },
         "1": {
          "text": "online",
@@ -2380,7 +2380,7 @@
       "mode": "absolute",
       "steps": [
        {
-        "color": "#ef4b5f",
+        "color": "#64748b",
         "value": null
        },
        {
@@ -2395,7 +2395,7 @@
        "options": {
         "0": {
          "text": "standby",
-         "color": "#ef4b5f"
+         "color": "#64748b"
         },
         "1": {
          "text": "active",
@@ -3562,9 +3562,10 @@
      },
      "refId": "A",
      "editorMode": "code",
-     "range": true,
+     "range": false,
      "expr": "netlens_info",
-     "legendFormat": "{{version}}"
+     "legendFormat": "{{version}}",
+     "instant": true
     }
    ],
    "fieldConfig": {

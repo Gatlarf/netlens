@@ -34,11 +34,11 @@ def steps(*pairs):
     return {"mode": "absolute", "steps": [{"color": c, "value": v} for v, c in pairs]}
 
 
-def stat(title, expr, x, y, w=4, h=4, unit="short", thresholds=None, mappings=None, color_mode="value", graph="area", decimals=None, description=None, reduce="lastNotNull", legend=None, text="auto", **kw):
+def stat(title, expr, x, y, w=4, h=4, unit="short", thresholds=None, mappings=None, color_mode="value", graph="area", decimals=None, description=None, reduce="lastNotNull", legend=None, text="auto", instant_=False, **kw):
     d = {"thresholds": thresholds or steps((None, BLUE)), "mappings": mappings or [], "color": {"mode": "thresholds"}}
     if decimals is not None:
         d["decimals"] = decimals
-    return _base("stat", title, x, y, w, h, [{"expr": one(expr) if not legend else expr, **({"legendFormat": legend} if legend else {})}], unit, description, defaults=d,
+    return _base("stat", title, x, y, w, h, [{"expr": one(expr) if not legend else expr, **({"legendFormat": legend} if legend else {}), **({"instant": True, "range": False} if instant_ else {})}], unit, description, defaults=d,
                  options={"colorMode": color_mode, "graphMode": graph, "textMode": text, "justifyMode": "center", "wideLayout": True, "reduceOptions": {"calcs": [reduce], "fields": "", "values": False}}, **kw)
 
 
@@ -80,10 +80,10 @@ def donut(title, expr, x, y, w, h, legend, description=None):
                           "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False}})
 
 
-def timeline(title, expr, x, y, w, h, legend, description=None, on="up", off="down"):
+def timeline(title, expr, x, y, w, h, legend, description=None, on="up", off="down", off_color=RED):
     return _base("state-timeline", title, x, y, w, h, [{"expr": expr, "legendFormat": legend}], "short", description,
-                 defaults={"color": {"mode": "thresholds"}, "custom": {"fillOpacity": 78, "lineWidth": 0, "mergeValues": True}, "thresholds": steps((None, RED), (1, GREEN)),
-                           "mappings": [{"type": "value", "options": {"0": {"text": off, "color": RED}, "1": {"text": on, "color": GREEN}}}]},
+                 defaults={"color": {"mode": "thresholds"}, "custom": {"fillOpacity": 78, "lineWidth": 0, "mergeValues": True}, "thresholds": steps((None, off_color), (1, GREEN)),
+                           "mappings": [{"type": "value", "options": {"0": {"text": off, "color": off_color}, "1": {"text": on, "color": GREEN}}}]},
                  options={"showValue": "never", "rowHeight": 0.82, "mergeValues": True, "alignValue": "center", "legend": {"showLegend": False}, "tooltip": {"mode": "single"}})
 
 
@@ -135,7 +135,7 @@ def build():
     y += 8
     # ---------------------------------------------------------------------------------------------------- devices
     p.append(row("Devices and services", y)); y += 1
-    p += [timeline("Device presence", "netlens_device_up", 0, y, 12, 18, "{{name}}", on="online", off="offline"),
+    p += [timeline("Device presence", "netlens_device_up", 0, y, 12, 18, "{{name}}", on="online", off="offline", off_color=GREY),
           timeline("Service checks", "netlens_service_up", 12, y, 12, 18, "{{name}}", on="up", off="down")]
     y += 18
     p += [bars("Weakest devices (health score)", "bottomk(12, netlens_device_health_score)", 0, y, 8, 9, legend="{{name}}", maximum=100, thresholds=steps((None, RED), (50, AMBER), (80, GREEN)), mode="basic",
@@ -161,7 +161,7 @@ def build():
     y += 8
     p.append(row("Internet connections", y)); y += 1
     p += [timeline("Connections (up or down)", "netlens_uplink_up", 0, y, 12, 6, "{{gateway}}: {{connection}}"),
-          timeline("Connection carrying the traffic", "netlens_uplink_active", 12, y, 12, 6, "{{gateway}}: {{connection}}", on="active", off="standby"),
+          timeline("Connection carrying the traffic", "netlens_uplink_active", 12, y, 12, 6, "{{gateway}}: {{connection}}", on="active", off="standby", off_color=GREY),
           series("Delay and jitter", [{"expr": "netlens_speedtest_latency_seconds", "legendFormat": "delay"}, {"expr": "netlens_speedtest_jitter_seconds", "legendFormat": "jitter"}], 0, y + 6, 24, 7, unit="s", minimum=0)]
     y += 13
     # ---------------------------------------------------------------------------------------------------- infrastructure
@@ -187,7 +187,7 @@ def build():
           stat("Flapping devices", "netlens_devices_flapping", 8, y, 4, 4, thresholds=steps((None, GREEN), (1, AMBER))),
           stat("Passive listening", "netlens_passive_running or vector(0)", 12, y, 4, 4, mappings=[{"type": "value", "options": {"1": {"text": "Listening", "color": GREEN}, "0": {"text": "Off", "color": GREY}}}], thresholds=steps((None, GREY), (1, GREEN)), graph="none"),
           stat("Plugin updates", "netlens_plugin_updates_available", 16, y, 4, 4, thresholds=steps((None, GREEN), (1, AMBER)), graph="none"),
-          stat("Version", "netlens_info", 20, y, 4, 4, thresholds=steps((None, BLUE)), graph="none", legend="{{version}}", color_mode="none", reduce="lastNotNull", text="name")]
+          stat("Version", "netlens_info", 20, y, 4, 4, thresholds=steps((None, BLUE)), graph="none", legend="{{version}}", color_mode="none", reduce="lastNotNull", text="name", instant_=True)]
     y += 4
     # ---------------------------------------------------------------------------------------------------- monitored hosts
     p.append(row("Monitored devices (SNMP and SSH)", y)); y += 1
