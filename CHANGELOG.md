@@ -2,6 +2,11 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.468 — 2026-11-18
+
+### Added
+- ★ **Hide offline devices in the HUD**: in the "All devices" view there is a new "Hide offline" switch. It leaves out the offline devices that are not always-on (phones, tablets, TVs) from the radar, the counters and the event feed, so only the devices that matter can show a red dot. They reappear as soon as they are online, and the switch is remembered.
+
 ## 0.4.467 — 2026-11-18
 
 ### Added

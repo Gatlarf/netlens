@@ -305,6 +305,10 @@ export async function render(container) {
   let disposed = false, lastId = 0;
   let scope = "all", coreIds = new Set();            // "core": only the always-on devices
   try { scope = localStorage.getItem("netlens.hud.scope") === "core" ? "core" : "all"; } catch (e) { /* not remembered */ }
+  let hideOff = false;                               // in the all-devices view: leave out offline devices that are not always-on
+  try { hideOff = localStorage.getItem("netlens.hud.hideoffline") === "1"; } catch (e) { /* not remembered */ }
+  const quiet = (d) => d.online || d.always_on || d.tier === "critical";
+  const inView = (d) => (scope === "core" ? !!d.always_on : !hideOff || quiet(d));
   let lastList = null, lastDash = null, lastRel = null, tree = [], rtt = new Map();
   let view = "hash";
   try { const v = localStorage.getItem("netlens.hud.radar"); if (VIEWS.some(([k]) => k === v)) view = v; } catch (e) { /* not remembered */ }
@@ -368,13 +372,21 @@ export async function render(container) {
     if (document.fullscreenElement) document.exitFullscreen(); else if (root.requestFullscreen) root.requestFullscreen().catch(() => {});
   } }, "Full screen");
   const scopeBtns = {};
+  const hideBtn = h("button", { type: "button", "aria-pressed": String(hideOff), title: "Leave out offline devices that are not always-on, such as phones. They come back as soon as they are online.", onclick: () => {
+    hideOff = !hideOff;
+    try { localStorage.setItem("netlens.hud.hideoffline", hideOff ? "1" : "0"); } catch (e) { /* only this page remembers it */ }
+    hideBtn.setAttribute("aria-pressed", String(hideOff));
+    if (lastDash) paint();
+  } }, "Hide offline");
+  hideBtn.hidden = scope === "core";
   const scopeSwitch = h("div", { class: "hud-scope", role: "group", "aria-label": "Which devices" },
     ...[["all", "All devices"], ["core", "Always-on"]].map(([key, label]) => (scopeBtns[key] = h("button", { type: "button", "aria-pressed": String(key === scope), onclick: () => {
       scope = key;
       try { localStorage.setItem("netlens.hud.scope", key); } catch (e) { /* only this page remembers it */ }
       for (const [k, b] of Object.entries(scopeBtns)) b.setAttribute("aria-pressed", String(k === scope));
+      hideBtn.hidden = scope === "core";
       if (lastDash) paint();
-    } }, label))));
+    } }, label))), hideBtn);
   const gauges = h("div", { class: "hud-gauges" });
   const attn = h("ol", { class: "hud-attn" });
   let tRange = "1h";
@@ -474,8 +486,9 @@ export async function render(container) {
   }
   const eventLine = (e, i) => h("li", { class: `${level(e.kind)}${e.fresh && i === 0 ? " new" : ""}` },
     h("a", { href: eventHref(e), title: "Open it" }, h("time", {}, (e.ts || "").slice(11, 19)), `${e.device ? e.device + " · " : ""}${e.detail || e.kind.replace(/_/g, " ")}`));
-  const shown = () => (scope === "core" ? evs.filter((e) => e.device_id == null || coreIds.has(e.device_id)) : evs);
+  const shown = () => (scope === "core" ? evs.filter((e) => e.device_id == null || coreIds.has(e.device_id)) : hideOff ? evs.filter((e) => e.device_id == null || !muted.has(e.device_id)) : evs);
   const drawFeed = () => fit(feed, eventLine, shown());
+  let muted = new Set();                              // devices left out by "Hide offline"
   let attnSig = "";
   const drawAttn = (force = false) => { const sig = JSON.stringify(attnItems); if (sig === attnSig && !force) return; attnSig = sig; if (!attnItems.length) { clear(attn); attn.appendChild(h("li", { class: "ok" }, "All systems nominal")); } else fit(attn, (a) => h("li", { class: a.level === "bad" ? "bad" : a.level === "warn" ? "warn" : "" }, h("a", { href: a.href || "#/dashboard" }, a.text)), attnItems); };
   function addEvent(e, fresh) {
@@ -531,7 +544,7 @@ export async function render(container) {
   }
 
   function drawRadar() {
-    const base = scope === "core" ? lastList.filter((d) => d.always_on) : lastList;
+    const base = lastList.filter(inView);
     if (mode === "constellation") { stars.update(withContainers(base), tree); return; }
     if (mode === "replay") { radarSvg.update(timeMachine.apply(base), { mode: layout(), all: lastList, tree, rtt, text: showText }); return; }      // containers have no history
     radarSvg.update(base, { mode: view, all: lastList, tree, rtt, text: showText });
@@ -574,7 +587,8 @@ export async function render(container) {
     try {
       const dash = lastDash, rel = lastRel;
       coreIds = new Set(lastList.filter((d) => d.always_on).map((d) => d.id));
-      const list = scope === "core" ? lastList.filter((d) => d.always_on) : lastList;
+      muted = new Set(lastList.filter((d) => !quiet(d)).map((d) => d.id));
+      const list = lastList.filter(inView);
       const dv = { ...dash.summary.devices, total: list.length, online: list.filter((d) => d.online).length };
       dv.offline = dv.total - dv.online;
       const services = dash.service_checks || [];
