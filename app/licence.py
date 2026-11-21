@@ -189,7 +189,7 @@ def status(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, A
     return out
 
 
-PAID_FEATURES = ("remediation", "engineer", "oncall", "sso", "siem", "insights", "vulnerabilities", "teams", "schedules", "sharing", "assistant", "agents", "mfa_policy", "privileged", "customer_views")      # beyond the free Community edition (trial and every licence include them)
+PAID_FEATURES = ("remediation", "oncall", "sso", "siem", "vulnerabilities", "teams", "schedules", "sharing", "assistant", "agents", "mfa_policy", "privileged", "customer_views")      # beyond the free Community edition (trial and every licence include them); the digital engineer and Insights are free in every edition since the move to codeshrimp-dev
 BUSINESS_ONLY = ("sso", "siem", "teams", "schedules", "sharing", "mfa_policy")      # of those, the ones the Supporter edition does not have: they mostly help organisations (the trial has them)
 ENTERPRISE_ONLY = ("agents", "privileged", "customer_views")      # host agents (app/ingest) and the privileged-access controls (session limits, step-up, token governance, PAM): the Enterprise edition and the free trial, not Small business
 

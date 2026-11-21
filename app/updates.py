@@ -19,6 +19,12 @@ TOKEN_URL = f"https://ghcr.io/token?scope=repository:{IMAGE}:pull&service=ghcr.i
 TAGS_URL = f"https://ghcr.io/v2/{IMAGE}/tags/list?n=1000"
 CHANGELOG_URL = "https://github.com/Gatlarf/netlens/blob/main/CHANGELOG.md"
 HOW_TO_URL = "https://github.com/Gatlarf/netlens#updating-to-a-new-version"
+# The project moved to a new GitHub organisation and image name. Builds that are still published under the old name tell their administrators once,
+# but only when the new image really exists (so nobody is sent to an address that is not there yet). Builds under the new name never do.
+LEGACY_IMAGE = "gatlarf/netlens"
+NEW_IMAGE = "codeshrimp-dev/netlens"
+NEW_GITHUB = "https://github.com/codeshrimp-dev/netlens"
+MOVED_KEY = "moved.state"
 SETTINGS_KEY = "update_check.settings"
 CACHE_KEY = "update_check.cache"
 TTL_SECONDS = 24 * 3600
@@ -44,12 +50,13 @@ def _cache(conn) -> dict | None:
     return data if isinstance(data, dict) and data.get("latest") else None
 
 
-def fetch_latest(getter=http_get) -> str:
+def fetch_latest(getter=http_get, image: str | None = None) -> str:
     """The highest x.y.z tag of the published image. Raises PluginIndexError when the registry cannot be asked."""
-    status, body, _ = getter(TOKEN_URL, max_bytes=20000, timeout=15.0)
+    token_url, tags_url = (TOKEN_URL, TAGS_URL) if image is None else (f"https://ghcr.io/token?scope=repository:{image}:pull&service=ghcr.io", f"https://ghcr.io/v2/{image}/tags/list?n=1000")
+    status, body, _ = getter(token_url, max_bytes=20000, timeout=15.0)
     try:
         token = json.loads(body.decode("utf-8"))["token"]
-        status, body, _ = getter(TAGS_URL, max_bytes=500000, headers={"Authorization": f"Bearer {token}"}, timeout=15.0)
+        status, body, _ = getter(tags_url, max_bytes=500000, headers={"Authorization": f"Bearer {token}"}, timeout=15.0)
         tags = json.loads(body.decode("utf-8"))["tags"]
     except (ValueError, KeyError, TypeError):
         raise PluginIndexError("the image registry answered something unexpected") from None
@@ -90,3 +97,40 @@ def check(conn, *, force: bool = False, getter=http_get, now: str | None = None,
         return {**result, "error": str(exc)}
     set_setting(conn, CACHE_KEY, json.dumps({"latest": latest, "checked": now, "current": current}))
     return status(conn, current)
+
+
+def _moved_state(conn) -> dict:
+    try:
+        data = json.loads(get_setting(conn, MOVED_KEY) or "{}")
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def moved_notice(conn, *, getter=http_get, now: str | None = None) -> dict | None:
+    """The one-time "Netlens has a new home" notice, or None: not on the new image name, already read, update check off, or the new image is not published yet."""
+    if IMAGE != LEGACY_IMAGE or not enabled(conn):
+        return None
+    state = _moved_state(conn)
+    if state.get("seen"):
+        return None
+    now = now or utcnow()
+    if not state.get("ready"):
+        if state.get("checked"):
+            age = (datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ") - datetime.strptime(state["checked"], "%Y-%m-%dT%H:%M:%SZ")).total_seconds()
+            if 0 <= age < TTL_SECONDS:
+                return None
+        try:
+            fetch_latest(getter, NEW_IMAGE)
+            state["ready"] = True
+        except PluginIndexError:
+            state["ready"] = False
+        state["checked"] = now
+        set_setting(conn, MOVED_KEY, json.dumps(state))
+        if not state["ready"]:
+            return None
+    return {"github": NEW_GITHUB, "image": f"ghcr.io/{NEW_IMAGE}", "old_image": f"ghcr.io/{LEGACY_IMAGE}"}
+
+
+def dismiss_moved(conn) -> None:
+    set_setting(conn, MOVED_KEY, json.dumps({**_moved_state(conn), "seen": True}))

@@ -1,4 +1,4 @@
-import { get, put } from "./api.js";
+import { get, put, post } from "./api.js";
 import { h, clear, toast, timeAgo } from "./util.js";
 
 // The little badge next to the version: shown only when a newer Netlens has been published.
@@ -75,4 +75,36 @@ export async function buildUpdateCard() {
   }
   await fill(await get("/api/update"));
   return card;
+}
+
+// Once, for administrators: the project has a new GitHub address and image name. The server only sends the notice when the new image exists;
+// a build that already runs the new image never gets one. Waits for the "What's new" window to be closed first.
+let movedShown = false;
+export async function maybeShowMoved() {
+  if (movedShown) return;
+  movedShown = true;
+  try {
+    const { notice } = await get("/api/moved");
+    if (!notice) { movedShown = false; return; }
+    while (document.querySelector("dialog.whats-new[open]")) await new Promise((r) => setTimeout(r, 500));
+    const dialog = h("dialog", { class: "whats-new", "aria-labelledby": "moved-title" });
+    const done = async () => { try { await post("/api/moved/seen", {}); } catch (err) { /* it will simply be shown again */ } dialog.close(); dialog.remove(); };
+    const link = h("a", { class: "btn", href: notice.github, target: "_blank", rel: "noopener noreferrer" }, "Open the new GitHub page");
+    dialog.append(h("h2", { id: "moved-title" }, "Netlens has a new home"),
+      h("p", {}, "Netlens moved to a new GitHub organisation and a new container image name. Your installation, your data and your settings are not affected and everything keeps working. To keep receiving updates in the long run, point your container at the new image the next time you update."),
+      h("div", { class: "kv" }, h("span", { class: "kv-label" }, "GitHub"), h("a", { href: notice.github, target: "_blank", rel: "noopener noreferrer" }, notice.github)),
+      h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Container image"), h("code", {}, notice.image), h("span", { class: "hint" }, ` (was ${notice.old_image})`)),
+      h("h3", {}, "How to switch"),
+      h("ul", { class: "hint" },
+        h("li", {}, "Your own docker-compose.yml: change the ", h("code", {}, "image:"), " line to ", h("code", {}, `${notice.image}:latest`), ", then ", h("code", {}, "docker compose pull netlens && docker compose up -d netlens")),
+        h("li", {}, "docker run: ", h("code", {}, `docker pull ${notice.image}:latest`), ", then remove and start the container again with the same options and the new image name"),
+        h("li", {}, "Portainer or Synology: change the image name of the stack or project and update it")),
+      h("p", { class: "hint" }, "The old image name keeps receiving updates for a transition period, so there is no hurry. Old GitHub links keep working: they are forwarded."),
+      h("div", { class: "cl-actions" }, link, h("button", { class: "btn primary", type: "button", autofocus: true, onclick: done }, "Got it")));
+    dialog.addEventListener("cancel", (e) => { e.preventDefault(); done(); });
+    document.body.appendChild(dialog);
+    dialog.showModal();
+  } catch (err) {
+    movedShown = false;      // a courtesy: never block the app
+  }
 }

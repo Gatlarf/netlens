@@ -229,7 +229,7 @@ async function buildAboutCard() {
   card.appendChild(kvRow("Version", cfg.version ?? ""));
   card.appendChild(kvRow("Listening on", cfg.bind ?? ""));
   card.appendChild(h("p", { class: "hint" }, "Netlens is free for noncommercial use and made in spare time. If it helps you, a coffee keeps the updates coming."));
-  card.appendChild(h("a", { class: "btn", href: "https://buymeacoffee.com/Gatlarf", target: "_blank", rel: "noopener noreferrer" }, "\u2615 Buy me a coffee"));
+  card.appendChild(h("a", { class: "btn", href: "https://buymeacoffee.com/codeshrimp", target: "_blank", rel: "noopener noreferrer" }, "\u2615 Buy me a coffee"));
   card.appendChild(h("a", { class: "btn", href: "#/wizard" }, "Open the setup guide"));
   if (isAdmin()) {
     // The bill of materials of this very installation (what it is made of, with versions, licences and hashes), for supply-chain and vulnerability reviews.

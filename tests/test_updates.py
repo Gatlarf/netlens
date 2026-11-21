@@ -132,3 +132,40 @@ def test_running_ahead_of_the_cached_answer_asks_again(conn):
     reg.tags.append("0.2.50")
     r = updates.check(conn, getter=reg, now="2026-03-10T12:30:00Z", current="0.2.50")   # running 0.2.50 while the cache says 0.2.44
     assert len(reg.calls) > n and r["latest"] == "0.2.50"
+
+
+def test_the_moved_notice_waits_for_the_new_image_and_shows_once(conn):
+    reg = Registry([])
+    assert updates.moved_notice(conn, getter=reg, now="2026-12-01T10:00:00Z") is None             # the new image is not published yet
+    n = len(reg.calls)
+    assert updates.moved_notice(conn, getter=reg, now="2026-12-01T11:00:00Z") is None and len(reg.calls) == n    # asked once a day, not at every look
+    reg.tags = ["0.5.1", "latest"]
+    notice = updates.moved_notice(conn, getter=reg, now="2026-12-02T11:00:00Z")
+    assert notice == {"github": "https://github.com/codeshrimp-dev/netlens", "image": "ghcr.io/codeshrimp-dev/netlens", "old_image": "ghcr.io/gatlarf/netlens"}
+    assert any("codeshrimp-dev/netlens" in u for u in reg.calls)
+    assert updates.moved_notice(conn, getter=reg, now="2026-12-02T12:00:00Z") == notice           # shown until it is read
+    updates.dismiss_moved(conn)
+    assert updates.moved_notice(conn, getter=reg, now="2026-12-03T12:00:00Z") is None
+
+
+def test_no_moved_notice_when_the_check_is_off_or_on_the_new_image(conn, monkeypatch):
+    reg = Registry(["0.5.1"])
+    updates.set_enabled(conn, False)
+    assert updates.moved_notice(conn, getter=reg) is None and reg.calls == []
+    updates.set_enabled(conn, True)
+    monkeypatch.setattr(updates, "IMAGE", "codeshrimp-dev/netlens")
+    assert updates.moved_notice(conn, getter=reg) is None and reg.calls == []
+
+
+def test_the_moved_api_is_for_administrators(tmp_path):
+    path = tmp_path / "t.db"
+    c = connect(path)
+    init_db(c)
+    c.close()
+    app = create_app(load_settings({"NETLENS_TOKEN": "secret"}), db_path=path)
+    app.state.update_getter = Registry(["0.5.1"])
+    with TestClient(app) as client:
+        assert client.get("/api/moved").status_code == 401
+        assert client.get("/api/moved", headers=AUTH).json()["notice"]["image"] == "ghcr.io/codeshrimp-dev/netlens"
+        assert client.post("/api/moved/seen", headers=AUTH).json() == {"ok": True}
+        assert client.get("/api/moved", headers=AUTH).json() == {"notice": None}

@@ -4,7 +4,7 @@ import { initActions } from "./actions.js";
 import { autoResizable } from "./colresize.js";
 import { describeScan, describeTiming } from "./progress.js";
 import { initThemeToggle } from "./theme.js";
-import { initUpdateBadge } from "./update.js";
+import { initUpdateBadge, maybeShowMoved } from "./update.js";
 import { initTopbar } from "./topbar.js";
 import { initMainNav, showRoute, setFeatures } from "./mainnav.js";
 import { autoMasonry } from "./masonry.js";
@@ -386,6 +386,7 @@ async function applySession() {
     whatsNewChecked = true;
     maybeShowWhatsNew();
     watchForUpdates();
+    if (session.user && session.user.role === "admin") setTimeout(maybeShowMoved, 2500);
   }
   return session;
 }

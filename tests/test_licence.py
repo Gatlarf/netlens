@@ -199,3 +199,9 @@ def test_api(tmp_path):
         assert client.post("/api/licence/trial", headers=h).status_code == 409
         assert client.post("/api/probe/push", json={}, headers={"Authorization": f"Bearer {token}"}).status_code == 200     # the trial thaws it
     tsdb.forget_all()
+
+
+def test_the_digital_engineer_and_insights_are_free_in_every_edition(conn):
+    assert licence.status(conn, NOW)["edition"] == "free"
+    assert licence.allows(conn, "engineer", NOW) and licence.allows(conn, "insights", NOW)
+    assert not licence.allows(conn, "remediation", NOW)

@@ -2,6 +2,15 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.475 — 2026-11-21
+
+### Added
+- ★ **Netlens has a new home**: the project moves to a new GitHub organisation (`codeshrimp-dev`) with a new container image name. Administrators get a one-time window with the new GitHub address, the new image name and how to switch (compose, docker run, Portainer, Synology). It appears only once the new image has been published, only when you still run the old image name, and never when the update check is switched off. Nothing changes in your installation or data; the old image name keeps receiving updates for a transition period.
+
+### Changed
+- ★ **Insights and the digital engineer are now free in every edition**: asking your network questions, incidents explained as one story, unusual readings, predictions and the language-model digital engineer no longer need a licence or the trial. Auto-remediation, escalation and more than one remote site still do.
+- The "Buy me a coffee" buttons (top bar, account menu, Settings) go to the new page, `buymeacoffee.com/codeshrimp`.
+
 ## 0.4.470 — 2026-11-18
 
 ### Added
