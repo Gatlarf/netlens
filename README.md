@@ -4,7 +4,7 @@
 
 Self-hosted LAN scanner and network map. Runs as a single Docker container.
 
-<p align="center"><a href="https://buymeacoffee.com/Gatlarf"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=Gatlarf&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="44"></a></p>
+<p align="center"><a href="https://buymeacoffee.com/codeshrimp"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=codeshrimp&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="44"></a></p>
 
 ## Contents
 
@@ -1475,7 +1475,7 @@ their own licenses, see below.
 
 ## Support
 
-Netlens is made in spare time. If it saved you some work, you can [buy me a coffee](https://buymeacoffee.com/Gatlarf).
+Netlens is made in spare time. If it saved you some work, you can [buy me a coffee](https://buymeacoffee.com/codeshrimp).
 
 ## Third-party
 
