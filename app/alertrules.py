@@ -428,8 +428,8 @@ def preview(conn: sqlite3.Connection, raw: Any, days: int = 7, limit: int = 2000
     return out
 
 
-def muted_counts(conn: sqlite3.Connection, days: int = 7) -> dict[str, int]:
+def muted_counts(conn: sqlite3.Connection, days: int = 7, now: datetime | None = None) -> dict[str, int]:
     """{rule name: how many events it muted in the last `days` days}."""
-    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime(STAMP)
+    since = ((now or datetime.now(timezone.utc)) - timedelta(days=days)).strftime(STAMP)
     return {r["maintenance"][len(TAG_PREFIX):]: r["n"] for r in conn.execute(
         "SELECT maintenance, COUNT(*) AS n FROM events WHERE maintenance LIKE ? AND ts >= ? GROUP BY maintenance", (TAG_PREFIX + "%", since))}

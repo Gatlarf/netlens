@@ -59,7 +59,7 @@ def test_a_mute_rule_records_the_event_with_a_tag_and_leaves_the_others_alone(co
     add_event(conn, "device_offline", "NAS offline", device_id=3, now=stamp())              # not in the group
     add_event(conn, "service_down", "x", device_id=1, now=stamp())                           # not one of the events
     assert events(conn) == [("device_offline", 1, "Rule: Garden"), ("device_offline", 3, None), ("service_down", 1, None)]
-    assert alertrules.muted_counts(conn) == {"Garden": 1}
+    assert alertrules.muted_counts(conn, now=NOW) == {"Garden": 1}
 
 
 def test_recoveries_follow_their_problem_and_critical_events_are_kept_unless_the_rule_says_otherwise(conn):
