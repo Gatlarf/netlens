@@ -7,7 +7,7 @@ Monitoring itself is never limited, nothing is deleted when a licence ends, and 
 
 A key is `NLK1.<payload>.<signature>`: JSON payload, Ed25519 signature, checked here with the public key below, offline. The signing key
 lives outside this repository. The source stays readable and a determined person can change it; the key is the way to buy a supported,
-signed licence, not a lock. A free 30-day trial of the full version can be started once per installation: its start is stored in the
+signed licence, not a lock. A free 30-day trial of the full version can be started once per installation (a trial key from the website counts as that trial: one per installation, whichever comes first; trial keys get 7 days of grace): its start is stored in the
 database and in a marker file next to it, and the clock cannot be turned back (the newest time ever seen is kept), so restoring a backup
 or setting the clock back does not renew it. Wiping the data folder does: Netlens has no online service that could prevent that.
 """
@@ -30,6 +30,9 @@ KEY_SETTING = "licence.key"
 TRIAL_SETTING = "licence.trial_started"
 SEEN_SETTING = "licence.seen"
 MARKER = ".licence-trial"
+TRIAL_KEY_SETTING = "licence.trial_key"
+TRIAL_KEY_MARKER = ".licence-trial-key"
+TRIAL_GRACE_DAYS = 7
 TRIAL_DAYS = 30
 GRACE_DAYS = 30
 WARN_DAYS = (30, 14, 7)
@@ -120,9 +123,28 @@ def _trial_start(conn: sqlite3.Connection) -> datetime | None:
     return min(found) if found else None
 
 
+def _trial_key_used(conn: sqlite3.Connection) -> str | None:
+    """The id of the trial key this installation used first (database or marker file: a restored database does not forget it), else None."""
+    found = [v for v in (_setting(conn, TRIAL_KEY_SETTING),) if v]
+    folder = _data_dir(conn)
+    if folder is not None:
+        try:
+            marker = (folder / TRIAL_KEY_MARKER).read_text().strip()
+        except OSError:
+            marker = ""
+        if marker:
+            found.append(marker)
+    return found[-1] if found else None
+
+
+def _grace(payload: dict[str, Any]) -> int:
+    """Trial keys get a short grace period, paid keys the long one."""
+    return TRIAL_GRACE_DAYS if payload.get("trial") else GRACE_DAYS
+
+
 def start_trial(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, Any]:
     when, _ = clock(conn, now)
-    if _trial_start(conn) is not None:
+    if _trial_start(conn) is not None or _trial_key_used(conn) is not None:
         raise LicenceError("the free trial of this installation has been used already")
     stamp = when.strftime(STAMP)
     _store(conn, TRIAL_SETTING, stamp)
@@ -158,6 +180,7 @@ def status(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, A
                 end = date.fromisoformat(expires) if expires else None
             except ValueError:
                 end = today - timedelta(days=GRACE_DAYS + 1)
+            grace = _grace(payload)
             out["expires"] = end.isoformat() if end else None
             if end is None:
                 out.update(state="active", sites=sites)
@@ -168,8 +191,8 @@ def status(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, A
                     out.update(state="active", sites=sites)
                     if left <= max(WARN_DAYS):
                         out["message"] = f"This licence ends in {left} day{'s' if left != 1 else ''}."
-                elif -left <= GRACE_DAYS:
-                    out.update(state="grace", sites=sites, message=f"This licence ended {-left} day{'s' if -left != 1 else ''} ago; the extra sites stay on for {GRACE_DAYS + left} more days.")
+                elif -left <= grace:
+                    out.update(state="grace", sites=sites, message=f"This licence ended {-left} day{'s' if -left != 1 else ''} ago; the extra sites stay on for {grace + left} more days.")
                 else:
                     out.update(state="expired", edition="free", name=EDITIONS["free"]["name"], sites=FREE_SITES,
                                message="This licence has ended: sites beyond the first one are frozen. Renew the key to bring them back.")
@@ -184,7 +207,7 @@ def status(conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, A
                        message=f"The free trial of the full version ends in {left} day{'s' if left != 1 else ''}.")
         elif out["state"] != "expired":
             out.update(state="trial_over", message="The free 30-day trial has ended: sites beyond the first one are frozen.")
-    elif started is None and out["state"] != "invalid":
+    elif started is None and out["state"] != "invalid" and _trial_key_used(conn) is None:
         out["trial_available"] = True
     return out
 
@@ -217,10 +240,25 @@ def install(conn: sqlite3.Connection, token: str, now: datetime | None = None) -
     when, _ = clock(conn, now)
     if payload.get("expires"):
         try:
-            if (when.date() - date.fromisoformat(payload["expires"])).days > GRACE_DAYS:
-                raise LicenceError("this licence key has expired")
+            overdue = (when.date() - date.fromisoformat(payload["expires"])).days
         except ValueError:
             raise LicenceError("this is not a valid Netlens licence key") from None
+        if overdue > _grace(payload):
+            raise LicenceError("this licence key has expired")
+    if payload.get("trial"):
+        used = _trial_key_used(conn)
+        if used is not None and used != payload.get("id"):
+            raise LicenceError("this installation has already used a trial key; a trial can only be used once")
+        if used is None:
+            if _trial_start(conn) is not None:
+                raise LicenceError("this installation has already used its free trial; a trial can only be used once")
+            _store(conn, TRIAL_KEY_SETTING, str(payload.get("id")))
+            folder = _data_dir(conn)
+            if folder is not None:
+                try:
+                    (folder / TRIAL_KEY_MARKER).write_text(str(payload.get("id")) + "\n")
+                except OSError:
+                    pass
     _store(conn, KEY_SETTING, token)
     return status(conn, now)
 

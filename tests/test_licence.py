@@ -205,3 +205,38 @@ def test_the_digital_engineer_and_insights_are_free_in_every_edition(conn):
     assert licence.status(conn, NOW)["edition"] == "free"
     assert licence.allows(conn, "engineer", NOW) and licence.allows(conn, "insights", NOW)
     assert not licence.allows(conn, "remediation", NOW)
+
+
+def test_a_trial_key_works_once_per_installation_and_has_seven_days_of_grace(conn):
+    first = key("enterprise", expires="2026-11-20", sites=None, trial=True, id="t1")
+    licence.install(conn, first, NOW)
+    assert licence.status(conn, NOW)["state"] == "active"
+    ended = NOW + timedelta(days=22)      # 2026-11-23: three days past the end of 2026-11-20
+    assert licence.status(conn, ended)["state"] == "grace"
+    # the same key may be entered again, another trial key may not, and the built-in trial is used up too
+    licence.install(conn, first, NOW)
+    with pytest.raises(licence.LicenceError, match="trial can only be used once"):
+        licence.install(conn, key("enterprise", expires="2027-01-30", sites=None, trial=True, id="t2"), NOW)
+    with pytest.raises(licence.LicenceError):
+        licence.start_trial(conn, NOW)
+    assert licence.status(conn, NOW + timedelta(days=30))["state"] == "expired"
+    assert licence.status(conn, NOW + timedelta(days=60))["trial_available"] is False
+    # a paid key is never affected
+    licence.install(conn, key("business"), NOW + timedelta(days=60))
+
+
+def test_a_trial_key_is_refused_after_the_builtin_trial_and_a_long_expired_one_is_refused(conn):
+    licence.start_trial(conn, NOW)
+    with pytest.raises(licence.LicenceError, match="already used its free trial"):
+        licence.install(conn, key("enterprise", expires="2027-01-30", trial=True, id="t3"), NOW)
+    with pytest.raises(licence.LicenceError, match="expired"):
+        licence.install(conn, key("enterprise", expires="2026-10-20", trial=True, id="t4"), NOW)
+
+
+def test_a_restored_database_does_not_forget_the_trial_key(conn, tmp_path):
+    licence.install(conn, key("enterprise", expires="2026-11-30", trial=True, id="t5"), NOW)
+    licence.remove(conn)
+    conn.execute("DELETE FROM settings WHERE key = ?", (licence.TRIAL_KEY_SETTING,))
+    conn.commit()
+    with pytest.raises(licence.LicenceError, match="trial can only be used once"):
+        licence.install(conn, key("enterprise", expires="2027-01-30", trial=True, id="t6"), NOW)

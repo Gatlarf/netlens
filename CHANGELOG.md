@@ -2,6 +2,14 @@
 
 The version is `<major.minor from VERSION>.<commits since VERSION last changed>` (`contrib/version.sh`). Each heading below is a release: it covers every build from that number up to the next heading. A leading ★ marks a notable change; those are what the "What's new" popup shows after an update. Netlens reads this file for Settings → About → Changelog, so keep the format (`## 0.2.N — date`, `### Added|Changed|Fixed`, `- ★ **Title**: text`).
 
+## 0.4.477 — 2026-11-25
+
+### Added
+- ★ **Trial keys from the website**: a 30-day trial key of the full version can be requested on codeshrimp.com. It works once per installation: after one trial key (or the built-in trial) this installation refuses any other trial key, also after a restored backup. A trial key gets a 7-day grace period instead of 30 days.
+
+### Fixed
+- Installing a key that ended long ago now says "this licence key has expired" instead of "not a valid key".
+
 ## 0.4.475 — 2026-11-21
 
 ### Added
