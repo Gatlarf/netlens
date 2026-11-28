@@ -18,6 +18,9 @@ export async function buildLicenceCard() {
       "Netlens is free for home and noncommercial use, with one remote site. A licence key adds more remote sites to the central overview: Supporter takes in 3, Small business 10, Enterprise any number. Monitoring itself is never limited, and nothing is removed when a licence ends: extra sites are only frozen. Host agents (monitoring of locked-down hosts through a collector) are part of the Enterprise edition and the free trial."));
     card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Edition"), h("span", {}, h("strong", {}, info.name), " ", h("span", { class: "hl-badge" }, STATE_TEXT[info.state] || info.state))));
     card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Takes in"), h("span", {}, `${SITES(info.sites)} (${info.sites_used} added)`)));
+    const iid = h("button", { class: "btn", type: "button", title: "Copy" }, "Copy");
+    iid.addEventListener("click", async () => { try { await navigator.clipboard.writeText(info.installation_id); toast("Installation ID copied", "success"); } catch (err) { toast("Select the ID and copy it", "error"); } });
+    card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Installation ID"), h("span", { class: "mono" }, info.installation_id, " ", iid)));
     if (info.holder) card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Licensed to"), h("span", {}, info.holder)));
     if (info.expires) card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, info.state === "trial" ? "Trial ends" : "Valid until"), h("span", {}, info.expires)));
     else if (info.state === "active") card.appendChild(h("div", { class: "kv" }, h("span", { class: "kv-label" }, "Valid until"), h("span", {}, "for life")));

@@ -5,7 +5,7 @@ The version is `<major.minor from VERSION>.<commits since VERSION last changed>`
 ## 0.4.477 — 2026-11-25
 
 ### Added
-- ★ **Trial keys from the website**: a 30-day trial key of the full version can be requested on codeshrimp.com. It works once per installation: after one trial key (or the built-in trial) this installation refuses any other trial key, also after a restored backup. A trial key gets a 7-day grace period instead of 30 days.
+- ★ **Trial keys from the website**: a 30-day trial key of the full version can be requested on codeshrimp.com. It works once per installation: after one trial key (or the built-in trial) this installation refuses any other trial key, also after a restored backup. A trial key gets a 7-day grace period instead of 30 days. Every installation has an **installation ID** (Settings → Licence, with a Copy button); a trial key is made for one ID and is refused on any other installation, so it cannot be shared.
 
 ### Fixed
 - Installing a key that ended long ago now says "this licence key has expired" instead of "not a valid key".

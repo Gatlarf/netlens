@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import base64
 import json
+import re
+import secrets
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -30,6 +32,8 @@ KEY_SETTING = "licence.key"
 TRIAL_SETTING = "licence.trial_started"
 SEEN_SETTING = "licence.seen"
 MARKER = ".licence-trial"
+INSTALL_SETTING = "licence.installation_id"
+INSTALL_MARKER = ".installation-id"
 TRIAL_KEY_SETTING = "licence.trial_key"
 TRIAL_KEY_MARKER = ".licence-trial-key"
 TRIAL_GRACE_DAYS = 7
@@ -135,6 +139,35 @@ def _trial_key_used(conn: sqlite3.Connection) -> str | None:
         if marker:
             found.append(marker)
     return found[-1] if found else None
+
+
+ID_RE = re.compile(r"^NL(-[A-Z2-7]{4}){4}$")
+
+
+def installation_id(conn: sqlite3.Connection) -> str:
+    """A random id of this installation (NL-XXXX-XXXX-XXXX-XXXX), kept in the database and in a marker file next to it. A trial key is made for one id, so it
+    cannot be shared. A restored backup keeps the id (the file wins); only a wiped data folder gives a new one."""
+    folder = _data_dir(conn)
+    found = None
+    if folder is not None:
+        try:
+            found = (folder / INSTALL_MARKER).read_text().strip()
+        except OSError:
+            found = None
+    if not (found and ID_RE.match(found)):
+        found = _setting(conn, INSTALL_SETTING)
+        if not (found and ID_RE.match(found)):
+            raw = base64.b32encode(secrets.token_bytes(10)).decode().rstrip("=")
+            found = "NL-" + "-".join(raw[i:i + 4] for i in range(0, 16, 4))
+    if _setting(conn, INSTALL_SETTING) != found:
+        _store(conn, INSTALL_SETTING, found)
+    if folder is not None:
+        try:
+            if not (folder / INSTALL_MARKER).exists() or (folder / INSTALL_MARKER).read_text().strip() != found:
+                (folder / INSTALL_MARKER).write_text(found + "\n")
+        except OSError:
+            pass
+    return found
 
 
 def _grace(payload: dict[str, Any]) -> int:
@@ -245,6 +278,8 @@ def install(conn: sqlite3.Connection, token: str, now: datetime | None = None) -
             raise LicenceError("this is not a valid Netlens licence key") from None
         if overdue > _grace(payload):
             raise LicenceError("this licence key has expired")
+    if payload.get("iid") and payload["iid"] != installation_id(conn):
+        raise LicenceError(f"this key was made for another installation ({payload['iid']}); this one is {installation_id(conn)}")
     if payload.get("trial"):
         used = _trial_key_used(conn)
         if used is not None and used != payload.get("id"):

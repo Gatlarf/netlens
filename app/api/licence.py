@@ -21,6 +21,7 @@ def _doc(conn) -> dict[str, Any]:
     from app import probes
 
     st = licence.status(conn)
+    st["installation_id"] = licence.installation_id(conn)
     st["sites_used"] = conn.execute("SELECT COUNT(*) FROM probes").fetchone()[0]
     st["sites_frozen"] = len(probes.locked_ids(conn))
     return st

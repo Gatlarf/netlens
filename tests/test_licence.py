@@ -240,3 +240,17 @@ def test_a_restored_database_does_not_forget_the_trial_key(conn, tmp_path):
     conn.commit()
     with pytest.raises(licence.LicenceError, match="trial can only be used once"):
         licence.install(conn, key("enterprise", expires="2027-01-30", trial=True, id="t6"), NOW)
+
+
+def test_a_key_made_for_one_installation_works_only_there(conn, tmp_path):
+    iid = licence.installation_id(conn)
+    assert licence.ID_RE.match(iid) and licence.installation_id(conn) == iid
+    licence.install(conn, key("enterprise", expires="2026-11-30", trial=True, id="b1", iid=iid), NOW)
+    other = key("enterprise", expires="2026-11-30", trial=True, id="b2", iid="NL-AAAA-BBBB-CCCC-DDDD")
+    with pytest.raises(licence.LicenceError, match="another installation"):
+        licence.install(conn, other, NOW)
+    # a key without an id (paid keys) works anywhere; a restored database keeps the id because the marker file wins
+    licence.install(conn, key("business"), NOW)
+    conn.execute("DELETE FROM settings WHERE key = ?", (licence.INSTALL_SETTING,))
+    conn.commit()
+    assert licence.installation_id(conn) == iid
